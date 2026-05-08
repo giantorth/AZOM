@@ -910,41 +910,48 @@ namespace MozaPlugin
             if (_activeTelemetry == null) return;
             var s = _settings;
 
-            // One-shot migration from legacy TelemetryProtocolVersion to FirmwareEra.
-            // Old saved values: 0 = URL tier-def; 2 = compact tier-def. Map to the
-            // 6-byte upload header variant (modern firmware default) since pre-
-            // migration installs had no wire-format setting and the auto-fallback
-            // covers a wrong guess. Fresh installs save -1 → no migration.
-            if (s.TelemetryProtocolVersion != -1
-                && s.TelemetryFirmwareEra == MozaFirmwareEra.Auto)
+            // One-shot legacy migration drainers. Both run only when the
+            // current TelemetryWheelEra is still Auto (= no explicit pick) so
+            // a user who has already chosen an era doesn't get reset.
+            if (s.TelemetryWheelEra == MozaWheelEra.Auto)
             {
-                s.TelemetryFirmwareEra = s.TelemetryProtocolVersion == 0
-                    ? MozaFirmwareEra.TierDefV0_Upload6B
-                    : MozaFirmwareEra.TierDefV2_Upload6B;
-                s.TelemetryProtocolVersion = -1;
+                // Old MozaFirmwareEra integer values, captured by the
+                // [JsonProperty("TelemetryFirmwareEra")] mapping on
+                // TelemetryFirmwareEraLegacy. -1 = sentinel (no legacy value).
+                if (s.TelemetryFirmwareEraLegacy >= 0)
+                {
+                    s.TelemetryWheelEra = s.TelemetryFirmwareEraLegacy switch
+                    {
+                        1 /* TierDefV2_Upload8B */ => MozaWheelEra.Era2025,
+                        2 /* TierDefV2_Upload6B */ => MozaWheelEra.Era2025,
+                        4 /* TierDefV0_Upload6B */ => MozaWheelEra.Era2024,
+                        5 /* TierDefV2_Type02   */ => MozaWheelEra.Era2026,
+                        _ /* 0 Auto or unknown  */ => MozaWheelEra.Auto,
+                    };
+                    s.TelemetryFirmwareEraLegacy = -1;
+                }
+                // Even older saved settings used the int property
+                // TelemetryProtocolVersion (0=URL, 2=compact). The plan
+                // corrects the prior 6B mapping so 0.8.0 VGS users land on
+                // Era2025 (working) instead of Era2026 (broken).
+                else if (s.TelemetryProtocolVersion != -1)
+                {
+                    s.TelemetryWheelEra = s.TelemetryProtocolVersion == 0
+                        ? MozaWheelEra.Era2024
+                        : MozaWheelEra.Era2025;
+                    s.TelemetryProtocolVersion = -1;
+                }
             }
 
-            // Map era → tier-def ProtocolVersion + file-transfer UploadWireFormat.
-            // Auto: optimistic Type02 default. SendTierDefinition downgrades
-            // UploadWireFormat to New2026_04 if the wheel's session-0x02 catalog
-            // never arrives (older firmware doesn't push one). Sub-msg-1 ack
-            // timeout further fallbacks 6B → 8B header for legacy 2025-11.
-            (int protocolVersion, FileTransferWireFormat wireFormat) = s.TelemetryFirmwareEra switch
-            {
-                MozaFirmwareEra.TierDefV2_Upload8B => (2, FileTransferWireFormat.Legacy2025_11),
-                MozaFirmwareEra.TierDefV2_Upload6B => (2, FileTransferWireFormat.New2026_04),
-                MozaFirmwareEra.TierDefV0_Upload6B => (0, FileTransferWireFormat.New2026_04),
-                MozaFirmwareEra.TierDefV2_Type02   => (2, FileTransferWireFormat.New2026_04_Type02),
-                _ /* Auto */                       => (2, FileTransferWireFormat.New2026_04_Type02),
-            };
-            // Old-pipeline-only settings (the new pipeline carries the equivalents
-            // through different channels — firmware era selection happens at the
-            // TierDefBuilder level, not as a flag on the host).
+            // Build the per-era policy and hand it to the v1 telemetry sender.
+            // EraPolicy.For carries every wire-protocol axis (tier-def session,
+            // encoding, preamble policy, blind-retransmit, upload header,
+            // protocol version). Auto returns a provisional Era2026 policy
+            // with IsAuto=true; TelemetrySender.ResolveAutoPolicy at session
+            // start replaces it once the wheel reveals itself.
             if (_telemetrySender != null)
             {
-                _telemetrySender.ProtocolVersion = protocolVersion;
-                _telemetrySender.UploadWireFormat = wireFormat;
-                _telemetrySender.AutoFallbackWireFormat = s.TelemetryFirmwareEra == MozaFirmwareEra.Auto;
+                _telemetrySender.Policy = EraPolicy.For(s.TelemetryWheelEra);
                 _telemetrySender.UploadDashboard = s.TelemetryUploadDashboard;
                 _telemetrySender.SetDownloadEnabled(s.TelemetryDownloadDashboard);
                 if (s.EnableAutoTestOnConnect)
@@ -1421,6 +1428,7 @@ namespace MozaPlugin
             _wheelPollMisses = 0;
             _lastKnownWheelModel = "";
         }
+
 
         private void PollStatus(object sender, ElapsedEventArgs e)
         {

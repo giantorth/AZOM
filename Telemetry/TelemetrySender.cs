@@ -39,6 +39,7 @@ namespace MozaPlugin.Telemetry
         // handshake (see SendGameStartHandshake).
         private volatile bool _gameStartHandshakePending;
         private volatile bool _dashSwitchMuted;
+        private bool[]? _tierDiagEmitted;
         private volatile bool _enabled;
         private int _tickCounter;
         private int _slowCounter;
@@ -111,6 +112,10 @@ namespace MozaPlugin.Telemetry
         private const int TierDefBlindMaxRounds = 12;
         private const int TierDefBlindIntervalMs = 200;
 
+        // True once ResolveAutoPolicy has run for this Start() cycle. Reset on
+        // every StartInner so each fresh connect re-evaluates the wheel.
+        private bool _autoResolutionDone;
+
         /// <summary>
         /// Outbound seq counter for session 0x01 (mgmt). Tier-def subscription
         /// flows here per PitHouse capture
@@ -128,23 +133,23 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         public byte UploadSessionOverride { get; set; } = 0;
 
-        /// <summary>
-        /// Wire format used to encode the upload sub-msg headers. Defaults to
-        /// <see cref="FileTransferWireFormat.Legacy2025_11"/> for backward
-        /// compatibility. Set to <see cref="FileTransferWireFormat.New2026_04"/>
-        /// when targeting 2026-04+ firmware.
-        /// </summary>
-        public FileTransferWireFormat UploadWireFormat { get; set; }
-            = FileTransferWireFormat.New2026_04;
+        // Active per-era policy. All wire-protocol axes (tier-def session,
+        // encoding, preamble policy, blind-retransmit, upload header, V0/V2
+        // value frames) are derived from this. Set by
+        // MozaPlugin.ApplyTelemetrySettings via the Policy property; mutated
+        // in place by ResolveAutoPolicy at session start (Auto only) and by
+        // the upload sub-msg-1 fallback path (Auto only).
+        private EraPolicy _policy = EraPolicy.For(MozaWheelEra.Auto);
 
         /// <summary>
-        /// When true, on sub-msg 1 ack timeout the upload retries with the
-        /// other wire format. Set true only when the era setting is Auto;
-        /// when the user picked a specific era, fallback is suppressed so
-        /// their choice is honoured (and the log reflects the picked format
-        /// instead of always converging on the fallback).
+        /// Active wheel-firmware era policy. Setter never accepts null —
+        /// substitutes Auto's optimistic Era2026 default if passed null.
         /// </summary>
-        public bool AutoFallbackWireFormat { get; set; } = true;
+        internal EraPolicy Policy
+        {
+            get => _policy;
+            set => _policy = value ?? EraPolicy.For(MozaWheelEra.Auto);
+        }
 
         // Session 0x09 configJson RPC state. Device proactively pushes its
         // dashboard state blob; we reply with the canonical dashboard library
@@ -390,6 +395,8 @@ namespace MozaPlugin.Telemetry
                 if (_testMode != value)
                 {
                     _testMode = value;
+                    if (value)
+                        _tierDiagEmitted = new bool[_tiers?.Length ?? 0];
                     MozaLog.Debug($"[Moza] TestMode changed to {value}");
                 }
             }
@@ -415,12 +422,11 @@ namespace MozaPlugin.Telemetry
             return f;
         }
 
-        /// <summary>
-        /// Tier definition protocol variant.
-        /// 0 = URL-based subscription (send channel URLs, wheel resolves compression).
-        /// 2 = Compact numeric, single batch (flag bytes, channel indices, compression codes, bit widths).
-        /// </summary>
-        public int ProtocolVersion { get; set; } = 2;
+        // ProtocolVersion / UploadWireFormat / AutoFallbackWireFormat removed —
+        // read from _policy directly (e.g. _policy.Encoding for V0 vs V2,
+        // _policy.UploadWireFormat for upload header, _policy.AutoFallbackUploadWireFormat
+        // for fallback gating). Value-frame paths use _policy.Encoding ==
+        // TierDefEncoding.V0Url instead of ProtocolVersion == 0.
 
         /// <summary>Channel URLs reported by the wheel during session startup. Null until parsed.</summary>
         public System.Collections.Generic.IReadOnlyList<string>? WheelChannelCatalog => _wheelChannelCatalog;
@@ -739,6 +745,26 @@ namespace MozaPlugin.Telemetry
 
         public void Stop()
         {
+            // Stop trace: log a synthetic stack via MozaLog so we can find
+            // every Stop call, including silent ones from inside StartInner's
+            // pre-init cleanup. Without this we can't tell why subscribers
+            // alternate between 1 and 2 mid-session.
+            try
+            {
+                var st = new System.Diagnostics.StackTrace(skipFrames: 1, fNeedFileInfo: false);
+                var frames = st.GetFrames();
+                var sb = new System.Text.StringBuilder();
+                int max = Math.Min(6, frames?.Length ?? 0);
+                for (int i = 0; i < max; i++)
+                {
+                    var f = frames![i];
+                    sb.Append(f.GetMethod()?.DeclaringType?.Name).Append('.').Append(f.GetMethod()?.Name);
+                    if (i < max - 1) sb.Append(" ← ");
+                }
+                MozaLog.Info($"[Moza] DIAG: TelemetrySender.Stop() called. caller chain: {sb}");
+            }
+            catch { }
+
             _enabled = false;
             _connection.MessageReceived -= OnMessageDuringPreamble;
             if (_sendTimer != null)
@@ -778,6 +804,7 @@ namespace MozaPlugin.Telemetry
             _session02OutboundSeq = 0;
             _session01OutboundSeq = 0;
             _tierDefPreambleSent = false;
+            _autoResolutionDone = false;
             _retransmitter.Clear();
             _tierDefBlindFrames = null;
             _lastSubscriptionDiag = null;
@@ -1567,6 +1594,12 @@ namespace MozaPlugin.Telemetry
         /// flag counter). False for initial connect (reset to 0).</param>
         private void ApplySubscription(bool force)
         {
+            // First-call era resolution. Auto-mode picks Era2024/2025/2026
+            // here based on the wheel's catalog push (or absence thereof) and
+            // its identity probe. After this returns, _policy is the final
+            // policy used for tier-def emission and value-frame routing.
+            ResolveAutoPolicy();
+
             MaybeSwapProfileForCatalog(force: force);
             if (_profile == null || _profile.Tiers.Count == 0)
                 return;
@@ -1595,6 +1628,65 @@ namespace MozaPlugin.Telemetry
                 $"[Moza] Subscription applied: \"{_profile.Name}\" " +
                 $"{chCount}ch/{_profile.Tiers.Count}t " +
                 $"catalog={_wheelChannelCatalog?.Count ?? -1}");
+        }
+
+        /// <summary>
+        /// One-shot auto-era resolution. When the user picked
+        /// <see cref="MozaWheelEra.Auto"/>, walk the available signals and
+        /// replace the provisional policy with a pinned one. Idempotent:
+        /// guarded by <see cref="_autoResolutionDone"/> so subsequent
+        /// dashboard-switch re-applications don't re-resolve mid-session.
+        /// </summary>
+        /// <remarks>
+        /// Decision order (per plan §3):
+        ///   1. <c>_wheelChannelCatalog</c> non-empty → Era2026 (catalog push
+        ///      is the strongest signal that the wheel speaks Type02).
+        ///   2. <c>EraPolicy.GuessFromWheelModel(WheelModelName)</c> hits →
+        ///      use that.
+        ///   3. Default to Era2025 (most-likely VGS-class wheel, matches 0.8.0
+        ///      working behavior for users with no catalog and no model match).
+        /// </remarks>
+        private void ResolveAutoPolicy()
+        {
+            if (!_policy.IsAuto) return;
+            if (_autoResolutionDone) return;
+            _autoResolutionDone = true;
+
+            MozaWheelEra resolved;
+            string reason;
+            int catalogCount = _wheelChannelCatalog?.Count ?? 0;
+            if (catalogCount > 0)
+            {
+                resolved = MozaWheelEra.Era2026;
+                reason = $"wheel-catalog={catalogCount}";
+            }
+            else
+            {
+                string modelName = MozaPlugin.Instance?.Data?.WheelModelName ?? "";
+                var guess = EraPolicy.GuessFromWheelModel(modelName);
+                if (guess.HasValue)
+                {
+                    resolved = guess.Value;
+                    reason = $"wheel-model=\"{modelName}\"";
+                }
+                else
+                {
+                    resolved = MozaWheelEra.Era2025;
+                    reason = $"default (no catalog, model=\"{modelName}\" unmatched)";
+                }
+            }
+
+            var newPolicy = EraPolicy.For(resolved);
+            // Preserve the Auto-mark so the upload-wire-format fallback stays
+            // available even after resolving. The wheel may accept tier-def
+            // under one wire format and need the other for the dashboard
+            // upload (different sub-msg layouts on different boards).
+            newPolicy.IsAuto = true;
+            if (resolved == MozaWheelEra.Era2026)
+                newPolicy.AutoFallbackUploadWireFormat = true;
+
+            _policy = newPolicy;
+            MozaLog.Info($"[Moza] Auto era resolved → {resolved} ({reason})");
         }
 
         /// <summary>
@@ -1627,7 +1719,7 @@ namespace MozaPlugin.Telemetry
             var catalog = _wheelChannelCatalog;
             if (catalog != null && catalog.Count > 0)
             {
-                if (ProtocolVersion == 0)
+                if (_policy.Encoding == TierDefEncoding.V0Url)
                 {
                     profile = BuildV0ProfileFromCatalog(profile, catalog);
                     int catalogCh = profile.Tiers[0].Channels.Count;
@@ -1642,137 +1734,167 @@ namespace MozaPlugin.Telemetry
                 // widget reads whichever channels it knows of.
             }
 
-            // PitHouse uses either session 0x01 or 0x02 for tier-def TLV
-            // depending on capture. BUT tier-def and FF records must be on
-            // SEPARATE sessions — mixing them garbles the session reassembler.
-            // FF records use session 0x02, so tier-def stays on 0x01.
-            byte tierDefSession = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
-            int seq = Math.Max(2, _session01OutboundSeq + 1);
-
-            // Collect all frames for blind retransmission after initial send.
-            if (ProtocolVersion == 0)
+            // Era-driven session pick. 2025-era VGS firmware accepts tier-def
+            // on FlagByte (probed, typically 0x02) — matches 0.8.0 (commit
+            // 5692099) working behavior. 2026-era firmware separates tier-def
+            // (mgmt port 0x01) from FF init records (telem port 0x02).
+            byte tierDefSession;
+            int seq;
+            if (_policy.TierDefSession == TierDefSessionPolicy.FlagByte)
             {
-                // Version 0: URL-based subscription.
-                // The sentinel (0xFF) and tag 0x03 (value=1) are inline in the message.
-                // No separate tag 0x07/0x03 preamble needed.
-                byte[] message = TierDefinitionBuilder.BuildV0UrlSubscription(profile);
-                var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq);
-
-                int channelCount = 0;
-                foreach (var t in profile.Tiers) channelCount += t.Channels.Count;
-                MozaLog.Debug(
-                    $"[Moza] Sending v0 URL subscription: " +
-                    $"{message.Length} bytes in {frames.Count} chunks " +
-                    $"on session 0x{tierDefSession:X2} ({channelCount} channels)");
-
-                foreach (var frame in frames)
-                    SendAndTrackChunk(frame);
-
-                _tierDefBlindFrames = frames.ToArray();
-                _tierDefBlindSentRounds = 0;
-                _tierDefBlindLastTickCount = Environment.TickCount;
-
-                _session01OutboundSeq = seq;
-
-                CaptureSubscriptionDiag(tierDefSession, "v0-url",
-                    System.Array.Empty<byte>(), message, profile);
+                tierDefSession = FlagByte;
+                seq = Math.Max(2, _session02OutboundSeq + 1);
             }
             else
             {
-                // Version 2: compact numeric tier definitions.
-                // Sub-message 1 preamble: tag 0x07 (version=2), tag 0x03 (value=0).
-                // PitHouse only sends this ONCE per session (at connect).
-                // Subsequent tier-def re-sends (dashboard switch) omit it —
-                // wheel rejects/ignores tier-def after a duplicate preamble.
-                int preambleChunkCount = 0;
-                if (!_tierDefPreambleSent)
-                {
-                    byte[] preambleMsg = new byte[]
-                    {
-                        0x07, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
-                        0x03, 0x00, 0x00, 0x00, 0x00
-                    };
-                    var preambleFrames = TierDefinitionBuilder.ChunkMessage(preambleMsg, tierDefSession, ref seq);
-                    foreach (var frame in preambleFrames)
-                        SendAndTrackChunk(frame);
-                    preambleChunkCount = preambleFrames.Count;
-                    _tierDefPreambleSent = true;
-                }
-
-                // Post-2026-04 CSP firmware (Type02 wire format) indexes channels
-                // by the wheel's advertised catalog order, not by host alphabetic
-                // order. Enables ARE still required (verified in
-                // `wireshark/csp/startup, change knob colors, ...pcapng` —
-                // PitHouse emits `00 01 00 00 00 [flag]` between every tier
-                // def). Match the capture format exactly so the wheel correlates
-                // value frames with subscribed channels.
-                bool cspIdx = UploadWireFormat == FileTransferWireFormat.New2026_04_Type02;
-                // Type02 firmware indexes channels by wheel-catalog position.
-                // Without catalog, falling through to legacy alphabetic indices
-                // double-counts duplicated channels in per-widget profiles and
-                // sends bogus indices the wheel can't bind. When user pinned a
-                // specific era we skip and retry; under Auto we downgrade the
-                // upload wire format to non-Type02 (older 2026-04 firmware
-                // accepts that path) and continue with alphabetic indices.
-                if (cspIdx && (_wheelChannelCatalog == null || _wheelChannelCatalog.Count == 0))
-                {
-                    MozaLog.Debug(
-                        "[Moza] No wheel catalog — using alphabetic indices for initial tier-def. " +
-                        "Wheel will push corrected catalog after receiving this.");
-                    cspIdx = false;
-                }
-                byte flagBase = _nextFlagBase;
-                var prevSub = _activeSubscription;
-
-                byte[] message;
-                if (cspIdx)
-                {
-                    message = TierDefinitionBuilder.BuildTierDefinitionMessage(
-                        profile, flagBase,
-                        includeEnableEntries: true,
-                        useWheelCatalogIndices: true,
-                        wheelCatalog: _wheelChannelCatalog,
-                        prevFlagBase: prevSub?.FlagBase,
-                        prevTierCount: prevSub?.TierCount ?? 0,
-                        prevSubPerBroadcast: prevSub?.SubTiersPerBroadcast ?? 0);
-                }
-                else
-                {
-                    message = TierDefinitionBuilder.BuildTierDefinitionV2(
-                        profile, flagBase, wheelCatalog: null);
-                }
-                var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq);
-
-                MozaLog.Debug(
-                    $"[Moza] Sending {(cspIdx ? "type02-section" : "v2-flat")} tier definition: " +
-                    $"flagBase=0x{flagBase:X2}, " +
-                    $"prev={(prevSub != null ? $"0x{prevSub.FlagBase:X2}/{prevSub.TierCount}t/{prevSub.SubTiersPerBroadcast}spb" : "none")}, " +
-                    $"preamble ({preambleChunkCount} chunks)" +
-                    $" + {message.Length} bytes in {frames.Count} chunks " +
-                    $"on session 0x{tierDefSession:X2} ({profile.Tiers.Count} tiers, " +
-                    $"idx={(cspIdx ? "wheel-catalog" : "alpha")})");
-
-                _activeSubscription = new SubscriptionState(
-                    flagBase: flagBase,
-                    tierCount: profile.Tiers.Count,
-                    subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile),
-                    profileName: profile.Name);
-                System.Threading.Interlocked.Increment(ref _subscriptionGen);
-                _nextFlagBase = (byte)(flagBase + profile.Tiers.Count);
-
-                foreach (var frame in frames)
-                    SendAndTrackChunk(frame);
-
-                _tierDefBlindFrames = frames.ToArray();
-                _tierDefBlindSentRounds = 0;
-                _tierDefBlindLastTickCount = Environment.TickCount;
-
-                _session01OutboundSeq = seq;
-
-                CaptureSubscriptionDiag(tierDefSession,
-                    cspIdx ? "v2-type02" : "v2-compact",
-                    System.Array.Empty<byte>(), message, profile);
+                tierDefSession = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
+                seq = Math.Max(2, _session01OutboundSeq + 1);
             }
+
+            // Send wrapper: under blind-retransmit policy (Era2026), every
+            // tier-def chunk is also tracked by the session retransmitter and
+            // captured for the tick-loop blind-retx replay (~10 rounds at
+            // 200ms). Era2024/2025 send raw and skip the capture so the wheel
+            // sees a single emission — matches 0.8.0 behavior.
+            void Send(byte[] frame)
+            {
+                if (_policy.BlindRetransmitTierDef)
+                    SendAndTrackChunk(frame);
+                else
+                    _connection.Send(frame);
+            }
+
+            switch (_policy.Encoding)
+            {
+                case TierDefEncoding.V0Url:
+                {
+                    // V0: URL-based subscription. Sentinel 0xFF + tag 0x03 inline.
+                    // No separate tag 0x07/0x03 preamble.
+                    byte[] message = TierDefinitionBuilder.BuildV0UrlSubscription(profile);
+                    var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq);
+
+                    int channelCount = 0;
+                    foreach (var t in profile.Tiers) channelCount += t.Channels.Count;
+                    MozaLog.Debug(
+                        $"[Moza] Sending v0 URL subscription: " +
+                        $"{message.Length} bytes in {frames.Count} chunks " +
+                        $"on session 0x{tierDefSession:X2} ({channelCount} channels)");
+
+                    foreach (var frame in frames)
+                        Send(frame);
+
+                    if (_policy.BlindRetransmitTierDef)
+                    {
+                        _tierDefBlindFrames = frames.ToArray();
+                        _tierDefBlindSentRounds = 0;
+                        _tierDefBlindLastTickCount = Environment.TickCount;
+                    }
+
+                    CaptureSubscriptionDiag(tierDefSession, "v0-url",
+                        System.Array.Empty<byte>(), message, profile);
+                    break;
+                }
+
+                case TierDefEncoding.V2Compact:
+                case TierDefEncoding.V2Type02:
+                {
+                    // V2 preamble: tag 0x07 (version=2), tag 0x03 (value=0).
+                    // 2025-era firmware needs it on every tier-def send;
+                    // 2026-era firmware only accepts it once per connect.
+                    bool emitPreamble = _policy.SendV2PreambleEverySend
+                                        || !_tierDefPreambleSent;
+                    int preambleChunkCount = 0;
+                    if (emitPreamble)
+                    {
+                        byte[] preambleMsg = new byte[]
+                        {
+                            0x07, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+                            0x03, 0x00, 0x00, 0x00, 0x00
+                        };
+                        var preambleFrames = TierDefinitionBuilder.ChunkMessage(preambleMsg, tierDefSession, ref seq);
+                        foreach (var frame in preambleFrames)
+                            Send(frame);
+                        preambleChunkCount = preambleFrames.Count;
+                        _tierDefPreambleSent = true;
+                    }
+
+                    // Type02 firmware indexes channels by wheel-catalog position.
+                    // Without a catalog, fall through to alphabetic indices —
+                    // sending the catalog-indexed form against an empty catalog
+                    // produces all chIdx=0 entries the wheel can't bind. Under
+                    // Auto, ResolveAutoPolicy already downgraded to Era2025 if
+                    // no catalog arrived; this guard catches the rare race
+                    // where a pinned Era2026 wheel fails to push its catalog
+                    // in the WaitForChannelCatalogQuiet window.
+                    bool cspIdx = _policy.Encoding == TierDefEncoding.V2Type02;
+                    if (cspIdx && (_wheelChannelCatalog == null || _wheelChannelCatalog.Count == 0))
+                    {
+                        MozaLog.Debug(
+                            "[Moza] No wheel catalog — using alphabetic indices for initial tier-def. " +
+                            "Wheel will push corrected catalog after receiving this.");
+                        cspIdx = false;
+                    }
+                    byte flagBase = _nextFlagBase;
+                    var prevSub = _activeSubscription;
+
+                    byte[] message;
+                    if (cspIdx)
+                    {
+                        message = TierDefinitionBuilder.BuildTierDefinitionMessage(
+                            profile, flagBase,
+                            includeEnableEntries: true,
+                            useWheelCatalogIndices: true,
+                            wheelCatalog: _wheelChannelCatalog,
+                            prevFlagBase: prevSub?.FlagBase,
+                            prevTierCount: prevSub?.TierCount ?? 0,
+                            prevSubPerBroadcast: prevSub?.SubTiersPerBroadcast ?? 0);
+                    }
+                    else
+                    {
+                        message = TierDefinitionBuilder.BuildTierDefinitionV2(
+                            profile, flagBase, wheelCatalog: null);
+                    }
+                    var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq);
+
+                    MozaLog.Debug(
+                        $"[Moza] Sending {(cspIdx ? "type02-section" : "v2-flat")} tier definition: " +
+                        $"flagBase=0x{flagBase:X2}, " +
+                        $"prev={(prevSub != null ? $"0x{prevSub.FlagBase:X2}/{prevSub.TierCount}t/{prevSub.SubTiersPerBroadcast}spb" : "none")}, " +
+                        $"preamble ({preambleChunkCount} chunks)" +
+                        $" + {message.Length} bytes in {frames.Count} chunks " +
+                        $"on session 0x{tierDefSession:X2} ({profile.Tiers.Count} tiers, " +
+                        $"idx={(cspIdx ? "wheel-catalog" : "alpha")})");
+
+                    _activeSubscription = new SubscriptionState(
+                        flagBase: flagBase,
+                        tierCount: profile.Tiers.Count,
+                        subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile),
+                        profileName: profile.Name);
+                    System.Threading.Interlocked.Increment(ref _subscriptionGen);
+                    _nextFlagBase = (byte)(flagBase + profile.Tiers.Count);
+
+                    foreach (var frame in frames)
+                        Send(frame);
+
+                    if (_policy.BlindRetransmitTierDef)
+                    {
+                        _tierDefBlindFrames = frames.ToArray();
+                        _tierDefBlindSentRounds = 0;
+                        _tierDefBlindLastTickCount = Environment.TickCount;
+                    }
+
+                    CaptureSubscriptionDiag(tierDefSession,
+                        cspIdx ? "v2-type02" : "v2-compact",
+                        System.Array.Empty<byte>(), message, profile);
+                    break;
+                }
+            }
+
+            // Persist the new seq counter on whichever session we used.
+            if (_policy.TierDefSession == TierDefSessionPolicy.FlagByte)
+                _session02OutboundSeq = seq;
+            else
+                _session01OutboundSeq = seq;
         }
 
         /// <summary>
@@ -1992,11 +2114,11 @@ namespace MozaPlugin.Telemetry
             // sub-msg 1 ack timeout, fall back to the other format.
             bool fellBack = false;
             DashboardUploader.UploadPayload upload =
-                DashboardUploader.BuildUpload(content, dashboardName, token, tsMs, UploadWireFormat);
+                DashboardUploader.BuildUpload(content, dashboardName, token, tsMs, _policy.UploadWireFormat);
 
             MozaLog.Debug(
                 $"[Moza] Uploading dashboard \"{dashboardName}\" via session 0x{uploadSess:X2} " +
-                $"(wire={UploadWireFormat}): " +
+                $"(wire={_policy.UploadWireFormat}): " +
                 $"raw={upload.UncompressedSize}B md5={upload.Md5Hex} token=0x{token:X8}");
 
             _uploadSubMsg1Response.Reset();
@@ -2019,28 +2141,29 @@ namespace MozaPlugin.Telemetry
             if (!_uploadSubMsg1Response.Wait(2000))
             {
                 // Probe fallback: flip wire format and retry sub-msg 1 once.
-                // Only runs when AutoFallbackWireFormat is true (era=Auto). When
-                // the user picked a specific era we honour it strictly so the
-                // logged wire format reflects their choice and a wedged upload
-                // is diagnosable instead of always converging on the fallback.
-                if (!AutoFallbackWireFormat)
+                // Only runs when policy.AutoFallbackUploadWireFormat is true
+                // (era=Auto). When the user picked a specific era we honour it
+                // strictly so the logged wire format reflects their choice and
+                // a wedged upload is diagnosable instead of always converging
+                // on the fallback.
+                if (!_policy.AutoFallbackUploadWireFormat)
                 {
                     MozaLog.Warn(
                         $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack timeout with " +
-                        $"wire={UploadWireFormat} — fallback disabled (era pinned by user)");
+                        $"wire={_policy.UploadWireFormat} — fallback disabled (era pinned by user)");
                 }
                 else
                 {
-                    var fallback = UploadWireFormat == FileTransferWireFormat.New2026_04
+                    var fallback = _policy.UploadWireFormat == FileTransferWireFormat.New2026_04
                         ? FileTransferWireFormat.Legacy2025_11
                         : FileTransferWireFormat.New2026_04;
                     MozaLog.Warn(
                         $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack timeout with " +
-                        $"wire={UploadWireFormat} — retrying with wire={fallback}");
+                        $"wire={_policy.UploadWireFormat} — retrying with wire={fallback}");
 
-                    UploadWireFormat = fallback;
+                    _policy.UploadWireFormat = fallback;
                     fellBack = true;
-                    upload = DashboardUploader.BuildUpload(content, dashboardName, token, tsMs, UploadWireFormat);
+                    upload = DashboardUploader.BuildUpload(content, dashboardName, token, tsMs, _policy.UploadWireFormat);
 
                     _uploadSubMsg1Response.Reset();
                     _uploadSubMsg2Response.Reset();
@@ -2059,10 +2182,10 @@ namespace MozaPlugin.Telemetry
                     if (!_uploadSubMsg1Response.Wait(2000))
                         MozaLog.Warn(
                             $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack timeout on fallback " +
-                            $"wire={UploadWireFormat} — wheel may not be in upload-ready state");
+                            $"wire={_policy.UploadWireFormat} — wheel may not be in upload-ready state");
                     else
                         MozaLog.Debug(
-                            $"[Moza] Wire format auto-detected: wheel accepts {UploadWireFormat} " +
+                            $"[Moza] Wire format auto-detected: wheel accepts {_policy.UploadWireFormat} " +
                             "(cached for this session)");
                 }
             }
@@ -2419,6 +2542,23 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         private void OnMessageDuringPreamble(byte[] data)
         {
+            // Top-of-handler DIAG: snapshot every C3/71/7C session-data frame
+            // for sessions 0x09/0x0a so we can prove whether the handler is
+            // actually reached for chunks that the WIRE log shows arriving.
+            // Placed BEFORE the _enabled / data.Length / data[0] / data[1]
+            // gates so we can see whether one of those gates is dropping the
+            // chunk too.
+            if (data != null && data.Length >= 8 && data[0] == 0xC3 && data[1] == 0x71
+                && data[2] == 0x7C && data[3] == 0x00
+                && (data[4] == 0x09 || data[4] == 0x0A))
+            {
+                int seq = data[6] | (data[7] << 8);
+                MozaLog.Info(
+                    $"[Moza] DIAG: OnMessageDuringPreamble TOP for sess=0x{data[4]:X2} " +
+                    $"type=0x{data[5]:X2} seq={seq} dataLen={data.Length} " +
+                    $"_enabled={_enabled} _preambleComplete={_preambleComplete}");
+            }
+
             if (!_enabled)
                 return;
 
@@ -2502,11 +2642,35 @@ namespace MozaPlugin.Telemetry
                     // Per-session inbound counter for diag tab.
                     BumpSessionCount(session, outbound: false);
 
+                    // Diagnostic: trace every type=0x01 chunk arrival for the
+                    // configJson sessions. Pairs with the WIRE log in
+                    // MozaSerialConnection so we can see whether a chunk
+                    // logged at the read layer reaches the dispatch layer
+                    // (and which branch swallows it).
+                    if (session == 0x09 || session == 0x0a)
+                    {
+                        MozaLog.Info(
+                            $"[Moza] DIAG: OnMessageDuringPreamble entered for sess=0x{session:X2} " +
+                            $"seq={seq} payload={chunkPayload.Length}B " +
+                            $"_enabled={_enabled} _preambleComplete={_preambleComplete}");
+                    }
+
                     // Dispatcher-owned sessions: route exclusively through
                     // dispatcher and ack. Skip all legacy if-chains below.
                     var owner = _dispatcher.GetOwner(session);
                     if (owner != null)
                     {
+                        // Diagnostic: surface unexpected ownership of
+                        // configJson sessions. v1 pipeline does NOT claim
+                        // 0x09/0x0a — anything taking them out of the legacy
+                        // path means dashboard-state decode is dead.
+                        if (session == 0x09 || session == 0x0a)
+                        {
+                            MozaLog.Info(
+                                $"[Moza] DIAG: session 0x{session:X2} chunk seq={seq} routed " +
+                                $"via dispatcher to {owner.GetType().Name} " +
+                                $"(legacy configJson handler bypassed)");
+                        }
                         SendSessionAck(session, (ushort)seq);
                         _dispatcher.DispatchData(session, seq, chunkPayload);
                         return;
@@ -2601,6 +2765,13 @@ namespace MozaPlugin.Telemetry
                     // firmware uses, and the parser drops malformed blobs.
                     if (session == 0x09 || session == 0x0a)
                     {
+                        // Diagnostic: confirm legacy configJson branch entered.
+                        // Pairs with the upstream "DIAG: OnMessageDuringPreamble entered"
+                        // log so we know chunks are actually reaching here vs being
+                        // dropped between subscribers. INFO so it's not filtered out.
+                        MozaLog.Info(
+                            $"[Moza] DIAG: legacy configJson branch entered for sess=0x{session:X2} " +
+                            $"seq={seq} chunkLen={chunkPayload.Length}");
                         SendSessionAck(session, (ushort)seq);
                         if (session == 0x09) _session09InboundSeq = seq;
                         try
@@ -3046,7 +3217,7 @@ namespace MozaPlugin.Telemetry
                 // Post-renegotiation diagnostic: log first few ticks
                 if (_postRenegDiagTicks > 0)
                 {
-                    bool useV0Diag = ProtocolVersion == 0;
+                    bool useV0Diag = _policy.Encoding == TierDefEncoding.V0Url;
                     MozaLog.Debug(
                         $"[Moza] TICK DIAG: tiers={tiers.Length} " +
                         $"testMode={TestMode} gameRunning={_gameRunning} " +
@@ -3083,8 +3254,8 @@ namespace MozaPlugin.Telemetry
                 // kind=10 standby) — verified by histogramming all FF kinds in
                 // capture. Earlier comment claiming Type02 uses V0 FF for
                 // telemetry was wrong. V0 FF is only for true V0 URL
-                // subscription (ProtocolVersion == 0).
-                bool useV0Values = ProtocolVersion == 0;
+                // subscription (Era2024 / TierDefEncoding.V0Url).
+                bool useV0Values = _policy.Encoding == TierDefEncoding.V0Url;
                 if (useV0Values)
                 {
                     // V0 / Type02 firmware: emit per-channel value frames only
@@ -3116,6 +3287,20 @@ namespace MozaPlugin.Telemetry
                         byte[] frame = TestMode
                             ? tier.Builder.BuildTestFrame(flagByte)
                             : tier.Builder.BuildFrameFromSnapshot(snapshot, flagByte);
+
+                        // Diagnostic: log first emission of each tier after test mode starts
+                        if (TestMode && _tierDiagEmitted != null && i < _tierDiagEmitted.Length && !_tierDiagEmitted[i])
+                        {
+                            _tierDiagEmitted[i] = true;
+                            var p = tier.Builder.Profile;
+                            MozaLog.Debug(
+                                $"[Moza] TIER-EMIT t[{i}] flag=0x{flagByte:X2} " +
+                                $"tickInterval={tier.TickInterval} " +
+                                $"name={p?.Name ?? "?"} ch={p?.Channels?.Count ?? 0} " +
+                                $"bits={p?.TotalBits ?? 0} bytes={p?.TotalBytes ?? 0} " +
+                                $"frameLen={frame.Length}");
+                        }
+
                         // Latest-wins per tier: if the last frame for this tier is still
                         // queued (e.g. write thread stalled under Wine syscall overhead),
                         // overwrite it so the wheel gets the freshest snapshot instead

@@ -835,18 +835,17 @@
                         <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
                                    Text="Download dashboard files stored on the wheel.  Experimental."/>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                            <TextBlock Text="Wire protocol:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Wheel firmware era:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <ComboBox x:Name="FirmwareEraCombo" Width="500"
                                       SelectionChanged="FirmwareEra_Changed">
-                                <ComboBoxItem Content="Auto — detect Type02 from wheel catalog, fall back to legacy"/>
-                                <ComboBoxItem Content="Compact tier-def + 8-byte upload header (legacy 2025-11)"/>
-                                <ComboBoxItem Content="Compact tier-def + 6-byte upload header (2026-04 pre-Type02)"/>
-                                <ComboBoxItem Content="URL tier-def + 6-byte upload header (CSP on R9)"/>
-                                <ComboBoxItem Content="Compact tier-def + Type02 metadata (R5+W17, KS Pro)"/>
+                                <ComboBoxItem Content="Auto — detect from wheel handshake"/>
+                                <ComboBoxItem Content="2024 era — R9 / older CSP (URL subscription)"/>
+                                <ComboBoxItem Content="2025 era — VGS / GS V2P / F1"/>
+                                <ComboBoxItem Content="2026 era — R5+W17 / KS Pro / post-2026-04 CSP"/>
                             </ComboBox>
                         </StackPanel>
                         <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,2,0,8"
-                                   Text="Two axes: tier-def format (compact numeric vs URL subscription) and dashboard-upload sub-msg header size (8-byte vs 6-byte). Auto picks safe defaults with one-time auto-fallback on upload timeout. Override only if uploads or telemetry stay broken. Telemetry restarts automatically on change."/>
+                                   Text="Auto detects the wheel's firmware era from its handshake (catalog push and identity) and picks the matching wire protocol. Override only if telemetry stays broken — pick the era that matches your wheel hardware. Telemetry restarts automatically on change."/>
 
                         <!-- Hidden for now: v2 telemetry pipeline not ready for general use
                         <CheckBox x:Name="UseNewTelemetryPipelineCheck"

@@ -1123,7 +1123,7 @@ namespace MozaPlugin
                 var s = _plugin.Settings;
                 UploadDashboardCheck.IsChecked = s.TelemetryUploadDashboard;
                 DownloadDashboardCheck.IsChecked = s.TelemetryDownloadDashboard;
-                FirmwareEraCombo.SelectedIndex = FirmwareEraToIndex(s.TelemetryFirmwareEra);
+                FirmwareEraCombo.SelectedIndex = (int)s.TelemetryWheelEra;
                 // Hidden for now: v2 telemetry pipeline UI not shown
                 // UseNewTelemetryPipelineCheck.IsChecked = s.UseNewTelemetryPipeline;
             }
@@ -1152,7 +1152,13 @@ namespace MozaPlugin
         private void FirmwareEra_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
-            _plugin.Settings.TelemetryFirmwareEra = FirmwareEraFromIndex(FirmwareEraCombo.SelectedIndex);
+            // MozaWheelEra values are contiguous 0..3 matching ComboBox indices —
+            // direct cast. -1 (no selection) clamps to Auto so the plugin stays
+            // in a valid state even if the combo is somehow deselected.
+            int idx = FirmwareEraCombo.SelectedIndex;
+            _plugin.Settings.TelemetryWheelEra = (idx >= 0 && idx <= 3)
+                ? (MozaWheelEra)idx
+                : MozaWheelEra.Auto;
             _plugin.SaveSettings();
             _plugin.RestartTelemetry();
         }
@@ -1168,35 +1174,6 @@ namespace MozaPlugin
         //     // call RestartTelemetry() so the active pipeline goes through Stop/Start.
         //     _plugin.RestartTelemetry();
         // }
-
-        private static int FirmwareEraToIndex(MozaFirmwareEra era)
-        {
-            // Index ↔ enum: dropped V0+8B (was 3) and V0+Type02 (was 6) on
-            // 2026-04-30 — never live-tested. Stale settings still containing
-            // those enum values default to Auto.
-            switch (era)
-            {
-                case MozaFirmwareEra.Auto:               return 0;
-                case MozaFirmwareEra.TierDefV2_Upload8B: return 1;
-                case MozaFirmwareEra.TierDefV2_Upload6B: return 2;
-                case MozaFirmwareEra.TierDefV0_Upload6B: return 3;
-                case MozaFirmwareEra.TierDefV2_Type02:   return 4;
-                default: return 0;
-            }
-        }
-
-        private static MozaFirmwareEra FirmwareEraFromIndex(int index)
-        {
-            switch (index)
-            {
-                case 0: return MozaFirmwareEra.Auto;
-                case 1: return MozaFirmwareEra.TierDefV2_Upload8B;
-                case 2: return MozaFirmwareEra.TierDefV2_Upload6B;
-                case 3: return MozaFirmwareEra.TierDefV0_Upload6B;
-                case 4: return MozaFirmwareEra.TierDefV2_Type02;
-                default: return MozaFirmwareEra.Auto;
-            }
-        }
 
         // ── Diagnostics tab ─────────────────────────────────────────────
         private void RefreshDiagnosticsTab()
@@ -1352,11 +1329,16 @@ namespace MozaPlugin
             sb.AppendLine($"FramesSent:         {_plugin.FramesSentForDiagnostics}");
             sb.AppendLine($"DisplayDetected:    {(ts?.DisplayDetected ?? _plugin.IsDisplayDetected)}");
             sb.AppendLine($"DisplayModelName:   {Blank(ts?.DisplayModelName ?? _plugin.DisplayModelName)}");
-            sb.AppendLine($"FirmwareEra:        {_plugin.Settings.TelemetryFirmwareEra}");
+            sb.AppendLine($"WheelEra:           {_plugin.Settings.TelemetryWheelEra}");
             if (ts != null)
             {
-                sb.AppendLine($"ProtocolVersion:    {ts.ProtocolVersion}");
-                sb.AppendLine($"UploadWireFormat:   {ts.UploadWireFormat}");
+                var p = ts.Policy;
+                sb.AppendLine($"PolicyEra:          {p.Era}{(p.IsAuto ? " (auto)" : "")}");
+                sb.AppendLine($"TierDefSession:     {p.TierDefSession}");
+                sb.AppendLine($"Encoding:           {p.Encoding}");
+                sb.AppendLine($"PreambleEverySend:  {p.SendV2PreambleEverySend}");
+                sb.AppendLine($"BlindRetransmit:    {p.BlindRetransmitTierDef}");
+                sb.AppendLine($"UploadWireFormat:   {p.UploadWireFormat}");
                 sb.AppendLine($"FlagByte:           0x{ts.FlagByte:X2}");
                 sb.AppendLine($"UploadDashboard:    {ts.UploadDashboard}");
                 sb.Append    ($"Profile:            {ts.Profile?.Name ?? "(none)"}");

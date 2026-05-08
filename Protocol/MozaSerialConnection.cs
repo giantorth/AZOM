@@ -164,7 +164,15 @@ namespace MozaPlugin.Protocol
 
             // Try the last known port first to avoid re-probing (which
             // opens/closes the port and can reset the device under Wine).
-            if (_lastPortName != null && TryOpen(_lastPortName))
+            // Check `_activePorts` first so a peer connection (wheelbase vs
+            // AB9 with the same saved port) doesn't grab a port already
+            // claimed — Wine allows the dual-open and silently splits the
+            // byte stream between the two readers, which then loses ~half of
+            // each wheel response (visible as missing session 0x09 chunks
+            // and false "AB9 shifter detected" on a base-only setup).
+            if (_lastPortName != null
+                && !_activePorts.ContainsKey(_lastPortName)
+                && TryOpen(_lastPortName))
                 return true;
 
             var (portName, pid, viaHubProbe) = FindMozaPort(_pidFilter, _probeTarget, () => _shutdownRequested);
@@ -510,6 +518,21 @@ namespace MozaPlugin.Protocol
                                 $"totalLen={data.Length} payload={bodyLen}B first8={first8}");
                         }
                         SerialTrafficCapture.Instance.RecordRx(CaptureLabel, data);
+                        // Pre-Invoke DIAG: prove whether MessageReceived is
+                        // actually invoked for sess=0x09/0x0a chunks. The WIRE
+                        // log above fires for every frame; if this DIAG is
+                        // missing for a chunk, Invoke wasn't called (and the
+                        // bug is in this read loop).
+                        if (data.Length >= 8 && data[0] == 0xC3 && data[1] == 0x71
+                            && data[2] == 0x7C && data[3] == 0x00
+                            && (data[4] == 0x09 || data[4] == 0x0A))
+                        {
+                            int seq = data[6] | (data[7] << 8);
+                            int subCount = MessageReceived?.GetInvocationList().Length ?? 0;
+                            MozaLog.Info(
+                                $"[Moza] DIAG: pre-Invoke for sess=0x{data[4]:X2} " +
+                                $"type=0x{data[5]:X2} seq={seq} subscribers={subCount}");
+                        }
                         MessageReceived?.Invoke(data);
                         // Move cursor past the consumed wire bytes.
                         cursor = wirePos;
