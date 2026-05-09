@@ -917,7 +917,7 @@
                                    Foreground="Gray" FontSize="11" Text="—"/>
                     </StackPanel>
                     <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
-                               Text="Dashboards the wheel reports via session 0x09 configJson state. Select a row and click Delete to issue a `completelyRemove` RPC on session 0x0a. List refreshes after every upload + on connect."/>
+                               Text="Dashboards the wheel reports via session 0x09 configJson state. Delete is temporarily disabled — the `completelyRemove` RPC currently wedges firmware until the wheelbase is power-cycled. List refreshes after every upload + on connect."/>
                     <DataGrid x:Name="WheelFilesGrid" AutoGenerateColumns="False" IsReadOnly="True"
                               CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
                               SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
@@ -933,7 +933,9 @@
                                     <DataTemplate>
                                         <Button Content="Delete" Padding="6,1"
                                                 Click="WheelFilesDelete_Click"
-                                                Tag="{Binding}"/>
+                                                Tag="{Binding}"
+                                                IsEnabled="False"
+                                                ToolTip="Disabled — completelyRemove RPC currently wedges wheel firmware until the wheelbase is power-cycled."/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

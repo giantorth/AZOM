@@ -1381,6 +1381,20 @@ namespace MozaPlugin
         private string BuildWheelCatalogText()
         {
             var sb = new System.Text.StringBuilder();
+
+            // Parser internals — top-of-section so the cause of an empty catalog
+            // is visible at a glance. Buffer>0 + count=0 = chunks fed but no URL
+            // records found (wrong session? wrong record format?). CrcRejects>0
+            // + count=0 = chunks reaching us but failing CRC. ActivityMs<0 = no
+            // chunks ever delivered to parser.
+            var pd = _plugin.CatalogParserDiagnostics;
+            string activity = pd.LastActivityMsAgo < 0
+                ? "never"
+                : $"{pd.LastActivityMsAgo} ms ago";
+            sb.AppendLine(
+                $"Parser: buf={pd.BufferBytes}B (last parsed {pd.LastParsedBufferBytes}B) " +
+                $"crcRejects={pd.CrcRejects} lastActivity={activity}");
+
             var catalog = _plugin.WheelChannelCatalogForDiagnostics;
             if (catalog != null && catalog.Count > 0)
             {
@@ -2135,6 +2149,12 @@ namespace MozaPlugin
 
         private void WheelFilesDelete_Click(object sender, RoutedEventArgs e)
         {
+            // Temporarily neutered: completelyRemove RPC wedges wheel firmware until
+            // the wheelbase is power-cycled. Button is also IsEnabled="False" in XAML;
+            // this guard is defensive in case the XAML flag is flipped without
+            // re-validating the RPC behaviour. Remove both when the firmware path is fixed.
+            return;
+#pragma warning disable CS0162 // Unreachable code — preserved scaffolding
             if (((Button)sender).Tag is not WheelFileRow row) return;
             if (string.IsNullOrEmpty(row.Id))
             {
@@ -2167,6 +2187,7 @@ namespace MozaPlugin
             // Wheel pushes a refreshed configJson state after completelyRemove —
             // the next 500ms timer tick will refresh the grid via
             // RefreshWheelFilesTab → ts.WheelState.
+#pragma warning restore CS0162
         }
 
         // ===== AB9 Active Shifter Tab =====

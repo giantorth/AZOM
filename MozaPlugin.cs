@@ -894,6 +894,24 @@ namespace MozaPlugin
         internal System.Collections.Generic.IReadOnlyList<string>? WheelChannelCatalogForDiagnostics =>
             _telemetrySender?.WheelChannelCatalog ?? _telemetryHost?.WheelChannelCatalog;
 
+        // Catalog-parser internals for the diag tab. Surfaces buffer/parse/CRC
+        // counters so we can tell at a glance why a missing catalog is missing.
+        // Old pipeline only — new pipeline uses CatalogConsumer with a different
+        // shape, which already surfaces its state via WheelChannelCatalog above.
+        internal (int BufferBytes, int LastParsedBufferBytes, int CrcRejects, int LastActivityMsAgo)
+            CatalogParserDiagnostics
+        {
+            get
+            {
+                var s = _telemetrySender;
+                if (s == null) return (0, 0, 0, -1);
+                int lastAct = s.CatalogLastActivityTickMs;
+                int ago = lastAct == 0 ? -1 : Environment.TickCount - lastAct;
+                return (s.CatalogBufferLength, s.CatalogLastParsedBufferLen,
+                        s.CatalogCrcRejects, ago);
+            }
+        }
+
         // Per-session traffic counters (in/out chunk counts).
         internal System.Collections.Generic.IReadOnlyDictionary<byte, (int In, int Out)>? SessionCountsForDiagnostics =>
             (System.Collections.Generic.IReadOnlyDictionary<byte, (int In, int Out)>?)_telemetrySender?.SessionCounts

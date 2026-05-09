@@ -716,6 +716,17 @@ namespace MozaPlugin.Telemetry
         internal int ActiveTierCount => _tiers?.Length ?? 0;
         public string? ActiveProfileName => _profile?.Name;
         internal int CatalogChannelCount => _catalogParser.Count;
+
+        // Catalog-parser internals for the Diagnostics tab. Exposes "why is the
+        // wheel-catalog list empty in diag" answers without forcing the user to
+        // enable debug logging — at a glance you can tell whether chunks are
+        // arriving (BufferLength>0), being rejected (CrcRejects>0), or simply
+        // never reaching the catalog session in the first place (LastActivity
+        // is "never").
+        internal int CatalogBufferLength => _catalogParser.BufferLength;
+        internal int CatalogLastParsedBufferLen => _catalogParser.LastParsedBufferLen;
+        internal int CatalogLastActivityTickMs => _catalogParser.LastActivityMs;
+
         private DashboardSwitchAutoTest? _autoTest;
 
         public TelemetrySender(MozaSerialConnection connection)
