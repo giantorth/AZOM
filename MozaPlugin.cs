@@ -1260,14 +1260,15 @@ namespace MozaPlugin
             var sender = _telemetrySender;
             if (sender != null && sender.Enabled)
             {
-                sender.MuteForDashSwitch();
-                MozaLog.Debug("[Moza] OnActiveDashboardChanged: muted value frames, scheduling renegotiation");
+                MozaLog.Debug("[Moza] OnActiveDashboardChanged: scheduling Stop+Start pipeline cycle");
 
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    Thread.Sleep(1500);
-                    sender.RenegotiateForDashboardSwitch();
-                });
+                // Same pattern as OnDashboardSwitched. Builtin-profile fallback
+                // path (user picked "(none)" or a non-Custom profile name with
+                // no wheel-state available) — re-stage settings and cycle the
+                // pipeline. Silence gate inside StartInner enforces the
+                // ~11s wheel sess=0x09 timeout wait automatically.
+                ApplyTelemetrySettings();
+                sender.RestartForSwitch();
                 return;
             }
 

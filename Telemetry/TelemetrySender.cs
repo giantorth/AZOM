@@ -13,12 +13,11 @@ namespace MozaPlugin.Telemetry
     /// 3-boolean soup (_enabled / _preambleComplete / _dashSwitchMuted) with
     /// a single explicit enum so the legal transitions are obvious.
     ///
-    /// Linear progression: Idle → Starting → Preamble → Active. Active loops
-    /// through DashSwitchMuted whenever the wheel switches dashboards. Stop()
-    /// returns from any state to Idle. Dashswitch entry guards check that we
-    /// are currently Active so a switch requested before preamble completes
-    /// is a no-op (matches the original boolean's effective behavior, which
-    /// was masked by the preamble-only return path in OnTimerElapsedInner).
+    /// Linear progression: Idle → Starting → Preamble → Active. Stop()
+    /// returns from any state to Idle. Dashboard switches go through a full
+    /// pipeline cycle (Stop+Start) via <c>RestartForSwitch</c> rather than
+    /// any in-place state transition; the prior <c>DashSwitchMuted</c>
+    /// sub-state was retired with the renegotiate-in-place code path.
     /// </summary>
     internal enum TelemetryState
     {
@@ -31,11 +30,6 @@ namespace MozaPlugin.Telemetry
         Preamble,
         /// <summary>Steady state — value frames + heartbeats + periodic streams.</summary>
         Active,
-        /// <summary>Active sub-state during dashboard switch: profile has been
-        /// applied but the new tier-def hasn't reached the wheel yet, so value
-        /// frames would carry the new layout under the old flag bytes. Tick
-        /// runs every other phase but skips value frames until restored.</summary>
-        DashSwitchMuted,
     }
 
     /// <summary>
@@ -1182,295 +1176,6 @@ namespace MozaPlugin.Telemetry
             MozaLog.Debug(
                 $"[Moza] Sent sess=0x02 init handshake (kind=2 nonce + kind=7 slot=0); " +
                 $"next outbound seq={_session02OutboundSeq}");
-        }
-
-        /// <summary>
-        /// Mute value frame emission. Called before the Profile is changed
-        /// so the wheel never receives frames with a mismatched data layout
-        /// (new profile channels packed into old tier-def flag slots).
-        /// Only meaningful when running steady-state (Active); pre-Active
-        /// states ignore the request because value frames aren't flowing yet.
-        /// </summary>
-        internal void MuteForDashSwitch()
-        {
-            if (_state == TelemetryState.Active)
-                TransitionTo(TelemetryState.DashSwitchMuted, "MuteForDashSwitch");
-        }
-
-        /// <summary>Restore Active from DashSwitchMuted. No-op if not currently muted.</summary>
-        private void UnmuteAfterDashSwitch(string reason)
-        {
-            if (_state == TelemetryState.DashSwitchMuted)
-                TransitionTo(TelemetryState.Active, reason);
-        }
-
-        internal void RenegotiateForDashboardSwitch()
-        {
-            if (_state == TelemetryState.Idle || !_connection.IsConnected)
-            {
-                UnmuteAfterDashSwitch("renegotiate skipped (idle/disconnected)");
-                return;
-            }
-            try
-            {
-                _catalogParser.TryParse();
-                MozaLog.Debug(
-                    $"[Moza] Dashboard switch renegotiation: " +
-                    $"catalog={_catalogParser.Catalog?.Count ?? -1} " +
-                    $"flagBase=0x{_nextFlagBase:X2}");
-                ApplySubscription(force: true);
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Error($"[Moza] Dashboard switch renegotiation failed: {ex}");
-            }
-            finally
-            {
-                UnmuteAfterDashSwitch("renegotiate finished");
-            }
-        }
-
-        internal void RenegotiateForDashboardSwitch(Action? applyProfile, bool waitForCatalog)
-        {
-            if (_state == TelemetryState.Idle || !_connection.IsConnected)
-            {
-                MozaLog.Debug($"[Moza] DashSwitch renegotiation skipped: state={_state} connected={_connection.IsConnected}");
-                return;
-            }
-
-            int t0 = Environment.TickCount;
-
-            try
-            {
-                var oldProfile = _profile?.Name ?? "null";
-                int oldTierCount = _tiers?.Length ?? 0;
-                byte oldFlagBase = _activeSubscription?.FlagBase ?? 0;
-
-                MozaLog.Debug(
-                    $"[Moza] DashSwitch: pre-swap state: profile=\"{oldProfile}\" " +
-                    $"tiers={oldTierCount} flagBase=0x{oldFlagBase:X2} " +
-                    $"catalog={_catalogParser.Catalog?.Count ?? -1} " +
-                    $"nextFlagBase=0x{_nextFlagBase:X2}");
-
-                int muteStart = Environment.TickCount;
-                // Active → DashSwitchMuted via the helper. If we're still in
-                // Preamble (rare — would need a wheel-initiated kind=4 echo
-                // before cold-start preamble completed), the helper no-ops and
-                // we proceed with the renegotiation steps; the preamble path
-                // will still exit with state Active so this block never leaves
-                // the system in an inconsistent state.
-                MuteForDashSwitch();
-
-                // Apply the new profile FIRST so we know which channel URLs the
-                // wheel must advertise before we can build a valid tier-def.
-                applyProfile?.Invoke();
-
-                var newProfile = _profile?.Name ?? "null";
-                int newTierCount = _tiers?.Length ?? 0;
-                MozaLog.Debug($"[Moza] DashSwitch: profile applied: \"{newProfile}\" tiers={newTierCount}");
-
-                if (waitForCatalog)
-                {
-                    WaitForCatalogCoverage(t0);
-                }
-
-                ApplySubscription(force: true);
-
-                int muteMs = Environment.TickCount - muteStart;
-                MozaLog.Debug(
-                    $"[Moza] DashSwitch: subscription applied, unmuting after {muteMs}ms mute. " +
-                    $"newFlagBase=0x{(_activeSubscription?.FlagBase ?? 0):X2} " +
-                    $"totalElapsed={Environment.TickCount - t0}ms");
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Error($"[Moza] DashSwitch renegotiation failed after {Environment.TickCount - t0}ms: {ex}");
-            }
-            finally
-            {
-                UnmuteAfterDashSwitch("renegotiate (with profile) finished");
-            }
-        }
-
-        /// <summary>
-        /// Wait until the wheel-advertised channel catalog covers every URL the
-        /// new <see cref="_profile"/> needs, or until the timeout expires.
-        /// Without this, we race the wheel — it pushes the new dashboard's
-        /// catalog ~400 ms after a DASH_SWITCH FF record, but the post-switch
-        /// renegotiation runs immediately and would otherwise build the
-        /// tier-def against the prior dashboard's catalog. Channel URLs not
-        /// found there encode as <c>chIndex=0</c> in
-        /// <see cref="TierDefinitionBuilder.BuildTierDefinitionV2"/>, which the
-        /// wheel cannot bind to display elements.
-        ///
-        /// Clears the catalog parser's byte buffer on entry so we only see
-        /// activity that arrives AFTER the profile swap. Polls every 20 ms,
-        /// re-parses on every buffer growth, and exits as soon as every
-        /// required URL is present in the parsed catalog.
-        /// </summary>
-        private void WaitForCatalogCoverage(int renegotiateStartTickMs)
-        {
-            int oldBufLen = _catalogParser.BufferLength;
-            // Drop chunk bytes accumulated before the switch. Do NOT clear the
-            // parsed catalog: post-switch parse stats show the wheel uses
-            // BACKREFS heavily (backref=16 in the 17:46 trace) to keep prior
-            // URLs alive at high indices while only re-announcing the changed
-            // low-index slots. The parser needs the existing entries to
-            // resolve those backrefs.
-            //
-            // Stale-slot duplicates are handled in
-            // BuildTierDefinitionMessageType02 / BuildTierDefinitionV2 via
-            // first-occurrence-wins (lowest matching idx wins) so a URL that
-            // appears at both a fresh low position and a stale high position
-            // resolves to the fresh one.
-            _catalogParser.ClearBuffer();
-
-            // Required URLs are the de-duplicated set of channel URLs across
-            // the new profile's tiers. Profile.Tiers is already broadcast-
-            // expanded by the Profile setter (each sub-tier replicated 3-N
-            // times) so the same URLs repeat — dedupe to keep the coverage
-            // check meaningful.
-            var requiredUrls = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var profileSnapshot = _profile;
-            if (profileSnapshot != null)
-            {
-                foreach (var tier in profileSnapshot.Tiers)
-                {
-                    foreach (var ch in tier.Channels)
-                    {
-                        if (!string.IsNullOrEmpty(ch.Url))
-                            requiredUrls.Add(ch.Url);
-                    }
-                }
-            }
-
-            int waitStart = Environment.TickCount;
-            const int catalogWaitTimeoutMs = 5000;
-            int deadline = waitStart + catalogWaitTimeoutMs;
-
-            MozaLog.Debug(
-                $"[Moza] DashSwitch: cleared catalog buffer (was {oldBufLen}B), " +
-                $"waiting for {requiredUrls.Count} required URL(s) from new profile " +
-                $"(timeout {catalogWaitTimeoutMs}ms)");
-
-            int lastParseLen = 0;
-            int finalCovered = 0;
-            int finalCatalogCount = 0;
-            bool covered = false;
-
-            while (Environment.TickCount < deadline)
-            {
-                if (_state == TelemetryState.Idle || !_connection.IsConnected)
-                {
-                    MozaLog.Debug("[Moza] DashSwitch: catalog wait aborted (disconnected/disabled)");
-                    return;
-                }
-
-                int curBufLen = _catalogParser.BufferLength;
-
-                if (curBufLen > lastParseLen)
-                {
-                    _catalogParser.TryParse();
-                    lastParseLen = curBufLen;
-                }
-
-                var catalog = _catalogParser.Catalog;
-                finalCatalogCount = catalog?.Count ?? 0;
-                if (catalog != null && requiredUrls.Count > 0)
-                {
-                    int countCovered = 0;
-                    foreach (var url in requiredUrls)
-                    {
-                        for (int i = 0; i < catalog.Count; i++)
-                        {
-                            if (string.Equals(catalog[i], url, StringComparison.OrdinalIgnoreCase))
-                            {
-                                countCovered++;
-                                break;
-                            }
-                        }
-                    }
-                    finalCovered = countCovered;
-                    if (countCovered >= requiredUrls.Count)
-                    {
-                        covered = true;
-                        break;
-                    }
-                }
-                else if (requiredUrls.Count == 0)
-                {
-                    covered = true;
-                    break;
-                }
-
-                System.Threading.Thread.Sleep(20);
-            }
-
-            // Final parse pass in case the buffer grew during the last sleep.
-            int tailBufLen = _catalogParser.BufferLength;
-            if (tailBufLen > lastParseLen)
-            {
-                _catalogParser.TryParse();
-                var catalog = _catalogParser.Catalog;
-                finalCatalogCount = catalog?.Count ?? 0;
-                if (catalog != null && requiredUrls.Count > 0)
-                {
-                    int countCovered = 0;
-                    foreach (var url in requiredUrls)
-                    {
-                        for (int i = 0; i < catalog.Count; i++)
-                        {
-                            if (string.Equals(catalog[i], url, StringComparison.OrdinalIgnoreCase))
-                            {
-                                countCovered++;
-                                break;
-                            }
-                        }
-                    }
-                    finalCovered = countCovered;
-                    if (countCovered >= requiredUrls.Count) covered = true;
-                }
-            }
-
-            int waitMs = Environment.TickCount - waitStart;
-            if (covered)
-            {
-                MozaLog.Debug(
-                    $"[Moza] DashSwitch: catalog coverage met after {waitMs}ms — " +
-                    $"{finalCovered}/{requiredUrls.Count} URLs present, catalog size={finalCatalogCount}");
-            }
-            else
-            {
-                // Build a list of which URLs were missing for diagnostics.
-                var missing = new System.Text.StringBuilder();
-                int missCount = 0;
-                var catalog = _catalogParser.Catalog;
-                foreach (var url in requiredUrls)
-                {
-                    bool found = false;
-                    if (catalog != null)
-                    {
-                        for (int i = 0; i < catalog.Count; i++)
-                        {
-                            if (string.Equals(catalog[i], url, StringComparison.OrdinalIgnoreCase))
-                            {
-                                found = true; break;
-                            }
-                        }
-                    }
-                    if (!found)
-                    {
-                        if (missCount > 0) missing.Append(", ");
-                        missing.Append(url);
-                        missCount++;
-                        if (missCount >= 5) { missing.Append(", ..."); break; }
-                    }
-                }
-                MozaLog.Warn(
-                    $"[Moza] DashSwitch: catalog wait TIMED OUT after {waitMs}ms — only " +
-                    $"{finalCovered}/{requiredUrls.Count} URLs covered (catalog size={finalCatalogCount}). " +
-                    $"Sending tier-def with stale catalog; missing: {missing}");
-            }
         }
 
         public void SwitchToProfile(uint slotIndex, MultiStreamProfile? newProfile)
@@ -2749,7 +2454,7 @@ namespace MozaPlugin.Telemetry
                     return;
                 }
 
-                // Steady-state (Active or DashSwitchMuted).
+                // Steady-state (Active).
                 TickAbsorbCatalogIfChanged();
                 _autoTest?.Tick(_baseTickMs);
 
@@ -2762,14 +2467,7 @@ namespace MozaPlugin.Telemetry
 
                 TickPostRenegDiagnostic(tiers);
                 TickFireGameStartHandshake();
-
-                // Muted during dashboard switch transition: Profile has already
-                // changed but the new tier-def hasn't been sent yet. Sending
-                // value frames with the new data layout under the old flag bytes
-                // gives the wheel garbage it can't decode. All other tick phases
-                // still run during DashSwitchMuted.
-                if (_state != TelemetryState.DashSwitchMuted)
-                    TickEmitValueFrames(tiers);
+                TickEmitValueFrames(tiers);
 
                 TickEmitEnableAndSequence();
                 TickEmitPeripheralPolls();
@@ -3591,10 +3289,8 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         private void Send28xPoll()
         {
-            // Past-preamble guard: the original check was `!_preambleComplete`,
-            // which is true in any state PRIOR to Active. Both Active and
-            // DashSwitchMuted are post-preamble, so accept either.
-            if (_state != TelemetryState.Active && _state != TelemetryState.DashSwitchMuted) return;
+            // Past-preamble guard: only valid once we've reached Active.
+            if (_state != TelemetryState.Active) return;
             if (!_connection.IsConnected) return;
             _connection.Send(BuildGroup40Frame3(0x28, 0x00, 0x00));
             _connection.Send(BuildGroup40Frame3(0x28, 0x01, 0x00));
@@ -3620,10 +3316,8 @@ namespace MozaPlugin.Telemetry
         private int _widgetPollIndex;
         private void SendWidgetStatePoll()
         {
-            // Past-preamble guard: the original check was `!_preambleComplete`,
-            // which is true in any state PRIOR to Active. Both Active and
-            // DashSwitchMuted are post-preamble, so accept either.
-            if (_state != TelemetryState.Active && _state != TelemetryState.DashSwitchMuted) return;
+            // Past-preamble guard: only valid once we've reached Active.
+            if (_state != TelemetryState.Active) return;
             if (!_connection.IsConnected) return;
             SendOneWidgetPoll();
         }
