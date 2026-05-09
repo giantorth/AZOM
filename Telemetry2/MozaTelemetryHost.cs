@@ -138,7 +138,10 @@ namespace MozaPlugin.Telemetry2
 
         private long _last28xTicks;
         private bool _poll28xBaseline;
-        private const long Poll28xIntervalTicks = 4000 * System.TimeSpan.TicksPerMillisecond;
+        // 28x poll keeps the wheel watchdog from biting (~165s timeout); fire well
+        // within that. 8s gives ~20× headroom and halves the bandwidth this slice
+        // costs (vs the previous 4s cadence).
+        private const long Poll28xIntervalTicks = 8000 * System.TimeSpan.TicksPerMillisecond;
 
         // Channel-config burst — group 0x40 frames that enable channels on the wheel's
         // display pages. PitHouse emits this once at preamble after the tier-def. Without
@@ -307,11 +310,15 @@ namespace MozaPlugin.Telemetry2
         private long _lastPedalOutTicks;
         private long _lastLedGroup1PollTicks;
         private long _lastLedGroup2PollTicks;
-        private const long PeriphHandbrakePresenceIntervalTicks = 45L  * System.TimeSpan.TicksPerMillisecond;
-        private const long PeriphHandbrakeOutputIntervalTicks   = 100L * System.TimeSpan.TicksPerMillisecond;
-        private const long PeriphPedalOutIntervalTicks          = 143L * System.TimeSpan.TicksPerMillisecond;
-        private const long PeriphLedGroup1PollIntervalTicks     = 55L  * System.TimeSpan.TicksPerMillisecond;
-        private const long PeriphLedGroup2PollIntervalTicks     = 588L * System.TimeSpan.TicksPerMillisecond;
+        // Parity-poll intervals at ~1 Hz. Wheel needs SOME poll activity to
+        // stay engaged at idle (turning these off entirely freezes the
+        // dashboard on last-value within ~5 min); ~1 Hz is enough at ~12% of
+        // the cost of mirroring PitHouse's full ~7-22 Hz cadence.
+        private const long PeriphHandbrakePresenceIntervalTicks = 1000L * System.TimeSpan.TicksPerMillisecond;
+        private const long PeriphHandbrakeOutputIntervalTicks   = 1000L * System.TimeSpan.TicksPerMillisecond;
+        private const long PeriphPedalOutIntervalTicks          = 1000L * System.TimeSpan.TicksPerMillisecond;
+        private const long PeriphLedGroup1PollIntervalTicks     = 1000L * System.TimeSpan.TicksPerMillisecond;
+        private const long PeriphLedGroup2PollIntervalTicks     = 5000L * System.TimeSpan.TicksPerMillisecond;
 
         // FFB-enable + sequence-counter periodic streams (v1 parity per
         // Telemetry/TelemetrySender.cs:2879-2884 + 3402-3410). Both fire every Tick
@@ -366,7 +373,7 @@ namespace MozaPlugin.Telemetry2
         private int _widgetPollIndex;
         private long _lastWidgetPollTicks;
         private bool _widgetPollBaseline;
-        private const long WidgetPollIntervalTicks = 300L * System.TimeSpan.TicksPerMillisecond;
+        private const long WidgetPollIntervalTicks = 1000L * System.TimeSpan.TicksPerMillisecond;
 
         private static byte[][] BuildWidgetPollFrames()
         {
@@ -449,16 +456,25 @@ namespace MozaPlugin.Telemetry2
         private long _configJsonLastChunkTicks;
         private int _configJsonRetries;
         private const int ConfigJsonMaxRetries = 3;
-        private const long ConfigJsonStaleTimeoutTicks = 3000 * System.TimeSpan.TicksPerMillisecond;
+        // Per-round stale-timeout backoff. First round catches transient drops fast
+        // (3s), later rounds widen so we don't thrash a slow-firmware wheel that's
+        // genuinely working. Total budget ≈ 3+5+8 = 16s across 3 rounds.
+        private static readonly long[] ConfigJsonStaleTimeoutTicksByRound = new long[]
+        {
+            3000 * System.TimeSpan.TicksPerMillisecond,
+            5000 * System.TimeSpan.TicksPerMillisecond,
+            8000 * System.TimeSpan.TicksPerMillisecond,
+        };
 
-        // Blind retransmit state for session 0x01 tier-def. PitHouse retransmits each
-        // tier-def emission 10× at 200ms intervals using identical seqs (verified by
-        // retransmit audit in Phase 0). The wheel never FC-acks session 0x01.
+        // Blind retransmit state for session 0x01 tier-def. The wheel never
+        // FC-acks session 0x01, so we re-emit on a backoff schedule until
+        // catalog activity arrives or the budget is exhausted. Schedule lives
+        // in Protocol/RetryBackoff so V0 and V2 can't drift.
         private List<SessionChunk>? _retransmitChunks;
         private long _retransmitLastTicks;
         private int _retransmitRoundsRemaining;
-        private const int RetransmitRounds = 10;
-        private const long RetransmitIntervalTicks = 200 * System.TimeSpan.TicksPerMillisecond;
+        private static int RetransmitRounds
+            => global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs.Length;
 
         // Display-config frames (7c:27 + 7c:23). Tells the wheel which dashboard pages
         // are active for the current dashboard. PitHouse emits these in pairs per page
@@ -1725,8 +1741,12 @@ namespace MozaPlugin.Telemetry2
             // 2d3. ConfigJson reassembly watchdog. If sess=0x09 data arrived but the
             // reassembler never produced a valid state (dropped chunk corrupted zlib),
             // clear the buffer and re-prime the session to trigger a fresh push.
+            // Per-round backoff so a slow-firmware wheel doesn't get re-primed
+            // before its current attempt has a fair chance to complete.
+            long staleTimeoutTicks = ConfigJsonStaleTimeoutTicksByRound[
+                Math.Min(_configJsonRetries, ConfigJsonStaleTimeoutTicksByRound.Length - 1)];
             if (_configJson.LastState == null && _configJsonLastChunkTicks > 0
-                && nowTicks - _configJsonLastChunkTicks >= ConfigJsonStaleTimeoutTicks
+                && nowTicks - _configJsonLastChunkTicks >= staleTimeoutTicks
                 && _configJsonRetries < ConfigJsonMaxRetries)
             {
                 _configJsonRetries++;
@@ -1757,10 +1777,9 @@ namespace MozaPlugin.Telemetry2
                 _lastDisplayConfigTicks = nowTicks;
             }
 
-            // 2f. Peripheral output polls (handbrake, pedals, LED state). v1
-            // (TelemetrySender line 2873-2890) sends these continuously regardless of
-            // game state — PitHouse parity. Without them the wheel may consider us
-            // telemetry-only and not refresh LEDs / dashboard rendering at full rate.
+            // 2f. Peripheral output polls (handbrake, pedals, LED state) at
+            // ~1 Hz. Required for wheel idle engagement — turning off
+            // entirely freezes the dashboard on last-value within ~5 min.
             if (nowTicks - _lastHandbrakePresenceTicks >= PeriphHandbrakePresenceIntervalTicks)
             {
                 _send?.Invoke(PeriphHandbrakePresence);
@@ -1826,11 +1845,7 @@ namespace MozaPlugin.Telemetry2
                 _lastModePeriodicTicks = nowTicks;
             }
 
-            // 2i. Widget-state poll cycle. v1 fires one slot from an 80-slot rotating
-            // cycle every ~10 ticks (TelemetrySender.cs:2946-2947 SendWidgetStatePoll).
-            // The cycle covers channel-enable scans, LED state reads, display-variant
-            // probes, and discovery probes — without them the wheel's display pipeline
-            // doesn't refresh widget bindings.
+            // 2i. Widget-state poll cycle at ~1 Hz. Same engagement rationale as 2f.
             if (!_widgetPollBaseline)
             {
                 _lastWidgetPollTicks = nowTicks;
@@ -1935,10 +1950,26 @@ namespace MozaPlugin.Telemetry2
         }
 
         // Re-emit the captured chunks at the same seqs (no endpoint state mutation).
+        // Early-exits as soon as the wheel announces fresh catalog data (signal that
+        // it's absorbing the tier-def). Per-round backoff so a stuck round doesn't
+        // hammer the link at fixed cadence.
         private void RebroadcastSession01(long nowTicks)
         {
             if (_retransmitChunks == null || _retransmitRoundsRemaining <= 0) return;
-            if (nowTicks - _retransmitLastTicks < RetransmitIntervalTicks)
+            // Round count we've already completed (not counting initial emit at line 1956).
+            int roundsDone = (RetransmitRounds - 1) - _retransmitRoundsRemaining;
+            // Early-exit: the wheel pushed fresh catalog data since our last emit.
+            if (roundsDone > 0 && _lastCatalogUpdateTicks > _retransmitLastTicks)
+            {
+                global::MozaPlugin.MozaLog.Debug(
+                    $"[Moza] V2 blind retransmit early-exit after {roundsDone} extra rounds (catalog activity detected)");
+                _retransmitChunks = null;
+                _retransmitRoundsRemaining = 0;
+                return;
+            }
+            var schedule = global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs;
+            long gateTicks = schedule[Math.Min(roundsDone, schedule.Length - 1)] * System.TimeSpan.TicksPerMillisecond;
+            if (nowTicks - _retransmitLastTicks < gateTicks)
                 return;
             foreach (var chunk in _retransmitChunks)
             {

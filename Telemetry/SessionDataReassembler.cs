@@ -75,13 +75,27 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Feed one chunk WITH its inbound seq number. Returns true on success;
-        /// false if a seq gap was detected — in that case the buffer is cleared
-        /// and the caller should trigger session-specific recovery (re-issue the
-        /// open / prime / RPC call so the wheel re-emits its burst). Without this
-        /// detection, a single dropped chunk silently corrupts the zlib stream
-        /// and the surrounding handshake (e.g. configJson) fails permanently for
-        /// the lifetime of the session.
+        /// Feed one chunk WITH its inbound seq number. Returns true when the
+        /// chunk was accepted (including as the start of a new burst after a
+        /// detected restart); false ONLY on a forward gap (chunks lost mid-
+        /// burst), in which case the buffer is cleared and the caller should
+        /// trigger session-specific recovery (re-issue the open / prime / RPC
+        /// call so the wheel re-emits its burst). Without forward-gap detection
+        /// a single dropped chunk silently corrupts the zlib stream and the
+        /// surrounding handshake fails permanently for the lifetime of the
+        /// session.
+        ///
+        /// Three non-monotonic cases are recognised:
+        ///   - <c>seq == _lastSeq</c> — exact duplicate (wheel retransmit
+        ///     because its inbound ack got lost). Skip silently; chunk's bytes
+        ///     are already in the buffer.
+        ///   - <c>seq &lt; _lastSeq</c> — wheel restarted its outbound seq
+        ///     counter for a new logical message (common on file-transfer
+        ///     sessions where each dir-listing / RPC reply burst is
+        ///     independent, and after configJson re-prime). Clear in-progress
+        ///     buffer and accept this chunk as the first of the new burst.
+        ///   - <c>seq &gt; _lastSeq + 1</c> — true forward gap (chunks lost).
+        ///     Clear, return false.
         ///
         /// First chunk after Clear (or Reset) accepts any seq. <paramref name="tag"/>
         /// is a free-form label included in the warning log (e.g. "sess=0x09")
@@ -95,16 +109,32 @@ namespace MozaPlugin.Telemetry
             {
                 if (_lastSeq != -1 && seq != _lastSeq + 1)
                 {
-                    int missing = seq - _lastSeq - 1;
+                    if (seq == _lastSeq) return true;
+
                     string warnTag = string.IsNullOrEmpty(tag) ? _gapTag : tag;
-                    MozaLog.Warn(
-                        $"[Moza] Reassembler seq gap{(string.IsNullOrEmpty(warnTag) ? "" : $" ({warnTag})")}: " +
-                        $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
-                        $"clearing {_buffer.Count}B buffer — caller should re-handshake");
-                    _buffer.Clear();
-                    _overflowLogged = false;
-                    _lastSeq = -1;
-                    return false;
+                    string tagSuffix = string.IsNullOrEmpty(warnTag) ? "" : $" ({warnTag})";
+                    if (seq < _lastSeq)
+                    {
+                        MozaLog.Debug(
+                            $"[Moza] Reassembler seq restart{tagSuffix}: " +
+                            $"got seq={seq}, last was {_lastSeq}; clearing {_buffer.Count}B buffer (assuming new burst)");
+                        _buffer.Clear();
+                        _overflowLogged = false;
+                        _lastSeq = -1;
+                        // fall through to accept this chunk as the first of the new burst
+                    }
+                    else
+                    {
+                        int missing = seq - _lastSeq - 1;
+                        MozaLog.Warn(
+                            $"[Moza] Reassembler seq gap{tagSuffix}: " +
+                            $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
+                            $"clearing {_buffer.Count}B buffer — caller should re-handshake");
+                        _buffer.Clear();
+                        _overflowLogged = false;
+                        _lastSeq = -1;
+                        return false;
+                    }
                 }
                 if (_buffer.Count + net.Length > MaxBufferBytes)
                 {

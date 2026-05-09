@@ -146,8 +146,8 @@ namespace MozaPlugin.Telemetry
         private byte[][]? _tierDefBlindFrames;
         private int _tierDefBlindSentRounds;
         private int _tierDefBlindLastTickCount;
-        private const int TierDefBlindMaxRounds = 12;
-        private const int TierDefBlindIntervalMs = 200;
+        private static int TierDefBlindMaxRounds
+            => global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs.Length;
 
         // Sess=0x09 establishment retry. Cold-start emits the prime+open-request
         // pair once in PrimeAndOpenSession09; if the wheel doesn't respond with
@@ -160,7 +160,13 @@ namespace MozaPlugin.Telemetry
         // post-switch sessions are untouched.
         private int _s09RetryRounds;
         private int _s09RetryLastTickCount;
-        private const int S09RetryIntervalMs = 1000;
+        // Exponential backoff schedule for sess=0x09 retry. First retry is fast
+        // to catch transient drops (Wine SerialPort R/W contention typically
+        // recovers within ~250ms); later retries widen so a wheel that's slow
+        // to engage isn't pummelled by a fixed-cadence retry storm. Total
+        // budget ≈ 56s across 10 rounds vs the old 10s × fixed 1000ms.
+        private static readonly int[] S09BackoffMs =
+            { 250, 500, 1000, 2000, 3000, 5000, 7000, 10000, 12000, 15000 };
         private const int S09RetryMaxRounds = 10;
 
         // Wall-clock timestamp (DateTime.UtcNow.Ticks) of the last Stop()
@@ -1687,12 +1693,12 @@ namespace MozaPlugin.Telemetry
             if (_policy.TierDefSession == TierDefSessionPolicy.FlagByte)
             {
                 tierDefSession = FlagByte;
-                seq = Math.Max(2, _session02OutboundSeq + 1);
+                seq = Math.Max(2, _session02OutboundSeq);
             }
             else
             {
                 tierDefSession = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
-                seq = Math.Max(2, _session01OutboundSeq + 1);
+                seq = Math.Max(2, _session01OutboundSeq);
             }
 
             // Send wrapper: under blind-retransmit policy (Era2026), every
@@ -2470,6 +2476,10 @@ namespace MozaPlugin.Telemetry
                 TickEmitValueFrames(tiers);
 
                 TickEmitEnableAndSequence();
+                // Parity polls keep the wheel engaged during idle. Empirically
+                // verified: turning them off entirely caused the dashboard to
+                // freeze on last-value within ~5 min. ~1 Hz cadence is enough
+                // at ~12% of PitHouse's full ~7-22 Hz wire cost.
                 TickEmitPeripheralPolls();
                 TickEmitLedStatePolls();
                 TickEmitRetransmits();
@@ -2627,19 +2637,16 @@ namespace MozaPlugin.Telemetry
                 _connection.SendStream(StreamKind.Sequence, BuildSequenceCounterFrame());
         }
 
-        /// <summary>Peripheral output polls (handbrake + pedals). PitHouse
-        /// polls these at fixed cadence; sub-tick gating approximates the
-        /// observed rates relative to the base tick rate (default 33 Hz).</summary>
+        /// <summary>Peripheral output polls (handbrake + pedals) at ~1 Hz,
+        /// staggered across ticks so the writes don't pile into a single
+        /// 4ms-paced burst.</summary>
         private void TickEmitPeripheralPolls()
         {
-            //   tick % 3 != 0 = ~22 Hz (PitHouse 22 Hz handbrake-presence)
-            //   tick % 3 == 0 = ~11 Hz (PitHouse 10 Hz handbrake-output)
-            //   tick % 5 == 0 = ~6.6 Hz (PitHouse 7 Hz pedal-output × 3)
-            if (_tickCounter % 3 != 0)
-                _connection.Send(_handbrakePresenceFrame);
-            if (_tickCounter % 3 == 0)
-                _connection.Send(_handbrakeOutputFrame);
-            if (_tickCounter % 5 == 0)
+            int slow = Math.Max(8, 1000 / _baseTickMs); // ~1Hz cycle (33 ticks @ 30ms base)
+            int phase = _tickCounter % slow;
+            if (phase == 0)             _connection.Send(_handbrakePresenceFrame);
+            else if (phase == slow / 5) _connection.Send(_handbrakeOutputFrame);
+            else if (phase == 2 * slow / 5)
             {
                 _connection.Send(_pedalThrottleOutFrame);
                 _connection.Send(_pedalBrakeOutFrame);
@@ -2647,22 +2654,23 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>LED state polls. Group 1 ~18 Hz (tick%2 on 33 Hz base);
-        /// group 2 ~1.7 Hz (tick%20).</summary>
+        /// <summary>LED state polls. Group 1 ~1 Hz, group 2 ~0.2 Hz.</summary>
         private void TickEmitLedStatePolls()
         {
-            if (_tickCounter % 2 == 0)
+            int slow = Math.Max(8, 1000 / _baseTickMs);
+            if (_tickCounter % slow == 3 * slow / 5)
                 _connection.Send(_ledStatePollGroup1);
-            if (_tickCounter % 20 == 0)
+            if (_tickCounter % (slow * 5) == 4 * slow / 5)
                 _connection.Send(_ledStatePollGroup2);
         }
 
-        /// <summary>Retransmit unacked session-data chunks. PitHouse re-emits
-        /// each chunk at ~1.4 Hz (50× over a 37s capture) until acked; mirror
-        /// with a 200ms minimum gap and a 100-attempt safety cap.</summary>
+        /// <summary>Retransmit unacked session-data chunks. Per-chunk
+        /// exponential backoff (100ms → 200 → 400 … capped at 2s) so a stuck
+        /// chunk doesn't keep flooding the link at fixed cadence. 8-attempt
+        /// safety cap matches PitHouse's observed retry ceiling.</summary>
         private void TickEmitRetransmits()
         {
-            foreach (var chunk in _retransmitter.DueRetransmits(intervalMs: 200, maxRetries: 100))
+            foreach (var chunk in _retransmitter.DueRetransmits(maxRetries: 8))
             {
                 if (_state == TelemetryState.Idle || !_connection.IsConnected) break;
                 _connection.Send(chunk);
@@ -2671,13 +2679,33 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>Tier-def blind retransmit rounds. Some firmwares need the
         /// tier-def re-sent a few times during cold-start before it sticks;
-        /// fire each blind round at TierDefBlindIntervalMs cadence up to
-        /// TierDefBlindMaxRounds, then stop (and free the buffer).</summary>
+        /// fire each blind round at exponential backoff up to
+        /// <see cref="TierDefBlindMaxRounds"/>, then stop (and free the buffer).
+        /// Early-exits as soon as the wheel sends ANY catalog activity since
+        /// the last round — that means it's absorbing, no need to keep
+        /// blasting.</summary>
         private void TickEmitTierDefBlindRetransmits()
         {
             if (_tierDefBlindFrames == null) return;
-            if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds) return;
-            if (Environment.TickCount - _tierDefBlindLastTickCount < TierDefBlindIntervalMs) return;
+            if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)
+            {
+                _tierDefBlindFrames = null;
+                return;
+            }
+            // Early-exit: if the wheel pushed catalog data since our last
+            // round, it's processing the tier-def. Stop blasting.
+            if (_tierDefBlindSentRounds > 0
+                && _catalogParser.LastActivityMs > _tierDefBlindLastTickCount)
+            {
+                MozaLog.Debug(
+                    $"[Moza] Blind retransmit early-exit after round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
+                    $"(catalog activity detected)");
+                _tierDefBlindFrames = null;
+                return;
+            }
+            var schedule = global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs;
+            int gateMs = schedule[Math.Min(_tierDefBlindSentRounds, schedule.Length - 1)];
+            if (Environment.TickCount - _tierDefBlindLastTickCount < gateMs) return;
 
             _tierDefBlindSentRounds++;
             _tierDefBlindLastTickCount = Environment.TickCount;
@@ -2688,7 +2716,7 @@ namespace MozaPlugin.Telemetry
             }
             MozaLog.Debug(
                 $"[Moza] Blind retransmit round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
-                $"({_tierDefBlindFrames.Length} chunks)");
+                $"({_tierDefBlindFrames.Length} chunks, next gate {gateMs}ms)");
             if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)
                 _tierDefBlindFrames = null;
         }
@@ -2715,8 +2743,11 @@ namespace MozaPlugin.Telemetry
             if (s09.DeviceInitiated) return;
 
             int now = Environment.TickCount;
-            if (_s09RetryRounds > 0 && (now - _s09RetryLastTickCount) < S09RetryIntervalMs)
-                return;
+            if (_s09RetryRounds > 0)
+            {
+                int gateMs = S09BackoffMs[Math.Min(_s09RetryRounds - 1, S09BackoffMs.Length - 1)];
+                if ((now - _s09RetryLastTickCount) < gateMs) return;
+            }
 
             _s09RetryRounds++;
             _s09RetryLastTickCount = now;
@@ -2751,9 +2782,13 @@ namespace MozaPlugin.Telemetry
         /// <summary>Widget-state poll cycle. Cycle of 80 slots at one frame per
         /// 10 ticks gives ~0.4/s per slot; PitHouse capture cadence is ~0.2/s
         /// per slot, within tolerable range.</summary>
+        /// <summary>Widget-state poll cycle at ~1 Hz. The cycle rotates
+        /// through 80 probes, so each individual probe gets covered every
+        /// ~80 seconds.</summary>
         private void TickEmitWidgetPoll()
         {
-            if (_tickCounter % 10 == 0)
+            int slow = Math.Max(8, 1000 / _baseTickMs);
+            if (_tickCounter % slow == slow / 2)
                 SendWidgetStatePoll();
         }
 
@@ -2776,7 +2811,7 @@ namespace MozaPlugin.Telemetry
                 _connection.SendStream(StreamKind.Mode, _cachedModeFrame);
             if ((_slowCounter & 1) == 1)
                 SendDisplayConfig();
-            else if (_slowCounter % 4 == 0)
+            else if (_slowCounter % 8 == 0)
                 Send28xPoll();
             SendStatusPush();
             SendSession09Keepalive();

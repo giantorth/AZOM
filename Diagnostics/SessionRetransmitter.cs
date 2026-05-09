@@ -25,16 +25,30 @@ namespace MozaPlugin.Diagnostics
     /// </summary>
     public sealed class SessionRetransmitter
     {
+        // Per-chunk exponential backoff. First retry hits fast (catches transient
+        // wire drops within ~100ms), subsequent rounds widen so a stuck chunk
+        // doesn't keep flooding the link at fixed cadence.
+        private const int InitialBackoffMs = 100;
+        private const int MaxBackoffMs = 2000;
+
         private sealed class Pending
         {
             public byte[] Frame = Array.Empty<byte>();
             public int LastSentTicks;
             public int SendCount;
+            public int NextDelayMs;
         }
 
         private readonly Dictionary<(byte session, int seq), Pending> _queue
             = new Dictionary<(byte, int), Pending>();
         private readonly object _lock = new object();
+
+        // Wraparound watch — fired once per minute when seq approaches the u16
+        // limit. Saved monotonically so warning rate is bounded regardless of
+        // chunk rate.
+        private int _lastWrapWarnTickCount;
+        private const int SeqWrapWarnThreshold = 60000;
+        private const int WrapWarnIntervalMs = 60000;
 
         public int QueueSize { get { lock (_lock) return _queue.Count; } }
 
@@ -59,10 +73,25 @@ namespace MozaPlugin.Diagnostics
                 Frame = (byte[])frame.Clone(),
                 LastSentTicks = Environment.TickCount,
                 SendCount = 1,
+                NextDelayMs = InitialBackoffMs,
             };
+            bool warn = false;
+            int queueSize = 0;
             lock (_lock)
             {
                 _queue[(session, seq)] = entry;
+                if (seq >= SeqWrapWarnThreshold
+                    && entry.LastSentTicks - _lastWrapWarnTickCount >= WrapWarnIntervalMs)
+                {
+                    _lastWrapWarnTickCount = entry.LastSentTicks;
+                    warn = true;
+                    queueSize = _queue.Count;
+                }
+            }
+            if (warn)
+            {
+                global::MozaPlugin.MozaLog.Warn(
+                    $"[Moza] session 0x{session:X2} seq approaching u16 wrap: {seq} (queue={queueSize})");
             }
         }
 
@@ -98,11 +127,13 @@ namespace MozaPlugin.Diagnostics
         }
 
         /// <summary>
-        /// Return frames whose last send was &gt;= <paramref name="intervalMs"/>
-        /// ago. Chunks past <paramref name="maxRetries"/> sends are silently
-        /// dropped from the queue (assume permanent loss).
+        /// Return frames whose per-chunk backoff has elapsed. Chunks past
+        /// <paramref name="maxRetries"/> sends are dropped (assume permanent
+        /// loss). Each successful retransmit doubles the chunk's next delay
+        /// (capped at <see cref="MaxBackoffMs"/>) so a stuck chunk doesn't
+        /// keep flooding the link.
         /// </summary>
-        public List<byte[]> DueRetransmits(int intervalMs, int maxRetries)
+        public List<byte[]> DueRetransmits(int maxRetries)
         {
             int now = Environment.TickCount;
             var output = new List<byte[]>();
@@ -111,7 +142,7 @@ namespace MozaPlugin.Diagnostics
                 var doomed = new List<(byte, int)>();
                 foreach (var kv in _queue)
                 {
-                    if (now - kv.Value.LastSentTicks < intervalMs) continue;
+                    if (now - kv.Value.LastSentTicks < kv.Value.NextDelayMs) continue;
                     if (kv.Value.SendCount >= maxRetries)
                     {
                         doomed.Add(kv.Key);
@@ -120,6 +151,8 @@ namespace MozaPlugin.Diagnostics
                     output.Add(kv.Value.Frame);
                     kv.Value.LastSentTicks = now;
                     kv.Value.SendCount++;
+                    int next = kv.Value.NextDelayMs * 2;
+                    kv.Value.NextDelayMs = next > MaxBackoffMs ? MaxBackoffMs : next;
                 }
                 foreach (var k in doomed) _queue.Remove(k);
             }

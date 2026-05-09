@@ -76,6 +76,10 @@ namespace MozaPlugin.Protocol
         // after the one-shot lane, unpaced. SendStream overwrites any pending
         // slot so lagging frames never reach the wire stale.
         private readonly byte[]?[] _streamSlots = new byte[StreamSlotCount][];
+        private readonly WriteBudget _budget = new WriteBudget();
+        private int _framesDropped;
+        private int _checksumFailures;
+        private int _frameStartScanResyncs;
         private volatile bool _running;
         private readonly object _lock = new object();
         private string? _lastPortName;
@@ -139,6 +143,33 @@ namespace MozaPlugin.Protocol
         /// fires only when a hub is attached.
         /// </summary>
         public bool HubProbeSucceeded { get; private set; }
+
+        /// <summary>Sliding-window snapshot of write-budget utilization. Read by
+        /// the diagnostics tab so the user can see when the link approaches
+        /// saturation. Each call resets the rolling peak.</summary>
+        public WriteBudget.Snapshot CurrentBudget => _budget.GetSnapshot();
+
+        /// <summary>Wire-error counters surfaced together — drops on write,
+        /// checksum mismatches on read, and frame-start resyncs (junk bytes
+        /// skipped between frames).</summary>
+        public WireErrorCounters WireErrors => new WireErrorCounters(
+            Interlocked.CompareExchange(ref _framesDropped, 0, 0),
+            Interlocked.CompareExchange(ref _checksumFailures, 0, 0),
+            Interlocked.CompareExchange(ref _frameStartScanResyncs, 0, 0));
+
+        public readonly struct WireErrorCounters
+        {
+            public readonly int FramesDropped;
+            public readonly int ChecksumFailures;
+            public readonly int FrameStartScanResyncs;
+
+            public WireErrorCounters(int dropped, int cksum, int resync)
+            {
+                FramesDropped = dropped;
+                ChecksumFailures = cksum;
+                FrameStartScanResyncs = resync;
+            }
+        }
 
         public MozaSerialConnection() : this(null, MozaProbeTarget.BaseAndHub) { }
 
@@ -510,6 +541,8 @@ namespace MozaPlugin.Protocol
                         // Scan for frame start 0x7E
                         while (frameStart < rx.Count && rx[frameStart] != MozaProtocol.MessageStart)
                             frameStart++;
+                        if (frameStart > cursor)
+                            Interlocked.Increment(ref _frameStartScanResyncs);
                         if (frameStart >= rx.Count)
                         {
                             // No start byte found at all — discard junk.
@@ -586,6 +619,7 @@ namespace MozaPlugin.Protocol
                         byte actual = raw[raw.Length - 1];
                         if (expected != actual)
                         {
+                            Interlocked.Increment(ref _checksumFailures);
                             int nn = Math.Min(8, raw.Length);
                             string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
                             MozaLog.Debug(
@@ -662,7 +696,9 @@ namespace MozaPlugin.Protocol
             // and never wraps for any plausible session length.
             long stopwatchFreq = System.Diagnostics.Stopwatch.Frequency;
             long fourMsTicks = stopwatchFreq * 4 / 1000;
+            long oneSecTicks = stopwatchFreq;
             long lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp() - stopwatchFreq;
+            long lastBudgetWarnTs = 0;
             bool lastWasOneShot = false;
 
             while (_running)
@@ -674,18 +710,27 @@ namespace MozaPlugin.Protocol
                 //    settings writes when flooded (ApplyProfile sends 30+ in a burst).
                 //    Pacing is skipped when the previous write was a stream frame,
                 //    since telemetry-group writes never trigger the drop.
+                //
+                //    Under bandwidth pressure, the budget extends the gate further
+                //    (still order-preserving FIFO, never drops) so the wheel can
+                //    drain its receive buffer before we pile on more.
                 if (_oneShotQueue.TryDequeue(out var msg))
                 {
+                    long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                    int stuffedSize = MozaProtocol.StuffedFrameSize(msg);
+                    int budgetExtraMs = _budget.RecommendOneShotDelayMs(stuffedSize);
+                    int baseGapMs = 0;
                     if (lastWasOneShot)
                     {
-                        long sinceTicks = System.Diagnostics.Stopwatch.GetTimestamp() - lastWriteTs;
+                        long sinceTicks = now - lastWriteTs;
                         if (sinceTicks < fourMsTicks)
-                        {
-                            int sleepMs = (int)((fourMsTicks - sinceTicks) * 1000 / stopwatchFreq);
-                            if (sleepMs > 0) Thread.Sleep(sleepMs);
-                        }
+                            baseGapMs = (int)((fourMsTicks - sinceTicks) * 1000 / stopwatchFreq);
                     }
-                    if (WriteFrame(msg, ref stuffBuf))
+                    int sleepMs = Math.Max(baseGapMs, budgetExtraMs);
+                    if (sleepMs > 0) Thread.Sleep(sleepMs);
+
+                    int written = WriteFrame(msg, ref stuffBuf, stuffedSize);
+                    if (written > 0)
                     {
                         writeCount++;
                         if (writeCount <= 5)
@@ -700,17 +745,42 @@ namespace MozaPlugin.Protocol
                 //    item (not only when FIFO is empty). Retransmit + blind
                 //    retransmit can keep the FIFO perpetually non-empty for seconds,
                 //    starving value frames if streams are gated on FIFO-empty.
-                for (int k = 0; k < _streamSlots.Length; k++)
+                //
+                //    Under bandwidth saturation we skip the drain — fresh frames
+                //    will overwrite the slot before next iteration, so latest-wins
+                //    semantics keep telemetry "current" without flooding the link.
+                if (_budget.MayDrainStreams())
                 {
-                    var slot = Interlocked.Exchange(ref _streamSlots[k], null);
-                    if (slot == null) continue;
-                    if (WriteFrame(slot, ref stuffBuf))
+                    for (int k = 0; k < _streamSlots.Length; k++)
                     {
-                        writeCount++;
-                        lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
-                        lastWasOneShot = false;
-                        didWork = true;
+                        var slot = Interlocked.Exchange(ref _streamSlots[k], null);
+                        if (slot == null) continue;
+                        int written = WriteFrame(slot, ref stuffBuf, MozaProtocol.StuffedFrameSize(slot));
+                        if (written > 0)
+                        {
+                            writeCount++;
+                            lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
+                            lastWasOneShot = false;
+                            didWork = true;
+                        }
                     }
+                }
+
+                // Periodic budget warning — single line per second, only when over
+                // 90 % of target. Lets the user / log analyzer correlate stress
+                // periods with downstream symptoms (frame drops, retransmits).
+                long warnNow = System.Diagnostics.Stopwatch.GetTimestamp();
+                if (warnNow - lastBudgetWarnTs >= oneSecTicks)
+                {
+                    // PeekSnapshot doesn't reset the rolling peak — leaves it
+                    // intact for the diagnostics tab's GetSnapshot to consume.
+                    var snap = _budget.PeekSnapshot();
+                    if (snap.PercentBudget >= 90)
+                    {
+                        MozaLog.Warn(
+                            $"[Moza] Write budget {snap.PercentBudget}% ({snap.BytesLastSec} B/s, peak {snap.PeakBurstBytes})");
+                    }
+                    lastBudgetWarnTs = warnNow;
                 }
 
                 if (!didWork)
@@ -721,14 +791,15 @@ namespace MozaPlugin.Protocol
         /// <summary>
         /// Byte-stuff <paramref name="msg"/> into <paramref name="stuffBuf"/> (growing
         /// it if needed) and write the stuffed bytes to the port in one call.
-        /// Returns true on success, false if the port write raised — callers should
-        /// still count this as "work done" for loop-pacing decisions.
+        /// Returns the wire-byte count on success or -1 if the port write raised.
+        /// Callers pass <paramref name="needed"/> (precomputed via
+        /// <see cref="MozaProtocol.StuffedFrameSize"/>) so this method doesn't
+        /// re-scan the input twice on the one-shot hot path.
         /// </summary>
-        private bool WriteFrame(byte[] msg, ref byte[] stuffBuf)
+        private int WriteFrame(byte[] msg, ref byte[] stuffBuf, int needed)
         {
             try
             {
-                int needed = MozaProtocol.StuffedFrameSize(msg);
                 if (stuffBuf.Length < needed)
                     stuffBuf = new byte[Math.Max(needed, stuffBuf.Length * 2)];
                 int len = MozaProtocol.StuffFrame(msg, stuffBuf);
@@ -743,12 +814,14 @@ namespace MozaPlugin.Protocol
                 _port?.Write(stuffBuf, 0, len);
                 Interlocked.Exchange(ref _consecutiveIoErrors, 0);
                 SerialTrafficCapture.Instance.RecordTx(CaptureLabel, msg);
-                return true;
+                _budget.Record(len);
+                return len;
             }
             catch (Exception ex)
             {
+                Interlocked.Increment(ref _framesDropped);
                 HandleIoFailure("Write", ex);
-                return false;
+                return -1;
             }
         }
 

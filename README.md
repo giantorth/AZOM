@@ -10,6 +10,9 @@ A SimHub plugin that communicates directly with MOZA Racing hardware over serial
 
 Built using the amazing work of [Boxflat](https://github.com/Lawstorant/boxflat) that reverse-engineered the [MOZA serial protocol](docs/protocol/README.md).
 
+> [!TIP]
+> If you find the plugin useful, [sponsorships on GitHub](https://github.com/sponsors/giantorth) are appreciated.
+
 ## Why This Exists
 
 MOZA makes excellent sim racing hardware, but their companion software — Pithouse — is Windows-only. Linux users have no official way to manage LED effects or stream telemetry to your wheel's dashboard. SimHub, on the other hand, runs on Linux (via Proton/Wine), opening the door for cross-platform hardware control with built-in telemetry support.
@@ -79,13 +82,16 @@ SimHub contains many effects to choose from and this plugin supports any custom 
 Tested:
 - Old-protocol wheels (ES series)
 - R5 Base
-- Moza handbrake (directly attached)
-- New-protocol wheels (Vision GS / GS V2P / TSW / KS Pro / CS Pro)
-- Dashboard telemetry + screen updates (confirmed on Vision GS and CS Pro)
+- New-protocol wheels (Vision GS / GS V2P / TSW / KS Pro / CS Pro / FSR V2)
+- MOZA handbrake (directly attached)
+- Universal Hub (port enumeration + child-device routing)
+- AB9 active shifter (mode + feel sliders) — opt-in, see Options tab
+- Dashboard telemetry + screen updates (confirmed on Vision GS, CS Pro, KS Pro)
+- Per-knob LED colors and knob-ring LEDs (CS Pro / KS Pro)
 
 TBD:
-- Stand alone dashboards
-- Older generation wheels
+- Stand-alone dashboards
+- Older generation wheels not in the list above
 
 
 ### Per-Model LED Configuration
@@ -112,13 +118,17 @@ If your wheel model isn't listed or incorrect, the generic "MOZA Racing Wheel" d
 
 ### Dashboard Support
 
-Wheels with an LCD dashboard (Vision GS and CS Pro confirmed; others likely work) can receive live telemetry from SimHub — speed, RPM, gear, lap times, fuel, tyre wear, and so on — streamed via MOZA's multi-tier binary telemetry protocol.
+Wheels with an LCD dashboard (Vision GS, CS Pro, and KS Pro confirmed; others likely work) can receive live telemetry from SimHub — speed, RPM, gear, lap times, fuel, tyre wear, and so on — streamed via MOZA's multi-tier binary telemetry protocol.
 
-**Important caveats of the current implementation:**
+- **Auto-detect dashboard folder.** The plugin scans your Pithouse install for the `.mzdash` source folder; an "Auto-detect" button on the wheel device page picks it up in one click. Subfolders are searched recursively, so the dropdown shows every layout you've authored in the dashboard builder.
+- **Hot-reload.** Pick a different layout in the Dashboard dropdown and the plugin re-negotiates the wheel's tier definitions and starts streaming the new channel set without restarting SimHub.
+- **Channel mapping.** The wheel device page has a "Channel mappings" expander to override which SimHub property drives each dashboard channel. Leave blank to use the plugin's built-in default mapping (sourced from `Data/Telemetry.json`, ~410 channels).
+- **Firmware era.** The Options tab has a "Wheel firmware era" override (Auto / 2024 / 2025 / 2026).
 
-- **You must provide the same `.mzdash` file currently loaded on the wheel.** The plugin streams game data into the wheel's active dashboard layout as-is; it does not install, switch, or author layouts. Build or edit layouts in the official MOZA dashboard builder and flash them to the wheel through Pithouse first, then pick the matching layout from the Dashboard dropdown on the wheel device page (or use "Load .mzdash…" to point at the file you flashed). If the channel bindings don't match, the displayed values will be wrong.
+**Important caveats:**
+
+- **You must use the same `.mzdash` file currently loaded on the wheel.** The plugin streams game data into the wheel's active dashboard layout as-is; it does not install, switch, or author layouts on the wheel. Build or edit layouts in the official MOZA dashboard builder and flash them through Pithouse first, then pick the matching layout from the Dashboard dropdown.
 - **SimHub dashboards are not supported.** MOZA wheels render their LCD through firmware using MOZA's proprietary dashboard format. This plugin only streams game data into that format — it cannot push SimHub dashboard templates, HTML overlays, or custom layouts to the screen. Continue using the official MOZA dashboard builder for layout work.
-- **Channel mapping.** The wheel device page has a "Channel mappings" expander to override which SimHub property drives each dashboard channel. Leave blank to use the plugin's built-in default mapping.
 
 ### Per-Game Profiles
 
@@ -126,7 +136,11 @@ All settings are stored per-game via SimHub's profile system and switch automati
 
 ### Hardware Configuration
 
-The plugin panel (Settings > Plugins > MOZA Control) exposes read/write control of wheelbase, wheel, handbrake, and pedal settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, paddle modes, handbrake modes, pedal calibration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected. The Diagnostics tab dumps live wheel identity, dashboard state, and session info for bug reports.
+The plugin panel (Settings > Plugins > MOZA Control) exposes read/write control of wheelbase, wheel, handbrake, pedal, hub, and AB9 settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, hub port enumeration, and AB9 mode + feel sliders — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, Hub, Options, LEDs, Wheel Files, Diagnostics). The Diagnostics tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
+
+The Universal Hub gets its own tab listing each connected port and the device attached to it, polled every 2 seconds. AB9 detection is gated by a checkbox in Options (off by default) — the AB9 advertises on a separate serial pipe that some setups don't have, so it's opt-in to avoid spurious port scans.
+
+The plugin also remembers the last-used wheelbase and AB9 COM ports across SimHub restarts, recovers serial connectivity after sleep/resume, and handles wheel hotswap (swap wheels mid-session and the device definition switches automatically once the new wheel reports its model).
 
 #### Serial traffic capture & diagnostics export
 
@@ -170,33 +184,48 @@ MozaPlugin.cs                      Main plugin class (IPlugin, IDataPlugin, IWPF
 MozaDeviceManager.cs               Read/write API for device settings
 Diagnostics/
   MozaLog.cs                       Thin wrapper over SimHub.Logging.Current; mirrors every [Moza] line into an in-process ring buffer for the Diagnostics tab export
-  SerialTrafficCapture.cs          Toggleable in-memory ring buffer of timestamped TX/RX serial frames (wheelbase + AB9)
+  SerialTrafficCapture.cs          Toggleable in-memory ring buffer of timestamped TX/RX serial frames (wheelbase + AB9), with optional file sink for long captures
+  SessionRetransmitter.cs          Reissues unacked session frames per the v2 retransmit policy
 Protocol/
   MozaProtocol.cs                  Protocol constants (start byte, device IDs, checksums)
   MozaCommand.cs                   Message builder (read/write/int/array)
   MozaCommandDatabase.cs           150+ command definitions from docs/protocol/devices/
-  MozaResponseParser.cs            Response decoder (bit 7 toggle, nibble swap, wildcard matching)
-  MozaSerialConnection.cs          Serial port I/O with auto-discovery and background threads
+  MozaResponseParser.cs            Response decoder (bit 7 toggle, nibble swap, wildcard matching, O(1) group-indexed lookup)
+  MozaSerialConnection.cs          Serial port I/O with auto-discovery, sleep/resume recovery, and background threads
   MozaHidReader.cs                 HID input reader — steering, pedals, paddles, handbrake via HidSharp
+  MozaUsbIds.cs                    Known MOZA USB VID/PID table for serial-port discovery
+  PendingResponseTracker.cs        Tracks outstanding read requests and matches replies back to their callers
+  RetryBackoff.cs                  Exponential-backoff helper for transient serial failures
+  WriteBudget.cs                   Per-pipe write rate limiter — protects the wheel from setting-spam during slider drags
+  SessionPropertyPushBuilder.cs    Builds session-property push frames (display brightness, knob colors, etc.)
 Telemetry/
   MozaData.cs                      Thread-safe data model for all device values
-  TelemetrySender.cs               Multi-tier game data streaming to dashboard display
+  MozaWheelEra.cs / EraPolicy.cs   Per-firmware-era policy (2024/2025/2026): tier-def shape, init handshake, upload header
+  TelemetrySender.cs               Multi-tier game data streaming to dashboard display (legacy v1 pipeline)
   TelemetryFrameBuilder.cs         Assembles bit-packed telemetry frames
   TelemetryEncoder.cs              Encodes game values to compressed wire formats
   TelemetryBitWriter.cs            LSB-first variable-width bit packer
   TierDefinitionBuilder.cs         Builds the 7c:00 tier-definition TLV (protocol v0 URL-subscription + v2 compact numeric)
   GameDataSnapshot.cs              Flat snapshot of SimHub game data for frame building
   DashboardProfile.cs              Channel definitions, tiers, and SimHubField enum
-  DashboardProfileStore.cs         Parses .mzdash files and maps channels to SimHub fields
+  DashboardProfileStore.cs         Parses .mzdash files and maps channels to SimHub fields (recursive folder scan)
   DashboardUploader.cs             Session 0x04 .mzdash upload orchestration (path registration + file content)
+  DashboardDownloader.cs           Pulls a .mzdash off the wheel — currently disabled in the UI, scaffolding kept
+  DashboardCache.cs                Caches downloaded dashboards by hash to avoid redundant transfers
+  DashboardSwitchAutoTest.cs       Cycles through every layout the wheel knows about for end-to-end testing
+  WheelUploadCoordinator.cs        Serializes upload + post-upload state-refresh against the wheel
+  ChannelCatalogParser.cs          Parses the wheel's reported channel catalog (dash-supported channels per layout)
   FileTransferBuilder.cs           Builds session 0x04 sub-message 1/2 payloads (MD5 + zlib content)
   ConfigJsonClient.cs              Session 0x09 configJson RPC — advertises the built-in dashboard library to the wheel
+  RpcCallChannel.cs                Request/response wrapper for session-0x0a RPCs (e.g. completelyRemove)
   SessionRegistry.cs               Tracks open 7c:00 sessions and their roles (mgmt / telemetry / file transfer / configJson / tile-server)
-  SessionDataReassembler.cs        Reassembles chunked session data with CRC verification + zlib decompression
+  SessionDispatcher.cs             Routes inbound session frames to the right consumer (legacy)
+  SessionDataReassembler.cs        Reassembles chunked session data with CRC verification + zlib decompression + seq-gap detection
+  ISessionConsumer.cs              Consumer contract for session-data dispatch
   WheelDashboardState.cs           Parses the wheel's session 0x09 state blob (dashboards loaded, disabled, library)
   TileServerStateBuilder.cs        Builds the empty tile-server JSON for session 0x03 uploads (ATS/ETS2 map metadata)
-  TileServerStateParser.cs        Decodes session 0x03 tile-server state blobs received from the wheel
-  PropertyCoercion.cs             Coerces SimHub property values (object) to double for bit-packing
+  TileServerStateParser.cs         Decodes session 0x03 tile-server state blobs received from the wheel
+  PropertyCoercion.cs              Coerces SimHub property values (object) to double for bit-packing
   KnownSimHubProperties.cs         Curated autocomplete list for the channel-mapping ComboBox
   TelemetryDiagnostics.cs          Frame logging and test pattern generation
 Data/
@@ -207,20 +236,21 @@ Devices/
   WheelModelInfo.cs                Per-model LED layout — button count, flag presence, index remapping
   MozaWheelDeviceExtension.cs      Wheel device extension — profiles, LED driver injection
   MozaWheelExtensionSettings.cs    Wheel settings for SimHub device profiles (includes telemetry)
-  MozaWheelSettingsControl.xaml(.cs) Wheel device tab — LED config, dashboard telemetry, input settings
+  MozaWheelSettingsControl.xaml(.cs) Wheel device tab — LED config, knob colors/rings, dashboard telemetry, channel mapping, Wheel Files browser
   MozaLedDeviceManager.cs          Virtual wheel LED driver — spoofs connection, forwards LED colors
   MozaDashDeviceExtension.cs       Dashboard device extension — profiles, LED driver injection
   MozaDashExtensionSettings.cs     Dashboard settings for SimHub device profiles
   MozaDashSettingsControl.xaml(.cs) Status panel for the dashboard device extension tab
   MozaDashLedDeviceManager.cs      Virtual dashboard LED driver — spoofs connection, forwards bitmask
+  MozaAb9DeviceManager.cs          AB9 active shifter — mode + feel slider control over its dedicated serial pipe
 DeviceTemplates/
   MozaWheelGeneric/                Generic fallback for unknown new-protocol wheels (embedded in DLL)
   MozaWheelOldProto/               Old-protocol (ES) wheels — RPM LEDs only (embedded in DLL)
   MozaDashShdp/                    Dashboard definition (10 RPM + 6 flag LEDs, embedded in DLL)
 UI/
-  SettingsControl.xaml(.cs)        WPF settings UI (Base, Wheel, Handbrake, Pedals, Hub, Options, Diagnostics tabs)
-  ColorPickerDialog.xaml(.cs)      RGB color picker dialog
-  MozaPluginSettings.cs            Persisted plugin settings (brightness, timings, colors)
+  SettingsControl.xaml(.cs)        WPF settings UI (Base, Wheel, Handbrake, Pedals, AB9 Shifter, Hub, Options, LEDs, Wheel Files, Diagnostics tabs)
+  ColorPickerDialog.xaml(.cs)      RGB color picker with last-picked-color memory and saved swatches
+  MozaPluginSettings.cs            Persisted plugin settings (brightness, timings, colors, last COM ports, era override, capture toggles)
   MozaProfile.cs                   Per-game configuration snapshot (80+ settings)
   MozaProfileStore.cs              SimHub profile storage integration
 ```

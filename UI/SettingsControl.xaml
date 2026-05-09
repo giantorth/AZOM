@@ -835,14 +835,21 @@
                                    Foreground="Gray" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
 
                         <TextBlock Text="Dashboard Telemetry" Style="{StaticResource SectionHeader}"/>
-                        <CheckBox x:Name="UploadDashboardCheck" Content="Upload dashboard on connect"
-                                  Margin="0,8,0,4" Checked="UploadDashboard_Changed" Unchecked="UploadDashboard_Changed"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
-                                   Text="Attempt to upload selected mzdash file.  Experimental."/>
-                        <CheckBox x:Name="DownloadDashboardCheck" Content="Download dashboards from wheel"
-                                  Margin="0,8,0,4" Checked="DownloadDashboard_Changed" Unchecked="DownloadDashboard_Changed"/>
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
-                                   Text="Download dashboard files stored on the wheel.  Experimental."/>
+                        <!-- Hidden: dashboard upload/download UI is collapsed while the feature is in
+                             development. Runtime values are forced off in MozaPlugin (Init cache wiring
+                             and ApplyTelemetrySettings); underlying settings, handlers, and the
+                             upload/download scaffolding are intentionally preserved. Un-collapse this
+                             StackPanel and revert the forced-false consumption sites to re-enable. -->
+                        <StackPanel Visibility="Collapsed">
+                            <CheckBox x:Name="UploadDashboardCheck" Content="Upload dashboard on connect"
+                                      Margin="0,8,0,4" Checked="UploadDashboard_Changed" Unchecked="UploadDashboard_Changed"/>
+                            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
+                                       Text="Attempt to upload selected mzdash file.  Experimental."/>
+                            <CheckBox x:Name="DownloadDashboardCheck" Content="Download dashboards from wheel"
+                                      Margin="0,8,0,4" Checked="DownloadDashboard_Changed" Unchecked="DownloadDashboard_Changed"/>
+                            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"
+                                       Text="Download dashboard files stored on the wheel.  Experimental."/>
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                             <TextBlock Text="Wheel firmware era:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <ComboBox x:Name="FirmwareEraCombo" Width="500"

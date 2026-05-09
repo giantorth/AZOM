@@ -1336,6 +1336,12 @@ namespace MozaPlugin
             sb.AppendLine($"Pipeline:           {(ts != null ? "OLD (TelemetrySender)" : "NEW (Telemetry2 host)")}");
             sb.AppendLine($"Enabled:            {_plugin.TelemetryEnabledForDiagnostics}");
             sb.AppendLine($"FramesSent:         {_plugin.FramesSentForDiagnostics}");
+            var budget = _plugin.SerialBudgetForDiagnostics;
+            var errs = _plugin.SerialWireErrorsForDiagnostics;
+            sb.AppendLine(
+                $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of 8KB target, peak={budget.PeakBurstBytes})");
+            sb.AppendLine(
+                $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} resync={errs.FrameStartScanResyncs}");
             sb.AppendLine($"DisplayDetected:    {(ts?.DisplayDetected ?? _plugin.IsDisplayDetected)}");
             sb.AppendLine($"DisplayModelName:   {Blank(ts?.DisplayModelName ?? _plugin.DisplayModelName)}");
             sb.AppendLine($"WheelEra:           {_plugin.Settings.TelemetryWheelEra}");

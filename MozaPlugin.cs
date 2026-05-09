@@ -26,8 +26,11 @@ namespace MozaPlugin
         private MozaData _data = null!;
         private MozaDeviceManager _deviceManager = null!;
         private MozaAb9DeviceManager _ab9Manager = null!;
+        internal global::MozaPlugin.Protocol.PendingResponseTracker PendingResponses { get; }
+            = new global::MozaPlugin.Protocol.PendingResponseTracker();
         private MozaPluginSettings _settings = null!;
         private Timer _pollTimer = null!;
+        private Timer _retryTimer = null!;
         private Timer _reconnectTimer = null!;
         private int _connectingFlag;
         private MozaHidReader _hidReader = null!;
@@ -428,6 +431,19 @@ namespace MozaPlugin
                 _pollTimer.AutoReset = true;
                 _pollTimer.Start();
 
+                // 250ms < shortest ReadRetryBackoffMs (200) so a dropped probe
+                // gets retried within ~one backoff window.
+                _retryTimer = new Timer(250);
+                _retryTimer.Elapsed += (s, e) =>
+                {
+                    if (IsShuttingDown) return;
+                    if (!_connection.IsConnected) return;
+                    try { PendingResponses.TickRetransmits(_connection.Send); }
+                    catch (Exception ex) { MozaLog.Warn($"[Moza] PendingResponseTracker tick failed: {ex.Message}"); }
+                };
+                _retryTimer.AutoReset = true;
+                _retryTimer.Start();
+
                 _reconnectTimer = new Timer(5000);
                 _reconnectTimer.Elapsed += (s, e) =>
                 {
@@ -487,7 +503,11 @@ namespace MozaPlugin
                 if (_telemetrySender != null)
                 {
                     _telemetrySender.DashCache = DashCache;
-                    _telemetrySender.SetDownloadEnabled(_settings.TelemetryDownloadDashboard);
+                    // UI for dashboard upload/download is hidden in SettingsControl.xaml while the
+                    // feature is in development; force the download path off regardless of the
+                    // saved setting. Setting is preserved on disk so re-enabling the UI restores
+                    // the user's prior preference automatically.
+                    _telemetrySender.SetDownloadEnabled(false);
                 }
 
                 ApplyTelemetrySettings();
@@ -515,6 +535,7 @@ namespace MozaPlugin
         private void CleanupPartialInit()
         {
             try { _pollTimer?.Stop(); } catch { }
+            try { _retryTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _saveDebounceTimer?.Stop(); } catch { }
             try { _telemetrySender?.Stop(); } catch { }
@@ -553,6 +574,7 @@ namespace MozaPlugin
             catch { }
             try { _ab9Manager?.Dispose(); } catch { }
             try { _pollTimer?.Dispose(); } catch { }
+            try { _retryTimer?.Dispose(); } catch { }
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _saveDebounceTimer?.Dispose(); } catch { }
             _saveDebounceTimer = null;
@@ -610,6 +632,7 @@ namespace MozaPlugin
             // 1. Stop timers first so no new callbacks fire against disposed state.
             _saveDebounceTimer?.Stop();
             _pollTimer?.Stop();
+            _retryTimer?.Stop();
             _reconnectTimer?.Stop();
 
             // Clear detection flags up-front. If SimHub re-uses this plugin instance
@@ -673,6 +696,7 @@ namespace MozaPlugin
             _saveDebounceTimer?.Dispose();
             _saveDebounceTimer = null;
             _pollTimer?.Dispose();
+            _retryTimer?.Dispose();
             _reconnectTimer?.Dispose();
 
             // 8. Null Instance last so any straggler callback can still no-op via IsShuttingDown.
@@ -883,6 +907,14 @@ namespace MozaPlugin
         internal int FramesSentForDiagnostics =>
             _telemetrySender?.FramesSent ?? _telemetryHost?.FramesSent ?? 0;
 
+        // Bandwidth + wire-error counters from the serial connection. Surfaced
+        // in the Diagnostics tab so the user can see when the link approaches
+        // saturation, and how many parse failures the read path is shedding.
+        internal global::MozaPlugin.Protocol.WriteBudget.Snapshot SerialBudgetForDiagnostics
+            => _connection?.CurrentBudget ?? default;
+        internal global::MozaPlugin.Protocol.MozaSerialConnection.WireErrorCounters SerialWireErrorsForDiagnostics
+            => _connection?.WireErrors ?? default;
+
         // Subscription diagnostics for the "Subscription" section of the Diagnostics tab.
         // Old pipeline returns its TelemetrySender.SubscriptionDiagnostics directly. New
         // pipeline materialises an equivalent from MozaTelemetryHost.LastSubscriptionRaw +
@@ -1002,8 +1034,12 @@ namespace MozaPlugin
             if (_telemetrySender != null)
             {
                 _telemetrySender.Policy = EraPolicy.For(s.TelemetryWheelEra);
-                _telemetrySender.UploadDashboard = s.TelemetryUploadDashboard;
-                _telemetrySender.SetDownloadEnabled(s.TelemetryDownloadDashboard);
+                // UI for dashboard upload/download is hidden in SettingsControl.xaml while the
+                // feature is in development; force both off regardless of the saved settings.
+                // Saved values (s.TelemetryUploadDashboard / s.TelemetryDownloadDashboard) are
+                // preserved on disk so re-enabling the UI restores the user's prior preference.
+                _telemetrySender.UploadDashboard = false;
+                _telemetrySender.SetDownloadEnabled(false);
                 if (s.EnableAutoTestOnConnect)
                     _telemetrySender.EnableAutoTest(this);
             }
@@ -1490,6 +1526,11 @@ namespace MozaPlugin
             // Pause first so the sender's next tick sees the timer stopped
             // before ResetWheelDetection issues its full Stop().
             try { _telemetrySender?.Pause(); } catch { }
+            // Drop pending response watches — the wheel/port we sent to is
+            // gone; their pending responses will never arrive on this
+            // connection. They'd otherwise keep retrying after reconnect
+            // against a fresh wheel that may not even speak the same protocol.
+            try { PendingResponses.Clear(); } catch { }
             if (_newWheelDetected || _oldWheelDetected || _dashDetected)
                 ResetWheelDetection("Serial disconnect — resetting wheel detection");
         }
@@ -1787,6 +1828,8 @@ namespace MozaPlugin
             }
 
             var r = result.Value;
+
+            PendingResponses.NoteResponse(r.Name);
 
             // Normalize stick-mode: old firmware sends 2-byte value (0 or 256),
             // new firmware sends 1-byte enum (0=none, 1=left, 2=right, 3=both).

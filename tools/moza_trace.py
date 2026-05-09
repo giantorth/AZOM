@@ -71,8 +71,12 @@ def decode_frame(t: float, direction: str, raw: bytes) -> Frame:
         f.group = raw[0]
         f.dev = raw[1]
         # Session-layer b2h: resp_group=0xC3, resp_dev=0x71
-        if raw[0] == 0xC3 and len(raw) >= 8:
-            if raw[2] == 0x7C and raw[3] == 0x00:
+        if raw[0] == 0xC3 and len(raw) >= 7:
+            if raw[2] == 0xFC and raw[3] == 0x00 and len(raw) >= 7:
+                f.fc_cmd = raw[3]
+                f.fc_session = raw[4]
+                f.fc_seq = raw[5] | (raw[6] << 8)
+            elif raw[2] == 0x7C and raw[3] == 0x00 and len(raw) >= 8:
                 f.session = raw[4]
                 f.stype = raw[5]
                 if f.stype == 0x81 and len(raw) > 7:
@@ -85,10 +89,6 @@ def decode_frame(t: float, direction: str, raw: bytes) -> Frame:
                         f.ff_kind = struct.unpack_from('<I', payload, 9)[0]
                 elif f.stype == 0x00 and len(raw) > 7:
                     f.seq = raw[6] | (raw[7] << 8)
-            elif raw[2] == 0xFC and raw[3] == 0x00 and len(raw) >= 7:
-                f.fc_cmd = raw[3]
-                f.fc_session = raw[4]
-                f.fc_seq = raw[5] | (raw[6] << 8)
         return f
 
     # h2b path

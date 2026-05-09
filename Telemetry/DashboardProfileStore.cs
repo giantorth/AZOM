@@ -492,6 +492,15 @@ namespace MozaPlugin.Telemetry
             => !string.IsNullOrEmpty(simHubProperty)
                && simHubProperty!.StartsWith("@internal/", StringComparison.Ordinal);
 
+        // Cache of file path → (lastWriteTime, key) so repeated ApplyTelemetrySettings
+        // calls don't re-hash multi-KB mzdash files. Invalidated by mtime change. LRU-
+        // bounded so swapping among many dashboards doesn't grow forever.
+        private static readonly Dictionary<string, (long writeTimeTicks, string key)> _keyCache
+            = new Dictionary<string, (long, string)>(StringComparer.OrdinalIgnoreCase);
+        private static readonly LinkedList<string> _keyCacheLru = new LinkedList<string>();
+        private static readonly object _keyCacheLock = new object();
+        private const int KeyCacheMax = 100;
+
         /// <summary>
         /// Build a stable identity for a dashboard so mappings can be keyed per-dashboard.
         /// Builtin profiles (no file path) use <c>"builtin:&lt;name&gt;"</c>. User-loaded
@@ -502,6 +511,23 @@ namespace MozaPlugin.Telemetry
         {
             if (string.IsNullOrEmpty(loadedPath))
                 return "builtin:" + (profile?.Name ?? "");
+
+            long mtime;
+            try { mtime = File.GetLastWriteTimeUtc(loadedPath!).Ticks; }
+            catch { mtime = 0; }
+
+            if (mtime != 0)
+            {
+                lock (_keyCacheLock)
+                {
+                    if (_keyCache.TryGetValue(loadedPath!, out var hit) && hit.writeTimeTicks == mtime)
+                    {
+                        var node = _keyCacheLru.Find(loadedPath!);
+                        if (node != null) { _keyCacheLru.Remove(node); _keyCacheLru.AddFirst(node); }
+                        return hit.key;
+                    }
+                }
+            }
 
             string filename = Path.GetFileName(loadedPath);
             string hash;
@@ -517,7 +543,28 @@ namespace MozaPlugin.Telemetry
             {
                 hash = "nohash";
             }
-            return "file:" + filename + ":" + hash;
+            string result = "file:" + filename + ":" + hash;
+
+            if (mtime != 0)
+            {
+                lock (_keyCacheLock)
+                {
+                    if (_keyCache.ContainsKey(loadedPath!))
+                    {
+                        var existing = _keyCacheLru.Find(loadedPath!);
+                        if (existing != null) _keyCacheLru.Remove(existing);
+                    }
+                    _keyCache[loadedPath!] = (mtime, result);
+                    _keyCacheLru.AddFirst(loadedPath!);
+                    while (_keyCacheLru.Count > KeyCacheMax)
+                    {
+                        var stale = _keyCacheLru.Last!.Value;
+                        _keyCacheLru.RemoveLast();
+                        _keyCache.Remove(stale);
+                    }
+                }
+            }
+            return result;
         }
 
         /// <summary>

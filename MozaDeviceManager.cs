@@ -170,6 +170,11 @@ namespace MozaPlugin
             MozaLog.Info($"[Moza] Wheel locked on device ID {_wheelDeviceId}");
         }
 
+        // Default backoff for tracked reads: catch transient drops in 200ms,
+        // widen on each retry. 3 attempts × 200/400/800 ≈ 1.4 s budget total.
+        private static readonly int[] ReadRetryBackoffMs = { 200, 400, 800 };
+        private const int ReadRetryMaxAttempts = 3;
+
         public bool ReadSettingForDevice(string commandName, byte deviceId)
         {
             if (!_connection.IsConnected) return false;
@@ -178,6 +183,8 @@ namespace MozaPlugin
             var msg = cmd.BuildReadMessage(deviceId);
             if (msg == null) return false;
             _connection.Send(msg);
+            MozaPlugin.Instance?.PendingResponses.Track(
+                cmd.Name, msg, ReadRetryBackoffMs, ReadRetryMaxAttempts);
             return true;
         }
 
@@ -189,6 +196,8 @@ namespace MozaPlugin
             var msg = cmd.BuildReadMessage(GetDeviceId(cmd.DeviceType));
             if (msg == null) return false;
             _connection.Send(msg);
+            MozaPlugin.Instance?.PendingResponses.Track(
+                cmd.Name, msg, ReadRetryBackoffMs, ReadRetryMaxAttempts);
             return true;
         }
 
