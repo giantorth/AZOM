@@ -1300,6 +1300,11 @@ namespace MozaPlugin.Telemetry2
             }
         }
 
+        // v2 host doesn't enforce a host-silence gate the way v1 does (its
+        // restart path is owned by the renegotiate state machine). Always
+        // returns false — UI just won't disable controls when v2 is active.
+        public bool IsInSilenceCooldown => false;
+
         // Wire-trace phase marker (see IMozaTelemetry). Frame:
         //   7e 03 55 55 4d 4b [phaseId] [chk]
         // grp=0x55 dev=0x55 unused by real wheel commands; frame lands in

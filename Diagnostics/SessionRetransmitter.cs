@@ -126,6 +126,16 @@ namespace MozaPlugin.Diagnostics
             lock (_lock) _queue.Remove((session, seq));
         }
 
+        /// <summary>True iff the given <c>(session, seq)</c> is still pending
+        /// (i.e. enqueued and not yet ack-cleared by <see cref="Ack"/> nor
+        /// dropped by <see cref="Drop"/>). Used by the tier-def blind-
+        /// retransmit early-exit to detect when the wheel has acked all of
+        /// the tracked blind chunks so we can stop blasting.</summary>
+        public bool Contains(byte session, int seq)
+        {
+            lock (_lock) return _queue.ContainsKey((session, seq));
+        }
+
         /// <summary>
         /// Return frames whose per-chunk backoff has elapsed. Chunks past
         /// <paramref name="maxRetries"/> sends are dropped (assume permanent

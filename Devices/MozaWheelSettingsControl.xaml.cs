@@ -858,8 +858,14 @@ namespace MozaPlugin.Devices
             else
                 TelemetryStatusLabel.Text = $"Sending — {framesSent} frames sent";
 
-            TelemetryTestStopBtn.IsEnabled = testMode;
-            TelemetryTestStartBtn.IsEnabled = active != null && !testMode;
+            // Disable switch-side controls while a Stop+Start cycle's silence
+            // gate is in effect — kind=4 frames sent during this window race
+            // against the in-flight restart and have been observed to push
+            // the wheel into a corrupted catalog state.
+            bool inCooldown = active?.IsInSilenceCooldown ?? false;
+            TelemetryTestStopBtn.IsEnabled = testMode && !inCooldown;
+            TelemetryTestStartBtn.IsEnabled = active != null && !testMode && !inCooldown;
+            TelemetryProfileCombo.IsEnabled = active != null && !inCooldown;
 
             // Refresh profile info — auto-renegotiate may have swapped
             // the profile on a background thread after a dashboard switch.

@@ -78,6 +78,14 @@ namespace MozaPlugin.Telemetry2
         // without a running game. Both pipelines implement it.
         bool TestMode { get; set; }
 
+        // True while a Stop+Start cycle is in flight or the post-Stop silence
+        // gate is still enforcing wheel-quiet time. UI consumers should
+        // disable dashboard-switch affordances (dropdown, Start Test) while
+        // this is true so users can't trigger races against the in-flight
+        // restart — observed 2026-05-09: a kind=4 leaked onto the wire during
+        // silence, putting the wheel into a corrupted catalog state.
+        bool IsInSilenceCooldown { get; }
+
         // Wire-trace phase marker. Used by DashboardSwitchAutoTest to inject an
         // unambiguous sentinel frame at each state transition so the v1↔v2 wire-diff
         // tool can align both captures by phase boundary. The frame must be:

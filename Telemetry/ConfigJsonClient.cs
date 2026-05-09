@@ -138,15 +138,44 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Clear reassembly buffer and state so a Stop/Start cycle doesn't
-        /// keep growing the inbox with leftover chunks from before Stop.
+        /// Clear the in-progress reassembly buffer ONLY. <see cref="LastState"/>
+        /// is preserved so a Stop/Start cycle (e.g. dashboard switch) doesn't
+        /// drop the dashboard library cache while we're waiting for the wheel
+        /// to re-burst. Wire-trace evidence (2026-05-09) showed that a single
+        /// b2h chunk drop on sess=0x09 during the post-Start re-burst left the
+        /// plugin with no state for the rest of the session — the wheel does
+        /// NOT re-burst on a re-issued OpenRequest once it considers the
+        /// session initialised, so the only way to repopulate state was a
+        /// full plugin restart. Caching the last-good state across Stop/Start
+        /// removes that failure mode for any session that has seen at least
+        /// one successful burst.
+        ///
+        /// Use <see cref="HardReset"/> for the full lifecycle reset (plugin
+        /// instance dispose / wheel hot-swap).
         /// </summary>
-        public void Reset()
+        public void ClearBuffer()
+        {
+            _deviceInbox.Clear();
+        }
+
+        /// <summary>
+        /// Full reset: clears reassembly buffer AND <see cref="LastState"/>.
+        /// Call only when the cached state is known stale (wheel hot-swap,
+        /// plugin instance dispose, mzdash library replacement). Routine
+        /// Stop/Start should use <see cref="ClearBuffer"/>.
+        /// </summary>
+        public void HardReset()
         {
             _deviceInbox.Clear();
             _lastState = null;
             _lastMissingShape = "";
         }
+
+        /// <summary>Backwards-compatible alias for <see cref="ClearBuffer"/>.
+        /// Old call sites assumed Reset() also cleared LastState; the buffer-
+        /// only behaviour is now the safer default. Callers wanting the full
+        /// clear should switch to <see cref="HardReset"/>.</summary>
+        public void Reset() => ClearBuffer();
 
         /// <summary>
         /// Build the host's `configJson()` reply. Pass the library names the

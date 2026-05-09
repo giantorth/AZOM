@@ -746,23 +746,28 @@ namespace MozaPlugin.Protocol
                 //    retransmit can keep the FIFO perpetually non-empty for seconds,
                 //    starving value frames if streams are gated on FIFO-empty.
                 //
-                //    Under bandwidth saturation we skip the drain — fresh frames
-                //    will overwrite the slot before next iteration, so latest-wins
-                //    semantics keep telemetry "current" without flooding the link.
-                if (_budget.MayDrainStreams())
+                //    The stream lane is NOT bandwidth-gated. Latest-wins
+                //    coalescing already provides natural backpressure — when
+                //    writes lag, fresh SendStream calls overwrite the slot
+                //    before the previous frame is dequeued, so the wheel sees
+                //    the freshest value automatically. SerialPort.Write blocks
+                //    when the OS buffer fills (16 kB), giving us a hard
+                //    physical-layer gate without artificial software gating.
+                //    Software gating here was the 2026-05-08 regression: it
+                //    held value frames for ~700ms-1s during routine bursts and
+                //    starved the wheel into dropping configJson chunks during
+                //    cold-start and post-switch.
+                for (int k = 0; k < _streamSlots.Length; k++)
                 {
-                    for (int k = 0; k < _streamSlots.Length; k++)
+                    var slot = Interlocked.Exchange(ref _streamSlots[k], null);
+                    if (slot == null) continue;
+                    int written = WriteFrame(slot, ref stuffBuf, MozaProtocol.StuffedFrameSize(slot));
+                    if (written > 0)
                     {
-                        var slot = Interlocked.Exchange(ref _streamSlots[k], null);
-                        if (slot == null) continue;
-                        int written = WriteFrame(slot, ref stuffBuf, MozaProtocol.StuffedFrameSize(slot));
-                        if (written > 0)
-                        {
-                            writeCount++;
-                            lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
-                            lastWasOneShot = false;
-                            didWork = true;
-                        }
+                        writeCount++;
+                        lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
+                        lastWasOneShot = false;
+                        didWork = true;
                     }
                 }
 

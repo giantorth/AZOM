@@ -194,7 +194,7 @@ namespace MozaPlugin.Devices
                 var modelInfo = plugin.WheelModelInfo;
                 if (rawColors.Length > 0)
                 {
-                    LogRawDiagnostic(rawColors, ledColors.Length, buttonColors.Length);
+                    // LogRawDiagnostic(rawColors, ledColors.Length, buttonColors.Length);
 
                     int telemetryPhys = modelInfo != null
                         ? modelInfo.RpmLedCount + (modelInfo.HasFlagLeds ? MozaDeviceConstants.FlagLedCount : 0)
@@ -641,6 +641,7 @@ namespace MozaPlugin.Devices
             string key = sb.ToString();
             if (key == _lastRawDiagKey) return;
             _lastRawDiagKey = key;
+            // Very chatty when animation is running
             MozaLog.Debug($"[Moza] IndividualLEDs diag {key}");
         }
 

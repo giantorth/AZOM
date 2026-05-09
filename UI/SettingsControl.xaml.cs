@@ -1338,8 +1338,9 @@ namespace MozaPlugin
             sb.AppendLine($"FramesSent:         {_plugin.FramesSentForDiagnostics}");
             var budget = _plugin.SerialBudgetForDiagnostics;
             var errs = _plugin.SerialWireErrorsForDiagnostics;
+            int budgetTargetBytes = global::MozaPlugin.Protocol.WriteBudget.TargetBytesPerWindow;
             sb.AppendLine(
-                $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of 8KB target, peak={budget.PeakBurstBytes})");
+                $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of {budgetTargetBytes}B target, peak={budget.PeakBurstBytes})");
             sb.AppendLine(
                 $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} resync={errs.FrameStartScanResyncs}");
             sb.AppendLine($"DisplayDetected:    {(ts?.DisplayDetected ?? _plugin.IsDisplayDetected)}");

@@ -183,6 +183,79 @@ namespace MozaPlugin.Telemetry
         private static long _lastStopUtcTicks;
         private const int MinSilenceAfterStopMs = 11000;
 
+        // ConfigJson chunk-drop recovery counters. The first response to a
+        // dropped chunk is the cheapest possible: clear the in-progress
+        // reassembly buffer and let the wheel's next push repopulate. If we
+        // already have LastState cached from earlier in this session,
+        // downstream consumers continue to render fine and we don't need to
+        // do anything. If we don't have LastState (cold-start / first burst
+        // dropped), the recovery escalates: prime + open-request, then after
+        // a few failures, a full Stop+Start so the wheel-side state machine
+        // resets and burst-from-scratch.
+        private int _configJsonGapCount;
+        private long _configJsonLastChunkUtcTicks;
+        private long _configJsonLastEscalationUtcTicks;
+        // Threshold for prime+open-request escalation when LastState is null.
+        private const int ConfigJsonGapPrimeRetryAt = 1;   // first cold-start gap fires prime+open
+        // Threshold for full RestartForSwitch escalation when prime+open
+        // hasn't recovered the burst.
+        private const int ConfigJsonGapRestartAt = 4;
+        // Min gap between escalations so a chunk-drop storm can't cycle
+        // RestartForSwitch faster than the wheel's 11 s sess=0x09 settle.
+        private const long ConfigJsonEscalationCooldownTicks =
+            15_000 * System.TimeSpan.TicksPerMillisecond;
+        // No-progress watchdog: if LastState is still null this long after
+        // the first chunk arrived on sess=0x09, the wheel is stuck and a
+        // full Restart is the only known recovery.
+        private const long ConfigJsonNoStateRestartTimeoutTicks =
+            30_000 * System.TimeSpan.TicksPerMillisecond;
+
+        // Wheel-catalog-growth tracking. The wheel pushes its channel URLs
+        // in batches over the first ~1-3 seconds after sessions open, but
+        // ApplySubscription runs once at end-of-preamble using whatever
+        // catalog has arrived by then. URLs that arrive AFTER that initial
+        // tier-def emission get chIndex=0 in the wheel's view (BuildTier-
+        // DefinitionV2 default for unknown URLs), and dashboard widgets
+        // bound to those URLs render frozen at zero — observed 2026-05-09
+        // on Grids/Mono dashboards where tire pressure/temp/wear channels
+        // (catalog slots 9-20) arrived ~200ms after preamble exited.
+        // PitHouse mimics the wheel's growing-catalog by re-emitting tier-
+        // def each time its catalog grows; we mirror that here.
+        private int _catalogCountAtLastSubscription;
+        private const int CatalogGrowthQuietMs = 400;
+        private const int CatalogGrowthMinDelta = 1;
+
+        // Count of catalog chunks rejected due to CRC32 mismatch. These
+        // chunks would have produced garbled URLs in the parsed catalog
+        // (observed 2026-05-09: tire entries showed "v1/gameDa???????t???"
+        // mid-string after 1100+ frame-start-scan resyncs in the read path).
+        // Surfaced via diagnostic readout so the user can spot link-quality
+        // degradation independently of dashboard symptoms.
+        private int _catalogCrcRejects;
+        public int CatalogCrcRejects => Interlocked.CompareExchange(ref _catalogCrcRejects, 0, 0);
+        private int _tileServerCrcRejects;
+        public int TileServerCrcRejects => Interlocked.CompareExchange(ref _tileServerCrcRejects, 0, 0);
+
+        // Per-session highest seen seq for sess=0x03 / 0x0b tile-server feed.
+        // Mirrors the catalog parser's per-session seq dedup: wheel re-pushes
+        // any unacked chunk, and blindly appending each retransmit duplicates
+        // bytes in the parser buffer and breaks sentinel-scan alignment.
+        private readonly System.Collections.Generic.Dictionary<byte, int> _tileServerHighestSeq
+            = new System.Collections.Generic.Dictionary<byte, int>();
+
+        // Catalog re-sync probe. Post-dashboard-switch the wheel sometimes
+        // advertises only a subset of the channels its dashboard actually
+        // renders (observed 2026-05-09: switching from Mono to Grids
+        // resulted in a stuck-at-8 catalog while Grids's tire widgets at
+        // slots 9-20 remained un-advertised). Sending a kind=4 dashboard-
+        // switch frame for the slot the wheel is ALREADY on tells the
+        // firmware to re-init its dashboard binding, which re-runs the
+        // catalog-advertise sequence. Throttled so a stuck case can't
+        // produce a switch storm.
+        private long _lastCatalogResyncProbeUtcTicks;
+        private const long CatalogResyncProbeMinIntervalTicks =
+            8000 * System.TimeSpan.TicksPerMillisecond;
+
         /// <summary>Time to let the caller's queued FF kind=4 (and other
         /// in-flight one-shot frames) drain to the wire before Stop's
         /// FlushPendingWrites discards the queue. Used by
@@ -823,7 +896,14 @@ namespace MozaPlugin.Telemetry
             _sequenceCounter = 0;
             _slowCounter = 0;
             _displayConfigPage = 0;
-            _catalogParser.Reset();
+            // ClearBuffer keeps the resolved _catalog so cross-switch backrefs
+            // can resolve. The wheel uses zero-length backref records (size=1,
+            // just the idx byte) post-switch to say "URL at idx X is unchanged
+            // from before" — Reset()'ing the catalog made every backref a
+            // backRefFail, leaving gaps in the post-switch channel list.
+            // ClearBuffer drops the in-progress reassembly buffer + per-session
+            // seq dedup map, which IS what we want at the start of a new cycle.
+            _catalogParser.ClearBuffer();
             _nextFlagBase = 0;
             _activeSubscription = null;
             _sessionAckSeq = 0;
@@ -937,6 +1017,10 @@ namespace MozaPlugin.Telemetry
             _dispatcher.Reset();
             _session09InboundSeq = 0;
             _session09OutboundSeq = 0;
+            // Reset reply-sent gate so the next sess=0x09 device-init cycle
+            // re-confirms canonical dashboard list to the wheel. The LastState
+            // cache below is the host-side fallback for downstream consumers,
+            // not a substitute for the wheel-side handshake.
             _session09ReplySent = false;
             _s09RetryRounds = 0;
             _s09RetryLastTickCount = 0;
@@ -951,10 +1035,21 @@ namespace MozaPlugin.Telemetry
             lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
             _subscriptionResponseDeadlineTicks = 0;
             lock (_sessionCounts) _sessionCounts.Clear();
+            // Reset gap-recovery counters; the new Start cycle gets a fresh
+            // tier-1/2 escalation budget.
+            _configJsonGapCount = 0;
+            _configJsonLastChunkUtcTicks = 0;
+            // Reset catalog-growth tracking so the next Start's first
+            // subscription (built from whatever catalog has arrived) is
+            // treated as the new baseline.
+            _catalogCountAtLastSubscription = 0;
             // Drop reassembly buffers — otherwise residual chunks from before
             // Stop persist into the next Start and (combined with the cap in
-            // SessionDataReassembler) get logged as overflow.
-            try { _configJson.Reset(); } catch { }
+            // SessionDataReassembler) get logged as overflow. Caches the
+            // last-good LastState so dashboard library remains valid through
+            // the Stop+Start window (wheel-state doesn't change without a
+            // user action — see ConfigJsonClient.ClearBuffer doc).
+            try { _configJson.ClearBuffer(); } catch { }
             try { _tileServerParser.Clear(); } catch { }
             try { _session0aInbox.Clear(); } catch { }
             // Reset so StartTelemetryIfReady() won't skip us on re-enable
@@ -1134,6 +1229,21 @@ namespace MozaPlugin.Telemetry
         public void SendDashboardSwitch(uint slotIndex)
         {
             if (!_connection.IsConnected) return;
+            // Block kind=4 emission during the post-Stop silence window or
+            // any non-Active state. Sending kind=4 mid-restart races with
+            // the wheel's session re-handshake — observed 2026-05-09: a
+            // user's rapid double-click during the silence wait leaked a
+            // kind=4 onto the wire BEFORE Start re-opened sessions, putting
+            // the wheel into a state where it pushed corrupt backref-style
+            // catalog records the parser couldn't decode.
+            if (_state != TelemetryState.Active || IsInSilenceCooldown)
+            {
+                MozaLog.Debug(
+                    $"[Moza] SendDashboardSwitch slot={slotIndex} suppressed: " +
+                    $"state={_state} cooldown={IsInSilenceCooldown}. " +
+                    "User must wait for restart cycle to complete.");
+                return;
+            }
 
             byte[] body = global::MozaPlugin.Protocol.SessionPropertyPushBuilder
                 .BuildDashboardSwitchBody(slotIndex);
@@ -1141,6 +1251,21 @@ namespace MozaPlugin.Telemetry
             MozaLog.Debug(
                 $"[Moza] Sent dashboard-switch FF-record: slot={slotIndex} " +
                 $"on session 0x02 seq={_session02OutboundSeq - 1}");
+        }
+
+        /// <summary>True while the post-Stop silence enforcement gate is
+        /// active. UI consumers should reflect this in their dashboard-switch
+        /// affordance (disable dropdown / Start Test button) so the user
+        /// can't trigger races against the in-flight Stop+Start.</summary>
+        public bool IsInSilenceCooldown
+        {
+            get
+            {
+                if (_lastStopUtcTicks == 0) return false;
+                long elapsedMs = (System.DateTime.UtcNow.Ticks - _lastStopUtcTicks)
+                    / System.TimeSpan.TicksPerMillisecond;
+                return elapsedMs < MinSilenceAfterStopMs;
+            }
         }
 
         /// <summary>
@@ -1822,6 +1947,49 @@ namespace MozaPlugin.Telemetry
                         profileName: profile.Name);
                     System.Threading.Interlocked.Increment(ref _subscriptionGen);
                     _nextFlagBase = (byte)(flagBase + profile.Tiers.Count);
+                    // Snapshot catalog size so TickGrowSubscriptionIfCatalogStable
+                    // can detect post-emission catalog growth and re-subscribe.
+                    _catalogCountAtLastSubscription = _catalogParser.Count;
+
+                    // Diagnose tier-def binding completeness. Channels whose URL
+                    // isn't in the wheel's catalog get chIndex=0 from
+                    // BuildTierDefinitionV2 and the wheel can't bind them to
+                    // dashboard widgets (symptom: widget renders frozen at
+                    // zero). Post-switch traces (2026-05-09) show the wheel
+                    // sometimes advertises only a subset of the channels its
+                    // dashboard actually uses; in that case schedule a kind=4
+                    // re-emit for the current slot to nudge the wheel into
+                    // re-running its catalog-advertise sequence.
+                    if (cspIdx)
+                    {
+                        var catalogSnapshot = _catalogParser.Catalog;
+                        if (catalogSnapshot != null && catalogSnapshot.Count > 0)
+                        {
+                            var have = new System.Collections.Generic.HashSet<string>(
+                                catalogSnapshot, StringComparer.OrdinalIgnoreCase);
+                            int unbound = 0, total = 0;
+                            string? firstUnboundUrl = null;
+                            foreach (var t2 in profile.Tiers)
+                            foreach (var c2 in t2.Channels)
+                            {
+                                total++;
+                                if (string.IsNullOrEmpty(c2.Url) || !have.Contains(c2.Url))
+                                {
+                                    unbound++;
+                                    if (firstUnboundUrl == null) firstUnboundUrl = c2.Url;
+                                }
+                            }
+                            if (unbound > 0)
+                            {
+                                MozaLog.Warn(
+                                    $"[Moza] Tier-def has {unbound}/{total} unbound channels " +
+                                    $"(chIndex=0; wheel catalog has {catalogSnapshot.Count} entries). " +
+                                    $"First unbound: {firstUnboundUrl ?? "(null)"}. " +
+                                    "Scheduling kind=4 re-emit to nudge wheel re-advertise.");
+                                ScheduleCatalogResyncProbe();
+                            }
+                        }
+                    }
 
                     foreach (var frame in frames)
                         Send(frame);
@@ -2194,12 +2362,17 @@ namespace MozaPlugin.Telemetry
                         return;
                     }
 
-                    // Ack on the telemetry session
+                    // Ack on the telemetry session. Send the SPECIFIC seq
+                    // received, not a running max — same fix as the mgmt-port
+                    // path below. Running max would silently drop retransmits
+                    // of older seqs (wheel sees stale ack, keeps re-pushing).
+                    // _sessionAckSeq is kept up-to-date for diagnostics and
+                    // the periodic SendStatusPush re-ack path.
                     if (session == FlagByte)
                     {
                         if (seq > _sessionAckSeq)
                             _sessionAckSeq = seq;
-                        SendSessionAck(FlagByte, (ushort)_sessionAckSeq);
+                        SendSessionAck(FlagByte, (ushort)seq);
 
                         // Capture wheel's post-subscription response for diag-tab
                         // visibility. Window is opened by SendTierDefinition and
@@ -2216,12 +2389,20 @@ namespace MozaPlugin.Telemetry
                         }
                     }
 
-                    // Ack on the management session (upload handshake)
+                    // Ack on the management session (upload handshake AND
+                    // wheel-pushed catalog/URL records). The wheel keys each
+                    // outbound chunk by its individual seq and expects an
+                    // ack with that specific seq number — sending a running
+                    // max here meant retransmits of older seqs (5..14 after
+                    // we've acked 21) never got cleared, causing the wheel
+                    // to re-push the catalog every ~1s indefinitely. Verified
+                    // 2026-05-09 trace: 219 b2h sess=01 chunks but only 120
+                    // acks because the running-max gate dropped retransmits.
                     if (session == _mgmtPort && _mgmtPort != 0)
                     {
                         if (seq > _mgmtAckSeq)
                             _mgmtAckSeq = seq;
-                        SendSessionAck(_mgmtPort, (ushort)_mgmtAckSeq);
+                        SendSessionAck(_mgmtPort, (ushort)seq);
                         _mgmtResponseEvent.Set();
                     }
 
@@ -2234,7 +2415,18 @@ namespace MozaPlugin.Telemetry
                     // Upload-session inbound: ack here so the wheel sees the host
                     // is keeping up, then forward to WheelUploadCoordinator which
                     // owns the sub-msg-1/2 wait events and dir-listing reassembly.
-                    if (session == _uploader.ActiveSession)
+                    //
+                    // Ack ALL FT-candidate sessions (0x04..0x08), not just the
+                    // uploader's currently-tracked ActiveSession. The wheel
+                    // device-inits multiple FT sessions (e.g. 0x05 and 0x07 in
+                    // the same connect cycle) and pushes data on whichever it
+                    // chose; gating on ActiveSession alone meant chunks on the
+                    // *other* session were never acked, and the wheel re-pushed
+                    // them every ~20s indefinitely (observed sess=0x05 seq=6..9
+                    // re-burst on 20s cadence in 2026-05-09 traces). Forward
+                    // to NoteInboundChunk regardless — its own ActiveSession
+                    // gate decides what's "real" upload data.
+                    if (session >= 0x04 && session <= 0x08)
                     {
                         SendSessionAck(session, (ushort)seq);
                         _uploader.NoteInboundChunk(session, seq, chunkPayload);
@@ -2260,14 +2452,30 @@ namespace MozaPlugin.Telemetry
                                 $"first8={BitConverter.ToString(chunkPayload, 0, Math.Min(8, chunkPayload.Length))}");
                         }
                         catch { }
-                        // Seq-aware path: detect a dropped chunk and re-handshake
-                        // instead of silently corrupting the zlib stream. Wire-trace
-                        // analysis (2026-05-08) showed a single missing seq=14 on
-                        // sess=0x09 under Wine R/W contention permanently broke the
-                        // configJson handshake for the session lifetime.
+                        // Seq-aware path: detect a dropped chunk and recover
+                        // depending on whether we have a cached LastState.
+                        // Wire-trace analysis (2026-05-08): a single missing
+                        // chunk seq corrupts the zlib stream for the whole
+                        // burst. (2026-05-09): the wheel does NOT re-burst
+                        // on a re-issued OpenRequest once it considers the
+                        // session initialised — it only sends short heartbeat
+                        // chunks, never the full state. So our recovery has to
+                        // be cache-aware:
+                        //  - LastState present (we got a complete burst earlier
+                        //    this session): no recovery needed. Downstream
+                        //    consumers keep using the cached state. The wheel's
+                        //    library doesn't change without a user action, so
+                        //    a stale-but-correct cache is better than a
+                        //    forced re-handshake.
+                        //  - LastState absent (cold-start / first burst dropped):
+                        //    escalate. First gap → prime+open-request. Repeated
+                        //    gaps → full RestartForSwitch (the only known way
+                        //    to make the wheel re-burst once it's stuck).
+                        _configJsonLastChunkUtcTicks = System.DateTime.UtcNow.Ticks;
                         var result = _configJson.OnChunk(seq, chunkPayload, $"sess=0x{session:X2}");
                         if (result == ConfigJsonClient.ChunkResult.StateReady)
                         {
+                            _configJsonGapCount = 0;
                             var state = _configJson.LastState;
                             if (state != null)
                             {
@@ -2277,22 +2485,7 @@ namespace MozaPlugin.Telemetry
                         }
                         else if (result == ConfigJsonClient.ChunkResult.GapDetected)
                         {
-                            // Re-issue the open request so the wheel re-emits its
-                            // state burst from scratch. Buffer was already cleared
-                            // by the reassembler. Use a fresh seq so the wheel
-                            // doesn't dedupe against the prior open.
-                            try
-                            {
-                                int recoverySeq = unchecked((ushort)(seq + 0x100));
-                                MozaLog.Warn(
-                                    $"[Moza] session 0x{session:X2} configJson gap recovery: " +
-                                    $"re-issuing open request with seq=0x{recoverySeq:X4}");
-                                SendConfigJsonOpenRequest(session, (ushort)recoverySeq);
-                            }
-                            catch (Exception ex)
-                            {
-                                MozaLog.Warn($"[Moza] configJson recovery emit failed: {ex.Message}");
-                            }
+                            HandleConfigJsonGap(session, seq);
                         }
                     }
 
@@ -2335,48 +2528,111 @@ namespace MozaPlugin.Telemetry
                     if (session == 0x03 || session == 0x0b)
                     {
                         SendSessionAck(session, (ushort)seq);
-                        // Strip CRC from tail (last 4 bytes) before handing to parser
-                        if (chunkPayload.Length >= 4)
+                        // Strip + validate CRC32 trailer before handing to
+                        // parser. Without validation, a corrupted chunk
+                        // injects random bytes into the parser's sentinel-
+                        // scan window and can either drop a real envelope
+                        // or hit-spot a spurious sentinel. Silently drop
+                        // mismatches; wheel will re-push if we don't ack.
+                        if (chunkPayload.Length >= 5)
                         {
-                            byte[] net = new byte[chunkPayload.Length - 4];
-                            Array.Copy(chunkPayload, 0, net, 0, net.Length);
-                            var tile = _tileServerParser.OnChunk(net);
-                            if (tile != null)
+                            int netLen = chunkPayload.Length - 4;
+                            uint wireCrc = (uint)(chunkPayload[netLen]
+                                                | (chunkPayload[netLen + 1] << 8)
+                                                | (chunkPayload[netLen + 2] << 16)
+                                                | (chunkPayload[netLen + 3] << 24));
+                            uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
+                            if (calcCrc != wireCrc)
                             {
-                                try
-                                {
+                                Interlocked.Increment(ref _tileServerCrcRejects);
+                                int n = _tileServerCrcRejects;
+                                if (n <= 5 || n % 50 == 0)
                                     MozaLog.Debug(
-                                        $"[Moza] Tile-server state received on session 0x{session:X2}: " +
-                                        $"root='{tile.Root}' version={tile.Version} games={tile.Games.Count} " +
-                                        $"any_populated={tile.AnyPopulated}");
+                                        $"[Moza] Tile-server chunk CRC mismatch sess=0x{session:X2} " +
+                                        $"seq={seq}: calc=0x{calcCrc:X8} wire=0x{wireCrc:X8} (rejects={n})");
+                            }
+                            else
+                            {
+                                // Seq dedup: skip retransmits so the parser
+                                // buffer doesn't accumulate duplicate copies
+                                // of the same chunk and break sentinel scan.
+                                bool isNew;
+                                lock (_tileServerHighestSeq)
+                                {
+                                    isNew = !_tileServerHighestSeq.TryGetValue(session, out int prev) || seq > prev;
+                                    if (isNew) _tileServerHighestSeq[session] = seq;
                                 }
-                                catch { /* logging optional */ }
+                                if (isNew)
+                                {
+                                    byte[] net = new byte[netLen];
+                                    Array.Copy(chunkPayload, 0, net, 0, netLen);
+                                    var tile = _tileServerParser.OnChunk(net);
+                                    if (tile != null)
+                                    {
+                                        try
+                                        {
+                                            MozaLog.Debug(
+                                                $"[Moza] Tile-server state received on session 0x{session:X2}: " +
+                                                $"root='{tile.Root}' version={tile.Version} games={tile.Games.Count} " +
+                                                $"any_populated={tile.AnyPopulated}");
+                                        }
+                                        catch { /* logging optional */ }
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // Buffer the chunk payload (strip CRC) for channel catalog parsing.
-                    // Wheel may push the catalog on either the telemetry session
-                    // (FlagByte) or the mgmt session (0x01) depending on firmware
-                    // — V0 URL-subscription firmware (CSP post-2026-04) sends URL
-                    // entries on 0x01 while V2-compact firmware uses 0x02. Collect
-                    // from both during preamble so ChannelCatalogParser sees
-                    // entries regardless of which session the wheel uses.
-                    // Always accumulate catalog data — no gate. The tick
-                    // handler detects changes after 2s of quiet and re-issues
-                    // the tier-def automatically.
+                    // Buffer the chunk payload (strip + validate CRC) for
+                    // channel catalog parsing. Wheel may push the catalog on
+                    // either the telemetry session (FlagByte) or the mgmt
+                    // session (0x01) depending on firmware — V0 URL-
+                    // subscription firmware (CSP post-2026-04) sends URL
+                    // entries on 0x01 while V2-compact firmware uses 0x02.
+                    // Collect from both during preamble.
+                    //
+                    // CRC32 validation: each chunk carries a 4-byte CRC32 LE
+                    // trailer covering the prior bytes. Without validation,
+                    // chunks corrupted in transit (1100+ frame-start resyncs
+                    // observed 2026-05-09 in healthy traces — Wine SerialPort
+                    // R/W contention) would feed garbled bytes to the parser
+                    // and produce mangled URLs in the diagnostic catalog
+                    // (e.g. "v1/gameDa???????t???"). On CRC mismatch we drop
+                    // the chunk silently — the wheel will re-push it on its
+                    // own retransmit cadence, and the parser stays clean.
                     bool isCatalogSession = session == FlagByte || session == 0x01;
-                    if (isCatalogSession && data.Length > 12)
+                    if (isCatalogSession && data.Length > 12 && chunkPayload.Length >= 5)
                     {
-                        byte[] raw = new byte[data.Length - 8];
-                        Array.Copy(data, 8, raw, 0, raw.Length);
-                        if (raw.Length >= 5)
+                        int netLen = chunkPayload.Length - 4;
+                        uint wireCrc = (uint)(chunkPayload[netLen]
+                                            | (chunkPayload[netLen + 1] << 8)
+                                            | (chunkPayload[netLen + 2] << 16)
+                                            | (chunkPayload[netLen + 3] << 24));
+                        uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
+                        if (calcCrc == wireCrc)
                         {
-                            // Drop the 4-byte CRC trailer; feed the rest to the
-                            // catalog parser. AppendChunk also stamps LastActivityMs
-                            // so quiet-window waits work without an external clock.
-                            int netLen = raw.Length - 4;
-                            _catalogParser.AppendChunk(raw, 0, netLen);
+                            // Seq-aware append: dedup retransmits per session
+                            // so the buffer doesn't get the same bytes 2-3×
+                            // (the wheel re-pushes catalog chunks until our
+                            // ack lands). Without dedup, duplicate appends
+                            // misalign the size-prefixed TLV walk and produce
+                            // garbled URLs at indexes whose record straddles
+                            // a duplicated chunk boundary.
+                            _catalogParser.AppendChunkIfNew(session, seq, chunkPayload, 0, netLen);
+                        }
+                        else
+                        {
+                            Interlocked.Increment(ref _catalogCrcRejects);
+                            // Log first few rejections so we can spot a sudden
+                            // surge, then sample at 1-per-50 to avoid flooding.
+                            int rejCount = _catalogCrcRejects;
+                            if (rejCount <= 5 || rejCount % 50 == 0)
+                            {
+                                MozaLog.Debug(
+                                    $"[Moza] Catalog chunk CRC mismatch sess=0x{session:X2} " +
+                                    $"seq={seq}: calc=0x{calcCrc:X8} wire=0x{wireCrc:X8} " +
+                                    $"(total rejects: {rejCount})");
+                            }
                         }
                     }
                 }
@@ -2485,6 +2741,8 @@ namespace MozaPlugin.Telemetry
                 TickEmitRetransmits();
                 TickEmitTierDefBlindRetransmits();
                 TickRetryS09IfNotEstablished();
+                TickConfigJsonStuckWatchdog();
+                TickGrowSubscriptionIfCatalogStable();
 
                 _tickCounter++;
 
@@ -2509,15 +2767,42 @@ namespace MozaPlugin.Telemetry
 
             if (_tickCounter >= _preambleTickTarget)
             {
-                TransitionTo(TelemetryState.Active, "preamble countdown elapsed");
-
+                // Try a fresh parse before checking catalog readiness — a
+                // burst that arrived in the last tick may not yet be merged.
                 _catalogParser.TryParse();
+
+                // Hold preamble open if the wheel hasn't yet advertised any
+                // catalog entries. Going Active with catalog=0 means the
+                // initial tier-def emits with idx=alpha (all chIndex=0
+                // bindings the wheel ignores) and the post-Active catalog-
+                // growth re-apply has to clean up the mess. Cap the wait so
+                // we don't stall indefinitely on a broken wheel.
+                int extendedCap = Math.Max(_preambleTickTarget * 4,
+                    PreambleCatalogWaitMaxMs / Math.Max(1, _baseTickMs));
+                if (_catalogParser.Count == 0 && _tickCounter < extendedCap)
+                {
+                    if (_tickCounter == _preambleTickTarget)
+                    {
+                        MozaLog.Debug(
+                            "[Moza] Preamble extended: waiting for catalog (count=0). " +
+                            $"Cap {extendedCap} ticks ({extendedCap * _baseTickMs} ms).");
+                    }
+                    return;
+                }
+
+                TransitionTo(TelemetryState.Active, "preamble countdown elapsed");
                 ApplySubscription(force: false);
 
                 _tickCounter = 0;
                 _slowCounter = 0;
             }
         }
+
+        /// <summary>Hard ceiling on preamble extension when the wheel hasn't
+        /// pushed any catalog entries. Beyond this we proceed with whatever
+        /// we have (likely empty → idx=alpha tier-def + the catalog-growth
+        /// re-apply path will eventually pick up the slack).</summary>
+        private const int PreambleCatalogWaitMaxMs = 3000;
 
         /// <summary>Continuous catalog absorption. Wheel pushes URL records
         /// in batches with ~1.2s gaps; parse every time the buffer grows and
@@ -2666,11 +2951,16 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>Retransmit unacked session-data chunks. Per-chunk
         /// exponential backoff (100ms → 200 → 400 … capped at 2s) so a stuck
-        /// chunk doesn't keep flooding the link at fixed cadence. 8-attempt
-        /// safety cap matches PitHouse's observed retry ceiling.</summary>
+        /// chunk doesn't keep flooding the link at fixed cadence. PitHouse
+        /// captures show 50× retransmit over 37s for genuinely stuck chunks;
+        /// 30 attempts × max-2s-backoff gives ~53s budget which covers the
+        /// observed pattern without unbounded retry. The previous 8-attempt
+        /// budget (≈9s total) was too tight: a configJson chunk drop on
+        /// sess=0x09 under post-switch saturation could not survive the
+        /// 11s session-silence settle without being abandoned.</summary>
         private void TickEmitRetransmits()
         {
-            foreach (var chunk in _retransmitter.DueRetransmits(maxRetries: 8))
+            foreach (var chunk in _retransmitter.DueRetransmits(maxRetries: 30))
             {
                 if (_state == TelemetryState.Idle || !_connection.IsConnected) break;
                 _connection.Send(chunk);
@@ -2681,9 +2971,15 @@ namespace MozaPlugin.Telemetry
         /// tier-def re-sent a few times during cold-start before it sticks;
         /// fire each blind round at exponential backoff up to
         /// <see cref="TierDefBlindMaxRounds"/>, then stop (and free the buffer).
-        /// Early-exits as soon as the wheel sends ANY catalog activity since
-        /// the last round — that means it's absorbing, no need to keep
-        /// blasting.</summary>
+        ///
+        /// Early-exit when the retransmit queue no longer contains any of the
+        /// blind tier-def chunks — that means the wheel acked them all and
+        /// re-sending would just waste bandwidth. Trace analysis 2026-05-09
+        /// showed the prior catalog-activity-timestamp gate never tripped
+        /// (catalog activity is timestamped before tier-def sends), so all
+        /// 6 rounds always fired. Switching to ack-state lets us stop after
+        /// the first round on healthy connects, eliminating the cold-start
+        /// saturation event (~6 KB extra h2b per connect).</summary>
         private void TickEmitTierDefBlindRetransmits()
         {
             if (_tierDefBlindFrames == null) return;
@@ -2692,14 +2988,15 @@ namespace MozaPlugin.Telemetry
                 _tierDefBlindFrames = null;
                 return;
             }
-            // Early-exit: if the wheel pushed catalog data since our last
-            // round, it's processing the tier-def. Stop blasting.
-            if (_tierDefBlindSentRounds > 0
-                && _catalogParser.LastActivityMs > _tierDefBlindLastTickCount)
+            // Early-exit: every tier-def chunk was tracked via SendAndTrack-
+            // Chunk, so SessionRetransmitter.Contains tells us per-chunk ack
+            // state. If none of the blind seqs are still in the queue, the
+            // wheel acked them all and additional rounds are pure waste.
+            if (_tierDefBlindSentRounds > 0 && AllBlindChunksAcked())
             {
                 MozaLog.Debug(
                     $"[Moza] Blind retransmit early-exit after round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
-                    $"(catalog activity detected)");
+                    "(all blind chunks acked by wheel)");
                 _tierDefBlindFrames = null;
                 return;
             }
@@ -2719,6 +3016,26 @@ namespace MozaPlugin.Telemetry
                 $"({_tierDefBlindFrames.Length} chunks, next gate {gateMs}ms)");
             if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)
                 _tierDefBlindFrames = null;
+        }
+
+        /// <summary>True iff every chunk in <see cref="_tierDefBlindFrames"/>
+        /// has been acked by the wheel (and therefore removed from the
+        /// retransmitter queue). Frame layout per <see cref="TierDefinition-
+        /// Builder.ChunkMessage"/> places session at byte 6 and seq at
+        /// bytes 8-9 (LE). Returns false if any chunk is still pending.
+        /// </summary>
+        private bool AllBlindChunksAcked()
+        {
+            if (_tierDefBlindFrames == null) return true;
+            foreach (var frame in _tierDefBlindFrames)
+            {
+                if (frame == null || frame.Length < 10) continue;
+                byte session = frame[6];
+                int seq = frame[8] | (frame[9] << 8);
+                if (_retransmitter.Contains(session, seq))
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>Re-emit the sess=0x09 prime + ConfigJson open request until
@@ -2777,6 +3094,178 @@ namespace MozaPlugin.Telemetry
                     "— wheel will not engage configJson handshake. Dashboard rendering may fail. " +
                     "Recovery: disable+re-enable plugin.");
             }
+        }
+
+        /// <summary>
+        /// When the most-recent tier-def emission had unbound channels,
+        /// schedule a kind=4 dashboard-switch re-emit for the slot the
+        /// wheel is currently on. Re-applying the same slot tells some
+        /// firmwares to re-run their dashboard-load sequence which re-
+        /// advertises the full channel catalog. Throttled by
+        /// <see cref="_lastCatalogResyncProbeUtcTicks"/> so a stuck case
+        /// can't produce a switch storm.
+        /// </summary>
+        private void ScheduleCatalogResyncProbe()
+        {
+            long now = System.DateTime.UtcNow.Ticks;
+            if (now - _lastCatalogResyncProbeUtcTicks < CatalogResyncProbeMinIntervalTicks)
+                return;
+            _lastCatalogResyncProbeUtcTicks = now;
+
+            // Resolve the current slot from the wheel-reported configJsonList
+            // by matching profile name. Without LastState we don't know which
+            // slot the wheel thinks it's on; skip silently in that case.
+            var state = _configJson.LastState;
+            string? profileName = _profile?.Name;
+            if (state == null || state.ConfigJsonList == null || state.ConfigJsonList.Count == 0
+                || string.IsNullOrEmpty(profileName))
+                return;
+            int slot = -1;
+            for (int i = 0; i < state.ConfigJsonList.Count; i++)
+            {
+                if (string.Equals(state.ConfigJsonList[i], profileName,
+                    System.StringComparison.OrdinalIgnoreCase))
+                { slot = i; break; }
+            }
+            if (slot < 0)
+            {
+                MozaLog.Debug(
+                    $"[Moza] Catalog re-sync probe skipped: profile '{profileName}' " +
+                    "not found in wheel-reported configJsonList");
+                return;
+            }
+
+            int slotCapture = slot;
+            string nameCapture = profileName!;
+            // Defer the kind=4 emission so it lands AFTER the just-sent tier-
+            // def chunks finish hitting the wire. 800ms covers the largest
+            // observed tier-def burst (Grids: 26 chunks * 4ms one-shot pace
+            // ≈ 100ms with budget pacing absorbed).
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    System.Threading.Thread.Sleep(800);
+                    if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
+                    SendDashboardSwitch((uint)slotCapture);
+                    MozaLog.Debug(
+                        $"[Moza] Catalog re-sync probe: re-emitted kind=4 " +
+                        $"slot={slotCapture} ('{nameCapture}')");
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[Moza] Catalog re-sync probe failed: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
+        /// Re-emit tier-def when the wheel's channel catalog has grown since
+        /// the last subscription emission. Mirrors PitHouse's growing-
+        /// subscription pattern: as the wheel pushes additional URL records
+        /// over the first few seconds (and again post-dashboard-switch), we
+        /// re-subscribe so late-arriving channels acquire correct chIndex
+        /// bindings instead of being stuck at chIndex=0.
+        ///
+        /// Without this, dashboard widgets bound to URLs that arrive after
+        /// the initial preamble→Active tier-def render frozen at zero —
+        /// observed 2026-05-09 with Grids tire channels (catalog slots 9-20
+        /// arrived after preamble exit) and Mono test channels.
+        ///
+        /// Quiet-window gating: only re-emit when the catalog has been
+        /// stable for <see cref="CatalogGrowthQuietMs"/>. Re-emitting mid-
+        /// burst would race the wheel's continuing advertisements and
+        /// fragment the tier-def across two emissions.
+        /// </summary>
+        private void TickGrowSubscriptionIfCatalogStable()
+        {
+            if (_state != TelemetryState.Active) return;
+            if (!_connection.IsConnected) return;
+            int cur = _catalogParser.Count;
+            if (cur - _catalogCountAtLastSubscription < CatalogGrowthMinDelta) return;
+
+            int idle = _catalogParser.LastActivityMs == 0
+                ? int.MaxValue
+                : Environment.TickCount - _catalogParser.LastActivityMs;
+            if (idle < CatalogGrowthQuietMs) return;
+
+            int prev = _catalogCountAtLastSubscription;
+            MozaLog.Debug(
+                $"[Moza] Catalog grew {prev}→{cur} since last subscription " +
+                $"(idle {idle}ms ≥ {CatalogGrowthQuietMs}ms) — re-applying tier-def");
+            try
+            {
+                ApplySubscription(force: true);
+                _catalogCountAtLastSubscription = _catalogParser.Count;
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[Moza] Catalog-growth re-subscribe failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Stuck-state watchdog for sess=0x09 configJson. Restart-escalates
+        /// ONLY when nothing else is working — a chunk drop on the configJson
+        /// burst is "nice to lose" if the catalog and tier-def are healthy,
+        /// because configJson state is for dashboard-library UI, not for
+        /// rendering the active dashboard itself. Forcing a 11s Stop+Start
+        /// just because LastState is null while streams are alive throws away
+        /// a working session.
+        ///
+        /// Skip conditions:
+        ///   - LastState already populated (steady state — no problem)
+        ///   - No chunks ever received (wheel hasn't started — TickRetryS09
+        ///     already handles this with shorter retry cadence)
+        ///   - Catalog is populated AND we have a tier-def emitted (dashboard
+        ///     can render fine without configJson library list — observed
+        ///     2026-05-09: catalog 0→20 + working test pattern despite
+        ///     stuck configJson)
+        ///   - Within escalation cooldown
+        ///
+        /// Only fires when ALL of: chunks were arriving, then went silent
+        /// for ConfigJsonNoStateRestartTimeoutTicks AND we have nothing else
+        /// (no catalog, no tier-def). That's the genuine stuck case where
+        /// only a Stop+Start can recover.
+        /// </summary>
+        private void TickConfigJsonStuckWatchdog()
+        {
+            if (_state == TelemetryState.Idle) return;
+            if (!_connection.IsConnected) return;
+            if (_configJson.LastState != null) return;
+            if (_configJsonLastChunkUtcTicks == 0) return; // never received any chunk yet
+
+            // Skip when we have a working dashboard despite the missing
+            // library list. Catalog + active subscription is enough for
+            // dashboard rendering; configJson library is a UI concern.
+            bool haveCatalog = (_catalogParser?.Count ?? 0) > 0;
+            bool haveSubscription = _activeSubscription != null;
+            if (haveCatalog && haveSubscription)
+                return;
+
+            long now = System.DateTime.UtcNow.Ticks;
+            if (now - _configJsonLastChunkUtcTicks < ConfigJsonNoStateRestartTimeoutTicks)
+                return;
+            if (now - _configJsonLastEscalationUtcTicks < ConfigJsonEscalationCooldownTicks)
+                return;
+
+            _configJsonLastEscalationUtcTicks = now;
+            _configJsonGapCount = 0;
+            // Reset the chunk-time so the next restart cycle gets a fresh
+            // window before this watchdog fires again.
+            _configJsonLastChunkUtcTicks = now;
+            MozaLog.Warn(
+                "[Moza] configJson stuck-state watchdog: " +
+                $"chunks arrived but no valid state for {ConfigJsonNoStateRestartTimeoutTicks / System.TimeSpan.TicksPerMillisecond / 1000}s, " +
+                "and no catalog/subscription either — triggering full RestartForSwitch");
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try { RestartForSwitch(); }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[Moza] RestartForSwitch from stuck-state watchdog failed: {ex.Message}");
+                }
+            });
         }
 
         /// <summary>Widget-state poll cycle. Cycle of 80 slots at one frame per
@@ -3032,6 +3521,97 @@ namespace MozaPlugin.Telemetry
         {
             int seq = ++_session09OutboundSeq;
             SendSessionPrime(0x09, (ushort)seq);
+        }
+
+        /// <summary>
+        /// Tiered chunk-drop recovery for sess=0x09 / 0x0a configJson. Tier
+        /// chosen by gap count and cached state:
+        ///
+        ///   Tier 0 (LastState present, any gap count): no action required.
+        ///   The cached state is still authoritative for downstream consumers
+        ///   (dashboard library list); the wheel doesn't change state without
+        ///   a user action so a stale-but-correct cache is preferable to a
+        ///   forced re-handshake (which the wheel often ignores anyway).
+        ///
+        ///   Tier 1 (LastState absent, first gap): prime + open-request. Some
+        ///   firmwares respond to the prime by resetting their sess=0x09 state
+        ///   machine and re-bursting on next OpenRequest.
+        ///
+        ///   Tier 2 (LastState absent, repeated gaps): full RestartForSwitch.
+        ///   The Stop+11s-settle+Start sequence is the only reliable way to
+        ///   force a wheel that's stuck mid-burst back to a cold-start where
+        ///   it'll definitely emit the full state again.
+        ///
+        /// Cooldown gates Tier 2 so a chunk-drop storm can't cycle Restart
+        /// faster than the wheel's settle window.
+        /// </summary>
+        private void HandleConfigJsonGap(byte session, int seq)
+        {
+            _configJsonGapCount++;
+            bool haveCachedState = _configJson.LastState != null;
+            string tag = $"sess=0x{session:X2}";
+            string cachedTag = haveCachedState ? "cached-state" : "no-state";
+
+            if (haveCachedState)
+            {
+                MozaLog.Warn(
+                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"buffer cleared, keeping cached state — no recovery action");
+                return;
+            }
+
+            if (_configJsonGapCount <= ConfigJsonGapPrimeRetryAt)
+            {
+                try
+                {
+                    int recoveryOpenSeq = unchecked((ushort)(seq + 0x100 * _configJsonGapCount));
+                    int primeSeq = unchecked((ushort)(seq + 0x200 + _configJsonGapCount));
+                    MozaLog.Warn(
+                        $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4})");
+                    SendSessionPrime(session, (ushort)primeSeq);
+                    SendConfigJsonOpenRequest(session, (ushort)recoveryOpenSeq);
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[Moza] {tag} configJson recovery emit failed: {ex.Message}");
+                }
+                return;
+            }
+
+            if (_configJsonGapCount >= ConfigJsonGapRestartAt)
+            {
+                long now = System.DateTime.UtcNow.Ticks;
+                if (now - _configJsonLastEscalationUtcTicks < ConfigJsonEscalationCooldownTicks)
+                {
+                    MozaLog.Warn(
+                        $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        "in escalation cooldown — deferring full restart");
+                    return;
+                }
+                _configJsonLastEscalationUtcTicks = now;
+                _configJsonGapCount = 0;
+                MozaLog.Warn(
+                    $"[Moza] {tag} configJson recovery escalation: " +
+                    "no cached state and prime+open-request didn't recover the burst — " +
+                    "triggering full RestartForSwitch");
+                System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    try { RestartForSwitch(); }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Warn($"[Moza] {tag} RestartForSwitch from gap recovery failed: {ex.Message}");
+                    }
+                });
+                return;
+            }
+
+            // Mid-tier (gap count between prime-retry and restart): just log;
+            // the wheel may still be flushing chunks and a heartbeat could
+            // reach us before the next escalation tier fires.
+            MozaLog.Warn(
+                $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                "waiting for next chunk before escalating");
         }
 
         /// <summary>
@@ -3532,11 +4112,14 @@ namespace MozaPlugin.Telemetry
 
         private void SendStatusPush()
         {
-            // Pithouse's fc:00 frames are purely reactive session acks — there is no
-            // separate "active-phase status sender." The ack_seq tracks the highest
-            // sequence received on this session. Sending periodically with the current
-            // ack_seq is harmless (just re-acks the same point if no new data arrived).
-            SendSessionAck(FlagByte, (ushort)_sessionAckSeq);
+            // Disabled. Per-chunk acks at the inbound dispatch (line 2315
+            // SendSessionAck on session==FlagByte) cover steady-state ack
+            // requirements. The 1Hz re-ack here was emitting a stale running-
+            // max ack — useful when ack reliability was poor under the old
+            // running-max ack bug, but redundant now and a footgun for
+            // cross-epoch staleness (running-max from a prior session
+            // re-acked into a new session). 2026-05-09 trace analysis
+            // showed this was the only remaining stale-running-max ack site.
         }
 
         public void Dispose()

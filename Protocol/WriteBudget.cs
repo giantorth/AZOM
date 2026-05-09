@@ -20,16 +20,27 @@ namespace MozaPlugin.Protocol
     /// </summary>
     public sealed class WriteBudget
     {
-        // Sustained budget = ~70% of theoretical 11 520 wire B/s. The remaining
-        // headroom absorbs inbound flow-control replies and short bursts before
-        // the OS write buffer (16 KB) fills.
-        private const int TargetBytesPerWindow = 8000;
+        // Wire ceiling = 11 520 B/s (115200 baud / 10 bits per byte). Measured
+        // steady-state telemetry traffic averages ~5 kB/s with bursts to 9-12
+        // kB/s during cold-start, post-switch settings ApplyProfile, and tier-
+        // def blind retransmit. The target must sit above the P99 of normal
+        // traffic, otherwise MayDrainStreams gates the stream lane during
+        // routine bursts and starves the wheel of fresh tier value frames —
+        // the exact failure mode that broke configJson handshakes post-switch
+        // in the 2026-05-09 regression trace (chunk drop on sess=0x09 + 4×
+        // dashboard-switch retries within 2 min).
+        //
+        // Sustained target = ~95 % of wire ceiling. The OS write buffer
+        // (16 kB on Wine SerialPort) provides natural backpressure above this
+        // point: SerialPort.Write blocks once the kernel buffer fills, which
+        // gates the host without us needing a software gate.
+        public const int TargetBytesPerWindow = 11000;
         // Bursts up to BurstAllowedBytes / window are tolerated without pacing
         // adjustment — settings ApplyProfile (~30 frames × 4 ms = 120 ms burst)
-        // sits in this band.
-        private const int BurstAllowedBytes = 12000;
+        // and tier-def chunk emission sit in this band.
+        private const int BurstAllowedBytes = 14000;
         // Below this threshold the gate stays at 0 ms — no impact on steady state.
-        private const int SoftThresholdBytes = 6400; // 80% of target
+        private const int SoftThresholdBytes = 9500;
 
         private const long TicksPerMillisecond = TimeSpan.TicksPerMillisecond;
         private const long WindowTicks = 1000 * TicksPerMillisecond;
@@ -112,34 +123,29 @@ namespace MozaPlugin.Protocol
             return 20;
         }
 
-        /// <summary>
-        /// True while the stream lane is allowed to drain this WriteLoop
-        /// iteration. Returns false above the target so latest-wins coalescing
-        /// has time to compress the pending state into one frame per slot.
-        /// </summary>
-        public bool MayDrainStreams()
-        {
-            lock (_lock)
-            {
-                Trim(Stopwatch.GetTimestamp());
-                return _bytesInWindow < TargetBytesPerWindow;
-            }
-        }
 
-        /// <summary>Read-and-reset snapshot — peak value resets to the
-        /// instantaneous count, so each caller sees the peak SINCE THEIR LAST
-        /// CALL. The diagnostics tab uses this so the peak in the UI reflects
-        /// activity since the user last looked.</summary>
+        /// <summary>Snapshot of current bandwidth state. Peak is monotonic
+        /// per session (max bytes-in-1s-window ever observed since the last
+        /// <see cref="ResetPeak"/> or session start). Earlier semantics
+        /// reset the peak on every call, which made the diagnostics UI's
+        /// peak field jump around every poll — confusing for users trying
+        /// to spot saturation events.</summary>
         public Snapshot GetSnapshot()
         {
             lock (_lock)
             {
                 Trim(Stopwatch.GetTimestamp());
                 int pct = PercentOf(_bytesInWindow);
-                int peak = _peakBytesInWindow;
-                _peakBytesInWindow = _bytesInWindow;
-                return new Snapshot(_bytesInWindow, pct, peak);
+                return new Snapshot(_bytesInWindow, pct, _peakBytesInWindow);
             }
+        }
+
+        /// <summary>Manually reset the peak counter. UI can offer a "reset
+        /// peak" button so the user can re-baseline after addressing a
+        /// burst event without reloading the plugin.</summary>
+        public void ResetPeak()
+        {
+            lock (_lock) _peakBytesInWindow = _bytesInWindow;
         }
 
         /// <summary>Non-mutating peek used by the WriteLoop's periodic warn

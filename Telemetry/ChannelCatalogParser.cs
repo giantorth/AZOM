@@ -27,6 +27,14 @@ namespace MozaPlugin.Telemetry
     {
         private readonly object _bufferLock = new object();
         private readonly List<byte> _buffer = new();
+        // Per-session highest seq we've already absorbed into _buffer. The
+        // wheel retransmits each catalog chunk multiple times before our ack
+        // reaches it (verified 2026-05-09 trace: seqs 5-14 received 3× each).
+        // Without dedup, every retransmit gets re-appended, doubling/tripling
+        // the buffer for early seqs and corrupting the size-prefixed TLV walk
+        // — symptom: tire URLs at indexes 10/11/13/14 parsed as garbage even
+        // though the wire bytes were clean per CRC + per-record validation.
+        private readonly Dictionary<byte, int> _highestSeqAppended = new();
         private volatile List<string>? _catalog;
         private volatile int _lastActivityMs;
         private int _lastParseLen;
@@ -49,7 +57,10 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>Append inbound chunk bytes to the rolling buffer. Records
-        /// activity timestamp so quiet-window waits can detect end-of-burst.</summary>
+        /// activity timestamp so quiet-window waits can detect end-of-burst.
+        ///
+        /// Legacy seq-unaware overload — use the (session, seq, …) variant
+        /// when possible to dedup retransmits.</summary>
         public void AppendChunk(byte[] chunkBytes, int offset, int length)
         {
             if (chunkBytes == null || length <= 0) return;
@@ -59,6 +70,24 @@ namespace MozaPlugin.Telemetry
                     _buffer.Add(chunkBytes[offset + i]);
             }
             _lastActivityMs = Environment.TickCount;
+        }
+
+        /// <summary>Seq-aware append: only adds the chunk if seq is greater
+        /// than the highest-seen seq for this session. Drops retransmits
+        /// silently. Returns true on append, false on dedup.</summary>
+        public bool AppendChunkIfNew(byte session, int seq, byte[] chunkBytes, int offset, int length)
+        {
+            if (chunkBytes == null || length <= 0) return false;
+            lock (_bufferLock)
+            {
+                if (_highestSeqAppended.TryGetValue(session, out int prevSeq) && seq <= prevSeq)
+                    return false;
+                _highestSeqAppended[session] = seq;
+                for (int i = 0; i < length; i++)
+                    _buffer.Add(chunkBytes[offset + i]);
+            }
+            _lastActivityMs = Environment.TickCount;
+            return true;
         }
 
         /// <summary>Append a single byte. Helper for TelemetrySender.OnMessageDuringPreamble
@@ -74,7 +103,13 @@ namespace MozaPlugin.Telemetry
         /// on prior idx→URL bindings for back-references after a dash switch.</summary>
         public void ClearBuffer()
         {
-            lock (_bufferLock) _buffer.Clear();
+            lock (_bufferLock)
+            {
+                _buffer.Clear();
+                // Drop seq-dedup tracking too — fresh buffer means fresh
+                // session, retransmit memory should not bleed across.
+                _highestSeqAppended.Clear();
+            }
             _lastParseLen = 0;
         }
 
@@ -231,6 +266,37 @@ namespace MozaPlugin.Telemetry
                             && urlLen >= 4
                             && buffer[urlStart + 1] == 0x31));
                 if (!plausible) { diagPlausReject++; i++; continue; }
+
+                // Stricter check: validate every byte of the URL body is in
+                // an expected character set. URLs are ASCII printable; the
+                // 0x01 prefix and 0x5C/0x31 abbrev markers are special-cased
+                // but the trailing characters of those forms are still
+                // printable ASCII or the {FL}/{FR}/{RL}/{RR} placeholders.
+                // Without this, a "false 0x04 tag" inside another record's
+                // data — combined with happen-to-pass plausibility on the
+                // first 3 bytes — leaks a corrupt URL into the catalog
+                // (observed 2026-05-09: same Grids switch produced "v1/
+                // gameDa???????t???" deterministically).
+                bool wholeUrlOk = true;
+                int scanStart = urlStart;
+                int scanLen = urlLen;
+                if (buffer[urlStart] == 0x01)
+                {
+                    scanStart = urlStart + 1; scanLen = urlLen - 1;
+                }
+                else if (buffer[urlStart] == 0x5C && buffer[urlStart + 1] == 0x31)
+                {
+                    scanStart = urlStart + 2; scanLen = urlLen - 2;
+                }
+                for (int k = 0; k < scanLen; k++)
+                {
+                    byte ch = buffer[scanStart + k];
+                    // Allow printable ASCII (0x20..0x7E). Permit tab (0x09)
+                    // because some abbreviation expansions retain it briefly.
+                    if (ch == 0x09) continue;
+                    if (ch < 0x20 || ch > 0x7E) { wholeUrlOk = false; break; }
+                }
+                if (!wholeUrlOk) { diagPlausReject++; i++; continue; }
                 string url;
                 if (buffer[urlStart] == 0x01)
                 {
