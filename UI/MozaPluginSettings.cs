@@ -121,7 +121,7 @@ namespace MozaPlugin
         // Code-only toggle — not serialized so changing the default here
         // is the only way to flip it. Avoids stale persisted values.
         [Newtonsoft.Json.JsonIgnore]
-        public bool EnableWireTraceFileSink { get; set; } = true;
+        public bool EnableWireTraceFileSink { get; set; } = false;
 
         [Newtonsoft.Json.JsonIgnore]
         public bool EnableAutoTestOnConnect { get; set; } = false;
