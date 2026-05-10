@@ -116,6 +116,7 @@ namespace MozaPlugin
         {
             "wheel-telemetry-mode", "wheel-telemetry-idle-effect",
             "wheel-buttons-idle-effect",
+            "wheel-knob-idle-effect",
             "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-flags-brightness",
             "wheel-idle-mode", "wheel-idle-timeout", "wheel-idle-speed",
             "wheel-idle-color",
@@ -141,7 +142,7 @@ namespace MozaPlugin
             "wheel-flag-color4", "wheel-flag-color5", "wheel-flag-color6",
             // Extended LED group presence probes (Single/Rotary/Ambient).
             // A brightness response flips IsWheelLedGroupPresent for that group.
-            "wheel-group2-brightness", "wheel-group3-brightness", "wheel-group4-brightness",
+            "wheel-single-brightness", "wheel-knob-brightness", "wheel-ambient-brightness",
         };
 
         private static readonly string[] OldWheelSettingsReadCommands = new[]
@@ -2113,11 +2114,11 @@ namespace MozaPlugin
                     _group3ColorsRead = true;
                     int total = model.KnobRingLedTotal;
                     var cmds = new string[total + 1];
-                    cmds[0] = "wheel-group3-brightness";
+                    cmds[0] = "wheel-knob-brightness";
                     for (int i = 0; i < total; i++)
-                        cmds[i + 1] = $"wheel-group3-color{i + 1}";
+                        cmds[i + 1] = $"wheel-knob-bg-color{i + 1}";
                     _deviceManager.ReadSettingsPaced(cmds);
-                    MozaLog.Debug($"[Moza] Reading Group 3 ring LED colors ({total} LEDs)");
+                    MozaLog.Debug($"[Moza] Reading knob ring LED colors ({total} LEDs)");
                 }
             }
 
@@ -2322,11 +2323,15 @@ namespace MozaPlugin
             if (r.ArrayValue != null)
                 _data.UpdateFromArray(r.Name, r.ArrayValue);
 
-            // Extended LED group presence — any response to groupN brightness/mode/color
-            // from this wheel proves the group exists in firmware.
-            if (r.Name != null && r.Name.StartsWith("wheel-group", StringComparison.Ordinal))
+            // Extended LED group presence — any response to a brightness/mode/color
+            // command from one of the named groups proves it exists in firmware.
+            // Maps the user-facing prefix back to the rs21_parameter.db group ID.
+            if (r.Name != null)
             {
-                int g = r.Name.Length > 11 ? r.Name[11] - '0' : -1;
+                int g = -1;
+                if (r.Name.StartsWith("wheel-single-",  StringComparison.Ordinal)) g = 2;
+                else if (r.Name.StartsWith("wheel-knob-",    StringComparison.Ordinal)) g = 3;
+                else if (r.Name.StartsWith("wheel-ambient-", StringComparison.Ordinal)) g = 4;
                 if (g >= 2 && g <= 4)
                 {
                     int bit = 1 << g;
@@ -2739,6 +2744,8 @@ namespace MozaPlugin
                 _data.WheelTelemetryIdleEffect = _settings.WheelIdleEffect;
             if (_settings.WheelButtonsIdleEffect >= 0)
                 _data.WheelButtonsIdleEffect = _settings.WheelButtonsIdleEffect;
+            if (_settings.WheelKnobIdleEffect >= 0)
+                _data.WheelKnobIdleEffect = _settings.WheelKnobIdleEffect;
             if (_settings.WheelRpmIndicatorMode >= 0)
                 _data.WheelRpmIndicatorMode = _settings.WheelRpmIndicatorMode;
             if (_settings.WheelRpmDisplayMode >= 0)
@@ -2770,6 +2777,8 @@ namespace MozaPlugin
                 _deviceManager.WriteSetting("wheel-telemetry-idle-effect", _settings.WheelIdleEffect);
             if (_settings.WheelButtonsIdleEffect >= 0)
                 _deviceManager.WriteSetting("wheel-buttons-idle-effect", _settings.WheelButtonsIdleEffect);
+            if (_settings.WheelKnobIdleEffect >= 0)
+                _deviceManager.WriteSetting("wheel-knob-idle-effect", _settings.WheelKnobIdleEffect);
 
             // ES/Old wheel modes
             if (_settings.WheelRpmIndicatorMode >= 0)
@@ -3016,6 +3025,11 @@ namespace MozaPlugin
                 {
                     _settings.WheelButtonsIdleEffect = profile.WheelButtonsIdleEffect;
                     _data.WheelButtonsIdleEffect = profile.WheelButtonsIdleEffect;
+                }
+                if (profile.WheelKnobIdleEffect >= 0)
+                {
+                    _settings.WheelKnobIdleEffect = profile.WheelKnobIdleEffect;
+                    _data.WheelKnobIdleEffect = profile.WheelKnobIdleEffect;
                 }
                 if (profile.WheelRpmBrightness >= 0)
                 {
@@ -3270,6 +3284,8 @@ namespace MozaPlugin
                         _deviceManager.WriteSetting("wheel-telemetry-idle-effect", profile.WheelIdleEffect);
                     if (profile.WheelButtonsIdleEffect >= 0)
                         _deviceManager.WriteSetting("wheel-buttons-idle-effect", profile.WheelButtonsIdleEffect);
+                    if (profile.WheelKnobIdleEffect >= 0)
+                        _deviceManager.WriteSetting("wheel-knob-idle-effect", profile.WheelKnobIdleEffect);
                     if (profile.WheelRpmBrightness >= 0)
                         _deviceManager.WriteSetting("wheel-rpm-brightness", profile.WheelRpmBrightness);
                     if (profile.WheelButtonsBrightness >= 0)
@@ -3352,45 +3368,69 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Push per-knob background + primary colors to the wheel. No-op unless the
-        /// active wheel model exposes knob LED rings (W17 CS Pro / W18 KS Pro).
-        /// Source arrays are packed R&lt;&lt;16|G&lt;&lt;8|B per knob; null = skip.
+        /// Push per-knob "bulk Inactive default" + per-knob "Active" colors to the
+        /// wheel. No-op unless the active wheel model exposes knob LED rings
+        /// (W17 CS Pro / W18 KS Pro). Source arrays are packed R&lt;&lt;16|G&lt;&lt;8|B
+        /// per knob; null = skip. The bulk Inactive value for each knob is fanned
+        /// out to all of that knob's ring LEDs via the per-LED wheel-knob-bg-color{N}
+        /// writes (cmd 0x1F 0x03 0x01); the Active value drives cmd 0x27 ROLE=0.
         /// </summary>
-        private void WriteKnobColors(int[]? packedBackground, int[]? packedPrimary)
+        private void WriteKnobColors(int[]? packedBulkInactive, int[]? packedActive)
         {
-            int knobs = WheelModelInfo?.KnobCount ?? 0;
+            var model = WheelModelInfo;
+            int knobs = model?.KnobCount ?? 0;
             if (knobs <= 0) return;
-            WriteKnobRoleArray(packedBackground, "bg-color", knobs);
-            WriteKnobRoleArray(packedPrimary,    "primary-color", knobs);
-        }
 
-        private void WriteKnobRoleArray(int[]? packedColors, string roleSuffix, int count)
-        {
-            if (packedColors == null) return;
-            int len = Math.Min(packedColors.Length, count);
-            for (int i = 0; i < len; i++)
+            // Per-knob Active LED color (cmd 0x27 ROLE=0).
+            if (packedActive != null)
             {
-                var rgb = MozaProfile.UnpackColor(packedColors[i]);
-                _deviceManager.WriteColor($"wheel-knob{i + 1}-{roleSuffix}", rgb[0], rgb[1], rgb[2]);
+                int len = Math.Min(packedActive.Length, knobs);
+                for (int i = 0; i < len; i++)
+                {
+                    var rgb = MozaProfile.UnpackColor(packedActive[i]);
+                    _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
+                }
+            }
+
+            // Per-knob "bulk Inactive default" — fan one color out to all of the
+            // knob's ring LEDs via per-LED writes (cmd 0x1F 0x03 0x01).
+            if (packedBulkInactive != null
+                && model?.KnobRingLeds != null
+                && IsWheelLedGroupPresent(3))
+            {
+                int kLen = Math.Min(packedBulkInactive.Length, knobs);
+                for (int k = 0; k < kLen; k++)
+                {
+                    var rgb = MozaProfile.UnpackColor(packedBulkInactive[k]);
+                    int startIdx = model.KnobRingStartIndex(k);
+                    int count = model.KnobRingLeds[k];
+                    for (int i = 0; i < count; i++)
+                    {
+                        int ledIdx = startIdx + i;
+                        _deviceManager.WriteColor($"wheel-knob-bg-color{ledIdx + 1}", rgb[0], rgb[1], rgb[2]);
+                    }
+                }
             }
         }
 
         /// <summary>
-        /// Push Group 3 per-LED ring colors to the wheel. No-op unless the active
-        /// wheel model has KnobRingLeds and Group 3 is present.
+        /// Push per-LED ring colors (cmd 0x1F 0x03 0x01) to the wheel. No-op
+        /// unless the active wheel model has KnobRingLeds and Group 3 is present.
+        /// `packedColors` is indexed across all knobs contiguously (LED 1..56);
+        /// brightness &lt; 0 skips the brightness write.
         /// </summary>
         private void WriteKnobRingColors(int[]? packedColors, int brightness)
         {
             var model = WheelModelInfo;
             if (model?.KnobRingLeds == null || !IsWheelLedGroupPresent(3)) return;
             if (brightness >= 0)
-                _deviceManager.WriteSetting("wheel-group3-brightness", brightness);
+                _deviceManager.WriteSetting("wheel-knob-brightness", brightness);
             if (packedColors == null) return;
             int total = Math.Min(packedColors.Length, model.KnobRingLedTotal);
             for (int i = 0; i < total; i++)
             {
                 var rgb = MozaProfile.UnpackColor(packedColors[i]);
-                _deviceManager.WriteColor($"wheel-group3-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
             }
         }
 
@@ -3432,6 +3472,8 @@ namespace MozaPlugin
                         _deviceManager.WriteSetting("wheel-telemetry-idle-effect", extSettings.WheelIdleEffect);
                     if (extSettings.WheelButtonsIdleEffect >= 0)
                         _deviceManager.WriteSetting("wheel-buttons-idle-effect", extSettings.WheelButtonsIdleEffect);
+                    if (extSettings.WheelKnobIdleEffect >= 0)
+                        _deviceManager.WriteSetting("wheel-knob-idle-effect", extSettings.WheelKnobIdleEffect);
                     if (extSettings.WheelRpmBrightness >= 0)
                         _deviceManager.WriteSetting("wheel-rpm-brightness", extSettings.WheelRpmBrightness);
                     if (extSettings.WheelButtonsBrightness >= 0)

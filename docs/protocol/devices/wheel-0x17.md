@@ -51,11 +51,10 @@ Full serial number = serial-a + serial-b (32 ASCII chars total).
 | buttons-idle-effect | `1D 01` | 1 | int | |
 | telemetry-idle-interval | `1E 00` | 3 | int | Write-only |
 | buttons-idle-interval | `1E 01` | 3 | int | Write-only |
-| idle-mode | `20` | 1 | int | |
-| idle-timeout | `21` | 2 | int | |
-| idle-color | `24 FF 01 FF` | 3 | array | |
-| idle-speed | `22 00` | 2 | int | |
-| rpm-idle-speed | `24 00 05` | 2 | int | |
+| idle-mode | `20` | 1 | int | Sleep-light mode selector. Verified value `0x01` = Breathing on 2026-05-10 (`bridge-20260510-115644.jsonl` t=41008.106). Plugin: `wheel-idle-mode` |
+| idle-timeout | `21` | 2 | int | BE u16 in **minutes** (verified 2026-05-10: `21 00 01` = 1 min, `21 00 0a` = 10 min). Plugin: `wheel-idle-timeout` |
+| idle-speed | `22 [mode] [ms_msb] [ms_lsb]` | 3 | array | Per-mode sleep-light animation speed. Wire payload is `[mode, BE u16 ms]` — each sleep mode stores its own speed. Verified 2026-05-10: `22 01 0c d7` = mode 1 (Breathing), 3287 ms. Plugin: `wheel-idle-speed` (3-byte array). Earlier docs documented this as `22 00` (cmdid with mode hardcoded to 0) + 2-byte int payload — incorrect; the mode byte must be the actual target mode |
+| idle-color | `24 FF 01 FF` | 3 | array | Sleep-light color RGB. Verified 2026-05-10: `24 FF 01 FF FF 00 00` = red. Plugin: `wheel-idle-color` |
 | rpm-interval | `16` | 4 | int | |
 | rpm-mode | `17` | 1 | int | |
 | rpm-value1 | `18 00` | 2 | int | RPM threshold for LED 1 |
@@ -192,13 +191,9 @@ Additional newer wheel commands:
 | Command | ID | Bytes | Type | Notes |
 |---------|----|-------|------|-------|
 | meter-auto-rotation | `10` | 1 | int | |
-| sleep-mode | `20` | 1 | int | |
-| sleep-timeout | `21` | 2 | int | |
-| sleep-breath-interval | `22 01` | 2 | int | |
 | sleep-breath-brightness | `23 [0/1]` | 1 | int | min (0) / max (1) |
-| sleep-breath-color | `24 FF 01 FF` | 3 | array | RGB |
 | startup-color | `25` | 3 | array | RGB |
 | paddle-thresholds | `26` | 24 | array | 12× 2-byte thresholds |
-| led-group-color | `27 [G] [role]` | 3 | array | Per-group idle/active RGB. `G=0` = RPM strip; `G=1..5` = rotary knobs (CS Pro has 4 knobs, KS Pro has 5). `role=0` = background/idle, `role=1` = primary/active. Plugin commands `wheel-knob{1..5}-bg-color` / `wheel-knob{1..5}-primary-color` for the knob groups. Wire frame verified on CS Pro (see [`../telemetry/control-signals.md` § LED group colour](../telemetry/control-signals.md)) |
+| knob-active-color | `27 [knob] [role]` | 3 | array | Per-knob "Active position" LED RGB. `knob=0..4` (knob 1..5; CS Pro 0..3, KS Pro 0..4). Role-byte semantics verified live 2026-05-10 against PitHouse: `role=0` is the only writable form — sets the persisted Active LED colour and is what PitHouse's "Active" swatch fires; `role=1` is read-only and returns the live ring-LED colour at the knob's current rotation position. Plugin commands: `wheel-knob{1..5}-active-color` (write/read role 0) and `wheel-knob{1..5}-live-color` (read-only role 1). Earlier docs labelled role 0 as "background/idle" and role 1 as "primary/active" — that mapping was wrong; corrected here and in [`../telemetry/control-signals.md` § Per-knob Active LED colour](../telemetry/control-signals.md). |
 | multi-function-switch | `28 [0..2]` | 1 | int | Enable, count, left/right assignment |
 | rotary-signal-mode | `2A [N]` | 1 | int | Encoder N (0–4) signal mode |

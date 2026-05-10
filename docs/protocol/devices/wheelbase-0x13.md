@@ -14,6 +14,7 @@
 | road-sensitivity | `0C` | 2 | int | |
 | protection | `0D` | 2 | int | Hands-off protection strength |
 | protection-mode | `2D` | 2 | int | |
+| gearshift-vibration | `2E` | 2 | int | "Gearshift vibration intensity" PitHouse slider. Range 0..5 (0 = effect disabled, 5 = max). Sets the strength of the rumble fired by `gearshift-event` (cmd 0x76, see Group `0x2D` below). Verified 2026-05-10 (`bridge-20260510-115644.jsonl` t=41600.748 `2E 00 01` = 1, t=41700.520 `2E 00 05` = 5). |
 | equalizer1 | `0E` | 2 | int | |
 | equalizer2 | `0F` | 2 | int | |
 | equalizer3 | `10` | 2 | int | |
@@ -30,7 +31,7 @@
 | soft-limit-strength | `1B` | 2 | int | |
 | soft-limit-retain | `1C` | 2 | int | |
 | soft-limit-stiffness | `1F` | 2 | int | |
-| temp-strategy | `1E` | 2 | int | |
+| temp-strategy / performance-output | `1E` | 2 | int | "Performance output" in newer PitHouse builds. 0 = Reserved, 1 = Full. Verified live 2026-05-10 (`bridge-20260510-115644.jsonl` t=41902.486 `1E 00 01`, t=42166.594 `1E 00 00`). |
 | ffb-curve-x1 | `22 01` | 1 | int | FFB linearization curve X point 1 |
 | ffb-curve-x2 | `22 02` | 1 | int | |
 | ffb-curve-x3 | `22 03` | 1 | int | |
@@ -83,10 +84,25 @@ Both produce ACK response: `7E 03 AA 31 43 0x 05 [chk]` (echo with group|0x80, d
 | mosfet-temp | `05` | 2 | int | |
 | motor-temp | `06` | 2 | int | |
 
-### Group `0x2D` (45) — Sequence Counter (write-only)
+### Group `0x2D` (45) — Sequence Counter / Discrete Events (write-only)
 
-Observed in USB capture at ~50×/sec during driving. Group 45 is not in the main command list — discovered by capture analysis. See [`../telemetry/control-signals.md` § Sequence counter](../telemetry/control-signals.md).
+Group 45 carries two distinct types of host→base traffic:
+
+1. The **sequence counter** (`F5 31 …`), sent at ~42 Hz during driving as a
+   frame-sync counter.
+2. **Discrete event** frames sent aperiodically, fire-and-forget — the wheel
+   does not echo them on group `0xAD`.
 
 | Command | ID | Bytes | Type | Notes |
 |---------|----|-------|------|-------|
-| sequence-counter | `F5 31` | 4 | int | Last byte monotonically increments each send; likely a frame sync counter sent to base |
+| sequence-counter | `F5 31` | 4 | int | Last byte monotonically increments each send; frame-sync counter at ~42 Hz |
+| gearshift-event | `76` | 2 | int | Fixed payload `00 01`. Fired once per gear change detected by PitHouse. Wheel firmware uses the configured `gearshift-vibration` (cmd 0x2E intensity) to drive a brief motor pulse. Verified 2026-05-10 (`bridge-20260510-115644.jsonl`): 112 occurrences across the capture, all identical body `76 00 01`, no `0xAD` echoes. The same trigger fires regardless of shift direction or gear value — direction/magnitude is not encoded. |
+
+Notes:
+- Trigger and intensity are independent commands. `gearshift-event` (group
+  `0x2D`) is the per-shift trigger; `gearshift-vibration` (group `0x29` cmd
+  0x2E) is the persisted strength setting. The wheel reads the setting
+  from EEPROM and reacts to the trigger from RAM.
+- The on-wheel display gear digit comes from the dashboard telemetry
+  (session 0x02 channel 15) — that's a separate render path and does NOT
+  drive the rumble.

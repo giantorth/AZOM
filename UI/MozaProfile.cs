@@ -75,6 +75,7 @@ namespace MozaPlugin
         public int WheelTelemetryMode { get; set; } = -1;
         public int WheelIdleEffect { get; set; } = -1;
         public int WheelButtonsIdleEffect { get; set; } = -1;
+        public int WheelKnobIdleEffect { get; set; } = -1;
         public int WheelRpmBrightness { get; set; } = -1;
         public int WheelButtonsBrightness { get; set; } = -1;
         public int WheelFlagsBrightness { get; set; } = -1;
@@ -174,6 +175,7 @@ namespace MozaPlugin
             // Wheel LED
             WheelTelemetryMode = p.WheelTelemetryMode; WheelIdleEffect = p.WheelIdleEffect;
             WheelButtonsIdleEffect = p.WheelButtonsIdleEffect;
+            WheelKnobIdleEffect = p.WheelKnobIdleEffect;
             WheelRpmBrightness = p.WheelRpmBrightness; WheelButtonsBrightness = p.WheelButtonsBrightness;
             WheelFlagsBrightness = p.WheelFlagsBrightness;
 
@@ -263,6 +265,7 @@ namespace MozaPlugin
             WheelTelemetryMode = settings.WheelTelemetryMode;
             WheelIdleEffect = settings.WheelIdleEffect;
             WheelButtonsIdleEffect = settings.WheelButtonsIdleEffect;
+            WheelKnobIdleEffect = settings.WheelKnobIdleEffect;
             WheelRpmBrightness = settings.WheelRpmBrightness;
             WheelButtonsBrightness = settings.WheelButtonsBrightness;
             WheelFlagsBrightness = settings.WheelFlagsBrightness;

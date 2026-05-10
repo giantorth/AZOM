@@ -49,10 +49,25 @@ namespace MozaPlugin.Protocol
             AddCommand("base-speed-damping-point","base", 40, 41, new byte[] { 26 },     2, "int");
             AddCommand("base-soft-limit-strength","base", 40, 41, new byte[] { 27 },     2, "int");
             AddCommand("base-soft-limit-retain",  "base", 40, 41, new byte[] { 28 },     2, "int");
+            // cmd 0x1E (30) — labelled "Performance output" in newer PitHouse builds;
+            // older docs called this "temp strategy" (the keep-name we registered
+            // it under originally). Two-state setting:
+            //   0 = Reserved, 1 = Full
+            // Verified 2026-05-10 (sim/logs/bridge-20260510-115644.jsonl):
+            //   t=41902.486  body `1E 00 01` = Full
+            //   t=42166.594  body `1E 00 00` = Reserved
             AddCommand("base-temp-strategy",      "base", 40, 41, new byte[] { 30 },     2, "int");
             AddCommand("base-soft-limit-stiffness","base",40, 41, new byte[] { 31 },     2, "int");
             AddCommand("base-equalizer6",         "base", 40, 41, new byte[] { 44 },     2, "int");
             AddCommand("base-protection-mode",    "base", 40, 41, new byte[] { 45 },     2, "int");
+            // cmd 0x2E (46) — base "Gearshift vibration intensity" slider. Range 0..5
+            // (0 = effect disabled, 5 = max). Verified 2026-05-10
+            // (sim/logs/bridge-20260510-115644.jsonl t=41600.748): body `2E 00 01`
+            // = value 1 (BE u16); t=41700.520: `2E 00 05` = max. Matches the
+            // existing base-* pattern (1-byte cmdid + 2-byte BE int payload).
+            // The companion fire-and-forget shift event is `gearshift-event`
+            // (cmd 0x76, group 0x2D) — see docs/protocol/devices/wheelbase-0x13.md.
+            AddCommand("base-gearshift-vibration","base", 40, 41, new byte[] { 46 },     2, "int");
             AddCommand("base-ffb-disable",        "base", 40, 41, new byte[] { 254 },    2, "int");
 
             // FFB curve (read group 40, write group 41)
@@ -207,28 +222,79 @@ namespace MozaPlugin.Protocol
             for (byte i = 0; i < 16; i++)
                 AddCommand($"wheel-button-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 1, 0xFF, i }, 3, "array");
 
-            // Per-rotary-knob LED colors (W17 CS Pro = 4 knobs, W18 KS Pro = 5 knobs).
-            // Wire: [0x27, <group>, <role>] + [R, G, B]. group = 0..4 (knob 1..5),
-            // role 0=background (idle), 1=primary (active). Write-only — wheel echoes via
-            // WheelEchoPrefixes entries for (0x3F, 0x17, 0x27, 0x00..0x04). Cmd byte must be
-            // 0x27 (LED group colour); decimal `27` (= 0x1B) is the brightness-page command —
-            // using it caused KS Pro / CS Pro knob colour writes to silently no-op.
+            // Per-rotary-knob "Active" LED color (W17 CS Pro = 4 knobs, W18 KS Pro = 5 knobs).
+            // Wire: [0x27, <knob>, <role>] + [R, G, B]. knob = 0..4 (knob 1..5).
+            //
+            // Role-byte semantics, verified 2026-05-10 against PitHouse
+            // (sim/logs/bridge-20260510-111708.jsonl,
+            // docs/protocol/findings/2026-05-10-knob-led-cmd27.md):
+            //   role=0  WRITE on grp=0x3F sets the knob's stored Active color (the
+            //           color shown at whichever ring LED is the knob's current
+            //           rotation position).
+            //           READ  on grp=0x40 returns that persisted value.
+            //   role=1  READ-only on grp=0x40 returns the live LED color at the knob's
+            //           current rotation position. PitHouse never WRITES role=1; doing
+            //           so leaves the wheel echoing but no LED change.
+            //
+            // Cmd byte must be 0x27 (LED group color); decimal `27` (= 0x1B) is the
+            // brightness-page command — using it caused KS Pro / CS Pro knob color
+            // writes to silently no-op.
+            //
+            // ReadGroup = 64 / WriteGroup = 63 — readable for connect-time state sync.
+            // Wheel echoes WRITES via WheelEchoPrefixes (0x3F, 0x17, 0x27, 0x00..0x04).
             for (byte k = 1; k <= 5; k++)
             {
-                AddCommand($"wheel-knob{k}-bg-color",      "wheel", 0xFF, 63, new byte[] { 0x27, (byte)(k - 1), 0 }, 3, "array");
-                AddCommand($"wheel-knob{k}-primary-color", "wheel", 0xFF, 63, new byte[] { 0x27, (byte)(k - 1), 1 }, 3, "array");
+                AddCommand($"wheel-knob{k}-active-color", "wheel", 64, 63, new byte[] { 0x27, (byte)(k - 1), 0 }, 3, "array");
+                // Read-only live-position color (no WRITE — wheel ignores ROLE1 writes).
+                AddCommand($"wheel-knob{k}-live-color",   "wheel", 64, 0xFF, new byte[] { 0x27, (byte)(k - 1), 1 }, 3, "array");
             }
 
-            // Extended LED groups (2=Single/28 LEDs, 3=Rotary/56 LEDs, 4=Ambient/12 LEDs).
-            // Per-LED color: [31, G, 0xFF, index] — same wire format as groups 0/1.
-            // Brightness: [27, G, 0xFF]. Mode: [28, G]. Presence probed via brightness read.
-            foreach (var (g, n) in new[] { ((byte)2, 28), ((byte)3, 56), ((byte)4, 12) })
+            // Extended LED groups, registered under their semantic names instead
+            // of the rs21_parameter.db-style "groupN" abstraction:
+            //   Group 2 (Single  / 28 LEDs)   →  wheel-single-*    status indicators
+            //   Group 3 (Rotary  / 56 LEDs)   →  wheel-knob-*      knob rings (below)
+            //   Group 4 (Ambient / 12 LEDs)   →  wheel-ambient-*   underglow lighting
+            //
+            // Per-LED color: [31, G, 0xFF, index].
+            // Brightness:    [27, G, 0xFF].
+            // Mode:          [28, G].
+            // Idle effect:   [29, G]. Mirrors wheel-{telemetry,buttons}-idle-effect.
+            // Presence probed via brightness read.
+            foreach (var (prefix, g, n) in new[] {
+                ("wheel-single",  (byte)2, 28),
+                ("wheel-ambient", (byte)4, 12),
+            })
             {
-                AddCommand($"wheel-group{g}-brightness", "wheel", 64, 63, new byte[] { 27, g, 0xFF }, 1, "int");
-                AddCommand($"wheel-group{g}-mode",       "wheel", 64, 63, new byte[] { 28, g },       1, "int");
+                AddCommand($"{prefix}-brightness",  "wheel", 64, 63, new byte[] { 27, g, 0xFF }, 1, "int");
+                AddCommand($"{prefix}-mode",        "wheel", 64, 63, new byte[] { 28, g },       1, "int");
+                AddCommand($"{prefix}-idle-effect", "wheel", 64, 63, new byte[] { 29, g },       1, "int");
                 for (byte i = 0; i < n; i++)
-                    AddCommand($"wheel-group{g}-color{i + 1}", "wheel", 64, 63, new byte[] { 31, g, 0xFF, i }, 3, "array");
+                    AddCommand($"{prefix}-color{i + 1}", "wheel", 64, 63, new byte[] { 31, g, 0xFF, i }, 3, "array");
             }
+
+            // Group 3 (Rotary / knob ring layer) — registered explicitly with the
+            // knob-* prefix that matches PitHouse's UI nomenclature.
+            //   wheel-knob-brightness     [27, 3, 0xFF]   1-byte int  per-group brightness
+            //   wheel-knob-led-mode       [28, 3]         1-byte int  LED rendering mode
+            //                                              (distinct from wheel-knob-mode at
+            //                                               cmd 10 which is the encoder
+            //                                               signal mode — Buttons vs Knob).
+            //   wheel-knob-idle-effect    [29, 3]         1-byte int  idle animation selector
+            //                                              (same enum as RPM/Buttons).
+            //                                              Verified 2026-05-10 — body `1D 03 06`
+            //                                              = "RGB pulse" on knob rings.
+            //   wheel-knob-bg-color{N}    [31, 3, 0x01, N-1]   3-byte RGB  per-LED ring color.
+            //                                              Sub byte is 0x01 (PitHouse's
+            //                                              persistent/Inactive write); the
+            //                                              previous 0xFF was incorrect for
+            //                                              this group. N = 1..56 (knob 1
+            //                                              spot 0 = ring-color1, knob 2 spot 0
+            //                                              = ring-color13, etc., contiguous).
+            AddCommand("wheel-knob-brightness",  "wheel", 64, 63, new byte[] { 27, 3, 0xFF }, 1, "int");
+            AddCommand("wheel-knob-led-mode",    "wheel", 64, 63, new byte[] { 28, 3 },       1, "int");
+            AddCommand("wheel-knob-idle-effect", "wheel", 64, 63, new byte[] { 29, 3 },       1, "int");
+            for (byte i = 0; i < 56; i++)
+                AddCommand($"wheel-knob-bg-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 3, 0x01, i }, 3, "array");
 
             // LEGACY: wheel-flag-color{1..6} on device 0x17 / write group 63 / id [21, 2, i].
             // RS21 parameter DB has no wheel-body flag commands; flag LEDs live on the
@@ -253,13 +319,36 @@ namespace MozaPlugin.Protocol
             AddCommand("wheel-telemetry-mode",          "wheel", 64, 63, new byte[] { 28, 0 },  1, "int");
             AddCommand("wheel-telemetry-idle-effect",   "wheel", 64, 63, new byte[] { 29, 0 },  1, "int");
             AddCommand("wheel-buttons-idle-effect",     "wheel", 64, 63, new byte[] { 29, 1 },  1, "int");
-            AddCommand("wheel-telemetry-idle-interval", "wheel", 0xFF, 63, new byte[] { 30, 0 }, 3, "int");
-            AddCommand("wheel-buttons-idle-interval",   "wheel", 0xFF, 63, new byte[] { 30, 1 }, 3, "int");
+            // Per-(group, effect) idle animation speed. cmd 0x1E [group] [effect_id]
+            // [ms_msb] [ms_lsb] — wire payload is 3 bytes: [effect_id, big-endian u16
+            // milliseconds]. Each animated effect (Breathing, Color Cycle, Rainbow,
+            // etc.) has its own slider, so the writer must fill the effect_id byte;
+            // the existing BuildWriteInt-based callers send effect_id=0 (Off), which
+            // happens to be silently absorbed by the wheel.
+            //
+            // Verified on 2026-05-10 (sim/logs/bridge-20260510-115644.jsonl):
+            //   t=40734.181  body `1E 03 02 03 B6`  group 3, effect=Breathing(0x02),
+            //                interval=950 ms  →  matches PitHouse slider value.
+            AddCommand("wheel-telemetry-idle-interval", "wheel", 0xFF, 63, new byte[] { 30, 0 }, 3, "array");
+            AddCommand("wheel-buttons-idle-interval",   "wheel", 0xFF, 63, new byte[] { 30, 1 }, 3, "array");
+            AddCommand("wheel-knob-idle-interval",      "wheel", 0xFF, 63, new byte[] { 30, 3 }, 3, "array");
 
             // Wheel idle settings
+            // Wheel sleep-light settings (verified live against PitHouse 2026-05-10,
+            // sim/logs/bridge-20260510-115644.jsonl):
+            //   wheel-idle-mode     0x20 [mode]              mode byte: 0x01 = Breathing
+            //                                                 (other values not yet captured)
+            //   wheel-idle-timeout  0x21 [BE u16 minutes]    e.g. `21 00 0a` = 10 min
+            //   wheel-idle-speed    0x22 [mode] [BE u16 ms]  per-sleep-mode speed slider —
+            //                                                 e.g. `22 01 0c d7` = Breathing,
+            //                                                 3287 ms
+            //   wheel-idle-color    0x24 0xFF 0x01 0xFF [RGB]
             AddCommand("wheel-idle-mode",    "wheel", 64, 63, new byte[] { 32 },       1, "int");
             AddCommand("wheel-idle-timeout", "wheel", 64, 63, new byte[] { 33 },       2, "int");
-            AddCommand("wheel-idle-speed",   "wheel", 64, 63, new byte[] { 34, 0 },    2, "int");
+            // wheel-idle-speed payload is [mode, ms_msb, ms_lsb]. Type "array" so
+            // callers must build all 3 bytes — the previous hardcoded mode=0 in
+            // CommandId silently sent slider updates to the wrong sleep mode.
+            AddCommand("wheel-idle-speed",   "wheel", 64, 63, new byte[] { 34 },       3, "array");
             AddCommand("wheel-idle-color",   "wheel", 64, 63, new byte[] { 36, 255, 1, 255 }, 3, "array");
 
             // Old wheel (ES) colors

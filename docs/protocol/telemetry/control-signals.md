@@ -42,42 +42,53 @@ worked examples.
 
 Source: `knob-rpm-effect.pcapng` (2026-05-03, CS Pro W17).
 
-### LED group colour (group 0x3F, device 0x17, cmd `[0x27, <group>, <role>]`)
+### Per-knob Active LED colour (group 0x3F, device 0x17, cmd `[0x27, <knob>, <role>]`)
 
-Sets the **idle** and **active** colours for an entire LED group on new-protocol
-wheels. Wire frame (6-byte body + checksum):
+Sets the **Active position LED colour** for a rotary knob — the colour shown at
+whichever ring LED is currently at the knob's rotation position. Wire frame
+(6-byte body + checksum):
 
 ```
-7E 06 3F 17 27 <group> <role> <R> <G> <B> <chk>
+7E 06 3F 17 27 <knob> <role> <R> <G> <B> <chk>
 ```
 
-- `group` — LED group selector:
-  - `0x00..0x04` — rotary knobs 1..5 (CS Pro has 4 knobs, KS Pro has 5). Group
-    indices beyond the physical knob count are silently ignored by firmware.
-- `role` — colour role:
-  - `0x00` — background / idle (colour shown while the knob is stationary or
-    the RPM bar is unlit)
-  - `0x01` — primary / active (colour flashed on rotation, or used as the lit
-    RPM colour when telemetry isn't driving the bar)
+- `knob` — knob index 0..4 (knob 1..5; CS Pro uses 0..3, KS Pro uses 0..4).
+  Indices beyond the physical knob count are silently ignored by firmware.
+- `role` — verified live against PitHouse 2026-05-10 (capture
+  `sim/logs/bridge-20260510-111708.jsonl`,
+  `findings/2026-05-10-knob-led-cmd27.md`):
+  - `0x00` — **WRITE**: sets the knob's stored Active LED colour. The wheel
+    paints whichever ring LED is the knob's current rotation position with this
+    RGB. **READ** (on group `0x40`): returns the persisted Active colour.
+  - `0x01` — **READ-only**: returns the *live* LED colour currently visible at
+    the knob's active rotation position (varies as the knob is turned).
+    PitHouse never WRITES `role=0x01`; doing so leaves the wheel echoing but
+    nothing changes on screen.
 - `R G B` — 24-bit RGB, 0x00..0xFF each channel.
 
-Captured examples (CS Pro, W17):
+Earlier docs in this codebase named role 0 as "background/idle" and role 1 as
+"primary/active". Live PitHouse capture proved that misleading: role 0 IS the
+Active colour (PitHouse's "Active" swatch), and role 1 is read-only state. The
+**Inactive / background** ring colours are written via cmd 0x1F 0x03 0x01 per
+LED — see [`../leds/wheel-groups-0x3F-0x40.md`](../leds/wheel-groups-0x3F-0x40.md)
+under `wheel-knob-bg-color{N}`.
+
+Captured examples (CS Pro, W17 — 2026-05-10):
 
 ```
-7E 06 3F 17 27 00 00 FF 00 00 0E   # knob 1 background = red  (group 0x00)
-7E 06 3F 17 27 00 01 FF FF FF 0D   # knob 1 primary   = white (group 0x00)
-7E 06 3F 17 27 02 00 00 FF 00 10   # knob 3 background = green (group 0x02)
-7E 06 3F 17 27 02 01 FF 00 00 11   # knob 3 primary   = red   (group 0x02)
+7E 06 3F 17 27 00 00 F7 00 00 …   # knob 1 Active = red
+7E 06 3F 17 27 01 00 00 FF 00 …   # knob 2 Active = green
+7E 06 3F 17 27 02 00 00 00 FF …   # knob 3 Active = blue
+7E 06 3F 17 27 03 00 FF F6 85 …   # knob 4 Active = yellow
 ```
 
 Wheel echoes `(group | 0x80)` / swapped device nibble / payload mirror — plugin
 recognizes via `WheelEchoPrefixes` entries for `(0x3F, 0x17, 0x27, 0x00..0x04)`.
-Not readable — the `0x27 <group> 0xFF` form reads *brightness* for the same
-group, not colour. Plugin persists the last-written values in
-`MozaPluginSettings.WheelKnobBackgroundColors` / `WheelKnobPrimaryColors` (and
-the matching fields on `MozaWheelExtensionSettings` / `MozaProfile`) and
-re-pushes them on wheel detect.
+The `0x27 <group> 0xFF` form reads *brightness* for the corresponding LED
+group, not colour.
 
-Command names in `MozaCommandDatabase`: `wheel-knob{1..5}-bg-color`,
-`wheel-knob{1..5}-primary-color` (3-byte array payload = RGB).
-Wire group byte = knob_number - 1 (knob 1 → 0x00, knob 5 → 0x04).
+Command names in `MozaCommandDatabase` (post-2026-05-10 rename):
+- `wheel-knob{1..5}-active-color` — write/read role 0 (3-byte RGB payload)
+- `wheel-knob{1..5}-live-color` — read-only role 1 (3-byte RGB payload)
+
+Wire knob byte = knob_number − 1 (knob 1 → 0x00, knob 5 → 0x04).

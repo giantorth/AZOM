@@ -19,6 +19,7 @@ namespace MozaPlugin.Devices
         public int WheelTelemetryMode { get; set; } = -1;
         public int WheelIdleEffect { get; set; } = -1;
         public int WheelButtonsIdleEffect { get; set; } = -1;
+        public int WheelKnobIdleEffect { get; set; } = -1;
 
         // Brightness (new wheels 0-100, ES wheels 0-15)
         public int WheelRpmBrightness { get; set; } = -1;
@@ -64,6 +65,7 @@ namespace MozaPlugin.Devices
             WheelTelemetryMode = settings.WheelTelemetryMode;
             WheelIdleEffect = settings.WheelIdleEffect;
             WheelButtonsIdleEffect = settings.WheelButtonsIdleEffect;
+            WheelKnobIdleEffect = settings.WheelKnobIdleEffect;
             WheelRpmBrightness = settings.WheelRpmBrightness;
             WheelButtonsBrightness = settings.WheelButtonsBrightness;
             WheelFlagsBrightness = settings.WheelFlagsBrightness;
@@ -111,6 +113,7 @@ namespace MozaPlugin.Devices
                 if (WheelTelemetryMode     >= 0) slot.WheelTelemetryMode     = WheelTelemetryMode;
                 if (WheelIdleEffect        >= 0) slot.WheelIdleEffect        = WheelIdleEffect;
                 if (WheelButtonsIdleEffect >= 0) slot.WheelButtonsIdleEffect = WheelButtonsIdleEffect;
+                if (WheelKnobIdleEffect    >= 0) slot.WheelKnobIdleEffect    = WheelKnobIdleEffect;
                 if (WheelRpmBrightness     >= 0) slot.WheelRpmBrightness     = WheelRpmBrightness;
                 if (WheelButtonsBrightness >= 0) slot.WheelButtonsBrightness = WheelButtonsBrightness;
                 if (WheelFlagsBrightness   >= 0) slot.WheelFlagsBrightness   = WheelFlagsBrightness;
@@ -124,6 +127,7 @@ namespace MozaPlugin.Devices
                 if (WheelTelemetryMode     >= 0) settings.WheelTelemetryMode     = WheelTelemetryMode;
                 if (WheelIdleEffect        >= 0) settings.WheelIdleEffect        = WheelIdleEffect;
                 if (WheelButtonsIdleEffect >= 0) settings.WheelButtonsIdleEffect = WheelButtonsIdleEffect;
+                if (WheelKnobIdleEffect    >= 0) settings.WheelKnobIdleEffect    = WheelKnobIdleEffect;
                 if (WheelRpmBrightness     >= 0) settings.WheelRpmBrightness     = WheelRpmBrightness;
                 if (WheelButtonsBrightness >= 0) settings.WheelButtonsBrightness = WheelButtonsBrightness;
                 if (WheelFlagsBrightness   >= 0) settings.WheelFlagsBrightness   = WheelFlagsBrightness;

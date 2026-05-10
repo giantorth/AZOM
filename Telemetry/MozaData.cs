@@ -147,6 +147,7 @@ namespace MozaPlugin
         public volatile int WheelTelemetryMode;     // 0=Off, 1=Telemetry, 2=Static
         public volatile int WheelTelemetryIdleEffect;
         public volatile int WheelButtonsIdleEffect;
+        public volatile int WheelKnobIdleEffect;
         public volatile int WheelRpmBrightness;
         public volatile int WheelButtonsBrightness;
         public volatile int WheelFlagsBrightness;
@@ -185,8 +186,9 @@ namespace MozaPlugin
         public readonly byte[][] WheelKnobBackgroundColors = InitColorArray(WheelKnobMax);
         public readonly byte[][] WheelKnobPrimaryColors = InitColorArray(WheelKnobMax);
 
-        // Group 3 (Rotary) per-LED ring colors. Up to 56 LEDs (CS Pro 48, KS Pro 56).
-        // Readable + writable via wheel-group3-color{1..56}.
+        // Per-LED knob ring (Inactive / background) colors. Up to 56 LEDs
+        // (CS Pro 48, KS Pro 56). Readable + writable via wheel-knob-bg-color{1..56}.
+        // Wire cmd: 0x1F 0x03 0x01 [N-1] [RGB] (cmd 0x1F sub 0x03 sub 0x01).
         public const int KnobRingLedMax = 56;
         public readonly byte[][] KnobRingColors = InitColorArray(KnobRingLedMax);
         public volatile int KnobRingBrightness = -1;
@@ -364,6 +366,7 @@ namespace MozaPlugin
                 case "wheel-telemetry-mode":        WheelTelemetryMode = value; break;
                 case "wheel-telemetry-idle-effect":  WheelTelemetryIdleEffect = value; break;
                 case "wheel-buttons-idle-effect":    WheelButtonsIdleEffect = value; break;
+                case "wheel-knob-idle-effect":       WheelKnobIdleEffect = value; break;
                 case "wheel-rpm-brightness":         WheelRpmBrightness = value; break;
                 case "wheel-buttons-brightness":     WheelButtonsBrightness = value; break;
                 case "wheel-flags-brightness":       WheelFlagsBrightness = value; break;
@@ -382,7 +385,7 @@ namespace MozaPlugin
                 case "wheel-rpm-indicator-mode":     WheelRpmIndicatorMode = value - 1; break; // raw 1/2/3 → display 0/1/2
                 case "wheel-get-rpm-display-mode":  WheelRpmDisplayMode = value; break;
                 case "wheel-old-rpm-brightness":     WheelESRpmBrightness = value; break;
-                case "wheel-group3-brightness":      KnobRingBrightness = value; break;
+                case "wheel-knob-brightness":        KnobRingBrightness = value; break;
 
                 // Dash settings
                 case "dash-rpm-indicator-mode":  DashRpmIndicatorMode = value; break;
@@ -517,10 +520,10 @@ namespace MozaPlugin
                 if (idx >= 0 && idx < 6 && data.Length >= 3)
                     SetColor(DashFlagColors[idx], data);
             }
-            // Group 3 (Rotary) per-LED ring colors
-            else if (commandName.StartsWith("wheel-group3-color"))
+            // Per-LED knob ring background colors (cmd 0x1F 0x03 0x01).
+            else if (commandName.StartsWith("wheel-knob-bg-color"))
             {
-                int idx = ParseTrailingIndex(commandName, "wheel-group3-color");
+                int idx = ParseTrailingIndex(commandName, "wheel-knob-bg-color");
                 if (idx >= 0 && idx < KnobRingLedMax && data.Length >= 3)
                     SetColor(KnobRingColors[idx], data);
             }

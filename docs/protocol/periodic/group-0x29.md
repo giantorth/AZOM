@@ -32,9 +32,21 @@ single occurrence per connect):
 
 `0x13` is the `natural-inertia` setting on the wheelbase (hands-off
 protection); writing `1100` likely sets a default safety threshold during
-PitHouse's config phase. Other group-`0x29` writes are theoretically possible
-(any of the cmd IDs from group `0x28`) but only this one has been observed
-during connect.
+PitHouse's config phase.
 
-Group `0x29` is **not periodic** — only one write seen per session,
-distinguishing it from groups `0x1F`, `0x28`, `0x2B` which poll continuously.
+**Observed during runtime UI interaction** (`bridge-20260510-115644.jsonl`,
+2026-05-10):
+
+| Cmd | Value | DB name | Decoded |
+|-----|-------|---------|---------|
+| `0x1E` | `00 01` | `temp-strategy` / `performance-output` | Full mode |
+| `0x1E` | `00 00` | same | Reserved mode |
+| `0x2E` | `00 01` | `gearshift-vibration` | intensity 1 |
+| `0x2E` | `00 05` | same | intensity 5 |
+
+Any of the cmd IDs from group `0x28` is reachable via group `0x29` — PitHouse
+fires a write whenever the user changes the corresponding setting in its UI.
+
+Group `0x29` is **not periodic** — writes are user-driven (one per setting
+change) rather than streamed, distinguishing it from groups `0x1F`, `0x28`,
+`0x2B` which poll continuously.

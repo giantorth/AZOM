@@ -190,6 +190,7 @@
                                     <ComboBoxItem Content="Color Cycle"/>
                                     <ComboBoxItem Content="Rainbow"/>
                                     <ComboBoxItem Content="Sand Flow"/>
+                                    <ComboBoxItem Content="RGB Pulse"/>
                                 </ComboBox>
                             </StackPanel>
 
@@ -250,6 +251,7 @@
                                 <ComboBoxItem Content="Off"/><ComboBoxItem Content="Constant"/>
                                 <ComboBoxItem Content="Breathing"/><ComboBoxItem Content="Color Cycle"/>
                                 <ComboBoxItem Content="Rainbow"/><ComboBoxItem Content="Sand Flow"/>
+                                <ComboBoxItem Content="RGB Pulse"/>
                             </ComboBox>
                         </StackPanel>
 
@@ -268,6 +270,18 @@
                     <StackPanel Margin="5">
 
                         <StackPanel x:Name="WheelKnobSection" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Knob Idle Effect" Style="{StaticResource SliderLabel}"/>
+                                <ComboBox x:Name="WheelKnobIdleEffectCombo" Width="140" SelectionChanged="WheelKnobIdleEffectCombo_Changed">
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Constant"/>
+                                    <ComboBoxItem Content="Breathing"/>
+                                    <ComboBoxItem Content="Color Cycle"/>
+                                    <ComboBoxItem Content="Rainbow"/>
+                                    <ComboBoxItem Content="Sand Flow"/>
+                                    <ComboBoxItem Content="RGB Pulse"/>
+                                </ComboBox>
+                            </StackPanel>
                             <TextBlock Text="Knob LED Colors" Style="{StaticResource SectionHeader}"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                 <TextBlock Width="70"/>

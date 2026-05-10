@@ -226,7 +226,7 @@ namespace MozaPlugin.Devices
             public byte[][] ColorSource = Array.Empty<byte[]>();
             // When non-empty, used verbatim as the wheel command name instead of
             // "{CommandPrefix}{Index+1}". Used for knob colors whose commands follow
-            // the pattern "wheel-knob{N}-bg-color" / "wheel-knob{N}-primary-color".
+            // the pattern "wheel-knob{N}-active-color" (per-knob Active LED).
             public string CommandNameOverride = "";
             // Optional callback fired after a successful picker commit — lets the
             // caller repack the colour into a packed int[] on MozaPluginSettings
@@ -253,13 +253,21 @@ namespace MozaPlugin.Devices
                     Width = 70,
                     VerticalAlignment = VerticalAlignment.Center,
                 });
-                var primary = CreateKnobSwatch($"wheel-knob{idx + 1}-primary-color", idx, _data.WheelKnobPrimaryColors, isBackground: false);
-                var bg = CreateKnobSwatch($"wheel-knob{idx + 1}-bg-color", idx, _data.WheelKnobBackgroundColors, isBackground: true);
-                row.Children.Add(WrapInCell(primary));
+                // "Active" swatch — single per-knob LED color (cmd 0x27 ROLE=0).
+                // The picked color is shown at whichever ring LED is the knob's
+                // current rotation position.
+                var active = CreateKnobSwatch($"wheel-knob{idx + 1}-active-color", idx, _data.WheelKnobPrimaryColors, isBackground: false);
+                // "Inactive" swatch — per-knob bulk default. The picked color is
+                // fanned out to all 12 ring LEDs (cmd 0x1F per-LED) via
+                // BulkSetKnobRingColor. The empty CommandNameOverride suppresses
+                // the per-click cmd 0x27 write — bulk handling is the only wire
+                // activity for this swatch.
+                var bg = CreateKnobSwatch("", idx, _data.WheelKnobBackgroundColors, isBackground: true);
+                row.Children.Add(WrapInCell(active));
                 row.Children.Add(WrapInCell(bg));
                 WheelKnobPanel.Children.Add(row);
                 _wheelKnobBgSwatches[idx] = bg;
-                _wheelKnobPrimarySwatches[idx] = primary;
+                _wheelKnobPrimarySwatches[idx] = active;
                 _wheelKnobRowContainers[idx] = row;
             }
         }
@@ -328,11 +336,21 @@ namespace MozaPlugin.Devices
             for (int i = 0; i < count; i++)
             {
                 int ledIdx = startIdx + i;
-                _device.WriteColor($"wheel-group3-color{ledIdx + 1}", r, g, b);
+                _device.WriteColor($"wheel-knob-bg-color{ledIdx + 1}", r, g, b);
                 _data.KnobRingColors[ledIdx][0] = r;
                 _data.KnobRingColors[ledIdx][1] = g;
                 _data.KnobRingColors[ledIdx][2] = b;
             }
+            // Read each ring LED back so the per-LED swatches in the UI reflect
+            // the wheel's actual state rather than only the colour we asked for.
+            // The reads come back asynchronously; MozaData.UpdateFromArray writes
+            // _data.KnobRingColors[], and the next RefreshWheel tick repaints the
+            // swatches from that array. ReadSettingsPaced spaces the reads so the
+            // wheel's RX queue doesn't flood.
+            var readCmds = new string[count];
+            for (int i = 0; i < count; i++)
+                readCmds[i] = $"wheel-knob-bg-color{startIdx + i + 1}";
+            _device.ReadSettingsPaced(readCmds);
             // Intentionally NOT calling PersistKnobRingColors() — bulk-set is a
             // convenience shortcut, individual ring edits take persistence priority.
         }
@@ -389,7 +407,7 @@ namespace MozaPlugin.Devices
                         Background = Brushes.Black,
                         Tag = new ColorSwatchInfo
                         {
-                            CommandPrefix = "wheel-group3-color",
+                            CommandPrefix = "wheel-knob-bg-color",
                             Index = ledIndex,
                             ColorSource = _data.KnobRingColors,
                             OnChanged = () => PersistKnobRingColors(),
@@ -419,7 +437,7 @@ namespace MozaPlugin.Devices
             int val = (int)Math.Round(e.NewValue);
             KnobRingBrightnessValue.Text = $"{val}";
             _data!.KnobRingBrightness = val;
-            _device!.WriteSetting("wheel-group3-brightness", val);
+            _device!.WriteSetting("wheel-knob-brightness", val);
             _settings!.WheelKnobRingBrightness = val;
             _plugin.SaveSettings();
         }
@@ -436,10 +454,19 @@ namespace MozaPlugin.Devices
             if (dialog.ShowDialog() == true)
             {
                 byte r = dialog.SelectedR, g = dialog.SelectedG, b = dialog.SelectedB;
-                string cmdName = !string.IsNullOrEmpty(info.CommandNameOverride)
-                    ? info.CommandNameOverride
-                    : $"{info.CommandPrefix}{info.Index + 1}";
-                _device!.WriteColor(cmdName, r, g, b);
+                // Resolve cmd name: explicit override > prefix+index > empty
+                // (suppress wire write — used by swatches whose hardware update
+                // happens entirely in OnChanged, e.g. the per-knob "Inactive
+                // bulk" swatch which fans out via BulkSetKnobRingColor).
+                string cmdName;
+                if (!string.IsNullOrEmpty(info.CommandNameOverride))
+                    cmdName = info.CommandNameOverride;
+                else if (!string.IsNullOrEmpty(info.CommandPrefix))
+                    cmdName = $"{info.CommandPrefix}{info.Index + 1}";
+                else
+                    cmdName = "";
+                if (!string.IsNullOrEmpty(cmdName))
+                    _device!.WriteColor(cmdName, r, g, b);
                 info.ColorSource[info.Index][0] = r;
                 info.ColorSource[info.Index][1] = g;
                 info.ColorSource[info.Index][2] = b;
@@ -523,6 +550,7 @@ namespace MozaPlugin.Devices
                     SetComboSafe(WheelTelemetryModeCombo, _data!.WheelTelemetryMode);
                     SetComboSafe(WheelIdleEffectCombo, _data.WheelTelemetryIdleEffect);
                     SetComboSafe(WheelButtonIdleEffectCombo, _data.WheelButtonsIdleEffect);
+                    SetComboSafe(WheelKnobIdleEffectCombo, _data.WheelKnobIdleEffect);
 
                     // Show/hide flag and button LED sections based on wheel model
                     var modelInfo = _plugin!.WheelModelInfo;
@@ -735,6 +763,16 @@ namespace MozaPlugin.Devices
             _data!.WheelButtonsIdleEffect = val;
             _settings!.WheelButtonsIdleEffect = val;
             _device!.WriteSetting("wheel-buttons-idle-effect", val);
+            _plugin.SaveSettings();
+        }
+
+        private void WheelKnobIdleEffectCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null) return;
+            int val = WheelKnobIdleEffectCombo.SelectedIndex;
+            _data!.WheelKnobIdleEffect = val;
+            _settings!.WheelKnobIdleEffect = val;
+            _device!.WriteSetting("wheel-knob-idle-effect", val);
             _plugin.SaveSettings();
         }
 

@@ -40,15 +40,20 @@ group byte differs.
 
 `G` = group ID (0–4); `N` = LED index within group (0..max-1).
 
-| Command | Cmd | Bytes | Type | Notes |
-|---------|-----|-------|------|-------|
-| group-brightness | `1B [G] FF` | 1 | int | Plugin command `wheel-group{G}-brightness` (G=2..4). Firmware answers regardless of hardware presence — cannot be used as a presence check |
-| group-normal-mode | `1C [G]` | 1 | int | Telemetry-active mode. Plugin command `wheel-group{G}-mode` |
-| group-standby-mode | `1D [G]` | 1 | int | Idle mode. Not yet exposed by plugin |
-| group-standby-interval | `1E [G] [2..6]` | 2 | int | 2 = breath, 3 = circular, 4 = rainbow, 5 = drift sand, 6 = breath color. Not yet exposed |
-| group-led-color | `1F [G] FF [N]` | 3 | array (RGB) | LED N static RGB. Plugin commands `wheel-rpm-color{1..25}` (G=0), `wheel-button-color{1..16}` (G=1), `wheel-group{G}-color{1..Nmax}` (G=2..4) |
-| group-live-colors | `19 [G]` | 20 | array (5×idx+RGB) | Bulk live telemetry frame. **Groups 0/1/3 confirmed**; 2/4 may or may not support |
-| group-live-bitmask | `1A [G]` | 2..8 | int (LE) | Per-frame active-LED bitmask. **Groups 0/1/3 confirmed**. Plugin `wheel-send-rpm-telemetry`, `wheel-send-buttons-telemetry`, `wheel-send-knob-telemetry` |
+Plugin commands use the group's semantic prefix
+(`wheel-rpm-`, `wheel-button-`, `wheel-single-`, `wheel-knob-`, `wheel-ambient-`)
+rather than `wheel-group{G}-`.
+
+| Command | Cmd | Wire payload | Plugin command(s) | Notes |
+|---------|-----|--------------|-------------------|-------|
+| group-brightness | `1B [G] FF` | 1-byte int | `wheel-{single,knob,ambient}-brightness` (G=2..4) | Firmware answers regardless of hardware presence — cannot be used as a strict presence check |
+| group-normal-mode | `1C [G]` | 1-byte int | `wheel-{single,knob-led,ambient}-mode` | Telemetry-active mode |
+| group-idle-effect | `1D [G] [effect_id]` | 1-byte int | `wheel-{telemetry,buttons,single,knob,ambient}-idle-effect` | Idle animation. Effect IDs `0..6`: `0`=Off, `1`=Constant, `2`=Breathing, `3`=Color Cycle, `4`=Rainbow, `5`=Sand Flow, `6`=RGB Pulse. Verified live for groups 0/1/3 on 2026-05-10. Earlier docs called this `group-standby-mode` |
+| group-idle-interval | `1E [G] [effect_id] [BE u16 ms]` | 3-byte payload | `wheel-{telemetry,buttons,knob}-idle-interval` | Per-effect speed slider. Payload is `[effect_id, ms_msb, ms_lsb]` (NOT a flat 2-byte int — earlier docs were incorrect). Verified live 2026-05-10 |
+| group-led-color (Inactive) | `1F [G] [sub] [N] [RGB]` | 3-byte RGB | RPM: `wheel-rpm-color{1..25}` (G=0, sub=`0xFF`); Buttons: `wheel-button-color{1..16}` (G=1, sub=`0xFF`); Knob ring: `wheel-knob-bg-color{1..56}` (G=3, **sub=`0x01`**); Single/Ambient: `wheel-{single,ambient}-color{N}` (G=2/4, sub=`0xFF`) | LED N persistent base color. **Sub byte `0x01` for the knob ring** (PitHouse's "Inactive" swatch wire); `0xFF` elsewhere. Earlier docs assumed `0xFF` universally |
+| group-live-colors | `19 [G]` | 20-byte (5×idx+RGB) | per-group telemetry color cmd | Bulk live telemetry frame. Groups 0/1/3 confirmed |
+| group-live-bitmask | `1A [G]` | 2..8-byte int LE | `wheel-send-{rpm,buttons,knob}-telemetry` | Per-frame active-LED bitmask. Groups 0/1/3 confirmed |
+| knob-active-color | `27 [knob] 00 [RGB]` | 3-byte RGB | `wheel-knob{1..5}-active-color` | Per-knob Active LED override (cmd 0x27 ROLE=0). Drives the single LED at the knob's current rotation position. Verified 2026-05-10. The `27 [knob] 01 …` variant is **read-only** (`wheel-knob{1..5}-live-color`) — returns the live LED color at the active position; PitHouse never writes role=1 |
 
 ### Static vs live rendering pipelines
 

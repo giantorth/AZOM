@@ -46,8 +46,8 @@ namespace MozaPlugin.Devices
         // Last time SimHub fed a non-black knob frame. The keepalive runs only
         // while this is recent — once SimHub goes idle for KnobIdleTimeoutSeconds
         // the keepalive pauses, letting the wheel revert to its stored static
-        // primary/background colors (configured via wheel-knob{N}-primary-color
-        // / wheel-knob{N}-bg-color). Resumes the moment SimHub drives a knob
+        // Active / per-LED background colors (wheel-knob{N}-active-color +
+        // wheel-knob-bg-color{N}). Resumes the moment SimHub drives a knob
         // active again.
         private DateTime _lastKnobActivityTime = DateTime.MinValue;
         private const double KeepaliveIntervalSeconds = 1.0;
@@ -496,7 +496,7 @@ namespace MozaPlugin.Devices
                 // the periodic refresh, but once SimHub goes idle the wheel
                 // must be allowed to revert to its stored static primary /
                 // background colors (otherwise the user-configured "active"
-                // colour set via wheel-knob{N}-primary-color is invisible).
+                // colour set via wheel-knob{N}-active-color is invisible).
                 // Resumes automatically the next frame SimHub drives a knob.
                 if (isNewWheel && _lastKnobs != null && modelInfo?.KnobCount > 0)
                 {

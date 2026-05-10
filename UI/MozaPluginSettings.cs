@@ -22,6 +22,8 @@ namespace MozaPlugin
         public int WheelIdleEffect { get => _wheelIdleEffect; set => _wheelIdleEffect = value; }
         private volatile int _wheelButtonsIdleEffect = -1;
         public int WheelButtonsIdleEffect { get => _wheelButtonsIdleEffect; set => _wheelButtonsIdleEffect = value; }
+        private volatile int _wheelKnobIdleEffect = -1;
+        public int WheelKnobIdleEffect { get => _wheelKnobIdleEffect; set => _wheelKnobIdleEffect = value; }
 
         // Wheel input settings cached locally — newer KS-family firmware
         // silently drops read-back for these (cmd 9 / cmd 10), so we have to
@@ -313,6 +315,7 @@ namespace MozaPlugin
                 slot.WheelTelemetryMode     = WheelTelemetryMode;
                 slot.WheelIdleEffect        = WheelIdleEffect;
                 slot.WheelButtonsIdleEffect = WheelButtonsIdleEffect;
+                slot.WheelKnobIdleEffect    = WheelKnobIdleEffect;
                 slot.WheelPaddlesMode       = WheelPaddlesMode;
                 slot.WheelClutchPoint       = WheelClutchPoint;
                 slot.WheelKnobMode          = WheelKnobMode;
@@ -341,6 +344,7 @@ namespace MozaPlugin
                 WheelTelemetryMode     = slot.WheelTelemetryMode;
                 WheelIdleEffect        = slot.WheelIdleEffect;
                 WheelButtonsIdleEffect = slot.WheelButtonsIdleEffect;
+                WheelKnobIdleEffect    = slot.WheelKnobIdleEffect;
                 WheelPaddlesMode       = slot.WheelPaddlesMode;
                 WheelClutchPoint       = slot.WheelClutchPoint;
                 WheelKnobMode          = slot.WheelKnobMode;
@@ -370,6 +374,7 @@ namespace MozaPlugin
         public int WheelTelemetryMode { get; set; } = -1;
         public int WheelIdleEffect { get; set; } = -1;
         public int WheelButtonsIdleEffect { get; set; } = -1;
+        public int WheelKnobIdleEffect { get; set; } = -1;
         public int WheelPaddlesMode { get; set; } = -1;
         public int WheelClutchPoint { get; set; } = -1;
         public int WheelKnobMode { get; set; } = -1;

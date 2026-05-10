@@ -1758,9 +1758,9 @@ namespace MozaPlugin
                              LiveColorCmd = "wheel-telemetry-rpm-colors", LiveBitmaskCmd = "wheel-send-rpm-telemetry" },
             new DiagLedCfg { Slot = 1, Title = "Group 1 — Button",   MaxLeds = 16, ColorCmdPrefix = "wheel-button-color", BrightnessCmd = "wheel-buttons-brightness", ModeCmd = null,
                              LiveColorCmd = "wheel-telemetry-button-colors", LiveBitmaskCmd = "wheel-send-buttons-telemetry" },
-            new DiagLedCfg { Slot = 2, Title = "Group 2 — Single",   MaxLeds = 28, ColorCmdPrefix = "wheel-group2-color", BrightnessCmd = "wheel-group2-brightness",  ModeCmd = "wheel-group2-mode" },
-            new DiagLedCfg { Slot = 3, Title = "Group 3 — Rotary",   MaxLeds = 56, ColorCmdPrefix = "wheel-group3-color", BrightnessCmd = "wheel-group3-brightness",  ModeCmd = "wheel-group3-mode" },
-            new DiagLedCfg { Slot = 4, Title = "Group 4 — Ambient",  MaxLeds = 12, ColorCmdPrefix = "wheel-group4-color", BrightnessCmd = "wheel-group4-brightness",  ModeCmd = "wheel-group4-mode" },
+            new DiagLedCfg { Slot = 2, Title = "Group 2 — Single",   MaxLeds = 28, ColorCmdPrefix = "wheel-single-color",  BrightnessCmd = "wheel-single-brightness",  ModeCmd = "wheel-single-mode" },
+            new DiagLedCfg { Slot = 3, Title = "Group 3 — Knob ring", MaxLeds = 56, ColorCmdPrefix = "wheel-knob-bg-color", BrightnessCmd = "wheel-knob-brightness",    ModeCmd = "wheel-knob-led-mode" },
+            new DiagLedCfg { Slot = 4, Title = "Group 4 — Ambient",  MaxLeds = 12, ColorCmdPrefix = "wheel-ambient-color", BrightnessCmd = "wheel-ambient-brightness", ModeCmd = "wheel-ambient-mode" },
             new DiagLedCfg { Slot = 5, Title = "Flags (Meter device)", MaxLeds = 6, ColorCmdPrefix = "dash-flag-color",   BrightnessCmd = "dash-flags-brightness",    ModeCmd = null },
         };
 
