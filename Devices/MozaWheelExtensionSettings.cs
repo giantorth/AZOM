@@ -20,6 +20,15 @@ namespace MozaPlugin.Devices
         public int WheelIdleEffect { get; set; } = -1;
         public int WheelButtonsIdleEffect { get; set; } = -1;
         public int WheelKnobIdleEffect { get; set; } = -1;
+        public int WheelKnobLedMode { get; set; } = -1;
+        public int WheelButtonsLedMode { get; set; } = -1;
+        public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
+        public int WheelButtonsIdleSpeedMs { get; set; } = -1;
+        public int WheelKnobIdleSpeedMs { get; set; } = -1;
+        public int WheelSleepMode { get; set; } = -1;
+        public int WheelSleepTimeoutMin { get; set; } = -1;
+        public int WheelSleepSpeedMs { get; set; } = -1;
+        public int[]? WheelSleepColor { get; set; }
 
         // Brightness (new wheels 0-100, ES wheels 0-15)
         public int WheelRpmBrightness { get; set; } = -1;
@@ -66,6 +75,15 @@ namespace MozaPlugin.Devices
             WheelIdleEffect = settings.WheelIdleEffect;
             WheelButtonsIdleEffect = settings.WheelButtonsIdleEffect;
             WheelKnobIdleEffect = settings.WheelKnobIdleEffect;
+            WheelKnobLedMode = settings.WheelKnobLedMode;
+            WheelButtonsLedMode = settings.WheelButtonsLedMode;
+            WheelTelemetryIdleSpeedMs = settings.WheelTelemetryIdleSpeedMs;
+            WheelButtonsIdleSpeedMs = settings.WheelButtonsIdleSpeedMs;
+            WheelKnobIdleSpeedMs = settings.WheelKnobIdleSpeedMs;
+            WheelSleepMode = settings.WheelSleepMode;
+            WheelSleepTimeoutMin = settings.WheelSleepTimeoutMin;
+            WheelSleepSpeedMs = settings.WheelSleepSpeedMs;
+            WheelSleepColor = settings.WheelSleepColor;
             WheelRpmBrightness = settings.WheelRpmBrightness;
             WheelButtonsBrightness = settings.WheelButtonsBrightness;
             WheelFlagsBrightness = settings.WheelFlagsBrightness;
@@ -114,6 +132,15 @@ namespace MozaPlugin.Devices
                 if (WheelIdleEffect        >= 0) slot.WheelIdleEffect        = WheelIdleEffect;
                 if (WheelButtonsIdleEffect >= 0) slot.WheelButtonsIdleEffect = WheelButtonsIdleEffect;
                 if (WheelKnobIdleEffect    >= 0) slot.WheelKnobIdleEffect    = WheelKnobIdleEffect;
+                if (WheelKnobLedMode       >= 0) slot.WheelKnobLedMode       = WheelKnobLedMode;
+                if (WheelButtonsLedMode    >= 0) slot.WheelButtonsLedMode    = WheelButtonsLedMode;
+                if (WheelTelemetryIdleSpeedMs >= 0) slot.WheelTelemetryIdleSpeedMs = WheelTelemetryIdleSpeedMs;
+                if (WheelButtonsIdleSpeedMs   >= 0) slot.WheelButtonsIdleSpeedMs   = WheelButtonsIdleSpeedMs;
+                if (WheelKnobIdleSpeedMs      >= 0) slot.WheelKnobIdleSpeedMs      = WheelKnobIdleSpeedMs;
+                if (WheelSleepMode         >= 0) slot.WheelSleepMode          = WheelSleepMode;
+                if (WheelSleepTimeoutMin   >= 0) slot.WheelSleepTimeoutMin    = WheelSleepTimeoutMin;
+                if (WheelSleepSpeedMs      >= 0) slot.WheelSleepSpeedMs       = WheelSleepSpeedMs;
+                if (WheelSleepColor        != null) slot.WheelSleepColor      = WheelSleepColor;
                 if (WheelRpmBrightness     >= 0) slot.WheelRpmBrightness     = WheelRpmBrightness;
                 if (WheelButtonsBrightness >= 0) slot.WheelButtonsBrightness = WheelButtonsBrightness;
                 if (WheelFlagsBrightness   >= 0) slot.WheelFlagsBrightness   = WheelFlagsBrightness;
@@ -128,6 +155,15 @@ namespace MozaPlugin.Devices
                 if (WheelIdleEffect        >= 0) settings.WheelIdleEffect        = WheelIdleEffect;
                 if (WheelButtonsIdleEffect >= 0) settings.WheelButtonsIdleEffect = WheelButtonsIdleEffect;
                 if (WheelKnobIdleEffect    >= 0) settings.WheelKnobIdleEffect    = WheelKnobIdleEffect;
+                if (WheelKnobLedMode       >= 0) settings.WheelKnobLedMode       = WheelKnobLedMode;
+                if (WheelButtonsLedMode    >= 0) settings.WheelButtonsLedMode    = WheelButtonsLedMode;
+                if (WheelTelemetryIdleSpeedMs >= 0) settings.WheelTelemetryIdleSpeedMs = WheelTelemetryIdleSpeedMs;
+                if (WheelButtonsIdleSpeedMs   >= 0) settings.WheelButtonsIdleSpeedMs   = WheelButtonsIdleSpeedMs;
+                if (WheelKnobIdleSpeedMs      >= 0) settings.WheelKnobIdleSpeedMs      = WheelKnobIdleSpeedMs;
+                if (WheelSleepMode         >= 0) settings.WheelSleepMode          = WheelSleepMode;
+                if (WheelSleepTimeoutMin   >= 0) settings.WheelSleepTimeoutMin    = WheelSleepTimeoutMin;
+                if (WheelSleepSpeedMs      >= 0) settings.WheelSleepSpeedMs       = WheelSleepSpeedMs;
+                if (WheelSleepColor        != null) settings.WheelSleepColor      = WheelSleepColor;
                 if (WheelRpmBrightness     >= 0) settings.WheelRpmBrightness     = WheelRpmBrightness;
                 if (WheelButtonsBrightness >= 0) settings.WheelButtonsBrightness = WheelButtonsBrightness;
                 if (WheelFlagsBrightness   >= 0) settings.WheelFlagsBrightness   = WheelFlagsBrightness;

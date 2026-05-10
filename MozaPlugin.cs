@@ -100,7 +100,7 @@ namespace MozaPlugin
             "base-protection", "base-natural-inertia",
             "base-speed-damping", "base-speed-damping-point",
             "base-soft-limit-stiffness", "base-soft-limit-retain",
-            "base-ffb-reverse", "base-temp-strategy",
+            "base-ffb-reverse", "base-temp-strategy", "base-gearshift-vibration",
             "main-get-work-mode", "main-get-led-status",
             "main-get-damper-gain", "main-get-friction-gain",
             "main-get-inertia-gain", "main-get-spring-gain",
@@ -117,6 +117,8 @@ namespace MozaPlugin
             "wheel-telemetry-mode", "wheel-telemetry-idle-effect",
             "wheel-buttons-idle-effect",
             "wheel-knob-idle-effect",
+            "wheel-knob-led-mode", "wheel-buttons-led-mode",
+            "wheel-idle-mode", "wheel-idle-timeout",
             "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-flags-brightness",
             "wheel-idle-mode", "wheel-idle-timeout", "wheel-idle-speed",
             "wheel-idle-color",
@@ -592,11 +594,54 @@ namespace MozaPlugin
             _saveDebounceTimer = null;
         }
 
+        // Gearshift trigger state. When the SimHub-reported gear value changes
+        // and the user has the base "Gearshift vibration intensity" set above
+        // zero, fire `base-gearshift-event` (cmd 0x76 on grp 0x2D) to make the
+        // wheelbase rumble. PitHouse uses the same fire-and-forget event;
+        // verified live 2026-05-10.
+        // _lastGearString holds the most recently observed Gear value (string
+        // — "R"/"N"/"1".."6"). Initial null suppresses the warm-up frame so we
+        // don't fire on the first DataUpdate just because the previous value
+        // was unset. Debounce window is 500 ms to coalesce ratcheting / rapid
+        // shifts.
+        private string? _lastGearString;
+        private DateTime _lastGearShiftSendUtc = DateTime.MinValue;
+        private const double GearShiftDebounceMs = 500.0;
+
+        // Fire a one-shot `base-gearshift-event` when the SimHub-reported gear
+        // value changes, gated by `_data.GearshiftVibration > 0` (the user's
+        // intensity slider — 0 disables the effect entirely) and a 500 ms
+        // debounce so quick ratcheting up/down of gears doesn't pile triggers
+        // on the wire.
+        private void CheckGearshiftEvent(GameData data)
+        {
+            if (!_data.IsConnected) return;
+            if (_data.GearshiftVibration <= 0) return;
+            string? gear = data?.NewData?.Gear;
+            if (string.IsNullOrEmpty(gear)) return;
+            if (_lastGearString == null)
+            {
+                _lastGearString = gear;
+                return; // warm-up: record the first observed value, don't fire
+            }
+            if (gear == _lastGearString) return;
+            var now = DateTime.UtcNow;
+            if ((now - _lastGearShiftSendUtc).TotalMilliseconds < GearShiftDebounceMs)
+            {
+                _lastGearString = gear; // still update the latch so we don't repeatedly debounce-fire on the same shift
+                return;
+            }
+            _lastGearString = gear;
+            _lastGearShiftSendUtc = now;
+            _deviceManager.WriteSetting("base-gearshift-event", 1);
+        }
+
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
         {
             if (IsShuttingDown) return;
             _activeTelemetry?.UpdateGameData(data.NewData);
             _activeTelemetry?.SetGameRunning(data.GameRunning);
+            CheckGearshiftEvent(data);
             // Drive the new pipeline's tick — pumps tier-def emissions, heartbeat cadence,
             // and value-frame bursts. The old TelemetrySender uses its own internal timer
             // and doesn't need a tick driver here.
@@ -2746,6 +2791,29 @@ namespace MozaPlugin
                 _data.WheelButtonsIdleEffect = _settings.WheelButtonsIdleEffect;
             if (_settings.WheelKnobIdleEffect >= 0)
                 _data.WheelKnobIdleEffect = _settings.WheelKnobIdleEffect;
+            if (_settings.WheelKnobLedMode >= 0)
+                _data.WheelKnobLedMode = _settings.WheelKnobLedMode;
+            if (_settings.WheelButtonsLedMode >= 0)
+                _data.WheelButtonsLedMode = _settings.WheelButtonsLedMode;
+            if (_settings.WheelTelemetryIdleSpeedMs >= 0)
+                _data.WheelTelemetryIdleSpeedMs = _settings.WheelTelemetryIdleSpeedMs;
+            if (_settings.WheelButtonsIdleSpeedMs >= 0)
+                _data.WheelButtonsIdleSpeedMs = _settings.WheelButtonsIdleSpeedMs;
+            if (_settings.WheelKnobIdleSpeedMs >= 0)
+                _data.WheelKnobIdleSpeedMs = _settings.WheelKnobIdleSpeedMs;
+            if (_settings.WheelSleepMode >= 0)
+                _data.WheelIdleMode = _settings.WheelSleepMode;
+            if (_settings.WheelSleepTimeoutMin >= 0)
+                _data.WheelIdleTimeout = _settings.WheelSleepTimeoutMin;
+            if (_settings.WheelSleepSpeedMs >= 0)
+                _data.WheelIdleSpeed = _settings.WheelSleepSpeedMs;
+            if (_settings.WheelSleepColor != null && _settings.WheelSleepColor.Length > 0)
+            {
+                var rgb = MozaProfile.UnpackColor(_settings.WheelSleepColor[0]);
+                _data.WheelIdleColor[0] = rgb[0];
+                _data.WheelIdleColor[1] = rgb[1];
+                _data.WheelIdleColor[2] = rgb[2];
+            }
             if (_settings.WheelRpmIndicatorMode >= 0)
                 _data.WheelRpmIndicatorMode = _settings.WheelRpmIndicatorMode;
             if (_settings.WheelRpmDisplayMode >= 0)
@@ -2779,6 +2847,36 @@ namespace MozaPlugin
                 _deviceManager.WriteSetting("wheel-buttons-idle-effect", _settings.WheelButtonsIdleEffect);
             if (_settings.WheelKnobIdleEffect >= 0)
                 _deviceManager.WriteSetting("wheel-knob-idle-effect", _settings.WheelKnobIdleEffect);
+            if (_settings.WheelKnobLedMode >= 0)
+                _deviceManager.WriteSetting("wheel-knob-led-mode", _settings.WheelKnobLedMode);
+            if (_settings.WheelButtonsLedMode >= 0)
+                _deviceManager.WriteSetting("wheel-buttons-led-mode", _settings.WheelButtonsLedMode);
+            // Per-effect speed sliders (cmd 0x1E [group] [effect_id] [BE u16 ms]).
+            // Only fire when both effect and speed are saved — without an effect_id
+            // we'd be writing a per-effect timer with effect=0 (Off) which has no
+            // animation to time and therefore no observable effect on the wheel.
+            if (_settings.WheelIdleEffect >= 0 && _settings.WheelTelemetryIdleSpeedMs >= 0)
+                _deviceManager.WriteArray("wheel-telemetry-idle-interval",
+                    BuildIdleIntervalPayload(_settings.WheelIdleEffect, _settings.WheelTelemetryIdleSpeedMs));
+            if (_settings.WheelButtonsIdleEffect >= 0 && _settings.WheelButtonsIdleSpeedMs >= 0)
+                _deviceManager.WriteArray("wheel-buttons-idle-interval",
+                    BuildIdleIntervalPayload(_settings.WheelButtonsIdleEffect, _settings.WheelButtonsIdleSpeedMs));
+            if (_settings.WheelKnobIdleEffect >= 0 && _settings.WheelKnobIdleSpeedMs >= 0)
+                _deviceManager.WriteArray("wheel-knob-idle-interval",
+                    BuildIdleIntervalPayload(_settings.WheelKnobIdleEffect, _settings.WheelKnobIdleSpeedMs));
+            // Wheel sleep-light settings (cmd 0x20/0x21/0x22/0x24).
+            if (_settings.WheelSleepMode >= 0)
+                _deviceManager.WriteSetting("wheel-idle-mode", _settings.WheelSleepMode);
+            if (_settings.WheelSleepTimeoutMin >= 0)
+                _deviceManager.WriteSetting("wheel-idle-timeout", _settings.WheelSleepTimeoutMin);
+            if (_settings.WheelSleepMode >= 0 && _settings.WheelSleepSpeedMs >= 0)
+                _deviceManager.WriteArray("wheel-idle-speed",
+                    BuildIdleIntervalPayload(_settings.WheelSleepMode, _settings.WheelSleepSpeedMs));
+            if (_settings.WheelSleepColor != null && _settings.WheelSleepColor.Length > 0)
+            {
+                var rgb = MozaProfile.UnpackColor(_settings.WheelSleepColor[0]);
+                _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
+            }
 
             // ES/Old wheel modes
             if (_settings.WheelRpmIndicatorMode >= 0)
@@ -3030,6 +3128,54 @@ namespace MozaPlugin
                 {
                     _settings.WheelKnobIdleEffect = profile.WheelKnobIdleEffect;
                     _data.WheelKnobIdleEffect = profile.WheelKnobIdleEffect;
+                }
+                if (profile.WheelKnobLedMode >= 0)
+                {
+                    _settings.WheelKnobLedMode = profile.WheelKnobLedMode;
+                    _data.WheelKnobLedMode = profile.WheelKnobLedMode;
+                }
+                if (profile.WheelButtonsLedMode >= 0)
+                {
+                    _settings.WheelButtonsLedMode = profile.WheelButtonsLedMode;
+                    _data.WheelButtonsLedMode = profile.WheelButtonsLedMode;
+                }
+                if (profile.WheelTelemetryIdleSpeedMs >= 0)
+                {
+                    _settings.WheelTelemetryIdleSpeedMs = profile.WheelTelemetryIdleSpeedMs;
+                    _data.WheelTelemetryIdleSpeedMs = profile.WheelTelemetryIdleSpeedMs;
+                }
+                if (profile.WheelButtonsIdleSpeedMs >= 0)
+                {
+                    _settings.WheelButtonsIdleSpeedMs = profile.WheelButtonsIdleSpeedMs;
+                    _data.WheelButtonsIdleSpeedMs = profile.WheelButtonsIdleSpeedMs;
+                }
+                if (profile.WheelKnobIdleSpeedMs >= 0)
+                {
+                    _settings.WheelKnobIdleSpeedMs = profile.WheelKnobIdleSpeedMs;
+                    _data.WheelKnobIdleSpeedMs = profile.WheelKnobIdleSpeedMs;
+                }
+                if (profile.WheelSleepMode >= 0)
+                {
+                    _settings.WheelSleepMode = profile.WheelSleepMode;
+                    _data.WheelIdleMode = profile.WheelSleepMode;
+                }
+                if (profile.WheelSleepTimeoutMin >= 0)
+                {
+                    _settings.WheelSleepTimeoutMin = profile.WheelSleepTimeoutMin;
+                    _data.WheelIdleTimeout = profile.WheelSleepTimeoutMin;
+                }
+                if (profile.WheelSleepSpeedMs >= 0)
+                {
+                    _settings.WheelSleepSpeedMs = profile.WheelSleepSpeedMs;
+                    _data.WheelIdleSpeed = profile.WheelSleepSpeedMs;
+                }
+                if (profile.WheelSleepColor != null && profile.WheelSleepColor.Length > 0)
+                {
+                    _settings.WheelSleepColor = profile.WheelSleepColor;
+                    var rgb = MozaProfile.UnpackColor(profile.WheelSleepColor[0]);
+                    _data.WheelIdleColor[0] = rgb[0];
+                    _data.WheelIdleColor[1] = rgb[1];
+                    _data.WheelIdleColor[2] = rgb[2];
                 }
                 if (profile.WheelRpmBrightness >= 0)
                 {
@@ -3286,6 +3432,31 @@ namespace MozaPlugin
                         _deviceManager.WriteSetting("wheel-buttons-idle-effect", profile.WheelButtonsIdleEffect);
                     if (profile.WheelKnobIdleEffect >= 0)
                         _deviceManager.WriteSetting("wheel-knob-idle-effect", profile.WheelKnobIdleEffect);
+                    if (profile.WheelKnobLedMode >= 0)
+                        _deviceManager.WriteSetting("wheel-knob-led-mode", profile.WheelKnobLedMode);
+                    if (profile.WheelButtonsLedMode >= 0)
+                        _deviceManager.WriteSetting("wheel-buttons-led-mode", profile.WheelButtonsLedMode);
+                    if (profile.WheelIdleEffect >= 0 && profile.WheelTelemetryIdleSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-telemetry-idle-interval",
+                            BuildIdleIntervalPayload(profile.WheelIdleEffect, profile.WheelTelemetryIdleSpeedMs));
+                    if (profile.WheelButtonsIdleEffect >= 0 && profile.WheelButtonsIdleSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-buttons-idle-interval",
+                            BuildIdleIntervalPayload(profile.WheelButtonsIdleEffect, profile.WheelButtonsIdleSpeedMs));
+                    if (profile.WheelKnobIdleEffect >= 0 && profile.WheelKnobIdleSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-knob-idle-interval",
+                            BuildIdleIntervalPayload(profile.WheelKnobIdleEffect, profile.WheelKnobIdleSpeedMs));
+                    if (profile.WheelSleepMode >= 0)
+                        _deviceManager.WriteSetting("wheel-idle-mode", profile.WheelSleepMode);
+                    if (profile.WheelSleepTimeoutMin >= 0)
+                        _deviceManager.WriteSetting("wheel-idle-timeout", profile.WheelSleepTimeoutMin);
+                    if (profile.WheelSleepMode >= 0 && profile.WheelSleepSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-idle-speed",
+                            BuildIdleIntervalPayload(profile.WheelSleepMode, profile.WheelSleepSpeedMs));
+                    if (profile.WheelSleepColor != null && profile.WheelSleepColor.Length > 0)
+                    {
+                        var rgb = MozaProfile.UnpackColor(profile.WheelSleepColor[0]);
+                        _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
+                    }
                     if (profile.WheelRpmBrightness >= 0)
                         _deviceManager.WriteSetting("wheel-rpm-brightness", profile.WheelRpmBrightness);
                     if (profile.WheelButtonsBrightness >= 0)
@@ -3354,6 +3525,21 @@ namespace MozaPlugin
                 WriteColorArray(profile.DashRpmBlinkColors, "dash-rpm-blink-color", 10);
                 WriteColorArray(profile.DashFlagColors, "dash-flag-color", 6);
             }
+        }
+
+        // Build the 3-byte payload shared by per-effect speed commands:
+        //   wheel-{telemetry,buttons,knob}-idle-interval — `[effect_id, ms_msb, ms_lsb]`
+        //   wheel-idle-speed                              — `[mode,      ms_msb, ms_lsb]`
+        // The first byte selects which effect/mode the slider applies to;
+        // the remaining two bytes encode the ms value big-endian.
+        private static byte[] BuildIdleIntervalPayload(int selector, int ms)
+        {
+            ms = System.Math.Max(0, System.Math.Min(0xFFFF, ms));
+            return new byte[] {
+                (byte)(selector & 0xFF),
+                (byte)((ms >> 8) & 0xFF),
+                (byte)(ms & 0xFF),
+            };
         }
 
         private void WriteColorArray(int[]? packedColors, string commandPrefix, int count)
@@ -3474,6 +3660,31 @@ namespace MozaPlugin
                         _deviceManager.WriteSetting("wheel-buttons-idle-effect", extSettings.WheelButtonsIdleEffect);
                     if (extSettings.WheelKnobIdleEffect >= 0)
                         _deviceManager.WriteSetting("wheel-knob-idle-effect", extSettings.WheelKnobIdleEffect);
+                    if (extSettings.WheelKnobLedMode >= 0)
+                        _deviceManager.WriteSetting("wheel-knob-led-mode", extSettings.WheelKnobLedMode);
+                    if (extSettings.WheelButtonsLedMode >= 0)
+                        _deviceManager.WriteSetting("wheel-buttons-led-mode", extSettings.WheelButtonsLedMode);
+                    if (extSettings.WheelIdleEffect >= 0 && extSettings.WheelTelemetryIdleSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-telemetry-idle-interval",
+                            BuildIdleIntervalPayload(extSettings.WheelIdleEffect, extSettings.WheelTelemetryIdleSpeedMs));
+                    if (extSettings.WheelButtonsIdleEffect >= 0 && extSettings.WheelButtonsIdleSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-buttons-idle-interval",
+                            BuildIdleIntervalPayload(extSettings.WheelButtonsIdleEffect, extSettings.WheelButtonsIdleSpeedMs));
+                    if (extSettings.WheelKnobIdleEffect >= 0 && extSettings.WheelKnobIdleSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-knob-idle-interval",
+                            BuildIdleIntervalPayload(extSettings.WheelKnobIdleEffect, extSettings.WheelKnobIdleSpeedMs));
+                    if (extSettings.WheelSleepMode >= 0)
+                        _deviceManager.WriteSetting("wheel-idle-mode", extSettings.WheelSleepMode);
+                    if (extSettings.WheelSleepTimeoutMin >= 0)
+                        _deviceManager.WriteSetting("wheel-idle-timeout", extSettings.WheelSleepTimeoutMin);
+                    if (extSettings.WheelSleepMode >= 0 && extSettings.WheelSleepSpeedMs >= 0)
+                        _deviceManager.WriteArray("wheel-idle-speed",
+                            BuildIdleIntervalPayload(extSettings.WheelSleepMode, extSettings.WheelSleepSpeedMs));
+                    if (extSettings.WheelSleepColor != null && extSettings.WheelSleepColor.Length > 0)
+                    {
+                        var rgb = MozaProfile.UnpackColor(extSettings.WheelSleepColor[0]);
+                        _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
+                    }
                     if (extSettings.WheelRpmBrightness >= 0)
                         _deviceManager.WriteSetting("wheel-rpm-brightness", extSettings.WheelRpmBrightness);
                     if (extSettings.WheelButtonsBrightness >= 0)

@@ -76,6 +76,15 @@ namespace MozaPlugin
         public int WheelIdleEffect { get; set; } = -1;
         public int WheelButtonsIdleEffect { get; set; } = -1;
         public int WheelKnobIdleEffect { get; set; } = -1;
+        public int WheelKnobLedMode { get; set; } = -1;
+        public int WheelButtonsLedMode { get; set; } = -1;
+        public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
+        public int WheelButtonsIdleSpeedMs { get; set; } = -1;
+        public int WheelKnobIdleSpeedMs { get; set; } = -1;
+        public int WheelSleepMode { get; set; } = -1;
+        public int WheelSleepTimeoutMin { get; set; } = -1;
+        public int WheelSleepSpeedMs { get; set; } = -1;
+        public int[]? WheelSleepColor { get; set; }
         public int WheelRpmBrightness { get; set; } = -1;
         public int WheelButtonsBrightness { get; set; } = -1;
         public int WheelFlagsBrightness { get; set; } = -1;
@@ -176,6 +185,15 @@ namespace MozaPlugin
             WheelTelemetryMode = p.WheelTelemetryMode; WheelIdleEffect = p.WheelIdleEffect;
             WheelButtonsIdleEffect = p.WheelButtonsIdleEffect;
             WheelKnobIdleEffect = p.WheelKnobIdleEffect;
+            WheelKnobLedMode = p.WheelKnobLedMode;
+            WheelButtonsLedMode = p.WheelButtonsLedMode;
+            WheelTelemetryIdleSpeedMs = p.WheelTelemetryIdleSpeedMs;
+            WheelButtonsIdleSpeedMs = p.WheelButtonsIdleSpeedMs;
+            WheelKnobIdleSpeedMs = p.WheelKnobIdleSpeedMs;
+            WheelSleepMode = p.WheelSleepMode;
+            WheelSleepTimeoutMin = p.WheelSleepTimeoutMin;
+            WheelSleepSpeedMs = p.WheelSleepSpeedMs;
+            WheelSleepColor = p.WheelSleepColor;
             WheelRpmBrightness = p.WheelRpmBrightness; WheelButtonsBrightness = p.WheelButtonsBrightness;
             WheelFlagsBrightness = p.WheelFlagsBrightness;
 
@@ -266,6 +284,15 @@ namespace MozaPlugin
             WheelIdleEffect = settings.WheelIdleEffect;
             WheelButtonsIdleEffect = settings.WheelButtonsIdleEffect;
             WheelKnobIdleEffect = settings.WheelKnobIdleEffect;
+            WheelKnobLedMode = settings.WheelKnobLedMode;
+            WheelButtonsLedMode = settings.WheelButtonsLedMode;
+            WheelTelemetryIdleSpeedMs = settings.WheelTelemetryIdleSpeedMs;
+            WheelButtonsIdleSpeedMs = settings.WheelButtonsIdleSpeedMs;
+            WheelKnobIdleSpeedMs = settings.WheelKnobIdleSpeedMs;
+            WheelSleepMode = settings.WheelSleepMode;
+            WheelSleepTimeoutMin = settings.WheelSleepTimeoutMin;
+            WheelSleepSpeedMs = settings.WheelSleepSpeedMs;
+            WheelSleepColor = settings.WheelSleepColor;
             WheelRpmBrightness = settings.WheelRpmBrightness;
             WheelButtonsBrightness = settings.WheelButtonsBrightness;
             WheelFlagsBrightness = settings.WheelFlagsBrightness;

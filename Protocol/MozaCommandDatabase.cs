@@ -68,6 +68,14 @@ namespace MozaPlugin.Protocol
             // The companion fire-and-forget shift event is `gearshift-event`
             // (cmd 0x76, group 0x2D) — see docs/protocol/devices/wheelbase-0x13.md.
             AddCommand("base-gearshift-vibration","base", 40, 41, new byte[] { 46 },     2, "int");
+            // cmd 0x76 (118) on the base sequence/event group 0x2D (45) — fire-and-forget
+            // gearshift event. Wire body always `76 00 01` (PitHouse never varies the
+            // payload). The wheel firmware uses the persisted `base-gearshift-vibration`
+            // intensity to drive a brief motor pulse; no echo on group 0xAD. Verified
+            // 2026-05-10 (sim/logs/bridge-20260510-115644.jsonl): 112 occurrences,
+            // identical body, no echoes. Calling
+            // `WriteSetting("base-gearshift-event", 1)` produces the verified body.
+            AddCommand("base-gearshift-event",    "base", 0xFF, 45, new byte[] { 0x76 }, 2, "int");
             AddCommand("base-ffb-disable",        "base", 40, 41, new byte[] { 254 },    2, "int");
 
             // FFB curve (read group 40, write group 41)
@@ -317,6 +325,7 @@ namespace MozaPlugin.Protocol
 
             // Wheel telemetry mode and idle effects
             AddCommand("wheel-telemetry-mode",          "wheel", 64, 63, new byte[] { 28, 0 },  1, "int");
+            AddCommand("wheel-buttons-led-mode",        "wheel", 64, 63, new byte[] { 28, 1 },  1, "int");
             AddCommand("wheel-telemetry-idle-effect",   "wheel", 64, 63, new byte[] { 29, 0 },  1, "int");
             AddCommand("wheel-buttons-idle-effect",     "wheel", 64, 63, new byte[] { 29, 1 },  1, "int");
             // Per-(group, effect) idle animation speed. cmd 0x1E [group] [effect_id]

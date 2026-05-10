@@ -24,6 +24,26 @@ namespace MozaPlugin
         public int WheelButtonsIdleEffect { get => _wheelButtonsIdleEffect; set => _wheelButtonsIdleEffect = value; }
         private volatile int _wheelKnobIdleEffect = -1;
         public int WheelKnobIdleEffect { get => _wheelKnobIdleEffect; set => _wheelKnobIdleEffect = value; }
+        private volatile int _wheelKnobLedMode = -1;
+        public int WheelKnobLedMode { get => _wheelKnobLedMode; set => _wheelKnobLedMode = value; }
+        private volatile int _wheelButtonsLedMode = -1;
+        public int WheelButtonsLedMode { get => _wheelButtonsLedMode; set => _wheelButtonsLedMode = value; }
+        // Per-group idle-effect speed (cmd 0x1E [group] [effect_id] [BE u16 ms]).
+        // -1 = never set; UI defaults to 1000ms when first showing the slider.
+        private volatile int _wheelTelemetryIdleSpeedMs = -1;
+        public int WheelTelemetryIdleSpeedMs { get => _wheelTelemetryIdleSpeedMs; set => _wheelTelemetryIdleSpeedMs = value; }
+        private volatile int _wheelButtonsIdleSpeedMs = -1;
+        public int WheelButtonsIdleSpeedMs { get => _wheelButtonsIdleSpeedMs; set => _wheelButtonsIdleSpeedMs = value; }
+        private volatile int _wheelKnobIdleSpeedMs = -1;
+        public int WheelKnobIdleSpeedMs { get => _wheelKnobIdleSpeedMs; set => _wheelKnobIdleSpeedMs = value; }
+        // Wheel sleep-light settings (cmd 0x20/0x21/0x22/0x24).
+        private volatile int _wheelSleepMode = -1;        // cmd 0x20 — 1-byte mode enum
+        public int WheelSleepMode { get => _wheelSleepMode; set => _wheelSleepMode = value; }
+        private volatile int _wheelSleepTimeoutMin = -1;  // cmd 0x21 — BE u16 minutes
+        public int WheelSleepTimeoutMin { get => _wheelSleepTimeoutMin; set => _wheelSleepTimeoutMin = value; }
+        private volatile int _wheelSleepSpeedMs = -1;     // cmd 0x22 [mode] [BE u16 ms]
+        public int WheelSleepSpeedMs { get => _wheelSleepSpeedMs; set => _wheelSleepSpeedMs = value; }
+        public int[]? WheelSleepColor { get; set; }       // packed R<<16|G<<8|B (single)
 
         // Wheel input settings cached locally — newer KS-family firmware
         // silently drops read-back for these (cmd 9 / cmd 10), so we have to
@@ -331,6 +351,15 @@ namespace MozaPlugin
                 slot.WheelKnobPrimaryColors    = WheelKnobPrimaryColors;
                 slot.WheelKnobRingColors       = WheelKnobRingColors;
                 slot.WheelKnobRingBrightness   = WheelKnobRingBrightness;
+                slot.WheelKnobLedMode          = WheelKnobLedMode;
+                slot.WheelButtonsLedMode       = WheelButtonsLedMode;
+                slot.WheelTelemetryIdleSpeedMs = WheelTelemetryIdleSpeedMs;
+                slot.WheelButtonsIdleSpeedMs   = WheelButtonsIdleSpeedMs;
+                slot.WheelKnobIdleSpeedMs      = WheelKnobIdleSpeedMs;
+                slot.WheelSleepMode            = WheelSleepMode;
+                slot.WheelSleepTimeoutMin      = WheelSleepTimeoutMin;
+                slot.WheelSleepSpeedMs         = WheelSleepSpeedMs;
+                slot.WheelSleepColor           = WheelSleepColor;
             }
         }
 
@@ -360,6 +389,15 @@ namespace MozaPlugin
                 WheelKnobPrimaryColors    = slot.WheelKnobPrimaryColors;
                 WheelKnobRingColors       = slot.WheelKnobRingColors;
                 WheelKnobRingBrightness   = slot.WheelKnobRingBrightness;
+                WheelKnobLedMode          = slot.WheelKnobLedMode;
+                WheelButtonsLedMode       = slot.WheelButtonsLedMode;
+                WheelTelemetryIdleSpeedMs = slot.WheelTelemetryIdleSpeedMs;
+                WheelButtonsIdleSpeedMs   = slot.WheelButtonsIdleSpeedMs;
+                WheelKnobIdleSpeedMs      = slot.WheelKnobIdleSpeedMs;
+                WheelSleepMode            = slot.WheelSleepMode;
+                WheelSleepTimeoutMin      = slot.WheelSleepTimeoutMin;
+                WheelSleepSpeedMs         = slot.WheelSleepSpeedMs;
+                WheelSleepColor           = slot.WheelSleepColor;
             }
         }
     }
@@ -390,5 +428,14 @@ namespace MozaPlugin
         public int[]? WheelKnobPrimaryColors { get; set; }
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
+        public int WheelKnobLedMode { get; set; } = -1;
+        public int WheelButtonsLedMode { get; set; } = -1;
+        public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
+        public int WheelButtonsIdleSpeedMs { get; set; } = -1;
+        public int WheelKnobIdleSpeedMs { get; set; } = -1;
+        public int WheelSleepMode { get; set; } = -1;
+        public int WheelSleepTimeoutMin { get; set; } = -1;
+        public int WheelSleepSpeedMs { get; set; } = -1;
+        public int[]? WheelSleepColor { get; set; }
     }
 }

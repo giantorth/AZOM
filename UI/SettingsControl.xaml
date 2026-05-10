@@ -201,6 +201,22 @@
                             <TextBlock x:Name="SpeedDampingPointValue" Style="{StaticResource SliderValue}" Text="120 kph"/>
                         </StackPanel>
 
+                        <TextBlock Text="Performance" Style="{StaticResource SectionHeader}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Performance Output" Style="{StaticResource SliderLabel}"/>
+                            <ComboBox x:Name="PerformanceOutputCombo" Width="140" SelectionChanged="PerformanceOutputCombo_Changed">
+                                <ComboBoxItem Content="Reserved"/>
+                                <ComboBoxItem Content="Full"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <TextBlock Text="Gearshift Vibration" Style="{StaticResource SectionHeader}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Shift Intensity" Style="{StaticResource SliderLabel}"/>
+                            <Slider x:Name="GearshiftVibrationSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="5" TickFrequency="1" SmallChange="1" LargeChange="1" IsSnapToTickEnabled="True" ValueChanged="GearshiftVibrationSlider_ValueChanged"/>
+                            <TextBlock x:Name="GearshiftVibrationValue" Style="{StaticResource SliderValue}" Text="0"/>
+                        </StackPanel>
+
                         <TextBlock Text="Protection" Style="{StaticResource SectionHeader}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,8">
                             <TextBlock Text="Hands-Off Protection" Style="{StaticResource SliderLabel}"/>

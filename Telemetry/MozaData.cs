@@ -130,7 +130,10 @@ namespace MozaPlugin
         // FFB misc
         public volatile int FfbReverse;
         public volatile int FfbDisable;
-        public volatile int TempStrategy;
+        public volatile int TempStrategy;        // cmd 0x1E base — also exposed in
+                                                  // PitHouse as "Performance output"
+                                                  // (0 = Reserved, 1 = Full).
+        public volatile int GearshiftVibration;  // cmd 0x2E base — 0..5 intensity.
 
         // Game effects
         public volatile int GameDamper;
@@ -148,6 +151,15 @@ namespace MozaPlugin
         public volatile int WheelTelemetryIdleEffect;
         public volatile int WheelButtonsIdleEffect;
         public volatile int WheelKnobIdleEffect;
+        public volatile int WheelKnobLedMode;
+        public volatile int WheelButtonsLedMode;
+        // Per-group idle-effect SPEED (cmd 0x1E [group] [effect_id] [BE u16 ms]).
+        // We track only the last ms value committed for each group; the effect_id
+        // byte is always paired from the corresponding *IdleEffect field at write
+        // time, so a single int per group is sufficient.
+        public volatile int WheelTelemetryIdleSpeedMs;
+        public volatile int WheelButtonsIdleSpeedMs;
+        public volatile int WheelKnobIdleSpeedMs;
         public volatile int WheelRpmBrightness;
         public volatile int WheelButtonsBrightness;
         public volatile int WheelFlagsBrightness;
@@ -349,6 +361,7 @@ namespace MozaPlugin
                 case "base-ffb-reverse":    FfbReverse = value; break;
                 case "base-ffb-disable":    FfbDisable = value; break;
                 case "base-temp-strategy":  TempStrategy = value; break;
+                case "base-gearshift-vibration": GearshiftVibration = value; break;
 
                 // Game effects
                 case "main-get-damper-gain":   GameDamper = value; break;
@@ -367,6 +380,8 @@ namespace MozaPlugin
                 case "wheel-telemetry-idle-effect":  WheelTelemetryIdleEffect = value; break;
                 case "wheel-buttons-idle-effect":    WheelButtonsIdleEffect = value; break;
                 case "wheel-knob-idle-effect":       WheelKnobIdleEffect = value; break;
+                case "wheel-knob-led-mode":          WheelKnobLedMode = value; break;
+                case "wheel-buttons-led-mode":       WheelButtonsLedMode = value; break;
                 case "wheel-rpm-brightness":         WheelRpmBrightness = value; break;
                 case "wheel-buttons-brightness":     WheelButtonsBrightness = value; break;
                 case "wheel-flags-brightness":       WheelFlagsBrightness = value; break;

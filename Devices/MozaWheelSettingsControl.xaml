@@ -193,6 +193,11 @@
                                     <ComboBoxItem Content="RGB Pulse"/>
                                 </ComboBox>
                             </StackPanel>
+                            <StackPanel x:Name="WheelIdleSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
+                                <TextBlock Text="RPM Idle Speed" Style="{StaticResource SliderLabel}"/>
+                                <Slider x:Name="WheelIdleSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelIdleSpeedSlider_ValueChanged"/>
+                                <TextBlock x:Name="WheelIdleSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
+                            </StackPanel>
 
                             <StackPanel x:Name="WheelRpmColorSection">
                                 <TextBlock Text="RPM LED Colors (Static)" Style="{StaticResource SectionHeader}"/>
@@ -246,6 +251,14 @@
 
                         <TextBlock Text="Button LED Mode" Style="{StaticResource SectionHeader}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Button LED Mode" Style="{StaticResource SliderLabel}"/>
+                            <ComboBox x:Name="WheelButtonLedModeCombo" Width="140" SelectionChanged="WheelButtonLedModeCombo_Changed">
+                                <ComboBoxItem Content="Off"/>
+                                <ComboBoxItem Content="SimHub Mode"/>
+                                <ComboBoxItem Content="Static"/>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="Button Idle Effect" Style="{StaticResource SliderLabel}"/>
                             <ComboBox x:Name="WheelButtonIdleEffectCombo" Width="140" SelectionChanged="WheelButtonIdleEffectCombo_Changed">
                                 <ComboBoxItem Content="Off"/><ComboBoxItem Content="Constant"/>
@@ -253,6 +266,11 @@
                                 <ComboBoxItem Content="Rainbow"/><ComboBoxItem Content="Sand Flow"/>
                                 <ComboBoxItem Content="RGB Pulse"/>
                             </ComboBox>
+                        </StackPanel>
+                        <StackPanel x:Name="WheelButtonIdleSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
+                            <TextBlock Text="Button Idle Speed" Style="{StaticResource SliderLabel}"/>
+                            <Slider x:Name="WheelButtonIdleSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelButtonIdleSpeedSlider_ValueChanged"/>
+                            <TextBlock x:Name="WheelButtonIdleSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
                         </StackPanel>
 
                         <TextBlock Text="Button LED Colors" Style="{StaticResource SectionHeader}"/>
@@ -271,6 +289,14 @@
 
                         <StackPanel x:Name="WheelKnobSection" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Knob LED Mode" Style="{StaticResource SliderLabel}"/>
+                                <ComboBox x:Name="WheelKnobLedModeCombo" Width="140" SelectionChanged="WheelKnobLedModeCombo_Changed">
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="SimHub Mode"/>
+                                    <ComboBoxItem Content="Static"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="Knob Idle Effect" Style="{StaticResource SliderLabel}"/>
                                 <ComboBox x:Name="WheelKnobIdleEffectCombo" Width="140" SelectionChanged="WheelKnobIdleEffectCombo_Changed">
                                     <ComboBoxItem Content="Off"/>
@@ -281,6 +307,11 @@
                                     <ComboBoxItem Content="Sand Flow"/>
                                     <ComboBoxItem Content="RGB Pulse"/>
                                 </ComboBox>
+                            </StackPanel>
+                            <StackPanel x:Name="WheelKnobIdleSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
+                                <TextBlock Text="Knob Idle Speed" Style="{StaticResource SliderLabel}"/>
+                                <Slider x:Name="WheelKnobIdleSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelKnobIdleSpeedSlider_ValueChanged"/>
+                                <TextBlock x:Name="WheelKnobIdleSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
                             </StackPanel>
                             <TextBlock Text="Knob LED Colors" Style="{StaticResource SectionHeader}"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
@@ -306,6 +337,69 @@
                             <StackPanel x:Name="WheelKnobRingPanel" Margin="0,0,0,10"/>
                         </StackPanel>
 
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ==================== SLEEP TAB ==================== -->
+            <TabItem x:Name="SleepTab" Header="Sleep" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
+                    <StackPanel Margin="5">
+                        <TextBlock Text="Sleep Light" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Text="What the wheel shows after the wheel-wide idle timeout elapses."
+                                   Foreground="Gray" FontSize="11" Margin="0,0,0,4" TextWrapping="Wrap"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Mode" Style="{StaticResource SliderLabel}"/>
+                            <ComboBox x:Name="WheelSleepModeCombo" Width="140" SelectionChanged="WheelSleepModeCombo_Changed">
+                                <ComboBoxItem Content="Off"/>
+                                <ComboBoxItem Content="Constant"/>
+                                <ComboBoxItem Content="Breathing"/>
+                                <ComboBoxItem Content="Color Cycle"/>
+                                <ComboBoxItem Content="Rainbow"/>
+                                <ComboBoxItem Content="Sand Flow"/>
+                                <ComboBoxItem Content="RGB Pulse"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Standby Time" Style="{StaticResource SliderLabel}"/>
+                            <ComboBox x:Name="WheelSleepTimeoutCombo" Width="140" SelectionChanged="WheelSleepTimeoutCombo_Changed">
+                                <ComboBoxItem Tag="1">1 minute</ComboBoxItem>
+                                <ComboBoxItem Tag="2">2 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="3">3 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="4">4 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="5">5 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="10">10 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="15">15 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="20">20 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="25">25 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="30">30 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="35">35 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="40">40 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="45">45 minutes</ComboBoxItem>
+                                <ComboBoxItem Tag="60">1 hour</ComboBoxItem>
+                                <ComboBoxItem Tag="120">2 hours</ComboBoxItem>
+                                <ComboBoxItem Tag="180">3 hours</ComboBoxItem>
+                                <ComboBoxItem Tag="240">4 hours</ComboBoxItem>
+                                <ComboBoxItem Tag="300">5 hours</ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel x:Name="WheelSleepSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
+                            <TextBlock Text="Speed" Style="{StaticResource SliderLabel}"/>
+                            <Slider x:Name="WheelSleepSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelSleepSpeedSlider_ValueChanged"/>
+                            <TextBlock x:Name="WheelSleepSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Color" Style="{StaticResource SliderLabel}"/>
+                            <Border x:Name="WheelSleepColorSwatch" Width="28" Height="28" BorderThickness="1" CornerRadius="3" Background="Black" Cursor="Hand" MouseLeftButtonUp="WheelSleepColorSwatch_Click">
+                                <Border.BorderBrush>
+                                    <SolidColorBrush Color="#555555"/>
+                                </Border.BorderBrush>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
