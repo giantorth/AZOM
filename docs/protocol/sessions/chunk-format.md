@@ -36,8 +36,32 @@ Net payload per full data chunk: **54 bytes** (58 minus 4-byte CRC). All data ch
 
 ### Session data chunk CRC — 4 bytes LE
 
-**Verified 2026-04-24 (again).** Each session `7c:00` data chunk carries a **4-byte CRC32-LE** trailer over the net body. A previous revision of this section briefly claimed 3 bytes; that claim was an artifact of a buggy `extract_frames` helper that dropped the last 2 bytes of each frame (real CRC's last byte + frame checksum). When raw tshark output is inspected directly every chunk's last 4 bytes match `zlib.crc32(net)` LE exactly.
+**Verified 2026-04-24, re-verified 2026-05-10 against 524 wire-trace files (227,497 / 227,713 chunks matched 4-byte; 0 / 227,713 matched 3-byte).** Each session `7c:00` data chunk carries a **4-byte CRC32-LE** trailer over the net body.
 
 Full chunk wire layout: 6-byte `7c:00:sess:01:seq_lo:seq_hi` + 54-byte net data + 4-byte CRC32-LE = 64-byte payload = 69-byte frame (with `7e/N/group/device/cksum` framing, `N = 0x40`). The final chunk of a message is shorter; it still carries a 4-byte CRC over its (smaller) net data.
 
+Reference computation (read-only validation against any capture):
+
+```python
+import zlib
+# raw = bytes after framing strip: [resp_group, resp_dev, 7c, 00, sess, type, seq_lo, seq_hi, chunkPayload]
+chunk = raw[8:]                                   # chunkPayload only
+calc  = zlib.crc32(chunk[:-4])                    # CRC over net data
+wire  = int.from_bytes(chunk[-4:], 'little')      # last 4 bytes LE
+assert calc == wire
+```
+
 Sim chunking (`chunk_session_payload`, `_chunk_catalog_message`) and all chunk-CRC-aware ingestion paths (`UploadTracker.feed`, `PitHouseUploadReassembler.add`) use 4-byte CRC. `chunk_session_payload` exposes a `crc_bytes` knob for future firmware variants but defaults to 4.
+
+#### Tautology trap when "verifying" alternative CRC widths
+
+Two distinct false-positives have produced "the CRC is N bytes wide" claims that fail in production. Both were the result of a verification script computing the canonical 4-byte CRC under a different label:
+
+| Bogus form | Why it appears to "match" 100% |
+|---|---|
+| `crc32(cp[:-3]) & 0xFFFFFF  ==  cp[-3:].le` while reading b2h JSONL bytes that did **not** include a wire checksum trailer | Treating the JSONL hex as if it has a trailing checksum byte (it doesn't — see [`../../tools/moza_trace.py:68-70`](../../tools/moza_trace.py) — b2h is `[resp_group, resp_dev, payload]` with no checksum) shifts `chunk[:-3]` onto the canonical `chunk[:-4]`. The compare against `chunk[-3:]` is just the bottom 3 bytes of the same 4-byte CRC LE. Looks like "3-byte CRC verified". |
+| `crc32(cp[:-4]) & 0xFFFFFF  ==  cp[-4:-1].le` | Truncates both sides of the canonical test to 24 bits. Always matches when the 4-byte test matches. |
+
+A "3-byte CRC" verification only proves the protocol is 3 bytes wide if it can also be shown to **fail** when the chunk is truncated by one byte at the front (or one byte is added at the back). The production code in `Telemetry/TelemetrySender.cs` does NOT make these off-by-one mistakes when reading from a real receive buffer — it reads `chunkPayload` at the correct offset, so a "3-byte CRC" branch in production rejects every real chunk (`crcRejects` counter grows until it's caught and reverted).
+
+If you genuinely suspect a firmware variant uses a different CRC width, the only convincing test is: capture from that variant, decode framing exactly as the read loop does (post-stuff, post-checksum-strip), and confirm that **4-byte CRC fails** on >99% of chunks. The 216 / 227,713 "4-byte mismatch" rate observed in the historical trace archive is the floor — corrupt/truncated frames produce that level of noise even on a healthy 4-byte link.

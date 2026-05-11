@@ -60,6 +60,44 @@ Read-then-write pattern: Pithouse sends 28:00 and 28:01 (read state), then 28:02
 
 **Normal operation:** `28 02 01 00` continues polling ~3.4 Hz to maintain multi-channel mode.
 
+### 28:00/28:01 response format — wheel's current dashboard / page
+
+The wheel's reply to `28:00` and `28:01` is **the wheel's authoritative answer to "which dashboard / page are you currently showing?"**, surviving plugin restart and SimHub reload (the wheel retains the last loaded dashboard across power cycles). This is the only positive signal of active-dashboard state at startup — the configJson state push on session 0x09 lists *installed* dashboards but does not single out an active one (see [`../dashboard-upload/config-rpc-session-09.md`](../dashboard-upload/config-rpc-session-09.md)).
+
+Wire form (response group = request group + 0x80, device nibble-swapped):
+
+```
+host → wheel  : 7e 04 40 17 28 00 00 00 [chk]      # 28:00 read
+wheel → host  : 7e 04 c0 71 28 00 [slot] [chk]     # response, slot = 1 byte
+host → wheel  : 7e 04 40 17 28 01 00 00 [chk]      # 28:01 read
+wheel → host  : 7e 05 c0 71 28 01 [page_lo] [page_hi] [chk]   # response, 2 bytes LE
+```
+
+Interpretation:
+
+| Field | Encoding | Meaning |
+|-------|----------|---------|
+| `28:00 [slot]` | `u8` | Index into the wheel's `configJsonList` (alphabetical order of installed dashboards). `0x00` = first entry, `0x01` = second, etc. Matches the slot value the host sends in `kind=4` FF-records on session 0x02. |
+| `28:01 [page_lo, page_hi]` | `u16 LE` | Active page within the currently-loaded dashboard. `0x0000` = page 0. Multi-page dashboards (with widget pagination) use this to identify which page is being rendered. |
+
+Example from a 2025-11 firmware (CS Pro W17) where the wheel was showing `Core`:
+
+```
+28:00 response = 00          → slot 0 → configJsonList[0] = "Core"
+28:01 response = 00 00       → page 0
+```
+
+The 11-entry configJsonList for that wheel was `Core, Grids, Mono, Nebula, Pulse, Rally V1, Rally V2, Rally V3, Rally V4, Rally V5, Rally V6` (alphabetical), so `slot=0` resolves to `"Core"`.
+
+**Use case — auto-detect active dashboard at startup.** A host can resolve the wheel's current dashboard by:
+1. Reading the configJson state push on session 0x09 (carries `configJsonList: [...]`).
+2. Reading `28:00` (returns the slot index into that list).
+3. `configJsonList[28:00.slot]` = dashboard name currently being rendered.
+
+This avoids the "host sends tier-def for dashboard A, wheel is rendering dashboard B, channels don't bind" desync after plugin restart. Plugin should auto-select the same dashboard on reconnect rather than reverting to its last saved profile.
+
+**Not currently parsed by the SimHub plugin.** As of 2026-05-10 the plugin sends both reads during the channel-config burst (`TelemetrySender.cs:3866-3867`) and the responses arrive in the wire trace, but the bytes are stored raw in `MozaData` (visible in the Diagnostics tab as `wheel 28:xx raw:`) without being parsed into a structured field. A future patch should resolve `28:00.slot → configJsonList[slot]` and surface it as `WheelDashboardState.ActiveDashboardName` for the plugin to gate its `RestartForSwitch` / catalog-resync logic on.
+
 ### 27:NN per-page binding state (host→wheel write on group 0x3F)
 
 **NOTE:** earlier draft of this section claimed `3F 27:NN` is THE

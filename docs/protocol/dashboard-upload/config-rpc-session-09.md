@@ -44,6 +44,14 @@ Key schema differences:
 
 Both schemas list same per-dashboard metadata: `title`, `dirName`, `hash`, `id`, `idealDeviceInfos`, `lastModified`, `previewImageFilePaths`. Simulators must emit schema matching firmware host expects.
 
+### What the state blob does NOT contain — active-dashboard signal
+
+Neither firmware schema includes a field identifying **which dashboard the wheel is currently rendering**. The state push lists installed/enabled/disabled dashboards and their metadata, but there is no `activeSlot`, `currentDashboard`, `selectedIndex`, or equivalent field in any observed capture across either schema version.
+
+Active-dashboard state is carried instead by the channel-config burst's `28:00` / `28:01` readbacks on group `0x40`. See [`../channel-config/group-0x40-burst.md`](../channel-config/group-0x40-burst.md) §"28:00/28:01 response format" for the wire form and decode. The wheel retains the loaded dashboard across power cycles, so this readback is the authoritative resume signal after plugin restart / SimHub reload.
+
+A host that relies on the configJson state blob alone for active-dashboard tracking will desync from the wheel after any restart cycle (host re-applies its saved profile; wheel keeps rendering whatever it was rendering). The only positive in-protocol confirmation of a switch is the wheel's echo of `kind=4` FF-records on session 0x02, which only fires when the host actually sends a switch — not at startup.
+
 ### configJson state `rootDirPath` changed between firmware versions
 
 | Firmware | `rootDirPath` | `rootPath` (enableManager/disableManager) |

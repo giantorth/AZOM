@@ -71,3 +71,36 @@ Group `0x0E` is also used host → device as the parameter-table reader
 (see [`periodic/group-0x0E-param-reader.md`](periodic/group-0x0E-param-reader.md));
 device-initiated `0x0E` frames carry firmware log output rather than
 parameter responses.
+
+#### Boot-time `0x0E` burst on cold connect
+
+On a fresh port open (cold connect, cable replug, wheel power-up), the
+wheel emits a **burst** of `0x0E` frames over the first several hundred
+ms before falling back to the ~0.5 Hz steady-state cadence above. Frames
+are ASCII status lines with a `0x05` (info) severity byte prefix —
+typical content includes MCU/MOS temperature, pedal connection state,
+brake/throttle/clutch calibration thetas, output-direction settings,
+and per-pedal output mode. Sample decoded from a 2026-05-10 CS Pro
+trace:
+
+```
+0e 21 05 'MCU temp : 37.00000 (°C)\n'
+0e 21 05 'MOS temp : 31.54000 (°C)\n'
+0e 21 05 'Pedals connected state: [throttle 1 brake 1 clutch 1]\n'
+0e 21 05 'Brake calibrate theta:[min 65535.00000° max 39.11192 angle -6.07003°]\n'
+0e 21 05 'Throttle calibrate theta:[min -0.69882° max 162.72099° angle -0.43945°]\n'
+0e 21 05 'Clutch calibrate theta:[min -1.42042° max 186.36941° angle -1.34035°]\n'
+0e 21 05 'Output direction: [throttle 0 brake 0 clutch 0]\n'
+0e 21 05 'Throttle output mode: 1 refuel: 0\n'
+```
+
+**Implication for port detection.** Host implementations that send a
+probe (e.g. base-identity read `7e 03 2b 13 04 00 00 d0` expecting an
+`ab 31 …` response) and decide port validity from the first received
+frame's group byte WILL false-negative this burst — the probe response
+arrives a few ms after the first 1–10 debug-log frames, not before
+them. Validation should scan **every** frame received within the
+window (≥ 1 s) for the expected response group, not just the first.
+The plugin's `MozaSerialConnection` cached-port validation was
+patched 2026-05-10 to use a per-group-seen bitmap instead of
+`_firstRxGroup` for exactly this reason.
