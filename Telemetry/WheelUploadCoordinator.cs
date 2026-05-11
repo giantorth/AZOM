@@ -31,6 +31,13 @@ namespace MozaPlugin.Telemetry
         private readonly Func<WheelDashboardState?> _getConfigJsonState;
         private readonly Action<byte, ushort> _sendSessionAck;
         private readonly Action<byte, ushort> _sendSessionEnd;
+        // Reliable-stream chunk emitter. Pushes the frame onto the wire AND
+        // registers it with the host-side retransmit queue so unacked
+        // session-data chunks get re-emitted by TelemetrySender's
+        // TickEmitRetransmits. Used for sub-msg 1 and sub-msg 2 so that if
+        // the wheel drops one mid-burst, the retransmit fires automatically
+        // instead of leaving the upload silently incomplete.
+        private readonly Action<byte[]> _sendAndTrackChunk;
 
         // FT-eligible sessions the wheel device-inited. ChooseUploadSession
         // prefers 0x04 (legacy), then walks up looking for the first match.
@@ -72,7 +79,8 @@ namespace MozaPlugin.Telemetry
             Func<EraPolicy> getPolicy,
             Func<WheelDashboardState?> getConfigJsonState,
             Action<byte, ushort> sendSessionAck,
-            Action<byte, ushort> sendSessionEnd)
+            Action<byte, ushort> sendSessionEnd,
+            Action<byte[]> sendAndTrackChunk)
         {
             _connection = connection;
             _shouldAbort = shouldAbort;
@@ -80,6 +88,7 @@ namespace MozaPlugin.Telemetry
             _getConfigJsonState = getConfigJsonState;
             _sendSessionAck = sendSessionAck;
             _sendSessionEnd = sendSessionEnd;
+            _sendAndTrackChunk = sendAndTrackChunk;
         }
 
         /// <summary>Notify the coordinator that the wheel device-inited a
@@ -286,14 +295,17 @@ namespace MozaPlugin.Telemetry
             _endReceived.Reset();
             _inboundMsgCount = 0;
 
-            // Sub-msg 1: path registration.
+            // Sub-msg 1: path registration. Route through SendAndTrackChunk
+            // so each chunk is enqueued for retransmit — if the wheel drops
+            // one, the host re-emits on the SessionRetransmitter backoff
+            // rather than failing the whole upload after the 2 s wait.
             int seq1 = _outboundSeq + 1;
             var subMsg1Frames = TierDefinitionBuilder.ChunkMessage(
                 upload.SubMsg1PathRegistration, uploadSess, ref seq1);
             foreach (var frame in subMsg1Frames)
             {
                 if (_shouldAbort()) return;
-                _connection.Send(frame);
+                _sendAndTrackChunk(frame);
             }
             _outboundSeq = seq1;
 
@@ -329,7 +341,7 @@ namespace MozaPlugin.Telemetry
                     foreach (var frame in subMsg1Frames)
                     {
                         if (_shouldAbort()) return;
-                        _connection.Send(frame);
+                        _sendAndTrackChunk(frame);
                     }
                     _outboundSeq = seq1;
 
@@ -350,6 +362,9 @@ namespace MozaPlugin.Telemetry
             // for new-firmware uploads when the body exceeds 0xFFFF bytes (TODO:
             // true multi-sub-msg chunking; today this is single-element for both
             // formats — see FileTransferBuilder.BuildFileContentChunked).
+            // Each frame goes through SendAndTrackChunk so retransmits cover
+            // wheel-side drops (was bare _connection.Send pre-fix, meaning a
+            // single dropped chunk silently aborted the upload).
             _inboundMsgCount = 0;
             int seq2 = _outboundSeq + 1;
             for (int chunkIdx = 0; chunkIdx < upload.SubMsg2Chunks.Count; chunkIdx++)
@@ -359,13 +374,25 @@ namespace MozaPlugin.Telemetry
                 foreach (var frame in subMsg2Frames)
                 {
                     if (_shouldAbort()) return;
-                    _connection.Send(frame);
+                    _sendAndTrackChunk(frame);
                 }
             }
             _outboundSeq = seq2;
 
             if (!_subMsg2Response.Wait(3000))
-                MozaLog.Warn($"[Moza] Session 0x{uploadSess:X2} sub-msg 2 response timeout");
+            {
+                // Sub-msg-2 reply never arrived within the wait window.
+                // Retransmits should have re-emitted the unacked chunks via
+                // SendAndTrackChunk above; if the wheel still hasn't replied
+                // after 3 s, the upload likely failed at the wheel-side
+                // filesystem layer (out-of-space, transient FS error) and
+                // the end-marker is the only thing left to do — emit it so
+                // the wheel cleanly closes the upload session and is ready
+                // for the next attempt on the next preamble cycle.
+                MozaLog.Warn(
+                    $"[Moza] Session 0x{uploadSess:X2} sub-msg 2 response timeout " +
+                    "(retransmits did not recover); emitting end marker and aborting");
+            }
 
             // End marker on the upload session.
             _sendSessionEnd(uploadSess, (ushort)_outboundSeq);

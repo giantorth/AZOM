@@ -41,15 +41,56 @@ namespace MozaPlugin.Telemetry
             {
                 _buf.RemoveRange(0, consumed);
                 _lastState = decoded;
+                return decoded;
+            }
+
+            // No decode this pass. If the buffer is large enough to evaluate
+            // the sentinel and it doesn't match at offset 0, the leading
+            // bytes are stray (envelope from a prior, partially-lost message
+            // or genuinely corrupt input). Scan for the next plausible
+            // envelope start (FF 01 00) and trim everything before it so the
+            // buffer doesn't accumulate up to MaxBufferBytes before clearing.
+            // Mirrors SessionDataReassembler.TryDecompressByMagic's recovery
+            // pattern. Without this, captures of malformed input grew the
+            // buffer to the 1 MiB cap over time before the wholesale clear.
+            if (_buf.Count >= 3 && !LooksLikeEnvelopeStart(_buf, 0))
+            {
+                int next = FindNextEnvelopeStart(_buf, 1);
+                if (next > 0)
+                    _buf.RemoveRange(0, next);
+                else
+                    // No sentinel anywhere in the buffer — keep the last 2
+                    // bytes in case the envelope start straddles the next
+                    // chunk boundary, drop the rest.
+                    _buf.RemoveRange(0, Math.Max(0, _buf.Count - 2));
             }
             else if (_buf.Count > MaxBufferBytes)
             {
-                // Malformed input or sentinel never arrived — drop everything to
-                // bound memory; a fresh chunk that begins with valid sentinels
-                // can resume parsing cleanly.
+                // Defensive: buffer still grew past the cap (e.g. a long
+                // run of plausible-sentinel starts that never resolve into
+                // a real envelope). Drop everything.
                 _buf.Clear();
             }
-            return decoded;
+
+            return null;
+        }
+
+        private static bool LooksLikeEnvelopeStart(List<byte> buf, int offset)
+        {
+            return offset + 2 < buf.Count
+                && buf[offset] == 0xFF
+                && buf[offset + 1] == 0x01
+                && buf[offset + 2] == 0x00;
+        }
+
+        private static int FindNextEnvelopeStart(List<byte> buf, int from)
+        {
+            for (int i = from; i + 2 < buf.Count; i++)
+            {
+                if (buf[i] == 0xFF && buf[i + 1] == 0x01 && buf[i + 2] == 0x00)
+                    return i;
+            }
+            return -1;
         }
 
         public void Clear() => _buf.Clear();

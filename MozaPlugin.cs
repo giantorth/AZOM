@@ -1886,7 +1886,22 @@ namespace MozaPlugin
             if (Interlocked.CompareExchange(ref _telemetryStartRequested, 1, 0) != 0) return;
 
             MozaLog.Info("[Moza] Wheel detected and telemetry enabled — starting telemetry sender");
-            ThreadPool.QueueUserWorkItem(_ => t.Start());
+            // Wrap the work item in a top-level catch so any exception from
+            // Start() (e.g. ObjectDisposedException from a race against
+            // plugin Dispose during game-switch reload, IOException from a
+            // serial port that closed mid-probe) is logged instead of
+            // propagating up through ThreadPool — on .NET Framework 4.8
+            // unhandled exceptions in ThreadPool callbacks can take down
+            // the SimHub host process.
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try { t.Start(); }
+                catch (ObjectDisposedException) { /* plugin disposed mid-start */ }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[Moza] Telemetry start failed: {ex.GetType().Name}: {ex.Message}");
+                }
+            });
         }
 
         private static MultiStreamProfile? FindProfile(

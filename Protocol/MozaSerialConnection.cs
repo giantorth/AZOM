@@ -112,6 +112,20 @@ namespace MozaPlugin.Protocol
         // received yet (0x00 is never a valid response group).
         private int _firstRxGroup;
 
+        // Bitmap of every response group byte ReadLoop has seen since the
+        // last Connect() reset. Cached-port validation checks this — looking
+        // for the EXPECTED probe response group anywhere in the validation
+        // window instead of just the literal first frame. Required because
+        // some wheels emit boot-time debug-log frames (group 0x0E) before
+        // responding to the base/AB9/hub probe; the probe response then
+        // arrives a few ms later mixed in with the noise, and pre-2026-05-10
+        // logic at `_firstRxGroup` saw the noise byte first and rejected
+        // the (valid) port. 32 bytes × 8 bits covers the full byte range.
+        private readonly byte[] _rxGroupsSeen = new byte[32];
+        private void NoteRxGroup(byte g) { _rxGroupsSeen[g >> 3] |= (byte)(1 << (g & 7)); }
+        private bool HaveSeenRxGroup(byte g) => (_rxGroupsSeen[g >> 3] & (1 << (g & 7))) != 0;
+        private void ResetRxGroupsSeen() { for (int i = 0; i < _rxGroupsSeen.Length; i++) _rxGroupsSeen[i] = 0; }
+
         public event Action<byte[]>? MessageReceived;
         // Raised on the thread that hit the I/O failure (reader or writer)
         // when the port was force-closed by HandleIoFailure. Subscribers
@@ -251,10 +265,17 @@ namespace MozaPlugin.Protocol
                 {
                     // No WMI — liveness-probe the cached port. The read
                     // thread is running; write the appropriate probe and
-                    // validate the response group matches the device type
-                    // we're looking for. A wrong device (or firmware debug
-                    // spam from a non-MOZA device) would respond with an
-                    // unrecognised group and should not be trusted.
+                    // look for the expected response group **anywhere** in
+                    // the receive stream during the validation window, not
+                    // just at byte offset 0. The wheel commonly emits
+                    // boot-time debug-log frames (group 0x0E, ASCII text
+                    // like "MCU temp: 37.000 (°C)") immediately on open —
+                    // the legacy `_firstRxGroup` check saw that noise first
+                    // and rejected the (valid) port even though the probe
+                    // response arrived a few ms later in the same window.
+                    //
+                    // We also re-emit the probe a couple of times so a
+                    // probe lost in the debug-log flood gets a fresh chance.
                     byte[] probe;
                     byte expectedGroup;
                     if (_probeTarget == MozaProbeTarget.Ab9)
@@ -267,22 +288,44 @@ namespace MozaPlugin.Protocol
                         probe = BaseProbeFrame;
                         expectedGroup = BaseRespGroup;
                     }
-                    try { _port?.Write(probe, 0, probe.Length); } catch { }
-                    Thread.Sleep(400);
-                    int rxGroup = Volatile.Read(ref _firstRxGroup);
-                    if (rxGroup == expectedGroup)
+
+                    const int ValidationWindowMs = 1500;
+                    const int ProbeRepeatMs = 250;
+                    const int PollSliceMs = 25;
+
+                    int waited = 0;
+                    int nextProbeAt = 0;
+                    while (waited < ValidationWindowMs)
+                    {
+                        if (waited >= nextProbeAt)
+                        {
+                            try { _port?.Write(probe, 0, probe.Length); } catch { }
+                            nextProbeAt = waited + ProbeRepeatMs;
+                        }
+                        Thread.Sleep(PollSliceMs);
+                        waited += PollSliceMs;
+                        bool seen;
+                        lock (_rxGroupsSeen) seen = HaveSeenRxGroup(expectedGroup);
+                        if (seen) break;
+                    }
+
+                    bool seenExpected;
+                    lock (_rxGroupsSeen) seenExpected = HaveSeenRxGroup(expectedGroup);
+                    if (seenExpected)
                     {
                         cachedPortValid = true;
                         MozaLog.Debug(
-                            $"[Moza] Cached port {_lastPortName} responded 0x{rxGroup:X2} — confirmed");
+                            $"[Moza] Cached port {_lastPortName} responded with 0x{expectedGroup:X2} " +
+                            $"within {waited}ms — confirmed");
                     }
                     else
                     {
+                        int rxGroup = Volatile.Read(ref _firstRxGroup);
                         string detail = rxGroup == 0
                             ? "no response"
-                            : $"unexpected group 0x{rxGroup:X2} (expected 0x{expectedGroup:X2})";
+                            : $"no 0x{expectedGroup:X2} seen (first was 0x{rxGroup:X2})";
                         MozaLog.Debug(
-                            $"[Moza] Cached port {_lastPortName}: {detail} — stale, will re-discover");
+                            $"[Moza] Cached port {_lastPortName}: {detail} after {ValidationWindowMs}ms — stale, will re-discover");
                         Disconnect();
                     }
                 }
@@ -328,6 +371,7 @@ namespace MozaPlugin.Protocol
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
             Interlocked.Exchange(ref _firstRxGroup, 0);
+            lock (_rxGroupsSeen) ResetRxGroupsSeen();
 
             try
             {
@@ -657,6 +701,10 @@ namespace MozaPlugin.Protocol
                                 $"totalLen={data.Length} payload={bodyLen}B first8={first8}");
                         }
                         Interlocked.CompareExchange(ref _firstRxGroup, data[0], 0);
+                        // Also record every group seen so cached-port
+                        // validation can find the expected response group
+                        // even when boot-time debug spam beats it to the port.
+                        lock (_rxGroupsSeen) NoteRxGroup(data[0]);
                         SerialTrafficCapture.Instance.RecordRx(CaptureLabel, data);
                         MessageReceived?.Invoke(data);
                         // Move cursor past the consumed wire bytes.
@@ -1157,45 +1205,68 @@ namespace MozaPlugin.Protocol
             try
             {
                 probe.DiscardInBuffer();
-                probe.Write(msg, 0, msg.Length);
 
-                System.Threading.Thread.Sleep(100);
+                // Generous validation window with periodic re-probes. The
+                // wheel commonly emits a burst of boot-time debug-log
+                // frames (group 0x0E, ASCII text) for several hundred ms
+                // on first open, drowning out a single 100ms probe-and-
+                // peek. We poll in short slices, re-emit the probe on a
+                // ~200ms cadence, and accept as soon as we see ANY frame
+                // whose group at wire offset +2 matches the expected
+                // response — surviving leading debug spam without a
+                // false positive on 0x0E frames.
+                const int TotalBudgetMs = 500;
+                const int ProbeRepeatMs = 200;
+                const int PollSliceMs = 25;
+                const int MaxAccumBytes = 4096;
 
+                var accum = new System.Collections.Generic.List<byte>(512);
+                byte firstSeenGroup = 0xFF;
                 bool responded = false;
-                int avail = probe.BytesToRead;
-                if (avail >= 3)
+
+                int waited = 0;
+                int nextProbeAt = 0;
+                while (waited < TotalBudgetMs)
                 {
-                    // Read up to 128 wire bytes so a leading AB9 debug
-                    // frame (`len=59 group=0x0E dev=0x21`, 61 bytes wire)
-                    // doesn't crowd out the actual probe reply behind it.
-                    // Scan for the first start byte whose group byte at
-                    // offset +2 matches the expected response — survives
-                    // leading firmware-debug spam without false-positive
-                    // on a 0x0E frame that happens to land in the wait
-                    // window.
-                    var buf = new byte[Math.Min(avail, 128)];
-                    int n = probe.Read(buf, 0, buf.Length);
-                    byte firstSeenGroup = 0xFF;
-                    for (int i = 0; i + 2 < n; i++)
+                    if (waited >= nextProbeAt)
                     {
-                        if (buf[i] != MozaProtocol.MessageStart) continue;
-                        byte respGroup = buf[i + 2];
-                        if (firstSeenGroup == 0xFF) firstSeenGroup = respGroup;
-                        if (respGroup == expectedRespGroup)
+                        try { probe.Write(msg, 0, msg.Length); } catch { return (false, false); }
+                        nextProbeAt = waited + ProbeRepeatMs;
+                    }
+
+                    System.Threading.Thread.Sleep(PollSliceMs);
+                    waited += PollSliceMs;
+
+                    int avail = probe.BytesToRead;
+                    if (avail > 0)
+                    {
+                        int want = Math.Min(avail, MaxAccumBytes - accum.Count);
+                        if (want > 0)
                         {
-                            responded = true;
-                            break;
+                            var tmp = new byte[want];
+                            int n = probe.Read(tmp, 0, want);
+                            for (int i = 0; i < n; i++) accum.Add(tmp[i]);
                         }
+                        for (int i = 0; i + 2 < accum.Count; i++)
+                        {
+                            if (accum[i] != MozaProtocol.MessageStart) continue;
+                            byte respGroup = accum[i + 2];
+                            if (firstSeenGroup == 0xFF) firstSeenGroup = respGroup;
+                            if (respGroup == expectedRespGroup)
+                            {
+                                responded = true;
+                                break;
+                            }
+                        }
+                        if (responded) break;
                     }
-                    if (!responded && firstSeenGroup != 0xFF)
-                    {
-                        // Saw at least one frame but none from the device
-                        // family we asked for — log so a wrong-target hit
-                        // (or pure debug spam) is visible without
-                        // confusing the operator with "found".
-                        MozaLog.Debug(
-                            $"[Moza] Probe {portName} {kind}: first reply group 0x{firstSeenGroup:X2} != expected 0x{expectedRespGroup:X2}");
-                    }
+                }
+
+                if (!responded && firstSeenGroup != 0xFF)
+                {
+                    MozaLog.Debug(
+                        $"[Moza] Probe {portName} {kind}: {accum.Count}B in {waited}ms, " +
+                        $"no 0x{expectedRespGroup:X2} (first seen 0x{firstSeenGroup:X2})");
                 }
                 return (responded, true);
             }

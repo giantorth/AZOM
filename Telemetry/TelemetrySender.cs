@@ -86,6 +86,12 @@ namespace MozaPlugin.Telemetry
 
         // Port probing state
         private volatile byte _lastAckedSession;  // Set by OnMessageDuringPreamble when fc:00 arrives
+        // Echoed ack_seq from the 7-byte fc:00 form; -1 if the ack was the 5-byte form
+        // (no seq carried). TryOpenSession verifies this against the seq it sent so a
+        // wheel that returns ack_seq=0 for every open (canonical "stale session" failure
+        // per docs/protocol/sessions/chunk-format.md:31) is detected and retried instead
+        // of being silently accepted.
+        private volatile int _lastAckedSeq = -1;
         private readonly ManualResetEventSlim _ackReceived = new ManualResetEventSlim(false);
 
         // Upload handshake state (legacy, kept for test harness)
@@ -114,6 +120,22 @@ namespace MozaPlugin.Telemetry
         /// V2 telemetry uses group=0x43 cmd=0x7d23 directly (no session seq).
         /// </summary>
         private int _session02OutboundSeq;
+
+        // Guard for the read-chunk-send-write of _session02OutboundSeq +
+        // _propertyPushLastSeqs. Without it, the timer thread (V0 value
+        // frames), the UI thread (brightness / dashboard switch property
+        // pushes), and background StartInner (session-init handshake,
+        // tier-def) can race: two threads reading the same seq each emit
+        // their N frames, and whichever finishes last overwrites the
+        // higher value with a lower one. The wheel keys retransmit
+        // suppression per literal seq, so a regression makes it drop
+        // chunks as duplicates and the upstream message stays stuck.
+        private readonly object _session02SeqLock = new object();
+
+        // Same rationale as _session02SeqLock but for the mgmt session.
+        // SendTierDefinition can target either 0x01 or 0x02 depending on
+        // _policy.TierDefSession.
+        private readonly object _session01SeqLock = new object();
 
         // Reliable-stream retransmit queue for session-data chunks. PitHouse
         // capture (2026-04-29) showed each unique session-02 chunk re-emitted
@@ -741,7 +763,8 @@ namespace MozaPlugin.Telemetry
                 getPolicy: () => _policy,
                 getConfigJsonState: () => _configJson.LastState,
                 sendSessionAck: SendSessionAck,
-                sendSessionEnd: SendSessionEnd);
+                sendSessionEnd: SendSessionEnd,
+                sendAndTrackChunk: SendAndTrackChunk);
         }
 
         // Caller passes the MozaPlugin instance directly because Init may call
@@ -1037,10 +1060,25 @@ namespace MozaPlugin.Telemetry
             _s09RetryLastTickCount = 0;
             _session02OutboundSeq = 0;
             _session01OutboundSeq = 0;
+            // Symmetry with the other per-session seq resets: a fresh
+            // Start cycle re-opens 0x0a from zero on the wheel side, so
+            // host-side seq state should also reset. The wheel routes RPC
+            // replies by integer id (not seq), so a residual non-zero
+            // counter wouldn't drop replies, but stale-seq retransmits
+            // queued against the prior session could re-emit into the
+            // new one. See chunk-format.md:33.
+            _rpc.OutboundSeq = 0;
             _tierDefPreambleSent = false;
             _autoResolutionDone = false;
             _retransmitter.Clear();
-            _propertyPushLastSeqs.Clear();
+            // Take the same lock the readers/writers (SendSessionPropertyBody)
+            // take so this Clear can't race a mid-flight enumeration of the
+            // dict. Pre-2026-05-10 this Clear was unsynchronised — the
+            // narrow window made the race invisible, but the new
+            // _session02SeqLock holds the dict-touching code longer and
+            // expanded the window enough to surface ConcurrentModification
+            // exceptions during Stop+Start cycles under load.
+            lock (_session02SeqLock) _propertyPushLastSeqs.Clear();
             _tierDefBlindFrames = null;
             _lastSubscriptionDiag = null;
             lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
@@ -1145,34 +1183,37 @@ namespace MozaPlugin.Telemetry
                 ? (uint)(body[9] | (body[10] << 8) | (body[11] << 16) | (body[12] << 24))
                 : 0u;
 
-            // Drop the prior seqs for the same kind before queuing the new
-            // chunk. See _propertyPushLastSeqs comment for the user-visible
-            // failure this prevents (stale brightness=0 retransmits leaving
-            // the display stuck blanked after a quick slider drag).
-            if (haveKind && _propertyPushLastSeqs.TryGetValue((session, kind), out var prevSeqs))
+            lock (_session02SeqLock)
             {
-                foreach (int s in prevSeqs)
-                    _retransmitter.Drop(session, s);
-                prevSeqs.Clear();
-            }
+                // Drop the prior seqs for the same kind before queuing the new
+                // chunk. See _propertyPushLastSeqs comment for the user-visible
+                // failure this prevents (stale brightness=0 retransmits leaving
+                // the display stuck blanked after a quick slider drag).
+                if (haveKind && _propertyPushLastSeqs.TryGetValue((session, kind), out var prevSeqs))
+                {
+                    foreach (int s in prevSeqs)
+                        _retransmitter.Drop(session, s);
+                    prevSeqs.Clear();
+                }
 
-            int seq = Math.Max(2, _session02OutboundSeq);
-            var frames = TierDefinitionBuilder.ChunkMessage(body, session, ref seq);
-            var newSeqs = haveKind
-                ? new System.Collections.Generic.List<int>(frames.Count)
-                : null;
-            foreach (var frame in frames)
-            {
-                SendAndTrackChunk(frame);
-                // Frame layout (TierDefinitionBuilder.ChunkMessage):
-                //   7E [N] 43 17 7C 00 [session] [type=01] [seq_lo] [seq_hi] [payload] [chk]
-                if (newSeqs != null && frame.Length >= 10)
-                    newSeqs.Add(frame[8] | (frame[9] << 8));
-            }
-            _session02OutboundSeq = seq;
+                int seq = Math.Max(2, _session02OutboundSeq);
+                var frames = TierDefinitionBuilder.ChunkMessage(body, session, ref seq);
+                var newSeqs = haveKind
+                    ? new System.Collections.Generic.List<int>(frames.Count)
+                    : null;
+                foreach (var frame in frames)
+                {
+                    SendAndTrackChunk(frame);
+                    // Frame layout (TierDefinitionBuilder.ChunkMessage):
+                    //   7E [N] 43 17 7C 00 [session] [type=01] [seq_lo] [seq_hi] [payload] [chk]
+                    if (newSeqs != null && frame.Length >= 10)
+                        newSeqs.Add(frame[8] | (frame[9] << 8));
+                }
+                _session02OutboundSeq = seq;
 
-            if (haveKind)
-                _propertyPushLastSeqs[(session, kind)] = newSeqs!;
+                if (haveKind)
+                    _propertyPushLastSeqs[(session, kind)] = newSeqs!;
+            }
         }
 
         /// <summary>
@@ -1500,11 +1541,28 @@ namespace MozaPlugin.Telemetry
         /// Send a SESSION_OPEN for the given session byte and wait up to
         /// <paramref name="timeoutMs"/> for a matching fc:00 ack. Returns the
         /// session byte on success, 0 on timeout.
+        ///
+        /// Single-attempt: an earlier revision added a 3× retry loop with
+        /// Thread.Sleep between attempts, but every Reset()/Wait() on
+        /// <see cref="_ackReceived"/> opened a window where <see cref="Dispose"/>
+        /// running on the UI thread (SimHub plugin teardown / game-switch
+        /// reload) could dispose the event mid-Wait, throwing
+        /// <see cref="ObjectDisposedException"/> out of the bg StartInner
+        /// thread up through <see cref="ThreadPool.QueueUserWorkItem"/> —
+        /// unhandled in .NET Framework 4.8 plugin hosts. The retry was also
+        /// speculative: under normal conditions the wheel acks promptly, and
+        /// genuine drops cause the wheel itself to retransmit its own opens.
+        ///
+        /// The wheel's echoed ack_seq is parsed (<see cref="_lastAckedSeq"/>)
+        /// for diagnostic logging but not used to gate the open — firmware
+        /// variants legitimately echo non-matching seqs and rejecting those
+        /// breaks disable+re-enable recovery in the field.
         /// </summary>
         private byte TryOpenSession(byte session, int timeoutMs)
         {
-            _ackReceived.Reset();
+            try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
             _lastAckedSession = 0;
+            _lastAckedSeq = -1;
 
             SendSessionOpen(session, session);
 
@@ -1512,16 +1570,29 @@ namespace MozaPlugin.Telemetry
             while (true)
             {
                 int remaining = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
-                if (remaining <= 0 || !_ackReceived.Wait(remaining))
-                    return 0;
+                if (remaining <= 0) return 0;
+
+                bool gotSignal;
+                try { gotSignal = _ackReceived.Wait(remaining); }
+                catch (ObjectDisposedException) { return 0; }
+                if (!gotSignal) return 0;
 
                 if (_lastAckedSession == session)
+                {
+                    int gotAckSeq = _lastAckedSeq;
+                    if (gotAckSeq != -1 && gotAckSeq != session)
+                    {
+                        MozaLog.Debug(
+                            $"[Moza] OpenSession 0x{session:X2}: ack_seq={gotAckSeq} " +
+                            $"(expected {session}); accepting (firmware may use own port counter)");
+                    }
                     return session;
+                }
 
                 // Stale ack (different session) — discard and keep waiting.
                 MozaLog.Debug(
                     $"[Moza] OpenSession 0x{session:X2}: ignoring stale ack for 0x{_lastAckedSession:X2}");
-                _ackReceived.Reset();
+                try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
                 _lastAckedSession = 0;
             }
         }
@@ -1825,17 +1896,30 @@ namespace MozaPlugin.Telemetry
             // 5692099) working behavior. 2026-era firmware separates tier-def
             // (mgmt port 0x01) from FF init records (telem port 0x02).
             byte tierDefSession;
-            int seq;
+            object seqLock;
             if (_policy.TierDefSession == TierDefSessionPolicy.FlagByte)
             {
                 tierDefSession = FlagByte;
-                seq = Math.Max(2, _session02OutboundSeq);
+                seqLock = _session02SeqLock;
             }
             else
             {
                 tierDefSession = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
-                seq = Math.Max(2, _session01OutboundSeq);
+                seqLock = _session01SeqLock;
             }
+
+            // Reserve the seq range for every chunk this tier-def emits
+            // under the per-session lock so no other writer (V0 value
+            // frames on the timer thread, FF property pushes from the UI
+            // thread, RPC reply on the configJson handler) can interleave
+            // a seq into the middle of our chunk train. Holding the lock
+            // across `_connection.Send` is cheap — the connection queues
+            // the frame and returns without blocking.
+            lock (seqLock)
+            {
+            int seq = _policy.TierDefSession == TierDefSessionPolicy.FlagByte
+                ? Math.Max(2, _session02OutboundSeq)
+                : Math.Max(2, _session01OutboundSeq);
 
             // Send wrapper: under blind-retransmit policy (Era2026), every
             // tier-def chunk is also tracked by the session retransmitter and
@@ -2024,6 +2108,7 @@ namespace MozaPlugin.Telemetry
                 _session02OutboundSeq = seq;
             else
                 _session01OutboundSeq = seq;
+            } // lock (seqLock)
         }
 
         /// <summary>
@@ -2310,9 +2395,18 @@ namespace MozaPlugin.Telemetry
                 if (data.Length >= 7)
                 {
                     int ackSeq = data[5] | (data[6] << 8);
+                    _lastAckedSeq = ackSeq;
                     _retransmitter.Ack(data[4], ackSeq);
                     // Route ack to session owner (downloader, uploader, etc.)
                     _dispatcher.DispatchAck(data[4], ackSeq);
+                }
+                else
+                {
+                    // 5-byte fc:00 (no seq). Signal "ack present but seq unknown"
+                    // so TryOpenSession's seq verification can fall through to
+                    // session-match-only (firmwares that omit the seq form are
+                    // still acceptable per the chunk-format doc).
+                    _lastAckedSeq = -1;
                 }
                 _ackReceived.Set();
                 return;
@@ -2547,13 +2641,20 @@ namespace MozaPlugin.Telemetry
                         // mismatches; wheel will re-push if we don't ack.
                         if (chunkPayload.Length >= 4)
                         {
-                            // 3-byte CRC trailer — see catalog feed above for
-                            // the full rationale (2026-05-09 firmware audit).
-                            int netLen = chunkPayload.Length - 3;
+                            // 4-byte CRC32 LE per docs/protocol/sessions/chunk-format.md.
+                            // Re-verified 2026-05-10 against 524 historical wire-trace
+                            // files (227,497 / 227,713 chunks matched 4-byte; 0 / 227,713
+                            // matched 3-byte). The 2026-05-09 "3-byte" code path was a
+                            // tautology bug in the verification script (treating b2h
+                            // JSONL hex as having a wire checksum trailer it doesn't
+                            // carry, shifting `chunk[:-3]` to be the same bytes as the
+                            // canonical `chunk[:-4]`).
+                            int netLen = chunkPayload.Length - 4;
                             uint wireCrc = (uint)(chunkPayload[netLen]
                                                 | (chunkPayload[netLen + 1] << 8)
-                                                | (chunkPayload[netLen + 2] << 16));
-                            uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen) & 0xFFFFFFu;
+                                                | (chunkPayload[netLen + 2] << 16)
+                                                | (chunkPayload[netLen + 3] << 24));
+                            uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
                             if (calcCrc != wireCrc)
                             {
                                 Interlocked.Increment(ref _tileServerCrcRejects);
@@ -2561,7 +2662,7 @@ namespace MozaPlugin.Telemetry
                                 if (n <= 5 || n % 50 == 0)
                                     MozaLog.Debug(
                                         $"[Moza] Tile-server chunk CRC mismatch sess=0x{session:X2} " +
-                                        $"seq={seq}: calc=0x{calcCrc:X6} wire=0x{wireCrc:X6} (rejects={n})");
+                                        $"seq={seq}: calc=0x{calcCrc:X8} wire=0x{wireCrc:X8} (rejects={n})");
                             }
                             else
                             {
@@ -2615,25 +2716,28 @@ namespace MozaPlugin.Telemetry
                     bool isCatalogSession = session == FlagByte || session == 0x01;
                     if (isCatalogSession && data.Length > 12 && chunkPayload.Length >= 4)
                     {
-                        // Inbound chunks from this wheel firmware carry a
-                        // 3-byte CRC trailer (low 24 bits of CRC32 LE), not
-                        // 4 bytes. Verified 2026-05-09 against captured wheel
-                        // catalog/configJson/sess-02 chunks — 154/154 chunks
-                        // matched 3-byte CRC, 0/154 matched 4-byte. Stripping
-                        // 4 bytes (the prior assumption) chopped the last
-                        // data byte of every chunk, which explained the
-                        // deterministic `v1/gameDa???\x04` URL corruption:
-                        // each chunk-boundary lost the last URL char, and
-                        // the next chunk's first byte (0x04 = next record's
-                        // tag) bled into where that char should have been.
-                        // Outbound chunks (our `TierDefinitionBuilder.Chunk-
-                        // Message`) still emit 4-byte CRC and the wheel
-                        // accepts them, so the asymmetry is wheel-side.
-                        int netLen = chunkPayload.Length - 3;
+                        // 4-byte CRC32 LE per docs/protocol/sessions/chunk-format.md.
+                        // Re-verified 2026-05-10 against 524 historical wire-trace
+                        // files from this CS Pro wheel (227,497 / 227,713 chunks
+                        // matched 4-byte; 0 / 227,713 matched 3-byte). The
+                        // 2026-05-09 "3-byte CRC" claim was a verification-script
+                        // bug — treating the b2h JSONL hex as having a wire
+                        // checksum trailer it doesn't carry (`moza_trace.py:68-70`
+                        // explicitly documents the b2h format as
+                        // `[resp_group, resp_dev, payload]` with no checksum),
+                        // which shifted `chunk[:-3]` onto the canonical
+                        // `chunk[:-4]` and produced a tautological match. The
+                        // shipped code at the correct offset rejected every real
+                        // chunk, manifesting as `crcRejects=70` and an empty
+                        // catalog parser on CS Pro (W17 firmware), with tier-def
+                        // falling back to alpha indices the wheel couldn't bind
+                        // to dashboard widgets.
+                        int netLen = chunkPayload.Length - 4;
                         uint wireCrc = (uint)(chunkPayload[netLen]
                                             | (chunkPayload[netLen + 1] << 8)
-                                            | (chunkPayload[netLen + 2] << 16));
-                        uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen) & 0xFFFFFFu;
+                                            | (chunkPayload[netLen + 2] << 16)
+                                            | (chunkPayload[netLen + 3] << 24));
+                        uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
                         if (calcCrc == wireCrc)
                         {
                             // Seq-aware append: dedup retransmits per session
@@ -2655,7 +2759,7 @@ namespace MozaPlugin.Telemetry
                             {
                                 MozaLog.Debug(
                                     $"[Moza] Catalog chunk CRC mismatch sess=0x{session:X2} " +
-                                    $"seq={seq}: calc=0x{calcCrc:X6} wire=0x{wireCrc:X6} " +
+                                    $"seq={seq}: calc=0x{calcCrc:X8} wire=0x{wireCrc:X8} " +
                                     $"(total rejects: {rejCount})");
                             }
                         }
@@ -2789,6 +2893,17 @@ namespace MozaPlugin.Telemetry
             int slowInterval = Math.Max(1, 1000 / _baseTickMs);
             if (_tickCounter % slowInterval == 0)
                 SendHeartbeat();
+
+            // Drain the retransmit queue and tier-def blind schedule
+            // during preamble too. Cold-start traffic (session-open, FF
+            // init records, tier-def, configJson reply, upload sub-msgs)
+            // is all sent during this phase; if the wheel drops a chunk
+            // the queue accumulates but goes unserviced until we hit
+            // Active, by which time the wheel has typically given up.
+            // The per-chunk backoff inside SessionRetransmitter keeps
+            // this from flooding the wire when nothing is due.
+            TickEmitRetransmits();
+            TickEmitTierDefBlindRetransmits();
 
             if (_tickCounter >= _preambleTickTarget)
             {
@@ -3466,8 +3581,13 @@ namespace MozaPlugin.Telemetry
                             byUrl[ch.Url] = ch;
             }
 
-            int seq = _session02OutboundSeq;
-            bool anySent = false;
+            // Compute every per-channel value frame BEFORE entering the lock
+            // so SimHub property resolution (PluginManager.GetPropertyValue
+            // — can hit slow paths under load) doesn't block UI-thread
+            // brightness/dashboard-switch property pushes that contend for
+            // _session02SeqLock. Holding the lock over IO-bound work was
+            // observable as a UI freeze during teardown.
+            var prebuilt = new System.Collections.Generic.List<byte[]>(catalog.Count);
             for (int i = 0; i < catalog.Count; i++)
             {
                 string url = catalog[i];
@@ -3490,17 +3610,41 @@ namespace MozaPlugin.Telemetry
                 }
 
                 byte[] valueBytes = TelemetryFrameBuilder.EncodeV0Value(compression, value);
-                byte[] vframe = TelemetryFrameBuilder.BuildV0ValueFrame(wheelIdx, valueBytes);
-                var frames = TierDefinitionBuilder.ChunkMessage(vframe, FlagByte, ref seq);
-                foreach (var frame in frames)
-                {
-                    if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                    SendAndTrackChunk(frame);
-                }
-                anySent = true;
+                prebuilt.Add(TelemetryFrameBuilder.BuildV0ValueFrame(wheelIdx, valueBytes));
             }
 
-            _session02OutboundSeq = seq;
+            if (prebuilt.Count == 0)
+            {
+                if (TestMode) _testPhaseV0 = (_testPhaseV0 + 1) % 100;
+                return;
+            }
+
+            // Reserve the seq range for the whole burst under the session
+            // lock so a concurrent FF property push (UI thread) or tier-def
+            // re-emit (background thread) can't slip a seq into the middle
+            // of our per-channel value frame train. Lock scope is now bounded
+            // to the chunking + send, not the value-resolution loop above.
+            bool anySent = false;
+            lock (_session02SeqLock)
+            {
+                int seq = _session02OutboundSeq;
+                foreach (var vframe in prebuilt)
+                {
+                    var frames = TierDefinitionBuilder.ChunkMessage(vframe, FlagByte, ref seq);
+                    foreach (var frame in frames)
+                    {
+                        if (_state == TelemetryState.Idle || !_connection.IsConnected)
+                        {
+                            _session02OutboundSeq = seq;
+                            if (anySent) _framesSent++;
+                            return;
+                        }
+                        SendAndTrackChunk(frame);
+                    }
+                    anySent = true;
+                }
+                _session02OutboundSeq = seq;
+            }
             if (anySent) _framesSent++;
             if (TestMode) _testPhaseV0 = (_testPhaseV0 + 1) % 100;
         }
