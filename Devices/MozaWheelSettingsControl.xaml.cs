@@ -20,6 +20,13 @@ namespace MozaPlugin.Devices
         private bool _suppressEvents;
         private bool _swatchesBuilt;
 
+        // Plugin instance we've attached DashboardSelectionChanged to. Tracked
+        // separately from _plugin so that re-resolving (after a plugin reload
+        // while the control is reused, or when ResolvePlugin first sees a
+        // non-null Instance) re-subscribes to the new instance and detaches
+        // the old subscription.
+        private MozaPlugin? _dashEventSubscribedPlugin;
+
         private readonly DispatcherTimer _refreshTimer;
 
         // Debounce timer for the wheel-integrated display brightness slider.
@@ -85,6 +92,11 @@ namespace MozaPlugin.Devices
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            // ResolvePlugin (called from OnRefreshTick every 500ms) is where
+            // DashboardSelectionChanged gets subscribed; do an initial attempt
+            // here too so the first tick of the new control isn't responsible
+            // for catching a same-instant profile-apply event.
+            ResolvePlugin();
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
         }
 
@@ -92,11 +104,46 @@ namespace MozaPlugin.Devices
         {
             _refreshTimer.Stop();
 
+            if (_dashEventSubscribedPlugin != null)
+            {
+                try { _dashEventSubscribedPlugin.DashboardSelectionChanged -= OnPluginDashboardSelectionChanged; }
+                catch { }
+                _dashEventSubscribedPlugin = null;
+            }
+
             // Flush any pending brightness debounce so the user's latest
             // slider value reaches the wheel + persisted settings even if
             // they navigate away before the 1s debounce expires.
             if (_displayBrightnessDebounce != null && _displayBrightnessDebounce.IsEnabled)
                 DisplayBrightnessDebounce_Tick(this, EventArgs.Empty);
+        }
+
+        private void OnPluginDashboardSelectionChanged(object? sender, EventArgs e)
+        {
+            // Profile load runs on SimHub's profile-event thread, not the UI thread.
+            // Marshal to the dispatcher before touching ComboBox.Items / SelectedIndex.
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => OnPluginDashboardSelectionChanged(sender, e)));
+                return;
+            }
+
+            if (_plugin == null)
+            {
+                MozaLog.Debug("[Moza] UI: DashboardSelectionChanged handler — _plugin null, skipping");
+                return;
+            }
+
+            // Always re-populate. The previous version short-circuited when
+            // _telemetryUIInitialized was still false, but the event can arrive
+            // 20+ seconds after plugin reload via the PollStatus deferred-apply
+            // path — well after the first RefreshWheel tick. We can't rely on
+            // InitTelemetryUI's later read picking up the latest value because
+            // it's already run with the disk-loaded (pre-apply) settings.
+            MozaLog.Debug(
+                $"[Moza] UI: DashboardSelectionChanged handler — selected='{_plugin.Settings.TelemetryProfileName}'");
+            PopulateDashboardCombo();
+            UpdateTelemetryProfileInfo();
         }
 
         private bool ResolvePlugin()
@@ -106,6 +153,26 @@ namespace MozaPlugin.Devices
             _device = _plugin.DeviceManager;
             _data = _plugin.Data;
             _settings = _plugin.Settings;
+
+            // Subscribe (or re-subscribe) to dashboard-selection events whenever
+            // the resolved plugin instance changes. Plugin Instance is published
+            // at the END of Init(), so OnLoaded can race with plugin reload and
+            // see Instance == null on first call. The 500ms RefreshTimer keeps
+            // calling ResolvePlugin, so this self-heals once Instance is set,
+            // and detaches stale subscriptions from a reloaded plugin.
+            if (!ReferenceEquals(_dashEventSubscribedPlugin, _plugin))
+            {
+                if (_dashEventSubscribedPlugin != null)
+                {
+                    try { _dashEventSubscribedPlugin.DashboardSelectionChanged -= OnPluginDashboardSelectionChanged; }
+                    catch { }
+                }
+                _plugin.DashboardSelectionChanged += OnPluginDashboardSelectionChanged;
+                _dashEventSubscribedPlugin = _plugin;
+                MozaLog.Debug(
+                    $"[Moza] UI: subscribed to DashboardSelectionChanged (plugin hash={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_plugin)})");
+            }
+
             return true;
         }
 

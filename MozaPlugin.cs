@@ -1623,6 +1623,28 @@ namespace MozaPlugin
         private static readonly TimeSpan PendingProfileKeyTimeout = TimeSpan.FromMinutes(5);
 
         /// <summary>
+        /// Raised when the active telemetry dashboard selection is updated
+        /// programmatically (profile load / deferred retry). UI controls that
+        /// mirror Settings.TelemetryProfileName / TelemetryMzdashPath should
+        /// subscribe and re-sync. Fired on the thread that updated settings —
+        /// subscribers must marshal to the UI thread before touching WPF.
+        /// Not fired for UI-originated changes (combo SelectionChanged etc.)
+        /// because the UI is already in sync there.
+        /// </summary>
+        public event EventHandler? DashboardSelectionChanged;
+
+        private void RaiseDashboardSelectionChanged()
+        {
+            int subs = DashboardSelectionChanged?.GetInvocationList().Length ?? 0;
+            MozaLog.Debug(
+                $"[Moza] Raising DashboardSelectionChanged (subscribers={subs}, " +
+                $"profileName='{_settings?.TelemetryProfileName}', " +
+                $"mzdash='{_settings?.TelemetryMzdashPath}')");
+            try { DashboardSelectionChanged?.Invoke(this, EventArgs.Empty); }
+            catch (Exception ex) { MozaLog.Warn("[Moza] DashboardSelectionChanged subscriber threw: " + ex.Message); }
+        }
+
+        /// <summary>
         /// Apply <see cref="MozaProfile.TelemetryDashboardKey"/> to the wheel: switch
         /// the active dashboard so each SimHub game/profile gets its own. Defers to
         /// the next poll tick when the wheel state isn't ready.
@@ -1706,6 +1728,7 @@ namespace MozaPlugin
                 _settings.TelemetryMzdashPath = "";
                 PersistSettings();
                 OnDashboardSwitched((uint)slot);
+                RaiseDashboardSelectionChanged();
                 return true;
             }
 
@@ -1725,6 +1748,7 @@ namespace MozaPlugin
                     _settings.TelemetryProfileName = "";
                     PersistSettings();
                     OnDashboardSwitched();
+                    RaiseDashboardSelectionChanged();
                     return true;
                 }
                 MozaLog.Info("[Moza] Profile dashboard file not resolvable (" + filename +
@@ -1740,6 +1764,7 @@ namespace MozaPlugin
                 _settings.TelemetryMzdashPath = "";
                 PersistSettings();
                 OnActiveDashboardChanged();
+                RaiseDashboardSelectionChanged();
                 return true;
             }
 
