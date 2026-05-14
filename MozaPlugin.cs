@@ -510,10 +510,22 @@ namespace MozaPlugin
                     if (IsShuttingDown) return;
                     if (!_connection.IsConnected)
                         TryConnect();
-                    // AB9 manager is always probed; with registry-based
+                    // AB9 manager is probed by default. With registry-based
                     // discovery the attempt is microseconds when no AB9 is
-                    // enumerated, so there's no probe storm to defend against.
-                    if (!_ab9Manager.IsConnected)
+                    // enumerated. On systems without working registry
+                    // enumeration (Wine/Proton) the AB9 probe would fall
+                    // back to a full COM-port scan every tick — observed to
+                    // lock up SimHub when 30+ wine COM symlinks are present.
+                    // Suppress AB9 probe automatically when the MOZA registry
+                    // walk returns empty (no Windows USB enumeration) — only
+                    // AB9 is affected; the wheelbase keeps its probe
+                    // fallback. DisableAb9Detection is an additional explicit
+                    // opt-out that wins even when registry discovery works.
+                    bool registryHasMoza =
+                        Protocol.MozaPortDiscovery.Instance.Enumerate().Count > 0;
+                    if (!_settings.DisableAb9Detection
+                        && registryHasMoza
+                        && !_ab9Manager.IsConnected)
                         TryConnectAb9();
                 };
                 _reconnectTimer.AutoReset = true;

@@ -170,7 +170,7 @@ Out of scope for Phase 0 — LED color encoding is its own decode task. The exis
    1. Emit kind=2 with `[current_unix_seconds][0][local_tz_offset_seconds]`.
    2. Emit kind=7 with constant `0300000000000000`.
    3. Emit kind=8 with zlib-compressed channel catalog. Catalog content comes from `DashboardProfileStore.GetTelemetryMap()` filtered to channels referenced by loaded dashboards (existing logic).
-   4. Emit kind=11 with the firmware-static action catalog (ship as embedded resource `Data/ActionCatalog.zlib`).
+   4. Emit kind=11 with the firmware-static action catalog (removed as embedded resource `Data/ActionCatalog.zlib` caused hardware crash).
    5. Emit close-sequence chunk on session 0x02 only after all 4 are ack'd? — TBD; in captures the next FF record (kind=14 heartbeat) follows ~2s later with no explicit close. The new operation can simply transition to `KeepaliveOp` after kind=11 send completes.
 
 2. All four init records ship via `SessionEndpoint(0x02).SendChunk(payload)` with FF wire format. Blind retransmit policy may not be needed on session 0x02 — captures show wheel FC-acks session 0x02 chunks.

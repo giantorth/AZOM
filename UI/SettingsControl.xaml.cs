@@ -61,6 +61,7 @@ namespace MozaPlugin
                     GearshiftDebounceValue.Text = $"{dbMs} ms";
                 }
                 DisableSerialProbeFallbackCheck.IsChecked = plugin.Settings.DisableSerialProbeFallback;
+                DisableAb9DetectionCheck.IsChecked = plugin.Settings.DisableAb9Detection;
                 StartCaptureOnNextLaunchCheck.IsChecked = plugin.Settings.StartCaptureOnNextLaunch;
                 // Reflect any in-flight capture (e.g. armed from a previous session
                 // and started in MozaPlugin.Init) so the user sees Stop instead of
@@ -1180,6 +1181,13 @@ namespace MozaPlugin
         {
             if (_suppressEvents) return;
             _plugin.Settings.DisableSerialProbeFallback = DisableSerialProbeFallbackCheck.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+
+        private void DisableAb9DetectionCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _plugin.Settings.DisableAb9Detection = DisableAb9DetectionCheck.IsChecked == true;
             _plugin.SaveSettings();
         }
 

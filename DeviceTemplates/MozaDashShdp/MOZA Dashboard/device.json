@@ -38,6 +38,7 @@
   "HardwareInterface": {
     "HardwareInterface": {
       "TypeName": "LedsStandardHIDProtocol",
+      "IsSerialNumberPickerEnabled": false,
       "HIDUsagePage": "0xFF00",
       "HIDUsage": "0x77",
       "HIDReportId": "0x68",

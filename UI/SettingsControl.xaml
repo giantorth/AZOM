@@ -876,6 +876,14 @@
                         <TextBlock Text="Default behaviour: Moza devices are discovered via Windows USB enumeration. If that returns nothing (Wine/Proton without USB enumeration, driver missing) the plugin falls back to writing a Moza protocol probe to every COM port. Check this to forbid the probe entirely — guarantees no Moza writes to non-Moza serial devices, but Moza hardware won't be found on systems where the registry path is unavailable."
                                    Foreground="Gray" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
 
+                        <StackPanel Orientation="Horizontal" Margin="0,8">
+                            <TextBlock Text="Disable AB9 active-shifter detection" Style="{StaticResource SliderLabel}"/>
+                            <CheckBox x:Name="DisableAb9DetectionCheck" VerticalAlignment="Center"
+                                      Checked="DisableAb9DetectionCheck_Changed" Unchecked="DisableAb9DetectionCheck_Changed"/>
+                        </StackPanel>
+                        <TextBlock Text="Skip the AB9 reconnect probe. Auto-skipped already whenever the MOZA USB registry path returns empty (Wine/Proton), because the COM-port sweep that runs in that mode can lock up SimHub. Check this to skip the probe explicitly on any system. The wheelbase probe fallback is unaffected."
+                                   Foreground="Gray" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
+
                         <TextBlock Text="Dashboard Telemetry" Style="{StaticResource SectionHeader}"/>
                         <!-- Hidden: dashboard upload/download UI is collapsed while the feature is in
                              development. Runtime values are forced off in MozaPlugin (Init cache wiring

@@ -46,6 +46,7 @@ namespace MozaPlugin.Devices
                 deviceName, guid, friendlyName,
                 modelInfo.RpmLedCount, modelInfo.HasFlagLeds,
                 modelInfo.ButtonLedCount, modelInfo.KnobCount,
+                modelInfo.BrowSegmentSize,
                 discoveredPid);
         }
 
@@ -61,7 +62,7 @@ namespace MozaPlugin.Devices
             => DeployFromResource(OldProtoDeviceName, OldProtoResource, discoveredPid);
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
-            int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, string? discoveredPid)
+            int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid)
         {
             try
             {
@@ -103,14 +104,14 @@ namespace MozaPlugin.Devices
                 // we successfully connected. Fallback only matters if the file
                 // is generated before the first connect.
                 var pid = discoveredPid ?? FallbackPid;
-                var json = GenerateWheelDeviceJson(guid, productName, rpmCount, hasFlagLeds, buttonCount, knobCount, pid);
+                var json = GenerateWheelDeviceJson(guid, productName, rpmCount, hasFlagLeds, buttonCount, knobCount, browSegmentSize, pid);
                 File.WriteAllText(deviceJsonPath, json);
 
                 string action = stale ? "Refreshed" : "Deployed";
                 MozaLog.Debug(
                     $"[Moza] {action} device definition: {deviceName} " +
                     $"(guid={guid}, telemetryLeds={expectedTelemetryCount}, rpm={rpmCount}, flags={hasFlagLeds}, " +
-                    $"buttons={buttonCount}, knobs={knobCount}, pid={pid}, restart SimHub to pick up changes)");
+                    $"buttons={buttonCount}, knobs={knobCount}, brow={browSegmentSize}, pid={pid}, restart SimHub to pick up changes)");
                 return true;
             }
             catch (Exception ex)
@@ -120,7 +121,7 @@ namespace MozaPlugin.Devices
             }
         }
 
-        private static string GenerateWheelDeviceJson(string guid, string productName, int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, string pid)
+        private static string GenerateWheelDeviceJson(string guid, string productName, int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string pid)
         {
             var physItems = new JArray();
 
@@ -191,9 +192,7 @@ namespace MozaPlugin.Devices
                     ["LogicalTelemetryLeds"] = new JObject
                     {
                         ["LedCount"] = telemetryCount,
-                        ["Segments"] = hasFlagLeds
-                            ? new JArray(new JObject { ["Size"] = 3 })
-                            : new JArray(),
+                        ["Segments"] = BuildTelemetrySegments(hasFlagLeds, browSegmentSize),
                         ["IsEnabled"] = true
                     },
                     ["LogicalButtonsSection"] = new JObject
@@ -217,6 +216,7 @@ namespace MozaPlugin.Devices
                     ["HardwareInterface"] = new JObject
                     {
                         ["TypeName"] = "LedsStandardHIDProtocol",
+                        ["IsSerialNumberPickerEnabled"] = false,
                         ["HIDUsagePage"] = "0xFF00",
                         ["HIDUsage"] = "0x77",
                         ["HIDReportId"] = "0x68",
@@ -232,6 +232,20 @@ namespace MozaPlugin.Devices
             };
 
             return device.ToString(Newtonsoft.Json.Formatting.Indented);
+        }
+
+        // SimHub interprets a single Segments entry of Size N as a 3-LED brow
+        // region carved from the LogicalTelemetryLeds strip. Both the legacy
+        // hasFlagLeds path (extra 6 LEDs total, 3 per side) and the in-band
+        // brow path (segment carved from the existing strip) use the same
+        // single-entry representation; they only differ in whether the LED
+        // count includes the segment. Brow size wins when both are present.
+        private static JArray BuildTelemetrySegments(bool hasFlagLeds, int browSegmentSize)
+        {
+            int size = browSegmentSize > 0 ? browSegmentSize : (hasFlagLeds ? 3 : 0);
+            if (size <= 0)
+                return new JArray();
+            return new JArray(new JObject { ["Size"] = size });
         }
 
         private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid)
