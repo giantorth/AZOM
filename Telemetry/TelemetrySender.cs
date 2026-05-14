@@ -3461,7 +3461,6 @@ namespace MozaPlugin.Telemetry
             long now = System.DateTime.UtcNow.Ticks;
             if (now - _lastCatalogResyncProbeUtcTicks < CatalogResyncProbeMinIntervalTicks)
                 return;
-            _lastCatalogResyncProbeUtcTicks = now;
 
             // Resolve the current slot from the wheel-reported configJsonList
             // by matching profile name. Without LastState we don't know which
@@ -3485,6 +3484,31 @@ namespace MozaPlugin.Telemetry
                     "not found in wheel-reported configJsonList");
                 return;
             }
+
+            // Wheel-on-target shortcut: the wheel emits a type-04 record on
+            // sess=0x02 b2h announcing its current slot at startup (BEFORE
+            // any host kind=4 — observed t=11.5 s in 2026-05-14 wire trace).
+            // If that matches what we'd be emitting to, the probe is pure
+            // noise — the catalog incompleteness will resolve via
+            // TickGrowSubscriptionIfCatalogStable's natural re-emit as the
+            // wheel pushes more channel URLs. Importantly we DON'T arm
+            // _lastCatalogResyncProbeUtcTicks here, so HasCatalogResyncProbeFired
+            // stays false and ApplyTelemetryDashboardFromProfile's slot-match
+            // path takes the "no wire action needed" branch instead of
+            // pointlessly cycling the pipeline.
+            if (_wheelReportedSlot == slot)
+            {
+                MozaLog.Debug(
+                    $"[Moza] Catalog re-sync probe skipped: wheel already on " +
+                    $"slot {slot} ('{profileName}') per wheel-reported state");
+                return;
+            }
+
+            // From here on we're committing to emit. Arm the timestamp now
+            // so the min-interval throttle counts from a real emission, and
+            // HasCatalogResyncProbeFired reflects a probe that actually
+            // changed wheel state.
+            _lastCatalogResyncProbeUtcTicks = now;
 
             int slotCapture = slot;
             string nameCapture = profileName!;
