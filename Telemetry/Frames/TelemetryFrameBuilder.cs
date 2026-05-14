@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
+using MozaPlugin.Telemetry.TestMode;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -159,33 +161,22 @@ namespace MozaPlugin.Telemetry.Frames
             return copy;
         }
 
-        // Per-builder phase counter — advances once per BuildTestFrame call so each tier
-        // sweeps at its own update rate (fast tiers cycle quickly, slow tiers slowly),
-        // matching how the user experiences live data.
-        private int _testPhase;
-
         /// <summary>
-        /// Build a test-pattern frame that cycles every channel through its decoded range
-        /// and back as a triangle wave. Bypasses the game-data resolver so all channels on
-        /// the loaded dashboard are exercised, not just a fixed subset.
-        /// Phase advances one step per call, so the cycle period scales with the tier's
-        /// update rate.
+        /// Build a test-pattern frame that synthesises sensible per-channel
+        /// values via <see cref="TestSignalGenerator"/>. Each channel's
+        /// <see cref="ChannelDefinition.TestSignal"/> was resolved at
+        /// dashboard-load time from overrides + Telemetry.json range +
+        /// compression-table fallback (see
+        /// <see cref="MozaPlugin.Telemetry.TestMode.TestSignalCatalog"/>).
+        ///
+        /// Wall-clock-driven so a 1 Hz Gear stepper changes once per real
+        /// second regardless of which tier (30 / 500 / 2000 ms) carries it.
         /// </summary>
         public byte[] BuildTestFrame(byte flagByte)
         {
             _frameBuffer[10] = flagByte;
 
-            const int period = 100;
-            // Phase step scales with tier's pkg_level so slow tiers (e.g. pkg=2000
-            // firing every ~2s) still complete a full triangle sweep on a similar
-            // wall-clock timescale as fast tiers (pkg=30 firing every 30ms).
-            // Without this scale, pkg=2000 took ~200s for one full cycle and
-            // looked static during TestMode visual sweep.
-            int pkgLevel = _profile.PackageLevel > 0 ? _profile.PackageLevel : 30;
-            int phaseStep = System.Math.Max(1, pkgLevel / 30);
-            int phase = _testPhase;
-            _testPhase = (_testPhase + phaseStep) % period;
-            double t = 1.0 - Math.Abs(phase * 2.0 / period - 1.0); // 0 → 1 → 0
+            long nowMs = Stopwatch.GetTimestamp() * 1000L / Stopwatch.Frequency;
 
             if (_bitWriter != null)
             {
@@ -194,8 +185,7 @@ namespace MozaPlugin.Telemetry.Frames
                 for (int i = 0; i < _profile.Channels.Count; i++)
                 {
                     var ch = _profile.Channels[i];
-                    var range = TelemetryEncoder.GetTestRange(ch.Compression);
-                    double value = range.min + (range.max - range.min) * t;
+                    double value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
 
                     if (TelemetryEncoder.IsFloat(ch.Compression))
                         _bitWriter.WriteFloat((float)value);

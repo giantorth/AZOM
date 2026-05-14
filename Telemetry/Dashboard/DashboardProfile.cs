@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using MozaPlugin.Telemetry.TestMode;
 
 namespace MozaPlugin.Telemetry.Dashboard
 {
@@ -41,6 +42,15 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>Telemetry tier (ms update interval, e.g. 30, 500, 2000).</summary>
         public int PackageLevel { get; set; } = 30;
+
+        /// <summary>
+        /// Per-channel synthetic value generator used while
+        /// <see cref="TelemetrySender.TestMode"/> is active. Resolved at
+        /// dashboard-load time by <see cref="TestSignalCatalog.Resolve"/>
+        /// from overrides + Telemetry.json range + compression-table fallback.
+        /// Default sweeps 0..1 (safe for any compression).
+        /// </summary>
+        public TestSignal TestSignal { get; set; } = TestSignal.Sweep(0, 1);
     }
 
     public class DashboardProfile

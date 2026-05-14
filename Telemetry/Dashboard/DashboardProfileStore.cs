@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using MozaPlugin.Telemetry.Protocol;
+using MozaPlugin.Telemetry.TestMode;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Telemetry.Dashboard
@@ -83,6 +84,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         SimHubProperty = info.SimHubProperty,
                         SimHubPropertyScale = scale,
                         PackageLevel = packageLevel,
+                        TestSignal = TestSignalCatalog.Resolve(info.Name, info.Range, info.DataType, info.Compression),
                     };
                 }
                 else
@@ -103,6 +105,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         SimHubProperty = "",
                         SimHubPropertyScale = 1.0,
                         PackageLevel = packageLevel,
+                        TestSignal = TestSignalCatalog.Resolve(suffix, null, null, compression),
                     };
                 }
                 if (!perTier.TryGetValue(packageLevel, out var list))
@@ -254,6 +257,12 @@ namespace MozaPlugin.Telemetry.Dashboard
                     MozaLog.Warn($"[Moza] Failed to load builtin profile {resourceName}: {ex.Message}");
                 }
             }
+
+            // Emit one aggregated debug-line listing any channels whose
+            // test-mode bounds fell through to the compression-table default
+            // (i.e. neither a TestSignalOverrides entry nor a parseable
+            // Telemetry.json range). Helps identify gaps to plug.
+            TestSignalCatalog.FlushFallbackLog();
         }
 
         /// <summary>
@@ -383,6 +392,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                             int level = 30;
                             string chName = suffix;
                             double scale = 1.0;
+                            string? rangeStr = null;
+                            string? dataType = null;
                             if (telemetryMap.TryGetValue(url, out var info))
                             {
                                 compression = info.Compression;
@@ -392,6 +403,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                                 level = info.PackageLevel;
                                 chName = info.Name;
                                 scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+                                rangeStr = info.Range;
+                                dataType = info.DataType;
                             }
                             else
                             {
@@ -411,6 +424,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                                 SimHubProperty = property,
                                 SimHubPropertyScale = scale,
                                 PackageLevel = level,
+                                TestSignal = TestSignalCatalog.Resolve(chName, rangeStr, dataType, compression),
                             });
                         }
 
@@ -601,6 +615,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     SimHubProperty      = info.SimHubProperty ?? "",
                     SimHubPropertyScale = scale,
                     PackageLevel        = level,
+                    TestSignal          = TestSignalCatalog.Resolve(info.Name, info.Range, info.DataType, info.Compression),
                 });
             }
 
@@ -677,10 +692,14 @@ namespace MozaPlugin.Telemetry.Dashboard
                     SimHubField field = SimHubField.Zero;
                     if (!string.IsNullOrEmpty(fieldStr))
                         Enum.TryParse(fieldStr, ignoreCase: true, out field);
+                    // range is localised ({zh_CN, en_US}); pull en_US.
+                    string? rangeStr   = sector["range"]?["en_US"]?.ToString();
+                    string? dataType   = sector["data_type"]?.ToString();
 
                     if (url == null || compression == null) continue;
                     result[url] = new TelemetryChannelInfo(
-                        name ?? url, compression, packageLevel, simHubProp ?? "", scale, field);
+                        name ?? url, compression, packageLevel, simHubProp ?? "", scale, field,
+                        rangeStr, dataType);
                 }
             }
             catch (Exception ex)
@@ -699,9 +718,14 @@ namespace MozaPlugin.Telemetry.Dashboard
             public string SimHubProperty;
             public double SimHubPropertyScale;
             public SimHubField Field;
+            // Raw fields from Telemetry.json carried through for test-mode
+            // sweep bounds. See Telemetry/TestMode/TestSignalCatalog.cs.
+            public string? Range;
+            public string? DataType;
 
             public TelemetryChannelInfo(string name, string compression, int packageLevel,
-                string simHubProperty, double simHubPropertyScale, SimHubField field)
+                string simHubProperty, double simHubPropertyScale, SimHubField field,
+                string? range = null, string? dataType = null)
             {
                 Name                = name;
                 Compression         = compression;
@@ -709,6 +733,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 SimHubProperty      = simHubProperty;
                 SimHubPropertyScale = simHubPropertyScale;
                 Field               = field;
+                Range               = range;
+                DataType            = dataType;
             }
         }
     }

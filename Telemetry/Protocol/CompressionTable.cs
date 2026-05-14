@@ -23,6 +23,10 @@ namespace MozaPlugin.Telemetry.Protocol
             public uint Code { get; }              // wire byte in tier-def channel record
             public int BitWidth { get; }           // bits packed into value frame
             public Func<double, ulong> Encode { get; } // game value → packed uint
+            // Wire-safe (min,max) for this compression. Used as the
+            // last-resort fallback for the test-mode sweep when neither an
+            // override nor a parseable Telemetry.json range is available
+            // (see Telemetry/TestMode/TestSignalCatalog.cs).
             public (double min, double max) TestRange { get; }
 
             public Entry(string name, uint code, int bitWidth,

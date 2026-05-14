@@ -24,6 +24,11 @@ namespace MozaPlugin.Telemetry.Frames
             return (uint)(int)gameValue;
         }
 
+        // Per-compression wire-bounds-safe range. No longer the primary
+        // source for test-mode sweep values — that's now resolved per channel
+        // in Telemetry/TestMode/TestSignalCatalog.cs from Telemetry.json
+        // range + overrides. Kept as a final fallback for channels without a
+        // parseable range / override.
         public static (double min, double max) GetTestRange(string compression)
         {
             if (CompressionTable.TryGetByName(compression, out var entry))

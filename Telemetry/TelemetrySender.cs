@@ -8,6 +8,7 @@ using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
+using MozaPlugin.Telemetry.TestMode;
 using MozaPlugin.Telemetry.TileServer;
 using Timer = System.Timers.Timer;
 
@@ -696,7 +697,15 @@ namespace MozaPlugin.Telemetry
                 {
                     _testMode = value;
                     if (value)
+                    {
                         _tierDiagEmitted = new bool[_tiers?.Length ?? 0];
+                        // Reset the Elapsed-kind clock so any timer-typed
+                        // channel (CurrentLapTime, TimeOfDay, etc.) restarts
+                        // at 00:00:00 on every Test Start.
+                        long nowMs = System.Diagnostics.Stopwatch.GetTimestamp() * 1000L /
+                                     System.Diagnostics.Stopwatch.Frequency;
+                        TestSignalGenerator.ResetEpoch(nowMs);
+                    }
                     MozaLog.Debug($"[Moza] TestMode changed to {value}");
                 }
             }
@@ -1877,9 +1886,10 @@ namespace MozaPlugin.Telemetry
                 }
                 else
                 {
+                    string fallbackName = url.Substring(url.LastIndexOf('/') + 1);
                     channels.Add(new ChannelDefinition
                     {
-                        Name = url.Substring(url.LastIndexOf('/') + 1),
+                        Name = fallbackName,
                         Url = url,
                         Compression = "uint32_t",
                         BitWidth = 32,
@@ -1887,6 +1897,7 @@ namespace MozaPlugin.Telemetry
                         SimHubProperty = "",
                         SimHubPropertyScale = 1.0,
                         PackageLevel = packageLevel,
+                        TestSignal = TestSignalCatalog.Resolve(fallbackName, null, null, "uint32_t"),
                     });
                 }
             }
@@ -3799,9 +3810,18 @@ namespace MozaPlugin.Telemetry
                 double value;
                 if (TestMode)
                 {
-                    value = ch != null
-                        ? GenerateV0TestValue(ch, _testPhaseV0)
-                        : GenerateV0TestValueDefault(_testPhaseV0);
+                    if (ch != null)
+                    {
+                        long nowMs = System.Diagnostics.Stopwatch.GetTimestamp() * 1000L /
+                                     System.Diagnostics.Stopwatch.Frequency;
+                        value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
+                    }
+                    else
+                    {
+                        // Unknown URL not in host profile — emit 0 so the
+                        // wheel sees "nothing mapped" rather than a fake percent.
+                        value = 0.0;
+                    }
                 }
                 else
                 {
@@ -3814,7 +3834,6 @@ namespace MozaPlugin.Telemetry
 
             if (prebuilt.Count == 0)
             {
-                if (TestMode) _testPhaseV0 = (_testPhaseV0 + 1) % 100;
                 return;
             }
 
@@ -3845,25 +3864,6 @@ namespace MozaPlugin.Telemetry
                 _session02OutboundSeq = seq;
             }
             if (anySent) _framesSent++;
-            if (TestMode) _testPhaseV0 = (_testPhaseV0 + 1) % 100;
-        }
-
-        private static double GenerateV0TestValueDefault(int phase)
-        {
-            const int period = 100;
-            double t = 1.0 - Math.Abs(phase * 2.0 / period - 1.0);
-            return t * 100.0; // 0..100 sweep — covers most percent / RPM-scaled channels
-        }
-
-        /// <summary>Phase counter for V0 test pattern triangle wave.</summary>
-        private int _testPhaseV0;
-
-        private static double GenerateV0TestValue(ChannelDefinition ch, int phase)
-        {
-            const int period = 100;
-            double t = 1.0 - Math.Abs(phase * 2.0 / period - 1.0); // 0 → 1 → 0
-            (double min, double max) = TelemetryEncoder.GetTestRange(ch.Compression);
-            return min + (max - min) * t;
         }
 
         private double ResolveV0ChannelValue(ChannelDefinition ch, GameDataSnapshot snapshot)
