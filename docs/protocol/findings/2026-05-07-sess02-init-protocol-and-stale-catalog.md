@@ -47,7 +47,7 @@ E1: 8/12 channels have idx=0
 ```
 
 The lookup falls back to `chIndex=0` in
-`Telemetry/TierDefinitionBuilder.cs:250-251` when a channel URL is not
+`Telemetry/Frames/TierDefinitionBuilder.cs:250-251` when a channel URL is not
 in the wheel's advertised catalog at build time.
 
 Cause-and-effect on the wire:

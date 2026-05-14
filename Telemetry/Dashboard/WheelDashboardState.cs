@@ -4,7 +4,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Snapshot of what the wheel reports via session 0x09 configJson RPC:

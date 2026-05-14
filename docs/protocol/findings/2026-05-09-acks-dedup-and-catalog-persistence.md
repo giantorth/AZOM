@@ -99,12 +99,12 @@ User-visible: dashboard switches no longer halt the test pattern post-cycle; tir
 | Area | File | What changed |
 |------|------|--------------|
 | Per-seq acks | `Telemetry/TelemetrySender.cs` (~2315, ~2380, ~2406) | Send `(ushort)seq`, ack 0x04..0x08, no-op `SendStatusPush` |
-| Retransmit dedup | `Telemetry/ChannelCatalogParser.cs` | New `AppendChunkIfNew(session, seq, …)` |
+| Retransmit dedup | `Telemetry/Frames/ChannelCatalogParser.cs` | New `AppendChunkIfNew(session, seq, …)` |
 | Catalog persist | `Telemetry/TelemetrySender.cs:898` | `Reset()` → `ClearBuffer()` |
 | Inbound CRC | `Telemetry/TelemetrySender.cs` (~2516, ~2580) | Validate CRC32 LE; expose reject counters |
-| Strict URL bytes | `Telemetry/ChannelCatalogParser.cs` | All-printable-ASCII check before accept |
+| Strict URL bytes | `Telemetry/Frames/ChannelCatalogParser.cs` | All-printable-ASCII check before accept |
 | Blind retransmit early-exit | `Telemetry/TelemetrySender.cs:2837` + `Diagnostics/SessionRetransmitter.cs` | New `Contains` API; `AllBlindChunksAcked` helper |
-| ConfigJson resilience | `Telemetry/ConfigJsonClient.cs` + `Telemetry/TelemetrySender.cs` | Split `Reset` / `HardReset`; tiered gap recovery; narrowed watchdog |
+| ConfigJson resilience | `Telemetry/Dashboard/ConfigJsonClient.cs` + `Telemetry/TelemetrySender.cs` | Split `Reset` / `HardReset`; tiered gap recovery; narrowed watchdog |
 | WriteBudget | `Protocol/WriteBudget.cs` + `Protocol/MozaSerialConnection.cs` | Raise targets, remove stream-lane gate, monotonic peak |
 | State guards | `Telemetry/TelemetrySender.cs` + `Devices/MozaWheelSettingsControl.xaml.cs` | Cooldown gate on kind=4; UI lock; preamble extension |
 | Growth + re-sync | `Telemetry/TelemetrySender.cs` | `TickGrowSubscriptionIfCatalogStable` + `ScheduleCatalogResyncProbe` |

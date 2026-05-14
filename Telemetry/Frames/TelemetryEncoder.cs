@@ -1,6 +1,6 @@
 using MozaPlugin.Telemetry.Protocol;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// Thin facade over <see cref="CompressionTable"/> — preserves the v1 call

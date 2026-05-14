@@ -5,7 +5,7 @@ using System.IO.Compression;
 using System.Text;
 using Newtonsoft.Json.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.TileServer
 {
     /// <summary>
     /// Decodes session 0x03 tile-server state blobs pushed by the wheel. Uses

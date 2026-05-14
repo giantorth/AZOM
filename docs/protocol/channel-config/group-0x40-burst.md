@@ -45,7 +45,7 @@ for (int page = 0; page <= 1; page++)
 Plugin missed `(0,6) (1,6) (3,2) (3,3) (3,4) (3,5) (3,6)` — page 2 entirely, channel 6 on every page. Patched 2026-04-29 to enumerate `pages {0,1,3} × channels {2..6}` matching PitHouse.
 
 Likely meaning of `page` and `channel`:
-- `page` = update-rate / tier bucket. 3 pages may correspond to the 3 known `package_level` values `30 / 500 / 2000` ms (see [`../../Telemetry/DashboardProfileStore.cs`]).
+- `page` = update-rate / tier bucket. 3 pages may correspond to the 3 known `package_level` values `30 / 500 / 2000` ms (see [`../../Telemetry/Dashboard/DashboardProfileStore.cs`]).
 - `channel` = sub-stream slot within bucket. 5 slots per page → 15 max simultaneous wheel-bound telemetry channels.
 
 ### 28:00/28:01/28:02 details

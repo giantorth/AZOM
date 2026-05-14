@@ -43,7 +43,7 @@ b2h first 200 bytes (UTF-16LE-decoded path portion): `/tmp/_moza_filetransfer_tm
 
 ## Status
 
-Download is deferred to a later milestone. The existing `Telemetry/DashboardDownloader.cs` (924 LOC) stays in-tree as reference material.
+Download is deferred to a later milestone. The existing `Telemetry/Dashboard/DashboardDownloader.cs` (924 LOC) stays in-tree as reference material.
 
 When download work resumes, the starting point is `bridge-20260501-073603.jsonl`, not "needs fresh capture." The phase-2 protocol can be reverse-engineered from existing data.
 

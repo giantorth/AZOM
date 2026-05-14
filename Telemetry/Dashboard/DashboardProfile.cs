@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     public class ChannelDefinition
     {

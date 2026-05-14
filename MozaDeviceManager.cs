@@ -80,7 +80,7 @@ namespace MozaPlugin
         /// frames PitHouse sends, mirrored from <see cref="Telemetry.TelemetrySender.SendDisplayProbe"/>).
         /// Responses arrive as 0xC3 / 0x71 frames and are decoded by
         /// <see cref="Protocol.MozaResponseParser.ParseDisplayIdentity"/> →
-        /// <see cref="Telemetry.MozaData"/> (display-* command names). Runs at wheel
+        /// <see cref="MozaData"/> (display-* command names). Runs at wheel
         /// detect so <see cref="MozaPlugin.IsDisplayDetected"/> flips independent
         /// of telemetry start — required because the UI gates the dashboard-telemetry
         /// section on detection, and the user can't pick a profile until that

@@ -48,7 +48,7 @@ Pithouse sends the v0 subscription **twice** in rapid succession:
 This redundancy is observed across multiple captures and is not a
 retransmit triggered by missing ACKs — both sends precede any
 subsequent telemetry. Plugin's
-[`TierDefinitionBuilder.BuildV0UrlSubscription`](../../../Telemetry/TierDefinitionBuilder.cs)
+[`TierDefinitionBuilder.BuildV0UrlSubscription`](../../../Telemetry/Frames/TierDefinitionBuilder.cs)
 mirrors the double-send for VGS-protocol parity.
 
 ### Worked example: confirm CSP `Rpm` subscription

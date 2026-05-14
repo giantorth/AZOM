@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using MozaPlugin.Telemetry.Sessions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Session 0x09 configJson RPC. Device pushes a compressed JSON state blob

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// Coerces SimHub property values (returned as <c>object</c> from

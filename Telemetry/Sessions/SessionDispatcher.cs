@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using MozaPlugin.Diagnostics;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Central dispatch for session-layer frames. Each session byte maps to

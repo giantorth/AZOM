@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Orchestrates the session 0x04 file-transfer upload of a `.mzdash`

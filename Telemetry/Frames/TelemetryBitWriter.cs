@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// Writes values into a byte buffer using LSB-first bit packing.

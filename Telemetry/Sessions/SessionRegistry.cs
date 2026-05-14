@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Tracks open 7c:00 sessions (both host- and device-initiated). Captures show

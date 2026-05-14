@@ -6,8 +6,10 @@ using System.Text;
 using System.Threading;
 using MozaPlugin.Diagnostics;
 using MozaPlugin.Protocol;
+using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Telemetry.Sessions;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Downloads dashboard mzdash files from the wheel via session 0x0B.

@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MozaPlugin.Protocol;
+using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Protocol;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// Builds the tier definition message that Pithouse sends to the wheel via

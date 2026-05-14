@@ -150,5 +150,5 @@ sends an ACK for every received chunk, not cumulatively.
 [`Telemetry/TelemetrySender.cs`](../../../Telemetry/TelemetrySender.cs)
 (`OnMessageDuringPreamble`, `SendSessionOpen`, `SendSessionAck`,
 `SendSessionClose`).
-[`Telemetry/SessionRegistry.cs`](../../../Telemetry/SessionRegistry.cs)
+[`Telemetry/Sessions/SessionRegistry.cs`](../../../Telemetry/Sessions/SessionRegistry.cs)
 (`SessionRegistry`, `SessionInfo`).

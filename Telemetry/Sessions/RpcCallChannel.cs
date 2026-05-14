@@ -5,9 +5,10 @@ using System.IO.Compression;
 using System.Text;
 using System.Threading;
 using MozaPlugin.Protocol;
+using MozaPlugin.Telemetry.Frames;
 using Newtonsoft.Json.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Host→wheel JSON RPC machinery on session 0x0a. Wire format mirrors configJson:

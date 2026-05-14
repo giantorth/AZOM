@@ -252,7 +252,7 @@ Implications:
 - Application-level record content lives in the per-chunk `payload` field; widget/binding/value records are reassembled by the receiver per session.
 - Counts of "unique kind values" across baseline-vs-spam are still meaningful as a coarse busy-ness signal (more chunks pushed = more activity), but the inferred record taxonomy isn't.
 
-**Re-decode path:** parse chunks per `chunk-format.md` (strip `[session][type][seq][crc]`), reassemble per (session, type=01) seq stream, then decode the application-level records inside. The reassembly is what `Telemetry/SessionDataReassembler.cs` already does for plugin-side ingestion — apply the same to the captured JSONL log to get the real record kinds.
+**Re-decode path:** parse chunks per `chunk-format.md` (strip `[session][type][seq][crc]`), reassemble per (session, type=01) seq stream, then decode the application-level records inside. The reassembly is what `Telemetry/Sessions/SessionDataReassembler.cs` already does for plugin-side ingestion — apply the same to the captured JSONL log to get the real record kinds.
 
 The bigger wins below (game-start handshake, channel-enable matrix, RPM-bar LED stream, in-game vs idle switch rate-spike signature, telemetry stream tags) are independent of this misread and remain valid.
 
@@ -366,7 +366,7 @@ combos        : 15 = 3 pages × 5 channels
 Pre-patch plugin emitted only 8 combos (pages 0/1 × channels 2-5) — missing `(0,6) (1,6) (3,2) (3,3) (3,4) (3,5) (3,6)`. Post-patch matches PitHouse.
 
 Likely meaning (unverified):
-- `page` = update-rate bucket. PitHouse uses 3 buckets, perhaps mapping to the 3 known `package_level` values `30/500/2000` ms (see `Telemetry/DashboardProfileStore.cs:650`).
+- `page` = update-rate bucket. PitHouse uses 3 buckets, perhaps mapping to the 3 known `package_level` values `30/500/2000` ms (see `Telemetry/Dashboard/DashboardProfileStore.cs:650`).
 - `channel` = sub-stream slot within bucket. 5 slots per page.
 - 15 total = max simultaneous wheel-bound telemetry channels.
 

@@ -3,8 +3,9 @@ using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
+using MozaPlugin.Telemetry.Frames;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Wire-format variant of the file-transfer sub-msg header.

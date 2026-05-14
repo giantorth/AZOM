@@ -10,6 +10,10 @@ using SimHub.Plugins;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Telemetry.Dashboard;
+using MozaPlugin.Telemetry.Era;
+using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Telemetry.TileServer;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin

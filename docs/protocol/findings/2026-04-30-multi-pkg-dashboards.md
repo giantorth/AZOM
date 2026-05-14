@@ -79,7 +79,7 @@ This is a TestMode-only ergonomic fix; live game data sweeps at the natural per-
 ## Files changed
 
 - `Telemetry/TelemetrySender.cs` — broadcast formula
-- `Telemetry/TelemetryFrameBuilder.cs` — TestMode phase scaling
+- `Telemetry/Frames/TelemetryFrameBuilder.cs` — TestMode phase scaling
 - `Data/Telemetry.json` — 12 SimHub mappings + tyre compression flip to `float`
 - `docs/protocol/README.md` — 2026-04-30 status banner
 - `docs/protocol/tier-definition/version-2-compact-vgs.md` — multi-pkg broadcast pattern + Type02 compression-code support note

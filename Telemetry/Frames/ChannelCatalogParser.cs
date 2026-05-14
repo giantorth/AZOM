@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// Buffers inbound 7c:00 session-data chunk bytes from the wheel and parses out

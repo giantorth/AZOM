@@ -84,7 +84,7 @@ ff [size:LE] [crc:LE] [08 00 00 00] [zlib-compressed channel catalog]
 
 Variation across captures is in the zlib stream content — PitHouse uploads its current channel-catalog snapshot, which depends on what dashboards it has loaded locally. The wheel uses this to map URL → catalog index for tier-def emission.
 
-The decompressed body is the same channel catalog format the wheel echoes back on `b2h` session 0x02 (decoded by `/tmp/parse_catalog_full.py` per HANDOVER-INVESTIGATION.md). Existing `Telemetry/DashboardProfileStore.cs:54` builds equivalent data — the new builder can call into it.
+The decompressed body is the same channel catalog format the wheel echoes back on `b2h` session 0x02 (decoded by `/tmp/parse_catalog_full.py` per HANDOVER-INVESTIGATION.md). Existing `Telemetry/Dashboard/DashboardProfileStore.cs:54` builds equivalent data — the new builder can call into it.
 
 ### 4. kind=11 (action catalog upload) — pos≈2065, size=2572 (every capture)
 

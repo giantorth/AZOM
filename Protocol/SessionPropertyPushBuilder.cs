@@ -8,7 +8,7 @@ namespace MozaPlugin.Protocol
     /// like display brightness and standby timeout).
     ///
     /// Net-data layout (caller wraps with the standard chunk container +
-    /// outer chunk CRC32 via <see cref="MozaPlugin.Telemetry.TierDefinitionBuilder.ChunkMessage"/>):
+    /// outer chunk CRC32 via <see cref="MozaPlugin.Telemetry.Frames.TierDefinitionBuilder.ChunkMessage"/>):
     ///
     /// <code>
     /// ff &lt;size:u32 LE&gt; &lt;inner_crc32_LE:4&gt; &lt;kind:u32 LE&gt; &lt;value:size-4 bytes LE&gt;
@@ -125,7 +125,7 @@ namespace MozaPlugin.Protocol
         internal static byte[] WrapFfRecord(byte[] kindAndValue)
         {
             int size = kindAndValue.Length;                 // 4 + sizeof(value)
-            uint innerCrc = global::MozaPlugin.Telemetry.TierDefinitionBuilder
+            uint innerCrc = global::MozaPlugin.Telemetry.Frames.TierDefinitionBuilder
                 .Crc32(kindAndValue, 0, size);
 
             var body = new byte[1 + 4 + 4 + size];

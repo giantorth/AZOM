@@ -53,9 +53,9 @@ JSON object with map state, e.g.:
 ```
 
 Plugin builder:
-[`Telemetry/TileServerStateBuilder.BuildEnvelope()`](../../../Telemetry/TileServerStateBuilder.cs).
+[`Telemetry/TileServerStateBuilder.BuildEnvelope()`](../../../Telemetry/TileServer/TileServerStateBuilder.cs).
 Plugin parser:
-[`Telemetry/TileServerStateParser.cs`](../../../Telemetry/TileServerStateParser.cs).
+[`Telemetry/TileServer/TileServerStateParser.cs`](../../../Telemetry/TileServer/TileServerStateParser.cs).
 
 ### Why this envelope is distinct
 

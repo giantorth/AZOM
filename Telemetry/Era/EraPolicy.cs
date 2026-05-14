@@ -1,6 +1,7 @@
 using System;
+using MozaPlugin.Telemetry.Dashboard;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Era
 {
     /// <summary>
     /// Which session number tier-def chunks ride on.

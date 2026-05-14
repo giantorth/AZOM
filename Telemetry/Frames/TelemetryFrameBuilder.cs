@@ -1,8 +1,9 @@
 using System;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
+using MozaPlugin.Telemetry.Dashboard;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// Assembles a complete Moza telemetry serial frame from game data.

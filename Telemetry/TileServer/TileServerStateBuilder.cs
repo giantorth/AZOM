@@ -2,7 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.TileServer
 {
     /// <summary>
     /// Builds an empty-state tile-server JSON blob matching the shape PitHouse

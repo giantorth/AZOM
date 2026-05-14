@@ -1,4 +1,4 @@
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// A component that owns one or more serial sessions and processes their

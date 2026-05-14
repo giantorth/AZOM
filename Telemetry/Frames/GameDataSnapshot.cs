@@ -1,7 +1,8 @@
 using System;
 using GameReaderCommon;
+using MozaPlugin.Telemetry.Dashboard;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
     /// A flat snapshot of the game data fields used by the telemetry sender.

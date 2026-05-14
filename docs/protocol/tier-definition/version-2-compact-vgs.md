@@ -209,7 +209,7 @@ full layout.)
 
 ### Plugin builder
 
-[`TierDefinitionBuilder.BuildTierDefinitionMessage`](../../../Telemetry/TierDefinitionBuilder.cs)
+[`TierDefinitionBuilder.BuildTierDefinitionMessage`](../../../Telemetry/Frames/TierDefinitionBuilder.cs)
 constructs the v2 stream. Flag-byte assignment is controlled by
 `FlagByteMode`:
 

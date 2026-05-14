@@ -30,7 +30,7 @@ Each chunk is one frame:
 
 | Constant | Value | Source |
 |----------|-------|--------|
-| Max net payload per chunk | **54 bytes** (58 with CRC) | [`Telemetry/TierDefinitionBuilder.cs:185`](../../../Telemetry/TierDefinitionBuilder.cs) `MaxNetPerChunk` |
+| Max net payload per chunk | **54 bytes** (58 with CRC) | [`Telemetry/Frames/TierDefinitionBuilder.cs:185`](../../../Telemetry/Frames/TierDefinitionBuilder.cs) `MaxNetPerChunk` |
 | Total chunk payload | up to 58 bytes | net + 4-byte CRC |
 | Chunk frame size on wire | up to 64 bytes (`N = 0x40`) | net + CRC + 6-byte chunk header |
 | Wire frame size | up to 69 bytes | adds `7E`, `[N]`, group, device, frame checksum |
@@ -49,7 +49,7 @@ captures.
 - Per-chunk, not cumulative — each chunk is CRCd independently
 
 Computable via `zlib.crc32()` (Python) or `System.IO.Hashing.Crc32`. Plugin
-implementation: [`TierDefinitionBuilder.Crc32`](../../../Telemetry/TierDefinitionBuilder.cs).
+implementation: [`TierDefinitionBuilder.Crc32`](../../../Telemetry/Frames/TierDefinitionBuilder.cs).
 
 ### Sequence numbers
 

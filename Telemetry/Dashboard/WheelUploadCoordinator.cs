@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using MozaPlugin.Protocol;
+using MozaPlugin.Telemetry.Era;
+using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Telemetry.Sessions;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Owns the wheel-side mzdash upload session lifecycle: detecting which FT

@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using MozaPlugin.Diagnostics;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// On-disk + in-memory cache of parsed dashboard profiles, keyed by MD5 hash

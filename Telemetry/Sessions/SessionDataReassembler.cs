@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using MozaPlugin.Telemetry.Frames;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Reassembles 7c:00 type=0x01 session data chunks into the underlying

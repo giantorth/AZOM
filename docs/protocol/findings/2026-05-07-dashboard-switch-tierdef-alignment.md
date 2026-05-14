@@ -208,7 +208,7 @@ to use the same helper.
 
 | File | Change |
 |------|--------|
-| `Telemetry/TierDefinitionBuilder.cs` | Added `DetectSubTiersPerBroadcast()` public static method. Refactored `BuildTierDefinitionMessageType02` inline detection (lines 130-143) to call it. |
+| `Telemetry/Frames/TierDefinitionBuilder.cs` | Added `DetectSubTiersPerBroadcast()` public static method. Refactored `BuildTierDefinitionMessageType02` inline detection (lines 130-143) to call it. |
 | `Telemetry/TelemetrySender.cs` | In `SendTierDefinition()` V2 branch: snapshot `_activeSubscription` as `prevSub`, route to `BuildTierDefinitionMessage` (Type02 path) when `cspIdx`, pass prev-sub fields for switch ENABLEs. Fixed `SubTiersPerBroadcast` to use `DetectSubTiersPerBroadcast(profile)`. Updated log line with format type and prev-sub state. |
 
 ## Wire trace verification

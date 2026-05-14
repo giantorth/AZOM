@@ -41,7 +41,7 @@ key/value match).
 5. Pass `body[9 : 9 + (comp_sz_plus_4 - 4)]` to `zlib.decompress`.
 6. Validate `len(decompressed) == uncomp_sz`.
 
-Plugin: [`SessionDataReassembler.TryDecompress`](../../../Telemetry/SessionDataReassembler.cs)
+Plugin: [`SessionDataReassembler.TryDecompress`](../../../Telemetry/Sessions/SessionDataReassembler.cs)
 applies this layout first; fallback `TryDecompressByMagic` scans for `78 9c`
 when the offset-based parser fails on a session that uses a different
 envelope (sessions 0x03/0x04). See

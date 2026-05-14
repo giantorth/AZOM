@@ -4,6 +4,11 @@ using System.Threading;
 using System.Timers;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
+using MozaPlugin.Telemetry.Dashboard;
+using MozaPlugin.Telemetry.Era;
+using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Telemetry.Sessions;
+using MozaPlugin.Telemetry.TileServer;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin.Telemetry

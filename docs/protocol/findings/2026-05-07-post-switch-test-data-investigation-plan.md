@@ -295,7 +295,7 @@ is right; flagged here so they can be opened in the same plan:
     setup (`_tierDefBlindFrames`)
   - tick loop (lines 2820–2916) — value-frame emission, mute gate,
     TestMode vs game gating
-- `Telemetry/TelemetryFrameBuilder.cs:157` — `BuildTestFrame`, profile
+- `Telemetry/Frames/TelemetryFrameBuilder.cs:157` — `BuildTestFrame`, profile
   binding
 - `Telemetry/SessionRetransmitter.cs` — what exactly the 12-round blind
   retx loop does

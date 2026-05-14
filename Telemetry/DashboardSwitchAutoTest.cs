@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MozaPlugin.Telemetry.Dashboard;
 
 namespace MozaPlugin.Telemetry
 {
@@ -49,7 +50,7 @@ namespace MozaPlugin.Telemetry
         // by the host (MozaPlugin) since profile parsing involves the cache + builtins.
         public delegate MultiStreamProfile? ProfileResolver(string dashName);
         // Returns the dashboard cache (nullable) for the fallback dash-list path.
-        public delegate Telemetry.DashboardCache? DashCacheResolver();
+        public delegate DashboardCache? DashCacheResolver();
         // Called when the auto-test settles on a target — used to persist the
         // user-visible TelemetryProfileName so the UI reflects what the auto-test did.
         public delegate void TargetChosenCallback(string dashName);

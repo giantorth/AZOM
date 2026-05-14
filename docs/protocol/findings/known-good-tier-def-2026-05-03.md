@@ -22,7 +22,7 @@ the wheel rendered. User eyeball is the rendering verification.
 
 ## Plugin behavior (in-source, currently deployed)
 
-### Tier-def builder (`Telemetry/TierDefinitionBuilder.cs`)
+### Tier-def builder (`Telemetry/Frames/TierDefinitionBuilder.cs`)
 
 Type02 path (Wireshark `wheel-catalog`-indexed builder, used when
 firmware era = `New2026_04_Type02`):
@@ -113,7 +113,7 @@ END val=12 (max idx)
 
 - `Telemetry/TelemetrySender.cs` — `_nextFlagBase`, `_declaredFlags`,
   `_priorSubscriptions`, value-frame loop
-- `Telemetry/TierDefinitionBuilder.cs` — `BuildTierDefinitionMessageType02`
+- `Telemetry/Frames/TierDefinitionBuilder.cs` — `BuildTierDefinitionMessageType02`
 
 ## What's been tried + reverted this session
 

@@ -43,7 +43,7 @@ real-wheel format (2026-04-22). It mirrors the `_scan` helper in
 
 ### Plugin source
 
-[`Telemetry/SessionDataReassembler.cs`](../../../Telemetry/SessionDataReassembler.cs).
+[`Telemetry/Sessions/SessionDataReassembler.cs`](../../../Telemetry/Sessions/SessionDataReassembler.cs).
 The reassembler accepts chunked frames (one per `7c:00` data chunk),
 strips per-chunk CRC32-LE trailers, concatenates net payloads, and runs
 `TryDecompress` on the assembled buffer.

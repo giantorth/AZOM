@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 using MozaPlugin.Telemetry.Protocol;
 using Newtonsoft.Json.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Dashboard
 {
     /// <summary>
     /// Builds and stores multi-stream dashboard profiles from bundled data and .mzdash files.

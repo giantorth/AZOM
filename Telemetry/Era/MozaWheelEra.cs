@@ -1,4 +1,4 @@
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Era
 {
     /// <summary>
     /// Coarse firmware era of the connected wheel. Drives every wire-protocol
