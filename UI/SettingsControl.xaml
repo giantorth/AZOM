@@ -783,8 +783,8 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="Frequency" Style="{StaticResource SliderLabel}"/>
-                            <Slider x:Name="Ab9EngineVibFreqSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="Ab9EngineVibFreqSlider_ValueChanged"/>
-                            <TextBlock x:Name="Ab9EngineVibFreqValue" Style="{StaticResource SliderValue}" Text="50"/>
+                            <Slider x:Name="Ab9EngineVibFreqSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="10" ValueChanged="Ab9EngineVibFreqSlider_ValueChanged"/>
+                            <TextBlock x:Name="Ab9EngineVibFreqValue" Style="{StaticResource SliderValue}" Text="100 Hz"/>
                         </StackPanel>
 
                         <TextBlock Text="Gear Shift" Style="{StaticResource SectionHeader}"/>
@@ -793,9 +793,6 @@
                             <Slider x:Name="Ab9GearShiftVibSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="Ab9GearShiftVibSlider_ValueChanged"/>
                             <TextBlock x:Name="Ab9GearShiftVibValue" Style="{StaticResource SliderValue}" Text="0"/>
                         </StackPanel>
-
-                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,12,0,0"
-                                   Text="Feel sliders are written to the AB9 over its dedicated USB pipe and stored in the device. Engine Vibration is host-rendered from SimHub's RPM telemetry and active only while a game is running — Frequency maps 0..100 to 50..200 Hz. Gear Shift Vibration is fired by the AB9 firmware on each H-pattern engagement using the stored intensity."/>
 
                     </StackPanel>
                 </ScrollViewer>

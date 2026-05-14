@@ -65,8 +65,6 @@ namespace MozaPlugin
         // idle+100Hz, idle+200Hz, idle+50Hz, redline+200Hz, redline+50Hz —
         // all five collapse to K ≈ 3.95 × 10¹¹ within 3%.
         private const double EngineVibK = 3.95e11;
-        private const double EngineVibFreqMinHz = 50.0;
-        private const double EngineVibFreqMaxHz = 200.0;
         private Thread? _ab9EngineVibThread;
         private volatile bool _ab9EngineVibStop;
         private volatile bool _ab9EngineVibActive;
@@ -738,9 +736,7 @@ namespace MozaPlugin
             if (ab9 == null) return;
 
             int intensity = ab9.EngineVibrationIntensity;
-            int freqSlider = ab9.EngineVibrationFrequency;
-            double freqHz = EngineVibFreqMinHz
-                + (freqSlider / 100.0) * (EngineVibFreqMaxHz - EngineVibFreqMinHz);
+            double freqHz = ab9.EngineVibrationFrequency;   // literal Hz, 0..300
             double rpm = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _latestRpmBits));
             bool gameOn = _latestGameRunning;
 

@@ -20,12 +20,14 @@ namespace MozaPlugin
         public byte NaturalFriction { get; set; }     = 50;
         public byte MaxTorqueLimit { get; set; }      = 50;
 
-        // Host-rendered engine vibration. Intensity gates the 0x0A 0x05 stream's
-        // slot ID (0 = silent slot 0x0000); frequency 0..100 maps to 50..200 Hz
-        // at runtime. Neither value is pushed as a stored device setting — they
-        // modulate the SimHub plugin's host-side stream generator only.
+        // Host-rendered engine vibration. Intensity (0..100 %) gates the
+        // 0x0A 0x05 stream's slot ID (0 = silent slot 0x0000). Frequency is
+        // the literal target Hz (0..300) of the oscillator the AB9 firmware
+        // runs from the streamed period field. Neither value is pushed as a
+        // stored device setting — they modulate the SimHub plugin's host-side
+        // stream generator only.
         public byte EngineVibrationIntensity { get; set; } = 0;
-        public byte EngineVibrationFrequency { get; set; } = 50;
+        public ushort EngineVibrationFrequency { get; set; } = 100;
 
         // Firmware-driven gear-shift vibration. One-shot 0x20/dev 0x12/cmd 0x0A 0x01
         // push when the user moves this slider; AB9 firmware then fires the rumble

@@ -8,6 +8,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Telemetry.Era;
 using MozaPlugin.UI;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 
@@ -2351,7 +2352,8 @@ namespace MozaPlugin
                 SetAb9Slider(Ab9FrictionSlider,          Ab9FrictionValue,          ab9.NaturalFriction);
                 SetAb9Slider(Ab9MaxTorqueSlider,         Ab9MaxTorqueValue,         ab9.MaxTorqueLimit);
                 SetAb9Slider(Ab9EngineVibIntensitySlider, Ab9EngineVibIntensityValue, ab9.EngineVibrationIntensity);
-                SetAb9Slider(Ab9EngineVibFreqSlider,      Ab9EngineVibFreqValue,      ab9.EngineVibrationFrequency);
+                Ab9EngineVibFreqSlider.Value = ab9.EngineVibrationFrequency;
+                Ab9EngineVibFreqValue.Text = ab9.EngineVibrationFrequency + " Hz";
                 SetAb9Slider(Ab9GearShiftVibSlider,       Ab9GearShiftVibValue,       ab9.GearShiftVibrationIntensity);
             }
             _ab9UiSeeded = true;
@@ -2443,13 +2445,14 @@ namespace MozaPlugin
             _plugin.SaveSettings();
         }
 
-        // Engine Vibration frequency slider (0..100, mapped to 50..200 Hz by
-        // the worker). Host-rendered — same no-send semantics as intensity.
+        // Engine Vibration frequency slider — literal target Hz (0..300) of
+        // the AB9 oscillator. Host-rendered, no device-side write; the worker
+        // thread picks up the new value on its next tick.
         private void Ab9EngineVibFreqSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents) return;
-            byte v = (byte)Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
-            Ab9EngineVibFreqValue.Text = v.ToString();
+            ushort v = (ushort)Math.Max(0, Math.Min(300, (int)Math.Round(e.NewValue)));
+            Ab9EngineVibFreqValue.Text = v + " Hz";
             GetOrCreateAb9Profile().EngineVibrationFrequency = v;
             _plugin.SaveSettings();
         }
