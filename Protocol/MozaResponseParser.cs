@@ -91,6 +91,15 @@ namespace MozaPlugin.Protocol
                 group = 100;
             }
 
+            // Device-ID–based hint: responses from the base/main device
+            // (0x12) must not match "wheel"-typed commands. Without this,
+            // identity-probe groups (2/4/5/6/9/17) that lack a group-range
+            // hint let base responses collide with wheel commands — e.g.
+            // the base STM32 UID overwrites the wheel UID depending on
+            // arrival order, breaking auto-detect folder lookup.
+            if (deviceHint == null && deviceId == MozaProtocol.DeviceMain)
+                deviceHint = "base";
+
             // Group-indexed scan: skips ~99% of the command database for any
             // given inbound message. CommandId may contain 0xFF wildcards so we
             // still walk the per-group bucket linearly, but each bucket is at
