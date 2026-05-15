@@ -67,28 +67,69 @@ jobs:
 
       - name: Notify Discord
         if: success()
+        continue-on-error: true
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          DISCORD_DEV_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
-            echo "DISCORD_RELEASE_WEBHOOK_URL not set; skipping notification."
-            exit 0
-          fi
           release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
           commit_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
           short_sha="${GITHUB_SHA:0:7}"
           built=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           commit_subject=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}" \
             --jq '.commit.message' | head -n1)
-          description=$(printf '**Tag:** `%s`\n**Commit:** [`%s`](%s) — %s\n**Built:** %s\n[View release notes](%s)' \
-            "$TAG" "$short_sha" "$commit_url" "$commit_subject" "$built" "$release_url")
+          # Build the payload entirely inside jq so every interpolated value is
+          # JSON-encoded safely. Unicode-safe slicing keeps us under Discord's
+          # embed limits (title 256 chars, description 4096 chars).
           payload=$(jq -n \
-            --arg title "Moza SimHub Plugin — release $TAG" \
-            --arg url "$release_url" \
-            --arg desc "$description" \
-            '{embeds: [{title: $title, url: $url, description: $desc, color: 3066993}]}')
-          curl -sS -f -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
+            --arg tag         "$TAG" \
+            --arg short_sha   "$short_sha" \
+            --arg commit_url  "$commit_url" \
+            --arg subject     "$commit_subject" \
+            --arg built       "$built" \
+            --arg release_url "$release_url" \
+            '{
+              embeds: [{
+                title: (("Moza SimHub Plugin — release " + $tag)[0:250]),
+                url: $release_url,
+                description: (
+                  "**Tag:** `" + $tag + "`" +
+                  "\n**Commit:** [`" + $short_sha + "`](" + $commit_url + ") — " +
+                  ($subject[0:200]) +
+                  "\n**Built:** " + $built +
+                  "\n[View release notes](" + $release_url + ")"
+                ),
+                color: 3066993
+              }]
+            }')
+
+          post_discord() {
+            local name="$1" url="$2"
+            if [ -z "$url" ]; then
+              echo "$name: webhook not set, skipping."
+              return 0
+            fi
+            local response_file http_code
+            response_file=$(mktemp)
+            http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+              -H "Content-Type: application/json" \
+              -X POST -d "$payload" "$url") || http_code="000"
+            if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+              echo "$name: notification sent (HTTP $http_code)."
+            else
+              echo "::warning::$name: notification failed (HTTP $http_code)"
+              echo "Payload:"
+              echo "$payload"
+              echo "Response body:"
+              cat "$response_file" || true
+              echo
+            fi
+            rm -f "$response_file"
+          }
+
+          post_discord "release channel" "${DISCORD_RELEASE_WEBHOOK_URL:-}"
+          post_discord "dev channel"     "${DISCORD_DEV_WEBHOOK_URL:-}"

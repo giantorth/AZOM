@@ -113,6 +113,7 @@ jobs:
 
       - name: Notify Discord
         if: success()
+        continue-on-error: true
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SHORT_SHA: ${{ steps.vars.outputs.short_sha }}
@@ -128,14 +129,44 @@ jobs:
           fi
           release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/dev-${SHORT_SHA}"
           commit_url="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-          description=$(printf '**Commit:** [`%s`](%s) — %s\n**Built:** %s\n[Download release](%s)' \
-            "$SHORT_SHA" "$commit_url" "$COMMIT_SUBJECT" "$BUILT" "$release_url")
+          # Build the payload entirely inside jq so every interpolated value is
+          # JSON-encoded safely. Unicode-safe slicing keeps us under Discord's
+          # embed limits (title 256 chars, description 4096 chars).
           payload=$(jq -n \
-            --arg title "Moza SimHub Plugin — dev build $DEV_VERSION" \
-            --arg url "$release_url" \
-            --arg desc "$description" \
-            '{embeds: [{title: $title, url: $url, description: $desc, color: 3447003}]}')
-          curl -sS -f -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
+            --arg dev_version "$DEV_VERSION" \
+            --arg short_sha   "$SHORT_SHA" \
+            --arg commit_url  "$commit_url" \
+            --arg subject     "$COMMIT_SUBJECT" \
+            --arg built       "$BUILT" \
+            --arg release_url "$release_url" \
+            '{
+              embeds: [{
+                title: (("Moza SimHub Plugin — dev build " + $dev_version)[0:250]),
+                url: $release_url,
+                description: (
+                  "**Commit:** [`" + $short_sha + "`](" + $commit_url + ") — " +
+                  ($subject[0:200]) +
+                  "\n**Built:** " + $built +
+                  "\n[Download release](" + $release_url + ")"
+                ),
+                color: 3447003
+              }]
+            }')
+          response_file=$(mktemp)
+          http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -X POST -d "$payload" "$DISCORD_WEBHOOK_URL") || http_code="000"
+          if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Discord notification sent (HTTP $http_code)."
+          else
+            echo "::warning::Discord notification failed (HTTP $http_code)"
+            echo "Payload:"
+            echo "$payload"
+            echo "Response body:"
+            cat "$response_file" || true
+            echo
+          fi
+          rm -f "$response_file"
 
       - name: Prune dev-<sha> releases superseded by a stable
         env:
