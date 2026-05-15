@@ -47,7 +47,7 @@ namespace MozaPlugin.Telemetry.TestMode
             if (dt == "bool")
                 return TestSignal.Toggle(stepMs: 4000, phaseOffsetMs: phaseOffsetMs);
             if (dt == "string")
-                return TestSignal.StringConstant_("DEMO");
+                return TestSignal.StringConstant_("STR-" + (string.IsNullOrEmpty(name) ? "?" : name));
 
             // 4. Compression-based fallback for the upper bound when the
             // JSON range was "≥0" / ">0" or unparseable. uint16-style RPMy

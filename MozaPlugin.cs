@@ -1260,6 +1260,7 @@ namespace MozaPlugin
 
             var sender = _telemetrySender!;
             sender.PropertyResolver = ResolvePropertyAsDouble;
+            sender.PropertyStringResolver = ResolvePropertyAsString;
             int tierCount = profile?.Tiers?.Count ?? 0;
             int chCount = 0;
             if (profile != null)
@@ -1308,6 +1309,30 @@ namespace MozaPlugin
 
             return PropertyCoercion.Coerce(
                 _pluginManager?.GetPropertyValue(path), path);
+        }
+
+        /// <summary>
+        /// String-valued sibling of <see cref="ResolvePropertyAsDouble"/>. Used by
+        /// the sess=0x01 type=0x05 string-channel emitter to read a SimHub property
+        /// (TrackName, CarModel, SessionTypeName, …) as a string. Returns null on
+        /// missing path / read exception; caller treats null as empty.
+        /// @internal/ paths are formatted invariantly so they can be exercised in
+        /// test mode without hitting SimHub at all.
+        /// </summary>
+        private string? ResolvePropertyAsString(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            if (path.StartsWith("@internal/", StringComparison.Ordinal))
+            {
+                return ResolveInternalChannel(path)
+                    .ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            try
+            {
+                var v = _pluginManager?.GetPropertyValue(path);
+                return v?.ToString();
+            }
+            catch { return null; }
         }
 
         // Latched once per plugin lifetime so a SimHub API change doesn't spam the log.

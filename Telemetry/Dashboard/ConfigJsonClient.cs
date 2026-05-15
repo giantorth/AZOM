@@ -46,6 +46,19 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// observe TelemetrySender.WheelReportedSlot instead.</summary>
         public WheelDashboardState? LastState => _lastState ?? _cachedLastState;
 
+        /// <summary>Highest contiguous-received chunk seq, suitable for use
+        /// as a cumulative session-ack value. -1 before the first chunk.
+        /// Proxy to the internal <see cref="SessionDataReassembler.HighWaterSeq"/>
+        /// so the TelemetrySender ack path can stay decoupled from this
+        /// client's reassembly state.</summary>
+        public int HighWaterSeq => _deviceInbox.HighWaterSeq;
+
+        /// <summary>UTC ticks of the most recent forward gap on the device
+        /// inbox, or 0 if none observed. Used by the gap-recovery watchdog
+        /// to decide when to escalate from passive (wait for wheel auto-
+        /// retransmit) to active (prime+open-request).</summary>
+        public long LastForwardGapUtcTicks => _deviceInbox.LastForwardGapUtcTicks;
+
         /// <summary>Result of a seq-aware <see cref="OnChunk(int, byte[])"/> call.</summary>
         public enum ChunkResult
         {

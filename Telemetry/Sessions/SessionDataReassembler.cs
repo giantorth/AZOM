@@ -37,19 +37,60 @@ namespace MozaPlugin.Telemetry.Sessions
 
         private readonly List<byte> _buffer = new();
         private bool _overflowLogged;
-        // Last accepted inbound seq, or -1 before the first chunk. Used by the
-        // seq-aware AddChunk overload to detect missing chunks (a single dropped
-        // chunk under Wine SerialPort R/W contention silently corrupts the zlib
-        // stream — see TelemetrySender.cs ProbeAndOpenSessions comment for the
-        // pre-existing 0x09 burst issue this guard now catches across sessions).
+        // Highest contiguous-received seq (-1 before the first chunk). Any
+        // seq > HighWaterSeq is unacked; the wheel auto-retransmits from
+        // the first unacked seq on its outstanding-ack timer (~1.3 s).
         private int _lastSeq = -1;
         private string _gapTag = "";
+        // UTC ticks of the last forward gap; drives the soft-watchdog
+        // escalation from passive-wait to prime+open-request.
+        private long _lastForwardGapUtcTicks;
 
         public int Length { get { lock (_buffer) return _buffer.Count; } }
 
-        /// <summary>Last accepted inbound seq, or -1 if no chunks have been
-        /// added since the last <see cref="Clear"/>.</summary>
-        public int LastAcceptedSeq { get { lock (_buffer) return _lastSeq; } }
+        /// <summary>Highest contiguously-received seq, suitable for sending as
+        /// a cumulative ACK. -1 before the first chunk after a
+        /// <see cref="Clear"/>. Out-of-order chunks are dropped (caller acks
+        /// this value so the wheel retransmits the missing seq), so the
+        /// high-water mark is also the most-recently-accepted seq.</summary>
+        public int HighWaterSeq { get { lock (_buffer) return _lastSeq; } }
+
+        /// <summary>UTC ticks of the most recent forward-gap observation
+        /// (seq &gt; _lastSeq + 1), or 0 if no gap has been observed.
+        /// Callers use this to drive the "wait for wheel auto-retransmit
+        /// vs. escalate to prime+open-request" decision.</summary>
+        public long LastForwardGapUtcTicks
+        {
+            get { lock (_buffer) return _lastForwardGapUtcTicks; }
+        }
+
+        /// <summary>
+        /// Result of an <see cref="Insert(int, byte[], string)"/> call.
+        /// </summary>
+        public enum ChunkInsertResult
+        {
+            /// <summary>Chunk had seq == HighWaterSeq+1; bytes appended,
+            /// HighWaterSeq advanced.</summary>
+            Contiguous,
+            /// <summary>Chunk had seq == HighWaterSeq; bytes already in
+            /// buffer (wheel retransmit because our ack didn't reach it).
+            /// Caller should still re-ack to confirm receipt.</summary>
+            Duplicate,
+            /// <summary>Wheel restarted its outbound seq counter for a new
+            /// burst (seq &lt; HighWaterSeq). Buffer was cleared and this
+            /// chunk accepted as the first chunk of the new burst.</summary>
+            Restart,
+            /// <summary>Forward gap (seq &gt; HighWaterSeq+1). Buffer
+            /// preserved, HighWaterSeq unchanged, chunk bytes DROPPED. Caller
+            /// must ack HighWaterSeq (not seq) so the wheel knows to
+            /// retransmit. If the wheel doesn't retransmit within its
+            /// auto-retransmit window, the caller should escalate via a
+            /// prime+open-request or similar.</summary>
+            GapDetected,
+            /// <summary>Buffer overflowed the 1 MiB cap. Buffer was cleared;
+            /// caller should treat this as a hard reset.</summary>
+            BufferOverflow,
+        }
 
         /// <summary>Feed one raw chunk payload (the bytes after session/type/seq).
         /// No seq tracking — caller doesn't have the seq context. Use the
@@ -78,42 +119,76 @@ namespace MozaPlugin.Telemetry.Sessions
         /// <summary>
         /// Feed one chunk WITH its inbound seq number. Returns true when the
         /// chunk was accepted (including as the start of a new burst after a
-        /// detected restart); false ONLY on a forward gap (chunks lost mid-
-        /// burst), in which case the buffer is cleared and the caller should
-        /// trigger session-specific recovery (re-issue the open / prime / RPC
-        /// call so the wheel re-emits its burst). Without forward-gap detection
-        /// a single dropped chunk silently corrupts the zlib stream and the
-        /// surrounding handshake fails permanently for the lifetime of the
-        /// session.
+        /// detected restart); false on forward gap (chunks lost mid-burst) or
+        /// buffer overflow. Back-compat wrapper around <see cref="Insert"/> —
+        /// new code should prefer the enum-returning variant since "false"
+        /// no longer maps 1:1 to a single recovery action.
         ///
-        /// Three non-monotonic cases are recognised:
-        ///   - <c>seq == _lastSeq</c> — exact duplicate (wheel retransmit
-        ///     because its inbound ack got lost). Skip silently; chunk's bytes
-        ///     are already in the buffer.
-        ///   - <c>seq &lt; _lastSeq</c> — wheel restarted its outbound seq
-        ///     counter for a new logical message (common on file-transfer
-        ///     sessions where each dir-listing / RPC reply burst is
-        ///     independent, and after configJson re-prime). Clear in-progress
-        ///     buffer and accept this chunk as the first of the new burst.
-        ///   - <c>seq &gt; _lastSeq + 1</c> — true forward gap (chunks lost).
-        ///     Clear, return false.
-        ///
-        /// First chunk after Clear (or Reset) accepts any seq. <paramref name="tag"/>
-        /// is a free-form label included in the warning log (e.g. "sess=0x09")
-        /// so multi-reassembler diagnostics are distinguishable.
+        /// Important: on forward gap the buffer is now PRESERVED (was
+        /// cleared in the pre-2026-05-15 implementation). The wheel
+        /// auto-retransmits the missing chunk from its outstanding-ack
+        /// timer (~1.3 s observed in PitHouse capture), at which point the
+        /// chunks arrive contiguously and the buffer holds the full burst.
+        /// Caller must ack <see cref="HighWaterSeq"/> (cumulative), NOT
+        /// the just-received seq — acking the post-gap seq would tell the
+        /// wheel "I have everything up to seq" and suppress retransmit.
         /// </summary>
         public bool AddChunk(int seq, byte[] chunk, string tag = "")
         {
-            if (chunk == null || chunk.Length < 4) return true;
+            var r = Insert(seq, chunk, tag);
+            return r != ChunkInsertResult.GapDetected
+                && r != ChunkInsertResult.BufferOverflow;
+        }
+
+        /// <summary>
+        /// Rich-result variant of <see cref="AddChunk"/>. Returns one of
+        /// <see cref="ChunkInsertResult"/> values describing exactly what
+        /// happened, so callers can implement cumulative-ack semantics
+        /// (ack <see cref="HighWaterSeq"/> on every insert regardless of
+        /// outcome — that's what tells the wheel which seq to retransmit
+        /// from) and choose recovery escalation (Restart / GapDetected /
+        /// BufferOverflow have different meanings).
+        ///
+        /// Three non-monotonic cases:
+        ///   - <c>seq == _lastSeq</c> → <see cref="ChunkInsertResult.Duplicate"/>.
+        ///     Wheel retransmit because our inbound ack got lost. Bytes
+        ///     already in buffer; do not re-append. Re-ack confirms receipt.
+        ///   - <c>seq &lt; _lastSeq</c> → <see cref="ChunkInsertResult.Restart"/>.
+        ///     Wheel restarted its outbound seq counter for a new logical
+        ///     message (RPC reply, dir-listing burst, post-prime+open). Clear
+        ///     in-progress buffer and accept this chunk as first of new burst.
+        ///   - <c>seq &gt; _lastSeq + 1</c> → <see cref="ChunkInsertResult.GapDetected"/>.
+        ///     True forward gap. Buffer preserved, HighWaterSeq unchanged,
+        ///     this chunk's bytes DROPPED. Caller acks HighWaterSeq → wheel
+        ///     retransmits from <c>HighWaterSeq + 1</c>.
+        ///
+        /// First chunk after <see cref="Clear"/> accepts any seq.
+        /// <paramref name="tag"/> is a free-form label included in warning
+        /// logs (e.g. <c>"sess=0x09"</c>).
+        /// </summary>
+        public ChunkInsertResult Insert(int seq, byte[] chunk, string tag = "")
+        {
+            // Malformed (too short to hold the CRC trailer): drop silently.
+            // We classify as Duplicate so callers don't react (no buffer
+            // mutation, no _lastSeq advance, ack-from-HighWaterSeq is correct).
+            if (chunk == null || chunk.Length < 4) return ChunkInsertResult.Duplicate;
             byte[] net = StripCrcTrailer(chunk);
             lock (_buffer)
             {
+                bool wasRestart = false;
                 if (_lastSeq != -1 && seq != _lastSeq + 1)
                 {
-                    if (seq == _lastSeq) return true;
-
                     string warnTag = string.IsNullOrEmpty(tag) ? _gapTag : tag;
                     string tagSuffix = string.IsNullOrEmpty(warnTag) ? "" : $" ({warnTag})";
+
+                    if (seq == _lastSeq)
+                    {
+                        // Wheel retransmit of the previous chunk (its inbound
+                        // ack-receipt timer fired before our ack reached it).
+                        // Bytes already in buffer; re-ack at the call site
+                        // re-affirms receipt to the wheel.
+                        return ChunkInsertResult.Duplicate;
+                    }
                     if (seq < _lastSeq)
                     {
                         MozaLog.Debug(
@@ -122,19 +197,27 @@ namespace MozaPlugin.Telemetry.Sessions
                         _buffer.Clear();
                         _overflowLogged = false;
                         _lastSeq = -1;
+                        wasRestart = true;
                         // fall through to accept this chunk as the first of the new burst
                     }
                     else
                     {
+                        // Forward gap. PRESERVE the buffer — the wheel will
+                        // auto-retransmit from HighWaterSeq+1 once its
+                        // outstanding-ack timer fires. We drop THIS chunk's
+                        // bytes because appending out-of-order corrupts the
+                        // zlib stream; when the wheel retransmits, it will
+                        // re-send this seq too (verified in PitHouse capture
+                        // bridge-20260514-204307.jsonl: wheel re-bursts the
+                        // full unacked window, not just the missing chunk).
+                        _lastForwardGapUtcTicks = System.DateTime.UtcNow.Ticks;
                         int missing = seq - _lastSeq - 1;
                         MozaLog.Warn(
-                            $"[Moza] Reassembler seq gap{tagSuffix}: " +
+                            $"[Moza] Reassembler forward gap{tagSuffix}: " +
                             $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
-                            $"clearing {_buffer.Count}B buffer — caller should re-handshake");
-                        _buffer.Clear();
-                        _overflowLogged = false;
-                        _lastSeq = -1;
-                        return false;
+                            $"preserving {_buffer.Count}B buffer, dropping out-of-order chunk — " +
+                            $"caller must ack HighWaterSeq={_lastSeq} so wheel retransmits");
+                        return ChunkInsertResult.GapDetected;
                     }
                 }
                 if (_buffer.Count + net.Length > MaxBufferBytes)
@@ -146,12 +229,16 @@ namespace MozaPlugin.Telemetry.Sessions
                     }
                     _buffer.Clear();
                     _lastSeq = -1;
-                    return true;
+                    return ChunkInsertResult.BufferOverflow;
                 }
                 _buffer.AddRange(net);
                 _lastSeq = seq;
                 if (!string.IsNullOrEmpty(tag)) _gapTag = tag;
-                return true;
+                // Forward progress resumed — clear the gap timestamp so the
+                // tick-driven watchdog (TickConfigJsonGapEscalation) doesn't
+                // fire an unnecessary prime+open-request.
+                _lastForwardGapUtcTicks = 0;
+                return wasRestart ? ChunkInsertResult.Restart : ChunkInsertResult.Contiguous;
             }
         }
 
@@ -162,6 +249,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 _buffer.Clear();
                 _overflowLogged = false;
                 _lastSeq = -1;
+                _lastForwardGapUtcTicks = 0;
             }
         }
 

@@ -1776,6 +1776,25 @@ namespace MozaPlugin.Devices
                     });
                 }
             }
+            // String channels live on profile.StringChannels (sess=0x01 type=0x05
+            // out-of-band transport), not on Tiers — they need a separate pass
+            // to surface in the mapping grid so users can override the URL →
+            // SimHub property defaults from StringChannelDefaults.
+            foreach (var ch in profile.StringChannels
+                         .OrderBy(c => c.Url, StringComparer.OrdinalIgnoreCase))
+            {
+                if (DashboardProfileStore.IsInternalChannel(ch.SimHubProperty)) continue;
+                if (!seen.Add(ch.Url)) continue;
+                rows.Add(new ChannelMappingRow
+                {
+                    AllProperties = props,
+                    Name = ch.Name,
+                    Url = ch.Url,
+                    PackageLevel = ch.PackageLevel,
+                    Compression = ch.Compression,           // "string"
+                    SimHubProperty = ch.SimHubProperty ?? "",
+                });
+            }
             TelemetryChannelGrid.ItemsSource = rows;
             // Now that initial-state filter passes have run with dropdown auto-open
             // suppressed, allow further user-typed input to open the dropdown.

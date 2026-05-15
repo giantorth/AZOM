@@ -69,31 +69,40 @@ namespace MozaPlugin.Telemetry.Frames
             using var ms = new MemoryStream();
             using var w = new BinaryWriter(ms);
 
-            var idxByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            // First-occurrence wins: the wheel re-indexes URLs from idx=1 after
-            // a dashboard switch, putting fresh entries at low positions while
-            // stale cold-start / prior-dashboard entries linger at higher
-            // positions in our merged view of the catalog. Last-wins would pick
-            // the stale slot — same URL string, but a slot the wheel has
-            // already forgotten — and the wheel cannot bind value frames to it.
-            // Matches BuildTierDefinitionV2's policy (see its comment).
-            for (int i = 0; i < wheelCatalog.Count; i++)
-            {
-                if (!string.IsNullOrEmpty(wheelCatalog[i]) && !idxByUrl.ContainsKey(wheelCatalog[i]))
-                    idxByUrl[wheelCatalog[i]] = i + 1; // 1-based
-            }
+            var idxByUrl = ChannelCatalogParser.BuildIdxByUrl(wheelCatalog);
 
+            // Track max chIdx ever written so END_MARKER can use it
+            // (PitHouse-faithful: bridge-20260514-204307 SR emit shows END=9
+            // when the tier-def contains idx=9 (patch/TPP), even though
+            // total channel count is only 8 (7 fast + 1 slow). Previous
+            // plugin used channelsPerBroadcast which would emit END=8 —
+            // off by one, and "any mistake in channel ordering breaks the
+            // link" per user feedback 2026-05-15).
+            int maxIdxSeen = 0;
             void WriteTier(byte flag, IReadOnlyList<ChannelDefinition> channels)
             {
-                int numChannels = channels.Count;
+                // Drop channels with chIdx=0 (URL not in wheel catalog) — W17
+                // silently rejects the whole tier-def if ANY record carries
+                // chIdx=0. Emit in tier.Channels order so the bit-packer in
+                // TelemetryFrameBuilder.BuildFrameFromSnapshot lines up with
+                // what we declare here. See docs/protocol/findings/.
+                var resolved = new List<(int chIndex, ChannelDefinition ch)>(channels.Count);
+                foreach (var ch in channels)
+                {
+                    int chIndex;
+                    if (!idxByUrl.TryGetValue(ch.Url ?? "", out chIndex)) chIndex = 0;
+                    if (chIndex <= 0) continue;
+                    resolved.Add((chIndex, ch));
+                }
+                int numChannels = resolved.Count;
+                if (numChannels == 0) return;
                 uint size = (uint)(1 + numChannels * 16);
                 w.Write((byte)0x01);
                 w.Write(size);
                 w.Write(flag);
-                foreach (var ch in channels)
+                foreach (var (chIndex, ch) in resolved)
                 {
-                    int chIndex;
-                    if (!idxByUrl.TryGetValue(ch.Url, out chIndex)) chIndex = 0;
+                    if (chIndex > maxIdxSeen) maxIdxSeen = chIndex;
                     uint compCode = LookupCompressionCode(ch.Compression);
                     w.Write((uint)chIndex);
                     w.Write(compCode);
@@ -153,10 +162,15 @@ namespace MozaPlugin.Telemetry.Frames
             int broadcastCount = tierCount / subPerBroadcast;
 
             // Total channel count across one broadcast (used as end-marker for
-            // subsequent broadcasts; first uses 0).
+            // subsequent broadcasts; first uses 0). Use the post-filter count
+            // (channels actually written by WriteTier — i.e. those whose URLs
+            // appear in the wheel catalog with a non-zero idx) so the marker
+            // matches the bytes we emit.
             int channelsPerBroadcast = 0;
             for (int j = 0; j < subPerBroadcast; j++)
-                channelsPerBroadcast += profile.Tiers[j].Channels.Count;
+                foreach (var ch in profile.Tiers[j].Channels)
+                    if (idxByUrl.TryGetValue(ch.Url ?? "", out var idx) && idx > 0)
+                        channelsPerBroadcast++;
 
             // On dashboard switch, emit ENABLE records for the previous
             // subscription's last-broadcast flags BEFORE the first new TIER.
@@ -175,7 +189,11 @@ namespace MozaPlugin.Telemetry.Frames
                 int baseTier = b * subPerBroadcast;
                 for (int s = 0; s < subPerBroadcast; s++)
                     WriteTier(FlagFor(baseTier + s), profile.Tiers[baseTier + s].Channels);
-                WriteEndMarker(b == 0 ? 0u : (uint)channelsPerBroadcast);
+                // END_MARKER value = max chIdx seen in tier-def so far
+                // (PitHouse SR: END=9 because tier-def includes idx=9
+                // patch/TrackPositionPercent). First broadcast still uses
+                // 0 per the captured warmup behavior.
+                WriteEndMarker(b == 0 ? 0u : (uint)maxIdxSeen);
                 if (b < broadcastCount - 1)
                 {
                     for (int s = 0; s < subPerBroadcast; s++)
@@ -208,23 +226,17 @@ namespace MozaPlugin.Telemetry.Frames
             using var ms = new MemoryStream();
             using var w = new BinaryWriter(ms);
 
-            var idxByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, int> idxByUrl;
             if (wheelCatalog != null && wheelCatalog.Count > 0)
             {
-                // First occurrence wins: after a dashboard switch the wheel
-                // re-indexes from 1 so fresh entries sit at lower positions
-                // while stale cold-start entries linger at higher positions.
-                for (int i = 0; i < wheelCatalog.Count; i++)
-                {
-                    string url = wheelCatalog[i];
-                    if (!string.IsNullOrEmpty(url) && !idxByUrl.ContainsKey(url))
-                        idxByUrl[url] = i + 1;
-                }
+                idxByUrl = ChannelCatalogParser.BuildIdxByUrl(wheelCatalog);
             }
             else
             {
-                // Deduplicate: broadcast expansion repeats URLs N× which
-                // inflates indices if we count every occurrence.
+                // Fallback: alphabetic-by-URL across all tiers, deduped (the
+                // broadcast-expanded profile repeats URLs N×, which would
+                // inflate indices if every occurrence got its own slot).
+                idxByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var unique = new List<ChannelDefinition>();
                 foreach (var ch in profile.Tiers.SelectMany(t => t.Channels))
@@ -248,15 +260,26 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 var tier = profile.Tiers[t];
                 byte flag = (byte)(flagBase + t);
-                int n = tier.Channels.Count;
+
+                // Drop channels with chIdx=0 — W17 silently rejects the
+                // whole tier-def if any record carries chIdx=0. See
+                // docs/protocol/findings/.
+                var resolved = new List<(int chIndex, ChannelDefinition ch)>(tier.Channels.Count);
+                foreach (var ch in tier.Channels)
+                {
+                    int chIndex;
+                    if (!idxByUrl.TryGetValue(ch.Url ?? "", out chIndex)) chIndex = 0;
+                    if (chIndex <= 0) continue;
+                    resolved.Add((chIndex, ch));
+                }
+                int n = resolved.Count;
+                if (n == 0) continue;
                 uint size = (uint)(1 + n * 16);
                 w.Write((byte)0x01);
                 w.Write(size);
                 w.Write(flag);
-                foreach (var ch in tier.Channels)
+                foreach (var (chIndex, ch) in resolved)
                 {
-                    int chIndex;
-                    if (!idxByUrl.TryGetValue(ch.Url, out chIndex)) chIndex = 0;
                     if (chIndex > maxIdx) maxIdx = chIndex;
                     uint compCode = LookupCompressionCode(ch.Compression);
                     w.Write((uint)chIndex);

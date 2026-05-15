@@ -87,5 +87,22 @@ namespace MozaPlugin.Telemetry.TestMode
                     return 0.0;
             }
         }
+
+        /// <summary>
+        /// String-valued sibling of <see cref="Compute"/>. Used by the sess=0x01
+        /// type=0x05 emitter (<c>TelemetrySender.TickEmitStringValues</c>) for
+        /// string-typed channels in test mode. For <see cref="TestKind.StringConstant"/>
+        /// returns the literal <c>StringValue</c>; for any other kind returns the
+        /// numeric Compute() result formatted invariantly so a misconfigured channel
+        /// (numeric signal accidentally bound to a string transport) still produces
+        /// something on the wire instead of silently degrading.
+        /// </summary>
+        public static string ComputeString(TestSignal s, long wallClockMs)
+        {
+            if (s.Kind == TestKind.StringConstant)
+                return s.StringValue ?? "";
+            return Compute(s, wallClockMs)
+                .ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        }
     }
 }

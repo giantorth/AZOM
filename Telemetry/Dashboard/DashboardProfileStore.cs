@@ -29,9 +29,11 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         // Newer mzdash format (Core, AMG-GT3 KS) embeds URL as a bare string in
         // binding/methods entries (no Telemetry.get() wrapper). Match raw
-        // `v1/gameData/<name>` so we don't miss those channels.
+        // `v1/gameData/<name>` and nested `v1/gameData/<seg>/<seg>/...` so we
+        // don't miss those channels (Telemetry.json's `v1/gameData/patch/*`
+        // namespace would otherwise be truncated to `v1/gameData/patch`).
         private static readonly Regex RawUrlRegex =
-            new Regex(@"v1/gameData/[A-Za-z0-9_]+",
+            new Regex(@"v1/gameData/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*",
                 RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         /// <summary>URL suffix → SimHub field mapping.</summary>
@@ -53,6 +55,39 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// Falls back to heuristic compression / SimHub field mapping for URLs
         /// the JSON doesn't declare (e.g. firmware-only channels).
         /// </summary>
+        // Strings are out-of-band (sess=0x01 type=0x05), not bit-packed into
+        // any tier. Both BuildStringChannel overloads route the resulting
+        // ChannelDefinition to MultiStreamProfile.StringChannels.
+        private static ChannelDefinition BuildStringChannel(string url, TelemetryChannelInfo info)
+        {
+            double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+            return BuildStringChannel(
+                url, info.Name, info.Compression, info.Field,
+                info.SimHubProperty ?? "", scale, info.PackageLevel,
+                info.Range, info.DataType);
+        }
+
+        private static ChannelDefinition BuildStringChannel(
+            string url, string name, string compression, SimHubField field,
+            string property, double scale, int packageLevel,
+            string? rangeStr, string? dataType)
+        {
+            var ch = new ChannelDefinition
+            {
+                Name                = name,
+                Url                 = url,
+                Compression         = compression,
+                BitWidth            = 0,
+                SimHubField         = field,
+                SimHubProperty      = property,
+                SimHubPropertyScale = scale,
+                PackageLevel        = packageLevel,
+                TestSignal          = TestSignalCatalog.Resolve(name, rangeStr, dataType, compression),
+            };
+            StringChannelDefaults.ApplyIfEmpty(ch);
+            return ch;
+        }
+
         public MultiStreamProfile BuildProfileFromCatalog(
             IReadOnlyList<string> catalog,
             string profileName = "WheelCatalog")
@@ -63,6 +98,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             // Telemetry.json. URLs not in the JSON fall back to heuristic
             // compression and SimHubField mapping.
             var perTier = new Dictionary<int, List<ChannelDefinition>>();
+            var stringChannels = new List<ChannelDefinition>();
             foreach (var url in catalog)
             {
                 if (string.IsNullOrEmpty(url)) continue;
@@ -72,6 +108,11 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (telemetryMap.TryGetValue(url, out var info))
                 {
                     packageLevel = info.PackageLevel;
+                    if (string.Equals(info.Compression, "string", StringComparison.OrdinalIgnoreCase))
+                    {
+                        stringChannels.Add(BuildStringChannel(url, info));
+                        continue;
+                    }
                     int bitWidth = CompressionTable.TryGetByName(info.Compression, out var ct) ? ct.BitWidth : 32;
                     double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
                     ch = new ChannelDefinition
@@ -155,11 +196,14 @@ namespace MozaPlugin.Telemetry.Dashboard
                 });
             }
 
+            stringChannels.Sort((a, b) => string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase));
+
             return new MultiStreamProfile
             {
                 Name = profileName,
                 PageCount = 1,
                 Tiers = tiers,
+                StringChannels = stringChannels,
             };
         }
 
@@ -349,6 +393,9 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             var widgetTiers = new List<DashboardProfile>();
             var telemetryMap = GetTelemetryMap();
+            // Captured by Walk() closure when a widget binds a string-typed
+            // channel — routed to MultiStreamProfile.StringChannels at the end.
+            var perWidgetStringChannels = new List<ChannelDefinition>();
 
             void Walk(JToken node)
             {
@@ -411,6 +458,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                                 compression = PickCompressionForUrl(suffix);
                                 bitWidth = CompressionTable.TryGetByName(compression, out var ct4) ? ct4.BitWidth : 32;
                             }
+                            if (string.Equals(compression, "string", StringComparison.OrdinalIgnoreCase))
+                            {
+                                perWidgetStringChannels.Add(BuildStringChannel(
+                                    url, chName, compression, field, property, scale, level,
+                                    rangeStr, dataType));
+                                continue;
+                            }
                             // Tier's package_level = fastest (lowest) of its
                             // channels — drives plugin tick scheduling.
                             if (level < packageLevel) packageLevel = level;
@@ -468,10 +522,20 @@ namespace MozaPlugin.Telemetry.Dashboard
                 return string.Compare(ua, ub, StringComparison.OrdinalIgnoreCase);
             });
 
+            // Dedupe string channels by URL (Walk may revisit a widget twice
+            // during retransmits or repeated children) and sort alphabetically.
+            var stringDedup = new Dictionary<string, ChannelDefinition>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in perWidgetStringChannels)
+                if (!stringDedup.ContainsKey(s.Url)) stringDedup[s.Url] = s;
+            var stringChannels = stringDedup.Values
+                .OrderBy(c => c.Url, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
             return new MultiStreamProfile
             {
                 Name = name,
                 Tiers = unique,
+                StringChannels = stringChannels,
             };
         }
 
@@ -498,6 +562,12 @@ namespace MozaPlugin.Telemetry.Dashboard
                     if (overrides.TryGetValue(ch.Url, out var path) && !string.IsNullOrWhiteSpace(path))
                         ch.SimHubProperty = path.Trim();
                 }
+            }
+            foreach (var ch in profile.StringChannels)
+            {
+                if (IsInternalChannel(ch.SimHubProperty)) continue;
+                if (overrides.TryGetValue(ch.Url, out var path) && !string.IsNullOrWhiteSpace(path))
+                    ch.SimHubProperty = path.Trim();
             }
         }
 
@@ -590,11 +660,18 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             var map = GetTelemetryMap();
             var byLevel = new Dictionary<int, List<ChannelDefinition>>();
+            var stringChannels = new List<ChannelDefinition>();
 
             foreach (var url in urls)
             {
                 if (!map.TryGetValue(url, out var info))
                     continue;
+
+                if (string.Equals(info.Compression, "string", StringComparison.OrdinalIgnoreCase))
+                {
+                    stringChannels.Add(BuildStringChannel(url, info));
+                    continue;
+                }
 
                 if (!CompressionTable.TryGetByName(info.Compression, out var ct5))
                     continue;
@@ -625,10 +702,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 .Select(level => BuildTierProfile(name, byLevel[level], level))
                 .ToList();
 
+            stringChannels.Sort((a, b) => string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase));
+
             return new MultiStreamProfile
             {
-                Name  = name,
-                Tiers = tiers,
+                Name           = name,
+                Tiers          = tiers,
+                StringChannels = stringChannels,
             };
         }
 

@@ -92,6 +92,15 @@ namespace MozaPlugin.Telemetry.Dashboard
         public List<DashboardProfile> Tiers { get; set; } = new List<DashboardProfile>();
 
         /// <summary>
+        /// String-typed channels referenced by the dashboard (Telemetry.json
+        /// <c>compression: "string"</c>). NOT part of <see cref="Tiers"/>: strings
+        /// are pushed out-of-band as <c>type=0x05</c> sub-msgs on sess=0x01 (see
+        /// <c>docs/protocol/sessions/session-0x01-channel-protocol.md</c>) and
+        /// do not appear in the bit-packed value frame. Keyed by URL.
+        /// </summary>
+        public List<ChannelDefinition> StringChannels { get; set; } = new List<ChannelDefinition>();
+
+        /// <summary>
         /// Number of pages (children) in the dashboard. Used for 7c:27 display config frames.
         /// Defaults to 1 for profiles that don't come from an mzdash file.
         /// </summary>
@@ -100,7 +109,8 @@ namespace MozaPlugin.Telemetry.Dashboard
         public override string ToString()
         {
             var parts = Tiers.Select(t => $"L{t.PackageLevel}:{t.Channels.Count}ch/{t.TotalBytes}B");
-            return $"{Name} ({string.Join(", ", parts)})";
+            string strs = StringChannels.Count > 0 ? $", strings:{StringChannels.Count}" : "";
+            return $"{Name} ({string.Join(", ", parts)}{strs})";
         }
     }
 

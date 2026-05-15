@@ -63,6 +63,11 @@ namespace MozaPlugin.Telemetry.Frames
         // were clean per CRC + per-record validation.
         private readonly Dictionary<byte, int> _highestSeqAppended = new();
         private volatile List<string>? _catalog;
+        // Cached URL → 1-based idx for the current _catalog. Published
+        // together with _catalog and read without locking; FindIdxByUrl is
+        // called per string channel per tick (~33 Hz × ~23 channels), so
+        // the linear scan it used to do shows up in the hot path.
+        private volatile Dictionary<string, int>? _idxByUrl;
         private volatile int _lastActivityMs;
         private int _lastParseLen;
 
@@ -72,6 +77,39 @@ namespace MozaPlugin.Telemetry.Frames
 
         /// <summary>Channel count in the latest catalog, or 0 if none.</summary>
         public int Count => _catalog?.Count ?? 0;
+
+        /// <summary>URL → 1-based idx for the current catalog (first-occurrence
+        /// wins: stale higher slots ignored after a dashboard switch re-indexes
+        /// from 1). Null until the first parse succeeds. Suitable for callers
+        /// that need to look up many URLs at once.</summary>
+        public IReadOnlyDictionary<string, int>? IdxByUrl => _idxByUrl;
+
+        /// <summary>Build the first-occurrence-wins URL → 1-based idx map from
+        /// an arbitrary catalog list. Used by callers that receive the catalog
+        /// as a parameter rather than going through the parser instance.</summary>
+        public static Dictionary<string, int> BuildIdxByUrl(IReadOnlyList<string> catalog)
+        {
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (catalog == null) return map;
+            for (int i = 0; i < catalog.Count; i++)
+            {
+                string url = catalog[i];
+                if (!string.IsNullOrEmpty(url) && !map.ContainsKey(url))
+                    map[url] = i + 1;
+            }
+            return map;
+        }
+
+        /// <summary>Look up a URL's wheel-firmware-canonical channel idx
+        /// (1-based) in the latest catalog. Returns -1 if the catalog isn't
+        /// populated yet or the URL isn't in it. Case-insensitive match.</summary>
+        public int FindIdxByUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return -1;
+            var map = _idxByUrl;
+            if (map == null) return -1;
+            return map.TryGetValue(url, out var ix) ? ix : -1;
+        }
 
         /// <summary>Environment.TickCount of the last AppendChunkIfNew call.
         /// Used by quiet-window waits.</summary>
@@ -208,6 +246,7 @@ namespace MozaPlugin.Telemetry.Frames
         {
             ClearBuffer();
             _catalog = null;
+            _idxByUrl = null;
             _lastActivityMs = 0;
         }
 
@@ -504,6 +543,7 @@ namespace MozaPlugin.Telemetry.Frames
                 if (changed)
                 {
                     _catalog = merged;
+                    _idxByUrl = BuildIdxByUrl(merged);
                     var diff = new StringBuilder();
                     foreach (var kv in parsed.OrderBy(kv => kv.Key))
                     {

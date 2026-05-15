@@ -33,7 +33,7 @@ namespace MozaPlugin.Telemetry
     {
         private enum State
         {
-            Idle, PreSwitchTest, SwitchPending, WaitRenegotiate,
+            Idle, PreSwitchTest, StringBurst, SwitchPending, WaitRenegotiate,
             PostSwitchTest, Done,
         }
 
@@ -44,7 +44,18 @@ namespace MozaPlugin.Telemetry
         private const byte PhaseEnterSwitchPending  = 0x12;
         private const byte PhaseEnterWaitRenegotiate= 0x13;
         private const byte PhaseEnterPostSwitchTest = 0x14;
+        // StringBurst sandwiches the PreSwitchTest and SwitchPending phases:
+        // forces every profile.StringChannels entry onto the wire bypassing
+        // change-detect + keepalive gates so the JSONL trace contains a
+        // distinctly-bounded window where the operator can verify which
+        // string channels reached the wheel.
+        private const byte PhaseStringBurst         = 0x15;
         private const byte PhaseEnterDone           = 0x1F;
+
+        // Hold time after the string burst is fired before transitioning to
+        // SwitchPending. Long enough that any wheel-side type=0x06 acks for
+        // the burst land inside the same window in the wire trace.
+        private const int StringBurstHoldMs = 1000;
 
         // Resolves a dashboard name to its parsed MultiStreamProfile. Implemented
         // by the host (MozaPlugin) since profile parsing involves the cache + builtins.
@@ -108,6 +119,7 @@ namespace MozaPlugin.Telemetry
             {
                 case State.Idle: TickIdle(); break;
                 case State.PreSwitchTest: TickPreSwitchTest(); break;
+                case State.StringBurst: TickStringBurst(); break;
                 case State.SwitchPending: TickSwitchPending(); break;
                 case State.WaitRenegotiate: TickWaitRenegotiate(); break;
                 case State.PostSwitchTest: TickPostSwitchTest(); break;
@@ -193,6 +205,23 @@ namespace MozaPlugin.Telemetry
             MozaLog.Debug(
                 $"[Moza] AUTO-TEST: pre-switch test done dash=\"{startName}\" " +
                 $"frames={frames} {(frames > 0 ? "PASS" : "FAIL")}");
+
+            // Keep TestMode on through the string burst so the burst's string
+            // values come from TestSignal (deterministic "STR-Name") rather
+            // than empty SimHub property reads if no game is running.
+            _elapsedMs = 0;
+            _telemetry.SendPhaseMarker(PhaseStringBurst);
+            _telemetry.ForceStringEmitAll();
+            _state = State.StringBurst;
+        }
+
+        private void TickStringBurst()
+        {
+            if (_elapsedMs < StringBurstHoldMs) return;
+
+            int strCount = _telemetry.Profile?.StringChannels.Count ?? 0;
+            MozaLog.Debug(
+                $"[Moza] AUTO-TEST: string burst done channels={strCount}");
 
             _telemetry.TestMode = false;
             _elapsedMs = 0;

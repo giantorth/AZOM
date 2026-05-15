@@ -312,7 +312,10 @@ namespace MozaPlugin.Telemetry.TestMode
             Add("CarSettings",                TestSignal.Sweep(0, 1, periodMs: 5000));
             Add("PacketTime",                 TestSignal.Constant_(0));
 
-            // --- String fields (placeholders; V2 frame layout skips them) ---
+            // --- String fields (sess=0x01 type=0x05 out-of-band) ---
+            // Distinct per-channel test value lets the wheel display unambiguously
+            // tell which channel reached the screen — "STR-TrackId" vs "STR-CarModel"
+            // vs the previous single literal "DEMO" which made every widget indistinguishable.
             string[] stringChannels =
             {
                 "MapName", "DisplayMapName", "TrackId", "TrackCode", "TrackConfig",
@@ -322,7 +325,7 @@ namespace MozaPlugin.Telemetry.TestMode
                 "DestinationCity",
             };
             foreach (var name in stringChannels)
-                Add(name, TestSignal.StringConstant_("DEMO"));
+                Add(name, TestSignal.StringConstant_("STR-" + name));
         }
 
         private static void Add(string name, TestSignal signal)

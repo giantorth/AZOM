@@ -351,8 +351,21 @@ namespace MozaPlugin.Telemetry
         private int _configJsonGapCount;
         private long _configJsonLastChunkUtcTicks;
         private long _configJsonLastEscalationUtcTicks;
-        // Threshold for prime+open-request escalation when LastState is null.
-        private const int ConfigJsonGapPrimeRetryAt = 1;   // first cold-start gap fires prime+open
+        // UTC ticks of the gap that fired prime+open-request escalation.
+        // Used so the soft-watchdog "wait for wheel auto-retransmit" path
+        // doesn't fire a redundant escalation while a prior one is in flight.
+        private long _configJsonLastPrimeRetryUtcTicks;
+        // Passive wait window: when a gap is detected on sess=0x09, the
+        // cumulative ACK we just sent points at HighWaterSeq. The wheel's
+        // outstanding-ack timer fires within ~1.3 s (verified in PitHouse
+        // capture bridge-20260514-204307.jsonl) and the wheel retransmits
+        // from HighWaterSeq+1. We give it 5 s headroom before escalating
+        // to an active prime+open-request — most gaps will self-heal in
+        // that window without any host action.
+        private const int ConfigJsonGapPassiveWaitMs = 5_000;
+        // Threshold for prime+open-request escalation when LastState is null
+        // AND the passive-wait timer expired without forward progress.
+        private const int ConfigJsonGapPrimeRetryAt = 1;
         // Threshold for full RestartForSwitch escalation when prime+open
         // hasn't recovered the burst.
         private const int ConfigJsonGapRestartAt = 4;
@@ -771,6 +784,15 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         public Func<string, double>? PropertyResolver { get; set; }
 
+        /// <summary>
+        /// String-valued sibling of <see cref="PropertyResolver"/>. Used by the
+        /// sess=0x01 type=0x05 string-channel emitter to read a SimHub property as
+        /// a string (game-running mode). Set by MozaPlugin alongside
+        /// <see cref="PropertyResolver"/>. Returns <c>null</c> when the path is
+        /// missing or the read throws; callers treat null as empty.
+        /// </summary>
+        public Func<string, string?>? PropertyStringResolver { get; set; }
+
         public MultiStreamProfile? Profile
         {
             get => _profile;
@@ -789,6 +811,18 @@ namespace MozaPlugin.Telemetry
                     int subCount = subTiers.Count;
                     int broadcasts = subCount == 1 ? 3 : System.Math.Max(4, subCount + 1);
                     var expanded = new System.Collections.Generic.List<DashboardProfile>(subCount * broadcasts);
+                    // One Channels copy per source sub-tier, shared across
+                    // its broadcast replicas. COPY so the in-place mutate in
+                    // SortTierChannelsByCatalogIdx doesn't corrupt the cached
+                    // profile; SHARE so the dedup-by-reference in that sort
+                    // still mutates each unique list exactly once.
+                    var copiedChannelsForSrc =
+                        new System.Collections.Generic.Dictionary<DashboardProfile, System.Collections.Generic.List<ChannelDefinition>>();
+                    foreach (var src in subTiers)
+                    {
+                        copiedChannelsForSrc[src] =
+                            new System.Collections.Generic.List<ChannelDefinition>(src.Channels);
+                    }
                     for (int b = 0; b < broadcasts; b++)
                     {
                         foreach (var src in subTiers)
@@ -796,7 +830,7 @@ namespace MozaPlugin.Telemetry
                             expanded.Add(new DashboardProfile
                             {
                                 Name = $"{src.Name}@b{b}",
-                                Channels = src.Channels,
+                                Channels = copiedChannelsForSrc[src],
                                 TotalBits = src.TotalBits,
                                 TotalBytes = src.TotalBytes,
                                 PackageLevel = src.PackageLevel,
@@ -809,6 +843,9 @@ namespace MozaPlugin.Telemetry
                         Name = value.Name,
                         PageCount = value.PageCount,
                         Tiers = expanded,
+                        // Strings are out-of-band; carry through unchanged
+                        // (the expanded profile becomes the live _profile).
+                        StringChannels = value.StringChannels,
                     };
                 }
                 _profile = value;
@@ -819,11 +856,32 @@ namespace MozaPlugin.Telemetry
                     return;
                 }
 
+                if (value.StringChannels.Count > 0)
+                {
+                    var urls = string.Join(", ", value.StringChannels.Select(c =>
+                        string.IsNullOrEmpty(c.SimHubProperty)
+                            ? c.Url
+                            : $"{c.Url}→{c.SimHubProperty}"));
+                    MozaLog.Debug(
+                        $"[Moza] Profile '{value.Name}' has {value.StringChannels.Count} " +
+                        $"string channels (sess=0x01 type=0x05): {urls}");
+                }
+
                 // Base tick = fastest tier's pkg_level (smallest).
                 int minPkg = int.MaxValue;
                 foreach (var t in value.Tiers)
                     if (t.PackageLevel > 0 && t.PackageLevel < minPkg) minPkg = t.PackageLevel;
                 _baseTickMs = (minPkg == int.MaxValue) ? 30 : minPkg;
+
+                // Do NOT apply the catalog-driven sort+filter here. The
+                // catalog state at Profile-set time is often stale (cold
+                // start: catalog hasn't arrived; post-dashboard-switch:
+                // catalog still has the PREVIOUS dashboard's URLs because
+                // the wheel sends new catalog over ~1s after the
+                // Stop+Start cycle). Defer to ApplySubscription which
+                // (a) has a fresher catalog and (b) re-runs from the
+                // pristine OriginalChannels every time, so a stale-catalog
+                // filter result doesn't permanently strip channels.
 
                 _tiers = new TierState[value.Tiers.Count];
                 var tierDiag = new System.Text.StringBuilder();
@@ -843,12 +901,44 @@ namespace MozaPlugin.Telemetry
                         Builder = new TelemetryFrameBuilder(tier, PropertyResolver,
                             type02NConvention: false),
                         TickInterval = tickInterval,
+                        // Snapshot the pristine (pre-filter) channel list so
+                        // ApplySubscription can refilter from scratch each call.
+                        OriginalChannels = new System.Collections.Generic.List<ChannelDefinition>(tier.Channels),
+                        OriginalTotalBits = tier.TotalBits,
+                        OriginalTotalBytes = tier.TotalBytes,
                     };
                 }
                 MozaLog.Debug(tierDiag.ToString());
+
+                // Apply the catalog-driven filter + sort + FrameBuilder
+                // rebuild NOW if the catalog is available. Each Profile
+                // setter call builds initial FrameBuilders from the
+                // UNFILTERED 10-channel profile (so that OriginalChannels
+                // captures the pristine state). Without this immediate
+                // re-filter, value frames between Profile setter and the
+                // next ApplySubscription leak out at the wrong (10-channel,
+                // 37-byte) size — verified 2026-05-15. ApplySubscription
+                // will reset + re-filter again later when needed; calls
+                // are idempotent.
+                if (_catalogParser.Catalog != null
+                    && _catalogParser.Catalog.Count > 0)
+                {
+                    SortTierChannelsByCatalogIdx(value, _catalogParser.Catalog);
+                    RebuildFrameBuildersFromProfile();
+                }
             }
         }
         private MultiStreamProfile? _profile;
+
+        // Per-string-channel emission state: last-sent value and tick timestamp.
+        // Keyed by channel URL (case-insensitive). The wheel re-indexes URLs per
+        // dashboard so idx is volatile, but the URL string is stable across
+        // catalog updates — keying by URL keeps the cadence/dedup state correct
+        // when a dashboard switch reshuffles idx assignments.
+        private readonly System.Collections.Generic.Dictionary<string, (string lastValue, int lastTickMs)>
+            _stringChannelState =
+                new System.Collections.Generic.Dictionary<string, (string, int)>(
+                    System.StringComparer.OrdinalIgnoreCase);
 
         private volatile int _framesSent;
         public int FramesSent => _framesSent;
@@ -1243,6 +1333,7 @@ namespace MozaPlugin.Telemetry
             // tier-1/2 escalation budget.
             _configJsonGapCount = 0;
             _configJsonLastChunkUtcTicks = 0;
+            _configJsonLastPrimeRetryUtcTicks = 0;
             // Reset catalog-growth tracking so the next Start's first
             // subscription (built from whatever catalog has arrived) is
             // treated as the new baseline.
@@ -1919,6 +2010,91 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
+        /// PitHouse byte-faithful tier-channel transform: for each unique
+        /// Channels list in the profile, REMOVE channels whose URLs aren't
+        /// in the wheel's catalog (chIdx would be 0 → tier-def can't
+        /// reference them) and SORT the remaining channels by catalog idx
+        /// ascending. Recomputes <c>tier.TotalBits</c>/<c>tier.TotalBytes</c>
+        /// so downstream FrameBuilders size their bit-pack buffers
+        /// correctly.
+        ///
+        /// MultiStreamProfile's tier-broadcast expansion shares Channels
+        /// lists by reference across tier replicas, so mutating each unique
+        /// list once propagates to every replica.
+        ///
+        /// IMPORTANT: this method does NOT touch <see cref="_tiers"/> or
+        /// rebuild FrameBuilders — callers do that explicitly. Two call
+        /// sites:
+        ///   * Profile setter (pre-FrameBuilder-construction): mutate the
+        ///     incoming profile in-place so the immediately-following
+        ///     `new TelemetryFrameBuilder(tier, …)` loop builds sized-
+        ///     correctly buffers against the filtered Channels list.
+        ///   * ApplySubscription (post-catalog-grow): mutate the live
+        ///     profile and then rebuild <see cref="_tiers"/> Builders via
+        ///     <see cref="RebuildFrameBuildersFromProfile"/>.
+        /// </summary>
+        private void SortTierChannelsByCatalogIdx(
+            MultiStreamProfile profile,
+            System.Collections.Generic.IReadOnlyList<string> catalog)
+        {
+            var idxByUrl = Frames.ChannelCatalogParser.BuildIdxByUrl(catalog);
+
+            int IdxFor(ChannelDefinition c)
+                => idxByUrl.TryGetValue(c.Url ?? "", out var ix) ? ix : 0;
+
+            // Dedupe by Channels reference — multi-broadcast replication shares
+            // the same List<ChannelDefinition> across replicas, and we want to
+            // mutate each unique list exactly once. .NET 4.8 has no
+            // ReferenceEqualityComparer; use a manual linear-scan list (tier
+            // counts are small, typically <16, so O(n²) is fine).
+            var sortedRefs = new System.Collections.Generic.List<object>();
+            foreach (var tier in profile.Tiers)
+            {
+                if (tier.Channels == null || tier.Channels.Count == 0) continue;
+                bool already = false;
+                foreach (var seen in sortedRefs)
+                {
+                    if (object.ReferenceEquals(seen, tier.Channels)) { already = true; break; }
+                }
+                if (already) continue;
+                sortedRefs.Add(tier.Channels);
+                var list = (System.Collections.Generic.List<ChannelDefinition>)tier.Channels;
+                list.RemoveAll(c => IdxFor(c) <= 0);
+                list.Sort((a, b) => IdxFor(a).CompareTo(IdxFor(b)));
+            }
+
+            // Recompute TotalBits/TotalBytes per tier — FrameBuilder sizes its
+            // value-frame buffer from TotalBytes, and after removing unbound
+            // channels the buffer must shrink to match the new packed length.
+            foreach (var tier in profile.Tiers)
+            {
+                int bits = 0;
+                foreach (var ch in tier.Channels) bits += ch.BitWidth;
+                tier.TotalBits = bits;
+                tier.TotalBytes = (bits + 7) / 8;
+            }
+        }
+
+        /// <summary>
+        /// Rebuild per-tier FrameBuilders from <see cref="_profile"/>.
+        /// Called after <see cref="SortTierChannelsByCatalogIdx"/> mutates
+        /// the live profile post-Profile-setter (e.g. ApplySubscription
+        /// after catalog growth). Safe to call when _tiers is null/empty.
+        /// </summary>
+        private void RebuildFrameBuildersFromProfile()
+        {
+            var profile = _profile;
+            if (profile == null || _tiers == null) return;
+            if (_tiers.Length != profile.Tiers.Count) return;
+            for (int i = 0; i < profile.Tiers.Count; i++)
+            {
+                _tiers[i].Builder = new TelemetryFrameBuilder(
+                    profile.Tiers[i], PropertyResolver,
+                    type02NConvention: false);
+            }
+        }
+
+        /// <summary>
         /// Single point of entry for (re-)subscribing to the wheel's channel
         /// catalog. Swaps the active profile to match the catalog, sends
         /// tier-def + channel config, and atomically publishes the new
@@ -2182,8 +2358,44 @@ namespace MozaPlugin.Telemetry
                             "Wheel will push corrected catalog after receiving this.");
                         cspIdx = false;
                     }
+
+                    // Restore the pristine pre-filter snapshot before re-
+                    // filtering, so a prior call that ran against a stale
+                    // catalog hasn't permanently stripped channels. Makes
+                    // ApplySubscription idempotent w.r.t. catalog state.
+                    if (_tiers != null)
+                    {
+                        for (int i = 0; i < profile.Tiers.Count && i < _tiers.Length; i++)
+                        {
+                            var st = _tiers[i];
+                            if (st?.OriginalChannels == null) continue;
+                            var tier = profile.Tiers[i];
+                            if (tier.Channels is System.Collections.Generic.List<ChannelDefinition> list)
+                            {
+                                list.Clear();
+                                list.AddRange(st.OriginalChannels);
+                                tier.TotalBits = st.OriginalTotalBits;
+                                tier.TotalBytes = st.OriginalTotalBytes;
+                            }
+                        }
+                    }
+
+                    // Now re-filter+re-sort against current catalog.
+                    if (_catalogParser.Catalog != null
+                        && _catalogParser.Catalog.Count > 0)
+                    {
+                        SortTierChannelsByCatalogIdx(profile, _catalogParser.Catalog);
+                        RebuildFrameBuildersFromProfile();
+                    }
+
                     byte flagBase = _nextFlagBase;
                     var prevSub = _activeSubscription;
+
+                    // The re-filter+re-sort above (against current catalog)
+                    // is the only catalog-driven mutation this method does;
+                    // the OriginalChannels restore makes that idempotent.
+                    // Profile setter already applied the same sort against
+                    // the catalog snapshot at profile-load time.
 
                     byte[] message;
                     if (cspIdx)
@@ -2740,7 +2952,6 @@ namespace MozaPlugin.Telemetry
                     // firmware uses, and the parser drops malformed blobs.
                     if (session == 0x09 || session == 0x0a)
                     {
-                        SendSessionAck(session, (ushort)seq);
                         if (session == 0x09) _session09InboundSeq = seq;
                         try
                         {
@@ -2749,30 +2960,42 @@ namespace MozaPlugin.Telemetry
                                 $"first8={BitConverter.ToString(chunkPayload, 0, Math.Min(8, chunkPayload.Length))}");
                         }
                         catch { }
-                        // Seq-aware path: detect a dropped chunk and recover
-                        // depending on whether we have a cached LastState.
-                        // Wire-trace analysis (2026-05-08): a single missing
-                        // chunk seq corrupts the zlib stream for the whole
-                        // burst. (2026-05-09): the wheel does NOT re-burst
-                        // on a re-issued OpenRequest once it considers the
-                        // session initialised — it only sends short heartbeat
-                        // chunks, never the full state. So our recovery has to
-                        // be cache-aware:
-                        //  - LastState present (we got a complete burst earlier
-                        //    this session): no recovery needed. Downstream
-                        //    consumers keep using the cached state. The wheel's
-                        //    library doesn't change without a user action, so
-                        //    a stale-but-correct cache is better than a
-                        //    forced re-handshake.
-                        //  - LastState absent (cold-start / first burst dropped):
-                        //    escalate. First gap → prime+open-request. Repeated
-                        //    gaps → full RestartForSwitch (the only known way
-                        //    to make the wheel re-burst once it's stuck).
+                        // Cumulative-ACK + buffer-preserving gap handling. The
+                        // previous implementation acked the just-received seq
+                        // unconditionally BEFORE the seq-gap check, which told
+                        // the wheel "I have everything up to seq" even when
+                        // an earlier chunk was dropped on the wire — wheel
+                        // moved on, missing chunk never retransmitted, zlib
+                        // stream corrupted, configJson handshake permanently
+                        // broken. New flow: process the chunk first, then ack
+                        // the reassembler's HighWaterSeq (highest contiguous-
+                        // received seq). On forward gap HighWaterSeq stays at
+                        // the pre-gap value, so the wheel sees the missing-
+                        // chunk ack window and auto-retransmits. PitHouse
+                        // capture bridge-20260514-204307.jsonl confirms wheel
+                        // retransmit on a ~1.3 s outstanding-ack timer.
                         _configJsonLastChunkUtcTicks = System.DateTime.UtcNow.Ticks;
                         var result = _configJson.OnChunk(seq, chunkPayload, $"sess=0x{session:X2}");
+
+                        // Pick the ACK value:
+                        //  - StateReady: the chunk just completed the burst,
+                        //    then ConfigJsonClient cleared its reassembler.
+                        //    HighWaterSeq is now -1, but we DID receive seq
+                        //    contiguously — ack `seq` so the wheel knows the
+                        //    burst is fully received.
+                        //  - Buffered / GapDetected: ack HighWaterSeq, which
+                        //    on a gap stays at the pre-gap value so the wheel
+                        //    retransmits the missing chunk.
+                        int ackSeq = (result == ConfigJsonClient.ChunkResult.StateReady)
+                            ? seq
+                            : _configJson.HighWaterSeq;
+                        if (ackSeq >= 0)
+                            SendSessionAck(session, (ushort)ackSeq);
+
                         if (result == ConfigJsonClient.ChunkResult.StateReady)
                         {
                             _configJsonGapCount = 0;
+                            _configJsonLastPrimeRetryUtcTicks = 0;
                             var state = _configJson.LastState;
                             if (state != null)
                             {
@@ -2782,6 +3005,14 @@ namespace MozaPlugin.Telemetry
                         }
                         else if (result == ConfigJsonClient.ChunkResult.GapDetected)
                         {
+                            // Soft path: log the gap but don't immediately
+                            // escalate. The cumulative ACK just sent points
+                            // at HighWaterSeq (NOT at seq), so the wheel's
+                            // next outstanding-ack-timer tick will retransmit
+                            // the missing chunk. Active escalation only kicks
+                            // in if no forward progress is observed for
+                            // ConfigJsonGapPassiveWaitMs — see HandleConfig-
+                            // JsonGap.
                             HandleConfigJsonGap(session, seq);
                         }
                     }
@@ -3051,6 +3282,7 @@ namespace MozaPlugin.Telemetry
                 TickPostRenegDiagnostic(tiers);
                 TickFireGameStartHandshake();
                 TickEmitValueFrames(tiers);
+                TickEmitStringValues();
 
                 TickEmitEnableAndSequence();
                 // Parity polls keep the wheel engaged during idle. Empirically
@@ -3062,6 +3294,7 @@ namespace MozaPlugin.Telemetry
                 TickEmitRetransmits();
                 TickEmitTierDefBlindRetransmits();
                 TickRetryS09IfNotEstablished();
+                TickConfigJsonGapEscalation();
                 TickConfigJsonStuckWatchdog();
                 TickGrowSubscriptionIfCatalogStable();
 
@@ -3243,6 +3476,125 @@ namespace MozaPlugin.Telemetry
                 }
             }
         }
+
+        /// <summary>Out-of-band string-channel value push on sess=0x01
+        /// type=0x05. Strings (Telemetry.json compression=string — TrackId,
+        /// CarModel, SessionTypeName, etc.) cannot be bit-packed into the
+        /// value frame; they ride a separate sub-msg on the management
+        /// session. Cadence: emit immediately on value change with a
+        /// 15-second keepalive floor for unchanged channels — matches the
+        /// 14.76 s mean cadence observed in PitHouse capture
+        /// bridge-20260514-204307.jsonl. Format and discovery in
+        /// docs/protocol/sessions/session-0x01-channel-protocol.md.
+        ///
+        /// _session01SeqLock is acquired around each emit. Today the only
+        /// other writer of _session01OutboundSeq is SendTierDefinition() also
+        /// on the tick handler (single-entry via _tickInProgress), so a race
+        /// is not reachable — but locking here matches SendTierDefinition's
+        /// pattern and is future-proof against off-tick sess=0x01 writers
+        /// being added later.</summary>
+        private void TickEmitStringValues()
+        {
+            if (!TestMode && !_gameRunning) return;
+            EmitStringChannels(force: false);
+        }
+
+        private const int StringKeepaliveFloorMs = 15000; // PitHouse mean cadence
+
+        /// <summary>Iterate the active profile's string channels and emit each
+        /// one via sess=0x01 type=0x05. When <paramref name="force"/> is false,
+        /// emits only on value change or 15 s keepalive expiry and skips
+        /// fully-unmapped channels with no prior state. When true, emits every
+        /// catalog-bound channel regardless — used by the auto-test burst.</summary>
+        private void EmitStringChannels(bool force)
+        {
+            var profile = _profile;
+            if (profile == null || profile.StringChannels.Count == 0) return;
+            var catalog = _catalogParser.Catalog;
+            if (catalog == null || catalog.Count == 0) return;
+
+            int nowMs = Environment.TickCount;
+            long signalNowMs = System.Diagnostics.Stopwatch.GetTimestamp() * 1000L /
+                               System.Diagnostics.Stopwatch.Frequency;
+
+            foreach (var ch in profile.StringChannels)
+            {
+                int idx = _catalogParser.FindIdxByUrl(ch.Url);
+                if (idx < 1 || idx > 255) continue;
+
+                string value = ResolveStringChannelValue(ch, signalNowMs);
+
+                if (!force)
+                {
+                    // Unmapped channels with no prior state would otherwise
+                    // blast "" at the wheel every 15 s. Wait for a UI mapping.
+                    if (value.Length == 0 && !_stringChannelState.ContainsKey(ch.Url))
+                        continue;
+
+                    bool send;
+                    if (!_stringChannelState.TryGetValue(ch.Url, out var st))
+                        send = true;
+                    else if (!string.Equals(st.lastValue, value, System.StringComparison.Ordinal))
+                        send = true;
+                    else
+                        send = nowMs - st.lastTickMs >= StringKeepaliveFloorMs;
+                    if (!send) continue;
+                }
+
+                EmitOneStringValue((byte)idx, value);
+                _stringChannelState[ch.Url] = (value, nowMs);
+            }
+        }
+
+        /// <summary>Resolve a string channel's current value. Test mode pulls
+        /// from the channel's resolved TestSignal (typically "STR-Name");
+        /// game-running mode reads the bound SimHub property via
+        /// <see cref="PropertyStringResolver"/>. Returns "" when no source is
+        /// available — caller decides whether to emit it.</summary>
+        private string ResolveStringChannelValue(ChannelDefinition ch, long nowMs)
+        {
+            if (TestMode)
+            {
+                return TestSignalGenerator.ComputeString(ch.TestSignal, nowMs);
+            }
+            if (!string.IsNullOrEmpty(ch.SimHubProperty) && PropertyStringResolver != null)
+            {
+                try
+                {
+                    var resolved = PropertyStringResolver(ch.SimHubProperty);
+                    if (!string.IsNullOrEmpty(resolved)) return resolved!;
+                }
+                catch
+                {
+                    // Resolver swallows internally; defensive in case a future
+                    // override throws. Fall through to empty string.
+                }
+            }
+            return "";
+        }
+
+        /// <summary>Build the type=0x05 sub-msg and ship it through the chunker
+        /// + connection under the sess=0x01 seq lock. Caller updates the
+        /// <c>_stringChannelState</c> dedup entry afterwards.</summary>
+        private void EmitOneStringValue(byte channelIdx, string value)
+        {
+            byte[] msg = Frames.StringValueBuilder.Build(channelIdx, value);
+            lock (_session01SeqLock)
+            {
+                var frames = Frames.TierDefinitionBuilder.ChunkMessage(
+                    msg, session: 0x01, seq: ref _session01OutboundSeq);
+                foreach (var f in frames)
+                    _connection.Send(f);
+            }
+        }
+
+        /// <summary>Diagnostic: emit every string channel in the current
+        /// profile right now, bypassing the change-detect + keepalive gate.
+        /// Used by the auto-test harness (PhaseStringBurst) to produce a
+        /// clearly-labelled wire-trace window even when no game is running
+        /// and steady-state cadence is silent. Updates dedup state so the
+        /// subsequent tick doesn't immediately re-emit.</summary>
+        public void ForceStringEmitAll() => EmitStringChannels(force: true);
 
         /// <summary>FFB-enable + sequence-counter. Both gated on gameRunning
         /// because PitHouse only emits these while a game is actively driving
@@ -3576,6 +3928,64 @@ namespace MozaPlugin.Telemetry
             catch (Exception ex)
             {
                 MozaLog.Warn($"[Moza] Catalog-growth re-subscribe failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tick-driven gap escalation. When a forward gap was detected on
+        /// sess=0x09 but no further chunks have arrived (the wheel's auto-
+        /// retransmit timer didn't fire, or the retransmit itself dropped),
+        /// the chunk-arrival-driven <see cref="HandleConfigJsonGap"/> path
+        /// never re-runs. This watchdog notices a stale gap and escalates
+        /// from passive-wait to active prime+open-request from the tick
+        /// loop instead.
+        ///
+        /// Cheap: short-circuits the moment LastState is non-null OR no
+        /// forward gap was ever observed OR the configJson session isn't in
+        /// play yet. Only runs the soft-watchdog logic when there's an
+        /// outstanding gap to recover from.
+        /// </summary>
+        private void TickConfigJsonGapEscalation()
+        {
+            if (_state == TelemetryState.Idle) return;
+            if (!_connection.IsConnected) return;
+            if (_configJson.LastState != null) return;
+            long gapTs = _configJson.LastForwardGapUtcTicks;
+            if (gapTs == 0) return;
+
+            long now = System.DateTime.UtcNow.Ticks;
+            long gapAgeMs = (now - gapTs) / System.TimeSpan.TicksPerMillisecond;
+            if (gapAgeMs < ConfigJsonGapPassiveWaitMs) return;
+
+            // Only escalate if we haven't already nudged within the passive
+            // window — HandleConfigJsonGap and this both share
+            // _configJsonLastPrimeRetryUtcTicks for that lockout.
+            long primeAgeTicks = now - _configJsonLastPrimeRetryUtcTicks;
+            long passiveWaitTicks = ConfigJsonGapPassiveWaitMs * System.TimeSpan.TicksPerMillisecond;
+            if (_configJsonLastPrimeRetryUtcTicks != 0 && primeAgeTicks < passiveWaitTicks)
+                return;
+
+            int recoveryOpenSeq = unchecked((ushort)(0x100 + _configJsonGapCount));
+            int primeSeq = unchecked((ushort)(0x200 + _configJsonGapCount));
+            byte session = 0x09;
+            // Prefer 0x0a if the wheel's been talking on it instead.
+            if (_session09InboundSeq == 0 && _configJsonLastChunkUtcTicks != 0)
+                session = 0x0a;
+            try
+            {
+                MozaLog.Warn(
+                    $"[Moza] sess=0x{session:X2} configJson gap stale " +
+                    $"({gapAgeMs}ms ≥ {ConfigJsonGapPassiveWaitMs}ms passive-wait window) — " +
+                    $"wheel didn't auto-retransmit. " +
+                    $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4})");
+                SendSessionPrime(session, (ushort)primeSeq);
+                SendConfigJsonOpenRequest(session, (ushort)recoveryOpenSeq);
+                _configJsonLastPrimeRetryUtcTicks = now;
+                if (_configJsonGapCount == 0) _configJsonGapCount = 1;
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[Moza] sess=0x{session:X2} configJson tick-watchdog recovery failed: {ex.Message}");
             }
         }
 
@@ -3917,7 +4327,8 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>
         /// Tiered chunk-drop recovery for sess=0x09 / 0x0a configJson. Tier
-        /// chosen by gap count and cached state:
+        /// chosen by gap count, cached state, and elapsed time since the gap
+        /// was first observed:
         ///
         ///   Tier 0 (LastState present, any gap count): no action required.
         ///   The cached state is still authoritative for downstream consumers
@@ -3925,14 +4336,22 @@ namespace MozaPlugin.Telemetry
         ///   a user action so a stale-but-correct cache is preferable to a
         ///   forced re-handshake (which the wheel often ignores anyway).
         ///
-        ///   Tier 1 (LastState absent, first gap): prime + open-request. Some
-        ///   firmwares respond to the prime by resetting their sess=0x09 state
-        ///   machine and re-bursting on next OpenRequest.
+        ///   Tier 0.5 (LastState absent, gap fresh): passive wait. The
+        ///   cumulative ACK the caller just sent points at HighWaterSeq
+        ///   instead of the just-received seq, so the wheel's outstanding-
+        ///   ack timer will retransmit the missing chunk in ~1.3 s. We give
+        ///   it ConfigJsonGapPassiveWaitMs (5 s) before escalating to an
+        ///   active prime+open-request — most gaps self-heal in that window.
         ///
-        ///   Tier 2 (LastState absent, repeated gaps): full RestartForSwitch.
-        ///   The Stop+11s-settle+Start sequence is the only reliable way to
-        ///   force a wheel that's stuck mid-burst back to a cold-start where
-        ///   it'll definitely emit the full state again.
+        ///   Tier 1 (LastState absent, passive wait expired): prime +
+        ///   open-request. Some firmwares respond to the prime by resetting
+        ///   their sess=0x09 state machine and re-bursting on next
+        ///   OpenRequest.
+        ///
+        ///   Tier 2 (LastState absent, repeated gaps after prime+open): full
+        ///   RestartForSwitch. The Stop+11s-settle+Start sequence is the only
+        ///   reliable way to force a wheel that's stuck mid-burst back to a
+        ///   cold-start where it'll definitely emit the full state again.
         ///
         /// Cooldown gates Tier 2 so a chunk-drop storm can't cycle Restart
         /// faster than the wheel's settle window.
@@ -3948,7 +4367,38 @@ namespace MozaPlugin.Telemetry
             {
                 MozaLog.Warn(
                     $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                    $"buffer cleared, keeping cached state — no recovery action");
+                    $"buffer preserved, keeping cached state — no recovery action");
+                return;
+            }
+
+            // Tier 0.5: passive wait. The cumulative-ACK we just sent points
+            // at HighWaterSeq, so the wheel will retransmit. Only escalate
+            // if the gap is stale (no forward progress for the passive-wait
+            // window). _configJson.LastForwardGapUtcTicks is set inside the
+            // reassembler the moment a forward gap is observed.
+            long now = System.DateTime.UtcNow.Ticks;
+            long gapAgeTicks = now - _configJson.LastForwardGapUtcTicks;
+            long passiveWaitTicks = ConfigJsonGapPassiveWaitMs * System.TimeSpan.TicksPerMillisecond;
+            if (_configJson.LastForwardGapUtcTicks != 0 && gapAgeTicks < passiveWaitTicks)
+            {
+                MozaLog.Debug(
+                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"waiting up to {ConfigJsonGapPassiveWaitMs}ms for wheel auto-retransmit " +
+                    $"(gap age={gapAgeTicks / System.TimeSpan.TicksPerMillisecond}ms)");
+                return;
+            }
+
+            // Avoid re-firing prime+open-request within the passive window of
+            // the previous retry — if we already nudged the wheel and the
+            // burst is still incomplete, give it time before nudging again.
+            long primeAgeTicks = now - _configJsonLastPrimeRetryUtcTicks;
+            if (_configJsonGapCount <= ConfigJsonGapPrimeRetryAt
+                && _configJsonLastPrimeRetryUtcTicks != 0
+                && primeAgeTicks < passiveWaitTicks)
+            {
+                MozaLog.Debug(
+                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"prior prime+open-request {primeAgeTicks / System.TimeSpan.TicksPerMillisecond}ms ago — deferring next");
                 return;
             }
 
@@ -3960,9 +4410,11 @@ namespace MozaPlugin.Telemetry
                     int primeSeq = unchecked((ushort)(seq + 0x200 + _configJsonGapCount));
                     MozaLog.Warn(
                         $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"passive wait expired ({gapAgeTicks / System.TimeSpan.TicksPerMillisecond}ms) — " +
                         $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4})");
                     SendSessionPrime(session, (ushort)primeSeq);
                     SendConfigJsonOpenRequest(session, (ushort)recoveryOpenSeq);
+                    _configJsonLastPrimeRetryUtcTicks = now;
                 }
                 catch (Exception ex)
                 {
@@ -3973,7 +4425,6 @@ namespace MozaPlugin.Telemetry
 
             if (_configJsonGapCount >= ConfigJsonGapRestartAt)
             {
-                long now = System.DateTime.UtcNow.Ticks;
                 if (now - _configJsonLastEscalationUtcTicks < ConfigJsonEscalationCooldownTicks)
                 {
                     MozaLog.Warn(
@@ -3983,6 +4434,7 @@ namespace MozaPlugin.Telemetry
                 }
                 _configJsonLastEscalationUtcTicks = now;
                 _configJsonGapCount = 0;
+                _configJsonLastPrimeRetryUtcTicks = 0;
                 MozaLog.Warn(
                     $"[Moza] {tag} configJson recovery escalation: " +
                     "no cached state and prime+open-request didn't recover the burst — " +
@@ -4519,6 +4971,20 @@ namespace MozaPlugin.Telemetry
         {
             public TelemetryFrameBuilder Builder = null!;
             public int TickInterval;
+            // Pristine copy of the tier's channels as set up by the Profile
+            // setter, BEFORE SortTierChannelsByCatalogIdx mutated them.
+            // ApplySubscription resets tier.Channels from this on each call
+            // so the filter sees the full channel set every time and can
+            // pick up additions from a recently-updated catalog. Without
+            // this, an early ApplySubscription against a stale/partial
+            // catalog would strip channels permanently — verified 2026-05-15
+            // post-dashboard-switch where the wheel sends SR catalog over
+            // ~1.2s after the Stop+Start cycle, but plugin's first
+            // ApplySubscription fired with Mono's catalog still in place.
+            public System.Collections.Generic.List<ChannelDefinition>? OriginalChannels;
+            // Pristine TotalBits/TotalBytes paired with OriginalChannels.
+            public int OriginalTotalBits;
+            public int OriginalTotalBytes;
         }
     }
 }
