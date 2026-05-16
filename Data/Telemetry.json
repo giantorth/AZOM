@@ -611,7 +611,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.FuelPercent",
-      "simhub_scale": 0.01,
+      "simhub_scale": 1.0,
       "simhub_field": "FuelPercent",
       "is_visible": true
     },
@@ -1696,7 +1696,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearFrontLeft",
-      "simhub_scale": 0.01,
+      "simhub_scale": 1.0,
       "simhub_field": "TyreWearFrontLeft",
       "is_visible": true
     },
@@ -1720,7 +1720,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearFrontRight",
-      "simhub_scale": 0.01,
+      "simhub_scale": 1.0,
       "simhub_field": "TyreWearFrontRight",
       "is_visible": true
     },
@@ -1744,7 +1744,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearRearLeft",
-      "simhub_scale": 0.01,
+      "simhub_scale": 1.0,
       "simhub_field": "TyreWearRearLeft",
       "is_visible": true
     },
@@ -1768,7 +1768,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearRearRight",
-      "simhub_scale": 0.01,
+      "simhub_scale": 1.0,
       "simhub_field": "TyreWearRearRight",
       "is_visible": true
     },
@@ -3177,7 +3177,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TrackPositionPercent",
-      "simhub_property_scale": 100,
+      "simhub_scale": 100,
       "is_visible": true
     },
     {
