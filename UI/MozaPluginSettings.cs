@@ -217,6 +217,13 @@ namespace MozaPlugin
         //       seed from the flat field (which survives ClearLegacyAfterMigration),
         //       and reseeds every profile's dash/ambient/gearshift baselines from
         //       _settings flat fields when still sentinel. Idempotent.
+        //   8 = wheel sleep-light settings (mode/timeout/speed/color) moved off
+        //       the per-game-per-wheel overlay onto WheelSleepByPageGuid (one
+        //       record per wheel, shared across profiles). Sleep behavior is a
+        //       firmware preference, not a per-game decision. Migration drains
+        //       from WheelOverride.WheelSleep* (now captured via LegacyJsonFields),
+        //       MozaProfile.WheelSleep* baseline (now captured via JsonExtensionData
+        //       on MozaProfile), and the _settings.WheelSleep* flat fields.
         public int SettingsSchemaVersion { get; set; } = 0;
 
         // Per-wheel-page mzdash folder library. Keyed by SimHub page DescriptorUniqueId
@@ -239,6 +246,13 @@ namespace MozaPlugin
         // re-pick the same era for every profile.
         public Dictionary<Guid, int> WheelTelemetryEraByPageGuid { get; set; }
             = new Dictionary<Guid, int>();
+
+        // Per-wheel-page sleep-light settings (firmware preference, not per-game).
+        // Schema v8 moved these off WheelOverride / MozaProfile baseline. Each
+        // entry holds mode / timeout (minutes) / speed (ms) / packed RGB color.
+        // Absence = wheel keeps its currently-stored value.
+        public Dictionary<Guid, WheelSleepSettings> WheelSleepByPageGuid { get; set; }
+            = new Dictionary<Guid, WheelSleepSettings>();
 
         // ===== Dashboard Telemetry =====
         public bool TelemetryEnabled { get; set; } = false;
@@ -381,6 +395,33 @@ namespace MozaPlugin
             DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
         public Dictionary<string, PerWheelSlot> PerWheelSlots { get; set; }
             = new Dictionary<string, PerWheelSlot>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Per-wheel-page sleep-light bundle stored on
+    /// <see cref="MozaPluginSettings.WheelSleepByPageGuid"/>. Wraps the
+    /// four wheel sleep-light fields into one dict-value so the JSON shape
+    /// stays compact and adding a future field doesn't require a new dict.
+    /// All fields use -1 (or null for the color array) as the "not set"
+    /// sentinel, matching <see cref="WheelOverride"/> convention.
+    /// </summary>
+    public sealed class WheelSleepSettings
+    {
+        public int Mode { get; set; } = -1;          // cmd 0x20 mode enum
+        public int TimeoutMin { get; set; } = -1;    // cmd 0x21 BE u16 minutes
+        public int SpeedMs { get; set; } = -1;       // cmd 0x22 BE u16 ms
+        public int[]? Color { get; set; }            // packed R<<16|G<<8|B (single)
+
+        public WheelSleepSettings Clone()
+        {
+            return new WheelSleepSettings
+            {
+                Mode = Mode,
+                TimeoutMin = TimeoutMin,
+                SpeedMs = SpeedMs,
+                Color = Color != null ? (int[])Color.Clone() : null,
+            };
+        }
     }
 
     /// <summary>

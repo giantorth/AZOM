@@ -36,10 +36,10 @@ namespace MozaPlugin
         public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
         public int WheelButtonsIdleSpeedMs { get; set; } = -1;
         public int WheelKnobIdleSpeedMs { get; set; } = -1;
-        public int WheelSleepMode { get; set; } = -1;
-        public int WheelSleepTimeoutMin { get; set; } = -1;
-        public int WheelSleepSpeedMs { get; set; } = -1;
-        public int[]? WheelSleepColor { get; set; }                 // packed [1]
+        // NOTE: WheelSleep* (mode / timeout / speed / color) moved to
+        // MozaPluginSettings.WheelSleepByPageGuid in schema v8 — sleep is a
+        // firmware preference, not a per-game-per-wheel decision. Legacy
+        // values get drained via LegacyJsonFields during migration.
 
         // Brightness (-1 = use profile baseline)
         public int WheelRpmBrightness { get; set; } = -1;
@@ -90,10 +90,6 @@ namespace MozaPlugin
                 WheelTelemetryIdleSpeedMs = WheelTelemetryIdleSpeedMs,
                 WheelButtonsIdleSpeedMs = WheelButtonsIdleSpeedMs,
                 WheelKnobIdleSpeedMs = WheelKnobIdleSpeedMs,
-                WheelSleepMode = WheelSleepMode,
-                WheelSleepTimeoutMin = WheelSleepTimeoutMin,
-                WheelSleepSpeedMs = WheelSleepSpeedMs,
-                WheelSleepColor = WheelSleepColor != null ? (int[])WheelSleepColor.Clone() : null,
                 WheelRpmBrightness = WheelRpmBrightness,
                 WheelButtonsBrightness = WheelButtonsBrightness,
                 WheelFlagsBrightness = WheelFlagsBrightness,
@@ -181,6 +177,14 @@ namespace MozaPlugin
         [JsonIgnore]
         public override Control ProfileContentControl => null!;
 
+        // Captures pre-schema-v8 JSON keys that no longer exist on this class
+        // (e.g. WheelSleepMode / WheelSleepTimeoutMin / WheelSleepSpeedMs /
+        // WheelSleepColor — moved to MozaPluginSettings.WheelSleepByPageGuid).
+        // Migration reads these into the per-wheel-page dict and clears the
+        // capture, so subsequent saves don't re-emit them.
+        [JsonExtensionData(WriteData = false)]
+        internal Dictionary<string, Newtonsoft.Json.Linq.JToken>? LegacyJsonFields;
+
         // ===== Base/Motor settings (raw device values from MozaData) =====
         public int Limit { get; set; } = -1;               // raw = degrees / 2
         public int FfbStrength { get; set; } = -1;          // raw = percent * 10
@@ -217,10 +221,9 @@ namespace MozaPlugin
         public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
         public int WheelButtonsIdleSpeedMs { get; set; } = -1;
         public int WheelKnobIdleSpeedMs { get; set; } = -1;
-        public int WheelSleepMode { get; set; } = -1;
-        public int WheelSleepTimeoutMin { get; set; } = -1;
-        public int WheelSleepSpeedMs { get; set; } = -1;
-        public int[]? WheelSleepColor { get; set; }
+        // NOTE: WheelSleep* (mode / timeout / speed / color) moved to
+        // MozaPluginSettings.WheelSleepByPageGuid in schema v8 — see the
+        // baseline-shared LegacyJsonFields capture above.
         public int WheelRpmBrightness { get; set; } = -1;
         public int WheelButtonsBrightness { get; set; } = -1;
         public int WheelFlagsBrightness { get; set; } = -1;
@@ -362,10 +365,8 @@ namespace MozaPlugin
             WheelTelemetryIdleSpeedMs = p.WheelTelemetryIdleSpeedMs;
             WheelButtonsIdleSpeedMs = p.WheelButtonsIdleSpeedMs;
             WheelKnobIdleSpeedMs = p.WheelKnobIdleSpeedMs;
-            WheelSleepMode = p.WheelSleepMode;
-            WheelSleepTimeoutMin = p.WheelSleepTimeoutMin;
-            WheelSleepSpeedMs = p.WheelSleepSpeedMs;
-            WheelSleepColor = p.WheelSleepColor;
+            // WheelSleep* now lives on MozaPluginSettings.WheelSleepByPageGuid
+            // (per-wheel, shared across profiles) — not copied here.
             WheelRpmBrightness = p.WheelRpmBrightness; WheelButtonsBrightness = p.WheelButtonsBrightness;
             WheelFlagsBrightness = p.WheelFlagsBrightness;
 

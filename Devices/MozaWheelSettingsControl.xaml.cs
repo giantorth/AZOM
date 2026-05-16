@@ -946,14 +946,17 @@ namespace MozaPlugin.Devices
             _plugin.SaveSettings();
         }
 
-        // Sleep-light tab handlers.
+        // Sleep-light tab handlers. Sleep settings are per-wheel-page (shared
+        // across all profiles) — they're a firmware preference, not a per-game
+        // decision. UI mutates the dict entry directly via GetOrCreateActiveWheelSleep().
         private void WheelSleepModeCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents || _plugin == null) return;
             int val = WheelSleepModeCombo.SelectedIndex;
             if (val < 0) return;
             _data!.WheelIdleMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelSleepMode = val);
+            var sleep = _plugin.GetOrCreateActiveWheelSleep();
+            if (sleep != null) sleep.Mode = val;
             _plugin.WriteIfWheelDetected("wheel-idle-mode", val);
             UpdateSleepSpeedRowVisibility();
             _plugin.SaveSettings();
@@ -966,7 +969,8 @@ namespace MozaPlugin.Devices
             if (item?.Tag == null) return;
             if (!int.TryParse(item.Tag.ToString(), out int minutes)) return;
             _data!.WheelIdleTimeout = minutes;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelSleepTimeoutMin = minutes);
+            var sleep = _plugin.GetOrCreateActiveWheelSleep();
+            if (sleep != null) sleep.TimeoutMin = minutes;
             _plugin.WriteIfWheelDetected("wheel-idle-timeout", minutes);
             _plugin.SaveSettings();
         }
@@ -977,7 +981,8 @@ namespace MozaPlugin.Devices
             int ms = (int)System.Math.Round(e.NewValue);
             WheelSleepSpeedValue.Text = $"{ms} ms";
             _data!.WheelIdleSpeed = ms;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelSleepSpeedMs = ms);
+            var sleep = _plugin.GetOrCreateActiveWheelSleep();
+            if (sleep != null) sleep.SpeedMs = ms;
             int mode = _data.WheelIdleMode;
             if (mode >= 2)
                 _plugin.WriteArrayIfWheelDetected("wheel-idle-speed", BuildIdleSpeedPayload(mode, ms));
@@ -999,7 +1004,8 @@ namespace MozaPlugin.Devices
             _data.WheelIdleColor[2] = b;
             WheelSleepColorSwatch.Background = GetCachedBrush(r, g, b);
             int packed = (r << 16) | (g << 8) | b;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelSleepColor = new[] { packed });
+            var sleep = _plugin.GetOrCreateActiveWheelSleep();
+            if (sleep != null) sleep.Color = new[] { packed };
             _plugin.WriteColorIfWheelDetected("wheel-idle-color", r, g, b);
             _plugin.SaveSettings();
         }

@@ -3124,47 +3124,49 @@ namespace MozaPlugin
         /// </summary>
         private bool MigrateSettingsToSchemaV2()
         {
-            if (_settings == null || _settings.SettingsSchemaVersion >= 7)
+            if (_settings == null || _settings.SettingsSchemaVersion >= 8)
                 return false;
 
             var store = _settings.ProfileStore;
             var profiles = store?.Profiles?.Where(p => p != null).ToList()
                 ?? new List<MozaProfile>();
 
-            // ----- v4/v5/v6/v7: per-page dict seeding from flat fields. Hoisted
+            // ----- v4..v8: per-page dict seeding from flat fields. Hoisted
             // above the empty-profiles branch so that pre-refactor users
             // (no profiles in their JSON) still get their mzdash folder /
-            // telemetry-enabled / wheel-era values carried over from the
-            // flat _settings fields and per-UID dicts. Runs through v6
-            // (instead of just below v6) because the broken v6 short-circuit
-            // skipped these — users stuck at schema 6 need the repair pass.
+            // telemetry-enabled / wheel-era / sleep-light values carried over
+            // from the flat _settings fields, per-UID dicts, and (for sleep)
+            // profile baselines via JsonExtensionData. Runs through v7 so
+            // users stuck at the broken schema-6 short-circuit (and the
+            // schema-7 build that didn't yet move sleep) get the repair.
             // Each helper is idempotent (only fills missing entries / only
             // reads flat fields that survive ClearLegacyAfterMigration).
             // The per-overlay drain loops no-op cleanly on an empty profile list.
             bool ranV4Plus = false;
-            if (_settings.SettingsSchemaVersion < 7)
+            if (_settings.SettingsSchemaVersion < 8)
             {
                 ranV4Plus = true;
                 MigrateMzdashFolderToPerPage(profiles);
                 MigrateTelemetryEnabledToPerPage(profiles);
                 MigrateWheelEraToPerPage(profiles);
+                MigrateWheelSleepToPerPage(profiles);
             }
 
             if (profiles.Count == 0)
             {
                 // No profiles yet — InitProfileSystem will create a default in a
                 // moment and seed its baselines from the flat fields via
-                // SeedProfileBaselineFromFlatFields. Bump straight to v7 so the
-                // v6→v7 repair pass below doesn't also fire on the same launch.
-                _settings.SettingsSchemaVersion = 7;
+                // SeedProfileBaselineFromFlatFields. Bump straight to v8 so the
+                // v6/v7 repair pass below doesn't also fire on the same launch.
+                _settings.SettingsSchemaVersion = 8;
                 ClearLegacyAfterMigration();
-                MozaLog.Debug("[Moza] Schema v7: no profiles present, marking migrated (default profile will be seeded by InitProfileSystem)");
+                MozaLog.Debug("[Moza] Schema v8: no profiles present, marking migrated (default profile will be seeded by InitProfileSystem)");
                 return true;
             }
 
             if (_settings.SettingsSchemaVersion >= 3)
             {
-                // v3+ → v7 path. The per-page dicts above are the only data-
+                // v3+ → v8 path. The per-page dicts above are the only data-
                 // carrying step for users who already had profiles; the
                 // additional v7 repair (baseline reseed) runs unconditionally
                 // here so users stuck at the broken schema-6 short-circuit
@@ -3172,12 +3174,12 @@ namespace MozaPlugin
                 foreach (var profile in profiles)
                     SeedProfileBaselineFromFlatFields(profile);
 
-                _settings.SettingsSchemaVersion = 7;
+                _settings.SettingsSchemaVersion = 8;
                 ClearLegacyAfterMigration();
                 if (ranV4Plus)
-                    MozaLog.Info("[Moza] Schema v7 migration: moved mzdash folder + telemetry-enable + wheel-era to per-wheel-page dicts; reseeded profile baselines from flat fields where sentinel.");
+                    MozaLog.Info("[Moza] Schema v8 migration: moved mzdash folder + telemetry-enable + wheel-era + sleep-light to per-wheel-page dicts; reseeded profile baselines from flat fields where sentinel.");
                 else
-                    MozaLog.Info("[Moza] Schema v7 repair: reseeded profile baselines from flat fields where sentinel.");
+                    MozaLog.Info("[Moza] Schema v8 repair: reseeded profile baselines from flat fields where sentinel.");
                 return true;
             }
 
@@ -3247,6 +3249,20 @@ namespace MozaPlugin
                             profile.WheelOverridesByPageGuid[pageGuid] = ov;
                         }
                         MergeSlotIntoOverlay(slot, ov);
+                    }
+
+                    // Schema v8: sleep-light bundle lives on the per-page dict
+                    // (shared across profiles), not in the overlay. Merge the
+                    // slot's sleep values into the dict keyed by this page GUID.
+                    if (slot.WheelSleepMode >= 0 || slot.WheelSleepTimeoutMin >= 0
+                        || slot.WheelSleepSpeedMs >= 0 || slot.WheelSleepColor != null)
+                    {
+                        var bundle = GetOrCreateSleepBundle(pageGuid);
+                        if (bundle.Mode       < 0 && slot.WheelSleepMode       >= 0) bundle.Mode       = slot.WheelSleepMode;
+                        if (bundle.TimeoutMin < 0 && slot.WheelSleepTimeoutMin >= 0) bundle.TimeoutMin = slot.WheelSleepTimeoutMin;
+                        if (bundle.SpeedMs    < 0 && slot.WheelSleepSpeedMs    >= 0) bundle.SpeedMs    = slot.WheelSleepSpeedMs;
+                        if (bundle.Color == null && slot.WheelSleepColor != null)
+                            bundle.Color = (int[])slot.WheelSleepColor.Clone();
                     }
                     slotsCount++;
                 }
@@ -3377,11 +3393,9 @@ namespace MozaPlugin
                     if (ov.WheelTelemetryIdleSpeedMs < 0) ov.WheelTelemetryIdleSpeedMs = _settings.WheelTelemetryIdleSpeedMs;
                     if (ov.WheelButtonsIdleSpeedMs   < 0) ov.WheelButtonsIdleSpeedMs   = _settings.WheelButtonsIdleSpeedMs;
                     if (ov.WheelKnobIdleSpeedMs      < 0) ov.WheelKnobIdleSpeedMs      = _settings.WheelKnobIdleSpeedMs;
-                    if (ov.WheelSleepMode          < 0) ov.WheelSleepMode          = _settings.WheelSleepMode;
-                    if (ov.WheelSleepTimeoutMin    < 0) ov.WheelSleepTimeoutMin    = _settings.WheelSleepTimeoutMin;
-                    if (ov.WheelSleepSpeedMs       < 0) ov.WheelSleepSpeedMs       = _settings.WheelSleepSpeedMs;
-                    if (ov.WheelSleepColor         == null && _settings.WheelSleepColor != null)
-                        ov.WheelSleepColor = (int[])_settings.WheelSleepColor.Clone();
+                    // WheelSleep* is no longer on the overlay — handled by
+                    // MigrateWheelSleepToPerPage above (which seeds the
+                    // per-wheel-page dict directly from _settings flat fields).
                     if (ov.WheelRpmBrightness      < 0) ov.WheelRpmBrightness      = _settings.WheelRpmBrightness;
                     if (ov.WheelButtonsBrightness  < 0) ov.WheelButtonsBrightness  = _settings.WheelButtonsBrightness;
                     if (ov.WheelFlagsBrightness    < 0) ov.WheelFlagsBrightness    = _settings.WheelFlagsBrightness;
@@ -3413,20 +3427,21 @@ namespace MozaPlugin
                 }
             }
 
-            // v4/v5/v6 step: per-wheel-page dict seeding (folder + enable + era).
+            // v4..v8 step: per-wheel-page dict seeding (folder + enable + era + sleep).
             // Re-run unconditionally here — the hoisted call at the top happens
             // BEFORE the legacy-era-encoding drain above sets
             // `_settings.TelemetryWheelEra` from `TelemetryFirmwareEraLegacy` /
             // `TelemetryProtocolVersion`, so the era helper needs a second pass
-            // to pick that up. Each helper is idempotent (folder/enable flat
+            // to pick that up. The other helpers are idempotent (their flat
             // fields are already cleared, so those become no-ops).
             MigrateMzdashFolderToPerPage(profiles);
             MigrateTelemetryEnabledToPerPage(profiles);
             MigrateWheelEraToPerPage(profiles);
+            MigrateWheelSleepToPerPage(profiles);
 
-            _settings.SettingsSchemaVersion = 7;
+            _settings.SettingsSchemaVersion = 8;
             MozaLog.Info(
-                $"[Moza] Schema v7 migration: PerWheelSlots={slotsCount}, " +
+                $"[Moza] Schema v8 migration: PerWheelSlots={slotsCount}, " +
                 $"ChannelMappings={channelMappingsCount}, TelemetryByUid={uidSlotCount}, " +
                 $"MzdashFolderByUid={folderCount} → applied across {profiles.Count} profile(s); " +
                 $"flat-field seeding done");
@@ -3472,6 +3487,151 @@ namespace MozaPlugin
             // Gearshift.
             if (profile.GearshiftVibrateOnNeutral < 0) profile.GearshiftVibrateOnNeutral = _settings.GearshiftVibrateOnNeutral ? 1 : 0;
             if (profile.GearshiftDebounceMs       < 0) profile.GearshiftDebounceMs       = _settings.GearshiftDebounceMs;
+        }
+
+        /// <summary>
+        /// Schema v8 step: move wheel sleep-light settings (mode / timeout /
+        /// speed / color) off the per-game-per-wheel overlay onto
+        /// <see cref="MozaPluginSettings.WheelSleepByPageGuid"/>. Sleep is a
+        /// firmware preference tied to the wheel, not the game — making it
+        /// per-(game × wheel) would force users to copy the same value to
+        /// every profile. First non-sentinel value per page-GUID wins.
+        ///
+        /// Drains from three sources:
+        ///   1. <see cref="WheelOverride.LegacyJsonFields"/> "WheelSleepMode"
+        ///      / "WheelSleepTimeoutMin" / "WheelSleepSpeedMs" / "WheelSleepColor"
+        ///      keys on every overlay across all profiles.
+        ///   2. <see cref="MozaProfile.LegacyJsonFields"/> same keys on the
+        ///      profile baseline. Applied universally to every known wheel
+        ///      page (single-wheel users will see the same values everywhere).
+        ///   3. <see cref="MozaPluginSettings.WheelSleepMode"/> etc. flat
+        ///      fields. Applied universally same as the profile baseline.
+        /// </summary>
+        private void MigrateWheelSleepToPerPage(List<MozaProfile> profiles)
+        {
+            if (_settings == null) return;
+            if (_settings.WheelSleepByPageGuid == null)
+                _settings.WheelSleepByPageGuid = new Dictionary<Guid, WheelSleepSettings>();
+
+            // 1. Drain pre-v8 per-overlay sleep values from LegacyJsonFields.
+            //    First non-sentinel value per page-guid wins.
+            foreach (var profile in profiles)
+            {
+                if (profile.WheelOverridesByPageGuid == null) continue;
+                foreach (var kvp in profile.WheelOverridesByPageGuid)
+                {
+                    var ov = kvp.Value;
+                    if (ov?.LegacyJsonFields == null) continue;
+                    var bundle = GetOrCreateSleepBundle(kvp.Key);
+                    DrainSleepKeysInto(ov.LegacyJsonFields, bundle);
+                    if (ov.LegacyJsonFields.Count == 0) ov.LegacyJsonFields = null;
+                }
+            }
+
+            // 2. Drain pre-v8 profile-baseline sleep values from
+            //    MozaProfile.LegacyJsonFields. Applies universally (same value
+            //    on every known wheel page) since the baseline wasn't keyed.
+            foreach (var profile in profiles)
+            {
+                if (profile.LegacyJsonFields == null) continue;
+                var staged = new WheelSleepSettings();
+                bool any = DrainSleepKeysInto(profile.LegacyJsonFields, staged);
+                if (any) SeedSleepUniversally(staged);
+                if (profile.LegacyJsonFields.Count == 0) profile.LegacyJsonFields = null;
+            }
+
+            // 3. Seed every known wheel page GUID from the flat fields when
+            //    not yet set. Single-wheel users get their settings preserved.
+            var flat = new WheelSleepSettings
+            {
+                Mode = _settings.WheelSleepMode,
+                TimeoutMin = _settings.WheelSleepTimeoutMin,
+                SpeedMs = _settings.WheelSleepSpeedMs,
+                Color = _settings.WheelSleepColor,
+            };
+            if (flat.Mode >= 0 || flat.TimeoutMin >= 0 || flat.SpeedMs >= 0 || flat.Color != null)
+                SeedSleepUniversally(flat);
+
+            // Clear the flat fields so they don't re-serialize stale values.
+            _settings.WheelSleepMode = -1;
+            _settings.WheelSleepTimeoutMin = -1;
+            _settings.WheelSleepSpeedMs = -1;
+            _settings.WheelSleepColor = null;
+        }
+
+        /// <summary>
+        /// Helper for <see cref="MigrateWheelSleepToPerPage"/>: pull
+        /// WheelSleep* keys out of a LegacyJsonFields dict into a bundle. Each
+        /// field is merged only if the bundle still has the sentinel value
+        /// (so the first non-sentinel value wins across multiple drain calls).
+        /// Returns true iff any field was actually populated.
+        /// </summary>
+        private static bool DrainSleepKeysInto(
+            Dictionary<string, Newtonsoft.Json.Linq.JToken> legacy,
+            WheelSleepSettings bundle)
+        {
+            bool any = false;
+            if (bundle.Mode < 0 && legacy.TryGetValue("WheelSleepMode", out var mTok) && mTok != null)
+            {
+                try { var v = mTok.ToObject<int>(); if (v >= 0) { bundle.Mode = v; any = true; } } catch { }
+            }
+            if (bundle.TimeoutMin < 0 && legacy.TryGetValue("WheelSleepTimeoutMin", out var tTok) && tTok != null)
+            {
+                try { var v = tTok.ToObject<int>(); if (v >= 0) { bundle.TimeoutMin = v; any = true; } } catch { }
+            }
+            if (bundle.SpeedMs < 0 && legacy.TryGetValue("WheelSleepSpeedMs", out var sTok) && sTok != null)
+            {
+                try { var v = sTok.ToObject<int>(); if (v >= 0) { bundle.SpeedMs = v; any = true; } } catch { }
+            }
+            if (bundle.Color == null && legacy.TryGetValue("WheelSleepColor", out var cTok) && cTok != null)
+            {
+                try { var v = cTok.ToObject<int[]>(); if (v != null && v.Length > 0) { bundle.Color = v; any = true; } } catch { }
+            }
+            legacy.Remove("WheelSleepMode");
+            legacy.Remove("WheelSleepTimeoutMin");
+            legacy.Remove("WheelSleepSpeedMs");
+            legacy.Remove("WheelSleepColor");
+            return any;
+        }
+
+        /// <summary>
+        /// Get-or-create a sleep bundle for the given page GUID inside
+        /// <see cref="MozaPluginSettings.WheelSleepByPageGuid"/>. Used by
+        /// <see cref="MigrateWheelSleepToPerPage"/>.
+        /// </summary>
+        private WheelSleepSettings GetOrCreateSleepBundle(Guid pageGuid)
+        {
+            if (!_settings!.WheelSleepByPageGuid.TryGetValue(pageGuid, out var bundle) || bundle == null)
+            {
+                bundle = new WheelSleepSettings();
+                _settings.WheelSleepByPageGuid[pageGuid] = bundle;
+            }
+            return bundle;
+        }
+
+        /// <summary>
+        /// Seed every known wheel page GUID's sleep bundle with values from the
+        /// given <paramref name="staged"/> bundle when the destination slot is
+        /// still at its sentinel. Used by <see cref="MigrateWheelSleepToPerPage"/>
+        /// to apply profile-baseline / flat-field values universally.
+        /// </summary>
+        private void SeedSleepUniversally(WheelSleepSettings staged)
+        {
+            void Seed(Guid pageGuid)
+            {
+                var dst = GetOrCreateSleepBundle(pageGuid);
+                if (dst.Mode < 0 && staged.Mode >= 0)             dst.Mode       = staged.Mode;
+                if (dst.TimeoutMin < 0 && staged.TimeoutMin >= 0) dst.TimeoutMin = staged.TimeoutMin;
+                if (dst.SpeedMs < 0 && staged.SpeedMs >= 0)       dst.SpeedMs    = staged.SpeedMs;
+                if (dst.Color == null && staged.Color != null)    dst.Color      = (int[])staged.Color.Clone();
+            }
+            foreach (var (prefix, _, _) in WheelModelInfo.KnownModels)
+            {
+                var guidStr = MozaDeviceConstants.ResolveWheelGuid(prefix);
+                if (Guid.TryParse(guidStr, out var pageGuid)) Seed(pageGuid);
+            }
+            if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var gg)) Seed(gg);
+            if (Guid.TryParse(MozaDeviceConstants.WheelOldProtoGuid, out var og)) Seed(og);
         }
 
         /// <summary>
@@ -3705,10 +3865,8 @@ namespace MozaPlugin
             if (slot.WheelTelemetryIdleSpeedMs >= 0) ov.WheelTelemetryIdleSpeedMs = slot.WheelTelemetryIdleSpeedMs;
             if (slot.WheelButtonsIdleSpeedMs   >= 0) ov.WheelButtonsIdleSpeedMs   = slot.WheelButtonsIdleSpeedMs;
             if (slot.WheelKnobIdleSpeedMs      >= 0) ov.WheelKnobIdleSpeedMs      = slot.WheelKnobIdleSpeedMs;
-            if (slot.WheelSleepMode         >= 0) ov.WheelSleepMode         = slot.WheelSleepMode;
-            if (slot.WheelSleepTimeoutMin   >= 0) ov.WheelSleepTimeoutMin   = slot.WheelSleepTimeoutMin;
-            if (slot.WheelSleepSpeedMs      >= 0) ov.WheelSleepSpeedMs      = slot.WheelSleepSpeedMs;
-            if (slot.WheelSleepColor        != null) ov.WheelSleepColor     = (int[])slot.WheelSleepColor.Clone();
+            // WheelSleep* is migrated by the caller into
+            // MozaPluginSettings.WheelSleepByPageGuid (not the overlay).
             if (slot.WheelRpmBrightness     >= 0) ov.WheelRpmBrightness     = slot.WheelRpmBrightness;
             if (slot.WheelButtonsBrightness >= 0) ov.WheelButtonsBrightness = slot.WheelButtonsBrightness;
             if (slot.WheelFlagsBrightness   >= 0) ov.WheelFlagsBrightness   = slot.WheelFlagsBrightness;
@@ -3818,10 +3976,14 @@ namespace MozaPlugin
             int idleSpeed      = Eff(ov?.WheelTelemetryIdleSpeedMs ?? -1, profile.WheelTelemetryIdleSpeedMs);
             int btnIdleSpeed   = Eff(ov?.WheelButtonsIdleSpeedMs ?? -1, profile.WheelButtonsIdleSpeedMs);
             int knobIdleSpeed  = Eff(ov?.WheelKnobIdleSpeedMs ?? -1, profile.WheelKnobIdleSpeedMs);
-            int sleepMode      = Eff(ov?.WheelSleepMode ?? -1, profile.WheelSleepMode);
-            int sleepTimeout   = Eff(ov?.WheelSleepTimeoutMin ?? -1, profile.WheelSleepTimeoutMin);
-            int sleepSpeed     = Eff(ov?.WheelSleepSpeedMs ?? -1, profile.WheelSleepSpeedMs);
-            int[]? sleepColor  = EffArr(ov?.WheelSleepColor, profile.WheelSleepColor);
+            // Sleep settings: per-wheel-page dict on MozaPluginSettings, shared
+            // across profiles (schema v8). Null bundle = no saved value, leave
+            // the wheel's currently-stored sleep config alone.
+            var sleepBundle    = ActiveWheelSleep;
+            int sleepMode      = sleepBundle?.Mode ?? -1;
+            int sleepTimeout   = sleepBundle?.TimeoutMin ?? -1;
+            int sleepSpeed     = sleepBundle?.SpeedMs ?? -1;
+            int[]? sleepColor  = sleepBundle?.Color;
             int rpmBri         = Eff(ov?.WheelRpmBrightness ?? -1, profile.WheelRpmBrightness);
             int btnBri         = Eff(ov?.WheelButtonsBrightness ?? -1, profile.WheelButtonsBrightness);
             int flagsBri       = Eff(ov?.WheelFlagsBrightness ?? -1, profile.WheelFlagsBrightness);
@@ -4363,6 +4525,44 @@ namespace MozaPlugin
                     _settings.WheelMzdashFolderByPageGuid = new Dictionary<Guid, string>();
                 _settings.WheelMzdashFolderByPageGuid[g.Value] = value ?? "";
             }
+        }
+
+        /// <summary>
+        /// Sleep-light bundle for the currently-identified wheel page. Sourced
+        /// from <see cref="MozaPluginSettings.WheelSleepByPageGuid"/> — shared
+        /// across all profiles for the same wheel (sleep is a firmware
+        /// preference, not per-game). Returns null when no wheel has
+        /// identified yet or the dict has no entry; callers should treat that
+        /// as "leave the wheel's currently-stored value alone".
+        /// </summary>
+        internal WheelSleepSettings? ActiveWheelSleep
+        {
+            get
+            {
+                var g = GetCurrentWheelPageGuid();
+                if (!g.HasValue || _settings?.WheelSleepByPageGuid == null) return null;
+                return _settings.WheelSleepByPageGuid.TryGetValue(g.Value, out var v) ? v : null;
+            }
+        }
+
+        /// <summary>
+        /// Get or create the sleep-light bundle for the currently-identified
+        /// wheel page. Returns null only when no wheel has been identified
+        /// (no page GUID yet). UI handlers use this to commit per-field
+        /// edits without re-reading the dict each time.
+        /// </summary>
+        internal WheelSleepSettings? GetOrCreateActiveWheelSleep()
+        {
+            var g = GetCurrentWheelPageGuid();
+            if (!g.HasValue || _settings == null) return null;
+            if (_settings.WheelSleepByPageGuid == null)
+                _settings.WheelSleepByPageGuid = new Dictionary<Guid, WheelSleepSettings>();
+            if (!_settings.WheelSleepByPageGuid.TryGetValue(g.Value, out var bundle) || bundle == null)
+            {
+                bundle = new WheelSleepSettings();
+                _settings.WheelSleepByPageGuid[g.Value] = bundle;
+            }
+            return bundle;
         }
 
         /// <summary>
