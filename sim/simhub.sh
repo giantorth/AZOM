@@ -47,16 +47,21 @@ start_simhub() {
 }
 
 graceful_close() {
-    # Send Alt+F4 to SimHub's X window so WPF runs Closing handlers and
-    # disposes NotifyIcon — avoids stale tray icon left by SIGTERM.
+    # Send Escape twice to dismiss any modal/popup, then Alt+F4 to SimHub's X
+    # window so WPF runs Closing handlers and disposes NotifyIcon — avoids
+    # stale tray icon left by SIGTERM.
     command -v xdotool >/dev/null 2>&1 || return 1
     local wins
     wins=$(xdotool search --name 'SimHub' 2>/dev/null) || return 1
     [[ -z "$wins" ]] && return 1
-    echo "Requesting graceful close via xdotool (Alt+F4)..."
+    echo "Requesting graceful close via xdotool (Escape x2, Alt+F4)..."
     local w
     for w in $wins; do
-        xdotool windowactivate --sync "$w" key --window "$w" alt+F4 2>/dev/null || true
+        xdotool windowactivate --sync "$w" key --window "$w" Escape 2>/dev/null || true
+        sleep 0.1
+        xdotool key --window "$w" Escape 2>/dev/null || true
+        sleep 0.1
+        xdotool key --window "$w" alt+F4 2>/dev/null || true
     done
     for _ in {1..30}; do
         is_running || return 0
