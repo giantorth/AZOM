@@ -60,7 +60,6 @@ namespace MozaPlugin
         internal void ApplyTelemetrySettings() => _dashboardBindingCoordinator.ApplyTelemetrySettings();
         internal void RestartTelemetry() => _dashboardBindingCoordinator.RestartTelemetry();
         internal bool ApplyTelemetryDashboardFromProfile(MozaProfile profile) => _dashboardBindingCoordinator.ApplyTelemetryDashboardFromProfile(profile);
-        internal void OnActiveDashboardChanged() => _dashboardBindingCoordinator.OnActiveDashboardChanged();
         internal void OnDashboardSwitched(uint slot) => _dashboardBindingCoordinator.OnDashboardSwitched(slot);
         internal void OnDashboardSwitched() => _dashboardBindingCoordinator.OnDashboardSwitched();
         internal void SetTelemetryEnabled(bool enabled) => _dashboardBindingCoordinator.SetTelemetryEnabled(enabled);
@@ -1144,6 +1143,7 @@ namespace MozaPlugin
 
         // Dashboard binding state moved to DashboardBindingCoordinator.
         internal bool IsPendingDashboardApply => _dashboardBindingCoordinator?.IsPendingDashboardApply ?? false;
+        internal string? PendingDashboardApplyDescription => _dashboardBindingCoordinator?.PendingDashboardApplyDescription;
 
         private void TryConnect()
         {

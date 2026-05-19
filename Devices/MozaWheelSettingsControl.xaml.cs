@@ -1057,7 +1057,12 @@ namespace MozaPlugin.Devices
                 {
                     for (int i = 0; i < TelemetryProfileCombo.Items.Count; i++)
                     {
-                        if (TelemetryProfileCombo.Items[i]?.ToString() == selectedName)
+                        // OrdinalIgnoreCase to match the rest of the dashboard
+                        // binding chain (DashboardBindingCoordinator key/name
+                        // lookups); a case mismatch between the saved profile
+                        // name and the wheel's ConfigJsonList entry used to
+                        // leave the combo stuck on the prior selection.
+                        if (string.Equals(TelemetryProfileCombo.Items[i]?.ToString(), selectedName, StringComparison.OrdinalIgnoreCase))
                         {
                             TelemetryProfileCombo.SelectedIndex = i;
                             break;
@@ -1115,7 +1120,12 @@ namespace MozaPlugin.Devices
                     ? "Switching dashboard… (post-emit silence)"
                     : "Connecting to wheel…";
             else if (pendingApply)
-                TelemetryStatusLabel.Text = $"Switching dashboard… — {framesSent} frames sent";
+            {
+                string? why = _plugin?.PendingDashboardApplyDescription;
+                TelemetryStatusLabel.Text = string.IsNullOrEmpty(why)
+                    ? $"Switching dashboard… — {framesSent} frames sent"
+                    : $"Switching dashboard… ({why}) — {framesSent} frames sent";
+            }
             else if (inCooldown)
                 TelemetryStatusLabel.Text = $"Switching dashboard… — {framesSent} frames sent";
             else
@@ -1260,7 +1270,7 @@ namespace MozaPlugin.Devices
                 _plugin.ActiveTelemetryProfileName = "";
                 _plugin.ActiveTelemetryMzdashPath = "";
                 _plugin.SaveSettings();
-                _plugin.OnActiveDashboardChanged();
+                _plugin.OnDashboardSwitched();
                 UpdateTelemetryProfileInfo();
                 if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
                 return;
@@ -1270,7 +1280,7 @@ namespace MozaPlugin.Devices
                 _plugin.ActiveTelemetryProfileName = selected;
                 _plugin.ActiveTelemetryMzdashPath = "";
                 _plugin.SaveSettings();
-                _plugin.OnActiveDashboardChanged();
+                _plugin.OnDashboardSwitched();
                 UpdateTelemetryProfileInfo();
                 if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
             }
@@ -1282,7 +1292,7 @@ namespace MozaPlugin.Devices
             _plugin.ActiveTelemetryProfileName = "";
             _plugin.ActiveTelemetryMzdashPath = "";
             _plugin.SaveSettings();
-            _plugin.OnActiveDashboardChanged();
+            _plugin.OnDashboardSwitched();
 
             using (_suppressor.Begin())
             {
@@ -1322,7 +1332,7 @@ namespace MozaPlugin.Devices
             _plugin.SaveSettings();
             // Hot-reload tier def on the existing session — mirrors PitHouse's
             // mid-game dash-change burst on session 0x01.
-            _plugin.OnActiveDashboardChanged();
+            _plugin.OnDashboardSwitched();
 
             using (_suppressor.Begin())
             {

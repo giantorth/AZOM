@@ -22,18 +22,66 @@ namespace MozaPlugin.Telemetry
         private readonly MozaSerialConnection _connection;
         private readonly DeviceDetectionState _detectionState;
 
-        // Profile-driven dashboard apply may defer until the wheel catalog arrives;
-        // PollStatus retries via TickPendingDashboardRetry until this clears or times out.
-        private string? _pendingProfileDashboardKey;
-        private long _pendingProfileDashboardKeyDeadlineTicks;
-        private static readonly TimeSpan PendingProfileKeyTimeout = TimeSpan.FromMinutes(5);
+        // ── Pending-apply state ──────────────────────────────────────────────
+        //
+        // All three fields below are guarded by _stateLock. They were
+        // previously bare reference/long fields with no synchronisation
+        // even though the writers run on three different threads:
+        //   - PollStatus timer thread (TickPendingDashboardRetry)
+        //   - Dispatcher / UI thread (manual OnDashboardSwitched* from
+        //     combo / load-mzdash / clear-mzdash)
+        //   - Profile-change thread (ApplyProfile → SetPendingDashboardKey)
+        // Under that race, a manual-click "clear" could be overwritten
+        // milliseconds later by a profile-event setter, leaving the
+        // system thinking a switch was still pending after the user had
+        // explicitly chosen something. The lock is held only for field
+        // operations; external calls (sender, plugin, ApplyTelemetrySettings)
+        // are made AFTER releasing the lock.
+        private readonly object _stateLock = new object();
+
+        /// <summary>Immutable snapshot of an in-flight profile-driven dashboard
+        /// apply that deferred because the wheel catalog / sender state wasn't
+        /// ready. PollStatus retries via TickPendingDashboardRetry until the
+        /// apply succeeds, the profile changes, the user manually switches, or
+        /// the deadline elapses. (Plain class rather than a record because
+        /// the project targets net48 and records/`with` need IsExternalInit.)</summary>
+        private sealed class PendingApply
+        {
+            public string Key { get; }
+            public DateTime DeadlineUtc { get; }
+            public int RetryCount { get; }
+            public DateTime LastRetryWarnUtc { get; }
+
+            public PendingApply(string key, DateTime deadlineUtc, int retryCount, DateTime lastRetryWarnUtc)
+            {
+                Key = key;
+                DeadlineUtc = deadlineUtc;
+                RetryCount = retryCount;
+                LastRetryWarnUtc = lastRetryWarnUtc;
+            }
+
+            public PendingApply With(int? retryCount = null, DateTime? lastRetryWarnUtc = null)
+                => new PendingApply(
+                    Key,
+                    DeadlineUtc,
+                    retryCount ?? RetryCount,
+                    lastRetryWarnUtc ?? LastRetryWarnUtc);
+        }
+
+        private PendingApply? _pending;
 
         // Per-plugin-instance memo: avoid re-emitting kind=4 for an already-applied
         // key. Cleared on plugin reload and on ResetWheelDetection.
         private string? _lastAppliedDashboardKey;
 
-        // Throttle for "deferring (key=X): reason" log lines; only re-log on change.
+        // Throttle for "deferring (key=X): reason" log lines AND text for the
+        // UI status label while a pending apply is waiting. Independent of
+        // _pending so the very first defer from ApplyProfile (which happens
+        // BEFORE SetPendingDashboardKey is called) can dedupe its own log line.
         private string? _lastApplyDeferReason;
+
+        private static readonly TimeSpan PendingProfileKeyTimeout = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan RetryWarnInterval = TimeSpan.FromSeconds(30);
 
         public DashboardBindingCoordinator(
             MozaPlugin plugin,
@@ -47,17 +95,73 @@ namespace MozaPlugin.Telemetry
             _detectionState = detectionState;
         }
 
-        public bool IsPendingDashboardApply => _pendingProfileDashboardKey != null;
+        public bool IsPendingDashboardApply
+        {
+            get { lock (_stateLock) { return _pending != null; } }
+        }
+
+        /// <summary>Short description of why the pending profile-driven apply is
+        /// waiting, for the UI status label. Null when no apply is pending.</summary>
+        public string? PendingDashboardApplyDescription
+        {
+            get
+            {
+                lock (_stateLock)
+                {
+                    if (_pending == null) return null;
+                    return _lastApplyDeferReason;
+                }
+            }
+        }
 
         public void SetPendingDashboardKey(string key)
         {
-            _pendingProfileDashboardKey = key;
-            _pendingProfileDashboardKeyDeadlineTicks = DateTime.UtcNow.Add(PendingProfileKeyTimeout).Ticks;
+            var now = DateTime.UtcNow;
+            lock (_stateLock)
+            {
+                _pending = new PendingApply(key, now.Add(PendingProfileKeyTimeout), 0, now);
+            }
         }
 
-        public void ClearPendingDashboardKey() => _pendingProfileDashboardKey = null;
+        public void ClearPendingDashboardKey()
+        {
+            lock (_stateLock) { _pending = null; }
+        }
 
-        public void ClearLastAppliedDashboardKey() => _lastAppliedDashboardKey = null;
+        public void ClearLastAppliedDashboardKey()
+        {
+            lock (_stateLock) { _lastAppliedDashboardKey = null; }
+        }
+
+        // ── Lock-guarded helpers (call ONLY from outside _stateLock) ─────────
+
+        private string? GetLastAppliedKey()
+        {
+            lock (_stateLock) { return _lastAppliedDashboardKey; }
+        }
+
+        private void SetLastAppliedKey(string? key)
+        {
+            lock (_stateLock) { _lastAppliedDashboardKey = key; }
+        }
+
+        /// <summary>Record a defer reason for the log throttle / UI status.
+        /// Returns true if the reason changed and the caller should emit a
+        /// Debug log line.</summary>
+        private bool RecordDeferReason(string reason)
+        {
+            lock (_stateLock)
+            {
+                if (_lastApplyDeferReason == reason) return false;
+                _lastApplyDeferReason = reason;
+                return true;
+            }
+        }
+
+        private void ClearDeferReason()
+        {
+            lock (_stateLock) { _lastApplyDeferReason = null; }
+        }
 
         /// <summary>Apply telemetry settings from the active wheel overlay to the TelemetrySender.</summary>
         public void ApplyTelemetrySettings()
@@ -235,8 +339,9 @@ namespace MozaPlugin.Telemetry
             if (string.IsNullOrEmpty(key)) return true;
 
             // Per-plugin-instance no-op: kind=4 already emitted for this key.
-            if (_lastAppliedDashboardKey != null
-                && string.Equals(_lastAppliedDashboardKey, key, StringComparison.OrdinalIgnoreCase))
+            string? lastApplied = GetLastAppliedKey();
+            if (lastApplied != null
+                && string.Equals(lastApplied, key, StringComparison.OrdinalIgnoreCase))
             {
                 MozaLog.Debug("[Moza] ApplyTelemetryDashboardFromProfile: already applied " +
                               key + " in this plugin instance — no-op");
@@ -251,24 +356,18 @@ namespace MozaPlugin.Telemetry
             {
                 string reason = $"sender={(sender == null ? "null" : (sender.IsActive ? "Active" : "not-Active"))} " +
                                 $"cooldown={sender?.IsInSilenceCooldown}";
-                if (reason != _lastApplyDeferReason)
-                {
+                if (RecordDeferReason(reason))
                     MozaLog.Debug($"[Moza] ApplyTelemetryDashboardFromProfile deferring (key={key}): {reason}");
-                    _lastApplyDeferReason = reason;
-                }
                 return false;
             }
             if (state == null || state.ConfigJsonList == null || state.ConfigJsonList.Count == 0)
             {
                 string reason = $"state={(state == null ? "null" : $"listCount={state.ConfigJsonList?.Count ?? -1}")}";
-                if (reason != _lastApplyDeferReason)
-                {
+                if (RecordDeferReason("wheel state not yet available — " + reason))
                     MozaLog.Debug($"[Moza] ApplyTelemetryDashboardFromProfile deferring (key={key}): wheel state not yet available — {reason}");
-                    _lastApplyDeferReason = reason;
-                }
                 return false;
             }
-            _lastApplyDeferReason = null;
+            ClearDeferReason();
 
             // Resolve target dashboard name + branch-specific side data.
             string targetName;
@@ -362,7 +461,7 @@ namespace MozaPlugin.Telemetry
                         _plugin.PersistSettings();
                         OnDashboardSwitched((uint)slot);
                         _plugin.RaiseDashboardSelectionChangedInternal();
-                        _lastAppliedDashboardKey = key;
+                        SetLastAppliedKey(key);
                         return true;
                     }
                     MozaLog.Info($"[Moza] Profile dashboard '{targetName}' (slot {slot}) already bound ({bindEvidence}, no probe this instance, source: {sourceTag}); no wire action needed");
@@ -371,7 +470,7 @@ namespace MozaPlugin.Telemetry
                     _plugin.PersistSettings();
                     ApplyTelemetrySettings();
                     _plugin.RaiseDashboardSelectionChangedInternal();
-                    _lastAppliedDashboardKey = key;
+                    SetLastAppliedKey(key);
                     return true;
                 }
                 MozaLog.Info($"[Moza] Applying profile dashboard '{targetName}' via wheel slot {slot} (source: {sourceTag})");
@@ -380,7 +479,7 @@ namespace MozaPlugin.Telemetry
                 _plugin.PersistSettings();
                 OnDashboardSwitched((uint)slot);
                 _plugin.RaiseDashboardSelectionChangedInternal();
-                _lastAppliedDashboardKey = key;
+                SetLastAppliedKey(key);
                 return true;
             }
 
@@ -388,7 +487,7 @@ namespace MozaPlugin.Telemetry
             //   - wheel: not in ConfigJsonList → stop retrying.
             //   - file: local file exists → slotless restart; wheel keeps current binding.
             //   - file: local file missing AND no slot → leave current selection.
-            //   - builtin: slotless OnActiveDashboardChanged restarts against the named builtin.
+            //   - builtin: slotless OnDashboardSwitched restarts against the named builtin.
             if (key.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
             {
                 MozaLog.Info("[Moza] Profile dashboard '" + targetName +
@@ -410,7 +509,7 @@ namespace MozaPlugin.Telemetry
                 _plugin.PersistSettings();
                 OnDashboardSwitched();
                 _plugin.RaiseDashboardSelectionChangedInternal();
-                _lastAppliedDashboardKey = key;
+                SetLastAppliedKey(key);
                 return true;
             }
 
@@ -419,32 +518,16 @@ namespace MozaPlugin.Telemetry
             _plugin.ActiveTelemetryProfileName = targetName;
             _plugin.ActiveTelemetryMzdashPath = "";
             _plugin.PersistSettings();
-            OnActiveDashboardChanged();
+            OnDashboardSwitched();
             _plugin.RaiseDashboardSelectionChangedInternal();
-            _lastAppliedDashboardKey = key;
+            SetLastAppliedKey(key);
             return true;
-        }
-
-        public void OnActiveDashboardChanged()
-        {
-            // Manual action wins: abandon any pending profile-driven switch.
-            _pendingProfileDashboardKey = null;
-
-            var sender = _plugin.TelemetrySender;
-            if (sender != null && sender.Enabled)
-            {
-                MozaLog.Debug("[Moza] OnActiveDashboardChanged: scheduling Stop+Start pipeline cycle");
-                // Builtin-profile fallback path. Re-stage settings and cycle pipeline.
-                // Silence gate inside StartInner enforces the ~11s sess=0x09 wait.
-                ApplyTelemetrySettings();
-                sender.RestartForSwitch();
-            }
         }
 
         /// <summary>Slot-aware dashboard switch: emits FF kind=4, awaits echo, then Stop+Start.</summary>
         public void OnDashboardSwitched(uint slot)
         {
-            _pendingProfileDashboardKey = null;
+            ClearPendingDashboardKey();
 
             var sender = _plugin.TelemetrySender;
             if (sender != null && sender.Enabled)
@@ -461,13 +544,18 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Slot-less dashboard switch entry point. Used by file-mode and
-        /// builtin-fallback paths where ConfigJsonList doesn't expose a slot — no
-        /// FF kind=4; sender cycles Stop+Start so the new profile takes effect.
+        /// Slot-less dashboard switch entry point. Used by file-mode, builtin-
+        /// fallback paths where ConfigJsonList doesn't expose a slot, and by UI
+        /// handlers that change the active dashboard without a wheel slot index
+        /// (combo selection of "(none)" / a builtin name, custom-mzdash load,
+        /// clear-mzdash). No FF kind=4; sender cycles Stop+Start so the new
+        /// profile takes effect. The ~11s silence gate inside StartInner gives
+        /// the wheel time to settle its sess=0x09 dashboard-binding state.
         /// </summary>
         public void OnDashboardSwitched()
         {
-            _pendingProfileDashboardKey = null;
+            // Manual action wins: abandon any pending profile-driven switch.
+            ClearPendingDashboardKey();
 
             var sender = _plugin.TelemetrySender;
             if (sender != null && sender.Enabled)
@@ -614,40 +702,87 @@ namespace MozaPlugin.Telemetry
         /// <summary>
         /// PollStatus tick hook: retry a deferred profile-driven dashboard switch
         /// once the wheel catalog arrives. Stops retrying after
-        /// <see cref="PendingProfileKeyTimeout"/>.
+        /// <see cref="PendingProfileKeyTimeout"/>. Emits a Warn every
+        /// <see cref="RetryWarnInterval"/> (30s) so silent multi-minute waits
+        /// don't go unnoticed in the log.
         /// </summary>
         public void TickPendingDashboardRetry()
         {
-            if (_pendingProfileDashboardKey == null) return;
+            // Snapshot under lock — never touch _pending directly outside the lock.
+            PendingApply? snap;
+            lock (_stateLock) { snap = _pending; }
+            if (snap == null) return;
 
-            if (DateTime.UtcNow.Ticks > _pendingProfileDashboardKeyDeadlineTicks)
+            var now = DateTime.UtcNow;
+            if (now > snap.DeadlineUtc)
             {
-                MozaLog.Info("[Moza] Pending profile dashboard apply timed out (key=" +
-                             _pendingProfileDashboardKey + "); giving up");
-                _pendingProfileDashboardKey = null;
+                MozaLog.Warn("[Moza] Pending profile dashboard apply timed out after " +
+                             $"{PendingProfileKeyTimeout.TotalMinutes:F0} min and {snap.RetryCount} retries " +
+                             $"(key={snap.Key}); giving up — wheel did not advertise dashboards in time");
+                lock (_stateLock)
+                {
+                    // Only clear if it's still the same pending; a concurrent
+                    // SetPendingDashboardKey may have replaced it under us.
+                    if (ReferenceEquals(_pending, snap)) _pending = null;
+                }
                 return;
             }
 
             var profile = _plugin.Settings.ProfileStore?.CurrentProfile;
-            if (profile != null &&
-                string.Equals(profile.TelemetryDashboardKey, _pendingProfileDashboardKey, StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    if (ApplyTelemetryDashboardFromProfile(profile))
-                        _pendingProfileDashboardKey = null;
-                }
-                catch (Exception ex)
-                {
-                    MozaLog.Warn("[Moza] Pending dashboard apply retry threw: " + ex.Message);
-                    _pendingProfileDashboardKey = null;
-                }
-            }
-            else
+            if (profile == null ||
+                !string.Equals(profile.TelemetryDashboardKey, snap.Key, StringComparison.OrdinalIgnoreCase))
             {
                 // Profile changed under us — drop the stale pending key.
-                MozaLog.Debug($"[Moza] Pending profile dashboard apply abandoned — profile/key mismatch (pending={_pendingProfileDashboardKey}, current={(profile == null ? "null" : profile.TelemetryDashboardKey ?? "(empty)")})");
-                _pendingProfileDashboardKey = null;
+                MozaLog.Debug($"[Moza] Pending profile dashboard apply abandoned — profile/key mismatch " +
+                              $"(pending={snap.Key}, current={(profile == null ? "null" : profile.TelemetryDashboardKey ?? "(empty)")})");
+                lock (_stateLock)
+                {
+                    if (ReferenceEquals(_pending, snap)) _pending = null;
+                }
+                return;
+            }
+
+            bool applied;
+            try
+            {
+                applied = ApplyTelemetryDashboardFromProfile(profile);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn("[Moza] Pending dashboard apply retry threw: " + ex.Message);
+                lock (_stateLock)
+                {
+                    if (ReferenceEquals(_pending, snap)) _pending = null;
+                }
+                return;
+            }
+
+            lock (_stateLock)
+            {
+                // Concurrent writer may have superseded our snapshot — bail
+                // without mutating in that case.
+                if (!ReferenceEquals(_pending, snap)) return;
+
+                if (applied)
+                {
+                    _pending = null;
+                    return;
+                }
+
+                // Still deferring. Increment retry count and, if it's been
+                // RetryWarnInterval since the last warn, emit one. Don't spam
+                // every PollStatus tick — that's why the throttle exists.
+                int newCount = snap.RetryCount + 1;
+                if (now - snap.LastRetryWarnUtc >= RetryWarnInterval)
+                {
+                    MozaLog.Warn($"[Moza] Profile dashboard apply still pending after {newCount} retries " +
+                                 $"(key={snap.Key}, reason={_lastApplyDeferReason ?? "?"})");
+                    _pending = snap.With(retryCount: newCount, lastRetryWarnUtc: now);
+                }
+                else
+                {
+                    _pending = snap.With(retryCount: newCount);
+                }
             }
         }
     }

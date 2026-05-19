@@ -123,35 +123,28 @@ namespace MozaPlugin.Telemetry
         // Sess=0x09 retry + sess=0x02 engagement watchdog state moved to
         // SessionWatchdogManager. See Telemetry/Watchdog/SessionWatchdogManager.cs.
 
-        // Two switch-debounce gates. Static so they survive plugin instance
-        // recycle (game-switch reload) within one SimHub process.
-        // _lastStopUtcTicks: drives the ~11s silence wait in StartInner — the
-        //   wheel's sess=0x09 device-init won't fire without it.
-        // _lastSwitchEmittedUtcTicks: drives the UI cooldown + gates
-        //   SendDashboardSwitch against rapid double-click during restart.
-        // See docs/protocol/plugin/session-management.md.
-        private static long _lastStopUtcTicks;
-        private static long _lastSwitchEmittedUtcTicks;
-        private const int MinSilenceAfterSwitchMs = 11000;
+        // Two host-side silence gates (Stop→Start ~11s + post-switch UI
+        // cooldown) live in SilenceGate. The instance carries no per-gate
+        // state of its own — the timestamps are static on the helper class
+        // so they survive plugin recycle within the same SimHub process.
+        // See docs/protocol/plugin/session-management.md and the
+        // SilenceGate class doc-comment.
+        private readonly Lifecycle.SilenceGate _silenceGate;
 
-        // Hot-renegotiation cooldown: coalesce rapid double-clicks; the wheel
-        // tolerates kind=4 as close as 0 ms, so this is purely host-side debounce.
-        private const int HotMinSilenceAfterSwitchMs = 200;
+        // Hot-renegotiation burst state machine. When Enabled, SwitchToProfile
+        // keeps sessions 0x01/0x02/0x03 open and re-emits tier-def in place
+        // instead of Stop+11s+Start. See docs/protocol/tier-definition/hot-switch.md.
+        private readonly Lifecycle.HotSwitchCoordinator _hotSwitch
+            = new Lifecycle.HotSwitchCoordinator();
 
-        // When true, SwitchToProfile keeps sessions 0x01/0x02/0x03 open and
-        // re-emits tier-def in place instead of Stop+11s+Start. See feature flag
-        // in MozaPluginSettings.
-        public bool EnableHotRenegotiation { get; set; } = false;
-
-        // Pending tier-def re-emissions in the current hot-switch burst.
-        // See docs/protocol/tier-definition/hot-switch.md (re-emit picks up the
-        // wheel's latest END marker after a slow wheel push).
-        private int _pendingHotTierDefReemit;
-        private int _hotSwitchArmTickMs;
-        private int _lastHotEmissionTickMs;
-        private const int HotSwitchEmissionCount = 4;       // small=3, multi-pkg=13; 4 covers small with margin
-        private const int HotSwitchEmissionSpacingMs = 1000;
-        private const int HotSwitchMinFallbackMs = 1500;
+        /// <summary>Feature flag — when true, dashboard switches use the hot
+        /// path; when false, they cycle the full pipeline. Set from
+        /// <c>MozaPluginSettings.EnableHotRenegotiation</c>.</summary>
+        public bool EnableHotRenegotiation
+        {
+            get => _hotSwitch.Enabled;
+            set => _hotSwitch.Enabled = value;
+        }
 
         // Wheel-reported current dashboard slot — ground truth, parsed from
         // type-04 records on sess=0x02 b2h. See WheelSlotTracker for parsing
@@ -185,7 +178,7 @@ namespace MozaPlugin.Telemetry
         /// Stop+Start. The probe alone (kind=4 to current slot) does NOT cause
         /// the wheel to re-push its catalog.
         /// </summary>
-        internal bool HasCatalogResyncProbeFired => _lastCatalogResyncProbeUtcTicks != 0;
+        internal bool HasCatalogResyncProbeFired => _catalogResyncProbe.HasFired;
 
         // Tier-def binding completeness moved to TierDefinitionEmitter.
         internal bool IsTierDefFullyBound => _tierDefEmitter.IsTierDefFullyBound;
@@ -212,10 +205,10 @@ namespace MozaPlugin.Telemetry
 
         // Catalog re-sync probe — kind=4 to current slot tells the wheel to
         // re-init its dashboard binding and re-run the catalog advertise.
-        // Throttled to avoid switch storms.
-        private long _lastCatalogResyncProbeUtcTicks;
-        private const long CatalogResyncProbeMinIntervalTicks =
-            8000 * System.TimeSpan.TicksPerMillisecond;
+        // Throttle + has-fired state lives on the helper; emission logic
+        // stays in ScheduleCatalogResyncProbe below.
+        private readonly Lifecycle.CatalogResyncProbe _catalogResyncProbe
+            = new Lifecycle.CatalogResyncProbe();
 
         /// <summary>Drain window for queued kind=4 / one-shot frames before
         /// Stop's FlushPendingWrites discards the queue.</summary>
@@ -824,6 +817,7 @@ namespace MozaPlugin.Telemetry
         public TelemetrySender(MozaSerialConnection connection)
         {
             _connection = connection;
+            _silenceGate = new Lifecycle.SilenceGate(() => EnableHotRenegotiation);
             _watchdog = new SessionWatchdogManager(this);
             _slotTracker = new Display.WheelSlotTracker(this);
             _propertyPushQueue = new PropertyPushQueue(this);
@@ -869,7 +863,18 @@ namespace MozaPlugin.Telemetry
         // run Stop() then `new Timer()`; the losing thread's timer gets
         // orphaned but keeps OnTimerElapsed subscribed, multiplying the tick
         // rate for the lifetime of the session.
-        private int _startInProgress;
+        //
+        // Supersession model: a second Start() arriving while the first is
+        // mid-StartInner cancels the first's CancellationTokenSource so
+        // StartInner bails at its next gate, then waits on _startSemaphore
+        // for the first run's finally block to release. This replaces the
+        // earlier _startInProgress int + SpinWait.SpinUntil pattern which
+        // (a) burned ThreadPool workers for up to 10 s of busy-wait, and
+        // (b) reached into the in-progress run by setting _state=Idle from
+        // outside, mixing supersession with the Stop signal.
+        private readonly SemaphoreSlim _startSemaphore = new SemaphoreSlim(1, 1);
+        private CancellationTokenSource? _startCts;
+        private readonly object _startCtsLock = new object();
 
         // Flipped to 1 by Dispose() so Stop() / SendRpcCall() / handlers can
         // bail without touching disposed ManualResetEventSlim instances.
@@ -907,36 +912,64 @@ namespace MozaPlugin.Telemetry
                     "(persistent-sender reuse path)");
                 return;
             }
-            if (Interlocked.CompareExchange(ref _startInProgress, 1, 0) != 0)
+
+            // Supersede any in-progress Start: cancel its CTS so StartInner
+            // bails at its next gate, then queue behind it on the semaphore.
+            // The prior run owns the disposal of its own CTS; we just signal.
+            CancellationTokenSource? prior;
+            lock (_startCtsLock) { prior = _startCts; }
+            if (prior != null)
             {
-                // A second Start() landed while the first is still inside StartInner.
-                // Force the in-progress run to drop out of any "is running" check by
-                // returning to Idle while we wait for it to release _startInProgress.
-                TransitionTo(TelemetryState.Idle, "Start() superseded in-progress start");
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                SpinWait.SpinUntil(() => Volatile.Read(ref _startInProgress) == 0, 10000);
-                if (Interlocked.CompareExchange(ref _startInProgress, 1, 0) != 0)
-                {
-                    MozaLog.Warn("[Moza] Start() could not acquire start lock after 10s");
-                    return;
-                }
-                MozaLog.Debug($"[Moza] Start() superseded in-progress start (waited {sw.ElapsedMilliseconds}ms)");
+                MozaLog.Debug("[Moza] Start() cancelling prior in-progress start");
+                try { prior.Cancel(); } catch (ObjectDisposedException) { }
             }
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            if (!_startSemaphore.Wait(10000))
+            {
+                MozaLog.Warn("[Moza] Start() could not acquire start lock after 10s");
+                return;
+            }
+            if (prior != null)
+                MozaLog.Debug($"[Moza] Start() superseded in-progress start (waited {sw.ElapsedMilliseconds}ms)");
+
+            // Re-check disposal after the (potentially long) wait — Dispose
+            // may have arrived while we were queued.
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                MozaLog.Warn("[Moza] Start() ignored — sender disposed during wait");
+                _startSemaphore.Release();
+                return;
+            }
+
+            CancellationTokenSource newCts = new CancellationTokenSource();
+            lock (_startCtsLock) { _startCts = newCts; }
+
             try
             {
-                StartInner();
+                StartInner(newCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                MozaLog.Debug("[Moza] StartInner cancelled by supersession / disposal");
             }
             finally
             {
-                Interlocked.Exchange(ref _startInProgress, 0);
+                lock (_startCtsLock)
+                {
+                    if (ReferenceEquals(_startCts, newCts))
+                        _startCts = null;
+                }
+                try { newCts.Dispose(); } catch { }
+                _startSemaphore.Release();
             }
         }
 
-        private void StartInner()
+        private void StartInner(CancellationToken cancel)
         {
             // Capture pre-Stop state. We need TWO things from
-            // _lastStopUtcTicks BEFORE the Stop() call below resets it
-            // to the current time:
+            // _silenceGate.LastStopUtcTicks BEFORE the Stop() call below
+            // resets it to the current time:
             //   1. Whether this is a true cold-start in a fresh SimHub
             //      process (preStopTicks == 0).
             //   2. The actual timestamp of the PRIOR Stop (typically
@@ -945,7 +978,7 @@ namespace MozaPlugin.Telemetry
             //      not the millisecond-since-StartInner's-internal-Stop
             //      (which is always ~0 and made the gate trivially
             //      always wait the full 11 s).
-            long preStopTicks = _lastStopUtcTicks;
+            long preStopTicks = _silenceGate.LastStopUtcTicks;
             bool isFirstStartInProcess = (preStopTicks == 0);
             Stop();
 
@@ -961,16 +994,16 @@ namespace MozaPlugin.Telemetry
             // stale session from a previous process has long since timed
             // out. The gate only matters for fast plugin reload within
             // the same process (e.g., SimHub game switch).
+            int waitMs = _silenceGate.RemainingStopReopenWaitMs(preStopTicks);
             if (!isFirstStartInProcess)
             {
                 long elapsedMs = (System.DateTime.UtcNow.Ticks - preStopTicks)
                     / System.TimeSpan.TicksPerMillisecond;
-                int waitMs = (int)System.Math.Max(0, MinSilenceAfterSwitchMs - elapsedMs);
                 if (waitMs > 0)
                 {
                     MozaLog.Debug(
                         $"[Moza] Start: enforcing {waitMs}ms silence " +
-                        $"(elapsed since last Stop: {elapsedMs}ms; min: {MinSilenceAfterSwitchMs}ms) " +
+                        $"(elapsed since last Stop: {elapsedMs}ms; min: {Lifecycle.SilenceGate.StopReopenSilenceMs}ms) " +
                         "so wheel session state can settle before reopen");
                     try { System.Threading.Thread.Sleep(waitMs); } catch { }
                 }
@@ -992,7 +1025,10 @@ namespace MozaPlugin.Telemetry
             // background thread (dispatched by StartTelemetryIfReady) so the
             // serial read thread stays free to deliver fc:00 ack responses.
             ProbeAndOpenSessions();
-            if (_state == TelemetryState.Idle) return;
+            // Supersession gate: a new Start() arriving mid-probe cancels
+            // our token. An external Stop() during the same window pushes
+            // state to Idle — both signal "abandon this StartInner".
+            if (cancel.IsCancellationRequested || _state == TelemetryState.Idle) return;
 
             // Universal Hub: 5-frame slot enumeration burst so the wheel
             // populates per-port device metadata. Skipped when no hub.
@@ -1001,7 +1037,7 @@ namespace MozaPlugin.Telemetry
 
             PrimeAndOpenSession09();
             QueueBackgroundUploadIfReady();
-            if (_state == TelemetryState.Idle) return;
+            if (cancel.IsCancellationRequested || _state == TelemetryState.Idle) return;
 
             // Open session 0x03 (tile-server). Tile-server push deferred until
             // after tier-def — earlier push collided with the wheel's
@@ -1023,7 +1059,7 @@ namespace MozaPlugin.Telemetry
             // Probe the wheel's Display sub-device. Non-blocking — responses
             // arrive via the inbound dispatcher.
             SendDisplayProbe();
-            if (_state == TelemetryState.Idle) return;
+            if (cancel.IsCancellationRequested || _state == TelemetryState.Idle) return;
 
             StartTickTimer();
         }
@@ -1099,7 +1135,7 @@ namespace MozaPlugin.Telemetry
         /// 0x04..0x0a / 0x09 configJson are LEFT ALONE — wheel never closes
         /// 0x09 host-side; closing it would be a no-op or regression. The
         /// wheel's ~10–14s internal sess=0x09 timeout is the actual re-engage
-        /// gate; <see cref="MinSilenceAfterSwitchMs"/> bridges it.
+        /// gate; <see cref="Lifecycle.SilenceGate.StopReopenSilenceMs"/> bridges it.
         /// </summary>
         private void CloseHostSessions()
         {
@@ -1188,7 +1224,7 @@ namespace MozaPlugin.Telemetry
             // completes its sess=0x09 device-init. This is the host's only
             // lever on that interlock; the wheel does not signal when its
             // internal state is settled.
-            _lastStopUtcTicks = System.DateTime.UtcNow.Ticks;
+            _silenceGate.MarkStopped(System.DateTime.UtcNow.Ticks);
         }
 
         public void UpdateGameData(StatusDataBase? data)
@@ -1322,10 +1358,10 @@ namespace MozaPlugin.Telemetry
             // so we also need to keep the UI from initiating another
             // switch until the wheel's window closes. The StartInner
             // silence sleep is armed separately by Stop() (see
-            // _lastStopUtcTicks) — that handles the host-side reopen
+            // SilenceGate.MarkStopped) — that handles the host-side reopen
             // protocol; this field handles UI affordances and double-
             // click suppression on SendDashboardSwitch itself.
-            _lastSwitchEmittedUtcTicks = System.DateTime.UtcNow.Ticks;
+            _silenceGate.MarkSwitchEmitted(System.DateTime.UtcNow.Ticks);
             // Record the slot we just bound so callers can detect
             // redundant subsequent emits (catalog probe + profile-apply
             // racing to the same slot is the common case).
@@ -1338,24 +1374,12 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>True while the post-emit silence enforcement gate is
         /// active (a kind=4 dashboard-switch frame went out on the wire
-        /// within the last MinSilenceAfterSwitchMs and the wheel's
-        /// sess=0x09 binding-state timeout is still running). UI consumers
-        /// should reflect this in their dashboard-switch affordance
-        /// (disable dropdown / Start Test button) so the user can't
-        /// trigger races against the in-flight Stop+Start.</summary>
-        public bool IsInSilenceCooldown
-        {
-            get
-            {
-                if (_lastSwitchEmittedUtcTicks == 0) return false;
-                long elapsedMs = (System.DateTime.UtcNow.Ticks - _lastSwitchEmittedUtcTicks)
-                    / System.TimeSpan.TicksPerMillisecond;
-                int gateMs = EnableHotRenegotiation
-                    ? HotMinSilenceAfterSwitchMs
-                    : MinSilenceAfterSwitchMs;
-                return elapsedMs < gateMs;
-            }
-        }
+        /// within the last silence window and the wheel's sess=0x09
+        /// binding-state timeout is still running). UI consumers should
+        /// reflect this in their dashboard-switch affordance (disable
+        /// dropdown / Start Test button) so the user can't trigger races
+        /// against the in-flight Stop+Start.</summary>
+        public bool IsInSilenceCooldown => _silenceGate.IsInSilenceCooldown;
 
         /// <summary>True only when the telemetry pipeline has completed
         /// its preamble and is delivering value frames. Callers gating
@@ -1467,14 +1491,10 @@ namespace MozaPlugin.Telemetry
         // ── WheelSlotTracker accessors ───────────────────────────────────
         internal Dashboard.WheelDashboardState? ConfigJsonLastState => _configJson.LastState;
 
-        /// <summary>Arm the hot-switch tier-def re-emission burst.</summary>
-        internal void ArmHotSwitchBurst()
-        {
-            _hotSwitchArmTickMs = Environment.TickCount;
-            _lastHotEmissionTickMs = 0;
-            System.Threading.Interlocked.Exchange(
-                ref _pendingHotTierDefReemit, HotSwitchEmissionCount);
-        }
+        /// <summary>Arm the hot-switch tier-def re-emission burst. Called
+        /// from <see cref="Display.WheelSlotTracker"/> when the wheel
+        /// initiates a switch via the on-wheel controls.</summary>
+        internal void ArmHotSwitchBurst() => _hotSwitch.ArmBurst();
 
         internal void RaiseWheelInitiatedSwitch(int slot)
         {
@@ -1543,14 +1563,11 @@ namespace MozaPlugin.Telemetry
                 // (matches PitHouse's 3-13 emissions ~1s apart). Sessions
                 // 0x01/0x02/0x03 stay open. Preamble skipped because
                 // _tierDefPreambleSent stays true.
-                _hotSwitchArmTickMs = Environment.TickCount;
-                _lastHotEmissionTickMs = 0;
-                System.Threading.Interlocked.Exchange(
-                    ref _pendingHotTierDefReemit, HotSwitchEmissionCount);
+                _hotSwitch.ArmBurst();
                 MozaLog.Info(
                     $"[Moza] SwitchToProfile slot={slotIndex}: HOT path — " +
-                    $"{HotSwitchEmissionCount} tier-def emissions queued " +
-                    $"~{HotSwitchEmissionSpacingMs}ms apart");
+                    $"{Lifecycle.HotSwitchCoordinator.EmissionCount} tier-def emissions queued " +
+                    $"~{Lifecycle.HotSwitchCoordinator.EmissionSpacingMs}ms apart");
             }
             else
             {
@@ -1568,8 +1585,8 @@ namespace MozaPlugin.Telemetry
         /// session state to match the new dashboard. The wheel's ~10–14s
         /// internal sess=0x09 timeout is the gate on re-engagement; the
         /// silence enforcement inside <see cref="StartInner"/> (via
-        /// <c>_lastStopUtcTicks</c>, which Stop arms unconditionally) handles
-        /// that automatically — no need for explicit Sleep here.
+        /// SilenceGate, which Stop arms unconditionally) handles that
+        /// automatically — no need for explicit Sleep here.
         ///
         /// PreStopDrainMs: critical. The caller's FF kind=4 frame is in the
         /// one-shot queue when this runs; Stop's <c>FlushPendingWrites</c>
@@ -1589,7 +1606,7 @@ namespace MozaPlugin.Telemetry
                     // discards the queue.
                     System.Threading.Thread.Sleep(PreStopDrainMs);
                     Stop();   // CloseHostSessions (01/02/03)
-                    Start();  // StartInner enforces MinSilenceAfterSwitchMs gate before opening
+                    Start();  // StartInner enforces SilenceGate.StopReopenSilenceMs gate before opening
                 }
                 catch (Exception ex)
                 {
@@ -2707,15 +2724,14 @@ namespace MozaPlugin.Telemetry
         /// schedule a kind=4 dashboard-switch re-emit for the slot the
         /// wheel is currently on. Re-applying the same slot tells some
         /// firmwares to re-run their dashboard-load sequence which re-
-        /// advertises the full channel catalog. Throttled by
-        /// <see cref="_lastCatalogResyncProbeUtcTicks"/> so a stuck case
-        /// can't produce a switch storm.
+        /// advertises the full channel catalog. Throttled via
+        /// <see cref="_catalogResyncProbe"/> so a stuck case can't produce
+        /// a switch storm.
         /// </summary>
         private void ScheduleCatalogResyncProbe()
         {
             long now = System.DateTime.UtcNow.Ticks;
-            if (now - _lastCatalogResyncProbeUtcTicks < CatalogResyncProbeMinIntervalTicks)
-                return;
+            if (!_catalogResyncProbe.IsThrottleClear(now)) return;
 
             // Resolve the current slot from the wheel-reported configJsonList
             // by matching profile name. Without LastState we don't know which
@@ -2746,8 +2762,8 @@ namespace MozaPlugin.Telemetry
             // If that matches what we'd be emitting to, the probe is pure
             // noise — the catalog incompleteness will resolve via
             // TickGrowSubscriptionIfCatalogStable's natural re-emit as the
-            // wheel pushes more channel URLs. Importantly we DON'T arm
-            // _lastCatalogResyncProbeUtcTicks here, so HasCatalogResyncProbeFired
+            // wheel pushes more channel URLs. Importantly we DON'T call
+            // _catalogResyncProbe.MarkFired here, so HasCatalogResyncProbeFired
             // stays false and ApplyTelemetryDashboardFromProfile's slot-match
             // path takes the "no wire action needed" branch instead of
             // pointlessly cycling the pipeline.
@@ -2763,7 +2779,7 @@ namespace MozaPlugin.Telemetry
             // so the min-interval throttle counts from a real emission, and
             // HasCatalogResyncProbeFired reflects a probe that actually
             // changed wheel state.
-            _lastCatalogResyncProbeUtcTicks = now;
+            _catalogResyncProbe.MarkFired(now);
 
             int slotCapture = slot;
             string nameCapture = profileName!;
@@ -2812,7 +2828,7 @@ namespace MozaPlugin.Telemetry
             if (_state != TelemetryState.Active) return;
             if (!_connection.IsConnected) return;
             int cur = _catalogParser.Count;
-            bool hotSwitchPending = _pendingHotTierDefReemit != 0;
+            bool hotSwitchPending = _hotSwitch.IsBurstPending;
             bool catalogGrew = (cur - _catalogCountAtLastSubscription) >= CatalogGrowthMinDelta;
             if (!hotSwitchPending && !catalogGrew) return;
 
@@ -2828,87 +2844,33 @@ namespace MozaPlugin.Telemetry
                 // wheel's most-recent END marker, so even if the first
                 // emission echoes a stale END (wheel hadn't pushed the
                 // new one yet), a later emission picks up the updated
-                // value and the wheel binds then.
+                // value and the wheel binds then. Gating logic for first
+                // emission (END handshake + fallback) and pacing for
+                // subsequent emissions both live in the helper.
+                if (!_hotSwitch.ShouldEmitThisTick(act, _catalogParser.LastWheelEndMarkerTickMs))
+                    return;
+
                 int now = Environment.TickCount;
-                int sinceArm = now - _hotSwitchArmTickMs;
-                bool isFirstEmission = _lastHotEmissionTickMs == 0;
-
-                if (isFirstEmission)
-                {
-                    // First-emission gate: wait for the wheel's END marker
-                    // handshake before firing. The END u32 the host echoes
-                    // on every tier-def emission must match what the wheel
-                    // just pushed; firing too early means the first
-                    // emission echoes a stale END the wheel rejects.
-                    //
-                    // We do NOT force-fire on a window timeout when the
-                    // wheel is actively pushing valid traffic — if catalog
-                    // chunks or END markers are still arriving, the wheel
-                    // is mid-handshake and we should let it finish. The
-                    // outer fallback only triggers when the wheel is
-                    // completely silent (no activity AND no END marker
-                    // update) for the full window, indicating the wheel
-                    // skipped its post-switch push for this slot.
-                    bool newEndSinceArm = _catalogParser.LastWheelEndMarkerTickMs != 0
-                        && (_catalogParser.LastWheelEndMarkerTickMs - _hotSwitchArmTickMs) > 0;
-                    bool newActivitySinceArm = act != 0
-                        && (act - _hotSwitchArmTickMs) > 0;
-
-                    if (newEndSinceArm)
-                    {
-                        // Got the handshake — fire (idle gate isn't
-                        // meaningful here; END marker is the last byte of
-                        // the wheel's catalog push, so by definition the
-                        // wheel is done emitting catalog for this switch).
-                    }
-                    else if (newActivitySinceArm)
-                    {
-                        // Wheel is pushing catalog but hasn't sent END
-                        // yet. Wait — no timeout while valid traffic
-                        // is in flight.
-                        return;
-                    }
-                    else if (sinceArm < HotSwitchMinFallbackMs)
-                    {
-                        // No activity at all yet; wait the fallback
-                        // window for the wheel to start pushing.
-                        return;
-                    }
-                    // else: fallback window elapsed with no wheel activity
-                    // — fire anyway so we don't deadlock on a wheel that
-                    // skipped its post-switch push (e.g., wheel-side
-                    // switch to the slot it was already on).
-                }
-                else
-                {
-                    // Subsequent emissions: pace ~1s apart.
-                    if (now - _lastHotEmissionTickMs < HotSwitchEmissionSpacingMs)
-                        return;
-                }
-
+                int sinceArm = now - _hotSwitch.ArmTickMs;
+                bool isFirstEmission = _hotSwitch.LastEmissionTickMs == 0;
                 int prev = _catalogCountAtLastSubscription;
-                int remaining = _pendingHotTierDefReemit;
-                int emissionIdx = HotSwitchEmissionCount - remaining + 1;
+                int remaining = _hotSwitch.RemainingEmissions;
+                int emissionIdx = Lifecycle.HotSwitchCoordinator.EmissionCount - remaining + 1;
                 MozaLog.Debug(
                     $"[Moza] Re-applying tier-def (hot-switch burst " +
-                    $"{emissionIdx}/{HotSwitchEmissionCount}): " +
+                    $"{emissionIdx}/{Lifecycle.HotSwitchCoordinator.EmissionCount}): " +
                     $"catalog {prev}→{cur}, wheel END={_catalogParser.LastWheelEndMarker}, " +
-                    $"sinceArm={sinceArm}ms, sinceLast={(isFirstEmission ? -1 : now - _lastHotEmissionTickMs)}ms");
+                    $"sinceArm={sinceArm}ms, sinceLast={(isFirstEmission ? -1 : now - _hotSwitch.LastEmissionTickMs)}ms");
                 try
                 {
                     ApplySubscription(force: true);
                     _catalogCountAtLastSubscription = _catalogParser.Count;
-                    _lastHotEmissionTickMs = Environment.TickCount;
-                    int newRemaining = System.Threading.Interlocked.Decrement(
-                        ref _pendingHotTierDefReemit);
-                    if (newRemaining <= 0)
+                    int newRemaining = _hotSwitch.MarkEmission();
+                    if (newRemaining == 0)
                     {
-                        // Burst done. Clear so the next switch can re-arm.
-                        System.Threading.Interlocked.Exchange(
-                            ref _pendingHotTierDefReemit, 0);
                         MozaLog.Debug(
                             $"[Moza] Hot-switch burst complete after " +
-                            $"{HotSwitchEmissionCount} emissions");
+                            $"{Lifecycle.HotSwitchCoordinator.EmissionCount} emissions");
                     }
                 }
                 catch (Exception ex)
@@ -3788,12 +3750,22 @@ namespace MozaPlugin.Telemetry
             // Idempotent: SimHub may invoke Dispose more than once during plugin
             // reload; double-dispose on ManualResetEventSlim throws.
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+            // Cancel any in-progress Start so StartInner bails out promptly
+            // rather than continuing to touch about-to-be-disposed sessions/
+            // events. The CTS itself is owned by the Start() finally block;
+            // we just signal.
+            CancellationTokenSource? cts;
+            lock (_startCtsLock) { cts = _startCts; }
+            try { cts?.Cancel(); } catch (ObjectDisposedException) { }
+
             Stop();
             try { _ackReceived.Dispose(); } catch { }
             try { _mgmtResponseEvent.Dispose(); } catch { }
             try { _uploader?.Dispose(); } catch { }
             try { _dashboardDownloader?.Dispose(); } catch { }
             try { _rpc?.Dispose(); } catch { }
+            try { _startSemaphore.Dispose(); } catch { }
         }
 
         internal class TierState
