@@ -83,25 +83,27 @@ namespace MozaPlugin.Devices
                 && profile.WheelOverridesByPageGuid.TryGetValue(pageGuid, out var ov)
                 && ov != null)
             {
-                // Sleep-light bundle is keyed by the same page GUID on the
-                // shared MozaPluginSettings dict (per-wheel-page, not per-game).
+                // Sleep-light + idle-effect/speed bundles are keyed by the same
+                // page GUID on the shared MozaPluginSettings dicts (per-wheel-page,
+                // not per-game).
                 WheelSleepSettings? sleep = null;
                 if (settings.WheelSleepByPageGuid != null)
                     settings.WheelSleepByPageGuid.TryGetValue(pageGuid, out sleep);
-                CaptureFromOverlay(ov, data, sleep);
+                WheelIdleSettings? idle = null;
+                if (settings.WheelIdleByPageGuid != null)
+                    settings.WheelIdleByPageGuid.TryGetValue(pageGuid, out idle);
+                CaptureFromOverlay(ov, data, sleep, idle);
                 return;
             }
 
             WheelModelName = data.WheelModelName ?? "";
             WheelTelemetryMode = settings.WheelTelemetryMode;
-            WheelIdleEffect = settings.WheelIdleEffect;
-            WheelButtonsIdleEffect = settings.WheelButtonsIdleEffect;
-            WheelKnobIdleEffect = settings.WheelKnobIdleEffect;
             WheelKnobLedMode = settings.WheelKnobLedMode;
             WheelButtonsLedMode = settings.WheelButtonsLedMode;
-            WheelTelemetryIdleSpeedMs = settings.WheelTelemetryIdleSpeedMs;
-            WheelButtonsIdleSpeedMs = settings.WheelButtonsIdleSpeedMs;
-            WheelKnobIdleSpeedMs = settings.WheelKnobIdleSpeedMs;
+            // Idle effect/speed live on settings.WheelIdleByPageGuid (per-wheel,
+            // shared across profiles). Without a page identity here we fall
+            // back to leaving the DTO fields at sentinel — the device-side JSON
+            // for a "no wheel identified" snapshot has no meaningful idle pick.
             // WheelSleep* now lives on settings.WheelSleepByPageGuid (per-wheel,
             // shared across profiles). The DTO still carries them so older
             // SimHub-side device blobs round-trip cleanly during migration; the
@@ -176,6 +178,28 @@ namespace MozaPlugin.Devices
                     if (WheelSleepSpeedMs    >= 0)   bundle.SpeedMs    = WheelSleepSpeedMs;
                     if (WheelSleepColor      != null) bundle.Color     = (int[])WheelSleepColor.Clone();
                 }
+
+                // Idle effect/speed bundle is also per-wheel-page (schema v9).
+                // Drain the legacy DTO fields here so older SimHub-side device
+                // JSON keeps round-tripping correctly.
+                if (WheelIdleEffect >= 0 || WheelButtonsIdleEffect >= 0
+                    || WheelKnobIdleEffect >= 0 || WheelTelemetryIdleSpeedMs >= 0
+                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0)
+                {
+                    if (settings.WheelIdleByPageGuid == null)
+                        settings.WheelIdleByPageGuid = new Dictionary<Guid, WheelIdleSettings>();
+                    if (!settings.WheelIdleByPageGuid.TryGetValue(pageGuid, out var idle) || idle == null)
+                    {
+                        idle = new WheelIdleSettings();
+                        settings.WheelIdleByPageGuid[pageGuid] = idle;
+                    }
+                    if (WheelIdleEffect >= 0)            idle.TelemetryEffect  = WheelIdleEffect;
+                    if (WheelButtonsIdleEffect >= 0)     idle.ButtonsEffect    = WheelButtonsIdleEffect;
+                    if (WheelKnobIdleEffect >= 0)        idle.KnobEffect       = WheelKnobIdleEffect;
+                    if (WheelTelemetryIdleSpeedMs >= 0)  idle.TelemetrySpeedMs = WheelTelemetryIdleSpeedMs;
+                    if (WheelButtonsIdleSpeedMs >= 0)    idle.ButtonsSpeedMs   = WheelButtonsIdleSpeedMs;
+                    if (WheelKnobIdleSpeedMs >= 0)       idle.KnobSpeedMs      = WheelKnobIdleSpeedMs;
+                }
             }
 
             // Mirror colors into _data so the UI's swatches reflect the loaded
@@ -228,16 +252,14 @@ namespace MozaPlugin.Devices
         private void MergeIntoOverlay(WheelOverride ov)
         {
             if (WheelTelemetryMode      >= 0) ov.WheelTelemetryMode      = WheelTelemetryMode;
-            if (WheelIdleEffect         >= 0) ov.WheelIdleEffect         = WheelIdleEffect;
-            if (WheelButtonsIdleEffect  >= 0) ov.WheelButtonsIdleEffect  = WheelButtonsIdleEffect;
-            if (WheelKnobIdleEffect     >= 0) ov.WheelKnobIdleEffect     = WheelKnobIdleEffect;
             if (WheelKnobLedMode        >= 0) ov.WheelKnobLedMode        = WheelKnobLedMode;
             if (WheelButtonsLedMode     >= 0) ov.WheelButtonsLedMode     = WheelButtonsLedMode;
-            if (WheelTelemetryIdleSpeedMs >= 0) ov.WheelTelemetryIdleSpeedMs = WheelTelemetryIdleSpeedMs;
-            if (WheelButtonsIdleSpeedMs   >= 0) ov.WheelButtonsIdleSpeedMs   = WheelButtonsIdleSpeedMs;
-            if (WheelKnobIdleSpeedMs      >= 0) ov.WheelKnobIdleSpeedMs      = WheelKnobIdleSpeedMs;
             // WheelSleep* are no longer on the overlay — handled by the
             // ApplyTo caller into MozaPluginSettings.WheelSleepByPageGuid.
+            // WheelIdleEffect / WheelButtonsIdleEffect / WheelKnobIdleEffect /
+            // WheelTelemetryIdleSpeedMs / WheelButtonsIdleSpeedMs /
+            // WheelKnobIdleSpeedMs are also no longer on the overlay (schema v9)
+            // — handled into MozaPluginSettings.WheelIdleByPageGuid.
             if (WheelRpmBrightness      >= 0) ov.WheelRpmBrightness      = WheelRpmBrightness;
             if (WheelButtonsBrightness  >= 0) ov.WheelButtonsBrightness  = WheelButtonsBrightness;
             if (WheelFlagsBrightness    >= 0) ov.WheelFlagsBrightness    = WheelFlagsBrightness;
@@ -264,29 +286,33 @@ namespace MozaPlugin.Devices
         /// by GetSettings so SimHub's persisted device-page JSON reflects
         /// the live state.
         /// </summary>
-        internal void CaptureFromOverlay(WheelOverride ov, MozaData data, WheelSleepSettings? sleep = null)
+        internal void CaptureFromOverlay(WheelOverride ov, MozaData data,
+            WheelSleepSettings? sleep = null, WheelIdleSettings? idle = null)
         {
             WheelModelName = data.WheelModelName ?? "";
             WheelTelemetryMode      = ov.WheelTelemetryMode;
-            WheelIdleEffect         = ov.WheelIdleEffect;
-            WheelButtonsIdleEffect  = ov.WheelButtonsIdleEffect;
-            WheelKnobIdleEffect     = ov.WheelKnobIdleEffect;
             WheelKnobLedMode        = ov.WheelKnobLedMode;
             WheelButtonsLedMode     = ov.WheelButtonsLedMode;
-            WheelTelemetryIdleSpeedMs = ov.WheelTelemetryIdleSpeedMs;
-            WheelButtonsIdleSpeedMs   = ov.WheelButtonsIdleSpeedMs;
-            WheelKnobIdleSpeedMs      = ov.WheelKnobIdleSpeedMs;
-            // WheelSleep* live in MozaPluginSettings.WheelSleepByPageGuid now —
-            // populated here from the optional bundle the caller looked up by
-            // the same page GUID. SimHub-side device JSON still includes them
-            // so users with multiple wheels round-trip correctly when they
-            // un-/re-install.
+            // WheelSleep* + WheelIdle*/Speed* now live on per-page dicts in
+            // MozaPluginSettings — populated here from the optional bundles
+            // the caller looked up by the same page GUID. SimHub-side device
+            // JSON still includes them so users with multiple wheels round-trip
+            // correctly when they un-/re-install.
             if (sleep != null)
             {
                 WheelSleepMode       = sleep.Mode;
                 WheelSleepTimeoutMin = sleep.TimeoutMin;
                 WheelSleepSpeedMs    = sleep.SpeedMs;
                 WheelSleepColor      = sleep.Color;
+            }
+            if (idle != null)
+            {
+                WheelIdleEffect            = idle.TelemetryEffect;
+                WheelButtonsIdleEffect     = idle.ButtonsEffect;
+                WheelKnobIdleEffect        = idle.KnobEffect;
+                WheelTelemetryIdleSpeedMs  = idle.TelemetrySpeedMs;
+                WheelButtonsIdleSpeedMs    = idle.ButtonsSpeedMs;
+                WheelKnobIdleSpeedMs       = idle.KnobSpeedMs;
             }
             WheelRpmBrightness      = ov.WheelRpmBrightness;
             WheelButtonsBrightness  = ov.WheelButtonsBrightness;

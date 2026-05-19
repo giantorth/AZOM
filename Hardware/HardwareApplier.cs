@@ -47,14 +47,20 @@ namespace MozaPlugin.Hardware
             var ov = _plugin.GetCurrentWheelOverlay(profile);
 
             int telemMode      = Eff(ov?.WheelTelemetryMode ?? -1, profile.WheelTelemetryMode);
-            int idleEffect     = Eff(ov?.WheelIdleEffect ?? -1, profile.WheelIdleEffect);
-            int btnIdleEffect  = Eff(ov?.WheelButtonsIdleEffect ?? -1, profile.WheelButtonsIdleEffect);
-            int knobIdleEffect = Eff(ov?.WheelKnobIdleEffect ?? -1, profile.WheelKnobIdleEffect);
+            // Idle-effect / idle-speed bundle is per-wheel-page (schema v9); null
+            // = leave wheel's value alone. These six fields used to live on the
+            // per-game overlay + profile baseline; v9 promoted them to a
+            // wheel-level bundle because the idle animation is a property of
+            // the wheel, not the game.
+            var idleBundle     = _plugin.ActiveWheelIdle;
+            int idleEffect     = idleBundle?.TelemetryEffect ?? -1;
+            int btnIdleEffect  = idleBundle?.ButtonsEffect ?? -1;
+            int knobIdleEffect = idleBundle?.KnobEffect ?? -1;
+            int idleSpeed      = idleBundle?.TelemetrySpeedMs ?? -1;
+            int btnIdleSpeed   = idleBundle?.ButtonsSpeedMs ?? -1;
+            int knobIdleSpeed  = idleBundle?.KnobSpeedMs ?? -1;
             int knobLedMode    = Eff(ov?.WheelKnobLedMode ?? -1, profile.WheelKnobLedMode);
             int btnLedMode     = Eff(ov?.WheelButtonsLedMode ?? -1, profile.WheelButtonsLedMode);
-            int idleSpeed      = Eff(ov?.WheelTelemetryIdleSpeedMs ?? -1, profile.WheelTelemetryIdleSpeedMs);
-            int btnIdleSpeed   = Eff(ov?.WheelButtonsIdleSpeedMs ?? -1, profile.WheelButtonsIdleSpeedMs);
-            int knobIdleSpeed  = Eff(ov?.WheelKnobIdleSpeedMs ?? -1, profile.WheelKnobIdleSpeedMs);
             // Sleep bundle is per-wheel-page (schema v8); null = leave wheel's value alone.
             var sleepBundle    = _plugin.ActiveWheelSleep;
             int sleepMode      = sleepBundle?.Mode ?? -1;

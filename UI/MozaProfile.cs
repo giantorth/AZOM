@@ -28,18 +28,17 @@ namespace MozaPlugin
 
         // LED / mode
         public int WheelTelemetryMode { get; set; } = -1;
-        public int WheelIdleEffect { get; set; } = -1;
-        public int WheelButtonsIdleEffect { get; set; } = -1;
-        public int WheelKnobIdleEffect { get; set; } = -1;
         public int WheelKnobLedMode { get; set; } = -1;
         public int WheelButtonsLedMode { get; set; } = -1;
-        public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
-        public int WheelButtonsIdleSpeedMs { get; set; } = -1;
-        public int WheelKnobIdleSpeedMs { get; set; } = -1;
         // NOTE: WheelSleep* (mode / timeout / speed / color) moved to
         // MozaPluginSettings.WheelSleepByPageGuid in schema v8 — sleep is a
         // firmware preference, not a per-game-per-wheel decision. Legacy
         // values get drained via LegacyJsonFields during migration.
+        // NOTE: WheelIdleEffect / WheelButtonsIdleEffect / WheelKnobIdleEffect
+        // / WheelTelemetryIdleSpeedMs / WheelButtonsIdleSpeedMs / WheelKnobIdleSpeedMs
+        // moved to MozaPluginSettings.WheelIdleByPageGuid in schema v9 — same
+        // wheel-level reasoning as sleep. Legacy values are drained via
+        // LegacyJsonFields during migration.
 
         // Brightness (-1 = use profile baseline)
         public int WheelRpmBrightness { get; set; } = -1;
@@ -82,14 +81,8 @@ namespace MozaPlugin
             return new WheelOverride
             {
                 WheelTelemetryMode = WheelTelemetryMode,
-                WheelIdleEffect = WheelIdleEffect,
-                WheelButtonsIdleEffect = WheelButtonsIdleEffect,
-                WheelKnobIdleEffect = WheelKnobIdleEffect,
                 WheelKnobLedMode = WheelKnobLedMode,
                 WheelButtonsLedMode = WheelButtonsLedMode,
-                WheelTelemetryIdleSpeedMs = WheelTelemetryIdleSpeedMs,
-                WheelButtonsIdleSpeedMs = WheelButtonsIdleSpeedMs,
-                WheelKnobIdleSpeedMs = WheelKnobIdleSpeedMs,
                 WheelRpmBrightness = WheelRpmBrightness,
                 WheelButtonsBrightness = WheelButtonsBrightness,
                 WheelFlagsBrightness = WheelFlagsBrightness,
@@ -213,17 +206,16 @@ namespace MozaPlugin
 
         // ===== Wheel LED settings =====
         public int WheelTelemetryMode { get; set; } = -1;
-        public int WheelIdleEffect { get; set; } = -1;
-        public int WheelButtonsIdleEffect { get; set; } = -1;
-        public int WheelKnobIdleEffect { get; set; } = -1;
         public int WheelKnobLedMode { get; set; } = -1;
         public int WheelButtonsLedMode { get; set; } = -1;
-        public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
-        public int WheelButtonsIdleSpeedMs { get; set; } = -1;
-        public int WheelKnobIdleSpeedMs { get; set; } = -1;
         // NOTE: WheelSleep* (mode / timeout / speed / color) moved to
         // MozaPluginSettings.WheelSleepByPageGuid in schema v8 — see the
         // baseline-shared LegacyJsonFields capture above.
+        // NOTE: WheelIdleEffect / WheelButtonsIdleEffect / WheelKnobIdleEffect
+        // / WheelTelemetryIdleSpeedMs / WheelButtonsIdleSpeedMs / WheelKnobIdleSpeedMs
+        // moved to MozaPluginSettings.WheelIdleByPageGuid in schema v9. Legacy
+        // baseline values get drained via the per-profile LegacyJsonFields
+        // capture above.
         public int WheelRpmBrightness { get; set; } = -1;
         public int WheelButtonsBrightness { get; set; } = -1;
         public int WheelFlagsBrightness { get; set; } = -1;
@@ -357,14 +349,11 @@ namespace MozaPlugin
             WorkMode = p.WorkMode;
 
             // Wheel LED
-            WheelTelemetryMode = p.WheelTelemetryMode; WheelIdleEffect = p.WheelIdleEffect;
-            WheelButtonsIdleEffect = p.WheelButtonsIdleEffect;
-            WheelKnobIdleEffect = p.WheelKnobIdleEffect;
+            WheelTelemetryMode = p.WheelTelemetryMode;
             WheelKnobLedMode = p.WheelKnobLedMode;
             WheelButtonsLedMode = p.WheelButtonsLedMode;
-            WheelTelemetryIdleSpeedMs = p.WheelTelemetryIdleSpeedMs;
-            WheelButtonsIdleSpeedMs = p.WheelButtonsIdleSpeedMs;
-            WheelKnobIdleSpeedMs = p.WheelKnobIdleSpeedMs;
+            // Idle effect/speed moved to per-wheel-page MozaPluginSettings.WheelIdleByPageGuid
+            // in schema v9 — not copied per profile.
             // WheelSleep* now lives on MozaPluginSettings.WheelSleepByPageGuid
             // (per-wheel, shared across profiles) — not copied here.
             WheelRpmBrightness = p.WheelRpmBrightness; WheelButtonsBrightness = p.WheelButtonsBrightness;

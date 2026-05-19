@@ -762,12 +762,18 @@ namespace MozaPlugin.Devices
             _plugin.SaveSettings();
         }
 
+        // Idle-effect handlers commit to the per-wheel-page idle bundle on
+        // MozaPluginSettings.WheelIdleByPageGuid (schema v9). Idle animation
+        // is a property of the wheel, not the game — same reasoning as the
+        // sleep-light bundle below.
         private void WheelIdleEffectCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents || _plugin == null) return;
             int val = WheelIdleEffectCombo.SelectedIndex;
+            if (val < 0) return;
             _data!.WheelTelemetryIdleEffect = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelIdleEffect = val);
+            var idle = _plugin.GetOrCreateActiveWheelIdle();
+            if (idle != null) idle.TelemetryEffect = val;
             _plugin.WriteIfWheelDetected("wheel-telemetry-idle-effect", val);
             UpdateIdleSpeedRowVisibility();
             _plugin.SaveSettings();
@@ -777,8 +783,10 @@ namespace MozaPlugin.Devices
         {
             if (_suppressEvents || _plugin == null) return;
             int val = WheelButtonIdleEffectCombo.SelectedIndex;
+            if (val < 0) return;
             _data!.WheelButtonsIdleEffect = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelButtonsIdleEffect = val);
+            var idle = _plugin.GetOrCreateActiveWheelIdle();
+            if (idle != null) idle.ButtonsEffect = val;
             _plugin.WriteIfWheelDetected("wheel-buttons-idle-effect", val);
             UpdateIdleSpeedRowVisibility();
             _plugin.SaveSettings();
@@ -788,8 +796,10 @@ namespace MozaPlugin.Devices
         {
             if (_suppressEvents || _plugin == null) return;
             int val = WheelKnobIdleEffectCombo.SelectedIndex;
+            if (val < 0) return;
             _data!.WheelKnobIdleEffect = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobIdleEffect = val);
+            var idle = _plugin.GetOrCreateActiveWheelIdle();
+            if (idle != null) idle.KnobEffect = val;
             _plugin.WriteIfWheelDetected("wheel-knob-idle-effect", val);
             UpdateIdleSpeedRowVisibility();
             _plugin.SaveSettings();
@@ -797,15 +807,16 @@ namespace MozaPlugin.Devices
 
         // Per-effect idle speed (cmd 0x1E [group] [effect_id] [BE u16 ms]).
         // The slider value is paired with the currently-selected idle effect at
-        // write time; the wire payload is `[effect_id, ms_msb, ms_lsb]`.
-        
+        // write time; the wire payload is `[effect_id, ms_msb, ms_lsb]`. Stored
+        // in the per-wheel-page idle bundle alongside the effect IDs.
         private void WheelIdleSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents || _plugin == null) return;
             int ms = (int)System.Math.Round(e.NewValue);
             WheelIdleSpeedValue.Text = $"{ms} ms";
             _data!.WheelTelemetryIdleSpeedMs = ms;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelTelemetryIdleSpeedMs = ms);
+            var idle = _plugin.GetOrCreateActiveWheelIdle();
+            if (idle != null) idle.TelemetrySpeedMs = ms;
             int effect = _data.WheelTelemetryIdleEffect;
             if (effect >= 2)
                 _plugin.WriteArrayIfWheelDetected("wheel-telemetry-idle-interval", BuildIdleSpeedPayload(effect, ms));
@@ -818,7 +829,8 @@ namespace MozaPlugin.Devices
             int ms = (int)System.Math.Round(e.NewValue);
             WheelButtonIdleSpeedValue.Text = $"{ms} ms";
             _data!.WheelButtonsIdleSpeedMs = ms;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelButtonsIdleSpeedMs = ms);
+            var idle = _plugin.GetOrCreateActiveWheelIdle();
+            if (idle != null) idle.ButtonsSpeedMs = ms;
             int effect = _data.WheelButtonsIdleEffect;
             if (effect >= 2)
                 _plugin.WriteArrayIfWheelDetected("wheel-buttons-idle-interval", BuildIdleSpeedPayload(effect, ms));
@@ -831,7 +843,8 @@ namespace MozaPlugin.Devices
             int ms = (int)System.Math.Round(e.NewValue);
             WheelKnobIdleSpeedValue.Text = $"{ms} ms";
             _data!.WheelKnobIdleSpeedMs = ms;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobIdleSpeedMs = ms);
+            var idle = _plugin.GetOrCreateActiveWheelIdle();
+            if (idle != null) idle.KnobSpeedMs = ms;
             int effect = _data.WheelKnobIdleEffect;
             if (effect >= 2)
                 _plugin.WriteArrayIfWheelDetected("wheel-knob-idle-interval", BuildIdleSpeedPayload(effect, ms));

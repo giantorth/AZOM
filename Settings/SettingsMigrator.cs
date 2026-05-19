@@ -26,51 +26,52 @@ namespace MozaPlugin.Settings
         /// </summary>
         public bool MigrateToSchemaV2()
         {
-            if (_settings == null || _settings.SettingsSchemaVersion >= 8)
+            if (_settings == null || _settings.SettingsSchemaVersion >= 9)
                 return false;
 
             var store = _settings.ProfileStore;
             var profiles = store?.Profiles?.Where(p => p != null).ToList()
                 ?? new List<MozaProfile>();
 
-            // v4..v8: per-page dict seeding from flat fields. Hoisted above the
+            // v4..v9: per-page dict seeding from flat fields. Hoisted above the
             // empty-profiles branch so pre-refactor users (no profiles in JSON)
             // still get their flat fields carried over. Helpers are idempotent.
             bool ranV4Plus = false;
-            if (_settings.SettingsSchemaVersion < 8)
+            if (_settings.SettingsSchemaVersion < 9)
             {
                 ranV4Plus = true;
                 MigrateMzdashFolderToPerPage(profiles);
                 MigrateTelemetryEnabledToPerPage(profiles);
                 MigrateWheelEraToPerPage(profiles);
                 MigrateWheelSleepToPerPage(profiles);
+                MigrateWheelIdleToPerPage(profiles);
             }
 
             if (profiles.Count == 0)
             {
                 // No profiles yet — InitProfileSystem will create a default and
                 // seed its baselines from the flat fields via
-                // SeedProfileBaselineFromFlatFields. Bump straight to v8.
-                _settings.SettingsSchemaVersion = 8;
+                // SeedProfileBaselineFromFlatFields. Bump straight to v9.
+                _settings.SettingsSchemaVersion = 9;
                 ClearLegacyAfterMigration();
-                MozaLog.Debug("[Moza] Schema v8: no profiles present, marking migrated (default profile will be seeded by InitProfileSystem)");
+                MozaLog.Debug("[Moza] Schema v9: no profiles present, marking migrated (default profile will be seeded by InitProfileSystem)");
                 return true;
             }
 
             if (_settings.SettingsSchemaVersion >= 3)
             {
-                // v3+ → v8 path. The per-page dicts above are the only data-
+                // v3+ → v9 path. The per-page dicts above are the only data-
                 // carrying step; the v7 baseline-reseed runs unconditionally
                 // to repair users stuck at the broken schema-6 short-circuit.
                 foreach (var profile in profiles)
                     SeedProfileBaselineFromFlatFields(profile);
 
-                _settings.SettingsSchemaVersion = 8;
+                _settings.SettingsSchemaVersion = 9;
                 ClearLegacyAfterMigration();
                 if (ranV4Plus)
-                    MozaLog.Info("[Moza] Schema v8 migration: moved mzdash folder + telemetry-enable + wheel-era + sleep-light to per-wheel-page dicts; reseeded profile baselines from flat fields where sentinel.");
+                    MozaLog.Info("[Moza] Schema v9 migration: moved mzdash folder + telemetry-enable + wheel-era + sleep-light + idle-effect/speed to per-wheel-page dicts; reseeded profile baselines from flat fields where sentinel.");
                 else
-                    MozaLog.Info("[Moza] Schema v8 repair: reseeded profile baselines from flat fields where sentinel.");
+                    MozaLog.Info("[Moza] Schema v9 repair: reseeded profile baselines from flat fields where sentinel.");
                 return true;
             }
 
@@ -150,6 +151,23 @@ namespace MozaPlugin.Settings
                         if (bundle.SpeedMs    < 0 && slot.WheelSleepSpeedMs    >= 0) bundle.SpeedMs    = slot.WheelSleepSpeedMs;
                         if (bundle.Color == null && slot.WheelSleepColor != null)
                             bundle.Color = (int[])slot.WheelSleepColor.Clone();
+                    }
+                    // Schema v9: idle effect/speed also moved to a per-page dict
+                    // (WheelIdleByPageGuid). Drain the slot's idle fields here so
+                    // the per-wheel slot's intent survives migration without
+                    // round-tripping through the overlay (which no longer carries
+                    // these fields).
+                    if (slot.WheelIdleEffect >= 0 || slot.WheelButtonsIdleEffect >= 0
+                        || slot.WheelKnobIdleEffect >= 0 || slot.WheelTelemetryIdleSpeedMs >= 0
+                        || slot.WheelButtonsIdleSpeedMs >= 0 || slot.WheelKnobIdleSpeedMs >= 0)
+                    {
+                        var ib = GetOrCreateIdleBundle(pageGuid);
+                        if (ib.TelemetryEffect < 0 && slot.WheelIdleEffect >= 0)             ib.TelemetryEffect  = slot.WheelIdleEffect;
+                        if (ib.ButtonsEffect < 0   && slot.WheelButtonsIdleEffect >= 0)      ib.ButtonsEffect    = slot.WheelButtonsIdleEffect;
+                        if (ib.KnobEffect < 0      && slot.WheelKnobIdleEffect >= 0)         ib.KnobEffect       = slot.WheelKnobIdleEffect;
+                        if (ib.TelemetrySpeedMs < 0 && slot.WheelTelemetryIdleSpeedMs >= 0)  ib.TelemetrySpeedMs = slot.WheelTelemetryIdleSpeedMs;
+                        if (ib.ButtonsSpeedMs < 0   && slot.WheelButtonsIdleSpeedMs >= 0)    ib.ButtonsSpeedMs   = slot.WheelButtonsIdleSpeedMs;
+                        if (ib.KnobSpeedMs < 0      && slot.WheelKnobIdleSpeedMs >= 0)       ib.KnobSpeedMs      = slot.WheelKnobIdleSpeedMs;
                     }
                     slotsCount++;
                 }
@@ -256,14 +274,10 @@ namespace MozaPlugin.Settings
                     }
 
                     if (ov.WheelTelemetryMode      < 0) ov.WheelTelemetryMode      = _settings.WheelTelemetryMode;
-                    if (ov.WheelIdleEffect         < 0) ov.WheelIdleEffect         = _settings.WheelIdleEffect;
-                    if (ov.WheelButtonsIdleEffect  < 0) ov.WheelButtonsIdleEffect  = _settings.WheelButtonsIdleEffect;
-                    if (ov.WheelKnobIdleEffect     < 0) ov.WheelKnobIdleEffect     = _settings.WheelKnobIdleEffect;
                     if (ov.WheelKnobLedMode        < 0) ov.WheelKnobLedMode        = _settings.WheelKnobLedMode;
                     if (ov.WheelButtonsLedMode     < 0) ov.WheelButtonsLedMode     = _settings.WheelButtonsLedMode;
-                    if (ov.WheelTelemetryIdleSpeedMs < 0) ov.WheelTelemetryIdleSpeedMs = _settings.WheelTelemetryIdleSpeedMs;
-                    if (ov.WheelButtonsIdleSpeedMs   < 0) ov.WheelButtonsIdleSpeedMs   = _settings.WheelButtonsIdleSpeedMs;
-                    if (ov.WheelKnobIdleSpeedMs      < 0) ov.WheelKnobIdleSpeedMs      = _settings.WheelKnobIdleSpeedMs;
+                    // Idle effect/speed: drained into WheelIdleByPageGuid by
+                    // MigrateWheelIdleToPerPage below — not seeded into the overlay.
                     if (ov.WheelRpmBrightness      < 0) ov.WheelRpmBrightness      = _settings.WheelRpmBrightness;
                     if (ov.WheelButtonsBrightness  < 0) ov.WheelButtonsBrightness  = _settings.WheelButtonsBrightness;
                     if (ov.WheelFlagsBrightness    < 0) ov.WheelFlagsBrightness    = _settings.WheelFlagsBrightness;
@@ -293,17 +307,18 @@ namespace MozaPlugin.Settings
                 }
             }
 
-            // v4..v8 step: per-wheel-page dict seeding. Re-run unconditionally —
+            // v4..v9 step: per-wheel-page dict seeding. Re-run unconditionally —
             // the era helper needs a second pass to pick up the value drained
             // from TelemetryFirmwareEraLegacy / TelemetryProtocolVersion above.
             MigrateMzdashFolderToPerPage(profiles);
             MigrateTelemetryEnabledToPerPage(profiles);
             MigrateWheelEraToPerPage(profiles);
             MigrateWheelSleepToPerPage(profiles);
+            MigrateWheelIdleToPerPage(profiles);
 
-            _settings.SettingsSchemaVersion = 8;
+            _settings.SettingsSchemaVersion = 9;
             MozaLog.Info(
-                $"[Moza] Schema v8 migration: PerWheelSlots={slotsCount}, " +
+                $"[Moza] Schema v9 migration: PerWheelSlots={slotsCount}, " +
                 $"ChannelMappings={channelMappingsCount}, TelemetryByUid={uidSlotCount}, " +
                 $"MzdashFolderByUid={folderCount} → applied across {profiles.Count} profile(s); " +
                 $"flat-field seeding done");
@@ -336,6 +351,138 @@ namespace MozaPlugin.Settings
             // Gearshift.
             if (profile.GearshiftVibrateOnNeutral < 0) profile.GearshiftVibrateOnNeutral = _settings.GearshiftVibrateOnNeutral ? 1 : 0;
             if (profile.GearshiftDebounceMs       < 0) profile.GearshiftDebounceMs       = _settings.GearshiftDebounceMs;
+        }
+
+        /// <summary>
+        /// Hoist wheel idle-effect / idle-speed settings off per-game overlay
+        /// onto WheelIdleByPageGuid (schema v9). First non-sentinel per page
+        /// wins. Drains overlay LegacyJsonFields, profile baseline LegacyJsonFields,
+        /// and the _settings flat fields.
+        /// </summary>
+        private void MigrateWheelIdleToPerPage(List<MozaProfile> profiles)
+        {
+            if (_settings == null) return;
+            if (_settings.WheelIdleByPageGuid == null)
+                _settings.WheelIdleByPageGuid = new Dictionary<Guid, WheelIdleSettings>();
+
+            // 1. Drain pre-v9 per-overlay idle values from LegacyJsonFields.
+            foreach (var profile in profiles)
+            {
+                if (profile.WheelOverridesByPageGuid == null) continue;
+                foreach (var kvp in profile.WheelOverridesByPageGuid)
+                {
+                    var ov = kvp.Value;
+                    if (ov?.LegacyJsonFields == null) continue;
+                    var bundle = GetOrCreateIdleBundle(kvp.Key);
+                    DrainIdleKeysInto(ov.LegacyJsonFields, bundle);
+                    if (ov.LegacyJsonFields.Count == 0) ov.LegacyJsonFields = null;
+                }
+            }
+
+            // 2. Drain pre-v9 profile-baseline idle values (applied universally).
+            foreach (var profile in profiles)
+            {
+                if (profile.LegacyJsonFields == null) continue;
+                var staged = new WheelIdleSettings();
+                bool any = DrainIdleKeysInto(profile.LegacyJsonFields, staged);
+                if (any) SeedIdleUniversally(staged);
+                if (profile.LegacyJsonFields.Count == 0) profile.LegacyJsonFields = null;
+            }
+
+            // 3. Seed every known wheel page GUID from the flat fields.
+            var flat = new WheelIdleSettings
+            {
+                TelemetryEffect = _settings.WheelIdleEffect,
+                ButtonsEffect = _settings.WheelButtonsIdleEffect,
+                KnobEffect = _settings.WheelKnobIdleEffect,
+                TelemetrySpeedMs = _settings.WheelTelemetryIdleSpeedMs,
+                ButtonsSpeedMs = _settings.WheelButtonsIdleSpeedMs,
+                KnobSpeedMs = _settings.WheelKnobIdleSpeedMs,
+            };
+            if (flat.TelemetryEffect >= 0 || flat.ButtonsEffect >= 0 || flat.KnobEffect >= 0
+                || flat.TelemetrySpeedMs >= 0 || flat.ButtonsSpeedMs >= 0 || flat.KnobSpeedMs >= 0)
+                SeedIdleUniversally(flat);
+
+            _settings.WheelIdleEffect = -1;
+            _settings.WheelButtonsIdleEffect = -1;
+            _settings.WheelKnobIdleEffect = -1;
+            _settings.WheelTelemetryIdleSpeedMs = -1;
+            _settings.WheelButtonsIdleSpeedMs = -1;
+            _settings.WheelKnobIdleSpeedMs = -1;
+        }
+
+        /// <summary>
+        /// Pull WheelIdle*/WheelButtonsIdle*/WheelKnobIdle* keys out of a
+        /// LegacyJsonFields dict into an idle bundle. First-non-sentinel wins
+        /// per field. Returns true iff any field set.
+        /// </summary>
+        private static bool DrainIdleKeysInto(
+            Dictionary<string, Newtonsoft.Json.Linq.JToken> legacy,
+            WheelIdleSettings bundle)
+        {
+            bool any = false;
+            bool TryDrainInt(string key, ref int dst)
+            {
+                if (dst >= 0) { legacy.Remove(key); return false; }
+                if (!legacy.TryGetValue(key, out var tok) || tok == null) { legacy.Remove(key); return false; }
+                try { var v = tok.ToObject<int>(); if (v >= 0) { dst = v; legacy.Remove(key); return true; } }
+                catch { }
+                legacy.Remove(key);
+                return false;
+            }
+            // Overlay JSON field name (WheelIdleEffect) ≠ bundle field name
+            // (TelemetryEffect) — the overlay was telemetry/RPM-scoped even
+            // though it was named "WheelIdleEffect". Wire bytes match.
+            int t = bundle.TelemetryEffect;
+            int b = bundle.ButtonsEffect;
+            int k = bundle.KnobEffect;
+            int ts = bundle.TelemetrySpeedMs;
+            int bs = bundle.ButtonsSpeedMs;
+            int ks = bundle.KnobSpeedMs;
+            if (TryDrainInt("WheelIdleEffect", ref t)) any = true;
+            if (TryDrainInt("WheelButtonsIdleEffect", ref b)) any = true;
+            if (TryDrainInt("WheelKnobIdleEffect", ref k)) any = true;
+            if (TryDrainInt("WheelTelemetryIdleSpeedMs", ref ts)) any = true;
+            if (TryDrainInt("WheelButtonsIdleSpeedMs", ref bs)) any = true;
+            if (TryDrainInt("WheelKnobIdleSpeedMs", ref ks)) any = true;
+            bundle.TelemetryEffect = t;
+            bundle.ButtonsEffect = b;
+            bundle.KnobEffect = k;
+            bundle.TelemetrySpeedMs = ts;
+            bundle.ButtonsSpeedMs = bs;
+            bundle.KnobSpeedMs = ks;
+            return any;
+        }
+
+        private WheelIdleSettings GetOrCreateIdleBundle(Guid pageGuid)
+        {
+            if (!_settings!.WheelIdleByPageGuid.TryGetValue(pageGuid, out var bundle) || bundle == null)
+            {
+                bundle = new WheelIdleSettings();
+                _settings.WheelIdleByPageGuid[pageGuid] = bundle;
+            }
+            return bundle;
+        }
+
+        private void SeedIdleUniversally(WheelIdleSettings staged)
+        {
+            void Seed(Guid pageGuid)
+            {
+                var dst = GetOrCreateIdleBundle(pageGuid);
+                if (dst.TelemetryEffect < 0 && staged.TelemetryEffect >= 0)   dst.TelemetryEffect  = staged.TelemetryEffect;
+                if (dst.ButtonsEffect < 0   && staged.ButtonsEffect >= 0)     dst.ButtonsEffect    = staged.ButtonsEffect;
+                if (dst.KnobEffect < 0      && staged.KnobEffect >= 0)        dst.KnobEffect       = staged.KnobEffect;
+                if (dst.TelemetrySpeedMs < 0 && staged.TelemetrySpeedMs >= 0) dst.TelemetrySpeedMs = staged.TelemetrySpeedMs;
+                if (dst.ButtonsSpeedMs < 0   && staged.ButtonsSpeedMs >= 0)   dst.ButtonsSpeedMs   = staged.ButtonsSpeedMs;
+                if (dst.KnobSpeedMs < 0      && staged.KnobSpeedMs >= 0)      dst.KnobSpeedMs      = staged.KnobSpeedMs;
+            }
+            foreach (var (prefix, _, _) in WheelModelInfo.KnownModels)
+            {
+                var guidStr = MozaDeviceConstants.ResolveWheelGuid(prefix);
+                if (Guid.TryParse(guidStr, out var pageGuid)) Seed(pageGuid);
+            }
+            if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var gg)) Seed(gg);
+            if (Guid.TryParse(MozaDeviceConstants.WheelOldProtoGuid, out var og)) Seed(og);
         }
 
         /// <summary>
@@ -643,15 +790,11 @@ namespace MozaPlugin.Settings
         private static void MergeSlotIntoOverlay(PerWheelSlot slot, WheelOverride ov)
         {
             if (slot.WheelTelemetryMode     >= 0) ov.WheelTelemetryMode     = slot.WheelTelemetryMode;
-            if (slot.WheelIdleEffect        >= 0) ov.WheelIdleEffect        = slot.WheelIdleEffect;
-            if (slot.WheelButtonsIdleEffect >= 0) ov.WheelButtonsIdleEffect = slot.WheelButtonsIdleEffect;
-            if (slot.WheelKnobIdleEffect    >= 0) ov.WheelKnobIdleEffect    = slot.WheelKnobIdleEffect;
             if (slot.WheelKnobLedMode       >= 0) ov.WheelKnobLedMode       = slot.WheelKnobLedMode;
             if (slot.WheelButtonsLedMode    >= 0) ov.WheelButtonsLedMode    = slot.WheelButtonsLedMode;
-            if (slot.WheelTelemetryIdleSpeedMs >= 0) ov.WheelTelemetryIdleSpeedMs = slot.WheelTelemetryIdleSpeedMs;
-            if (slot.WheelButtonsIdleSpeedMs   >= 0) ov.WheelButtonsIdleSpeedMs   = slot.WheelButtonsIdleSpeedMs;
-            if (slot.WheelKnobIdleSpeedMs      >= 0) ov.WheelKnobIdleSpeedMs      = slot.WheelKnobIdleSpeedMs;
             // WheelSleep* is migrated by the caller into WheelSleepByPageGuid.
+            // WheelIdle* / WheelButtonsIdle* / WheelKnobIdle* and the matching
+            // *SpeedMs fields are migrated by the caller into WheelIdleByPageGuid.
             if (slot.WheelRpmBrightness     >= 0) ov.WheelRpmBrightness     = slot.WheelRpmBrightness;
             if (slot.WheelButtonsBrightness >= 0) ov.WheelButtonsBrightness = slot.WheelButtonsBrightness;
             if (slot.WheelFlagsBrightness   >= 0) ov.WheelFlagsBrightness   = slot.WheelFlagsBrightness;

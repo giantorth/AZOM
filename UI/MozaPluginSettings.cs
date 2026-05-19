@@ -239,6 +239,13 @@ namespace MozaPlugin
         //       from WheelOverride.WheelSleep* (now captured via LegacyJsonFields),
         //       MozaProfile.WheelSleep* baseline (now captured via JsonExtensionData
         //       on MozaProfile), and the _settings.WheelSleep* flat fields.
+        //   9 = wheel idle-effect + idle-speed (telemetry/buttons/knob) moved
+        //       off WheelOverride / MozaProfile baseline onto WheelIdleByPageGuid.
+        //       Same reasoning as v8 sleep: the idle animation pick is a property
+        //       of the wheel, not the game. Migration drains from the per-profile
+        //       overlay, the profile baseline, and the _settings flat fields,
+        //       then zeroes the legacy slots so subsequent saves don't resurrect
+        //       per-game values.
         public int SettingsSchemaVersion { get; set; } = 0;
 
         // Per-wheel-page mzdash folder library. Keyed by SimHub page DescriptorUniqueId
@@ -268,6 +275,15 @@ namespace MozaPlugin
         // Absence = wheel keeps its currently-stored value.
         public Dictionary<Guid, WheelSleepSettings> WheelSleepByPageGuid { get; set; }
             = new Dictionary<Guid, WheelSleepSettings>();
+
+        // Per-wheel-page idle-effect/speed settings (telemetry-area RPM LEDs,
+        // buttons, knob). Schema v9 moved these off WheelOverride / MozaProfile
+        // baseline because the idle animation is a property of the wheel, not
+        // the game — same as the sleep-light bundle above. Each entry holds the
+        // three effect IDs (cmd 0x1D [group]) and the three per-group speeds
+        // (cmd 0x1E [group] [BE u16 ms]).
+        public Dictionary<Guid, WheelIdleSettings> WheelIdleByPageGuid { get; set; }
+            = new Dictionary<Guid, WheelIdleSettings>();
 
         // ===== Dashboard Telemetry =====
         public bool TelemetryEnabled { get; set; } = false;
@@ -435,6 +451,37 @@ namespace MozaPlugin
                 TimeoutMin = TimeoutMin,
                 SpeedMs = SpeedMs,
                 Color = Color != null ? (int[])Color.Clone() : null,
+            };
+        }
+    }
+
+    /// <summary>
+    /// Per-wheel-page idle-effect + idle-speed bundle stored on
+    /// <see cref="MozaPluginSettings.WheelIdleByPageGuid"/>. Wraps the
+    /// three telemetry/buttons/knob effect IDs and the three matching
+    /// per-group speed values (ms) into one dict-value, mirroring the
+    /// per-page sleep bundle (<see cref="WheelSleepSettings"/>).
+    /// All fields use -1 as the "not set" sentinel.
+    /// </summary>
+    public sealed class WheelIdleSettings
+    {
+        public int TelemetryEffect { get; set; } = -1;   // cmd 0x1D [0]
+        public int ButtonsEffect { get; set; } = -1;     // cmd 0x1D [1]
+        public int KnobEffect { get; set; } = -1;        // cmd 0x1D [3]
+        public int TelemetrySpeedMs { get; set; } = -1;  // cmd 0x1E [0] [BE u16]
+        public int ButtonsSpeedMs { get; set; } = -1;    // cmd 0x1E [1] [BE u16]
+        public int KnobSpeedMs { get; set; } = -1;       // cmd 0x1E [3] [BE u16]
+
+        public WheelIdleSettings Clone()
+        {
+            return new WheelIdleSettings
+            {
+                TelemetryEffect = TelemetryEffect,
+                ButtonsEffect = ButtonsEffect,
+                KnobEffect = KnobEffect,
+                TelemetrySpeedMs = TelemetrySpeedMs,
+                ButtonsSpeedMs = ButtonsSpeedMs,
+                KnobSpeedMs = KnobSpeedMs,
             };
         }
     }

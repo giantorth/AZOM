@@ -1721,15 +1721,67 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Seed wheel-reported sleep-light values into the per-page bundle.
-        /// Only fills sentinel (-1/null) fields — user UI selections win.
+        /// Idle effect/speed bundle for the current wheel page (shared across profiles).
+        /// null means "leave the wheel's stored value alone".
+        /// </summary>
+        internal WheelIdleSettings? ActiveWheelIdle
+        {
+            get
+            {
+                var g = GetCurrentWheelPageGuid();
+                if (!g.HasValue || _settings?.WheelIdleByPageGuid == null) return null;
+                return _settings.WheelIdleByPageGuid.TryGetValue(g.Value, out var v) ? v : null;
+            }
+        }
+
+        /// <summary>Get-or-create the per-page idle bundle. Null only if no wheel identified.</summary>
+        internal WheelIdleSettings? GetOrCreateActiveWheelIdle()
+        {
+            var g = GetCurrentWheelPageGuid();
+            if (!g.HasValue || _settings == null) return null;
+            if (_settings.WheelIdleByPageGuid == null)
+                _settings.WheelIdleByPageGuid = new Dictionary<Guid, WheelIdleSettings>();
+            if (!_settings.WheelIdleByPageGuid.TryGetValue(g.Value, out var bundle) || bundle == null)
+            {
+                bundle = new WheelIdleSettings();
+                _settings.WheelIdleByPageGuid[g.Value] = bundle;
+            }
+            return bundle;
+        }
+
+        /// <summary>
+        /// Seed wheel-reported sleep-light + idle-effect/speed values into the
+        /// per-page bundles. Only fills sentinel (-1/null) fields — user UI
+        /// selections win. Without this, the wheel's current state is mirrored
+        /// into _data but never persisted, so on the next launch the bundles
+        /// are empty for unset fields and ApplyWheelToHardware leaves the
+        /// wheel's mode/speed/color/idle-effect untouched even though we just
+        /// observed them.
         /// </summary>
         private void SeedSleepBundleFromResponse(ParsedResponse r)
         {
             if (r.Name == null) return;
-            if (r.Name != "wheel-idle-mode" && r.Name != "wheel-idle-timeout"
-                && r.Name != "wheel-idle-speed" && r.Name != "wheel-idle-color")
-                return;
+            switch (r.Name)
+            {
+                case "wheel-idle-mode":
+                case "wheel-idle-timeout":
+                case "wheel-idle-speed":
+                case "wheel-idle-color":
+                    SeedSleepBundleField(r);
+                    return;
+                case "wheel-telemetry-idle-effect":
+                case "wheel-buttons-idle-effect":
+                case "wheel-knob-idle-effect":
+                case "wheel-telemetry-idle-interval":
+                case "wheel-buttons-idle-interval":
+                case "wheel-knob-idle-interval":
+                    SeedIdleBundleField(r);
+                    return;
+            }
+        }
+
+        private void SeedSleepBundleField(ParsedResponse r)
+        {
             var bundle = GetOrCreateActiveWheelSleep();
             if (bundle == null) return;
             bool changed = false;
@@ -1768,6 +1820,65 @@ namespace MozaPlugin
                         int packed = (r.ArrayValue[0] << 16) | (r.ArrayValue[1] << 8) | r.ArrayValue[2];
                         bundle.Color = new[] { packed };
                         changed = true;
+                    }
+                    break;
+            }
+            if (changed) PersistSettings();
+        }
+
+        private void SeedIdleBundleField(ParsedResponse r)
+        {
+            var bundle = GetOrCreateActiveWheelIdle();
+            if (bundle == null) return;
+            bool changed = false;
+            switch (r.Name)
+            {
+                case "wheel-telemetry-idle-effect":
+                    if (bundle.TelemetryEffect < 0 && r.IntValue >= 0)
+                    {
+                        bundle.TelemetryEffect = r.IntValue;
+                        changed = true;
+                    }
+                    break;
+                case "wheel-buttons-idle-effect":
+                    if (bundle.ButtonsEffect < 0 && r.IntValue >= 0)
+                    {
+                        bundle.ButtonsEffect = r.IntValue;
+                        changed = true;
+                    }
+                    break;
+                case "wheel-knob-idle-effect":
+                    if (bundle.KnobEffect < 0 && r.IntValue >= 0)
+                    {
+                        bundle.KnobEffect = r.IntValue;
+                        changed = true;
+                    }
+                    break;
+                case "wheel-telemetry-idle-interval":
+                case "wheel-buttons-idle-interval":
+                case "wheel-knob-idle-interval":
+                    // Payload [effect_id, ms_msb, ms_lsb] — store only the ms.
+                    if (r.ArrayValue != null && r.ArrayValue.Length >= 3)
+                    {
+                        int ms = (r.ArrayValue[1] << 8) | r.ArrayValue[2];
+                        if (ms > 0)
+                        {
+                            if (r.Name == "wheel-telemetry-idle-interval" && bundle.TelemetrySpeedMs < 0)
+                            {
+                                bundle.TelemetrySpeedMs = ms;
+                                changed = true;
+                            }
+                            else if (r.Name == "wheel-buttons-idle-interval" && bundle.ButtonsSpeedMs < 0)
+                            {
+                                bundle.ButtonsSpeedMs = ms;
+                                changed = true;
+                            }
+                            else if (r.Name == "wheel-knob-idle-interval" && bundle.KnobSpeedMs < 0)
+                            {
+                                bundle.KnobSpeedMs = ms;
+                                changed = true;
+                            }
+                        }
                     }
                     break;
             }

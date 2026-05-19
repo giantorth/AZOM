@@ -31,13 +31,17 @@ namespace MozaPlugin.Devices
 
         internal static readonly string[] NewWheelSettingsReadCommands = new[]
         {
-            "wheel-telemetry-mode", "wheel-telemetry-idle-effect",
-            "wheel-buttons-idle-effect",
-            "wheel-knob-idle-effect",
+            "wheel-telemetry-mode",
             "wheel-knob-led-mode", "wheel-buttons-led-mode",
             "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-flags-brightness",
-            // Sleep-light reads — captured into MozaData and seeded into
-            // WheelSleepByPageGuid via SeedSleepBundleFromResponse.
+            // Idle-effect + sleep-light reads — captured into MozaData and
+            // seeded into per-wheel-page WheelIdleByPageGuid (effects) and
+            // WheelSleepByPageGuid (sleep mode/timeout/speed/color) via
+            // SeedSleepBundleFromResponse. The matching idle-*-interval
+            // (speed) commands are write-only on the wire (RxGroup=0xFF) so
+            // they're not read here.
+            "wheel-telemetry-idle-effect", "wheel-buttons-idle-effect",
+            "wheel-knob-idle-effect",
             "wheel-idle-mode", "wheel-idle-timeout", "wheel-idle-speed",
             "wheel-idle-color",
             "wheel-paddles-mode", "wheel-clutch-point", "wheel-knob-mode", "wheel-stick-mode",
