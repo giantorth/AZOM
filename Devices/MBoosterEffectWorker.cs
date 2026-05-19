@@ -22,8 +22,16 @@ namespace MozaPlugin.Devices
         private const double TickPeriodSec = 0.020;
         // Keepalive @ ~2 Hz — 25 ticks × 20 ms = 500 ms (protocol note § 3 / § 4).
         private const int KeepaliveTickInterval = 25;
-        // Engine continuous-effect safety clamp (doc § 4 suggested default = 0.01..0.1).
-        private const double EngineIntensityCap = 0.10;
+
+        // Per-effect maximum scale at user IntensityPct = 100, per protocol note § 4
+        // ("Suggested defaults: 0.01 / 0.10 / 0.15 / 0.10"). The note treats those
+        // numbers as the suggested *applied* scale, so user 100 % maps to those
+        // ceilings; user 0 % is silent. Matches PitHouse's perceived loudness at
+        // equivalent slider positions.
+        private const double AbsScaleMax       = 0.10;
+        private const double LockupScaleMax    = 0.15;
+        private const double ThresholdScaleMax = 0.10;
+        private const double EngineScaleMax    = 0.10;
 
         private readonly MBoosterDeviceController _device;
         private readonly Func<MBoosterDeviceSettings?> _settingsLookup;
@@ -46,13 +54,19 @@ namespace MozaPlugin.Devices
         private bool _thresholdLatched; // hysteresis flag for the Threshold effect (doc § 4)
 
         // Test pulses (UI test buttons) — fire one effect for ~1 s outside the
-        // game-driven mapping. Each effect tracks a `_testUntilTicks` deadline.
+        // game-driven mapping. The stored `_testIntensity*` is the raw user
+        // setting (0..1, = IntensityPct/100); per-effect ScaleMax is applied
+        // inside the test path along with live brake modulation (ABS, Lockup,
+        // Threshold) or the fixed reference frequency (Engine).
         private long _testAbsUntil;
         private long _testLockupUntil;
         private long _testThresholdUntil;
         private long _testEngineUntil;
         private double _testIntensityAbs, _testIntensityLockup, _testIntensityThreshold, _testIntensityEngine;
-        private double _testHzAbs, _testHzLockup, _testHzThreshold, _testHzEngine;
+        // Fixed reference frequency for the Engine test pulse — mid-range of the
+        // doc § 4 RPM-derived freq mapping. The brake-modulated test paths
+        // compute their own frequency from the live brake reading.
+        private const double EngineTestRefHz = 10.0;
 
         // Keepalive tick counter (mod KeepaliveTickInterval).
         private int _keepaliveCounter;
@@ -102,20 +116,23 @@ namespace MozaPlugin.Devices
             lock (_telemetryLock) _latest = snap;
         }
 
-        public void FireTestPulse(MBoosterEffectId effect, double intensity01, double freqHz)
+        public void FireTestPulse(MBoosterEffectId effect, double intensity01)
         {
-            // Default pulse length 1 s.
+            // Default pulse length 1 s. The brake-modulated effects re-derive
+            // freq + intensity from live brake during the window; Engine uses a
+            // fixed reference frequency. Stored value is the raw 0..1 user
+            // intensity setting; per-effect ScaleMax is applied at use time.
             long deadline = Stopwatch.GetTimestamp() + Stopwatch.Frequency;
             switch (effect)
             {
                 case MBoosterEffectId.Abs:
-                    _testIntensityAbs = intensity01; _testHzAbs = freqHz; _testAbsUntil = deadline; break;
+                    _testIntensityAbs = intensity01; _testAbsUntil = deadline; break;
                 case MBoosterEffectId.Lockup:
-                    _testIntensityLockup = intensity01; _testHzLockup = freqHz; _testLockupUntil = deadline; break;
+                    _testIntensityLockup = intensity01; _testLockupUntil = deadline; break;
                 case MBoosterEffectId.Threshold:
-                    _testIntensityThreshold = intensity01; _testHzThreshold = freqHz; _testThresholdUntil = deadline; break;
+                    _testIntensityThreshold = intensity01; _testThresholdUntil = deadline; break;
                 case MBoosterEffectId.Engine:
-                    _testIntensityEngine = intensity01; _testHzEngine = freqHz; _testEngineUntil = deadline; break;
+                    _testIntensityEngine = intensity01; _testEngineUntil = deadline; break;
             }
         }
 
@@ -179,11 +196,13 @@ namespace MozaPlugin.Devices
 
         private void UpdateEngineRequest(MBoosterDeviceSettings? settings, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
-            // Test pulse overrides telemetry-driven engine.
+            // Test pulse overrides telemetry-driven engine. Engine is not
+            // brake-modulated (continuous RPM-driven effect); test runs at the
+            // user-configured intensity, scaled by EngineScaleMax.
             if (Stopwatch.GetTimestamp() < _testEngineUntil)
             {
-                st.IntensityRequest = ClampEngine(_testIntensityEngine);
-                st.FreqHz = _testHzEngine;
+                st.IntensityRequest = Clamp01(_testIntensityEngine * EngineScaleMax);
+                st.FreqHz = EngineTestRefHz;
                 return;
             }
 
@@ -208,18 +227,27 @@ namespace MozaPlugin.Devices
             if (hz < 10) hz = 10;
             if (hz > 200) hz = 200;
             st.FreqHz = hz;
-            // Engine continuous-effect safety: doc default is engineScale = 0.01,
-            // clamped to [0, 0.1]. We map user 0..100 → 0..0.1.
-            double engineScale = (settings.Engine.IntensityPct / 100.0) * 0.10;
-            st.IntensityRequest = ClampEngine(engineScale);
+            // Engine continuous-effect: user 0..100 % maps to scale 0..EngineScaleMax.
+            double engineScale = (settings.Engine.IntensityPct / 100.0) * EngineScaleMax;
+            st.IntensityRequest = Clamp01(engineScale);
         }
 
         private void UpdateAbsRequest(MBoosterDeviceSettings? settings, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
+            // Test path: substitute live brake position for absActive so the
+            // user can feel dynamic range by pressing the pedal during the
+            // 1 s pulse. Brake = 0 leaves the effect silent (matches PitHouse).
             if (Stopwatch.GetTimestamp() < _testAbsUntil)
             {
-                st.IntensityRequest = Clamp01(_testIntensityAbs);
-                st.FreqHz = _testHzAbs;
+                double brakeT = EffectiveBrake(settings, snap);
+                if (brakeT <= 0.01)
+                {
+                    st.IntensityRequest = 0;
+                    st.FreqHz = 0;
+                    return;
+                }
+                st.FreqHz = 18 + brakeT * 12;
+                st.IntensityRequest = Clamp01(brakeT * _testIntensityAbs * AbsScaleMax);
                 return;
             }
 
@@ -243,16 +271,26 @@ namespace MozaPlugin.Devices
                 return;
             }
             st.FreqHz = 18 + abs01 * 12;       // 18..30 Hz
-            double absScale = settings.Abs.IntensityPct / 100.0;
+            double absScale = (settings.Abs.IntensityPct / 100.0) * AbsScaleMax;
             st.IntensityRequest = Clamp01(abs01 * absScale);
         }
 
         private void UpdateLockupRequest(MBoosterDeviceSettings? settings, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
+            // Test path: bypass the lockup-detection heuristic (which needs
+            // vehicle speed) and modulate purely on live brake position so the
+            // user can feel the effect by pressing the pedal during the pulse.
             if (Stopwatch.GetTimestamp() < _testLockupUntil)
             {
-                st.IntensityRequest = Clamp01(_testIntensityLockup);
-                st.FreqHz = _testHzLockup;
+                double brakeT = EffectiveBrake(settings, snap);
+                if (brakeT <= 0.01)
+                {
+                    st.IntensityRequest = 0;
+                    st.FreqHz = 0;
+                    return;
+                }
+                st.FreqHz = 40 + brakeT * 30;
+                st.IntensityRequest = Clamp01(brakeT * _testIntensityLockup * LockupScaleMax);
                 return;
             }
 
@@ -284,17 +322,26 @@ namespace MozaPlugin.Devices
                 return;
             }
             st.FreqHz = 40 + brake * 30;       // 40..70 Hz
-            double lockupScale = settings.Lockup.IntensityPct / 100.0;
+            double lockupScale = (settings.Lockup.IntensityPct / 100.0) * LockupScaleMax;
             st.IntensityRequest = Clamp01(brake * lockupScale);
         }
 
         private void UpdateThresholdRequest(MBoosterDeviceSettings? settings, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
+            // Test path: skip the rising-edge hysteresis so the effect tracks
+            // brake position continuously during the 1 s pulse — the user can
+            // feel the envelope shape across the full range of pedal travel.
             if (Stopwatch.GetTimestamp() < _testThresholdUntil)
             {
-                st.IntensityRequest = Clamp01(_testIntensityThreshold);
-                st.FreqHz = _testHzThreshold;
-                _thresholdLatched = true;
+                double brakeT = EffectiveBrake(settings, snap);
+                if (brakeT <= 0.01)
+                {
+                    st.IntensityRequest = 0;
+                    st.FreqHz = 0;
+                    return;
+                }
+                st.FreqHz = 60 + brakeT * 30;
+                st.IntensityRequest = Clamp01(brakeT * _testIntensityThreshold * ThresholdScaleMax);
                 return;
             }
 
@@ -320,7 +367,7 @@ namespace MozaPlugin.Devices
                 return;
             }
             st.FreqHz = 60 + brake * 30;       // 60..90 Hz
-            double thresholdScale = settings.Threshold.IntensityPct / 100.0;
+            double thresholdScale = (settings.Threshold.IntensityPct / 100.0) * ThresholdScaleMax;
             st.IntensityRequest = Clamp01(brake * thresholdScale);
         }
 
@@ -378,19 +425,28 @@ namespace MozaPlugin.Devices
 
         // ===== Helpers ====================================================
 
+        /// <summary>
+        /// Live brake reading for test pulses. Prefers <c>snap.Brake</c> (the
+        /// game-telemetry source SimHub publishes) and rises to the mBooster's
+        /// own HID pedal position when its role is Brake — so the user can feel
+        /// brake-modulated test pulses even with no game running.
+        /// </summary>
+        private double EffectiveBrake(MBoosterDeviceSettings? settings, in MBoosterTelemetrySnapshot snap)
+        {
+            double b = Clamp01(snap.Brake);
+            if (settings?.Role == MBoosterRole.Brake)
+            {
+                double hid = Clamp01(_device.LastHidPosition);
+                if (hid > b) b = hid;
+            }
+            return b;
+        }
+
         private static double Clamp01(double v)
         {
             if (double.IsNaN(v)) return 0;
             if (v < 0) return 0;
             if (v > 1) return 1;
-            return v;
-        }
-
-        private static double ClampEngine(double v)
-        {
-            if (double.IsNaN(v)) return 0;
-            if (v < 0) return 0;
-            if (v > EngineIntensityCap) return EngineIntensityCap;
             return v;
         }
     }

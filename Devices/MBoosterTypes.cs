@@ -19,9 +19,11 @@ namespace MozaPlugin.Devices
     /// <summary>
     /// Per-effect knobs the user can tweak. Frequency is computed at runtime
     /// per protocol note § 4 telemetry pseudocode — only enable + intensity
-    /// are surfaced in the UI. Engine intensity is clamped to 10 % at apply
-    /// time (the doc warns engine runs continuously, much louder than the
-    /// other effects, so a much smaller scale is appropriate).
+    /// are surfaced in the UI. Each effect's user 0..100 % maps to scale
+    /// 0..ScaleMax at apply time (protocol note § 4 suggested defaults:
+    /// ABS / Threshold = 0.10, Lockup = 0.15, Engine = 0.10 — engine runs
+    /// continuously and would dominate the others without this cap). The
+    /// caps live on <c>MBoosterEffectWorker</c>.
     /// </summary>
     public sealed class MBoosterEffectSettings
     {

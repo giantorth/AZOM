@@ -276,27 +276,16 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Fire a single effect at the configured intensity for ~1 s, used by
-        /// the per-effect "Test" buttons in the UI. Runs independently of the
-        /// game-driven worker — just builds frames inline at the doc's
-        /// reference frequencies.
+        /// Fire a single effect for ~1 s, used by the per-effect "Test" buttons
+        /// in the UI. The worker handles per-effect scale caps and brake
+        /// modulation (ABS / Lockup / Threshold track live brake; Engine uses
+        /// its reference frequency at the configured intensity). The raw 0..1
+        /// user setting is passed through unchanged.
         /// </summary>
         public void FireEffectTest(MBoosterEffectId effect)
         {
             var settings = _settingsLookup();
             if (settings == null || !_connection.IsConnected) return;
-
-            // Pick a sensible test frequency per effect (mid-range of the
-            // doc's telemetry mapping for each).
-            double testHz;
-            switch (effect)
-            {
-                case MBoosterEffectId.Abs:       testHz = 22.0; break;
-                case MBoosterEffectId.Lockup:    testHz = 55.0; break;
-                case MBoosterEffectId.Threshold: testHz = 70.0; break;
-                case MBoosterEffectId.Engine:    testHz = 10.0; break;
-                default: testHz = 22.0; break;
-            }
 
             var es = effect switch
             {
@@ -308,12 +297,7 @@ namespace MozaPlugin.Devices
             };
 
             double intensity = (es?.IntensityPct ?? 50) / 100.0;
-            // Engine continuous-effect safety: clamp to 10 % as the protocol
-            // note's pseudocode does (engine runs continuously).
-            if (effect == MBoosterEffectId.Engine && intensity > 0.10)
-                intensity = 0.10;
-
-            _worker.FireTestPulse(effect, intensity, testHz);
+            _worker.FireTestPulse(effect, intensity);
         }
 
         public void Dispose()
