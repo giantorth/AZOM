@@ -284,6 +284,14 @@ namespace MozaPlugin
         // values to a device that isn't attached.
         public Ab9Settings? Ab9 { get; set; }
 
+        // ===== mBooster Pedals (per-device) =====
+        // Per-device settings keyed by USB device instance ID (stable across
+        // reconnects). One entry per physical mBooster the user has touched
+        // settings for. Dict starts empty; mBooster detection populates it
+        // lazily via the UI when the user first opens the device's tab.
+        public Dictionary<string, MBoosterDeviceSettings> MBoosterSettings { get; set; }
+            = new Dictionary<string, MBoosterDeviceSettings>(StringComparer.OrdinalIgnoreCase);
+
         // ===== Active dashboard for this game profile =====
         // Stable key in the same format MozaPlugin.GetActiveDashboardKeyCandidates() emits:
         //   "wheel:<configJsonId>"     — wheel-resident dashboard, stable across re-uploads
@@ -406,6 +414,17 @@ namespace MozaPlugin
             DashFlagColors = CloneArray(p.DashFlagColors);
 
             Ab9 = p.Ab9?.Clone();
+
+            // mBooster — deep-copy each per-device settings entry.
+            MBoosterSettings = new Dictionary<string, MBoosterDeviceSettings>(StringComparer.OrdinalIgnoreCase);
+            if (p.MBoosterSettings != null)
+            {
+                foreach (var kvp in p.MBoosterSettings)
+                {
+                    if (kvp.Value != null)
+                        MBoosterSettings[kvp.Key] = kvp.Value.Clone();
+                }
+            }
 
             TelemetryDashboardKey = p.TelemetryDashboardKey;
 

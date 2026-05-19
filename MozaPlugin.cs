@@ -38,6 +38,7 @@ namespace MozaPlugin
         private MozaData _data = null!;
         private MozaDeviceManager _deviceManager = null!;
         private MozaAb9DeviceManager _ab9Manager = null!;
+        private MozaMBoosterRegistry? _mboosterRegistry;
         internal global::MozaPlugin.Protocol.PendingResponseTracker PendingResponses { get; }
             = new global::MozaPlugin.Protocol.PendingResponseTracker();
         private MozaPluginSettings _settings = null!;
@@ -247,6 +248,7 @@ namespace MozaPlugin
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
+        internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;
         internal MozaSerialConnection Connection => _connection;
 
         /// <summary>True if the wheel's internal Display sub-device responded to probe.
@@ -433,6 +435,20 @@ namespace MozaPlugin
                     () => IsShuttingDown);
                 _ab9Worker.Start();
 
+                // mBooster Pedals registry — multi-device owner. Refresh() is
+                // called from the reconnect timer alongside TryConnectAb9. Each
+                // detected mBooster spawns its own controller + 50 Hz worker.
+                _mboosterRegistry = new MozaMBoosterRegistry(
+                    _data,
+                    settingsLookup: id => GetOrCreateMBoosterSettings(id),
+                    isShuttingDown: () => IsShuttingDown,
+                    onDeviceDetectedEdge: OnMBoosterDeviceDetected);
+                // Initial walk so any mBooster plugged in BEFORE SimHub launched
+                // appears immediately — without this, the user waits up to 5 s
+                // for the reconnect timer to fire.
+                try { _mboosterRegistry.Refresh(); }
+                catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Initial refresh: {ex.Message}"); }
+
                 // 5 s poll interval — balances wire noise vs hot-swap / temp UI responsiveness.
                 _pollTimer = new Timer(5000);
                 _pollTimer.Elapsed += PollStatus;
@@ -468,12 +484,25 @@ namespace MozaPlugin
                         && registryHasMoza
                         && !_ab9Manager.IsConnected)
                         TryConnectAb9();
+
+                    // Slice I: reconnect-timer mBooster Refresh re-enabled.
+                    try { _mboosterRegistry?.Refresh(); }
+                    catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Refresh: {ex.Message}"); }
                 };
                 _reconnectTimer.AutoReset = true;
                 if (_settings.ConnectionEnabled)
                     _reconnectTimer.Start();
 
                 _hidReader = new MozaHidReader(_data);
+                // Slice G: HID event subscription re-enabled.
+                if (_mboosterRegistry != null)
+                {
+                    _hidReader.MBoosterAxisChanged += (identity, pos01) =>
+                    {
+                        try { _mboosterRegistry.OnHidAxisUpdate(identity, pos01); }
+                        catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] HID dispatch: {ex.Message}"); }
+                    };
+                }
                 _hidReader.Start();
                 _propertyResolver = new SimHubPropertyResolver(_pluginManager, _data, _hidReader);
                 _hardwareApplier = new HardwareApplier(this, _data, _deviceManager, _ab9Manager, DetectionState);
@@ -580,6 +609,9 @@ namespace MozaPlugin
 
             // Halt the AB9 engine-vib worker before disposing the AB9 manager.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
+            // Dispose every mBooster controller — same reason: stop workers
+            // before the connections they own get torn down.
+            try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
             try
             {
                 if (_connection != null)
@@ -670,6 +702,110 @@ namespace MozaPlugin
             // Hand the latest RPM + game-running flag to the AB9 engine-vib worker.
             double rpm = data.NewData?.Rpms ?? 0.0;
             _ab9Worker?.PostFrame(rpm, data.GameRunning);
+
+            // Slice F: DataUpdate hook re-enabled.
+            // Fan-out fresh telemetry to every mBooster's effect worker.
+            if (_mboosterRegistry != null)
+            {
+                var nd = data.NewData;
+                double brake01 = (nd?.Brake ?? 0.0) / 100.0;
+                if (brake01 < 0) brake01 = 0; if (brake01 > 1) brake01 = 1;
+                bool absActive = false;
+                try
+                {
+                    object? raw = nd?.ABSActive;
+                    if (raw != null)
+                        absActive = Convert.ToInt32(raw, System.Globalization.CultureInfo.InvariantCulture) != 0;
+                }
+                catch { }
+                double vehicleMs = (nd?.SpeedKmh ?? 0.0) / 3.6;
+                double avgWheelMs = 0.0;
+                double idleRpm = 800.0;
+                var snap = new MBoosterTelemetrySnapshot(
+                    gameRunning: data.GameRunning,
+                    rpm: rpm,
+                    idleRpm: idleRpm,
+                    brake: brake01,
+                    absActive: absActive,
+                    vehicleSpeedMs: vehicleMs,
+                    avgWheelSpeedMs: avgWheelMs);
+                _mboosterRegistry.OnDataUpdate(snap);
+            }
+        }
+
+        /// <summary>
+        /// Look up (or lazily create) the per-device mBooster settings entry
+        /// in the current profile. Called by the registry and the effect
+        /// worker on every tick — must be allocation-free for known devices.
+        /// </summary>
+        internal MBoosterDeviceSettings GetOrCreateMBoosterSettings(string identity)
+        {
+            var profile = _settings?.ProfileStore?.CurrentProfile;
+            if (profile == null) return new MBoosterDeviceSettings();
+            if (profile.MBoosterSettings == null)
+                profile.MBoosterSettings = new Dictionary<string, MBoosterDeviceSettings>(StringComparer.OrdinalIgnoreCase);
+            if (!profile.MBoosterSettings.TryGetValue(identity, out var s) || s == null)
+            {
+                s = new MBoosterDeviceSettings();
+                profile.MBoosterSettings[identity] = s;
+            }
+            return s;
+        }
+
+        /// <summary>
+        /// Called once per detection rising edge by the registry. Pushes any
+        /// saved calibration values to the device and kicks off a read-back
+        /// for unset calibration fields. The doc warns this surface may not
+        /// be honored by mBooster firmware — we attempt it anyway since the
+        /// user opted in.
+        /// </summary>
+        private void OnMBoosterDeviceDetected(MBoosterDeviceController controller)
+        {
+            if (IsShuttingDown || controller == null) return;
+            try
+            {
+                MozaLog.Info($"[Moza/mBooster] Applying settings for {MBoosterDeviceController.ShortIdentity(controller.Identity)} (experimental calibration surface)");
+                var s = GetOrCreateMBoosterSettings(controller.Identity);
+                ApplyMBoosterToHardware(controller, s);
+                // Always issue a calibration read burst on detect so the panel
+                // can populate (or so we learn the device ignored them).
+                controller.RequestCalibrationReads();
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[Moza/mBooster] OnDetected for {controller.Identity}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Push calibration values (direction / min / max / curve) for one
+        /// mBooster to its device. Sentinel-guarded — values left at -1 (or
+        /// null array) are skipped, so a fresh profile with no overrides
+        /// produces zero hardware writes. Per protocol note § 6 these
+        /// commands are "likely but unverified" on mBooster firmware.
+        /// </summary>
+        internal void ApplyMBoosterToHardware(MBoosterDeviceController controller, MBoosterDeviceSettings s)
+        {
+            if (controller == null || s == null || !controller.IsConnected) return;
+            // Direction / min / max — write only if the user has set them.
+            if (s.Direction >= 0)
+            {
+                // Direction is a per-pedal field on real Moza pedals; on
+                // mBooster (single-axis) we route through the throttle dir
+                // slot. Brake/clutch dirs are reserved for symmetry but
+                // unlikely to be wired on a single-axis unit.
+                controller.SendIntWrite("mbooster-throttle-dir", s.Direction);
+            }
+            if (s.Min >= 0) controller.SendIntWrite("mbooster-throttle-min", s.Min);
+            if (s.Max >= 0) controller.SendIntWrite("mbooster-throttle-max", s.Max);
+            if (s.CurveY != null && s.CurveY.Length == 5)
+            {
+                controller.SendFloatWrite("mbooster-throttle-y1", s.CurveY[0]);
+                controller.SendFloatWrite("mbooster-throttle-y2", s.CurveY[1]);
+                controller.SendFloatWrite("mbooster-throttle-y3", s.CurveY[2]);
+                controller.SendFloatWrite("mbooster-throttle-y4", s.CurveY[3]);
+                controller.SendFloatWrite("mbooster-throttle-y5", s.CurveY[4]);
+            }
         }
 
         // Resolve a dashboard name to its parsed MultiStreamProfile without firing
@@ -706,6 +842,11 @@ namespace MozaPlugin
             // are disposed; the tick gates on connection state but joining here
             // keeps shutdown deterministic.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
+
+            // Dispose every mBooster controller — fires disable frames + closes
+            // each connection. Must happen before MozaData is torn down so the
+            // position-merge path (which writes to _data) doesn't race.
+            try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
 
             // Clear detection flags up-front. If SimHub re-uses this plugin instance
             // across load/unload, the next Init() also clears them — together this

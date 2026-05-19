@@ -9,6 +9,20 @@ using HidSharp.Reports.Input;
 
 namespace MozaPlugin.Protocol
 {
+    /// <summary>Per-device class for the HID reader's routing decision.</summary>
+    internal enum MozaHidClass
+    {
+        /// <summary>Wheelbase / pedals / handbrake / hub — standard usage→field mapping.</summary>
+        Standard = 0,
+        /// <summary>
+        /// mBooster Pedals (PID 0x0008) — single axis, position routed via
+        /// <c>MBoosterAxisChanged</c> event so the registry can fan it out
+        /// to whichever role the user picked. Direct usage→field assignment
+        /// is skipped for this class.
+        /// </summary>
+        MBooster = 1,
+    }
+
     /// <summary>Reads physical input positions from Moza HID devices (VID 0x346E).</summary>
     internal sealed class MozaHidReader : IDisposable
     {
@@ -40,6 +54,16 @@ namespace MozaPlugin.Protocol
         private Thread? _thread;
         private volatile bool _stop;
         private long _hidParseErrorCount;
+
+        /// <summary>
+        /// Fires when an mBooster's HID axis changes (one event per device per
+        /// report). String arg is the device identity (extracted USB parent
+        /// instance segment from <see cref="HidDevice.DevicePath"/>); double
+        /// arg is the normalized position in [0, 1].
+        /// Subscribed by <c>MozaMBoosterRegistry.OnHidAxisUpdate</c> which
+        /// merges per-device positions into MozaData by role.
+        /// </summary>
+        public event Action<string, double>? MBoosterAxisChanged;
 
         // Live HidStreams so Dispose can force-close silent devices' blocked reads.
         private readonly object _streamsLock = new object();
@@ -119,7 +143,7 @@ namespace MozaPlugin.Protocol
 
                 try
                 {
-                    foreach (var (device, usages) in devices)
+                    foreach (var (device, usages, deviceClass, identity) in devices)
                     {
                         if (!device.TryOpen(out HidStream stream)) continue;
                         try
@@ -129,8 +153,10 @@ namespace MozaPlugin.Protocol
                             lock (_streamsLock) _liveStreams.Add(stream);
 
                             bool isHandbrake = HandbrakePattern.IsMatch(device.GetFriendlyName() ?? "");
+                            string idCapture = identity;
+                            MozaHidClass classCapture = deviceClass;
                             // ReadDevice owns `stream` and disposes it before returning.
-                            var t = new Thread(() => ReadDevice(device, stream, usages, isHandbrake))
+                            var t = new Thread(() => ReadDevice(device, stream, usages, isHandbrake, classCapture, idCapture))
                             {
                                 IsBackground = true,
                                 Name = $"MozaHid_{device.ProductID:X4}",
@@ -174,13 +200,16 @@ namespace MozaPlugin.Protocol
         }
 
         /// <summary>
-        /// Finds all Moza HID devices by matching product name against known
-        /// patterns (same regex as boxflat's MozaHidDevice). Returns devices
-        /// that expose at least one tracked axis usage.
+        /// Finds all Moza HID devices: (a) name-regex match for the
+        /// wheelbase / standalone pedals / handbrake / hub family, plus
+        /// (b) VID/PID match (0x346E / 0x0008) for mBooster Pedals. mBooster
+        /// is tagged with <see cref="MozaHidClass.MBooster"/> + a stable identity
+        /// extracted from <see cref="HidDevice.DevicePath"/> so the registry
+        /// can pair the HID device with its serial-port sibling.
         /// </summary>
-        private static List<(HidDevice device, Dictionary<uint, (int min, int max)> usages)> FindMozaDevices()
+        private static List<(HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity)> FindMozaDevices()
         {
-            var result = new List<(HidDevice, Dictionary<uint, (int min, int max)>)>();
+            var result = new List<(HidDevice, Dictionary<uint, (int, int)>, MozaHidClass, string)>();
             IEnumerable<HidDevice> allDevices;
             try
             {
@@ -193,8 +222,16 @@ namespace MozaPlugin.Protocol
                 try
                 {
                     string name = (dev.GetFriendlyName() ?? "").ToLowerInvariant();
-                    if (!DevicePatterns.Any(p => Regex.IsMatch(name, p)))
-                        continue;
+
+                    // (a) mBooster: VID 0x346E + PID 0x0008. Identified by VID/PID
+                    // (deterministic) instead of name regex — name format on real
+                    // hardware is unverified at the time of this code.
+                    bool isMBooster = dev.VendorID == 0x346E && dev.ProductID == 0x0008;
+
+                    // (b) Standard wheelbase / pedals / handbrake / hub via name regex.
+                    bool isStandard = DevicePatterns.Any(p => Regex.IsMatch(name, p));
+
+                    if (!isMBooster && !isStandard) continue;
 
                     var usages = new Dictionary<uint, (int min, int max)>();
                     var descriptor = dev.GetReportDescriptor();
@@ -206,14 +243,25 @@ namespace MozaPlugin.Protocol
                             {
                                 foreach (uint usage in dataItem.Usages.GetAllValues())
                                 {
-                                    if (Array.IndexOf(TrackedUsages, usage) >= 0 || (usage >> 16) == 0x0009)
+                                    // For mBooster we want EVERY GenericDesktop axis
+                                    // (page 0x0001, usages 0x30..0x37) — the doc
+                                    // doesn't pin a specific axis, so we accept the
+                                    // first one that streams data at runtime.
+                                    bool isAxis = (usage >> 16) == 0x0001 && (usage & 0xFFFF) >= 0x30 && (usage & 0xFFFF) <= 0x37;
+                                    bool isButton = (usage >> 16) == 0x0009;
+                                    bool tracked = Array.IndexOf(TrackedUsages, usage) >= 0;
+                                    if (tracked || isButton || (isMBooster && isAxis))
                                         usages[usage] = (dataItem.LogicalMinimum, dataItem.LogicalMaximum);
                                 }
                             }
                         }
                     }
                     if (usages.Count > 0)
-                        result.Add((dev, usages));
+                    {
+                        var kind = isMBooster ? MozaHidClass.MBooster : MozaHidClass.Standard;
+                        string identity = isMBooster ? ExtractUsbParentInstance(dev) : "";
+                        result.Add((dev, usages, kind, identity));
+                    }
                 }
                 catch { }
             }
@@ -221,7 +269,33 @@ namespace MozaPlugin.Protocol
             return result;
         }
 
-        private void ReadDevice(HidDevice device, HidStream stream, Dictionary<uint, (int min, int max)> usages, bool isHandbrake = false)
+        /// <summary>
+        /// Extract the USB parent device instance segment from a HID device path.
+        /// Windows HID device paths look like
+        /// <c>\\?\HID#VID_346E&amp;PID_0008&amp;MI_02#a&amp;399b951f&amp;0&amp;0002#{4d1e55b2-...}</c>;
+        /// the parent USB device's instance ID is the second '#'-delimited
+        /// segment. Mirroring the registry walk in <see cref="MozaPortDiscovery"/>
+        /// lets the registry's CDC port match against the HID device.
+        ///
+        /// Falls back to the full device path if the format doesn't match —
+        /// the registry tolerates non-canonical identities (it's still
+        /// deterministic per-physical-device, just less collision-tolerant
+        /// across replug-to-different-USB-port).
+        /// </summary>
+        internal static string ExtractUsbParentInstance(HidDevice dev)
+        {
+            string path = "";
+            try { path = dev.DevicePath ?? ""; } catch { }
+            if (string.IsNullOrEmpty(path)) return "hid:unknown";
+
+            // Split on '#'. Expect: [\\?\HID, VID_..., parent-instance, {GUID}]
+            var parts = path.Split('#');
+            if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[2]))
+                return parts[2];
+            return path;
+        }
+
+        private void ReadDevice(HidDevice device, HidStream stream, Dictionary<uint, (int min, int max)> usages, bool isHandbrake, MozaHidClass kind = MozaHidClass.Standard, string identity = "")
         {
             try
             {
@@ -282,6 +356,11 @@ namespace MozaPlugin.Protocol
                                 }
                                 else if ((usage >> 16) == 0x0009)
                                 {
+                                    // mBooster Pedals don't share the wheel button surface
+                                    // — never route their button reports into the wheel's
+                                    // button-state table or the handbrake's pressed flag.
+                                    if (kind == MozaHidClass.MBooster) continue;
+
                                     bool pressed = value.GetLogicalValue() != 0;
                                     if (isHandbrake)
                                     {
@@ -307,6 +386,23 @@ namespace MozaPlugin.Protocol
                                     var range = usages[usage];
                                     if (range.max > range.min)
                                     {
+                                        if (kind == MozaHidClass.MBooster)
+                                        {
+                                            // mBooster axes route via the registry — never directly into
+                                            // MozaData. The registry maps the per-device position into
+                                            // throttle/brake/clutch based on the user-assigned role and
+                                            // merges across multiple devices with first-wins semantics.
+                                            // We accept the first GenericDesktop axis the device emits;
+                                            // additional axes (if any) on the same device are ignored.
+                                            double raw = value.GetLogicalValue();
+                                            double normalized01 = (raw - range.min) / (double)(range.max - range.min);
+                                            if (normalized01 < 0) normalized01 = 0;
+                                            if (normalized01 > 1) normalized01 = 1;
+                                            try { MBoosterAxisChanged?.Invoke(identity, normalized01); }
+                                            catch (Exception ex) { MozaLog.Debug($"[Moza] mBooster axis handler: {ex.Message}"); }
+                                            continue;
+                                        }
+
                                         int pct = NormalizePct(value.GetLogicalValue(), range.min, range.max);
                                         switch (usage)
                                         {

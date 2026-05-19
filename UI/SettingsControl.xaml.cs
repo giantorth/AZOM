@@ -153,6 +153,7 @@ namespace MozaPlugin
                 RefreshPedalsTab();
                 RefreshHubTab();
                 RefreshAb9Tab();
+                RefreshMBoosterTab();
                 InitTelemetryTab();
                 RefreshExtendedLedGroups();
                 RefreshDashboardUploadTab();
@@ -2210,6 +2211,297 @@ namespace MozaPlugin
             GetOrCreateAb9Profile().GearShiftVibrationIntensity = v;
             _plugin.Ab9Manager?.SendGearShiftVibrationIntensity(v);
             _plugin.SaveSettings();
+        }
+
+        // =====================================================================
+        // mBooster tab — multi-device. ComboBox selects the active device;
+        // settings panel below populates from the selection's per-device
+        // entry in MozaProfile.MBoosterSettings (lazily created).
+        // =====================================================================
+
+        private string? _mboosterSelectedIdentity;
+        private bool _mboosterUiSeeded;
+
+        private void RefreshMBoosterTab()
+        {
+            var registry = _plugin?.MBoosterRegistry;
+            if (registry == null) { MBoosterTab.Visibility = Visibility.Collapsed; return; }
+            var devices = registry.Devices;
+            if (devices.Count == 0)
+            {
+                MBoosterTab.Visibility = Visibility.Collapsed;
+                _mboosterUiSeeded = false;
+                return;
+            }
+            MBoosterTab.Visibility = Visibility.Visible;
+
+            // Rebuild the device combo if the list changed.
+            using (_suppressor.Begin())
+            {
+                int prevSelected = -1;
+                for (int i = 0; i < devices.Count; i++)
+                {
+                    if (string.Equals(devices[i].Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase))
+                    {
+                        prevSelected = i;
+                        break;
+                    }
+                }
+                if (MBoosterDeviceCombo.Items.Count != devices.Count)
+                {
+                    MBoosterDeviceCombo.Items.Clear();
+                    for (int i = 0; i < devices.Count; i++)
+                    {
+                        var c = devices[i];
+                        var item = new ComboBoxItem
+                        {
+                            Content = $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})",
+                            Tag = c.Identity,
+                        };
+                        MBoosterDeviceCombo.Items.Add(item);
+                    }
+                }
+                if (prevSelected < 0) prevSelected = 0;
+                if (MBoosterDeviceCombo.SelectedIndex != prevSelected)
+                    MBoosterDeviceCombo.SelectedIndex = prevSelected;
+                _mboosterSelectedIdentity = devices[prevSelected].Identity;
+            }
+
+            var selected = registry.FindByIdentity(_mboosterSelectedIdentity ?? "");
+            if (selected == null)
+            {
+                MBoosterStatusDot.Fill = Brushes.Gray;
+                MBoosterStatusLabel.Text = "No mBooster selected";
+                MBoosterDevicePanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            MBoosterStatusDot.Fill = selected.Detected
+                ? Brushes.LimeGreen
+                : (selected.IsConnected ? Brushes.Goldenrod : Brushes.Gray);
+            MBoosterStatusLabel.Text = selected.Detected
+                ? $"Connected ({MBoosterDeviceController.ShortIdentity(selected.Identity)})"
+                : (selected.IsConnected ? "Probing…" : "Disconnected");
+            MBoosterDevicePanel.Visibility = Visibility.Visible;
+
+            // Live position bar — driven by the controller's latest HID position.
+            int pct = (int)Math.Round(selected.LastHidPosition * 100);
+            if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+            MBoosterPositionBar.Value = pct;
+            MBoosterPositionLabel.Text = pct + " %";
+
+            if (_mboosterUiSeeded) return;
+            // Seed slider/checkbox values from the profile entry. _plugin is
+            // never null past Init (the constructor stores it); guard anyway.
+            if (_plugin == null) return;
+            var s = _plugin.GetOrCreateMBoosterSettings(selected.Identity);
+            using (_suppressor.Begin())
+            {
+                SetMBoosterRoleCombo(s.Role);
+                MBoosterAbsEnable.IsChecked       = s.Abs?.Enabled       ?? false;
+                MBoosterAbsIntensity.Value        = s.Abs?.IntensityPct  ?? 50;
+                MBoosterAbsIntensityValue.Text    = (s.Abs?.IntensityPct ?? 50).ToString();
+                MBoosterLockupEnable.IsChecked    = s.Lockup?.Enabled       ?? false;
+                MBoosterLockupIntensity.Value     = s.Lockup?.IntensityPct  ?? 50;
+                MBoosterLockupIntensityValue.Text = (s.Lockup?.IntensityPct ?? 50).ToString();
+                MBoosterThresholdEnable.IsChecked    = s.Threshold?.Enabled       ?? false;
+                MBoosterThresholdIntensity.Value     = s.Threshold?.IntensityPct  ?? 50;
+                MBoosterThresholdIntensityValue.Text = (s.Threshold?.IntensityPct ?? 50).ToString();
+                MBoosterEngineEnable.IsChecked    = s.Engine?.Enabled       ?? false;
+                MBoosterEngineIntensity.Value     = s.Engine?.IntensityPct  ?? 50;
+                MBoosterEngineIntensityValue.Text = (s.Engine?.IntensityPct ?? 50).ToString();
+                MBoosterDirCheck.IsChecked = (s.Direction == 1);
+                MBoosterMinSlider.Value = s.Min >= 0 ? s.Min : 0;
+                MBoosterMinValue.Text = MBoosterMinSlider.Value.ToString("F0");
+                MBoosterMaxSlider.Value = s.Max >= 0 ? s.Max : 0;
+                MBoosterMaxValue.Text = MBoosterMaxSlider.Value.ToString("F0");
+            }
+            _mboosterUiSeeded = true;
+        }
+
+        private void SetMBoosterRoleCombo(MBoosterRole role)
+        {
+            for (int i = 0; i < MBoosterRoleCombo.Items.Count; i++)
+            {
+                if (MBoosterRoleCombo.Items[i] is ComboBoxItem ci
+                    && ci.Tag is string tag
+                    && int.TryParse(tag, out int v)
+                    && v == (int)role)
+                {
+                    MBoosterRoleCombo.SelectedIndex = i;
+                    return;
+                }
+            }
+            MBoosterRoleCombo.SelectedIndex = 0;
+        }
+
+        private MBoosterDeviceSettings? CurrentMBoosterSettings()
+        {
+            if (_mboosterSelectedIdentity == null) return null;
+            return _plugin.GetOrCreateMBoosterSettings(_mboosterSelectedIdentity);
+        }
+
+        private MBoosterDeviceController? CurrentMBoosterController()
+        {
+            return _plugin?.MBoosterRegistry?.FindByIdentity(_mboosterSelectedIdentity ?? "");
+        }
+
+        private void MBoosterDeviceCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            if (MBoosterDeviceCombo.SelectedItem is not ComboBoxItem item) return;
+            if (item.Tag is not string identity) return;
+            if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)) return;
+            _mboosterSelectedIdentity = identity;
+            _mboosterUiSeeded = false;
+            RefreshMBoosterTab();
+        }
+
+        private void MBoosterRoleCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            if (MBoosterRoleCombo.SelectedItem is not ComboBoxItem ci) return;
+            if (ci.Tag is not string tag || !int.TryParse(tag, out int v)) return;
+            s.Role = (MBoosterRole)v;
+            _plugin.SaveSettings();
+        }
+
+        // ===== Effect handlers (4 × enable + slider + test button) ==========
+
+        private void MBoosterAbsEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Abs ??= new MBoosterEffectSettings()).Enabled = MBoosterAbsEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterAbsIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterAbsIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Abs ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterAbsTest_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentMBoosterController()?.FireEffectTest(global::MozaPlugin.Protocol.MBoosterEffectId.Abs);
+        }
+
+        private void MBoosterLockupEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Lockup ??= new MBoosterEffectSettings()).Enabled = MBoosterLockupEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterLockupIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterLockupIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Lockup ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterLockupTest_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentMBoosterController()?.FireEffectTest(global::MozaPlugin.Protocol.MBoosterEffectId.Lockup);
+        }
+
+        private void MBoosterThresholdEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Threshold ??= new MBoosterEffectSettings()).Enabled = MBoosterThresholdEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterThresholdIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterThresholdIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Threshold ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterThresholdTest_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentMBoosterController()?.FireEffectTest(global::MozaPlugin.Protocol.MBoosterEffectId.Threshold);
+        }
+
+        private void MBoosterEngineEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Engine ??= new MBoosterEffectSettings()).Enabled = MBoosterEngineEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterEngineIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterEngineIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            (s.Engine ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterEngineTest_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentMBoosterController()?.FireEffectTest(global::MozaPlugin.Protocol.MBoosterEffectId.Engine);
+        }
+
+        // ===== Calibration (experimental) ===================================
+
+        private void MBoosterDirCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            s.Direction = MBoosterDirCheck.IsChecked == true ? 1 : 0;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterMinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = (int)Math.Round(e.NewValue);
+            MBoosterMinValue.Text = v.ToString();
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            s.Min = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterMaxSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = (int)Math.Round(e.NewValue);
+            MBoosterMaxValue.Text = v.ToString();
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            s.Max = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)
+        {
+            CurrentMBoosterController()?.RequestCalibrationReads();
+        }
+        private void MBoosterApplyCalButton_Click(object sender, RoutedEventArgs e)
+        {
+            var c = CurrentMBoosterController();
+            var s = CurrentMBoosterSettings();
+            if (c == null || s == null) return;
+            _plugin.ApplyMBoosterToHardware(c, s);
         }
 
     }

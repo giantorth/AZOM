@@ -18,6 +18,7 @@ namespace MozaPlugin.Protocol
         Handbrake,
         Hub,
         Ab9,
+        MBooster,
     }
 
     /// <summary>
@@ -32,6 +33,7 @@ namespace MozaPlugin.Protocol
         public const string PidWheelbaseR16R21 = "0x0000";
         public const string PidPedalsCrp       = "0x0001";
         public const string PidPedalsSrp       = "0x0003";
+        public const string PidMBoosterPedals  = "0x0008";
         public const string PidWheelbaseR5     = "0x0004";
         public const string PidWheelbaseR3     = "0x0005";
         public const string PidShifterHgp      = "0x001E";
@@ -52,6 +54,7 @@ namespace MozaPlugin.Protocol
                 [0x0004] = new InventoryEntry(MozaDeviceCategory.Wheelbase, "R5"),
                 [0x0005] = new InventoryEntry(MozaDeviceCategory.Wheelbase, "R3 (unconfirmed)"),
                 [0x0006] = new InventoryEntry(MozaDeviceCategory.Wheelbase, "R12 / R12v2"),
+                [0x0008] = new InventoryEntry(MozaDeviceCategory.MBooster,  "mBooster Pedals"),
                 [0x001E] = new InventoryEntry(MozaDeviceCategory.Shifter,   "HGP shifter (unconfirmed)"),
                 [0x001F] = new InventoryEntry(MozaDeviceCategory.Handbrake, "HBP handbrake (unconfirmed)"),
                 [0x0020] = new InventoryEntry(MozaDeviceCategory.Hub,       "Universal HUB"),
@@ -101,6 +104,8 @@ namespace MozaPlugin.Protocol
         public static bool IsHandbrakePid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.Handbrake;
         public static bool IsHubPid(string? pid)       => Categorize(pid) == MozaDeviceCategory.Hub;
         public static bool IsHubPid(ushort pid)        => Categorize(pid) == MozaDeviceCategory.Hub;
+        public static bool IsMBoosterPid(string? pid)  => Categorize(pid) == MozaDeviceCategory.MBooster;
+        public static bool IsMBoosterPid(ushort pid)   => Categorize(pid) == MozaDeviceCategory.MBooster;
 
         /// <summary>True iff the PID is registered in the inventory. Use this to gate "unknown PID" fallback paths.</summary>
         public static bool IsKnownMozaPid(string? pid)

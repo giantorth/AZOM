@@ -377,6 +377,53 @@ namespace MozaPlugin.Protocol
             AddCommand("ab9-id-10",     "ab9", 0x10, 0xFF, new byte[] { }, 17, "array");
             AddCommand("ab9-id-11",     "ab9", 0x11, 0xFF, new byte[] { }, 2,  "array");
 
+            // ===== mBOOSTER PEDALS (dev id 0x12 on its own USB-CDC) =====
+            // The mBooster vibration motor lives on its own PID 0x0008 composite
+            // device; per protocol note § 6 the pedal-config surface (groups 35/36)
+            // is "likely but unverified" on mBooster firmware. The plugin ships
+            // the full surface because the user opted into the experimental path
+            // — register here, send via MBoosterDeviceController (which targets
+            // device 0x12 on the mBooster's own connection). Motor write (0xb1)
+            // and the keepalive frame are NOT registered: they don't fit the
+            // single-cmd-id-array convention and are built inline by
+            // <see cref="MozaMBoosterProtocol"/>.
+            //
+            // The "mbooster" device-type string + "mbooster" bus hint are the
+            // two routing keys the response parser uses to keep mBooster acks
+            // from cross-matching against the wheelbase main / AB9 main
+            // (all three share device id 0x12 on different USB endpoints).
+            AddCommand("mbooster-throttle-dir", "mbooster", 35, 36, new byte[] { 1 }, 2, "int");
+            AddCommand("mbooster-throttle-min", "mbooster", 35, 36, new byte[] { 2 }, 2, "int");
+            AddCommand("mbooster-throttle-max", "mbooster", 35, 36, new byte[] { 3 }, 2, "int");
+            AddCommand("mbooster-brake-dir",    "mbooster", 35, 36, new byte[] { 4 }, 2, "int");
+            AddCommand("mbooster-brake-min",    "mbooster", 35, 36, new byte[] { 5 }, 2, "int");
+            AddCommand("mbooster-brake-max",    "mbooster", 35, 36, new byte[] { 6 }, 2, "int");
+            AddCommand("mbooster-clutch-dir",   "mbooster", 35, 36, new byte[] { 7 }, 2, "int");
+            AddCommand("mbooster-clutch-min",   "mbooster", 35, 36, new byte[] { 8 }, 2, "int");
+            AddCommand("mbooster-clutch-max",   "mbooster", 35, 36, new byte[] { 9 }, 2, "int");
+            AddCommand("mbooster-brake-angle-ratio", "mbooster", 35, 36, new byte[] { 26 }, 4, "float");
+            // 5-point output curves per pedal (4-byte float, read 35 / write 36)
+            AddCommand("mbooster-throttle-y1", "mbooster", 35, 36, new byte[] { 14 }, 4, "float");
+            AddCommand("mbooster-throttle-y2", "mbooster", 35, 36, new byte[] { 15 }, 4, "float");
+            AddCommand("mbooster-throttle-y3", "mbooster", 35, 36, new byte[] { 16 }, 4, "float");
+            AddCommand("mbooster-throttle-y4", "mbooster", 35, 36, new byte[] { 17 }, 4, "float");
+            AddCommand("mbooster-throttle-y5", "mbooster", 35, 36, new byte[] { 27 }, 4, "float");
+            AddCommand("mbooster-brake-y1",    "mbooster", 35, 36, new byte[] { 18 }, 4, "float");
+            AddCommand("mbooster-brake-y2",    "mbooster", 35, 36, new byte[] { 19 }, 4, "float");
+            AddCommand("mbooster-brake-y3",    "mbooster", 35, 36, new byte[] { 20 }, 4, "float");
+            AddCommand("mbooster-brake-y4",    "mbooster", 35, 36, new byte[] { 21 }, 4, "float");
+            AddCommand("mbooster-brake-y5",    "mbooster", 35, 36, new byte[] { 28 }, 4, "float");
+            AddCommand("mbooster-clutch-y1",   "mbooster", 35, 36, new byte[] { 22 }, 4, "float");
+            AddCommand("mbooster-clutch-y2",   "mbooster", 35, 36, new byte[] { 23 }, 4, "float");
+            AddCommand("mbooster-clutch-y3",   "mbooster", 35, 36, new byte[] { 24 }, 4, "float");
+            AddCommand("mbooster-clutch-y4",   "mbooster", 35, 36, new byte[] { 25 }, 4, "float");
+            AddCommand("mbooster-clutch-y5",   "mbooster", 35, 36, new byte[] { 29 }, 4, "float");
+            // Live outputs (read-only group 37) — fallback live-position source
+            // if HID identity pairing fails on a particular unit.
+            AddCommand("mbooster-throttle-output", "mbooster", 37, 0xFF, new byte[] { 1 }, 2, "int");
+            AddCommand("mbooster-brake-output",    "mbooster", 37, 0xFF, new byte[] { 2 }, 2, "int");
+            AddCommand("mbooster-clutch-output",   "mbooster", 37, 0xFF, new byte[] { 3 }, 2, "int");
+
             // ===== BASE AMBIENT LEDS (dev 0x12, write grp 0x20, read grp 0x22) =====
             // Two 9-LED strips on R21/R25/R27 bodies; R9/R12 silently drop the read.
             // Detection gates on a 0xA2 response to base-ambient-brightness.

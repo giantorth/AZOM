@@ -19,8 +19,12 @@ namespace MozaPlugin.Protocol
     public class MozaResponseParser
     {
         /// <summary>
-        /// Parse a response (null = unrecognized). <paramref name="busHint"/>="ab9" overrides
-        /// the auto-derived device hint to resolve the dev 0x12 collision with wheelbase main.
+        /// Parse a response (null = unrecognized). <paramref name="busHint"/> overrides
+        /// the auto-derived device hint to resolve dev 0x12 collisions:
+        ///   "ab9"      — AB9 active shifter on its own PID 0x1000 USB pipe
+        ///   "mbooster" — Moza mBooster Pedals on its own PID 0x0008 USB pipe
+        /// Wheelbase main, AB9 main and mBooster main all use device id 0x12;
+        /// the bus hint is the only way to tell them apart at the parser layer.
         /// </summary>
         public static ParsedResponse? Parse(byte[] data, string? busHint = null)
         {

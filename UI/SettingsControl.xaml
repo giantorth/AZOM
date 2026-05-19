@@ -798,6 +798,128 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ==================== mBOOSTER TAB ==================== -->
+            <TabItem x:Name="MBoosterTab" Header="mBooster" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">
+                    <StackPanel Margin="5">
+                        <TextBlock Text="Moza mBooster Pedals" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,12">
+                            Each connected mBooster appears below. Pick a role (Throttle/Brake/Clutch) per device to route its
+                            pedal position. Effects are host-rendered per the documented protocol — enable each effect you want
+                            to feel and adjust its intensity. The Calibration section is experimental and may not be honored by
+                            mBooster firmware.
+                        </TextBlock>
+
+                        <!-- Device selector -->
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Device" Style="{StaticResource SliderLabel}"/>
+                            <ComboBox x:Name="MBoosterDeviceCombo" Width="320" SelectionChanged="MBoosterDeviceCombo_Changed"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <Ellipse x:Name="MBoosterStatusDot" Style="{StaticResource ConnectionDot}" Fill="Gray"/>
+                            <TextBlock x:Name="MBoosterStatusLabel" Text="No mBooster connected" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Per-device panel -->
+                        <StackPanel x:Name="MBoosterDevicePanel" Visibility="Collapsed">
+                            <TextBlock Text="Pedal Role" Style="{StaticResource SectionHeader}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Role" Style="{StaticResource SliderLabel}"/>
+                                <ComboBox x:Name="MBoosterRoleCombo" Width="160" SelectionChanged="MBoosterRoleCombo_Changed">
+                                    <ComboBoxItem Content="Disabled"  Tag="0"/>
+                                    <ComboBoxItem Content="Throttle"  Tag="1"/>
+                                    <ComboBoxItem Content="Brake"     Tag="2"/>
+                                    <ComboBoxItem Content="Clutch"    Tag="3"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="Position" Style="{StaticResource SliderLabel}"/>
+                                <ProgressBar x:Name="MBoosterPositionBar" Width="220" Height="14" Minimum="0" Maximum="100" Value="0"/>
+                                <TextBlock x:Name="MBoosterPositionLabel" Style="{StaticResource SliderValue}" Text="0 %"/>
+                            </StackPanel>
+
+                            <!-- Effects -->
+                            <TextBlock Text="Effects" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Foreground="Gray" FontSize="11" Margin="0,0,0,8" TextWrapping="Wrap">
+                                Effect triggers (per protocol note): ABS fires on the game's ABS-active signal; Lockup fires under heavy braking
+                                (brake &gt; 0.8); Threshold fires on a rising-edge of brake pressure (0.6 → release at 0.3); Engine runs continuously
+                                from RPM. Engine intensity is automatically clamped to 10 % at the apply layer (engine runs continuously, much
+                                louder than the others).
+                            </TextBlock>
+
+                            <Expander Header="ABS" IsExpanded="True">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <CheckBox x:Name="MBoosterAbsEnable" Content="Enable" VerticalAlignment="Center" Width="120" Checked="MBoosterAbsEnable_Changed" Unchecked="MBoosterAbsEnable_Changed"/>
+                                        <Slider x:Name="MBoosterAbsIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterAbsIntensity_ValueChanged"/>
+                                        <TextBlock x:Name="MBoosterAbsIntensityValue" Style="{StaticResource SliderValue}" Text="50"/>
+                                        <Button x:Name="MBoosterAbsTest" Content="Test 1s" Margin="6,0,0,0" Padding="10,2" Click="MBoosterAbsTest_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                            <Expander Header="Lockup" IsExpanded="True">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <CheckBox x:Name="MBoosterLockupEnable" Content="Enable" VerticalAlignment="Center" Width="120" Checked="MBoosterLockupEnable_Changed" Unchecked="MBoosterLockupEnable_Changed"/>
+                                        <Slider x:Name="MBoosterLockupIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterLockupIntensity_ValueChanged"/>
+                                        <TextBlock x:Name="MBoosterLockupIntensityValue" Style="{StaticResource SliderValue}" Text="50"/>
+                                        <Button x:Name="MBoosterLockupTest" Content="Test 1s" Margin="6,0,0,0" Padding="10,2" Click="MBoosterLockupTest_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                            <Expander Header="Threshold" IsExpanded="True">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <CheckBox x:Name="MBoosterThresholdEnable" Content="Enable" VerticalAlignment="Center" Width="120" Checked="MBoosterThresholdEnable_Changed" Unchecked="MBoosterThresholdEnable_Changed"/>
+                                        <Slider x:Name="MBoosterThresholdIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterThresholdIntensity_ValueChanged"/>
+                                        <TextBlock x:Name="MBoosterThresholdIntensityValue" Style="{StaticResource SliderValue}" Text="50"/>
+                                        <Button x:Name="MBoosterThresholdTest" Content="Test 1s" Margin="6,0,0,0" Padding="10,2" Click="MBoosterThresholdTest_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                            <Expander Header="Engine (continuous — auto-clamped to 10%)" IsExpanded="False">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <CheckBox x:Name="MBoosterEngineEnable" Content="Enable" VerticalAlignment="Center" Width="120" Checked="MBoosterEngineEnable_Changed" Unchecked="MBoosterEngineEnable_Changed"/>
+                                        <Slider x:Name="MBoosterEngineIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterEngineIntensity_ValueChanged"/>
+                                        <TextBlock x:Name="MBoosterEngineIntensityValue" Style="{StaticResource SliderValue}" Text="50"/>
+                                        <Button x:Name="MBoosterEngineTest" Content="Test 1s" Margin="6,0,0,0" Padding="10,2" Click="MBoosterEngineTest_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+
+                            <Expander Header="Calibration (experimental — may not be honored by mBooster firmware)" IsExpanded="False" Margin="0,12,0,0">
+                                <StackPanel Margin="8,4">
+                                    <TextBlock TextWrapping="Wrap" Foreground="Goldenrod" FontSize="11" Margin="0,0,0,8">
+                                        The pedal-config command surface (direction / min / max / 5-point curve) is from the standard Moza pedal
+                                        protocol. Whether mBooster firmware acknowledges these reads/writes is unverified — your changes may
+                                        appear to take effect locally but be silently ignored by the device. Use "Read from device" to check
+                                        whether values come back at all.
+                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <CheckBox x:Name="MBoosterDirCheck" Content="Reversed direction" Checked="MBoosterDirCheck_Changed" Unchecked="MBoosterDirCheck_Changed"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Min (raw)" Style="{StaticResource SliderLabel}"/>
+                                        <Slider x:Name="MBoosterMinSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="65535" TickFrequency="1024" ValueChanged="MBoosterMinSlider_ValueChanged"/>
+                                        <TextBlock x:Name="MBoosterMinValue" Style="{StaticResource SliderValue}" Text="0"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Max (raw)" Style="{StaticResource SliderLabel}"/>
+                                        <Slider x:Name="MBoosterMaxSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="65535" TickFrequency="1024" ValueChanged="MBoosterMaxSlider_ValueChanged"/>
+                                        <TextBlock x:Name="MBoosterMaxValue" Style="{StaticResource SliderValue}" Text="0"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <Button x:Name="MBoosterReadCalButton" Content="Read from device" Padding="12,4" Margin="0,0,6,0" Click="MBoosterReadCalButton_Click"/>
+                                        <Button x:Name="MBoosterApplyCalButton" Content="Apply" Padding="12,4" Click="MBoosterApplyCalButton_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ==================== HUB TAB ==================== -->
             <TabItem x:Name="HubTab" Header="Hub" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10">

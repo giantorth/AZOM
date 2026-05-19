@@ -34,6 +34,10 @@ namespace MozaPlugin.Protocol
         Ab9TriggerRpm = 14,      // 0x0D 0x05 (RPM-tracking trigger)
         Ab9TriggerExtra = 15,    // 0x0D 0x01 (newly-observed sub-cmd)
         Ab9LowRate = 16,         // 0x08 0x04 + 0x08 0x06 (signed-pair low-rate)
+        // mBooster motor-write lane (single slot per connection; the worker
+        // emits one frame per ~20 ms tick across all four effects, so a
+        // shared lane is sufficient — latest-wins on the writer-lag edge).
+        MBoosterEffect = 17,
     }
 
     /// <summary>Device family targeted by the serial probe fallback (registry-empty case).</summary>
@@ -41,11 +45,16 @@ namespace MozaPlugin.Protocol
     {
         BaseAndHub,
         Ab9,
+        // mBooster has no handshake (protocol note § 1) and the multi-device
+        // discovery is registry-driven; the serial-probe fallback would have
+        // to write at every COM port to find a unit, which we deliberately
+        // skip to keep the per-port probe surface minimal. See FindMozaPort.
+        MBooster,
     }
 
     public class MozaSerialConnection : IDisposable
     {
-        private const int StreamSlotCount = 17;
+        private const int StreamSlotCount = 18;
 
         // Ports held by a live connection — probe path skips these (Wine pty
         // doesn't enforce O_EXCL, so a second Open would steal the device).
@@ -814,6 +823,17 @@ namespace MozaPlugin.Protocol
                 // "skip and continue" by checking decided.Item1 == null
                 // && we returned true.
                 return true;
+            }
+
+            if (probeTarget == MozaProbeTarget.MBooster)
+            {
+                // mBooster has no application-level handshake (protocol note § 1)
+                // and dev id 0x12 collides with wheelbase Main + AB9 main, so
+                // writing a discovery probe at every COM port is high-risk.
+                // The multi-device registry path is registry-only by design —
+                // if the registry doesn't see the device we don't probe.
+                MozaLog.Debug("[Moza] mBooster probe fallback is disabled by design (registry-only discovery)");
+                return (null, null, false);
             }
 
             if (probeTarget == MozaProbeTarget.Ab9)
