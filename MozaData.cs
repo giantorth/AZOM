@@ -586,6 +586,22 @@ namespace MozaPlugin
                 if (idx >= 0 && idx < KnobRingLedMax && data.Length >= 3)
                     SetColor(KnobRingColors[idx], data);
             }
+            // Per-knob Active LED color (cmd 0x27, role=0). Command name shape
+            // is "wheel-knob{N}-active-color" with N in 1..5. Cheap StartsWith
+            // gate keeps the parse off the hot path for unrelated frames.
+            else if (commandName.StartsWith("wheel-knob") && commandName.EndsWith("-active-color"))
+            {
+                // Extract the knob index between "wheel-knob" (10 chars) and
+                // "-active-color" (13 chars).
+                int start = "wheel-knob".Length;
+                int end = commandName.Length - "-active-color".Length;
+                if (end > start && data.Length >= 3
+                    && int.TryParse(commandName.Substring(start, end - start), out int knob1)
+                    && knob1 >= 1 && knob1 <= WheelKnobPrimaryColors.Length)
+                {
+                    SetColor(WheelKnobPrimaryColors[knob1 - 1], data);
+                }
+            }
             // Wheel identity strings (work with any data length)
             else if (commandName == "wheel-model-name")
             {

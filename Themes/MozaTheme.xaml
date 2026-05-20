@@ -1,0 +1,682 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ============================================================ -->
+    <!-- Color tokens                                                  -->
+    <!-- ============================================================ -->
+
+    <!-- Backgrounds -->
+    <Color x:Key="BgDeepColor">#20000000</Color>
+    <Color x:Key="BgPanelColor">#10000000</Color>
+    <Color x:Key="BgCardColor">#08FFFFFF</Color>
+    <Color x:Key="BgCard2Color">#10FFFFFF</Color>
+    <Color x:Key="BgCardHoverColor">#18FFFFFF</Color>
+    <Color x:Key="BgTrackColor">#18000000</Color>
+
+    <!-- Borders -->
+    <Color x:Key="BorderColor">#FF20262B</Color>
+    <Color x:Key="BorderBrightColor">#FF2E373D</Color>
+    <Color x:Key="BorderGlowColor">#3300E5FF</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextColor">#FFE8EDF0</Color>
+    <Color x:Key="TextDimColor">#FF8993A0</Color>
+    <Color x:Key="TextFaintColor">#FF555C64</Color>
+    <Color x:Key="TextMutedColor">#FF6A737C</Color>
+
+    <!-- Accents -->
+    <Color x:Key="CyanColor">#FF00E5FF</Color>
+    <Color x:Key="CyanGlowColor">#6600E5FF</Color>
+    <Color x:Key="CyanSoftColor">#2200E5FF</Color>
+    <Color x:Key="GreenColor">#FF39FF88</Color>
+    <Color x:Key="GreenGlowColor">#6639FF88</Color>
+    <Color x:Key="GreenSoftColor">#2239FF88</Color>
+    <Color x:Key="AmberColor">#FFFFB84D</Color>
+    <Color x:Key="AmberGlowColor">#66FFB84D</Color>
+    <Color x:Key="AmberSoftColor">#22FFB84D</Color>
+    <Color x:Key="RedColor">#FFFF5566</Color>
+    <Color x:Key="RedGlowColor">#66FF5566</Color>
+
+    <!-- ============================================================ -->
+    <!-- Brushes                                                       -->
+    <!-- ============================================================ -->
+
+    <SolidColorBrush x:Key="BgDeepBrush" Color="{StaticResource BgDeepColor}"/>
+    <SolidColorBrush x:Key="BgPanelBrush" Color="{StaticResource BgPanelColor}"/>
+    <SolidColorBrush x:Key="BgCardBrush" Color="{StaticResource BgCardColor}"/>
+    <SolidColorBrush x:Key="BgCard2Brush" Color="{StaticResource BgCard2Color}"/>
+    <SolidColorBrush x:Key="BgCardHoverBrush" Color="{StaticResource BgCardHoverColor}"/>
+    <SolidColorBrush x:Key="BgTrackBrush" Color="{StaticResource BgTrackColor}"/>
+
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderBrightBrush" Color="{StaticResource BorderBrightColor}"/>
+    <SolidColorBrush x:Key="BorderGlowBrush" Color="{StaticResource BorderGlowColor}"/>
+
+    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}"/>
+    <SolidColorBrush x:Key="TextDimBrush" Color="{StaticResource TextDimColor}"/>
+    <SolidColorBrush x:Key="TextFaintBrush" Color="{StaticResource TextFaintColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+
+    <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource CyanColor}"/>
+    <SolidColorBrush x:Key="CyanGlowBrush" Color="{StaticResource CyanGlowColor}"/>
+    <SolidColorBrush x:Key="CyanSoftBrush" Color="{StaticResource CyanSoftColor}"/>
+    <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="GreenGlowBrush" Color="{StaticResource GreenGlowColor}"/>
+    <SolidColorBrush x:Key="GreenSoftBrush" Color="{StaticResource GreenSoftColor}"/>
+    <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}"/>
+    <SolidColorBrush x:Key="AmberSoftBrush" Color="{StaticResource AmberSoftColor}"/>
+    <SolidColorBrush x:Key="RedBrush" Color="{StaticResource RedColor}"/>
+
+    <!-- Gradient fills used by slider track, EQ bars, temperature meters -->
+    <LinearGradientBrush x:Key="CyanFillBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF00B8D4" Offset="0"/>
+        <GradientStop Color="{StaticResource CyanColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="GreenFillBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF1A7044" Offset="0"/>
+        <GradientStop Color="{StaticResource GreenColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="EqBarFillBrush" StartPoint="0,1" EndPoint="0,0">
+        <GradientStop Color="#FF00667A" Offset="0"/>
+        <GradientStop Color="{StaticResource CyanColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="EqBarBoostFillBrush" StartPoint="0,1" EndPoint="0,0">
+        <GradientStop Color="#FF1A7044" Offset="0"/>
+        <GradientStop Color="{StaticResource GreenColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="TempMeterBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource GreenColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource AmberColor}" Offset="0.6"/>
+        <GradientStop Color="{StaticResource RedColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="TopBarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#20000000" Offset="0"/>
+        <GradientStop Color="{StaticResource BgPanelColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="ToggleOnBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#3300E5FF" Offset="0"/>
+        <GradientStop Color="#1000E5FF" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BannerBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#18FFB84D" Offset="0"/>
+        <GradientStop Color="#08FFB84D" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- ============================================================ -->
+    <!-- Font keys (no font files packaged — fall back gracefully)     -->
+    <!-- ============================================================ -->
+
+    <FontFamily x:Key="FontUi">Segoe UI, Inter, system-ui, sans-serif</FontFamily>
+    <FontFamily x:Key="FontMono">Consolas, JetBrains Mono, monospace</FontFamily>
+
+    <!-- ============================================================ -->
+    <!-- Reusable drop-shadow / glow effects                           -->
+    <!-- Used sparingly per design hint: only on accent elements       -->
+    <!-- ============================================================ -->
+
+    <DropShadowEffect x:Key="CyanGlowEffect" Color="{StaticResource CyanColor}"
+                      ShadowDepth="0" BlurRadius="10" Opacity="0.6"/>
+    <DropShadowEffect x:Key="CyanGlowSoftEffect" Color="{StaticResource CyanColor}"
+                      ShadowDepth="0" BlurRadius="6" Opacity="0.35"/>
+    <DropShadowEffect x:Key="GreenGlowEffect" Color="{StaticResource GreenColor}"
+                      ShadowDepth="0" BlurRadius="8" Opacity="0.6"/>
+    <DropShadowEffect x:Key="AmberGlowEffect" Color="{StaticResource AmberColor}"
+                      ShadowDepth="0" BlurRadius="6" Opacity="0.4"/>
+
+    <!-- ============================================================ -->
+    <!-- Shared TextBlock typography                                   -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="SectionTitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+    </Style>
+
+    <Style x:Key="SectionSubText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="8,0,0,0"/>
+    </Style>
+
+    <Style x:Key="LabelText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="13.5"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="ValueText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+        <Setter Property="TextAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="9,5"/>
+        <Setter Property="MinWidth" Value="72"/>
+        <Setter Property="Background" Value="{StaticResource BgDeepBrush}"/>
+    </Style>
+
+    <Style x:Key="MutedHintText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="KvKeyText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,6,0"/>
+    </Style>
+
+    <Style x:Key="KvValueText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,18,0"/>
+    </Style>
+
+    <Style x:Key="StatusBarText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,18,0"/>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- Buttons                                                       -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="MozaButton" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrightBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="13,7"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4" SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Margin="{TemplateBinding Padding}"
+                                          TextBlock.FontFamily="{TemplateBinding FontFamily}"
+                                          TextBlock.FontSize="{TemplateBinding FontSize}"
+                                          TextBlock.FontWeight="{TemplateBinding FontWeight}"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"
+                                          RecognizesAccessKey="True"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCardHoverBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgDeepBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="MozaButtonPrimary" TargetType="Button" BasedOn="{StaticResource MozaButton}">
+        <Setter Property="Background" Value="{StaticResource ToggleOnBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+    </Style>
+
+    <Style x:Key="MozaButtonDanger" TargetType="Button" BasedOn="{StaticResource MozaButton}">
+        <Setter Property="Foreground" Value="{StaticResource RedBrush}"/>
+        <Setter Property="BorderBrush" Value="#44FF5566"/>
+    </Style>
+
+    <Style x:Key="MozaButtonGhost" TargetType="Button" BasedOn="{StaticResource MozaButton}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- Slider — bar-fill style with cyan thumb + value pill          -->
+    <!-- (No value pill in the template — the parent row supplies it.) -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="MozaThumbStyle" TargetType="Thumb">
+        <Setter Property="Width" Value="4"/>
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Rectangle Fill="{StaticResource CyanBrush}" RadiusX="1" RadiusY="1"
+                               Width="4" Height="18"
+                               Effect="{StaticResource CyanGlowEffect}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="MozaRepeatButtonStyle" TargetType="RepeatButton">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="MozaSlider" TargetType="Slider">
+        <Setter Property="MinHeight" Value="22"/>
+        <Setter Property="Background" Value="{StaticResource BgTrackBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource CyanFillBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid VerticalAlignment="Center" MinHeight="22">
+                        <Border x:Name="TrackBg"
+                                Height="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                VerticalAlignment="Center"
+                                SnapsToDevicePixels="True"/>
+                        <Track x:Name="PART_Track" Maximum="{TemplateBinding Maximum}"
+                               Minimum="{TemplateBinding Minimum}"
+                               Value="{TemplateBinding Value}">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource MozaRepeatButtonStyle}"
+                                              Command="Slider.DecreaseLarge">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Background="{TemplateBinding Background}">
+                                                <Rectangle Margin="0,8" Height="6"
+                                                           Fill="{StaticResource CyanFillBrush}"
+                                                           RadiusX="2" RadiusY="2"
+                                                           Effect="{StaticResource CyanGlowSoftEffect}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Stretch"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource MozaRepeatButtonStyle}"
+                                              Command="Slider.IncreaseLarge"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource MozaThumbStyle}"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Vertical EQ bar variant (used by MozaEqualizer custom control) -->
+    <Style x:Key="MozaSliderVertical" TargetType="Slider" BasedOn="{StaticResource MozaSlider}">
+        <Setter Property="Orientation" Value="Vertical"/>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- ComboBox restyle                                              -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="MozaComboItem" TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="Background" Value="#FF1E242A"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCardHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <ControlTemplate x:Key="MozaComboToggleTemplate" TargetType="ToggleButton">
+        <Border x:Name="Bd"
+                Background="#FF1E242A"
+                BorderBrush="{StaticResource BorderBrightBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                SnapsToDevicePixels="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ContentPresenter Grid.Column="0"
+                                  Margin="11,7,4,7"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Center"
+                                  IsHitTestVisible="False"/>
+                <Path Grid.Column="1" Margin="0,0,11,0"
+                      Width="9" Height="6"
+                      Stretch="Fill"
+                      Fill="{StaticResource TextDimBrush}"
+                      Data="M 0,0 L 9,0 L 4.5,6 Z"
+                      VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="MozaCombo" TargetType="ComboBox">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="Background" Value="{StaticResource BgCard2Brush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrightBrush}"/>
+        <Setter Property="MinWidth" Value="160"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="Padding" Value="11,7"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource MozaComboItem}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton x:Name="ToggleButton"
+                                      Grid.Column="0"
+                                      Template="{StaticResource MozaComboToggleTemplate}"
+                                      Focusable="False"
+                                      ClickMode="Press"
+                                      IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              Margin="0"/>
+                        </ToggleButton>
+                        <Popup x:Name="Popup"
+                               Placement="Bottom"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               PopupAnimation="Slide">
+                            <Border Background="#FF1E242A"
+                                    BorderBrush="{StaticResource BorderBrightBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    MinWidth="{TemplateBinding ActualWidth}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <ScrollViewer SnapsToDevicePixels="True">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- CheckBox restyle (used where we want a plain checkbox; toggle-style is OffOnToggle) -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="MozaCheckBox" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal">
+                        <Border x:Name="Box" Width="14" Height="14"
+                                BorderBrush="{StaticResource BorderBrightBrush}" BorderThickness="1"
+                                Background="{StaticResource BgDeepBrush}" CornerRadius="2"
+                                VerticalAlignment="Center">
+                            <Path x:Name="Check" Stretch="Uniform" Margin="2"
+                                  Data="M0,3 L2,5 L6,0"
+                                  Stroke="{StaticResource CyanBrush}" StrokeThickness="1.6"
+                                  Visibility="Collapsed"/>
+                        </Border>
+                        <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- TabControl + TabItem — cyan underline on active tab            -->
+    <!-- (TabControl itself uses a minimal wrapper template — chrome    -->
+    <!--  is removed, content area is plain.)                          -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="MozaTabItem" TargetType="TabItem">
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="18,0"/>
+        <Setter Property="Height" Value="44"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Grid x:Name="Root" Background="Transparent">
+                        <ContentPresenter ContentSource="Header"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"
+                                          TextBlock.FontFamily="{TemplateBinding FontFamily}"
+                                          TextBlock.FontSize="{TemplateBinding FontSize}"
+                                          TextBlock.FontWeight="{TemplateBinding FontWeight}"
+                                          RecognizesAccessKey="True"/>
+                        <Border x:Name="Underline"
+                                VerticalAlignment="Bottom"
+                                Height="2" Margin="12,0"
+                                Background="{StaticResource CyanBrush}"
+                                Effect="{StaticResource CyanGlowEffect}"
+                                Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+                            <Setter TargetName="Underline" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="MozaTabControl" TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource MozaTabItem}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <DockPanel LastChildFill="True">
+                        <Border DockPanel.Dock="Top"
+                                Background="{StaticResource BgPanelBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="0,0,0,1">
+                            <TabPanel x:Name="HeaderPanel"
+                                      Panel.ZIndex="1"
+                                      IsItemsHost="True"
+                                      KeyboardNavigation.TabIndex="1"
+                                      Background="Transparent"
+                                      Margin="22,0"/>
+                        </Border>
+                        <Border Background="Transparent"
+                                BorderThickness="0">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="True"/>
+                        </Border>
+                    </DockPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- ScrollViewer / ScrollBar — slim dark scroll                   -->
+    <!-- ============================================================ -->
+
+    <Style x:Key="MozaScrollThumb" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border CornerRadius="5"
+                            Background="#1C2228"
+                            BorderBrush="{StaticResource BgDeepBrush}"
+                            BorderThickness="2"
+                            SnapsToDevicePixels="True"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="MozaScrollBar" TargetType="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="MinWidth" Value="10"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid Background="Transparent">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource MozaScrollThumb}"/>
+                            </Track.Thumb>
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource MozaRepeatButtonStyle}"
+                                              Command="ScrollBar.PageUpCommand"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource MozaRepeatButtonStyle}"
+                                              Command="ScrollBar.PageDownCommand"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- Section card — used by UI/Controls/SectionCard.cs              -->
+    <!-- Style is keyed by the type itself (default style) via the     -->
+    <!-- SectionCard class's static constructor.                       -->
+    <!-- ============================================================ -->
+
+    <!-- TeleCard background style for compact telemetry tiles -->
+    <Style x:Key="TeleCardBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,10,10"/>
+    </Style>
+
+    <!-- Generic "card" wrapper (no header — for paddle/button live tiles) -->
+    <Style x:Key="InnerCardBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BgCard2Brush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Padding" Value="14,12"/>
+    </Style>
+
+    <!-- Banner style for the restart notice -->
+    <Style x:Key="BannerBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BannerBrush}"/>
+        <Setter Property="BorderBrush" Value="#44FFB84D"/>
+        <Setter Property="BorderThickness" Value="1,1,1,1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="Margin" Value="0,0,0,14"/>
+    </Style>
+
+</ResourceDictionary>

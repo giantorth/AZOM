@@ -49,6 +49,14 @@ namespace MozaPlugin.Diagnostics
         public DateTime StartedAtUtc => _startedAtUtc;
         public string? FileSinkPath => _fileSinkPath;
 
+        // Always-on cumulative byte counters — incremented on every RecordTx /
+        // RecordRx regardless of whether the in-memory ring is enabled. Powers
+        // the Diagnostics-tab bandwidth sparklines.
+        private long _totalRxBytes;
+        private long _totalTxBytes;
+        public long TotalRxBytes => Volatile.Read(ref _totalRxBytes);
+        public long TotalTxBytes => Volatile.Read(ref _totalTxBytes);
+
         private SerialTrafficCapture() { }
 
         public void Start()
@@ -121,6 +129,11 @@ namespace MozaPlugin.Diagnostics
         private void Record(Direction dir, string source, byte[] frame)
         {
             if (frame == null || frame.Length == 0) return;
+            // Cumulative byte counters — always-on, drives the Diagnostics-tab
+            // bandwidth sparklines independent of the ring buffer enable state.
+            if (dir == Direction.Rx) Interlocked.Add(ref _totalRxBytes, frame.Length);
+            else                     Interlocked.Add(ref _totalTxBytes, frame.Length);
+
             // File sink — always writes when open, even if ring is off.
             WriteFileSinkLine(dir, frame);
 

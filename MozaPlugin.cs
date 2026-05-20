@@ -167,6 +167,11 @@ namespace MozaPlugin
         internal bool IsNewWheelDetected => DetectionState.NewWheelDetected;
         internal bool IsOldWheelDetected => DetectionState.OldWheelDetected;
         internal Devices.WheelModelInfo? WheelModelInfo { get; set; }
+        /// <summary>True once the wheel has reported its model name and a per-page
+        /// guid can be resolved. UI handlers that persist into per-page bundles
+        /// (sleep / idle / wheel overlay) must gate on this — without a guid the
+        /// dict write silently drops, and the value is lost on restart.</summary>
+        internal bool IsWheelPageReady => GetCurrentWheelPageGuid().HasValue;
 
         /// <summary>Wheel LED group g (2=Single, 3=Rotary, 4=Ambient). Detected on brightness read.</summary>
         internal bool IsWheelLedGroupPresent(int group) => DetectionState.IsWheelLedGroupPresent(group);
@@ -967,6 +972,26 @@ namespace MozaPlugin
             ScheduleSave();
         }
 
+        // Trace log helper — emit the active wheel page's sleep bundle state
+        // so we can correlate disk-write contents with what the user reported.
+        // Cheap (single string format) and only fires at save points, not per-tick.
+        private void LogSleepBundleStateForSaveTrace(string trigger)
+        {
+            try
+            {
+                var g = GetCurrentWheelPageGuid();
+                if (!g.HasValue) { MozaLog.Debug($"[Moza] SLEEP-TRACE [{trigger}]: page guid unresolvable"); return; }
+                var dict = _settings?.WheelSleepByPageGuid;
+                if (dict == null || !dict.TryGetValue(g.Value, out var b) || b == null)
+                {
+                    MozaLog.Debug($"[Moza] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} bundle=null");
+                    return;
+                }
+                MozaLog.Info($"[Moza] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} Mode={b.Mode} TimeoutMin={b.TimeoutMin} SpeedMs={b.SpeedMs}");
+            }
+            catch (Exception ex) { MozaLog.Debug($"[Moza] SLEEP-TRACE failed: {ex.Message}"); }
+        }
+
         private readonly object _saveDebounceLock = new object();
 
         /// <summary>
@@ -984,7 +1009,10 @@ namespace MozaPlugin
                 {
                     _saveDebounceTimer = new Timer(500) { AutoReset = false };
                     _saveDebounceTimer.Elapsed += (s, e) =>
+                    {
+                        LogSleepBundleStateForSaveTrace("debounced-save");
                         this.SaveCommonSettings("MozaPluginSettings", _settings);
+                    };
                 }
                 _saveDebounceTimer.Stop();
                 _saveDebounceTimer.Start();
@@ -1938,8 +1966,13 @@ namespace MozaPlugin
                 case "wheel-idle-timeout":
                     if (bundle.TimeoutMin < 0 && r.IntValue > 0)
                     {
+                        MozaLog.Info($"[Moza] SLEEP-SEED: bundle.TimeoutMin {bundle.TimeoutMin} -> {r.IntValue} (from wheel response)");
                         bundle.TimeoutMin = r.IntValue;
                         changed = true;
+                    }
+                    else
+                    {
+                        MozaLog.Debug($"[Moza] SLEEP-SEED skipped: bundle.TimeoutMin={bundle.TimeoutMin}, wheel reported {r.IntValue}");
                     }
                     break;
                 case "wheel-idle-speed":

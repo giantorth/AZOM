@@ -18,6 +18,11 @@ namespace MozaPlugin
 {
     public partial class SettingsControl : UserControl
     {
+        // Static reference so per-device controls (e.g. MozaWheelSettingsControl's
+        // Inputs sub-tab) can forward user input back to the existing plugin-pane
+        // handlers + settings persistence path. Cleared in OnUnloadedStopTimers.
+        internal static SettingsControl? Instance { get; private set; }
+
         private readonly MozaPlugin _plugin;
         private readonly MozaDeviceManager _device;
         private readonly MozaData _data;
@@ -84,6 +89,8 @@ namespace MozaPlugin
             }
 
             InitProfilesTab();
+            InitRedesignControls();
+            Instance = this;
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _refreshTimer.Tick += RefreshDisplay;
@@ -118,6 +125,7 @@ namespace MozaPlugin
             // killed the timers if the control was reloaded.
             _refreshTimer.Stop();
             _steeringAngleTimer.Stop();
+            if (ReferenceEquals(Instance, this)) Instance = null;
         }
 
         private MozaPluginSettings _settings => _plugin.Settings;
@@ -157,7 +165,6 @@ namespace MozaPlugin
                 InitTelemetryTab();
                 RefreshDashboardUploadTab();
                 RefreshWheelFilesTab();
-                RefreshDiagnosticsTab();
             }
         }
 
@@ -170,10 +177,12 @@ namespace MozaPlugin
             {
                 double deg = hidReader!.GetCurrentAngleDegrees(_data.MaxAngle * 2);
                 SteeringAngleLabel.Text = $"{deg:0;-0;0}°";
+                UpdateRedesignSteeringAngle(deg, valid: true);
             }
             else
             {
                 SteeringAngleLabel.Text = "--";
+                UpdateRedesignSteeringAngle(0, valid: false);
             }
 
             if (connected)
@@ -199,6 +208,12 @@ namespace MozaPlugin
 
             UpdateActiveButtons(connected);
             UpdateHandbrakeButtonStatus(connected);
+
+            // Phase 6: fan out live HID data to the per-device wheel control's
+            // Inputs sub-tab so its paddle bars + active-button text update at
+            // the same 30 Hz cadence as the (now hidden) plugin-pane controls.
+            try { global::MozaPlugin.Devices.MozaWheelSettingsControl.Instance?.PushInputsLiveData(_data); }
+            catch { }
         }
 
         private void UpdateActiveButtons(bool connected)
@@ -255,6 +270,7 @@ namespace MozaPlugin
         {
             ConnectionIndicator.Fill = _data.IsConnected ? Brushes.LimeGreen : Brushes.Gray;
             ConnectionLabel.Text = _data.IsConnected ? "Connected" : "Disconnected";
+            UpdateRedesignLiveDisplays();
 
             string tempUnit = _data.UseFahrenheit ? "°F" : "°C";
             McuTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.McuTemp):F0} {tempUnit}" : "--";
@@ -1259,24 +1275,9 @@ namespace MozaPlugin
         }
 
         // ── Diagnostics tab ─────────────────────────────────────────────
-        private void RefreshDiagnosticsTab()
-        {
-            if (DiagWheelIdentityBox == null) return;
-            DiagPluginBox.Text = DiagnosticsTextBuilder.BuildPluginInfo();
-            if (DiagUsbDetectionBox != null)
-                DiagUsbDetectionBox.Text = DiagnosticsTextBuilder.BuildUsbDetection(_plugin);
-            DiagWheelIdentityBox.Text = DiagnosticsTextBuilder.BuildWheelIdentity(_data);
-            DiagDisplayIdentityBox.Text = DiagnosticsTextBuilder.BuildDisplayIdentity(_data);
-            DiagDashboardStateBox.Text = DiagnosticsTextBuilder.BuildDashboardState(_plugin);
-            DiagTileServerBox.Text = DiagnosticsTextBuilder.BuildTileServer(_plugin);
-            DiagSessionBox.Text = DiagnosticsTextBuilder.BuildSessionState(_plugin);
-            if (DiagWheelCatalogBox != null)
-                DiagWheelCatalogBox.Text = DiagnosticsTextBuilder.BuildWheelCatalog(_plugin);
-            if (DiagSubscriptionBox != null)
-                DiagSubscriptionBox.Text = DiagnosticsTextBuilder.BuildSubscription(_plugin);
-            if (DiagSubscriptionResponseBox != null)
-                DiagSubscriptionResponseBox.Text = DiagnosticsTextBuilder.BuildSubscriptionResponse(_plugin);
-        }
+        // Live state TextBlocks were removed (the FULL DIAGNOSTIC REPORT expander
+        // shows the same content); BuildDiagnosticsDump now sources every line
+        // straight from DiagnosticsTextBuilder.
 
         private void DiagCopyAll_Click(object sender, System.Windows.RoutedEventArgs e)
         {
@@ -1288,25 +1289,25 @@ namespace MozaPlugin
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("=== Plugin ===");
-            sb.AppendLine(DiagPluginBox.Text);
+            sb.AppendLine(DiagnosticsTextBuilder.BuildPluginInfo());
             sb.AppendLine();
             sb.AppendLine("=== USB detection ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
-            sb.AppendLine(DiagWheelIdentityBox.Text);
+            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data));
             sb.AppendLine();
             sb.AppendLine("=== Display sub-device identity ===");
-            sb.AppendLine(DiagDisplayIdentityBox.Text);
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data));
             sb.AppendLine();
             sb.AppendLine("=== Dashboard state ===");
-            sb.AppendLine(DiagDashboardStateBox.Text);
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDashboardState(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Tile-server state ===");
-            sb.AppendLine(DiagTileServerBox.Text);
+            sb.AppendLine(DiagnosticsTextBuilder.BuildTileServer(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Session state ===");
-            sb.AppendLine(DiagSessionBox.Text);
+            sb.AppendLine(DiagnosticsTextBuilder.BuildSessionState(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Wheel channel catalog ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildWheelCatalog(_plugin));

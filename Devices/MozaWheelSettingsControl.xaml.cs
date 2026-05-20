@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MozaControls;
 using MozaPlugin.Devices.WheelUi;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Dashboard;
@@ -90,10 +91,14 @@ namespace MozaPlugin.Devices
             // for catching a same-instant profile-apply event.
             ResolvePlugin();
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
+            Instance = this;
+            EnsureInputsLiveTimer();
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
+            if (ReferenceEquals(Instance, this)) Instance = null;
+            StopInputsLiveTimer();
             _refreshTimer.Stop();
 
             if (_dashEventSubscribedPlugin != null)
@@ -127,10 +132,14 @@ namespace MozaPlugin.Devices
             }
 
             // Always re-populate: event can arrive long after the first RefreshWheel tick.
+            // Wheel-initiated dashboard switches also fire this event (via
+            // DashboardBindingCoordinator.RaiseDashboardSelectionChangedInternal),
+            // so refreshing the channel-mapping grid here covers both UI- and
+            // wheel-initiated switches.
             MozaLog.Debug(
                 $"[Moza] UI: DashboardSelectionChanged handler — selected='{_plugin.ActiveTelemetryProfileName}'");
             PopulateDashboardCombo();
-            UpdateTelemetryProfileInfo();
+            PopulateChannelMappingGrid();
         }
 
         private bool ResolvePlugin()
@@ -164,11 +173,17 @@ namespace MozaPlugin.Devices
         {
             if (_swatchesBuilt || _data == null) return;
             // Flag LEDs live on the Meter sub-device (RS21 DB); swatch writes route via dash-flag-color*.
-            BuildSwatchRow(WheelFlagColorPanel, _wheelFlagColorSwatches, 6, "dash-flag-color", _data.WheelFlagColors);
+            BuildSwatchRow(WheelFlagColorPanel, _wheelFlagColorSwatches, 6, "dash-flag-color", _data.WheelFlagColors, SwatchSection.Flag);
             BuildButtonSwatchRow();
             BuildRpmSwatches();
-            BuildKnobSwatchRows();
-            BuildKnobRingSwatchRows();
+            InitInlineColorEditors();
+            BuildKnobSwatchRows();        // legacy hidden swatches — kept for refresh-path compat
+            BuildKnobRingSwatchRows();    // legacy hidden swatches — kept for refresh-path compat
+            // KnobRingViz panels for the redesigned Knobs tab. Wrapped: any
+            // failure here must not take the whole device control down (the
+            // legacy hidden swatch path above still updates _data).
+            try { BuildKnobRingVizPanels(); }
+            catch (Exception ex) { MozaLog.Warn($"[Moza] BuildKnobRingVizPanels failed: {ex.Message}"); }
             _swatchesBuilt = true;
         }
 
@@ -183,12 +198,39 @@ namespace MozaPlugin.Devices
                 WheelRpmIndexPanel.Children.Add(idxLabel);
                 _wheelRpmIndexLabels[i] = idxLabel;
             }
-            BuildSwatchRow(WheelRpmColorPanel, _wheelRpmColorSwatches, count, "wheel-rpm-color", _data.WheelRpmColors);
+            BuildSwatchRow(WheelRpmColorPanel, _wheelRpmColorSwatches, count, "wheel-rpm-color", _data.WheelRpmColors, SwatchSection.Rpm);
+        }
+
+        // Overlay-wins helper: unpack the persisted overlay's packed int[] array
+        // into a fresh byte[][] when present; fall back to _data's wheel-mirrored
+        // bytes otherwise. Slots past the overlay's length read from _data so a
+        // short overlay (e.g. legacy 10-entry array) doesn't blank out the
+        // higher slots. Used to render LED swatches without letting the wheel's
+        // transient response state mask the user's saved choice.
+        private static byte[][] MergeOverlayIntoData(int[]? packedOverlay, byte[][] data)
+        {
+            var result = new byte[data.Length][];
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (packedOverlay != null && i < packedOverlay.Length)
+                {
+                    var rgb = MozaProfile.UnpackColor(packedOverlay[i]);
+                    result[i] = new[] { rgb[0], rgb[1], rgb[2] };
+                }
+                else
+                {
+                    result[i] = data[i];
+                }
+            }
+            return result;
         }
 
         private void BuildSwatchRow(StackPanel panel, Border[] swatches, int count,
-            string commandPrefix, byte[][] colorSource)
+            string commandPrefix, byte[][] colorSource, SwatchSection section = SwatchSection.None)
         {
+            // Inline-editor swatches (RPM/Flag/Button) render as circles per the
+            // redesign; legacy (no section) stay rounded squares.
+            double radius = section == SwatchSection.None ? 3 : 14;
             for (int i = 0; i < count; i++)
             {
                 var border = new Border
@@ -196,11 +238,17 @@ namespace MozaPlugin.Devices
                     Width = 28, Height = 28,
                     BorderBrush = GetCachedBrush(85, 85, 85),
                     BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(3),
+                    CornerRadius = new CornerRadius(radius),
                     Margin = new Thickness(2, 0, 2, 0),
                     Cursor = Cursors.Hand,
                     Background = Brushes.Black,
-                    Tag = new ColorSwatchInfo { CommandPrefix = commandPrefix, Index = i, ColorSource = colorSource }
+                    Tag = new ColorSwatchInfo
+                    {
+                        CommandPrefix = commandPrefix,
+                        Index = i,
+                        ColorSource = colorSource,
+                        Section = section,
+                    },
                 };
                 border.MouseLeftButtonUp += ColorSwatch_Click;
                 panel.Children.Add(border);
@@ -226,7 +274,7 @@ namespace MozaPlugin.Devices
                     Width = 28, Height = 28,
                     BorderBrush = GetCachedBrush(85, 85, 85),
                     BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(3),
+                    CornerRadius = new CornerRadius(14),  // circle
                     Cursor = Cursors.Hand,
                     Background = Brushes.Black,
                     Tag = new ColorSwatchInfo
@@ -234,6 +282,7 @@ namespace MozaPlugin.Devices
                         CommandPrefix = "wheel-button-color",
                         Index = i,
                         ColorSource = _data.WheelButtonColors,
+                        Section = SwatchSection.Button,
                     },
                 };
                 border.MouseLeftButtonUp += ColorSwatch_Click;
@@ -268,6 +317,10 @@ namespace MozaPlugin.Devices
             _plugin.SaveSettings();
         }
 
+        // Routes a clicked swatch to the matching inline editor (PaletteStrip +
+        // label panel) instead of opening a modal ColorPickerDialog.
+        private enum SwatchSection { None, Rpm, Flag, Button }
+
         private class ColorSwatchInfo
         {
             public string CommandPrefix = "";
@@ -282,6 +335,159 @@ namespace MozaPlugin.Devices
             // (knob colours are write-only on the wire, so settings is the only
             // persisted copy).
             public Action? OnChanged;
+            // Identifies which inline editor panel owns this swatch.
+            public SwatchSection Section = SwatchSection.None;
+        }
+
+        // Track the currently-selected swatch per inline editor so we can
+        // (a) write palette picks into it and (b) restore the prior swatch's
+        // default border when a different one is clicked.
+        private Border? _rpmSelectedSwatch;
+        private Border? _flagSelectedSwatch;
+        private Border? _buttonSelectedSwatch;
+        private bool _inlineEditorsBuilt;
+
+        private void InitInlineColorEditors()
+        {
+            if (_inlineEditorsBuilt) return;
+            _inlineEditorsBuilt = true;
+
+            // CUSTOM chip on every PaletteStrip pops the legacy hue dialog as a
+            // fallback. Set once globally (PaletteStrip.CustomPickerFactory is
+            // static) so all palettes share it.
+            if (PaletteStrip.CustomPickerFactory == null)
+            {
+                PaletteStrip.CustomPickerFactory = (current) =>
+                {
+                    var dlg = new ColorPickerDialog(current.R, current.G, current.B);
+                    dlg.Owner = Window.GetWindow(this);
+                    if (dlg.ShowDialog() != true) return null;
+                    return Color.FromRgb(dlg.SelectedR, dlg.SelectedG, dlg.SelectedB);
+                };
+            }
+
+            WiRpmPalette.ColorChanged    += (_, c) => OnInlinePaletteCommit(SwatchSection.Rpm, c);
+            WiFlagPalette.ColorChanged   += (_, c) => OnInlinePaletteCommit(SwatchSection.Flag, c);
+            WiButtonPalette.ColorChanged += (_, c) => OnInlinePaletteCommit(SwatchSection.Button, c);
+        }
+
+        private Border? GetSelectedSwatch(SwatchSection s) => s switch
+        {
+            SwatchSection.Rpm    => _rpmSelectedSwatch,
+            SwatchSection.Flag   => _flagSelectedSwatch,
+            SwatchSection.Button => _buttonSelectedSwatch,
+            _ => null,
+        };
+
+        private void SetSelectedSwatch(SwatchSection s, Border? b)
+        {
+            switch (s)
+            {
+                case SwatchSection.Rpm:    _rpmSelectedSwatch = b; break;
+                case SwatchSection.Flag:   _flagSelectedSwatch = b; break;
+                case SwatchSection.Button: _buttonSelectedSwatch = b; break;
+            }
+        }
+
+        private (Border? editor, TextBlock? label, PaletteStrip? palette) GetEditorWidgets(SwatchSection s) => s switch
+        {
+            SwatchSection.Rpm    => (WiRpmEditorPanel, WiRpmEditorLabel, WiRpmPalette),
+            SwatchSection.Flag   => (WiFlagEditorPanel, WiFlagEditorLabel, WiFlagPalette),
+            SwatchSection.Button => (WiButtonEditorPanel, WiButtonEditorLabel, WiButtonPalette),
+            _ => (null, null, null),
+        };
+
+        private static string FormatSwatchLabel(SwatchSection s, int idx) => s switch
+        {
+            SwatchSection.Rpm    => $"LED {idx + 1:D2}",
+            SwatchSection.Flag   => $"FLAG {idx + 1}",
+            SwatchSection.Button => $"BUTTON {idx + 1:D2}",
+            _ => "",
+        };
+
+        private void SelectSwatchForEditor(Border swatch, ColorSwatchInfo info)
+        {
+            var s = info.Section;
+            if (s == SwatchSection.None) return;
+
+            // Restore the previously-selected swatch's default border.
+            var prev = GetSelectedSwatch(s);
+            if (prev != null && !ReferenceEquals(prev, swatch))
+            {
+                prev.BorderBrush = GetCachedBrush(85, 85, 85);
+                prev.BorderThickness = new Thickness(1);
+                prev.Effect = null;
+            }
+
+            // Highlight the new selection with cyan + soft glow.
+            swatch.BorderBrush = (Brush)(TryFindResource("CyanBrush") ?? Brushes.Cyan);
+            swatch.BorderThickness = new Thickness(2);
+            swatch.Effect = (System.Windows.Media.Effects.Effect?)TryFindResource("CyanGlowSoftEffect");
+            SetSelectedSwatch(s, swatch);
+
+            // Pre-seed palette with the swatch's current colour and reveal the
+            // editor row + label.
+            var (editor, label, palette) = GetEditorWidgets(s);
+            if (editor == null || label == null || palette == null) return;
+            var current = info.ColorSource[info.Index];
+            using (_suppressor.Begin())
+            {
+                palette.SelectedColor = Color.FromRgb(current[0], current[1], current[2]);
+            }
+            label.Text = FormatSwatchLabel(s, info.Index);
+            editor.Visibility = Visibility.Visible;
+        }
+
+        private void OnInlinePaletteCommit(SwatchSection s, Color c)
+        {
+            if (_suppressEvents || _plugin == null) return;
+            var swatch = GetSelectedSwatch(s);
+            if (swatch == null) return;
+            var info = (ColorSwatchInfo)swatch.Tag;
+            CommitColorToSwatch(swatch, info, c.R, c.G, c.B);
+        }
+
+        private void CommitColorToSwatch(Border swatch, ColorSwatchInfo info, byte r, byte g, byte b)
+        {
+            if (_plugin == null || _data == null) return;
+            string cmdName;
+            if (!string.IsNullOrEmpty(info.CommandNameOverride))
+                cmdName = info.CommandNameOverride;
+            else if (!string.IsNullOrEmpty(info.CommandPrefix))
+                cmdName = $"{info.CommandPrefix}{info.Index + 1}";
+            else
+                cmdName = "";
+            if (!string.IsNullOrEmpty(cmdName))
+                _plugin.WriteColorIfWheelDetected(cmdName, r, g, b);
+            info.ColorSource[info.Index][0] = r;
+            info.ColorSource[info.Index][1] = g;
+            info.ColorSource[info.Index][2] = b;
+            swatch.Background = GetCachedBrush(r, g, b);
+
+            // MozaProfile.CaptureFromCurrent explicitly skips wheel-LED fields
+            // ("UI handlers must write the overlay directly"), so without an
+            // explicit overlay update the next ApplyWheelToHardware tick
+            // overwrites the user's pick with the stale overlay value. Pack
+            // the full array of the matching section into the active wheel
+            // overlay so the change actually survives a restart.
+            switch (info.Section)
+            {
+                case SwatchSection.Rpm:
+                    _plugin.UpdateActiveWheelOverlay(o =>
+                        o.WheelRpmColors = MozaProfile.PackColors(_data.WheelRpmColors));
+                    break;
+                case SwatchSection.Flag:
+                    _plugin.UpdateActiveWheelOverlay(o =>
+                        o.WheelFlagColors = MozaProfile.PackColors(_data.WheelFlagColors));
+                    break;
+                case SwatchSection.Button:
+                    _plugin.UpdateActiveWheelOverlay(o =>
+                        o.WheelButtonColors = MozaProfile.PackColors(_data.WheelButtonColors));
+                    break;
+            }
+
+            info.OnChanged?.Invoke();
+            _plugin.SaveSettings();
         }
 
         private void BuildKnobSwatchRows()
@@ -475,33 +681,25 @@ namespace MozaPlugin.Devices
             if (_suppressEvents || _plugin == null) return;
             var border = (Border)sender;
             var info = (ColorSwatchInfo)border.Tag;
-            var current = info.ColorSource[info.Index];
 
+            // RPM / Flag / Button swatches: route to the inline editor (cyan
+            // selection ring + PaletteStrip below). Other swatches with no
+            // section (legacy knob-row containers in WheelKnobRingSection, the
+            // sleep colour swatch which has its own click handler) fall through
+            // to the legacy modal dialog.
+            if (info.Section != SwatchSection.None)
+            {
+                SelectSwatchForEditor(border, info);
+                return;
+            }
+
+            var current = info.ColorSource[info.Index];
             var dialog = new ColorPickerDialog(current[0], current[1], current[2]);
             dialog.Owner = Window.GetWindow(this);
             if (dialog.ShowDialog() == true)
             {
-                byte r = dialog.SelectedR, g = dialog.SelectedG, b = dialog.SelectedB;
-                // Resolve cmd name: explicit override > prefix+index > empty
-                // (suppress wire write — used by swatches whose hardware update
-                // happens entirely in OnChanged, e.g. the per-knob "Inactive
-                // bulk" swatch which fans out via BulkSetKnobRingColor).
-                string cmdName;
-                if (!string.IsNullOrEmpty(info.CommandNameOverride))
-                    cmdName = info.CommandNameOverride;
-                else if (!string.IsNullOrEmpty(info.CommandPrefix))
-                    cmdName = $"{info.CommandPrefix}{info.Index + 1}";
-                else
-                    cmdName = "";
-                if (!string.IsNullOrEmpty(cmdName))
-                    _plugin.WriteColorIfWheelDetected(cmdName, r, g, b);
-                info.ColorSource[info.Index][0] = r;
-                info.ColorSource[info.Index][1] = g;
-                info.ColorSource[info.Index][2] = b;
-                border.Background = GetCachedBrush(r, g, b);
-
-                info.OnChanged?.Invoke();
-                _plugin.SaveSettings();
+                CommitColorToSwatch(border, info,
+                    dialog.SelectedR, dialog.SelectedG, dialog.SelectedB);
             }
         }
 
@@ -518,6 +716,7 @@ namespace MozaPlugin.Devices
                 RpmTab.Visibility = Visibility.Collapsed;
                 ButtonsTab.Visibility = Visibility.Collapsed;
                 KnobsTab.Visibility = Visibility.Collapsed;
+                FilesTab.Visibility = Visibility.Collapsed;
                 return;
             }
 
@@ -526,6 +725,7 @@ namespace MozaPlugin.Devices
 
             InitTelemetryUI();
             RefreshTelemetryStatus();
+            RefreshFilesTab();
 
             // Use the linked LED driver's model-aware connection check when available
             bool wheelConnected = LinkedLedDriver?.IsConnected() ?? false;
@@ -534,7 +734,18 @@ namespace MozaPlugin.Devices
 
             bool isOldProtoDevice = LinkedLedDriver?.ExpectedModelPrefix == MozaDeviceConstants.OldProtocolMarker;
             bool oldWheel = wheelConnected && isOldProtoDevice && _plugin!.IsOldWheelDetected;
-            bool newWheel = wheelConnected && !isOldProtoDevice && _plugin!.IsNewWheelDetected;
+            // Wait for wheel-model-name to arrive before declaring the panel
+            // "ready": the per-page guid is keyed off the model prefix, and any
+            // UI write into a per-page bundle/overlay before that resolves
+            // silently drops on disk (no guid → no dict slot → no save).
+            // Detection runs in two beats — wheel-telemetry-mode flips
+            // NewWheelDetected, then wheel-model-name arrives a few hundred ms
+            // later. Gating on IsWheelPageReady delays the tabs until the second
+            // beat lands, so the user can't touch a dropdown / palette before
+            // their choice can be persisted.
+            bool newWheel = wheelConnected && !isOldProtoDevice
+                            && _plugin!.IsNewWheelDetected
+                            && _plugin!.IsWheelPageReady;
 
             if (wheelConnected)
             {
@@ -560,6 +771,11 @@ namespace MozaPlugin.Devices
                 RpmTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;
                 KnobsTab.Visibility = showKnobsTab ? Visibility.Visible : Visibility.Collapsed;
+                // Files tab: dashboard upload + wheel-side dashboard inventory.
+                // Same gate as DashboardTab — dashboard support implies the
+                // wheel has a display and the management-session pipeline that
+                // both features depend on.
+                FilesTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
                 SleepTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
 
                 RpmNewContent.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
@@ -602,10 +818,22 @@ namespace MozaPlugin.Devices
                     WheelKnobIdleSpeedValue.Text = $"{knbSpeed} ms";
                     UpdateIdleSpeedRowVisibility();
 
-                    // Sleep-light tab.
-                    SetComboSafe(WheelSleepModeCombo, _data.WheelIdleMode);
-                    SelectSleepTimeoutByMinutes(_data.WheelIdleTimeout);
-                    int sleepSpeed = _data.WheelIdleSpeed > 0 ? _data.WheelIdleSpeed : 1000;
+                    // Sleep-light tab — drive the UI from the persisted per-page
+                    // bundle (the user's saved choice), NOT from _data which
+                    // mirrors the wheel's transient current state. The wheel
+                    // returns wheel-idle-timeout=0 when sleep mode is Off,
+                    // which doesn't map to any dropdown option → the dropdown
+                    // would render empty and look like the value was wiped.
+                    var sleepBundle = _plugin!.ActiveWheelSleep;
+                    int sleepMode = sleepBundle?.Mode ?? _data.WheelIdleMode;
+                    int sleepTimeoutMin = sleepBundle?.TimeoutMin > 0
+                        ? sleepBundle.TimeoutMin
+                        : _data.WheelIdleTimeout;
+                    int sleepSpeed = sleepBundle?.SpeedMs > 0
+                        ? sleepBundle.SpeedMs
+                        : (_data.WheelIdleSpeed > 0 ? _data.WheelIdleSpeed : 1000);
+                    SetComboSafe(WheelSleepModeCombo, sleepMode);
+                    SelectSleepTimeoutByMinutes(sleepTimeoutMin);
                     WheelSleepSpeedSlider.Value = System.Math.Max(WheelSleepSpeedSlider.Minimum, System.Math.Min(WheelSleepSpeedSlider.Maximum, sleepSpeed));
                     WheelSleepSpeedValue.Text = $"{sleepSpeed} ms";
                     UpdateSleepSpeedRowVisibility();
@@ -634,8 +862,19 @@ namespace MozaPlugin.Devices
                         if (_wheelRpmIndexLabels[i] != null) _wheelRpmIndexLabels[i].Visibility = vis;
                     }
 
-                    UpdateSwatches(_wheelFlagColorSwatches, _data.WheelFlagColors, 6);
-                    UpdateSwatches(_wheelButtonColorSwatches, _data.WheelButtonColors, 14);
+                    // Render LED swatches from the per-game overlay (the user's
+                    // saved choice) when available, falling back to _data
+                    // (wheel's transient current state) only when nothing has
+                    // been saved. Otherwise the wheel's responses for slot N
+                    // can mask the user's saved color — observed on the first
+                    // RPM swatch where the wheel reports a stale value and the
+                    // UI shows it instead of the just-saved user pick.
+                    var wheelOv = _plugin.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                    var rpmOverlay = MergeOverlayIntoData(wheelOv?.WheelRpmColors, _data.WheelRpmColors);
+                    var flagOverlay = MergeOverlayIntoData(wheelOv?.WheelFlagColors, _data.WheelFlagColors);
+                    var buttonOverlay = MergeOverlayIntoData(wheelOv?.WheelButtonColors, _data.WheelButtonColors);
+                    UpdateSwatches(_wheelFlagColorSwatches, flagOverlay, 6);
+                    UpdateSwatches(_wheelButtonColorSwatches, buttonOverlay, 14);
                     for (int i = 0; i < 14; i++)
                     {
                         var cb = _wheelButtonDefaultTelemetryChecks[i];
@@ -643,7 +882,7 @@ namespace MozaPlugin.Devices
                         bool want = _data.WheelButtonDefaultDuringTelemetry[i];
                         if ((cb.IsChecked == true) != want) cb.IsChecked = want;
                     }
-                    UpdateSwatches(_wheelRpmColorSwatches, _data.WheelRpmColors, rpmCount);
+                    UpdateSwatches(_wheelRpmColorSwatches, rpmOverlay, rpmCount);
 
                     int knobCount = modelInfo?.KnobCount ?? 0;
                     WheelKnobSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -656,10 +895,15 @@ namespace MozaPlugin.Devices
                     UpdateSwatches(_wheelKnobBgSwatches, _data.WheelKnobBackgroundColors, knobCount);
                     UpdateSwatches(_wheelKnobPrimarySwatches, _data.WheelKnobPrimaryColors, knobCount);
 
-                    // Knob ring LEDs (Group 3)
+                    // Push the same data into the visible KnobRingViz UI on the Knobs sub-tab.
+                    RefreshKnobRingViz(knobCount, modelInfo?.KnobRingLeds);
+
+                    // Legacy knob-ring section is collapsed unconditionally — the
+                    // KnobRingViz path above replaces it. Kept in the visual tree
+                    // so the existing swatch-build code-behind keeps resolving.
                     var ringLeds = modelInfo?.KnobRingLeds;
                     bool showRings = knobCount > 0 && ringLeds != null && _plugin!.IsWheelLedGroupPresent(3);
-                    WheelKnobRingSection.Visibility = showRings ? Visibility.Visible : Visibility.Collapsed;
+                    WheelKnobRingSection.Visibility = Visibility.Collapsed;
                     if (showRings)
                     {
                         for (int k = 0; k < MozaData.WheelKnobMax; k++)
@@ -717,6 +961,12 @@ namespace MozaPlugin.Devices
                     SetComboSafe(EsRpmDisplayCombo, _data.WheelRpmDisplayMode);
                 }
             }
+
+            // Phase 6: refresh Inputs sub-tab + Knobs sub-tab signal-mode rows
+            // directly from _data. No dependency on the (now hidden) plugin-pane
+            // WheelTab controls — handlers in MozaWheelSettingsControl.Inputs.cs
+            // own the persistence path.
+            RefreshInputsAndKnobsSignalMode(newWheel);
         }
 
         // Pick the first visible tab whenever the current selection has been
@@ -896,8 +1146,13 @@ namespace MozaPlugin.Devices
             if (item?.Tag == null) return;
             if (!int.TryParse(item.Tag.ToString(), out int minutes)) return;
             _data!.WheelIdleTimeout = minutes;
+            // RefreshWheel only reveals the Sleep tab once IsWheelPageReady is
+            // true, so GetOrCreateActiveWheelSleep is guaranteed to return a
+            // valid bundle here (page guid is resolvable).
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
+            int prev = sleep?.TimeoutMin ?? -2;
             if (sleep != null) sleep.TimeoutMin = minutes;
+            MozaLog.Info($"[Moza] SLEEP-USER: bundle.TimeoutMin {prev} -> {minutes} (from dropdown handler, sleep={(sleep==null?"null":"ok")})");
             _plugin.WriteIfWheelDetected("wheel-idle-timeout", minutes);
             _plugin.SaveSettings();
         }
@@ -998,8 +1253,11 @@ namespace MozaPlugin.Devices
                 TelemetryEnabledCheck.IsChecked = _plugin.ActiveTelemetryEnabled;
 
                 PopulateDashboardCombo();
-                UpdateTelemetryProfileInfo();
-                UpdateFolderInfo();
+                    UpdateFolderInfo();
+                // CHANNEL MAPPINGS is always-on (no expander gate). Seed the grid
+                // once _plugin is resolved + start the 2 Hz value poller.
+                PopulateChannelMappingGrid();
+                StartMappingValueTimer();
             }
         }
 
@@ -1081,6 +1339,32 @@ namespace MozaPlugin.Devices
         /// </summary>
         private bool _dashComboFromWheelState;
 
+        // Signature of the data feeding the channel-mapping grid. Composed from
+        // (profile-ref-hash, tier-count, total-channel-count, string-channel-count,
+        // catalog-count) — any change means the wheel sent more data and we should
+        // rebuild. -1 means "never populated".
+        private long _lastMappingDataSignature = -1;
+
+        private long ComputeMappingDataSignature()
+        {
+            if (_plugin == null) return -2;
+            var profile = _plugin.TelemetrySender?.Profile;
+            int catalogCount = _plugin.WheelChannelCatalogForDiagnostics?.Count ?? 0;
+            if (profile == null) return ((long)catalogCount << 40);
+            int tiers = profile.Tiers.Count;
+            int channels = 0;
+            for (int i = 0; i < tiers; i++) channels += profile.Tiers[i].Channels.Count;
+            int strings = profile.StringChannels.Count;
+            // Pack: profile identity (low bits of hashcode) + counts. Profile rebuilds
+            // on dashboard switch get a new object reference → different hash → re-populate.
+            long sig = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(profile) & 0xFFFFFFL;
+            sig |= (long)(tiers      & 0xFF) << 24;
+            sig |= (long)(channels   & 0xFFFF) << 32;
+            sig |= (long)(strings    & 0xFF) << 48;
+            sig |= (long)(catalogCount & 0xFF) << 56;
+            return sig;
+        }
+
         private void RefreshTelemetryStatus()
         {
             if (_plugin == null) return;
@@ -1092,6 +1376,16 @@ namespace MozaPlugin.Devices
                 _dashComboFromWheelState = true;
                 PopulateDashboardCombo();
             }
+
+            // Re-seed CHANNEL MAPPINGS when the data source first appears AND
+            // whenever it grows. The wheel streams the catalog/tier list in
+            // chunks: a one-shot populate on first byte misses the rest. Re-poll
+            // every tick using a cheap signature (profile-ref + tier/channel
+            // counts + catalog count) and rebuild only when the signature
+            // actually changes. PopulateChannelMappingGrid snapshots the
+            // signature itself so other call sites also keep this in sync.
+            long sig = ComputeMappingDataSignature();
+            if (sig != _lastMappingDataSignature) PopulateChannelMappingGrid();
 
             bool enabled = _plugin.ActiveTelemetryEnabled;
             var active = _plugin.TelemetrySender;
@@ -1137,29 +1431,12 @@ namespace MozaPlugin.Devices
 
             // Refresh profile info — auto-renegotiate may have swapped
             // the profile on a background thread after a dashboard switch.
-            UpdateTelemetryProfileInfo();
-        }
-
-        private void UpdateTelemetryProfileInfo()
-        {
-            if (_plugin == null) return;
-            var profile = _plugin.TelemetrySender?.Profile;
-            if (profile == null || profile.Tiers.Count == 0)
-            {
-                TelemetryProfileInfo.Text = "—";
-                return;
-            }
-            var parts = new System.Collections.Generic.List<string>();
-            foreach (var tier in profile.Tiers)
-                parts.Add($"L{tier.PackageLevel}: {tier.Channels.Count}ch/{tier.TotalBytes}B");
-            TelemetryProfileInfo.Text = string.Join("  ", parts);
         }
 
         private void TelemetryEnabledCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents || _plugin == null) return;
             _plugin.SetTelemetryEnabled(TelemetryEnabledCheck.IsChecked == true);
-            UpdateTelemetryProfileInfo();
         }
 
         private void WheelDisplayBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1259,8 +1536,7 @@ namespace MozaPlugin.Devices
 
                 _plugin.OnDashboardSwitched((uint)idx);
 
-                UpdateTelemetryProfileInfo();
-                if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
+                    PopulateChannelMappingGrid();
                 return;
             }
 
@@ -1271,8 +1547,7 @@ namespace MozaPlugin.Devices
                 _plugin.ActiveTelemetryMzdashPath = "";
                 _plugin.SaveSettings();
                 _plugin.OnDashboardSwitched();
-                UpdateTelemetryProfileInfo();
-                if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
+                    PopulateChannelMappingGrid();
                 return;
             }
             if (!selected.StartsWith("[Custom:"))
@@ -1281,8 +1556,7 @@ namespace MozaPlugin.Devices
                 _plugin.ActiveTelemetryMzdashPath = "";
                 _plugin.SaveSettings();
                 _plugin.OnDashboardSwitched();
-                UpdateTelemetryProfileInfo();
-                if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
+                    PopulateChannelMappingGrid();
             }
         }
 
@@ -1312,8 +1586,7 @@ namespace MozaPlugin.Devices
                 }
             }
 
-            UpdateTelemetryProfileInfo();
-            if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
+            PopulateChannelMappingGrid();
         }
 
         private void TelemetryLoadMzdash_Click(object sender, RoutedEventArgs e)
@@ -1344,8 +1617,7 @@ namespace MozaPlugin.Devices
                 TelemetryProfileCombo.SelectedIndex = TelemetryProfileCombo.Items.Count - 1;
             }
 
-            UpdateTelemetryProfileInfo();
-            if (TelemetryMappingsExpander.IsExpanded) PopulateChannelMappingGrid();
+            PopulateChannelMappingGrid();
         }
 
         private void TelemetrySetFolder_Click(object sender, RoutedEventArgs e)
@@ -1482,22 +1754,10 @@ namespace MozaPlugin.Devices
 
         // ===== Channel mappings =====
 
-        // 2 Hz refresh of the "Current value" column while the expander is open.
-        // Stopped on collapse so we don't pay the GetPropertyValue cost when the
-        // user can't see the values.
+        // 2 Hz refresh of the "Current value" column. Started from OnLoaded
+        // (CHANNEL MAPPINGS card is always visible — no expander gate).
         private DispatcherTimer? _mappingValueTimer;
         private static readonly TimeSpan MappingValueInterval = TimeSpan.FromMilliseconds(500);
-
-        private void TelemetryMappingsExpander_Expanded(object sender, RoutedEventArgs e)
-        {
-            PopulateChannelMappingGrid();
-            StartMappingValueTimer();
-        }
-
-        private void TelemetryMappingsExpander_Collapsed(object sender, RoutedEventArgs e)
-        {
-            StopMappingValueTimer();
-        }
 
         private void StartMappingValueTimer()
         {
@@ -1583,6 +1843,9 @@ namespace MozaPlugin.Devices
 
         private void PopulateChannelMappingGrid()
         {
+            // Snapshot the data signature so the RefreshTelemetryStatus growth
+            // detector doesn't re-trigger every 500ms for already-current data.
+            _lastMappingDataSignature = ComputeMappingDataSignature();
             if (_plugin == null) { TelemetryChannelGrid.ItemsSource = null; return; }
 
             // Unsubscribe from prior rows so stale rows can be GC'd and we don't

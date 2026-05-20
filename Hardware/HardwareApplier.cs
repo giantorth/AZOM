@@ -193,6 +193,19 @@ namespace MozaPlugin.Hardware
                 }
                 WriteKnobColors(knobBgColors, knobPrimaryColors);
                 WriteKnobRingColors(knobRingColors, knobRingBri);
+
+                // If we have no saved active-colour overlay (fresh install, or
+                // user never touched the centre swatch), read the wheel's own
+                // stored values back — they'll land in MozaData via
+                // UpdateFromArray for wheel-knob{N}-active-color and surface
+                // as the visible defaults instead of black-on-load.
+                if (knobPrimaryColors == null)
+                {
+                    var model = _plugin.WheelModelInfo;
+                    int knobs = model?.KnobCount ?? 0;
+                    for (int i = 0; i < knobs && i < 5; i++)
+                        _deviceManager.ReadSetting($"wheel-knob{i + 1}-active-color");
+                }
             }
 
             if (_detectionState.OldWheelDetected)

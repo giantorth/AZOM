@@ -243,6 +243,16 @@ namespace MozaPlugin
         //       per-game values.
         public int SettingsSchemaVersion { get; set; } = 0;
 
+        // Marks the wheel device extension as already drained into the per-page
+        // bundle + overlay. MozaWheelExtensionSettings.ApplyTo gates on this:
+        // once true, subsequent SetSettings calls (which fire every restart and
+        // every profile switch) skip the merge entirely, so a stale device JSON
+        // cannot clobber the user's saved values. Lives on MozaPluginSettings
+        // (which the plugin reliably flushes via the debounce timer + End())
+        // rather than on the DTO (which SimHub doesn't reliably re-serialize
+        // before shutdown).
+        public bool WheelExtensionDrained { get; set; } = false;
+
         // Per-wheel-page mzdash folder library. Keyed by SimHub page DescriptorUniqueId
         // GUID. Shared across all profiles — every game using the same wheel sees
         // the same folder. Set per-wheel-page, not per-game, so the user maintains

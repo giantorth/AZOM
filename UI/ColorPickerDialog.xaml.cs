@@ -19,6 +19,14 @@ namespace MozaPlugin
             RSlider.Value = r;
             GSlider.Value = g;
             BSlider.Value = b;
+            Palette.SelectedColor = Color.FromRgb(r, g, b);
+            Palette.ColorChanged += (_, c) =>
+            {
+                // Suppress the picker's recursive call back into Palette during slider updates.
+                RSlider.Value = c.R;
+                GSlider.Value = c.G;
+                BSlider.Value = c.B;
+            };
             UpdatePreview();
 
             if (s_hasLastColor)

@@ -1,0 +1,65 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Section icons — converted from components.jsx Icon const SVGs.
+         Each is a Geometry (path-mini-language) sized to a 24x24 viewbox.
+         Renderers (e.g. SectionCard's icon chip) use Path with
+         Stretch=Uniform + Stroke=Cyan + StrokeThickness=1.5 + Fill=None. -->
+
+    <!-- Plugin-tab top-bar icons -->
+    <Geometry x:Key="IconBase">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M8,12 A4,4 0 1 1 16,12 A4,4 0 1 1 8,12 Z M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21</Geometry>
+
+    <Geometry x:Key="IconWheel">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M9.5,12 A2.5,2.5 0 1 1 14.5,12 A2.5,2.5 0 1 1 9.5,12 Z M12,9.5 V4.5 M14.5,13.5 L18.5,17 M9.5,13.5 L5.5,17</Geometry>
+
+    <Geometry x:Key="IconHandbrake">M7,4 V14 M7,14 A3,3 0 0 0 10,17 H14 A3,3 0 0 0 17,14 V12 M5,2 H9 V5 H5 Z M11,17 V21 M15,17 V21</Geometry>
+
+    <Geometry x:Key="IconPedals">M3,6 H9 V20 H3 Z M11,9 H17 V20 H11 Z M19,12 H22 V20 H19 Z</Geometry>
+
+    <Geometry x:Key="IconOptions">M9.5,12 A2.5,2.5 0 1 1 14.5,12 A2.5,2.5 0 1 1 9.5,12 Z M19.4,15 a1.7,1.7 0 0 0 0.3,1.8 l0.1,0.1 a2,2 0 1 1 -2.8,2.8 l-0.1,-0.1 a1.7,1.7 0 0 0 -1.8,-0.3 a1.7,1.7 0 0 0 -1,1.5 V21 a2,2 0 1 1 -4,0 v-0.1 a1.7,1.7 0 0 0 -1,-1.5 a1.7,1.7 0 0 0 -1.8,0.3 l-0.1,0.1 a2,2 0 1 1 -2.8,-2.8 l0.1,-0.1 a1.7,1.7 0 0 0 0.3,-1.8 a1.7,1.7 0 0 0 -1.5,-1 H3 a2,2 0 1 1 0,-4 h0.1 a1.7,1.7 0 0 0 1.5,-1 a1.7,1.7 0 0 0 -0.3,-1.8 l-0.1,-0.1 a2,2 0 1 1 2.8,-2.8 l0.1,0.1 a1.7,1.7 0 0 0 1.8,0.3 a1.7,1.7 0 0 0 1,-1.5 V3 a2,2 0 1 1 4,0 v0.1 a1.7,1.7 0 0 0 1,1.5 a1.7,1.7 0 0 0 1.8,-0.3 l0.1,-0.1 a2,2 0 1 1 2.8,2.8 l-0.1,0.1 a1.7,1.7 0 0 0 -0.3,1.8 a1.7,1.7 0 0 0 1.5,1 H21 a2,2 0 1 1 0,4 h-0.1 a1.7,1.7 0 0 0 -1.5,1 Z</Geometry>
+
+    <Geometry x:Key="IconDiag">M3,12 H7 L10,4 L14,20 L17,12 H21</Geometry>
+
+    <!-- Section header icons -->
+    <Geometry x:Key="IconSteer">M4,12 A8,8 0 1 1 20,12 A8,8 0 1 1 4,12 Z M10,12 A2,2 0 1 1 14,12 A2,2 0 1 1 10,12 Z M12,10 V4 M14,13 L19,17 M10,13 L5,17</Geometry>
+
+    <Geometry x:Key="IconTemp">M14,14 V5 A2,2 0 1 0 10,5 V14 A4,4 0 1 0 14,14 Z</Geometry>
+
+    <Geometry x:Key="IconPower">M13,2 L4,14 H11 L10,22 L19,10 H12 L13,2 Z</Geometry>
+
+    <Geometry x:Key="IconDamper">M3,17 C5,17 5,13 7,13 S9,17 11,17 S13,9 15,9 S17,17 19,17 S21,13 23,13</Geometry>
+
+    <Geometry x:Key="IconGame">M2,10 V16 A3,3 0 0 0 5,19 H19 A3,3 0 0 0 22,16 V10 A3,3 0 0 0 19,7 H5 A3,3 0 0 0 2,10 Z M7,12 H10 M8.5,10.5 V13.5 M14.7,12.2 L15.3,12.2 M17.2,14.2 L17.8,14.2</Geometry>
+
+    <Geometry x:Key="IconSpeed">M12,14 L16,10 M3,12 A9,9 0 0 1 21,12 M10.5,14 A1.5,1.5 0 1 1 13.5,14 A1.5,1.5 0 1 1 10.5,14 Z</Geometry>
+
+    <Geometry x:Key="IconShield">M12,2 L20,6 V12 C20,17 16.5,20.5 12,22 C7.5,20.5 4,17 4,12 V6 L12,2 Z</Geometry>
+
+    <Geometry x:Key="IconLimit">M4,12 H20 M8,6 L4,12 L8,18 M16,6 L20,12 L16,18</Geometry>
+
+    <Geometry x:Key="IconEq">M5,4 V10 M5,14 V20 M12,4 V7 M12,11 V20 M19,4 V9 M19,13 V20 M3.4,12 A1.6,1.6 0 1 1 6.6,12 A1.6,1.6 0 1 1 3.4,12 Z M10.4,9 A1.6,1.6 0 1 1 13.6,9 A1.6,1.6 0 1 1 10.4,9 Z M17.4,11 A1.6,1.6 0 1 1 20.6,11 A1.6,1.6 0 1 1 17.4,11 Z</Geometry>
+
+    <Geometry x:Key="IconCurve">M3,20 C7,20 9,4 21,4 M3,20 H21</Geometry>
+
+    <Geometry x:Key="IconShift">M12,3 V21 M5,8 L12,3 L19,8 M5,16 L12,21 L19,16</Geometry>
+
+    <Geometry x:Key="IconMisc">M3.4,12 A1.6,1.6 0 1 1 6.6,12 A1.6,1.6 0 1 1 3.4,12 Z M10.4,12 A1.6,1.6 0 1 1 13.6,12 A1.6,1.6 0 1 1 10.4,12 Z M17.4,12 A1.6,1.6 0 1 1 20.6,12 A1.6,1.6 0 1 1 17.4,12 Z</Geometry>
+
+    <Geometry x:Key="IconPaddle">M3,8 L11,5 V19 L3,16 Z M21,8 L13,5 V19 L21,17 Z</Geometry>
+
+    <Geometry x:Key="IconKnob">M5,12 A7,7 0 1 1 19,12 A7,7 0 1 1 5,12 Z M12,7 V12</Geometry>
+
+    <Geometry x:Key="IconButtons">M4.6,7 A2.4,2.4 0 1 1 9.4,7 A2.4,2.4 0 1 1 4.6,7 Z M14.6,7 A2.4,2.4 0 1 1 19.4,7 A2.4,2.4 0 1 1 14.6,7 Z M4.6,17 A2.4,2.4 0 1 1 9.4,17 A2.4,2.4 0 1 1 4.6,17 Z M14.6,17 A2.4,2.4 0 1 1 19.4,17 A2.4,2.4 0 1 1 14.6,17 Z</Geometry>
+
+    <Geometry x:Key="IconRange">M4,12 H20 M4,9 V15 M20,9 V15 M9,12 L12,9 M9,12 L12,15 M15,12 L12,9 M15,12 L12,15</Geometry>
+
+    <Geometry x:Key="IconCal">M12,2 V5 M12,19 V22 M2,12 H5 M19,12 H22 M5,5 L7,7 M17,17 L19,19 M5,19 L7,17 M17,7 L19,5 M8,12 A4,4 0 1 1 16,12 A4,4 0 1 1 8,12 Z</Geometry>
+
+    <Geometry x:Key="IconLed">M9,18 H15 M10,21 H14 M12,3 A7,7 0 0 0 8,15 C8.7,15.7 9,16.5 9,17.5 H15 C15,16.5 15.3,15.7 16,15 A7,7 0 0 0 12,3 Z</Geometry>
+
+    <Geometry x:Key="IconAlert">M12,9 V13 M12,17 H12.01 M10.3,3.86 L1.82,18 A2,2 0 0 0 3.53,21 H20.47 A2,2 0 0 0 22.18,18 L13.71,3.86 A2,2 0 0 0 10.29,3.86 Z</Geometry>
+
+    <Geometry x:Key="IconRefresh">M3,12 A9,9 0 0 1 18,5.3 L21,8 M21,3 V8 H16 M21,12 A9,9 0 0 1 6,18.7 L3,16 M3,21 V16 H8</Geometry>
+
+    <Geometry x:Key="IconBolt">M13,2 L4,14 H11 L10,22 L19,10 H12 L13,2 Z</Geometry>
+
+</ResourceDictionary>

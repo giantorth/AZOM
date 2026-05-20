@@ -22,6 +22,15 @@ namespace MozaPlugin.UI
                 combo.SelectedIndex = index;
         }
 
+        /// <summary>Overload for any <see cref="Selector"/> (covers ListBox-derived
+        /// SegmentedControl + ComboBox in one call site). Clamps to valid range,
+        /// no-op outside bounds — matches the ComboBox overload's semantics.</summary>
+        public static void SetComboSafe(System.Windows.Controls.Primitives.Selector selector, int index)
+        {
+            if (index >= 0 && index < selector.Items.Count)
+                selector.SelectedIndex = index;
+        }
+
         /// <summary>Set slider value (clamped) and paint a "%" label.</summary>
         public static void SetSliderPercent(Slider slider, TextBlock label, double value, double min, double max)
         {

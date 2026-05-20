@@ -143,6 +143,23 @@ namespace MozaPlugin.Devices
         public void ApplyTo(MozaPluginSettings settings, MozaData data,
             MozaProfile? profile = null, string? pageModelPrefix = null)
         {
+            // Migration is one-shot. The plugin settings file (bundle + overlay)
+            // is the authoritative source for the user's wheel-LED / sleep /
+            // idle settings; this DTO is only the SimHub-side device JSON,
+            // which mirrors but can lag behind. Once we've drained any legacy
+            // values it carried into the live in-memory state, every subsequent
+            // SetSettings call is a no-op — otherwise a stale DTO field will
+            // win on restart whenever SimHub failed to call GetSettings before
+            // shutdown.
+            //
+            // Gate on MozaPluginSettings.WheelExtensionDrained — saved with the
+            // plugin's own debounce timer + End() flush, so it's reliable.
+            // Affects every wheel device-extension instance (one per saved-on-
+            // disk device GUID — the user can accumulate several): once the
+            // first one runs the merge, the flag locks for all of them.
+            MozaLog.Info($"[Moza] APPLYTO: prefix='{pageModelPrefix ?? "(null)"}' Drained={(settings?.WheelExtensionDrained == true)} dtoSleepTimeoutMin={WheelSleepTimeoutMin}");
+            if (settings != null && settings.WheelExtensionDrained) return;
+
             // Write into the profile's overlay for this page GUID. No-op when the
             // profile or page GUID can't be resolved (extension's SetSettings
             // arrived before profile system initialized — the extension JSON on
@@ -160,9 +177,15 @@ namespace MozaPlugin.Devices
                 MergeIntoOverlay(ov);
 
                 // Sleep-light bundle is per-wheel-page (NOT per-game), so it
-                // lives on MozaPluginSettings.WheelSleepByPageGuid. Merge any
-                // non-sentinel values from the DTO into that dict keyed by the
-                // same page GUID we used for the overlay.
+                // lives on MozaPluginSettings.WheelSleepByPageGuid. The plugin
+                // settings file is loaded BEFORE this method is invoked, so the
+                // bundle already holds the user's most recent value at this
+                // point. The DTO can lag behind (SimHub only re-serializes the
+                // device JSON when it calls GetSettings, which doesn't always
+                // happen before shutdown) — so treat it as a FILL-ONLY source:
+                // only adopt a DTO value when the bundle field is at its
+                // sentinel. Otherwise the stale device JSON clobbers the
+                // user's freshly-loaded setting on every restart.
                 if (WheelSleepMode >= 0 || WheelSleepTimeoutMin >= 0
                     || WheelSleepSpeedMs >= 0 || WheelSleepColor != null)
                 {
@@ -173,15 +196,14 @@ namespace MozaPlugin.Devices
                         bundle = new WheelSleepSettings();
                         settings.WheelSleepByPageGuid[pageGuid] = bundle;
                     }
-                    if (WheelSleepMode       >= 0)   bundle.Mode       = WheelSleepMode;
-                    if (WheelSleepTimeoutMin >= 0)   bundle.TimeoutMin = WheelSleepTimeoutMin;
-                    if (WheelSleepSpeedMs    >= 0)   bundle.SpeedMs    = WheelSleepSpeedMs;
-                    if (WheelSleepColor      != null) bundle.Color     = (int[])WheelSleepColor.Clone();
+                    if (bundle.Mode       < 0 && WheelSleepMode       >= 0) bundle.Mode       = WheelSleepMode;
+                    if (bundle.TimeoutMin < 0 && WheelSleepTimeoutMin >= 0) bundle.TimeoutMin = WheelSleepTimeoutMin;
+                    if (bundle.SpeedMs    < 0 && WheelSleepSpeedMs    >= 0) bundle.SpeedMs    = WheelSleepSpeedMs;
+                    if (bundle.Color   == null && WheelSleepColor    != null) bundle.Color    = (int[])WheelSleepColor.Clone();
                 }
 
                 // Idle effect/speed bundle is also per-wheel-page (schema v9).
-                // Drain the legacy DTO fields here so older SimHub-side device
-                // JSON keeps round-tripping correctly.
+                // Same fill-only semantics as the sleep bundle above.
                 if (WheelIdleEffect >= 0 || WheelButtonsIdleEffect >= 0
                     || WheelKnobIdleEffect >= 0 || WheelTelemetryIdleSpeedMs >= 0
                     || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0)
@@ -193,12 +215,12 @@ namespace MozaPlugin.Devices
                         idle = new WheelIdleSettings();
                         settings.WheelIdleByPageGuid[pageGuid] = idle;
                     }
-                    if (WheelIdleEffect >= 0)            idle.TelemetryEffect  = WheelIdleEffect;
-                    if (WheelButtonsIdleEffect >= 0)     idle.ButtonsEffect    = WheelButtonsIdleEffect;
-                    if (WheelKnobIdleEffect >= 0)        idle.KnobEffect       = WheelKnobIdleEffect;
-                    if (WheelTelemetryIdleSpeedMs >= 0)  idle.TelemetrySpeedMs = WheelTelemetryIdleSpeedMs;
-                    if (WheelButtonsIdleSpeedMs >= 0)    idle.ButtonsSpeedMs   = WheelButtonsIdleSpeedMs;
-                    if (WheelKnobIdleSpeedMs >= 0)       idle.KnobSpeedMs      = WheelKnobIdleSpeedMs;
+                    if (idle.TelemetryEffect  < 0 && WheelIdleEffect            >= 0) idle.TelemetryEffect  = WheelIdleEffect;
+                    if (idle.ButtonsEffect    < 0 && WheelButtonsIdleEffect     >= 0) idle.ButtonsEffect    = WheelButtonsIdleEffect;
+                    if (idle.KnobEffect       < 0 && WheelKnobIdleEffect        >= 0) idle.KnobEffect       = WheelKnobIdleEffect;
+                    if (idle.TelemetrySpeedMs < 0 && WheelTelemetryIdleSpeedMs  >= 0) idle.TelemetrySpeedMs = WheelTelemetryIdleSpeedMs;
+                    if (idle.ButtonsSpeedMs   < 0 && WheelButtonsIdleSpeedMs    >= 0) idle.ButtonsSpeedMs   = WheelButtonsIdleSpeedMs;
+                    if (idle.KnobSpeedMs      < 0 && WheelKnobIdleSpeedMs       >= 0) idle.KnobSpeedMs      = WheelKnobIdleSpeedMs;
                 }
             }
 
@@ -225,6 +247,11 @@ namespace MozaPlugin.Devices
             MozaProfile.UnpackColorsInto(WheelKnobPrimaryColors, data.WheelKnobPrimaryColors);
             MozaProfile.UnpackColorsInto(WheelKnobRingColors, data.KnobRingColors);
             if (WheelKnobRingBrightness >= 0) data.KnobRingBrightness = WheelKnobRingBrightness;
+
+            // Migration done. Stamp the plugin-side flag so every subsequent
+            // SetSettings on any wheel extension skips this method entirely.
+            // The plugin's debounce + End() flush will persist this reliably.
+            if (settings != null) settings.WheelExtensionDrained = true;
         }
 
         /// <summary>
@@ -247,37 +274,47 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Copy non-sentinel fields from this DTO into the given overlay.
-        /// Mirrors the legacy slot-write path inside ApplyTo.
+        /// FILL-ONLY: a DTO value only writes into the overlay when the overlay
+        /// field is still at its sentinel. The overlay (under the profile in
+        /// MozaPluginSettings) is loaded before SetSettings fires, so the
+        /// user's most recent value is already in place when this runs — and
+        /// the device JSON can lag behind (SimHub doesn't always call
+        /// GetSettings before shutdown). Unconditional overwrites here were
+        /// the cause of user picks (sleep timeout, RPM colors, etc.) randomly
+        /// vanishing across restarts.
         /// </summary>
         private void MergeIntoOverlay(WheelOverride ov)
         {
-            if (WheelTelemetryMode      >= 0) ov.WheelTelemetryMode      = WheelTelemetryMode;
-            if (WheelKnobLedMode        >= 0) ov.WheelKnobLedMode        = WheelKnobLedMode;
-            if (WheelButtonsLedMode     >= 0) ov.WheelButtonsLedMode     = WheelButtonsLedMode;
+            if (ov.WheelTelemetryMode      < 0 && WheelTelemetryMode      >= 0) ov.WheelTelemetryMode      = WheelTelemetryMode;
+            if (ov.WheelKnobLedMode        < 0 && WheelKnobLedMode        >= 0) ov.WheelKnobLedMode        = WheelKnobLedMode;
+            if (ov.WheelButtonsLedMode     < 0 && WheelButtonsLedMode     >= 0) ov.WheelButtonsLedMode     = WheelButtonsLedMode;
             // WheelSleep* are no longer on the overlay — handled by the
             // ApplyTo caller into MozaPluginSettings.WheelSleepByPageGuid.
             // WheelIdleEffect / WheelButtonsIdleEffect / WheelKnobIdleEffect /
             // WheelTelemetryIdleSpeedMs / WheelButtonsIdleSpeedMs /
             // WheelKnobIdleSpeedMs are also no longer on the overlay (schema v9)
             // — handled into MozaPluginSettings.WheelIdleByPageGuid.
-            if (WheelRpmBrightness      >= 0) ov.WheelRpmBrightness      = WheelRpmBrightness;
-            if (WheelButtonsBrightness  >= 0) ov.WheelButtonsBrightness  = WheelButtonsBrightness;
-            if (WheelFlagsBrightness    >= 0) ov.WheelFlagsBrightness    = WheelFlagsBrightness;
-            if (WheelESRpmBrightness    >= 0) ov.WheelESRpmBrightness    = WheelESRpmBrightness;
-            if (WheelRpmIndicatorMode   >= 0) ov.WheelRpmIndicatorMode   = WheelRpmIndicatorMode;
-            if (WheelRpmDisplayMode     >= 0) ov.WheelRpmDisplayMode     = WheelRpmDisplayMode;
-            if (WheelRpmColors          != null) ov.WheelRpmColors       = (int[])WheelRpmColors.Clone();
-            if (WheelRpmBlinkColors     != null) ov.WheelRpmBlinkColors  = (int[])WheelRpmBlinkColors.Clone();
-            if (WheelButtonColors       != null) ov.WheelButtonColors    = (int[])WheelButtonColors.Clone();
-            if (WheelButtonDefaultDuringTelemetry != null)
+            if (ov.WheelRpmBrightness      < 0 && WheelRpmBrightness      >= 0) ov.WheelRpmBrightness      = WheelRpmBrightness;
+            if (ov.WheelButtonsBrightness  < 0 && WheelButtonsBrightness  >= 0) ov.WheelButtonsBrightness  = WheelButtonsBrightness;
+            if (ov.WheelFlagsBrightness    < 0 && WheelFlagsBrightness    >= 0) ov.WheelFlagsBrightness    = WheelFlagsBrightness;
+            if (ov.WheelESRpmBrightness    < 0 && WheelESRpmBrightness    >= 0) ov.WheelESRpmBrightness    = WheelESRpmBrightness;
+            if (ov.WheelRpmIndicatorMode   < 0 && WheelRpmIndicatorMode   >= 0) ov.WheelRpmIndicatorMode   = WheelRpmIndicatorMode;
+            if (ov.WheelRpmDisplayMode     < 0 && WheelRpmDisplayMode     >= 0) ov.WheelRpmDisplayMode     = WheelRpmDisplayMode;
+            if (ov.WheelRpmColors       == null && WheelRpmColors          != null) ov.WheelRpmColors       = (int[])WheelRpmColors.Clone();
+            if (ov.WheelRpmBlinkColors  == null && WheelRpmBlinkColors     != null) ov.WheelRpmBlinkColors  = (int[])WheelRpmBlinkColors.Clone();
+            if (ov.WheelButtonColors    == null && WheelButtonColors       != null) ov.WheelButtonColors    = (int[])WheelButtonColors.Clone();
+            if (ov.WheelButtonDefaultDuringTelemetry == null && WheelButtonDefaultDuringTelemetry != null)
                 ov.WheelButtonDefaultDuringTelemetry = (bool[])WheelButtonDefaultDuringTelemetry.Clone();
-            if (WheelFlagColors         != null) ov.WheelFlagColors      = (int[])WheelFlagColors.Clone();
-            if (WheelIdleColor          != null) ov.WheelIdleColor       = (int[])WheelIdleColor.Clone();
-            if (WheelESRpmColors        != null) ov.WheelESRpmColors     = (int[])WheelESRpmColors.Clone();
-            if (WheelKnobBackgroundColors != null) ov.WheelKnobBackgroundColors = (int[])WheelKnobBackgroundColors.Clone();
-            if (WheelKnobPrimaryColors    != null) ov.WheelKnobPrimaryColors    = (int[])WheelKnobPrimaryColors.Clone();
-            if (WheelKnobRingColors       != null) ov.WheelKnobRingColors       = (int[])WheelKnobRingColors.Clone();
-            if (WheelKnobRingBrightness >= 0) ov.WheelKnobRingBrightness = WheelKnobRingBrightness;
+            if (ov.WheelFlagColors      == null && WheelFlagColors         != null) ov.WheelFlagColors      = (int[])WheelFlagColors.Clone();
+            if (ov.WheelIdleColor       == null && WheelIdleColor          != null) ov.WheelIdleColor       = (int[])WheelIdleColor.Clone();
+            if (ov.WheelESRpmColors     == null && WheelESRpmColors        != null) ov.WheelESRpmColors     = (int[])WheelESRpmColors.Clone();
+            if (ov.WheelKnobBackgroundColors == null && WheelKnobBackgroundColors != null)
+                ov.WheelKnobBackgroundColors = (int[])WheelKnobBackgroundColors.Clone();
+            if (ov.WheelKnobPrimaryColors    == null && WheelKnobPrimaryColors    != null)
+                ov.WheelKnobPrimaryColors    = (int[])WheelKnobPrimaryColors.Clone();
+            if (ov.WheelKnobRingColors       == null && WheelKnobRingColors       != null)
+                ov.WheelKnobRingColors       = (int[])WheelKnobRingColors.Clone();
+            if (ov.WheelKnobRingBrightness   < 0 && WheelKnobRingBrightness >= 0) ov.WheelKnobRingBrightness = WheelKnobRingBrightness;
         }
 
         /// <summary>
