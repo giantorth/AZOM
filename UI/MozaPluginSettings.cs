@@ -209,6 +209,26 @@ namespace MozaPlugin
         /// </summary>
         public int AutoTestLastSlot { get; set; } = -1;
 
+        // ===== Third-party SDK emulation =====
+        // Master toggle for the in-plugin CoAP/UDP server that mimics MOZA's
+        // PitHouse "partner SDK" surface (iRacing in particular). When false
+        // (default) the plugin makes no attempt to bind a port — third-party
+        // apps that depend on PitHouse continue to talk to PitHouse, not us.
+        // Plugin-global (not per-game / per-wheel). Takes effect on next
+        // plugin restart — Stream 7 wires the actual server lifecycle.
+        public bool SdkEmulationEnabled { get; set; } = false;
+
+        // UDP port the embedded CoAP server binds when SdkEmulationEnabled is
+        // true. Defaults to 5683 (the CoAP standard port that PitHouse uses).
+        // Range enforced by the UI to 1024-65535. Plugin-global.
+        public int SdkCoapPort { get; set; } = 5683;
+
+        // Always bind to loopback (127.0.0.1) only. Hidden from the UI in v1
+        // because exposing the partner-API to LAN traffic has no legitimate
+        // use case and only adds attack surface — but plumbed through so a
+        // future power-user switch can flip it without a settings migration.
+        public bool SdkBindLoopbackOnly { get; set; } = true;
+
         // ===== Profile system (SimHub native) =====
         public MozaProfileStore ProfileStore { get; set; } = new MozaProfileStore();
 

@@ -16,6 +16,17 @@
     <Copyright>Copyright 2026</Copyright>
     <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <!-- Workaround for dotnet SDK 10.x CS0579 duplicate AssemblyAttribute when
+         WPF's markup-compile temp project (`*_wpftmp.csproj`) re-imports the
+         auto-generated obj/*.AssemblyInfo.cs. The temp project shares its obj
+         dir with the parent and ends up compiling the generated assembly
+         attributes twice. Telling the SDK not to generate them at all means
+         the temp project simply inherits ours from this csproj's metadata
+         (Description / Product / Copyright / Version above) and no
+         duplicates surface. See dotnet/wpf#93 and dotnet/sdk#7207. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
     <!-- Force Platform=x86 so csproj-only builds (no sln) emit to bin\x86\<Config>\
          — matches the path sln-driven Release|x86 builds use, which the deploy
          scripts hard-code. Without this, `dotnet build MozaPlugin.csproj` defaults
@@ -70,6 +81,42 @@
       <LogicalName>MozaPlugin.Data.Dashes.%(Filename).mzdash</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
+
+  <!-- PitHouseStub project reference for build ordering only. The output is
+       NOT linked into the plugin assembly; it's embedded as a manifest
+       resource below so PitHouseStubManager can extract it at runtime.
+       Path is relative to this csproj's directory (the repo root) — the
+       PitHouseStub project sits in a sibling folder under that root, not
+       above it. -->
+  <ItemGroup>
+    <ProjectReference Include="PitHouseStub\PitHouseStub.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+      <UndefineProperties>TargetFramework;Platform;PlatformTarget</UndefineProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Embed the built PitHouseStub exe as a manifest resource. We track
+       $(Configuration) so Debug|x86 and Release|x86 builds each pick up the
+       matching sibling output. The ProjectReference above guarantees the
+       sibling builds before this target's GenerateResourceMain runs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="PitHouseStub\bin\x86\$(Configuration)\MOZA Pit House.exe"
+                      LogicalName="MozaPlugin.Sdk.PitHouseStub.exe"
+                      Visible="false" />
+  </ItemGroup>
+
+  <!-- Sanity gate: fail fast with a clear message if the stub exe is missing
+       when GenerateResourceMain goes to embed it. Without this, MSBuild
+       would emit a confusing "file not found" deep inside the resource
+       generation step. The ProjectReference above should ensure the sibling
+       builds first; this target only fires if someone bypasses it (e.g.
+       `dotnet build MozaPlugin.csproj` without restoring the sln). -->
+  <Target Name="VerifyPitHouseStubBuilt" BeforeTargets="GenerateResourceMain">
+    <Error Condition="!Exists('PitHouseStub\bin\x86\$(Configuration)\MOZA Pit House.exe')"
+           Text="PitHouseStub output not found at 'PitHouseStub\bin\x86\$(Configuration)\MOZA Pit House.exe'. Build the sln (or run `dotnet build PitHouseStub/PitHouseStub.csproj -c $(Configuration)` first)." />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3">

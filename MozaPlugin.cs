@@ -39,6 +39,13 @@ namespace MozaPlugin
         private MozaDeviceManager _deviceManager = null!;
         private MozaAb9DeviceManager _ab9Manager = null!;
         private MozaMBoosterRegistry? _mboosterRegistry;
+
+        // Third-party SDK (CoAP-over-UDP) emulation server + PitHouse stub
+        // process. Both are gated on Settings.SdkEmulationEnabled and require
+        // a plugin restart to toggle (no runtime enable/disable — see Init()).
+        // Null when disabled, so the UI tab uses null-conditional access.
+        private Sdk.MozaSdkCoapServer? _sdkServer;
+        private Sdk.PitHouseStubManager? _sdkStubManager;
         internal global::MozaPlugin.Protocol.PendingResponseTracker PendingResponses { get; }
             = new global::MozaPlugin.Protocol.PendingResponseTracker();
         private MozaPluginSettings _settings = null!;
@@ -255,6 +262,19 @@ namespace MozaPlugin
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
         internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;
         internal MozaSerialConnection Connection => _connection;
+
+        /// <summary>
+        /// Live SDK CoAP server when emulation is enabled; null otherwise.
+        /// Surfaced for the Settings UI's SDK tab to read its status and
+        /// recent-requests buffer.
+        /// </summary>
+        internal Sdk.MozaSdkCoapServer? SdkServer => _sdkServer;
+
+        /// <summary>
+        /// Live PitHouse stub child-process manager when SDK emulation is
+        /// enabled; null otherwise. Same UI consumer as <see cref="SdkServer"/>.
+        /// </summary>
+        internal Sdk.PitHouseStubManager? SdkStubManager => _sdkStubManager;
 
         /// <summary>True if the wheel's internal Display sub-device responded to probe.
         /// Accepts any populated identity field — some wheels (e.g. W17) return an
@@ -591,6 +611,34 @@ namespace MozaPlugin
                 // Publish Instance only after all resources are wired so a partial-init
                 // throw can't leave a half-built plugin reachable from background callbacks.
                 Instance = this;
+
+                // Third-party SDK emulation (CoAP server + PitHouse stub). Gated
+                // on the persisted Settings.SdkEmulationEnabled flag — toggling
+                // it requires a plugin restart for the change to take effect
+                // (matches the description shown in the UI tab). Failures here
+                // are logged and swallowed so a port conflict / bad permission
+                // doesn't prevent the rest of the plugin from initialising.
+                if (_settings.SdkEmulationEnabled)
+                {
+                    try
+                    {
+                        _sdkStubManager = new Sdk.PitHouseStubManager();
+                        _sdkStubManager.Start();
+                        _sdkServer = new Sdk.MozaSdkCoapServer(_data, _hardwareApplier, _settings);
+                        _sdkServer.Start();
+                        MozaLog.Info("[Sdk] Third-party SDK emulation enabled");
+                    }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Error($"[Sdk] Failed to start SDK emulation: {ex.Message}");
+                        // Partial-failure cleanup so a half-started SDK feature
+                        // doesn't leave a stub process / bound port behind.
+                        try { _sdkServer?.Stop(); } catch { /* swallow */ }
+                        try { _sdkStubManager?.Stop(); } catch { /* swallow */ }
+                        _sdkServer = null;
+                        _sdkStubManager = null;
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -617,6 +665,14 @@ namespace MozaPlugin
             // Dispose every mBooster controller — same reason: stop workers
             // before the connections they own get torn down.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
+
+            // Tear down SDK emulation BEFORE the wire / data layers so the
+            // CoAP receive thread can't dispatch into half-disposed handlers.
+            try { _sdkServer?.Stop(); _sdkServer?.Dispose(); _sdkServer = null; }
+            catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
+            try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
+            catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+
             try
             {
                 if (_connection != null)
@@ -852,6 +908,14 @@ namespace MozaPlugin
             // each connection. Must happen before MozaData is torn down so the
             // position-merge path (which writes to _data) doesn't race.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
+
+            // Tear down SDK emulation up-front. The CoAP receive thread holds
+            // references into MozaData and HardwareApplier; stop it before the
+            // rest of the wire stack disposes those out from under it.
+            try { _sdkServer?.Stop(); _sdkServer?.Dispose(); _sdkServer = null; }
+            catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
+            try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
+            catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
 
             // Clear detection flags up-front. If SimHub re-uses this plugin instance
             // across load/unload, the next Init() also clears them — together this

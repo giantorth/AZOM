@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>MOZA Pit House</AssemblyName>
+    <RootNamespace>MozaPlugin.PitHouseStub</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AssemblyTitle>MOZA Pit House</AssemblyTitle>
+    <Description>Process-name impersonation stub for the MOZA SDK emulation feature. Sits idle until killed by its Win32 JobObject when SimHub exits.</Description>
+    <Product>MOZA Pit House</Product>
+    <Copyright>Copyright 2026</Copyright>
+    <!-- Force Platform=x86 so csproj-only builds emit to bin\x86\<Config>\
+         matching the path sln-driven Release|x86 builds use. -->
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x86</Platform>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

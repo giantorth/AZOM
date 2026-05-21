@@ -90,6 +90,7 @@ namespace MozaPlugin
 
             InitProfilesTab();
             InitRedesignControls();
+            InitSdkTab();
             Instance = this;
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -125,6 +126,11 @@ namespace MozaPlugin
             // killed the timers if the control was reloaded.
             _refreshTimer.Stop();
             _steeringAngleTimer.Stop();
+            // SDK CoAP server fires RecentRequestAppended on its receive
+            // thread; unsubscribe so a torn-down SettingsControl can be GC'd
+            // without the server's event list pinning it. Re-subscribe
+            // happens on the next refresh tick after Loaded fires.
+            UnsubscribeFromSdkServer();
             if (ReferenceEquals(Instance, this)) Instance = null;
         }
 
@@ -165,6 +171,7 @@ namespace MozaPlugin
                 InitTelemetryTab();
                 RefreshDashboardUploadTab();
                 RefreshWheelFilesTab();
+                RefreshSdkTabTick();
             }
         }
 

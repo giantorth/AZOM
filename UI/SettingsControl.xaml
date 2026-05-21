@@ -1529,7 +1529,7 @@
                                                Style="{StaticResource MutedHintText}" Margin="14,0,0,0"/>
                                 </StackPanel>
                                 <ctrl:OffOnToggle x:Name="StartCaptureOnNextLaunchCheck"
-                                          Content="Start capture on next launch (one-shot — auto-clears after firing)"
+                                          Content="Start diagnostics capture on next launch/game switch"
                                           Click="StartCaptureOnNextLaunch_Click"
                                           Margin="0,0,0,10"
                                           ToolTip="Arms the capture so it begins immediately when the plugin re-initializes (next SimHub launch or plugin reload). Useful for catching connect/handshake traffic that's hard to arm in time manually."/>
@@ -1576,6 +1576,74 @@
                                          HorizontalScrollBarVisibility="Auto"
                                          MaxHeight="400" Padding="10"
                                          Visibility="Collapsed"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="CoAP">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,40">
+                    <StackPanel>
+
+                        <ctrl:SectionCard Title="COAP SERVER"
+                                          Subtitle="// embedded CoAP/UDP server on loopback"
+                                          Icon="{StaticResource IconBolt}">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
+                                           Text="When enabled, the plugin runs an embedded CoAP control server."/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="Enable CoAP server" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
+                                              Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="UDP port" Style="{StaticResource SliderLabel}"/>
+                                    <TextBox x:Name="SdkCoapPortBox" Width="100" VerticalAlignment="Center"
+                                             FontFamily="{StaticResource FontMono}"
+                                             LostFocus="SdkCoapPortBox_LostFocus"
+                                             KeyDown="SdkCoapPortBox_KeyDown"/>
+                                    <TextBlock Text="(1024-65535, default 5683)"
+                                               Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                        <ctrl:SectionCard Title="STATUS" Icon="{StaticResource IconDiag}">
+                            <StackPanel>
+                                <Grid Margin="0,4,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="200"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="CoAP server" Style="{StaticResource LabelText}"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" x:Name="SdkServerStatusText"
+                                               Text="Disabled"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Foreground="{StaticResource TextDimBrush}"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Button x:Name="SdkRefreshStatusButton" Content="REFRESH"
+                                            Click="SdkRefreshStatusButton_Click" MinWidth="100"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                        <ctrl:SectionCard Title="RECENT REQUESTS"
+                                          Subtitle="// last 20 CoAP requests · live"
+                                          Icon="{StaticResource IconDiag}">
+                            <StackPanel>
+                                <ListBox x:Name="SdkRecentRequestsList"
+                                         FontFamily="{StaticResource FontMono}" FontSize="11"
+                                         Background="{StaticResource BgDeepBrush}"
+                                         Foreground="{StaticResource TextDimBrush}"
+                                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                         Height="180"
+                                         HorizontalContentAlignment="Stretch"/>
                             </StackPanel>
                         </ctrl:SectionCard>
 
