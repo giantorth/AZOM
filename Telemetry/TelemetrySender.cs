@@ -1406,6 +1406,7 @@ namespace MozaPlugin.Telemetry
 
         private SessionWatchdogManager _watchdog = null!;
         internal SessionWatchdogManager Watchdog => _watchdog;
+        internal bool HotSwitchBurstPending => _hotSwitch.IsBurstPending;
         private readonly Display.WheelSlotTracker _slotTracker;
         private readonly PropertyPushQueue _propertyPushQueue;
         private readonly Frames.TierDefinitionEmitter _tierDefEmitter;
@@ -2315,6 +2316,7 @@ namespace MozaPlugin.Telemetry
                 _watchdog.TickConfigJsonGapEscalation();
                 _watchdog.TickConfigJsonStuckWatchdog();
                 _watchdog.TickSession02EngagementWatchdog();
+                _watchdog.TickSession01EngagementWatchdog();
                 TickGrowSubscriptionIfCatalogStable();
 
                 _tickCounter++;

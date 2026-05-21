@@ -5,9 +5,9 @@ using MozaPlugin.Protocol;
 namespace MozaPlugin.Telemetry.Watchdog
 {
     /// <summary>
-    /// Four wheel-session watchdog loops (sess=0x09 retry, sess=0x02 engagement,
-    /// configJson gap escalation, configJson stuck-state). Budget exhaustion parks
-    /// or escalates to <see cref="TelemetrySender.RestartForSwitch"/>.
+    /// Five wheel-session watchdog loops (sess=0x09 retry, sess=0x01 engagement,
+    /// sess=0x02 engagement, configJson gap escalation, configJson stuck-state).
+    /// Budget exhaustion parks or escalates to <see cref="TelemetrySender.RestartForSwitch"/>.
     /// </summary>
     internal sealed class SessionWatchdogManager
     {
@@ -29,6 +29,37 @@ namespace MozaPlugin.Telemetry.Watchdog
             { 3_000, 5_000, 7_000, 10_000, 15_000 };
         private const int S02ReArmMaxRounds = 5;
         private const int S02InitialGraceMs = 3_000;
+
+        // ── sess=0x01 (mgmt) engagement watchdog ──────────────────────────
+        // Symmetric to the sess=0x02 watchdog. ProbeAndOpenSessions emits
+        // exactly one SessionOpen 0x01 with a 500 ms ack budget; on the
+        // CS-Pro / Universal Hub the wheel takes 12-15 s after device-lock
+        // to start acking session-control frames (CS-Pro-0.9.3-dev capture
+        // 2026-05-20: first `c3 71 fc 00 02` at 11:33:02, ~14 s after the
+        // host's `SessionOpen 0x01` at 11:32:48; zero `c3 71 fc 00 01` in
+        // the entire 2 MB trace). The single-shot open always misses on
+        // this hardware. Without retry the plugin then emits tier-defs on
+        // a session the wheel never accepted — wheel never publishes its
+        // catalog, dashboard renders nothing, user reports "didn't connect".
+        // Engagement signal = wheel acked sess=0x01 (`fc:00 01`) OR pushed
+        // any 7c:00 01 data chunk; either is sufficient.
+        //
+        // Grace is set wide (15 s): healthy wheels on this firmware push
+        // first sess=0x01 chunk ~4 s after Active (verified W17 capture
+        // 2026-05-20 17:55: Active at 17:55:05.015, first sess=0x01
+        // inbound at 17:55:09.039). The CS-Pro pathology is total silence
+        // for the full 14 s window; 15 s gracefully tolerates normal
+        // start-up without false-triggering re-arm that would clobber
+        // an in-flight hot-switch burst (observed: 3 s grace fired at
+        // 17:55:08.528 mid-burst, re-arm's ApplySubscription stomped
+        // the burst's session state).
+        private long _session01EngagedUtcTicks;
+        private int _s01ReArmRounds;
+        private int _s01ReArmLastTickCount;
+        private static readonly int[] S01ReArmBackoffMs =
+            { 5_000, 7_000, 10_000, 15_000, 20_000 };
+        private const int S01ReArmMaxRounds = 5;
+        private const int S01InitialGraceMs = 15_000;
 
         // ── configJson gap / stuck-state ──────────────────────────────────
         private int _configJsonGapCount;
@@ -62,6 +93,15 @@ namespace MozaPlugin.Telemetry.Watchdog
                 _session02FirstInboundUtcTicks = DateTime.UtcNow.Ticks;
         }
 
+        /// <summary>Called when sess=MgmtPort receives an fc:00 ack or any 7c:00
+        /// data chunk. Either is sufficient proof the mgmt session is alive on
+        /// the wheel side. Idempotent — first hit arms, subsequent are no-ops.</summary>
+        public void NoteSession01Engaged()
+        {
+            if (_session01EngagedUtcTicks == 0)
+                _session01EngagedUtcTicks = DateTime.UtcNow.Ticks;
+        }
+
         public void NoteConfigJsonChunkArrived() =>
             _configJsonLastChunkUtcTicks = DateTime.UtcNow.Ticks;
 
@@ -82,6 +122,9 @@ namespace MozaPlugin.Telemetry.Watchdog
             _activeStateEnteredTickCount = 0;
             _s02ReArmRounds = 0;
             _s02ReArmLastTickCount = 0;
+            _session01EngagedUtcTicks = 0;
+            _s01ReArmRounds = 0;
+            _s01ReArmLastTickCount = 0;
             _configJsonGapCount = 0;
             _configJsonLastChunkUtcTicks = 0;
             _configJsonLastPrimeRetryUtcTicks = 0;
@@ -293,6 +336,83 @@ namespace MozaPlugin.Telemetry.Watchdog
                     {
                         MozaLog.Warn(
                             $"[Moza] RestartForSwitch from sess=0x02 watchdog failed: {ex.Message}");
+                    }
+                });
+            }
+        }
+
+        /// <summary>Sess=0x01 (mgmt) engagement: re-arm (close+open+resubscribe)
+        /// if no fc:00 ack or 7c:00 data has been seen; escalate on exhaustion.
+        /// Symmetric to <see cref="TickSession02EngagementWatchdog"/> — see the
+        /// field-block comment above the sess=0x01 watchdog state for the
+        /// hardware-specific failure this catches.</summary>
+        public void TickSession01EngagementWatchdog()
+        {
+            if (!_sender.StateIsActive) return;
+            if (!_sender.ConnectionIsConnected) return;
+            if (_session01EngagedUtcTicks != 0) return;
+            if (_s01ReArmRounds >= S01ReArmMaxRounds) return;
+            if (_activeStateEnteredTickCount == 0) return;
+            // Don't fight a hot-switch burst in flight. The burst's tier-def
+            // re-applications and session state are coordinated by the
+            // HotSwitchCoordinator; our close+open+ApplySubscription would
+            // clobber that work and reset both to a half-formed state.
+            // Verified in W17 capture 2026-05-20 17:55: re-arm fired at
+            // 17:55:08.528 while burst 1/4 was in flight (armed 17:55:06,
+            // first emission 17:55:07.564) and stomped the burst — switches
+            // and test mode then misbehaved for the rest of the session.
+            if (_sender.HotSwitchBurstPending) return;
+
+            byte mgmt = _sender.MgmtPort;
+            if (mgmt == 0) return;
+
+            int now = Environment.TickCount;
+            if (_s01ReArmRounds == 0)
+            {
+                if ((now - _activeStateEnteredTickCount) < S01InitialGraceMs) return;
+            }
+            else
+            {
+                int gateMs = S01ReArmBackoffMs[Math.Min(_s01ReArmRounds - 1, S01ReArmBackoffMs.Length - 1)];
+                if ((now - _s01ReArmLastTickCount) < gateMs) return;
+            }
+
+            _s01ReArmRounds++;
+            _s01ReArmLastTickCount = now;
+
+            MozaLog.Warn(
+                $"[Moza] sess=0x{mgmt:X2} (mgmt) no inbound observed; re-arm round " +
+                $"{_s01ReArmRounds}/{S01ReArmMaxRounds} — close+open+resubscribe");
+
+            try
+            {
+                const int ReArmAckTimeoutMs = 500;
+                _sender.TryCloseSession(mgmt, ReArmAckTimeoutMs);
+                _sender.TryOpenSession(mgmt, ReArmAckTimeoutMs);
+                // ApplySubscription re-emits tier-def on MgmtPort, which is the
+                // payload sess=0x01 exists to carry. If the wheel acks the fresh
+                // open, tier-def reaches it on this round and the catalog push
+                // follows naturally; no separate init handshake (unlike sess=0x02).
+                _sender.ApplySubscription(force: true);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn(
+                    $"[Moza] sess=0x{mgmt:X2} re-arm round {_s01ReArmRounds} failed: {ex.Message}");
+            }
+
+            if (_s01ReArmRounds >= S01ReArmMaxRounds)
+            {
+                MozaLog.Warn(
+                    $"[Moza] sess=0x{mgmt:X2} re-arm budget exhausted after {S01ReArmMaxRounds} rounds " +
+                    "— escalating to full RestartForSwitch (Stop+Start cycle)");
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    try { _sender.RestartForSwitch(); }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Warn(
+                            $"[Moza] RestartForSwitch from sess=0x{mgmt:X2} watchdog failed: {ex.Message}");
                     }
                 });
             }

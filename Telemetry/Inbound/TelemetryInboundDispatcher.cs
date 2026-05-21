@@ -92,6 +92,12 @@ namespace MozaPlugin.Telemetry.Inbound
                 // TryOpenSession's seq verification falls through to session-match-only.
                 _sender._lastAckedSeq = -1;
             }
+            // Mgmt session engagement signal: a wheel fc:00 ack on sess=MgmtPort
+            // proves the session is open even if the wheel never pushes data on
+            // it. See TickSession01EngagementWatchdog for why this matters on
+            // slow-bring-up wheels (CS-Pro / Universal Hub).
+            if (data[4] == _sender.MgmtPort && _sender.MgmtPort != 0)
+                _sender.Watchdog.NoteSession01Engaged();
             _sender.AckReceived.Set();
         }
 
@@ -164,6 +170,9 @@ namespace MozaPlugin.Telemetry.Inbound
                     _sender._mgmtAckSeq = seq;
                 _sender.SendSessionAckInternal(_sender.MgmtPort, (ushort)seq);
                 _sender.MgmtResponseEvent.Set();
+                // Mgmt session engagement signal — data flow on sess=MgmtPort
+                // is the strongest possible proof the session is alive.
+                _sender.Watchdog.NoteSession01Engaged();
             }
 
             // File-transfer candidate sessions (0x04..0x08): ack ALL, forward to
