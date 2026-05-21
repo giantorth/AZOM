@@ -9,13 +9,14 @@ using MozaControls;
 
 namespace MozaPlugin.Devices
 {
-    // Phase 7 knob page: per-knob KnobRingViz (12 ring slots + centre swatch),
-    // a single shared PaletteStrip editor below, and bulk actions
-    // ("Fill ring with selected", "Copy this knob to all").
+    // Phase 7 knob page: per-knob KnobRingViz (ring slot count tracks the
+    // wheel's per-knob LED count — 12 for most knobs, 8 for the KS Pro middle
+    // knob — plus a centre swatch), a single shared PaletteStrip editor below,
+    // and bulk actions ("Fill ring with selected", "Copy this knob to all").
     //
     // Reads/writes the same _data fields as the legacy Border-based UI:
     //   • Centre swatch  ↔ _data.WheelKnobPrimaryColors[knob]
-    //   • Ring slot N    ↔ _data.KnobRingColors[knob*12 + N]
+    //   • Ring slot N    ↔ _data.KnobRingColors[WheelModelInfo.KnobRingStartIndex(knob) + N]
     // Wire commands match the existing handlers:
     //   • "wheel-knob{N}-active-color" for the centre swatch
     //   • "wheel-knob-bg-color{ledIndex+1}" for each ring LED
@@ -26,7 +27,7 @@ namespace MozaPlugin.Devices
         private Border[]? _wiKnobSignalCardWrappers; // per-knob signal-mode card (no selection state)
         private SegmentedControl[]? _wiKnobSignalChips;  // Btn/Knob chip inside each signal-mode card
         private int _wiSelectedKnob = -1;
-        private int _wiSelectedSlot = -1;       // -2 = centre, 0..11 = ring slot
+        private int _wiSelectedSlot = -1;       // -2 = centre, 0..(N-1) = ring slot
         private bool _wiKnobsBuilt;
 
         private void BuildKnobRingVizPanels()
@@ -115,14 +116,19 @@ namespace MozaPlugin.Devices
                     WiSignalModeGrid.Children.Add(signalCard);
 
                 // ===== Colours card (bottom grid) =====
+                // Seed with 12 slots so the viz renders something before the
+                // first RefreshKnobRingViz tick lands. RefreshKnobRingViz
+                // resizes the collection per-knob (e.g. 8 for KS Pro middle
+                // knob) once WheelModelInfo is known.
+                var ringSeed = new System.Collections.ObjectModel.ObservableCollection<Color>();
+                for (int i = 0; i < 12; i++) ringSeed.Add(Colors.Black);
                 var viz = new KnobRingViz
                 {
                     Width = 110, Height = 110,
-                    RingColors = new System.Collections.ObjectModel.ObservableCollection<Color>(),
+                    RingColors = ringSeed,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                 };
-                for (int i = 0; i < 12; i++) viz.RingColors.Add(Colors.Black);
                 viz.SlotSelected += (_, slot) => OnKnobSlotSelected(knobIdx, slot);
 
                 var coloursCard = new Border
@@ -192,7 +198,9 @@ namespace MozaPlugin.Devices
         }
 
         // Reflect _data → KnobRingViz on every refresh tick. Also toggles
-        // per-knob visibility (Collapsed when knobCount < this knob index).
+        // per-knob visibility (Collapsed when knobCount < this knob index)
+        // and resizes each viz's ring to match the per-knob LED count
+        // (e.g. KS Pro middle knob = 8 dots evenly spaced, not 12 with 4 dimmed).
         private void RefreshKnobRingViz(int knobCount, int[]? ledsPerKnob)
         {
             if (!_wiKnobsBuilt || _wiKnobViz == null || _wiKnobViewWrappers == null || _data == null) return;
@@ -212,23 +220,33 @@ namespace MozaPlugin.Devices
                 // Centre = active color
                 var ac = _data.WheelKnobPrimaryColors[k];
                 viz.ActiveColor = Color.FromRgb(ac[0], ac[1], ac[2]);
-                // Ring = per-LED colors (capped at this knob's actual LED count)
-                int ledCount = ledsPerKnob != null && k < ledsPerKnob.Length ? ledsPerKnob[k] : 0;
+                // Ring = one dot per physical LED on this knob. Resize the
+                // collection if the per-knob count changed (assigning a new
+                // ObservableCollection triggers KnobRingViz.OnRingChanged →
+                // Rebuild, which re-lays the dots evenly around the ring).
+                int ledCount = ledsPerKnob != null && k < ledsPerKnob.Length ? ledsPerKnob[k] : 12;
+                if (ledCount <= 0) ledCount = 12;
                 int startIdx = _plugin?.WheelModelInfo?.KnobRingStartIndex(k) ?? (k * 12);
-                for (int i = 0; i < 12 && i < viz.RingColors!.Count; i++)
+                if (viz.RingColors == null || viz.RingColors.Count != ledCount)
                 {
-                    if (i < ledCount)
+                    var fresh = new System.Collections.ObjectModel.ObservableCollection<Color>();
+                    for (int i = 0; i < ledCount; i++) fresh.Add(Colors.Black);
+                    viz.RingColors = fresh;
+                    // If the prior selection points past the new bounds, clear it
+                    // so the editor label/palette don't paint into a missing slot.
+                    if (_wiSelectedKnob == k && _wiSelectedSlot >= ledCount)
                     {
-                        int absIdx = startIdx + i;
-                        if (absIdx < MozaData.KnobRingLedMax)
-                        {
-                            var rc = _data.KnobRingColors[absIdx];
-                            viz.RingColors[i] = Color.FromRgb(rc[0], rc[1], rc[2]);
-                        }
+                        _wiSelectedSlot = -1;
+                        viz.SelectedSlot = -1;
                     }
-                    else
+                }
+                for (int i = 0; i < ledCount; i++)
+                {
+                    int absIdx = startIdx + i;
+                    if (absIdx < MozaData.KnobRingLedMax)
                     {
-                        viz.RingColors[i] = Color.FromRgb(0x14, 0x18, 0x1B);  // off-look (bg-card)
+                        var rc = _data.KnobRingColors[absIdx];
+                        viz.RingColors![i] = Color.FromRgb(rc[0], rc[1], rc[2]);
                     }
                 }
             }
@@ -269,7 +287,15 @@ namespace MozaPlugin.Devices
             if (WiKnobEditorLabel == null) return;
             string slotName;
             if (_wiSelectedSlot == -2) slotName = "ACTIVE";
-            else if (_wiSelectedSlot >= 0) slotName = $"LED {_wiSelectedSlot + 1:D2}/12";
+            else if (_wiSelectedSlot >= 0)
+            {
+                int ringCount = (_wiKnobViz != null && _wiSelectedKnob >= 0
+                                 && _wiSelectedKnob < _wiKnobViz.Length
+                                 && _wiKnobViz[_wiSelectedKnob].RingColors != null)
+                    ? _wiKnobViz[_wiSelectedKnob].RingColors!.Count
+                    : 12;
+                slotName = $"LED {_wiSelectedSlot + 1:D2}/{ringCount:D2}";
+            }
             else slotName = "—";
             WiKnobEditorLabel.Text = $"EDITING · KNOB {_wiSelectedKnob + 1} · {slotName}";
         }
@@ -298,7 +324,7 @@ namespace MozaPlugin.Devices
                 _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobPrimaryColors = packed);
                 _plugin.SaveSettings();
             }
-            else if (slot >= 0 && slot < 12)
+            else if (slot >= 0)
             {
                 int startIdx = _plugin.WheelModelInfo?.KnobRingStartIndex(knob) ?? (knob * 12);
                 int ledCount = _plugin.WheelModelInfo?.KnobRingLeds != null

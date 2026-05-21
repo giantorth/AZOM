@@ -11,10 +11,12 @@ using System.Windows.Shapes;
 namespace MozaControls
 {
     /// <summary>
-    /// 12 LED dots arranged in a ring around a central swatch. Click any dot
-    /// or the centre to select it for editing. Stationary — no runtime indicator
-    /// of which LED is currently lit; the firmware decides at runtime, the host
-    /// only stores per-slot colour values.
+    /// N LED dots arranged evenly in a ring around a central swatch. Slot count
+    /// follows <see cref="RingColors"/>.Count: 12 for most knobs, 8 for the KS
+    /// Pro middle knob, but any N works (e.g. 8 → 45° spacing, 12 → 30°). Click
+    /// any dot or the centre to select it for editing. Stationary — no runtime
+    /// indicator of which LED is currently lit; the firmware decides at runtime,
+    /// the host only stores per-slot colour values.
     /// </summary>
     public class KnobRingViz : Control
     {
