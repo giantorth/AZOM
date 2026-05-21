@@ -44,22 +44,25 @@ namespace MozaPlugin.Telemetry.Watchdog
         // Engagement signal = wheel acked sess=0x01 (`fc:00 01`) OR pushed
         // any 7c:00 01 data chunk; either is sufficient.
         //
-        // Grace is set wide (15 s): healthy wheels on this firmware push
+        // Grace is set wide (10 s): healthy wheels on this firmware push
         // first sess=0x01 chunk ~4 s after Active (verified W17 capture
         // 2026-05-20 17:55: Active at 17:55:05.015, first sess=0x01
         // inbound at 17:55:09.039). The CS-Pro pathology is total silence
-        // for the full 14 s window; 15 s gracefully tolerates normal
-        // start-up without false-triggering re-arm that would clobber
-        // an in-flight hot-switch burst (observed: 3 s grace fired at
-        // 17:55:08.528 mid-burst, re-arm's ApplySubscription stomped
-        // the burst's session state).
+        // for the full 14 s window — the first re-arm round at 10 s
+        // lands inside that silence, and subsequent rounds push session
+        // state through once the wheel finally accepts session-control
+        // frames. 10 s gives normal start-up plenty of headroom without
+        // false-triggering re-arm that would clobber an in-flight
+        // hot-switch burst (observed: 3 s grace fired at 17:55:08.528
+        // mid-burst, re-arm's ApplySubscription stomped the burst's
+        // session state).
         private long _session01EngagedUtcTicks;
         private int _s01ReArmRounds;
         private int _s01ReArmLastTickCount;
         private static readonly int[] S01ReArmBackoffMs =
             { 5_000, 7_000, 10_000, 15_000, 20_000 };
         private const int S01ReArmMaxRounds = 5;
-        private const int S01InitialGraceMs = 15_000;
+        private const int S01InitialGraceMs = 10_000;
 
         // ── configJson gap / stuck-state ──────────────────────────────────
         private int _configJsonGapCount;
