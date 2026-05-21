@@ -46,6 +46,11 @@ namespace MozaPlugin.Devices
         // registry; published as a property so the UI panel can show the bar.
         public double LastHidPosition { get; internal set; }
 
+        /// <summary>Latest per-identity settings (role, display name, calibration).
+        /// Thin pass-through to the registry's settings lookup — returns null if no
+        /// row is recorded yet for this identity.</summary>
+        public MBoosterDeviceSettings? CurrentSettings => _settingsLookup();
+
         public event Action<byte[]>? MessageReceived
         {
             add    => _connection.MessageReceived += value;

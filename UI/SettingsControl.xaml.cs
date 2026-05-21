@@ -1333,6 +1333,9 @@ namespace MozaPlugin
             sb.AppendLine("=== USB detection ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
             sb.AppendLine();
+            sb.AppendLine("=== mBooster pedals ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin));
+            sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data));
             sb.AppendLine();

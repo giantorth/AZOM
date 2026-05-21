@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
+using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 
 namespace MozaPlugin.UI
@@ -79,6 +81,46 @@ namespace MozaPlugin.UI
             sb.Append(string.IsNullOrEmpty(ab9Port) ? "(disconnected)" : "→ " + ab9Port);
             sb.AppendLine();
             return sb.ToString();
+        }
+
+        public static string BuildMBoosterDevices(MozaPlugin plugin)
+        {
+            var registry = plugin.MBoosterRegistry;
+            if (registry == null || registry.Devices.Count == 0)
+                return "(no mBooster pedals detected — registry-only discovery; requires VID 0x346E PID 0x0008 in Windows USB enum)";
+
+            var sb = new StringBuilder();
+            var devs = registry.Devices;
+            sb.AppendLine($"Discovered:     {devs.Count} mBooster device(s)");
+            for (int i = 0; i < devs.Count; i++)
+            {
+                var d = devs[i];
+                string id = MBoosterDeviceController.ShortIdentity(d.Identity);
+                string state =
+                    d.Detected      ? "detected"
+                    : d.IsConnected ? "connected (probing)"
+                                    : "disconnected";
+                string roleStr;
+                string dispNameStr;
+                var s = d.CurrentSettings;
+                if (s != null)
+                {
+                    roleStr     = s.Role.ToString();
+                    dispNameStr = string.IsNullOrEmpty(s.DisplayName) ? "—" : s.DisplayName;
+                }
+                else
+                {
+                    roleStr = "(no settings row)";
+                    dispNameStr = "—";
+                }
+                string livePort = d.Connection?.LastPortName ?? "";
+                string port = string.IsNullOrEmpty(livePort) ? d.PortName : livePort;
+                sb.AppendLine(
+                    $"  [{i}] {port,-6}  role={roleStr,-8}  state={state}  " +
+                    $"hidPos={d.LastHidPosition.ToString("F3", CultureInfo.InvariantCulture)}  " +
+                    $"name='{dispNameStr}'  id={id}");
+            }
+            return sb.ToString().TrimEnd();
         }
 
         public static string BuildWheelIdentity(MozaData d)
