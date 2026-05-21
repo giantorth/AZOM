@@ -20,10 +20,11 @@
          WPF's markup-compile temp project (`*_wpftmp.csproj`) re-imports the
          auto-generated obj/*.AssemblyInfo.cs. The temp project shares its obj
          dir with the parent and ends up compiling the generated assembly
-         attributes twice. Telling the SDK not to generate them at all means
-         the temp project simply inherits ours from this csproj's metadata
-         (Description / Product / Copyright / Version above) and no
-         duplicates surface. See dotnet/wpf#93 and dotnet/sdk#7207. -->
+         attributes twice. Disabling SDK auto-generation suppresses the
+         duplicate; the version attributes are re-emitted by the
+         WriteVersionInfo target below into a single shared VersionInfo.cs
+         that both the main project and the wpftmp project pick up. See
+         dotnet/wpf#93 and dotnet/sdk#7207. -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
@@ -100,5 +101,43 @@
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(SIMHUB_PATH)" />
   </Target>
 
+  <!-- Re-emit the three version attributes ourselves since GenerateAssemblyInfo
+       is off (see workaround comment above). The CI workflows pass /p:Version=...
+       to stamp the build; without this target the value would never reach the
+       DLL and DiagnosticsTextBuilder.GetPluginVersion() would fall back to the
+       default 1.0.0.0. AssemblyVersion / AssemblyFileVersion require strict
+       4-part numeric form, so we strip any SemVer prerelease/build suffix and
+       pad to 4 parts. The full $(Version) (including suffix) goes into
+       AssemblyInformationalVersion, which is what diagnostics displays. -->
+  <Target Name="WriteVersionInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_VersionNumeric>$(Version)</_VersionNumeric>
+      <_VersionNumeric Condition="$(_VersionNumeric.Contains('-'))">$(_VersionNumeric.Substring(0, $(_VersionNumeric.IndexOf('-'))))</_VersionNumeric>
+      <_VersionNumeric Condition="$(_VersionNumeric.Contains('+'))">$(_VersionNumeric.Substring(0, $(_VersionNumeric.IndexOf('+'))))</_VersionNumeric>
+      <_VersionDotCount>$([MSBuild]::Subtract($(_VersionNumeric.Length), $(_VersionNumeric.Replace('.', '').Length)))</_VersionDotCount>
+      <_VersionNumeric Condition="'$(_VersionDotCount)' == '0'">$(_VersionNumeric).0.0.0</_VersionNumeric>
+      <_VersionNumeric Condition="'$(_VersionDotCount)' == '1'">$(_VersionNumeric).0.0</_VersionNumeric>
+      <_VersionNumeric Condition="'$(_VersionDotCount)' == '2'">$(_VersionNumeric).0</_VersionNumeric>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PluginVersionAttr Include="System.Reflection.AssemblyVersionAttribute">
+        <_Parameter1>$(_VersionNumeric)</_Parameter1>
+      </_PluginVersionAttr>
+      <_PluginVersionAttr Include="System.Reflection.AssemblyFileVersionAttribute">
+        <_Parameter1>$(_VersionNumeric)</_Parameter1>
+      </_PluginVersionAttr>
+      <_PluginVersionAttr Include="System.Reflection.AssemblyInformationalVersionAttribute">
+        <_Parameter1>$(Version)</_Parameter1>
+      </_PluginVersionAttr>
+    </ItemGroup>
+    <WriteCodeFragment
+        AssemblyAttributes="@(_PluginVersionAttr)"
+        Language="C#"
+        OutputDirectory="$(IntermediateOutputPath)"
+        OutputFile="VersionInfo.cs">
+      <Output TaskParameter="OutputFile" ItemName="Compile" />
+      <Output TaskParameter="OutputFile" ItemName="FileWrites" />
+    </WriteCodeFragment>
+  </Target>
 
 </Project>
