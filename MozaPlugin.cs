@@ -374,8 +374,6 @@ namespace MozaPlugin
                     MozaLog.Debug("[Moza] Serial traffic capture armed from previous session — capturing now");
                 }
 
-                MozaDeviceConstants.InitializeRegistry();
-
                 // Read SimHub's global temperature unit preference (set at first launch)
                 var tempUnit = pluginManager.GetPropertyValue("DataCorePlugin.GameData.TemperatureUnit");
                 _data.UseFahrenheit = string.Equals(tempUnit as string, "Fahrenheit", StringComparison.OrdinalIgnoreCase);
@@ -603,6 +601,12 @@ namespace MozaPlugin
         /// <summary>
         /// Tear down any resources allocated by Init() before it threw. Mirrors End()
         /// but tolerates null fields and never sets IsShuttingDown (caller may retry).
+        ///
+        /// Persistent-wire safety: if Init() reused the persistent statics
+        /// (<see cref="s_persistentConnection"/> / <see cref="s_persistentTelemetrySender"/>)
+        /// and then threw later in the same Init, this method MUST NOT dispose
+        /// them — the next Init expects to inherit them. Disposal is gated on
+        /// !ReferenceEquals(field, static).
         /// </summary>
         private void CleanupPartialInit()
         {
@@ -610,7 +614,14 @@ namespace MozaPlugin
             try { _retryTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _saveDebounceTimer?.Stop(); } catch { }
-            try { _telemetrySender?.Stop(); } catch { }
+
+            bool ownConnection = _connection != null && !ReferenceEquals(_connection, s_persistentConnection);
+            bool ownTelemetrySender = _telemetrySender != null && !ReferenceEquals(_telemetrySender, s_persistentTelemetrySender);
+
+            if (ownTelemetrySender)
+            {
+                try { _telemetrySender?.Stop(); } catch { }
+            }
 
             // Halt the AB9 engine-vib worker before disposing the AB9 manager.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
@@ -637,10 +648,16 @@ namespace MozaPlugin
             catch { }
             try { _deviceManager?.Dispose(); } catch { }
             try { _hidReader?.Dispose(); } catch { }
-            try { _telemetrySender?.Dispose(); } catch { }
+            if (ownTelemetrySender)
+            {
+                try { _telemetrySender?.Dispose(); } catch { }
+            }
             try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StopFileSink(); } catch { }
             try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.Stop(); } catch { }
-            try { _connection?.Dispose(); } catch { }
+            if (ownConnection)
+            {
+                try { _connection?.Dispose(); } catch { }
+            }
             try
             {
                 if (_ab9Manager != null)
@@ -653,6 +670,14 @@ namespace MozaPlugin
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _saveDebounceTimer?.Dispose(); } catch { }
             _saveDebounceTimer = null;
+
+            // Drop our refs so a successive Init re-entry doesn't see them as
+            // "prior state". If we kept the persistent statics alive above, the
+            // statics themselves still hold them — the next Init will pick them
+            // back up via the s_persistentConnection / s_persistentTelemetrySender
+            // reuse path.
+            if (!ownConnection) _connection = null;
+            if (!ownTelemetrySender) _telemetrySender = null;
         }
 
         // Gearshift trigger state. Fires base-gearshift-event (grp 0x2D cmd 0x76)
@@ -710,19 +735,33 @@ namespace MozaPlugin
 
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
-            if (_mboosterRegistry != null)
+            // Lock-free fast path: when no mBoosters are registered (the
+            // common case for users without the device), skip the entire
+            // snapshot build + LockedDict traversal. HasControllers reads a
+            // volatile int updated only on Refresh().
+            if (_mboosterRegistry != null && _mboosterRegistry.HasControllers)
             {
                 var nd = data.NewData;
                 double brake01 = (nd?.Brake ?? 0.0) / 100.0;
                 if (brake01 < 0) brake01 = 0; if (brake01 > 1) brake01 = 1;
-                bool absActive = false;
-                try
+                // ABSActive is SimHub's loosely-typed property — games supply
+                // bool / int / sbyte / byte / short / long depending on backend.
+                // Pattern-match the common shapes to skip Convert.ToInt32's
+                // InvariantCulture lookup and the try/catch on the hot path
+                // (DataUpdate runs at SimHub's data rate, ~60Hz+). Unknown
+                // types fall through to false — same observable behaviour as
+                // the catch-and-default that lived here previously.
+                object? rawAbs = nd?.ABSActive;
+                bool absActive = rawAbs switch
                 {
-                    object? raw = nd?.ABSActive;
-                    if (raw != null)
-                        absActive = Convert.ToInt32(raw, System.Globalization.CultureInfo.InvariantCulture) != 0;
-                }
-                catch { }
+                    bool b   => b,
+                    int i    => i != 0,
+                    byte by  => by != 0,
+                    sbyte sb => sb != 0,
+                    short sh => sh != 0,
+                    long lo  => lo != 0,
+                    _ => false,
+                };
                 double vehicleMs = (nd?.SpeedKmh ?? 0.0) / 3.6;
                 double avgWheelMs = 0.0;
                 double idleRpm = 800.0;

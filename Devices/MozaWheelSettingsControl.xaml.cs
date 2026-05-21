@@ -355,13 +355,16 @@ namespace MozaPlugin.Devices
 
             // CUSTOM chip on every PaletteStrip pops the legacy hue dialog as a
             // fallback. Set once globally (PaletteStrip.CustomPickerFactory is
-            // static) so all palettes share it.
+            // static) so all palettes share it. The lambda MUST resolve the
+            // owner window via Application.Current — capturing `this` via
+            // Window.GetWindow(this) would root this MozaWheelSettingsControl
+            // in a static field for the lifetime of the AppDomain.
             if (PaletteStrip.CustomPickerFactory == null)
             {
                 PaletteStrip.CustomPickerFactory = (current) =>
                 {
                     var dlg = new ColorPickerDialog(current.R, current.G, current.B);
-                    dlg.Owner = Window.GetWindow(this);
+                    dlg.Owner = System.Windows.Application.Current?.MainWindow;
                     if (dlg.ShowDialog() != true) return null;
                     return Color.FromRgb(dlg.SelectedR, dlg.SelectedG, dlg.SelectedB);
                 };

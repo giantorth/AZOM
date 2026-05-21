@@ -35,9 +35,6 @@ namespace MozaPlugin.Devices
         private int _lastButtonBitmask = -1;
         private int _lastKnobBitmask = -1;
 
-        // Diagnostic: log rawColors shape once per distinct (length, non-empty pattern)
-        private string? _lastRawDiagKey;
-
         // Keepalive timer
         private DateTime _lastSendTime = DateTime.MinValue;
         // Tracked separately so knob frames are refreshed even while RPM is updating
@@ -680,6 +677,8 @@ namespace MozaPlugin.Devices
 
         // Diagnostic: log rawColors length and per-slot state once per distinct pattern.
         // Helps verify SimHub's Individual-LEDs output shape (physical-indexed vs other).
+#if MOZA_RAW_LED_DIAG
+        private string? _lastRawDiagKey;
         private void LogRawDiagnostic(Color[] rawColors, int ledsLen, int buttonsLen)
         {
             var sb = new System.Text.StringBuilder();
@@ -697,6 +696,7 @@ namespace MozaPlugin.Devices
             // Very chatty when animation is running
             MozaLog.Debug($"[Moza] IndividualLEDs diag {key}");
         }
+#endif
 
         // Merge physical-layer Individual-LED overrides onto a logical-channel array.
         // A raw slot with Alpha != 0 replaces the corresponding dst slot.

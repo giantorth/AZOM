@@ -86,8 +86,21 @@ namespace MozaPlugin.Devices
             // the dedicated "mbooster" bus hint so dev 0x12 responses don't
             // cross-match against base-* (wheelbase main) or ab9-* (AB9 main).
             _connection.MessageReceived += OnConnectionMessage;
+            // Reset detection latch when the underlying port wedges. Disconnected
+            // fires from HandleIoFailure on the read/write thread, so this stays
+            // lightweight (single volatile bool write). Without it, _detected
+            // remains true after a silent reconnect and MarkDetected short-circuits
+            // → DetectedRisingEdge never re-fires → OnMBoosterDeviceDetected does
+            // not re-run RequestCalibrationReads or ApplyMBoosterSettings for the
+            // recovered device.
+            _connection.Disconnected += OnConnectionDisconnected;
 
             _worker = new MBoosterEffectWorker(this, _settingsLookup, _isShuttingDown);
+        }
+
+        private void OnConnectionDisconnected()
+        {
+            _detected = false;
         }
 
         private void OnConnectionMessage(byte[] data)

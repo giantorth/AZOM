@@ -322,27 +322,5 @@ namespace MozaPlugin
             }
         }
 
-        // -------- Version resolution helpers --------
-
-        private string ResolveSimHubVersion()
-        {
-            try
-            {
-                var asm = AppDomain.CurrentDomain.GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == "SimHubWPF");
-                return asm?.GetName().Version?.ToString() ?? "—";
-            }
-            catch { return "—"; }
-        }
-
-        private string ResolvePluginVersion()
-        {
-            try
-            {
-                var v = Assembly.GetExecutingAssembly().GetName().Version;
-                return v != null ? $"v{v.Major}.{v.Minor}.{v.Build}" : "—";
-            }
-            catch { return "—"; }
-        }
     }
 }

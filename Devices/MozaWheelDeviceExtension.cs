@@ -53,7 +53,6 @@ namespace MozaPlugin.Devices
             }
 
             // Report active only when the matching wheel model is connected
-            var modelPrefix = _expectedModelPrefix;
             pluginManager.AttachDelegate(
                 LinkedDevice.DeviceDescriptor.Name + "_MozaWheelActive",
                 this.GetType(),

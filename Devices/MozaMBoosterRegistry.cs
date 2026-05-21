@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices
@@ -28,6 +29,13 @@ namespace MozaPlugin.Devices
         private readonly List<MBoosterDeviceController> _order =
             new List<MBoosterDeviceController>();
         private readonly object _lock = new object();
+
+        // Lock-free fast-path counter for the DataUpdate hot path. Updated
+        // only on Refresh() add/drop, which happens on the reconnect timer
+        // (5s cadence). Reading is a volatile int load — no lock, no alloc.
+        private int _controllerCount;
+        /// <summary>True iff at least one controller is registered. Lock-free; safe to call from DataUpdate.</summary>
+        public bool HasControllers => Volatile.Read(ref _controllerCount) > 0;
 
         private readonly MozaData _data;
         private readonly Func<string, MBoosterDeviceSettings?> _settingsLookup;
@@ -140,6 +148,9 @@ namespace MozaPlugin.Devices
                     _order.Remove(c);
                     (removed ??= new List<MBoosterDeviceController>()).Add(c);
                 }
+
+                // Publish the new count for the lock-free hot-path gate.
+                Volatile.Write(ref _controllerCount, _order.Count);
             }
 
             // Connect newcomers + dispose removed (outside the lock — Connect

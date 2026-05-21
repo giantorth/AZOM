@@ -19,24 +19,6 @@ namespace MozaControls
             => throw new NotSupportedException();
     }
 
-    /// <summary>Returns Visible if value > 0 (numeric) or true (bool), Collapsed otherwise.</summary>
-    public sealed class TruthyToVisibilityConverter : IValueConverter
-    {
-        public static readonly TruthyToVisibilityConverter Instance = new TruthyToVisibilityConverter();
-
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            if (value is bool b) return b ? Visibility.Visible : Visibility.Collapsed;
-            if (value is int i) return i > 0 ? Visibility.Visible : Visibility.Collapsed;
-            if (value is double d) return d > 0 ? Visibility.Visible : Visibility.Collapsed;
-            if (value == null) return Visibility.Collapsed;
-            return Visibility.Visible;
-        }
-
-        public object ConvertBack(object value, Type targetType, object? parameter, CultureInfo culture)
-            => throw new NotSupportedException();
-    }
-
     /// <summary>Static color constants used by the palette + LED dots.</summary>
     public static class MozaPalette
     {

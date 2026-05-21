@@ -95,6 +95,36 @@ namespace MozaPlugin.Protocol
             return (byte)(sum & 0xFF);
         }
 
+        /// <summary>
+        /// Allocation-free overload for the read path. Computes the expected
+        /// checksum of the conceptual frame
+        /// <c>[MessageStart, length, body[0..bodyLength-1], 0]</c> — i.e. the
+        /// same answer as
+        /// <see cref="CalculateWireChecksum(byte[], int)"/> applied to a synthesised
+        /// frame, without requiring the synthesised array to exist. ReadLoop
+        /// uses this to avoid a per-Rx <c>byte[payloadLength+4]</c> allocation
+        /// at telemetry rates (250–1000 frames/sec).
+        /// </summary>
+        public static byte CalculateWireChecksumFromParts(byte length, byte[] body, int bodyLength)
+        {
+            // Conceptual frame contributes: MessageStart + length + body[0..bodyLength-1]
+            // plus a trailing zero placeholder (the checksum slot itself). The
+            // trailing zero adds nothing to either accumulator, so we drop it.
+            int sum = MagicValue + MessageStart + length;
+            for (int i = 0; i < bodyLength; i++)
+            {
+                byte b = body[i];
+                sum += b;
+                // The escape-double pass in the array overload covers indices ≥ 2,
+                // i.e. everything in `body`. Index 0 (start) and index 1 (length)
+                // never participate in the doubling. length is constrained ≤ 64
+                // so it can never collide with MessageStart anyway.
+                if (b == MessageStart)
+                    sum += MessageStart;
+            }
+            return (byte)(sum & 0xFF);
+        }
+
         public static byte SwapNibbles(byte b)
         {
             return (byte)(((b & 0x0F) << 4) | ((b & 0xF0) >> 4));

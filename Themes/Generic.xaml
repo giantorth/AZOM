@@ -9,7 +9,6 @@
 
     <!-- Converters -->
     <controls:EmptyStringToVisibilityConverter x:Key="EmptyStringToVisibility"/>
-    <controls:TruthyToVisibilityConverter x:Key="TruthyToVisibility"/>
 
     <!-- ============================================================ -->
     <!-- OffOnToggle                                                   -->
@@ -609,34 +608,6 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type controls:PaletteStrip}">
                     <StackPanel x:Name="PART_Swatches" Orientation="Horizontal"/>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- ============================================================ -->
-    <!-- LedStrip                                                      -->
-    <!-- ============================================================ -->
-
-    <Style TargetType="{x:Type controls:LedStrip}">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type controls:LedStrip}">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8" HorizontalAlignment="Right">
-                            <Button x:Name="PART_FillAll" Content="FILL ALL WITH SELECTED" Margin="0,0,6,0"/>
-                            <Button x:Name="PART_Reverse" Content="REVERSE"/>
-                        </StackPanel>
-                        <WrapPanel x:Name="PART_Wrap" Margin="0,0,0,10"/>
-                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
-                                Padding="0,10,0,0">
-                            <StackPanel>
-                                <TextBlock Text="EDITING SELECTED LED · CLICK A SWATCH TO RECOLOR"
-                                           Style="{StaticResource MutedHintText}" Margin="0,0,0,6"/>
-                                <controls:PaletteStrip x:Name="PART_Palette"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

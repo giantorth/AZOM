@@ -16,6 +16,17 @@
     <Copyright>Copyright 2026</Copyright>
     <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <!-- Workaround for dotnet SDK 10.x CS0579 duplicate AssemblyAttribute when
+         WPF's markup-compile temp project (`*_wpftmp.csproj`) re-imports the
+         auto-generated obj/*.AssemblyInfo.cs. The temp project shares its obj
+         dir with the parent and ends up compiling the generated assembly
+         attributes twice. Telling the SDK not to generate them at all means
+         the temp project simply inherits ours from this csproj's metadata
+         (Description / Product / Copyright / Version above) and no
+         duplicates surface. See dotnet/wpf#93 and dotnet/sdk#7207. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
     <!-- Force Platform=x86 so csproj-only builds (no sln) emit to bin\x86\<Config>\
          — matches the path sln-driven Release|x86 builds use, which the deploy
          scripts hard-code. Without this, `dotnet build MozaPlugin.csproj` defaults

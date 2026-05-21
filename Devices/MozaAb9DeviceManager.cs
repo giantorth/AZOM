@@ -98,6 +98,20 @@ namespace MozaPlugin.Devices
                 MozaProbeTarget.Ab9,
                 disableProbeFallback);
             _connection.CaptureLabel = "ab9";
+            // Reset detection latches when the underlying port wedges. The
+            // Disconnected event fires from HandleIoFailure on the read/write
+            // thread, so this handler MUST stay lightweight (no Join, no I/O):
+            // it only clears two volatile bools. Without this, _ffbInitSent
+            // stays sticky after a silent reconnect and the FFB slot-table
+            // handshake never re-fires → engine vibration / pulse streams hit
+            // an uninitialised device.
+            _connection.Disconnected += OnConnectionDisconnected;
+        }
+
+        private void OnConnectionDisconnected()
+        {
+            _detected = false;
+            _ffbInitSent = false;
         }
 
         /// <summary>

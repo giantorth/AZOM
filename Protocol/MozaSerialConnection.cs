@@ -103,21 +103,6 @@ namespace MozaPlugin.Protocol
         private int _portFailureLogged;
         private const int PortDeadThreshold = 10;
 
-        // Set by ReadLoop to the group byte of the first valid frame
-        // received after TryOpen. Used by Connect() to verify a cached
-        // port has the expected MOZA device behind it — not a ghost port,
-        // not a different device that happens to send bytes. 0 = nothing
-        // received yet (0x00 is never a valid response group).
-        private int _firstRxGroup;
-
-        // Bitmap of all response groups seen since Connect(). Validation looks
-        // for the probe response anywhere in the window — boot-time debug
-        // frames (group 0x0E) can precede the actual probe reply.
-        private readonly byte[] _rxGroupsSeen = new byte[32];
-        private void NoteRxGroup(byte g) { _rxGroupsSeen[g >> 3] |= (byte)(1 << (g & 7)); }
-        private bool HaveSeenRxGroup(byte g) => (_rxGroupsSeen[g >> 3] & (1 << (g & 7))) != 0;
-        private void ResetRxGroupsSeen() { for (int i = 0; i < _rxGroupsSeen.Length; i++) _rxGroupsSeen[i] = 0; }
-
         public event Action<byte[]>? MessageReceived;
         // Raised on the I/O thread after HandleIoFailure force-closes the port.
         // Subscribers must be background-safe and non-blocking.
@@ -166,8 +151,6 @@ namespace MozaPlugin.Protocol
                 FrameStartScanResyncs = resync;
             }
         }
-
-        public MozaSerialConnection() : this(null, MozaProbeTarget.BaseAndHub, null) { }
 
         /// <summary>
         /// Connection scoped to a subset of MOZA PIDs. <paramref name="pidFilter"/>
@@ -252,8 +235,6 @@ namespace MozaPlugin.Protocol
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
-            Interlocked.Exchange(ref _firstRxGroup, 0);
-            lock (_rxGroupsSeen) ResetRxGroupsSeen();
 
             try
             {
@@ -510,12 +491,13 @@ namespace MozaPlugin.Protocol
                         }
 
                         // Validate wire-level checksum (includes 0x7E escape
-                        // accounting per doc § 54).
-                        var wireFrame = new byte[2 + payloadLength + 2];
-                        wireFrame[0] = MozaProtocol.MessageStart;
-                        wireFrame[1] = (byte)payloadLength;
-                        Array.Copy(raw, 0, wireFrame, 2, payloadLength + 2);
-                        byte expected = MozaProtocol.CalculateWireChecksum(wireFrame);
+                        // accounting per doc § 54). Allocation-free overload —
+                        // ReadLoop used to allocate a wireFrame byte[] here every
+                        // received frame just to feed the array-based checksum;
+                        // CalculateWireChecksumFromParts derives the same value
+                        // directly from raw + payloadLength.
+                        byte expected = MozaProtocol.CalculateWireChecksumFromParts(
+                            (byte)payloadLength, raw, payloadLength + 2);
                         byte actual = raw[raw.Length - 1];
                         if (expected != actual)
                         {
@@ -558,11 +540,6 @@ namespace MozaPlugin.Protocol
                                 $"[Moza] WIRE sess=0x{sess:X2} type=0x{type:X2} seq={seqWire} " +
                                 $"totalLen={data.Length} payload={bodyLen}B first8={first8}");
                         }
-                        Interlocked.CompareExchange(ref _firstRxGroup, data[0], 0);
-                        // Also record every group seen so cached-port
-                        // validation can find the expected response group
-                        // even when boot-time debug spam beats it to the port.
-                        lock (_rxGroupsSeen) NoteRxGroup(data[0]);
                         SerialTrafficCapture.Instance.RecordRx(CaptureLabel, data);
                         MessageReceived?.Invoke(data);
                         // Move cursor past the consumed wire bytes.

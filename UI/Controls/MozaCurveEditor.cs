@@ -264,17 +264,5 @@ namespace MozaControls
             SetValue(GridGeometryKey, grid);
         }
 
-        // -------- Preset apply --------
-
-        public void ApplyPreset(int idx)
-        {
-            switch (idx)
-            {
-                case 0: Y1 = 20; Y2 = 40; Y3 = 60; Y4 = 80; Y5 = 100; break;   // Linear
-                case 1: Y1 = 8;  Y2 = 28; Y3 = 60; Y4 = 88; Y5 = 100; break;   // S
-                case 2: Y1 = 6;  Y2 = 14; Y3 = 30; Y4 = 56; Y5 = 100; break;   // Exponential
-                case 3: Y1 = 45; Y2 = 70; Y3 = 85; Y4 = 95; Y5 = 100; break;   // Parabolic
-            }
-        }
     }
 }

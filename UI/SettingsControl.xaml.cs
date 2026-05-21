@@ -37,6 +37,20 @@ namespace MozaPlugin
         private TextBlock[]? _throttleCurveLabels, _brakeCurveLabels, _clutchCurveLabels;
         private readonly DateTime[] _buttonLastPressed = new DateTime[MozaData.MaxButtons];
 
+        // 500ms-refresh change-detection caches. RefreshDisplay walks every
+        // tab even when its visuals haven't changed, which lit up the UI thread
+        // and the GC. The fields below let the per-tab refresh short-circuit
+        // when nothing observable changed since the previous tick.
+        private byte[]? _md5CachedBytes;     // reference key (not contents)
+        private string? _md5CachedHex;
+        private DateTime _wheelFilesLastCapturedAt;
+        private string? _wheelFilesLastPickedName;
+        private int _wheelFilesLastRowCount = -1;
+        // Pre-allocated Run pool for UpdateActiveButtons. 30Hz cadence × N buttons
+        // would otherwise create N Runs/frame; we recycle them in place.
+        private Run[]? _activeButtonRuns;
+        private Run[]? _activeButtonSeparatorRuns;
+
         public SettingsControl(MozaPlugin plugin)
         {
             _plugin = plugin;
@@ -116,19 +130,24 @@ namespace MozaPlugin
             // Calling Start() twice would double the tick rate.
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
             if (!_steeringAngleTimer.IsEnabled) _steeringAngleTimer.Start();
+            if (_bandwidthTimer != null && !_bandwidthTimer.IsEnabled) _bandwidthTimer.Start();
         }
 
         private void OnUnloadedStopTimers(object sender, RoutedEventArgs e)
         {
             // Stop only — leave Tick handlers attached so a subsequent Loaded
             // re-Start picks up where it left off. Detaching here permanently
-            // killed the timers if the control was reloaded.
+            // killed the timers if the control was reloaded. The _bandwidthTimer
+            // MUST be stopped on Unload too: its Tick captures `this`, so a
+            // running DispatcherTimer roots the entire SettingsControl past
+            // panel-close. Across many open/close cycles this leaked one
+            // SettingsControl + _plugin/_data graph per cycle until process exit.
             _refreshTimer.Stop();
             _steeringAngleTimer.Stop();
+            _bandwidthTimer?.Stop();
             if (ReferenceEquals(Instance, this)) Instance = null;
         }
 
-        private MozaPluginSettings _settings => _plugin.Settings;
 
         // ===== Refresh =====
 
@@ -225,9 +244,24 @@ namespace MozaPlugin
                 return;
             }
 
+            // Pool the Run objects so the 30Hz refresh doesn't allocate
+            // a fresh Run per visible button (~720 allocations/sec on a
+            // 24-button wheel). The pool sizes match MozaData.MaxButtons.
+            if (_activeButtonRuns == null)
+            {
+                _activeButtonRuns = new Run[MozaData.MaxButtons];
+                _activeButtonSeparatorRuns = new Run[MozaData.MaxButtons];
+                for (int i = 0; i < MozaData.MaxButtons; i++)
+                {
+                    _activeButtonRuns[i] = new Run((i + 1).ToString());
+                    _activeButtonSeparatorRuns[i] = new Run(", ");
+                }
+            }
+
             var now = DateTime.UtcNow;
-            var inlines = new System.Collections.Generic.List<Inline>();
             int count = _data.ButtonCount;
+            ActiveButtonsText.Inlines.Clear();
+            int emitted = 0;
             for (int i = 0; i < count; i++)
             {
                 bool pressed = _data.ButtonStates[i];
@@ -236,23 +270,28 @@ namespace MozaPlugin
 
                 if ((now - _buttonLastPressed[i]).TotalSeconds < 1.0)
                 {
-                    if (inlines.Count > 0)
-                        inlines.Add(new Run(", "));
+                    if (emitted > 0)
+                        ActiveButtonsText.Inlines.Add(_activeButtonSeparatorRuns![emitted - 1]);
 
-                    var run = new Run((i + 1).ToString());
+                    var run = _activeButtonRuns[i];
                     if (pressed)
                     {
                         run.FontWeight = FontWeights.Bold;
                         run.Foreground = Brushes.White;
                     }
-                    inlines.Add(run);
+                    else
+                    {
+                        // Revert to inherited TextBlock defaults so a fade-out
+                        // button doesn't keep the bold/white styling from its press.
+                        run.ClearValue(Run.FontWeightProperty);
+                        run.ClearValue(Run.ForegroundProperty);
+                    }
+                    ActiveButtonsText.Inlines.Add(run);
+                    emitted++;
                 }
             }
 
-            ActiveButtonsText.Inlines.Clear();
-            if (inlines.Count > 0)
-                ActiveButtonsText.Inlines.AddRange(inlines);
-            else
+            if (emitted == 0)
                 ActiveButtonsText.Inlines.Add(new Run("None"));
         }
 
@@ -1567,9 +1606,31 @@ namespace MozaPlugin
             UploadInfoRawSizeText.Text = rawSize > 0 ? $"{rawSize:N0} bytes" : "—";
 
             byte[]? bytes = _uploadPickedContent ?? ts?.MzdashContent;
-            UploadInfoMd5Text.Text = bytes != null && bytes.Length > 0
-                ? FileTransferBuilder.Md5Hex(FileTransferBuilder.ComputeMd5(bytes))
-                : "—";
+            // MD5 caching: this refresh runs every 500ms. Hashing the full
+            // mzdash (~50–500KB) on the UI thread twice a second is wasteful
+            // when the content reference hasn't changed. The cache key is the
+            // array reference, not its contents — both producers (the file
+            // picker and TelemetrySender.MzdashContent) replace the whole
+            // array when content changes, so reference identity matches the
+            // "content changed" notion exactly.
+            string md5Hex;
+            if (bytes == null || bytes.Length == 0)
+            {
+                md5Hex = "—";
+                _md5CachedBytes = null;
+                _md5CachedHex = null;
+            }
+            else if (ReferenceEquals(bytes, _md5CachedBytes) && _md5CachedHex != null)
+            {
+                md5Hex = _md5CachedHex;
+            }
+            else
+            {
+                md5Hex = FileTransferBuilder.Md5Hex(FileTransferBuilder.ComputeMd5(bytes));
+                _md5CachedBytes = bytes;
+                _md5CachedHex = md5Hex;
+            }
+            UploadInfoMd5Text.Text = md5Hex;
 
             bool inFlight = ts?.IsUploadInFlight ?? false;
             UploadInfoInFlightText.Text = inFlight ? "yes" : "no";
@@ -1626,6 +1687,24 @@ namespace MozaPlugin
             if (WheelFilesGrid == null) return;
             var ts = _plugin.TelemetrySender;
             var state = _plugin.WheelStateForDiagnostics;
+
+            // Change-detection gate: state.CapturedAt is bumped by the wheel
+            // every time a new configJson lands. _uploadPickedName changes
+            // when the user picks a different mzdash from the file picker.
+            // No new CapturedAt and no picker change → no point rebuilding
+            // the DataGrid (List<WheelFileRow> + selection re-application
+            // on every tick is the dominant cost).
+            DateTime currentCapturedAt = state?.CapturedAt ?? DateTime.MinValue;
+            if (state != null
+                && currentCapturedAt == _wheelFilesLastCapturedAt
+                && _wheelFilesLastPickedName == _uploadPickedName
+                && _wheelFilesLastRowCount >= 0)
+            {
+                return;
+            }
+            _wheelFilesLastCapturedAt = currentCapturedAt;
+            _wheelFilesLastPickedName = _uploadPickedName;
+
             var rows = new System.Collections.Generic.List<WheelFileRow>();
             if (state != null)
             {
@@ -1653,6 +1732,7 @@ namespace MozaPlugin
             // Preserve grid selection across refresh by DirName key.
             string? prevDir = (WheelFilesGrid.SelectedItem as WheelFileRow)?.DirName;
             WheelFilesGrid.ItemsSource = rows;
+            _wheelFilesLastRowCount = rows.Count;
             if (!string.IsNullOrEmpty(prevDir))
             {
                 foreach (var r in rows)
