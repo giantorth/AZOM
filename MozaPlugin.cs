@@ -40,12 +40,13 @@ namespace MozaPlugin
         private MozaAb9DeviceManager _ab9Manager = null!;
         private MozaMBoosterRegistry? _mboosterRegistry;
 
-        // Third-party SDK (CoAP-over-UDP) emulation server + PitHouse stub
-        // process. Both are gated on Settings.SdkEmulationEnabled and require
-        // a plugin restart to toggle (no runtime enable/disable — see Init()).
-        // Null when disabled, so the UI tab uses null-conditional access.
+        // Third-party SDK (CoAP-over-UDP) emulation server + name-impersonation
+        // stub process. Both are gated on Settings.SdkEmulationEnabled and
+        // require a plugin restart to toggle (no runtime enable/disable —
+        // see Init()). Null when disabled, so the UI tab uses null-conditional
+        // access.
         private Sdk.MozaSdkCoapServer? _sdkServer;
-        private Sdk.PitHouseStubManager? _sdkStubManager;
+        private Sdk.CoapStubManager? _sdkStubManager;
         internal global::MozaPlugin.Protocol.PendingResponseTracker PendingResponses { get; }
             = new global::MozaPlugin.Protocol.PendingResponseTracker();
         private MozaPluginSettings _settings = null!;
@@ -271,10 +272,10 @@ namespace MozaPlugin
         internal Sdk.MozaSdkCoapServer? SdkServer => _sdkServer;
 
         /// <summary>
-        /// Live PitHouse stub child-process manager when SDK emulation is
+        /// Live CoAP-stub child-process manager when SDK emulation is
         /// enabled; null otherwise. Same UI consumer as <see cref="SdkServer"/>.
         /// </summary>
-        internal Sdk.PitHouseStubManager? SdkStubManager => _sdkStubManager;
+        internal Sdk.CoapStubManager? SdkStubManager => _sdkStubManager;
 
         /// <summary>True if the wheel's internal Display sub-device responded to probe.
         /// Accepts any populated identity field — some wheels (e.g. W17) return an
@@ -610,7 +611,7 @@ namespace MozaPlugin
                 // throw can't leave a half-built plugin reachable from background callbacks.
                 Instance = this;
 
-                // Third-party SDK emulation (CoAP server + PitHouse stub). Gated
+                // Third-party SDK emulation (CoAP server + name-impersonation stub). Gated
                 // on the persisted Settings.SdkEmulationEnabled flag — toggling
                 // it requires a plugin restart for the change to take effect
                 // (matches the description shown in the UI tab). Failures here
@@ -620,7 +621,7 @@ namespace MozaPlugin
                 {
                     try
                     {
-                        _sdkStubManager = new Sdk.PitHouseStubManager();
+                        _sdkStubManager = new Sdk.CoapStubManager();
                         _sdkStubManager.Start();
                         _sdkServer = new Sdk.MozaSdkCoapServer(_data, _hardwareApplier, _settings);
                         _sdkServer.Start();

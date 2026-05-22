@@ -16,34 +16,20 @@
     <Copyright>Copyright 2026</Copyright>
     <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
-    <!-- Workaround for dotnet SDK 10.x CS0579 duplicate AssemblyAttribute when
-         WPF's markup-compile temp project (`*_wpftmp.csproj`) re-imports the
-         auto-generated obj/*.AssemblyInfo.cs. The temp project shares its obj
-         dir with the parent and ends up compiling the generated assembly
-         attributes twice. Disabling SDK auto-generation suppresses the
-         duplicate; the version attributes are re-emitted by the
-         WriteVersionInfo target below into a single shared VersionInfo.cs
-         that both the main project and the wpftmp project pick up. See
-         dotnet/wpf#93 and dotnet/sdk#7207. -->
+    <!-- dotnet SDK 10.x + WPF emits duplicate AssemblyAttribute (CS0579) in
+         the markup-compile temp project. Turn off SDK auto-generation and
+         re-emit the version attributes ourselves in WriteVersionInfo below.
+         See dotnet/wpf#93 and dotnet/sdk#7207. -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
-    <!-- PitHouseStub is a sibling project nested inside this csproj's
-         directory. The SDK's default `**\*.cs` Compile glob would otherwise
-         sweep in PitHouseStub/Program.cs AND its auto-generated
-         PitHouseStub/obj/.../PitHouseStub.AssemblyInfo.cs, which carries
-         AssemblyVersion / AssemblyFileVersion / AssemblyInformationalVersion
-         attributes that collide with the ones WriteVersionInfo emits below
-         (CS0579). Excluding the whole subtree from default globs keeps the
-         explicit `<EmbeddedResource Include="PitHouseStub\bin\...">` line
-         intact while preventing the source files from being picked up
-         twice. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);PitHouseStub\**</DefaultItemExcludes>
-    <!-- Force Platform=x86 so csproj-only builds (no sln) emit to bin\x86\<Config>\
-         — matches the path sln-driven Release|x86 builds use, which the deploy
-         scripts hard-code. Without this, `dotnet build MozaPlugin.csproj` defaults
-         to Platform=AnyCPU and lands in bin\Release\, silently producing a stale
-         deploy. Sln-level Release|x86 still wins because it sets Platform up front. -->
+    <!-- CoapStub is nested under this csproj's directory, so the SDK's
+         default `**\*.cs` Compile glob would sweep its sources in.
+         Exclude the whole subtree; the stub exe still gets embedded
+         via the explicit EmbeddedResource Include below. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);CoapStub\**</DefaultItemExcludes>
+    <!-- Force Platform=x86 so csproj-only builds match the path the
+         sln-driven Release|x86 build uses (bin\x86\Release\). -->
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x86</Platform>
   </PropertyGroup>
 
@@ -94,40 +80,33 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <!-- PitHouseStub project reference for build ordering only. The output is
-       NOT linked into the plugin assembly; it's embedded as a manifest
-       resource below so PitHouseStubManager can extract it at runtime.
-       Path is relative to this csproj's directory (the repo root) — the
-       PitHouseStub project sits in a sibling folder under that root, not
-       above it. -->
+  <!-- Build CoapStub before this project. Do NOT add UndefineProperties
+       here: MSBuild keys project-instance cache by (path + global props),
+       so any divergence from the sln-driven build's properties causes a
+       second concurrent build of CoapStub — which fails on Windows
+       (CS2012, exe write-locked by VBCSCompiler). -->
   <ItemGroup>
-    <ProjectReference Include="PitHouseStub\PitHouseStub.csproj">
+    <ProjectReference Include="CoapStub\CoapStub.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <Private>false</Private>
-      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
-      <UndefineProperties>TargetFramework;Platform;PlatformTarget</UndefineProperties>
     </ProjectReference>
   </ItemGroup>
 
-  <!-- Embed the built PitHouseStub exe as a manifest resource. We track
-       $(Configuration) so Debug|x86 and Release|x86 builds each pick up the
-       matching sibling output. The ProjectReference above guarantees the
-       sibling builds before this target's GenerateResourceMain runs. -->
   <ItemGroup>
-    <EmbeddedResource Include="PitHouseStub\bin\x86\$(Configuration)\MOZA Pit House.exe"
-                      LogicalName="MozaPlugin.Sdk.PitHouseStub.exe"
+    <!-- Embed the CoapStub output exe so CoapStubManager can extract it
+         at runtime. AssemblyName stays "MOZA Pit House" because the stub's
+         purpose is to impersonate that process name. -->
+    <EmbeddedResource Include="CoapStub\bin\x86\$(Configuration)\MOZA Pit House.exe"
+                      LogicalName="MozaPlugin.Sdk.CoapStub.exe"
                       Visible="false" />
   </ItemGroup>
 
-  <!-- Sanity gate: fail fast with a clear message if the stub exe is missing
-       when GenerateResourceMain goes to embed it. Without this, MSBuild
-       would emit a confusing "file not found" deep inside the resource
-       generation step. The ProjectReference above should ensure the sibling
-       builds first; this target only fires if someone bypasses it (e.g.
-       `dotnet build MozaPlugin.csproj` without restoring the sln). -->
-  <Target Name="VerifyPitHouseStubBuilt" BeforeTargets="GenerateResourceMain">
-    <Error Condition="!Exists('PitHouseStub\bin\x86\$(Configuration)\MOZA Pit House.exe')"
-           Text="PitHouseStub output not found at 'PitHouseStub\bin\x86\$(Configuration)\MOZA Pit House.exe'. Build the sln (or run `dotnet build PitHouseStub/PitHouseStub.csproj -c $(Configuration)` first)." />
+  <!-- Fail with a clear message if someone builds this csproj directly
+       without first building CoapStub. Sln-driven builds satisfy this
+       via the ProjectReference above. -->
+  <Target Name="VerifyCoapStubBuilt" BeforeTargets="GenerateResourceMain">
+    <Error Condition="!Exists('CoapStub\bin\x86\$(Configuration)\MOZA Pit House.exe')"
+           Text="CoapStub output not found at 'CoapStub\bin\x86\$(Configuration)\MOZA Pit House.exe'. Build the sln (or `dotnet build CoapStub/CoapStub.csproj -c $(Configuration)` first)." />
   </Target>
 
   <ItemGroup>
@@ -148,14 +127,12 @@
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(SIMHUB_PATH)" />
   </Target>
 
-  <!-- Re-emit the three version attributes ourselves since GenerateAssemblyInfo
-       is off (see workaround comment above). The CI workflows pass /p:Version=...
-       to stamp the build; without this target the value would never reach the
-       DLL and DiagnosticsTextBuilder.GetPluginVersion() would fall back to the
-       default 1.0.0.0. AssemblyVersion / AssemblyFileVersion require strict
-       4-part numeric form, so we strip any SemVer prerelease/build suffix and
-       pad to 4 parts. The full $(Version) (including suffix) goes into
-       AssemblyInformationalVersion, which is what diagnostics displays. -->
+  <!-- Re-emit version attributes since GenerateAssemblyInfo is off. CI
+       passes /p:Version=...; without this target the value never reaches
+       the DLL and DiagnosticsTextBuilder.GetPluginVersion falls back to
+       1.0.0.0. AssemblyVersion / AssemblyFileVersion require 4-part
+       numeric form, so we strip any SemVer suffix and pad. The full
+       $(Version) goes into AssemblyInformationalVersion. -->
   <Target Name="WriteVersionInfo" BeforeTargets="CoreCompile">
     <PropertyGroup>
       <_VersionNumeric>$(Version)</_VersionNumeric>
