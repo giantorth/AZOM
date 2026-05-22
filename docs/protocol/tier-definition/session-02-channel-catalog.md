@@ -41,9 +41,14 @@ distribution). Examples: `v1/gameData/Rpm`, `v1/gameData/Brake`,
 - Index `0` is **reserved for padding** — sent on session 0x01
   device-description but never re-used here on session 0x02.
 - Real channels start at index `1`.
-- Indices are **1-based** and assigned **alphabetically by URL** across
-  all channels the wheel knows. A wheel may have channels indexed
-  1..16, 1..20, etc. depending on what its firmware ships with.
+- Indices are **1-based** and assigned in the wheel's **parse order from
+  the currently-loaded mzdash** (the order `Telemetry.get(...)` /
+  `v1/gameData/...` references appear in the dashboard's JSON), NOT
+  alphabetically. The early-2026 alphabetic hypothesis was wrong: wire
+  traces against dashboards with known non-alphabetic URL order confirm
+  the wheel re-indexes per dashboard, in load order. A wheel may have
+  channels indexed 1..N where N depends on the active dashboard's
+  channel count.
 
 ### Observed catalogs
 
@@ -71,6 +76,60 @@ the next connect.
 (URL length: 19 bytes; total entry: 20 bytes after the 5-byte tag/length
 prefix → 25-byte TLV entry on wire.)
 
+### Back-references and END-marker generations
+
+After the initial full-URL announcement, the wheel re-emits the catalog
+on every dashboard switch (re-indexed) and **continuously as a
+keepalive** for as long as the session is open. Two record forms appear:
+
+- **Full URL records** — `[0x04] [size_LE] [ch_idx] [url bytes]` with
+  `size > 1`. The wheel only emits these for idxs whose URL is being
+  *declared* (initial announcement, switch with a changed channel,
+  full-catalog refresh).
+- **Back-reference records** — `[0x04] [04 00 00 00] [ch_idx]` with
+  `size = 1` (just the idx byte, no URL bytes). The wheel emits these
+  to refresh / re-acknowledge any idx it has ever announced. **Back-refs
+  are emitted both as part of switch announcements (carry-over channels
+  the new dash inherits) AND as part of pure keepalive** — they're
+  indistinguishable on the wire.
+
+The end-of-announcement boundary is the **tag-0x06 END marker** with a
+u32 value (`[0x06] [04 00 00 00] [u32 LE value]`). The value bumps
+monotonically per generation within a session and is the tier-def
+version handshake — the host echoes the latest value in its own tier-def
+emissions so the wheel treats them as the current generation rather than
+duplicates. Keepalive END markers re-assert the current generation with
+the same value; switch END markers bump to a new value.
+
+### Live-set tracking ("which idxs are in the current dashboard?")
+
+`Catalog` (the accumulated URL list) is not dash-specific — it preserves
+every URL the wheel has ever announced this session so back-refs can
+resolve. To know which idxs are in the **currently-loaded** dashboard
+(needed for catalog-only profile synthesis and the channel-mapping UI),
+the parser publishes a separate `LiveCatalog` view via these rules:
+
+1. Walk records in byte order. Maintain `_pendingIdxs` (set of idxs
+   touched since the last END marker boundary).
+2. **Only full URL records add to `_pendingIdxs`.** Back-references are
+   resolved into `_catalog` for URL lookup but do NOT contribute to
+   the live set — they're ambiguous (keepalive vs. carry-over) and
+   crediting them poisoned post-switch live sets with stale historical
+   idxs in observed traces.
+3. On each tag-0x06 END marker encountered in the byte stream, commit:
+   snapshot `_pendingIdxs` into `_lastCommittedIdxs`, rebuild
+   `_liveCatalog` as `_catalog` masked to empty strings outside the
+   committed set, clear `_pendingIdxs`. Dedup: if the new committed set
+   equals `_lastCommittedIdxs`, skip the publish + log.
+4. Clear `_pendingIdxs` at the start of every parse pass. The buffer is
+   append-only and re-walked each pass; carry-over state would let URLs
+   from an uncommitted generation pollute the FIRST commit of the next
+   pass.
+
+This gives the host a clean "channels in the wheel's currently-loaded
+dashboard" view for tier-def synthesis even when there's no local mzdash
+to consult.
+
 ### Plugin consumption
 
 [`TelemetrySender.WheelChannelCatalog`](../../../Telemetry/TelemetrySender.cs)
@@ -79,6 +138,13 @@ the UI. The list is also used by `FilterProfileToCatalog` to drop tier
 entries whose URL doesn't appear in the wheel's advertised set, with
 last-path-segment fallback (case-insensitive). See
 [`../plugin/tier-impl.md`](../plugin/tier-impl.md).
+
+Catalog-only profile synthesis (`TelemetrySender.MaybeSwapProfileForCatalog`,
+fallback path when no local mzdash is configured) consumes
+`ChannelCatalogParser.LiveCatalog` rather than `Catalog`, then builds a
+`MultiStreamProfile` via `DashboardProfileStore.BuildProfileFromCatalog`.
+Re-synthesis triggers on catalog count change OR `LastWheelEndMarker`
+value change.
 
 ### Cross-references
 

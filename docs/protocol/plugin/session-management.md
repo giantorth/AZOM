@@ -97,9 +97,22 @@ The plugin handles this with a **silence gate** in `Stop`/`StartInner`:
   both instances.
 - Cold-start (`_lastStopUtcTicks == 0` initially) skips the gate.
 
-Dashboard switches (UI knob → `OnDashboardSwitched` → `RestartForSwitch`)
-also route through Stop+Start, so the same silence gate fires
-automatically — no separate timeout logic needed.
+Dashboard switches **do NOT route through Stop+Start in the current default**
+(`EnableHotRenegotiation = true` in `MozaPluginSettings`). The hot-reneg path
+keeps sessions 0x01-0x03 open across switches and emits a paced multi-emission
+tier-def burst echoing the wheel's END marker — see
+[`../tier-definition/handshake.md`](../tier-definition/handshake.md) § In-game
+dashboard switch. UI cooldown shrinks to `HotSwitchCooldownMs` (200 ms).
+
+The legacy `OnDashboardSwitched → RestartForSwitch` Stop+Start cycle (with the
+full 11 s silence gate) is reached only from:
+
+- `EnableHotRenegotiation = false`,
+- Game-switch / wheel hot-swap (`MozaPlugin.ResetWheelDetection`),
+- sess=0x02 engagement-watchdog exhaustion (`TickSession02EngagementWatchdog`
+  escalation after 5-round backoff).
+
+A normal user dashboard switch in default config never trips the silence gate.
 
 ### sess=0x09 establishment retry
 
