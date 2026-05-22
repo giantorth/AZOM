@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              xmlns:ctrl="clr-namespace:MozaControls"
+             xmlns:ui="clr-namespace:MozaPlugin.UI"
              Padding="0"
              Background="{DynamicResource BgPanelBrush}"
              TextElement.Foreground="{DynamicResource TextBrush}"
@@ -174,12 +175,24 @@
             </Grid>
         </Border>
 
-        <!-- Restart notice -->
-        <Border x:Name="RestartBanner" DockPanel.Dock="Top" Visibility="Collapsed"
-                Style="{StaticResource BannerBorder}" Margin="22,12,22,0">
-            <TextBlock Text="New device definitions were deployed. Restart SimHub to add them under Devices."
-                       Foreground="#FFD7A0" TextWrapping="Wrap"/>
-        </Border>
+        <!-- Status hint banners: port-locked-by-other-app, restart notice,
+             profile-not-added-in-SimHub. Items bound by code-behind every
+             ~500ms; the list diff suppresses unchanged-tick rebuilds. -->
+        <ItemsControl x:Name="HintBanners" DockPanel.Dock="Top"
+                      Margin="22,12,22,0" KeyboardNavigation.TabNavigation="None">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type ui:StatusHint}">
+                    <Border Style="{StaticResource BannerBorder}" Margin="0,0,0,6">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" FontWeight="Bold"
+                                       Foreground="#FFD7A0"/>
+                            <TextBlock Text="{Binding Body}" Foreground="#FFD7A0"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
         <!-- Tabs -->
         <TabControl Style="{StaticResource MozaTabControl}">
@@ -1604,7 +1617,7 @@
                                              FontFamily="{StaticResource FontMono}"
                                              LostFocus="SdkCoapPortBox_LostFocus"
                                              KeyDown="SdkCoapPortBox_KeyDown"/>
-                                    <TextBlock Text="(1024-65535, default 5683)"
+                                    <TextBlock Text="(1024-65535, default 40266)"
                                                Style="{StaticResource MutedHintText}"
                                                VerticalAlignment="Center" Margin="10,0,0,0"/>
                                 </StackPanel>

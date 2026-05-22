@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -50,6 +51,11 @@ namespace MozaPlugin
         // would otherwise create N Runs/frame; we recycle them in place.
         private Run[]? _activeButtonRuns;
         private Run[]? _activeButtonSeparatorRuns;
+
+        // Cache of the previous tick's hint list so RefreshDisplay only assigns
+        // ItemsSource when the set genuinely changes. ItemsControl rebuilds its
+        // visual tree on every assignment; the diff keeps it stable at 2 Hz.
+        private IReadOnlyList<StatusHint>? _lastHints;
 
         public SettingsControl(MozaPlugin plugin)
         {
@@ -175,8 +181,12 @@ namespace MozaPlugin
 
         private void RefreshDisplay(object sender, EventArgs e)
         {
-            RestartBanner.Visibility = _plugin.DeviceDefinitionDeployed
-                ? Visibility.Visible : Visibility.Collapsed;
+            var hints = StatusHintBuilder.Build(_plugin, DateTime.UtcNow);
+            if (!StatusHint.ListEquals(_lastHints, hints))
+            {
+                HintBanners.ItemsSource = hints;
+                _lastHints = hints;
+            }
 
             using (_suppressor.Begin())
             {

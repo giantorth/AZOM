@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Threading;
@@ -103,6 +104,15 @@ namespace MozaPlugin.Protocol
         private int _portFailureLogged;
         private const int PortDeadThreshold = 10;
 
+        // Classified open-failure surface. UI hint-builder reads this every
+        // 500 ms to distinguish port-in-use from generic disconnect. Counter
+        // is incremented atomically; the snapshot struct is copied under
+        // _failureLock so the UI sees a consistent view across fields.
+        private readonly object _failureLock = new object();
+        private ConnectionFailureInfo _lastFailure;
+        private int _consecutiveOpenFailures;
+        private DateTime _lastSuccessfulOpenUtc;
+
         public event Action<byte[]>? MessageReceived;
         // Raised on the I/O thread after HandleIoFailure force-closes the port.
         // Subscribers must be background-safe and non-blocking.
@@ -150,6 +160,88 @@ namespace MozaPlugin.Protocol
                 ChecksumFailures = cksum;
                 FrameStartScanResyncs = resync;
             }
+        }
+
+        /// <summary>
+        /// Snapshot of the most recent open-failure classification. Returns
+        /// <see cref="ConnectionFailureInfo.None"/> when no failure is current
+        /// (either we've never tried to connect or the last connect succeeded
+        /// and <see cref="ResetFailureState"/> ran).
+        /// </summary>
+        public ConnectionFailureInfo LastFailure
+        {
+            get { lock (_failureLock) return _lastFailure; }
+        }
+
+        /// <summary>
+        /// Number of consecutive <see cref="TryOpen"/> calls that have failed
+        /// since the last successful open. Reset to 0 on each successful Open
+        /// and on <see cref="ResetFailureState"/>. UI hint-builder requires
+        /// >= 2 before showing the port-in-use banner so a single transient
+        /// failure during plug-in doesn't flash a banner.
+        /// </summary>
+        public int ConsecutiveOpenFailures =>
+            Interlocked.CompareExchange(ref _consecutiveOpenFailures, 0, 0);
+
+        /// <summary>UTC of the most recent successful <see cref="TryOpen"/>;
+        /// <see cref="DateTime.MinValue"/> if never connected this session.</summary>
+        public DateTime LastSuccessfulOpenUtc
+        {
+            get { lock (_failureLock) return _lastSuccessfulOpenUtc; }
+        }
+
+        /// <summary>
+        /// Clear the classified-failure surface. Called from <see cref="TryOpen"/>
+        /// on success and from <see cref="MozaPlugin"/> when the user toggles
+        /// the connection off (so a stale "port in use" banner doesn't linger
+        /// after a deliberate disable).
+        /// </summary>
+        public void ResetFailureState()
+        {
+            Interlocked.Exchange(ref _consecutiveOpenFailures, 0);
+            lock (_failureLock)
+            {
+                _lastFailure = ConnectionFailureInfo.None;
+            }
+        }
+
+        private void RecordOpenFailure(string portName, ConnectionFailureKind kind, Exception ex)
+        {
+            Interlocked.Increment(ref _consecutiveOpenFailures);
+            lock (_failureLock)
+            {
+                _lastFailure = new ConnectionFailureInfo(kind, portName, ex.Message, DateTime.UtcNow);
+            }
+        }
+
+        // SerialPort.Open / CreateFile under Wine and native Windows both
+        // produce ERROR_ACCESS_DENIED (HResult 0x80070005) when another
+        // process holds the port (PitHouse is the canonical case). The
+        // exception type can be UnauthorizedAccessException OR IOException
+        // depending on driver path; the substring check covers both, and
+        // the HResult check is a belt-and-braces alternative when the
+        // message has been localized.
+        private static bool LooksLikeAccessDenied(Exception ex)
+        {
+            const int E_ACCESSDENIED = unchecked((int)0x80070005);
+            if (ex.HResult == E_ACCESSDENIED) return true;
+            var msg = ex.Message;
+            if (string.IsNullOrEmpty(msg)) return false;
+            return msg.IndexOf("access is denied", StringComparison.OrdinalIgnoreCase) >= 0
+                || msg.IndexOf("already in use", StringComparison.OrdinalIgnoreCase) >= 0
+                || msg.IndexOf("sharing violation", StringComparison.OrdinalIgnoreCase) >= 0
+                || msg.IndexOf("resource busy", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        // "Port vanished" — registry enumeration showed the COM but Open
+        // can't see it. Distinct from access-denied because the remediation
+        // is different (replug, not close-other-app).
+        private static bool LooksLikePortVanished(Exception ex)
+        {
+            var msg = ex.Message;
+            if (string.IsNullOrEmpty(msg)) return false;
+            return msg.IndexOf("does not exist", StringComparison.OrdinalIgnoreCase) >= 0
+                || msg.IndexOf("no such", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
@@ -277,11 +369,42 @@ namespace MozaPlugin.Protocol
                 _activePorts[portName] = 1;
                 Interlocked.Exchange(ref _consecutiveIoErrors, 0);
                 Interlocked.Exchange(ref _portFailureLogged, 0);
+                lock (_failureLock)
+                {
+                    _lastFailure = ConnectionFailureInfo.None;
+                    _lastSuccessfulOpenUtc = DateTime.UtcNow;
+                }
+                Interlocked.Exchange(ref _consecutiveOpenFailures, 0);
                 MozaLog.Info($"[Moza] Connected to {portName}");
                 return true;
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                RecordOpenFailure(portName, ConnectionFailureKind.AccessDenied, ex);
+                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                return false;
+            }
+            catch (IOException ex) when (LooksLikeAccessDenied(ex))
+            {
+                RecordOpenFailure(portName, ConnectionFailureKind.AccessDenied, ex);
+                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                return false;
+            }
+            catch (FileNotFoundException ex)
+            {
+                RecordOpenFailure(portName, ConnectionFailureKind.PortVanished, ex);
+                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                return false;
+            }
+            catch (IOException ex) when (LooksLikePortVanished(ex))
+            {
+                RecordOpenFailure(portName, ConnectionFailureKind.PortVanished, ex);
+                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                return false;
+            }
             catch (Exception ex)
             {
+                RecordOpenFailure(portName, ConnectionFailureKind.OpenFailedOther, ex);
                 MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }

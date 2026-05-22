@@ -80,6 +80,19 @@ namespace MozaPlugin.UI
             sb.Append("  |  AB9 ");
             sb.Append(string.IsNullOrEmpty(ab9Port) ? "(disconnected)" : "→ " + ab9Port);
             sb.AppendLine();
+
+            // Classified open-failure surface. AccessDenied here is the
+            // "port held by another app" footgun (PitHouse etc.); a stuck
+            // ConsecutiveOpenFails count with PortVanished points at hot-
+            // unplug or Wine pty teardown rather than user misconfig.
+            var conn = plugin.Connection;
+            if (conn != null)
+            {
+                var f = conn.LastFailure;
+                sb.AppendLine(
+                    $"LastFailure:    kind={f.Kind} port={f.PortName ?? "-"} " +
+                    $"consecutive={conn.ConsecutiveOpenFailures}");
+            }
             return sb.ToString();
         }
 
