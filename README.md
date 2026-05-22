@@ -14,8 +14,8 @@ A SimHub plugin that communicates directly with MOZA Racing hardware over serial
 
 Built using the amazing work of [Boxflat](https://github.com/Lawstorant/boxflat) and the intial reverse-engineering of the the [MOZA serial protocol](docs/protocol/README.md).
 
-> [!NOTE]
-> If you find the plugin useful, please leave a star or [sponsor future development efforts](https://github.com/sponsors/giantorth).
+> [!WARNING]
+> If you [sponsor future development efforts](https://github.com/sponsors/giantorth) the money will just be used to buy more MOZA hardware.
 
 ## Why This Exists
 
