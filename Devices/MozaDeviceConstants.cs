@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 
 namespace MozaPlugin.Devices
@@ -69,6 +70,15 @@ namespace MozaPlugin.Devices
         private static readonly object _registryLock = new object();
         private static string? _registryPath;
 
+        // Save serialization. The registry lock guards only the in-memory dicts;
+        // file I/O is pushed outside that lock so LED writes and hot-swap detection
+        // (which also take _registryLock indirectly via Resolve/Get calls) aren't
+        // blocked behind a synchronous disk write. _pendingSaveSnapshot holds the
+        // latest snapshot any caller wants persisted; _saveLock serializes the
+        // actual writer so two threads never interleave temp-file+rename steps.
+        private static readonly object _saveLock = new object();
+        private static Dictionary<string, string>? _pendingSaveSnapshot;
+
         /// <summary>
         /// Initialize the GUID registry. Call once from plugin Init.
         /// Populates the lookup tables from backward-compat GUIDs,
@@ -109,16 +119,56 @@ namespace MozaPlugin.Devices
         /// </summary>
         public static string ResolveWheelGuid(string modelPrefix)
         {
+            string guid;
+            Dictionary<string, string> snapshot;
             lock (_registryLock)
             {
                 if (PrefixToGuid.TryGetValue(modelPrefix, out var existing))
                     return existing;
 
-                // New model — generate and persist
-                var guid = GenerateUuidV5(modelPrefix);
+                // New model — generate, register, and snapshot the current map
+                // while still holding the lock so the snapshot is internally consistent.
+                guid = GenerateUuidV5(modelPrefix);
                 Register(modelPrefix, guid);
-                SaveRegistryFile();
-                return guid;
+                snapshot = new Dictionary<string, string>(PrefixToGuid, StringComparer.OrdinalIgnoreCase);
+            }
+
+            // Disk write happens outside the registry lock to avoid blocking LED
+            // writes / hot-swap detection behind a synchronous WriteAllText+Move.
+            EnqueueRegistrySave(snapshot);
+            return guid;
+        }
+
+        /// <summary>
+        /// Publish a snapshot to be persisted, then either run the writer (if no
+        /// other thread is currently writing) or hand off to whoever holds the
+        /// writer slot. The in-flight writer re-checks <see cref="_pendingSaveSnapshot"/>
+        /// after each write, so a later, fresher snapshot always wins — and we
+        /// never queue more than one follow-up write regardless of caller volume.
+        /// </summary>
+        private static void EnqueueRegistrySave(Dictionary<string, string> snapshot)
+        {
+            // Publish the latest snapshot first. Any in-flight writer will pick
+            // this up on its post-write check; that's why we don't need to queue.
+            Volatile.Write(ref _pendingSaveSnapshot, snapshot);
+
+            // Try to become the writer. If another thread already holds the slot,
+            // it will observe our published snapshot and write it for us.
+            if (!Monitor.TryEnter(_saveLock))
+                return;
+
+            try
+            {
+                while (true)
+                {
+                    var pending = Interlocked.Exchange(ref _pendingSaveSnapshot, null);
+                    if (pending == null) return;
+                    WriteRegistrySnapshot(pending);
+                }
+            }
+            finally
+            {
+                Monitor.Exit(_saveLock);
             }
         }
 
@@ -237,7 +287,12 @@ namespace MozaPlugin.Devices
             }
         }
 
-        internal static void SaveRegistryFile()
+        /// <summary>
+        /// Persist the given snapshot to disk. Caller must hold <see cref="_saveLock"/>
+        /// (via <see cref="EnqueueRegistrySave"/>) to guarantee no other thread is
+        /// running the temp-file+rename sequence concurrently.
+        /// </summary>
+        private static void WriteRegistrySnapshot(Dictionary<string, string> snapshot)
         {
             try
             {
@@ -247,7 +302,7 @@ namespace MozaPlugin.Devices
                 if (dir != null)
                     Directory.CreateDirectory(dir);
 
-                var json = JsonConvert.SerializeObject(PrefixToGuid, Formatting.Indented);
+                var json = JsonConvert.SerializeObject(snapshot, Formatting.Indented);
 
                 // Atomic write: stage to a sibling .tmp first, then move into place.
                 // A crash mid-WriteAllText would otherwise truncate the existing

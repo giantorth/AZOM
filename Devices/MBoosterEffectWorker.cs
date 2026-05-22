@@ -54,15 +54,30 @@ namespace MozaPlugin.Devices
         private bool _thresholdLatched; // hysteresis flag for the Threshold effect (doc § 4)
 
         // Test pulses (UI test buttons) — fire one effect for ~1 s outside the
-        // game-driven mapping. The stored `_testIntensity*` is the raw user
-        // setting (0..1, = IntensityPct/100); per-effect ScaleMax is applied
-        // inside the test path along with live brake modulation (ABS, Lockup,
-        // Threshold) or the fixed reference frequency (Engine).
-        private long _testAbsUntil;
-        private long _testLockupUntil;
-        private long _testThresholdUntil;
-        private long _testEngineUntil;
-        private double _testIntensityAbs, _testIntensityLockup, _testIntensityThreshold, _testIntensityEngine;
+        // game-driven mapping. Stored intensity is the raw user setting (0..1,
+        // = IntensityPct/100); per-effect ScaleMax is applied inside the test
+        // path along with live brake modulation (ABS, Lockup, Threshold) or
+        // the fixed reference frequency (Engine).
+        //
+        // Deadline + intensity are bundled into a single immutable holder so
+        // the (deadline, intensity) pair is published atomically across the
+        // UI → worker boundary: Volatile.Write on FireTestPulse, Volatile.Read
+        // once per Update*Request call. Without this, the worker could read a
+        // fresh deadline against a stale (or torn, on x86) intensity.
+        private sealed class TestPulse
+        {
+            public readonly long DeadlineTicks;
+            public readonly double Intensity;
+            public TestPulse(long deadlineTicks, double intensity)
+            {
+                DeadlineTicks = deadlineTicks;
+                Intensity = intensity;
+            }
+        }
+        private TestPulse? _absPulse;
+        private TestPulse? _lockupPulse;
+        private TestPulse? _thresholdPulse;
+        private TestPulse? _enginePulse;
         // Fixed reference frequency for the Engine test pulse — mid-range of the
         // doc § 4 RPM-derived freq mapping. The brake-modulated test paths
         // compute their own frequency from the live brake reading.
@@ -123,16 +138,13 @@ namespace MozaPlugin.Devices
             // fixed reference frequency. Stored value is the raw 0..1 user
             // intensity setting; per-effect ScaleMax is applied at use time.
             long deadline = Stopwatch.GetTimestamp() + Stopwatch.Frequency;
+            var pulse = new TestPulse(deadline, intensity01);
             switch (effect)
             {
-                case MBoosterEffectId.Abs:
-                    _testIntensityAbs = intensity01; _testAbsUntil = deadline; break;
-                case MBoosterEffectId.Lockup:
-                    _testIntensityLockup = intensity01; _testLockupUntil = deadline; break;
-                case MBoosterEffectId.Threshold:
-                    _testIntensityThreshold = intensity01; _testThresholdUntil = deadline; break;
-                case MBoosterEffectId.Engine:
-                    _testIntensityEngine = intensity01; _testEngineUntil = deadline; break;
+                case MBoosterEffectId.Abs:       Volatile.Write(ref _absPulse,       pulse); break;
+                case MBoosterEffectId.Lockup:    Volatile.Write(ref _lockupPulse,    pulse); break;
+                case MBoosterEffectId.Threshold: Volatile.Write(ref _thresholdPulse, pulse); break;
+                case MBoosterEffectId.Engine:    Volatile.Write(ref _enginePulse,    pulse); break;
             }
         }
 
@@ -199,9 +211,10 @@ namespace MozaPlugin.Devices
             // Test pulse overrides telemetry-driven engine. Engine is not
             // brake-modulated (continuous RPM-driven effect); test runs at the
             // user-configured intensity, scaled by EngineScaleMax.
-            if (Stopwatch.GetTimestamp() < _testEngineUntil)
+            var pulse = Volatile.Read(ref _enginePulse);
+            if (pulse != null && Stopwatch.GetTimestamp() < pulse.DeadlineTicks)
             {
-                st.IntensityRequest = Clamp01(_testIntensityEngine * EngineScaleMax);
+                st.IntensityRequest = Clamp01(pulse.Intensity * EngineScaleMax);
                 st.FreqHz = EngineTestRefHz;
                 return;
             }
@@ -237,7 +250,8 @@ namespace MozaPlugin.Devices
             // Test path: substitute live brake position for absActive so the
             // user can feel dynamic range by pressing the pedal during the
             // 1 s pulse. Brake = 0 leaves the effect silent (matches PitHouse).
-            if (Stopwatch.GetTimestamp() < _testAbsUntil)
+            var pulse = Volatile.Read(ref _absPulse);
+            if (pulse != null && Stopwatch.GetTimestamp() < pulse.DeadlineTicks)
             {
                 double brakeT = EffectiveBrake(settings, snap);
                 if (brakeT <= 0.01)
@@ -247,7 +261,7 @@ namespace MozaPlugin.Devices
                     return;
                 }
                 st.FreqHz = 18 + brakeT * 12;
-                st.IntensityRequest = Clamp01(brakeT * _testIntensityAbs * AbsScaleMax);
+                st.IntensityRequest = Clamp01(brakeT * pulse.Intensity * AbsScaleMax);
                 return;
             }
 
@@ -280,7 +294,8 @@ namespace MozaPlugin.Devices
             // Test path: bypass the lockup-detection heuristic (which needs
             // vehicle speed) and modulate purely on live brake position so the
             // user can feel the effect by pressing the pedal during the pulse.
-            if (Stopwatch.GetTimestamp() < _testLockupUntil)
+            var pulse = Volatile.Read(ref _lockupPulse);
+            if (pulse != null && Stopwatch.GetTimestamp() < pulse.DeadlineTicks)
             {
                 double brakeT = EffectiveBrake(settings, snap);
                 if (brakeT <= 0.01)
@@ -290,7 +305,7 @@ namespace MozaPlugin.Devices
                     return;
                 }
                 st.FreqHz = 40 + brakeT * 30;
-                st.IntensityRequest = Clamp01(brakeT * _testIntensityLockup * LockupScaleMax);
+                st.IntensityRequest = Clamp01(brakeT * pulse.Intensity * LockupScaleMax);
                 return;
             }
 
@@ -331,7 +346,8 @@ namespace MozaPlugin.Devices
             // Test path: skip the rising-edge hysteresis so the effect tracks
             // brake position continuously during the 1 s pulse — the user can
             // feel the envelope shape across the full range of pedal travel.
-            if (Stopwatch.GetTimestamp() < _testThresholdUntil)
+            var pulse = Volatile.Read(ref _thresholdPulse);
+            if (pulse != null && Stopwatch.GetTimestamp() < pulse.DeadlineTicks)
             {
                 double brakeT = EffectiveBrake(settings, snap);
                 if (brakeT <= 0.01)
@@ -341,7 +357,7 @@ namespace MozaPlugin.Devices
                     return;
                 }
                 st.FreqHz = 60 + brakeT * 30;
-                st.IntensityRequest = Clamp01(brakeT * _testIntensityThreshold * ThresholdScaleMax);
+                st.IntensityRequest = Clamp01(brakeT * pulse.Intensity * ThresholdScaleMax);
                 return;
             }
 

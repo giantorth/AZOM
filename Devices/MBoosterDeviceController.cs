@@ -332,6 +332,7 @@ namespace MozaPlugin.Devices
             catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Disable on dispose: {ex.Message}"); }
             try { _worker.Stop(); } catch { }
             try { _connection.MessageReceived -= OnConnectionMessage; } catch { }
+            try { _connection.Disconnected -= OnConnectionDisconnected; } catch { }
             try { _connection.Dispose(); } catch { }
         }
     }

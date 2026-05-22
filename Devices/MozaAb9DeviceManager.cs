@@ -597,6 +597,9 @@ namespace MozaPlugin.Devices
 
         public void Dispose()
         {
+            _connection.Disconnected -= OnConnectionDisconnected;
+            _detected = false;
+            _ffbInitSent = false;
             _connection.Dispose();
         }
     }

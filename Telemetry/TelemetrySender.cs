@@ -261,6 +261,17 @@ namespace MozaPlugin.Telemetry
         private readonly ConfigJsonClient _configJson = new ConfigJsonClient();
         internal int _session09InboundSeq;
         private int _session09OutboundSeq;
+
+        // Guard for the read-chunk-send-write of _session09OutboundSeq.
+        // Without it, MaybeSendConfigJsonReply (runs on the serial-read thread
+        // via TelemetryInboundDispatcher when the wheel completes a sess=0x09
+        // configJson chunk burst) races SendSession09Keepalive (runs on the
+        // System.Timers ThreadPool tick via OnTimerElapsed → TickEmitSlowPath).
+        // The reply is a multi-chunk emission so its read-modify-write window
+        // is wide enough to interleave with a keepalive ++seq, producing seq
+        // skew that the wheel sees as a gap.
+        private readonly object _session09SeqLock = new object();
+
         private bool _session09ReplySent;
         public WheelDashboardState? WheelState => _configJson.LastState;
 
@@ -771,7 +782,6 @@ namespace MozaPlugin.Telemetry
 
         private volatile int _framesSent;
         public int FramesSent => _framesSent;
-        private volatile int _postRenegDiagTicks; // counts down from 3 after renegotiation
         /// <summary>True between Start() and Stop(). Exposed for diagnostics panel.
         /// Preserves the prior `_enabled` boolean's external semantics — anything
         /// other than Idle counts as "running".</summary>
@@ -791,9 +801,6 @@ namespace MozaPlugin.Telemetry
             try { MozaLog.Debug($"[Moza] state {prev} → {next} ({reason})"); }
             catch { /* logging may not be initialised in tests */ }
         }
-        public byte[]? LastFrameSent { get; private set; }
-        public TelemetryDiagnostics Diagnostics { get; } = new TelemetryDiagnostics();
-
         // Read-only accessors for DashboardSwitchAutoTest
         internal byte? ActiveFlagBase => _activeSubscription?.FlagBase;
         internal int ActiveTierCount => _tiers?.Length ?? 0;
@@ -1423,13 +1430,33 @@ namespace MozaPlugin.Telemetry
         internal Display.WheelSlotTracker SlotTracker => _slotTracker;
 
         // ── Property/TierDef accessors ───────────────────────────────────
+
+        /// <summary>Lock guarding the read-emit-write cycle on
+        /// <see cref="Session02OutboundSeq"/>. Callers that mutate the seq
+        /// via the property MUST hold this lock for the entire
+        /// read-chunk-send-write region — the property's setter is a bare
+        /// assignment because locking only the assignment leaves the
+        /// read-then-emit window unprotected, which is what actually races.
+        /// In-class writers (TickEmitValueFrames, Stop reset) and external
+        /// writers (PropertyPushQueue, TierDefinitionEmitter) all conform.</summary>
         internal object Session02SeqLock => _session02SeqLock;
+
+        /// <summary>Next outbound seq for session 0x02 (telemetry / FlagByte).
+        /// MUST be read AND written under <see cref="Session02SeqLock"/> —
+        /// see the lock's doc-comment for the why.</summary>
         internal int Session02OutboundSeq
         {
             get => _session02OutboundSeq;
             set => _session02OutboundSeq = value;
         }
+
+        /// <summary>Lock guarding the read-emit-write cycle on
+        /// <see cref="Session01OutboundSeq"/>. Same contract as
+        /// <see cref="Session02SeqLock"/>; see its doc-comment.</summary>
         internal object Session01SeqLock => _session01SeqLock;
+
+        /// <summary>Next outbound seq for session 0x01 (mgmt). MUST be read
+        /// AND written under <see cref="Session01SeqLock"/>.</summary>
         internal int Session01OutboundSeq
         {
             get => _session01OutboundSeq;
@@ -2255,18 +2282,32 @@ namespace MozaPlugin.Telemetry
             }
 
             byte[] reply = ConfigJsonClient.BuildConfigJsonReply(CanonicalDashboardList);
-            int seq = _session09OutboundSeq + 1;
-            var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq);
-            foreach (var frame in frames)
+            int chunkCount;
+            // Hold _session09SeqLock across the entire read-chunk-send-write
+            // so SendSession09Keepalive (timer thread) can't slip a ++seq in
+            // mid-emission and break the wheel's gap detector. Early-return
+            // on disconnect still persists the partial advance — any frames
+            // already on the wire have consumed those seqs wheel-side.
+            lock (_session09SeqLock)
             {
-                if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                _connection.Send(frame);
+                int seq = _session09OutboundSeq + 1;
+                var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq);
+                chunkCount = frames.Count;
+                foreach (var frame in frames)
+                {
+                    if (_state == TelemetryState.Idle || !_connection.IsConnected)
+                    {
+                        _session09OutboundSeq = seq;
+                        return;
+                    }
+                    _connection.Send(frame);
+                }
+                _session09OutboundSeq = seq;
             }
-            _session09OutboundSeq = seq;
             _session09ReplySent = true;
             MozaLog.Debug(
                 $"[Moza] Sent configJson() reply on session 0x{session:X2}: " +
-                $"{CanonicalDashboardList.Count} dashboards, {frames.Count} chunks");
+                $"{CanonicalDashboardList.Count} dashboards, {chunkCount} chunks");
         }
 
         /// <summary>
@@ -2313,18 +2354,6 @@ namespace MozaPlugin.Telemetry
         {
             if (Volatile.Read(ref _disposed) != 0) return null;
             return _rpc.Call(method, arg, timeoutMs);
-        }
-
-        private static int CountOccurrences(string haystack, string needle)
-        {
-            if (string.IsNullOrEmpty(haystack) || string.IsNullOrEmpty(needle)) return 0;
-            int count = 0, idx = 0;
-            while ((idx = haystack.IndexOf(needle, idx, StringComparison.Ordinal)) != -1)
-            {
-                count++;
-                idx += needle.Length;
-            }
-            return count;
         }
 
         private void SendSessionEnd(byte session, ushort seq)
@@ -2460,7 +2489,6 @@ namespace MozaPlugin.Telemetry
                 if (tiers == null || tiers.Length == 0)
                     return;
 
-                TickPostRenegDiagnostic(tiers);
                 TickFireGameStartHandshake();
                 TickEmitValueFrames(tiers);
                 TickEmitStringValues();
@@ -2578,20 +2606,6 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        private void TickPostRenegDiagnostic(TierState[] tiers)
-        {
-            if (_postRenegDiagTicks <= 0) return;
-            bool useV0Diag = _policy.Encoding == TierDefEncoding.V0Url;
-            MozaLog.Debug(
-                $"[Moza] TICK DIAG: tiers={tiers.Length} " +
-                $"testMode={TestMode} gameRunning={_gameRunning} " +
-                $"useV0={useV0Diag} tickCounter={_tickCounter} " +
-                $"profile={_profile?.Name ?? "null"} " +
-                $"catalog={_catalogParser.Catalog?.Count ?? -1} " +
-                $"framesSent={_framesSent}");
-            _postRenegDiagTicks--;
-        }
-
         private void TickFireGameStartHandshake()
         {
             if (!_gameStartHandshakePending) return;
@@ -2666,9 +2680,7 @@ namespace MozaPlugin.Telemetry
 
                 if (i == 0)
                 {
-                    LastFrameSent = frame;
                     _framesSent++;
-                    Diagnostics.RecordFrame(frame);
                 }
             }
         }
@@ -3392,8 +3404,14 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         private void SendSession09Keepalive()
         {
-            int seq = ++_session09OutboundSeq;
-            SendSessionPrime(0x09, (ushort)seq);
+            // Reserve seq + emit under _session09SeqLock so a concurrent
+            // MaybeSendConfigJsonReply (read-thread) can't slip its multi-chunk
+            // train in between this seq reservation and the wire send.
+            lock (_session09SeqLock)
+            {
+                int seq = ++_session09OutboundSeq;
+                SendSessionPrime(0x09, (ushort)seq);
+            }
         }
 
         /// <summary>
