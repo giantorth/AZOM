@@ -742,7 +742,7 @@ namespace MozaPlugin
             // statics themselves still hold them — the next Init will pick them
             // back up via the s_persistentConnection / s_persistentTelemetrySender
             // reuse path.
-            if (!ownConnection) _connection = null;
+            if (!ownConnection) _connection = null!;
             if (!ownTelemetrySender) _telemetrySender = null;
         }
 

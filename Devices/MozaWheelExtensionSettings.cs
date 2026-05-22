@@ -186,8 +186,11 @@ namespace MozaPlugin.Devices
                 // only adopt a DTO value when the bundle field is at its
                 // sentinel. Otherwise the stale device JSON clobbers the
                 // user's freshly-loaded setting on every restart.
-                if (WheelSleepMode >= 0 || WheelSleepTimeoutMin >= 0
-                    || WheelSleepSpeedMs >= 0 || WheelSleepColor != null)
+                // Sleep/idle bundles live on plugin-wide settings; skip when
+                // the caller passed a null settings (no-op for bundles, the
+                // profile-overlay merge above still runs).
+                if (settings != null && (WheelSleepMode >= 0 || WheelSleepTimeoutMin >= 0
+                    || WheelSleepSpeedMs >= 0 || WheelSleepColor != null))
                 {
                     if (settings.WheelSleepByPageGuid == null)
                         settings.WheelSleepByPageGuid = new Dictionary<Guid, WheelSleepSettings>();
@@ -204,9 +207,9 @@ namespace MozaPlugin.Devices
 
                 // Idle effect/speed bundle is also per-wheel-page (schema v9).
                 // Same fill-only semantics as the sleep bundle above.
-                if (WheelIdleEffect >= 0 || WheelButtonsIdleEffect >= 0
+                if (settings != null && (WheelIdleEffect >= 0 || WheelButtonsIdleEffect >= 0
                     || WheelKnobIdleEffect >= 0 || WheelTelemetryIdleSpeedMs >= 0
-                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0)
+                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0))
                 {
                     if (settings.WheelIdleByPageGuid == null)
                         settings.WheelIdleByPageGuid = new Dictionary<Guid, WheelIdleSettings>();
