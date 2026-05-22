@@ -104,6 +104,11 @@ namespace MozaPlugin.Devices
             // per user. RPM/button counts should be confirmed against a real RS V2
             // and tightened in a follow-up.
             ("RS V2",   "RS V2",      new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
+            // Original CS (predecessor to CS V2 / CS V2.1) — firmware reports the
+            // bare prefix "CS" with no version suffix. 10 RGB RPM LEDs, no button
+            // / flag / knob LEDs, no display. Must come after "CS V2.1" so the
+            // longer prefix is matched first for newer firmware reports.
+            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false)),
         };
 
         public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0)

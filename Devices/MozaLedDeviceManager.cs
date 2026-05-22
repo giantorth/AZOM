@@ -623,7 +623,11 @@ namespace MozaPlugin.Devices
                 // wheel RPM + button LEDs only; flag LEDs use the stored config written via
                 // ApplySavedDashSettings on connect / plugin UI slider.
 
-                if (isNewWheel && buttonsBrightness != _lastButtonsBrightness)
+                // Skip wheels with no button LEDs (e.g. the original CS) — the
+                // wheel doesn't know about wheel-buttons-brightness and the write
+                // just adds wire noise + a pending tracker entry that times out.
+                if (isNewWheel && (modelInfo?.ButtonLedCount ?? 0) > 0
+                    && buttonsBrightness != _lastButtonsBrightness)
                 {
                     _lastButtonsBrightness = buttonsBrightness;
                     plugin.DeviceManager.WriteSetting("wheel-buttons-brightness", (int)(buttonsBrightness * 100));

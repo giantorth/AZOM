@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry;
 
@@ -29,40 +30,101 @@ namespace MozaPlugin.Devices
             "base-ffb-curve-y1", "base-ffb-curve-y2", "base-ffb-curve-y3", "base-ffb-curve-y4", "base-ffb-curve-y5",
         };
 
-        internal static readonly string[] NewWheelSettingsReadCommands = new[]
+        /// <summary>
+        /// Per-wheel reads that don't depend on which LEDs are present. Sent at
+        /// new-protocol detection regardless of the wheel model. LED-related
+        /// reads (per-zone modes, per-zone brightness, per-LED colors, LED
+        /// group probes) are deferred to <see cref="BuildNewWheelLedReadCommands"/>
+        /// once <see cref="WheelModelInfo"/> has resolved — this stops the
+        /// plugin hammering wheels (e.g. the original CS, which has only RPM
+        /// LEDs) with reads for buttons / flags / knobs they can't service.
+        /// PendingResponseTracker burns its retry budget on those timeouts.
+        /// </summary>
+        internal static readonly string[] NewWheelCoreReadCommands = new[]
         {
             "wheel-telemetry-mode",
-            "wheel-knob-led-mode", "wheel-buttons-led-mode",
-            "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-flags-brightness",
-            // Idle-effect + sleep-light reads — captured into MozaData and
-            // seeded into per-wheel-page WheelIdleByPageGuid (effects) and
-            // WheelSleepByPageGuid (sleep mode/timeout/speed/color) via
-            // SeedSleepBundleFromResponse. The matching idle-*-interval
-            // (speed) commands are write-only on the wire (RxGroup=0xFF) so
-            // they're not read here.
-            "wheel-telemetry-idle-effect", "wheel-buttons-idle-effect",
-            "wheel-knob-idle-effect",
+            // Sleep-light reads — captured into MozaData and seeded into the
+            // per-wheel-page WheelSleepByPageGuid bundle via
+            // SeedSleepBundleFromResponse. Common to every new-protocol wheel.
+            // The matching idle-*-interval (speed) commands are write-only on
+            // the wire (RxGroup=0xFF) so they're not read here.
             "wheel-idle-mode", "wheel-idle-timeout", "wheel-idle-speed",
             "wheel-idle-color",
-            "wheel-paddles-mode", "wheel-clutch-point", "wheel-knob-mode", "wheel-stick-mode",
-            "wheel-knob-signal-mode0", "wheel-knob-signal-mode1", "wheel-knob-signal-mode2",
-            "wheel-knob-signal-mode3", "wheel-knob-signal-mode4",
-            "wheel-rpm-color1", "wheel-rpm-color2", "wheel-rpm-color3",
-            "wheel-rpm-color4", "wheel-rpm-color5", "wheel-rpm-color6",
-            "wheel-rpm-color7", "wheel-rpm-color8", "wheel-rpm-color9",
-            "wheel-rpm-color10", "wheel-rpm-color11", "wheel-rpm-color12",
-            "wheel-rpm-color13", "wheel-rpm-color14", "wheel-rpm-color15",
-            "wheel-rpm-color16", "wheel-rpm-color17", "wheel-rpm-color18",
-            "wheel-button-color1",  "wheel-button-color2",  "wheel-button-color3",
-            "wheel-button-color4",  "wheel-button-color5",  "wheel-button-color6",
-            "wheel-button-color7",  "wheel-button-color8",  "wheel-button-color9",
-            "wheel-button-color10", "wheel-button-color11", "wheel-button-color12",
-            "wheel-button-color13", "wheel-button-color14",
-            "wheel-flag-color1", "wheel-flag-color2", "wheel-flag-color3",
-            "wheel-flag-color4", "wheel-flag-color5", "wheel-flag-color6",
-            // Extended LED group presence probes (Single/Rotary/Ambient).
-            "wheel-single-brightness", "wheel-knob-brightness", "wheel-ambient-brightness",
+            // Input modes — paddles/clutch/stick exist on every new-protocol wheel.
+            // Knob input modes (wheel-knob-mode, wheel-knob-signal-modeN) are
+            // gated below on WheelModelInfo.KnobCount.
+            "wheel-paddles-mode", "wheel-clutch-point", "wheel-stick-mode",
         };
+
+        /// <summary>
+        /// Build the LED-related per-wheel read list filtered by the wheel's
+        /// actual LED layout. Reads omitted for LED groups the wheel doesn't
+        /// have keep PendingResponseTracker from churning through retries on
+        /// every cold-start of a wheel like the original "CS" (10 RPM LEDs
+        /// only) or any future wheel registered in <see cref="WheelModelInfo.KnownModels"/>.
+        ///
+        /// For wheels mapped to <see cref="WheelModelInfo.Default"/> (firmware
+        /// model name not in KnownModels) the LED-group probes still go out so
+        /// we can detect Single / Rotary / Ambient groups we don't know about
+        /// statically.
+        /// </summary>
+        internal static string[] BuildNewWheelLedReadCommands(WheelModelInfo? info)
+        {
+            info ??= WheelModelInfo.Default;
+            var cmds = new List<string>();
+
+            // Per-zone LED modes + brightness + idle effect, gated on whether
+            // the wheel actually has that zone.
+            if (info.RpmLedCount > 0)
+            {
+                cmds.Add("wheel-rpm-brightness");
+                cmds.Add("wheel-telemetry-idle-effect");
+            }
+            if (info.ButtonLedCount > 0)
+            {
+                cmds.Add("wheel-buttons-led-mode");
+                cmds.Add("wheel-buttons-brightness");
+                cmds.Add("wheel-buttons-idle-effect");
+            }
+            if (info.KnobCount > 0)
+            {
+                cmds.Add("wheel-knob-led-mode");
+                cmds.Add("wheel-knob-idle-effect");
+                // Knob input config (encoder signal mode per knob).
+                cmds.Add("wheel-knob-mode");
+                for (int i = 0; i < info.KnobCount && i < 5; i++)
+                    cmds.Add($"wheel-knob-signal-mode{i}");
+            }
+
+            // Per-LED color reads, capped at the LED count this wheel reports.
+            for (int i = 1; i <= info.RpmLedCount; i++)
+                cmds.Add($"wheel-rpm-color{i}");
+            for (int i = 1; i <= info.ButtonLedCount; i++)
+                cmds.Add($"wheel-button-color{i}");
+            if (info.HasFlagLeds)
+            {
+                for (int i = 1; i <= 6; i++)
+                    cmds.Add($"wheel-flag-color{i}");
+            }
+
+            // Extended LED group probes (Single/Rotary/Ambient). For known
+            // models the WheelModelInfo already tells us what's there; only
+            // probe when the model is unknown, or when the model claims knobs
+            // (so wheel-knob-brightness lights the Rotary-group presence flag
+            // used by knob-ring writes).
+            bool isUnknown = ReferenceEquals(info, WheelModelInfo.Default);
+            if (isUnknown)
+            {
+                cmds.Add("wheel-single-brightness");
+                cmds.Add("wheel-ambient-brightness");
+            }
+            if (info.KnobCount > 0 || isUnknown)
+            {
+                cmds.Add("wheel-knob-brightness");
+            }
+
+            return cmds.ToArray();
+        }
 
         internal static readonly string[] OldWheelSettingsReadCommands = new[]
         {
@@ -243,7 +305,12 @@ namespace MozaPlugin.Devices
                         // Display sub-device probe (independent of TelemetrySender)
                         // so IsDisplayDetected flips before the user picks a profile.
                         _deviceManager.SendDisplayProbe();
-                        _deviceManager.ReadSettingsPaced(NewWheelSettingsReadCommands);
+                        // Send the LED-layout-independent reads now. The
+                        // model-aware LED reads (per-zone modes, brightness,
+                        // per-LED colors, group probes) are kicked off in the
+                        // wheel-model-name handler below, once WheelModelInfo
+                        // is resolved.
+                        _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
                         MozaLog.Info($"[Moza] New-protocol wheel detected on ID {deviceId}");
                         // Telemetry start is deferred until wheel-model-name responds;
                         // ShouldDriveDashboard() needs WheelModelInfo to decide.
@@ -284,6 +351,11 @@ namespace MozaPlugin.Devices
                             MozaLog.Debug(
                                 $"[Moza] Wheel model: {currentModel} " +
                                 $"(rpm={info!.RpmLedCount}, buttons={info.ButtonLedCount}, flags={info.HasFlagLeds}, knobs={info.KnobCount})");
+                            // Now that WheelModelInfo is resolved, send the
+                            // LED-group-filtered reads. Skipping reads for LEDs
+                            // the wheel doesn't have keeps PendingResponseTracker
+                            // from churning on inevitable timeouts.
+                            _deviceManager.ReadSettingsPaced(BuildNewWheelLedReadCommands(info));
                             if (DeviceDefinitionDeployer.DeployForModel(currentModel, _connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
 

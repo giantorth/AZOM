@@ -151,19 +151,30 @@ namespace MozaPlugin.Hardware
             if (!deviceLive) return;
             if (_detectionState.NewWheelDetected)
             {
-                if (telemMode      >= 0) _deviceManager.WriteSetting("wheel-telemetry-mode", telemMode);
-                if (idleEffect     >= 0) _deviceManager.WriteSetting("wheel-telemetry-idle-effect", idleEffect);
-                if (btnIdleEffect  >= 0) _deviceManager.WriteSetting("wheel-buttons-idle-effect", btnIdleEffect);
-                if (knobIdleEffect >= 0) _deviceManager.WriteSetting("wheel-knob-idle-effect", knobIdleEffect);
-                if (knobLedMode    >= 0) _deviceManager.WriteSetting("wheel-knob-led-mode", knobLedMode);
-                if (btnLedMode     >= 0) _deviceManager.WriteSetting("wheel-buttons-led-mode", btnLedMode);
-                if (idleEffect >= 0 && idleSpeed >= 0)
+                // Capability snapshot for the active wheel. Falls back to
+                // Default (10 RPM / 14 buttons / no flags / no knobs) when the
+                // wheel hasn't been identified yet, so we still write a
+                // reasonable subset rather than nothing.
+                var model = _plugin.WheelModelInfo ?? WheelModelInfo.Default;
+                int rpmCount = model.RpmLedCount;
+                int btnCount = model.ButtonLedCount;
+                bool hasRpm  = rpmCount > 0;
+                bool hasBtn  = btnCount > 0;
+                bool hasKnob = model.KnobCount > 0;
+
+                if (telemMode      >= 0)            _deviceManager.WriteSetting("wheel-telemetry-mode", telemMode);
+                if (idleEffect     >= 0 && hasRpm)  _deviceManager.WriteSetting("wheel-telemetry-idle-effect", idleEffect);
+                if (btnIdleEffect  >= 0 && hasBtn)  _deviceManager.WriteSetting("wheel-buttons-idle-effect", btnIdleEffect);
+                if (knobIdleEffect >= 0 && hasKnob) _deviceManager.WriteSetting("wheel-knob-idle-effect", knobIdleEffect);
+                if (knobLedMode    >= 0 && hasKnob) _deviceManager.WriteSetting("wheel-knob-led-mode", knobLedMode);
+                if (btnLedMode     >= 0 && hasBtn)  _deviceManager.WriteSetting("wheel-buttons-led-mode", btnLedMode);
+                if (idleEffect >= 0 && idleSpeed >= 0 && hasRpm)
                     _deviceManager.WriteArray("wheel-telemetry-idle-interval",
                         BuildIdleIntervalPayload(idleEffect, idleSpeed));
-                if (btnIdleEffect >= 0 && btnIdleSpeed >= 0)
+                if (btnIdleEffect >= 0 && btnIdleSpeed >= 0 && hasBtn)
                     _deviceManager.WriteArray("wheel-buttons-idle-interval",
                         BuildIdleIntervalPayload(btnIdleEffect, btnIdleSpeed));
-                if (knobIdleEffect >= 0 && knobIdleSpeed >= 0)
+                if (knobIdleEffect >= 0 && knobIdleSpeed >= 0 && hasKnob)
                     _deviceManager.WriteArray("wheel-knob-idle-interval",
                         BuildIdleIntervalPayload(knobIdleEffect, knobIdleSpeed));
                 if (sleepMode    >= 0) _deviceManager.WriteSetting("wheel-idle-mode", sleepMode);
@@ -176,14 +187,15 @@ namespace MozaPlugin.Hardware
                     var rgb = MozaProfile.UnpackColor(sleepColor[0]);
                     _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
                 }
-                if (rpmBri   >= 0) _deviceManager.WriteSetting("wheel-rpm-brightness", rpmBri);
-                if (btnBri   >= 0) _deviceManager.WriteSetting("wheel-buttons-brightness", btnBri);
+                if (rpmBri   >= 0 && hasRpm) _deviceManager.WriteSetting("wheel-rpm-brightness", rpmBri);
+                if (btnBri   >= 0 && hasBtn) _deviceManager.WriteSetting("wheel-buttons-brightness", btnBri);
                 if (flagsBri >= 0 && _detectionState.DashDetected)
                     _deviceManager.WriteSetting("dash-flags-brightness", flagsBri);
 
-                WriteColorArray(rpmColors, "wheel-rpm-color", 18);
-                WriteColorArray(rpmBlinkColors, "wheel-rpm-blink-color", 10);
-                WriteColorArray(buttonColors, "wheel-button-color", 14);
+                WriteColorArray(rpmColors, "wheel-rpm-color", rpmCount);
+                if (hasRpm)
+                    WriteColorArray(rpmBlinkColors, "wheel-rpm-blink-color", Math.Min(10, rpmCount));
+                WriteColorArray(buttonColors, "wheel-button-color", btnCount);
                 if (_detectionState.DashDetected)
                     WriteColorArray(flagColors, "dash-flag-color", 6);
                 if (idleColor != null && idleColor.Length > 0)
@@ -204,10 +216,9 @@ namespace MozaPlugin.Hardware
                 // stored values back — they'll land in MozaData via
                 // UpdateFromArray for wheel-knob{N}-active-color and surface
                 // as the visible defaults instead of black-on-load.
-                if (knobPrimaryColors == null)
+                if (knobPrimaryColors == null && hasKnob)
                 {
-                    var model = _plugin.WheelModelInfo;
-                    int knobs = model?.KnobCount ?? 0;
+                    int knobs = model.KnobCount;
                     for (int i = 0; i < knobs && i < 5; i++)
                         _deviceManager.ReadSetting($"wheel-knob{i + 1}-active-color");
                 }
