@@ -302,9 +302,15 @@ namespace MozaPlugin.Devices
                         _deviceManager.ReadSetting("wheel-serial-b");
                         // PitHouse's 12-frame identity handshake.
                         _deviceManager.SendPithouseIdentityProbe(deviceId);
-                        // Display sub-device probe (independent of TelemetrySender)
-                        // so IsDisplayDetected flips before the user picks a profile.
-                        _deviceManager.SendDisplayProbe();
+                        // Display sub-device probe is deferred to the
+                        // wheel-model-name handler below — sending 11 frames on
+                        // the dashboard session group (0x43 dev=0x17) to a
+                        // screenless wheel appears to put its command parser
+                        // into a half-engaged state where settings reads start
+                        // timing out. By waiting for the model-name response we
+                        // can skip the probe entirely when WheelModelInfo says
+                        // the wheel has no display.
+                        //
                         // Send the LED-layout-independent reads now. The
                         // model-aware LED reads (per-zone modes, brightness,
                         // per-LED colors, group probes) are kicked off in the
@@ -351,6 +357,18 @@ namespace MozaPlugin.Devices
                             MozaLog.Debug(
                                 $"[Moza] Wheel model: {currentModel} " +
                                 $"(rpm={info!.RpmLedCount}, buttons={info.ButtonLedCount}, flags={info.HasFlagLeds}, knobs={info.KnobCount})");
+                            // Display sub-device probe — deferred from the
+                            // initial wheel-detection site so we can skip it
+                            // entirely for known-no-display wheels. The probe
+                            // sends 11 frames on the dashboard session group
+                            // (0x43 dev=0x17); screenless wheels appear to
+                            // interpret those as dashboard-pipeline traffic and
+                            // stop servicing settings reads. For unknown wheels
+                            // (HasDisplay==null) the probe still runs so the UI
+                            // can light the dashboard section when a display
+                            // sub-device responds.
+                            if (info.HasDisplay != false)
+                                _deviceManager.SendDisplayProbe();
                             // Now that WheelModelInfo is resolved, send the
                             // LED-group-filtered reads. Skipping reads for LEDs
                             // the wheel doesn't have keeps PendingResponseTracker

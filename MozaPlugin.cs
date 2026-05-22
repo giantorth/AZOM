@@ -263,6 +263,14 @@ namespace MozaPlugin
         /// </summary>
         internal volatile bool DeviceDefinitionDeployed;
 
+        /// <summary>
+        /// UTC timestamp of the last <see cref="Init"/> call. The UI hint-builder
+        /// uses this as a settling reference so banners ("profile not added",
+        /// "port in use") don't flash during the first few seconds of plugin
+        /// startup before discovery and probe responses have arrived.
+        /// </summary>
+        internal DateTime StartupUtc { get; private set; } = DateTime.UtcNow;
+
         internal bool IsDashDetected => DetectionState.DashDetected;
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
@@ -334,6 +342,10 @@ namespace MozaPlugin
             // SimHub may load+unload plugins without restarting, leaving this true.
             IsShuttingDown = false;
             Interlocked.Exchange(ref _telemetryStartRequested, 0);
+            // Refresh startup timestamp on every Init (covers SimHub load+unload+load
+            // sequences) so banner settling windows are measured from the current
+            // plugin lifetime, not from process launch.
+            StartupUtc = DateTime.UtcNow;
             // Reset detection flags so a plugin reload doesn't carry over stale
             // "device detected" state from the prior session.
             ResetDetectionFlags();
@@ -1156,6 +1168,10 @@ namespace MozaPlugin
                 ClearLedsOnHardware();
                 _telemetrySender?.Stop();
                 _connection?.Disconnect();
+                // Deliberate disable — clear any classified failure so the UI
+                // doesn't keep showing a "port in use" banner after the user
+                // has intentionally turned the connection off.
+                _connection?.ResetFailureState();
                 _data.IsBaseConnected = false;
                 _data.IsHubConnected = false;
                 _data.ClearWheelIdentity();
@@ -1608,8 +1624,15 @@ namespace MozaPlugin
                 _deviceManager.ReadSetting("hub-port1-power");
 
             // Re-probe display sub-device until fully identified — initial probe
-            // can race power-up and return only partial identity.
-            if (DetectionState.NewWheelDetected && !IsDisplayDetected)
+            // can race power-up and return only partial identity. Skip for wheels
+            // we already know have no display: the probe sends 11 frames on the
+            // dashboard session group (0x43 dev=0x17), and screenless wheels
+            // (CS V2.1 / KS / GS V2P / TSW / RS V2 / "CS") may interpret those as
+            // dashboard-pipeline traffic and stop servicing settings reads.
+            // For unknown wheels (HasDisplay==null) the re-probe still runs.
+            if (DetectionState.NewWheelDetected
+                && !IsDisplayDetected
+                && WheelModelInfo?.HasDisplay != false)
                 _deviceManager.SendDisplayProbe();
 
             // Read Group 3 ring LED colors once after group detected + model resolved
