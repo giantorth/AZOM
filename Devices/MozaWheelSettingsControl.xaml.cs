@@ -462,10 +462,30 @@ namespace MozaPlugin.Devices
             else
                 cmdName = "";
             if (!string.IsNullOrEmpty(cmdName))
-                _plugin.WriteColorIfWheelDetected(cmdName, r, g, b);
-            info.ColorSource[info.Index][0] = r;
-            info.ColorSource[info.Index][1] = g;
-            info.ColorSource[info.Index][2] = b;
+            {
+                // Route LED-colour writes through the LED helper so the live cache
+                // for the matching kind is invalidated after the write — without that,
+                // the live pipeline could dedup its next frame against a stale
+                // _last* and leave the wheel showing the static value. Non-LED
+                // commands fall through to the plain helper.
+                LedKind kind = info.Section switch
+                {
+                    SwatchSection.Rpm    => LedKind.Rpm,
+                    SwatchSection.Flag   => LedKind.Flag,
+                    SwatchSection.Button => LedKind.Button,
+                    _ => cmdName.StartsWith("wheel-knob", StringComparison.Ordinal)
+                            ? LedKind.Knob
+                            : LedKind.None,
+                };
+                if (kind != LedKind.None)
+                    _plugin.WriteLedColorIfWheelDetected(cmdName, r, g, b, kind);
+                else
+                    _plugin.WriteColorIfWheelDetected(cmdName, r, g, b);
+            }
+            // B4: atomic 3-byte write — Display() may read this slot's RGB triplet
+            // concurrently for the "default during telemetry" override path
+            // (WheelButtonColors specifically). Cheap in the no-contention case.
+            _data.WriteLedColor(info.ColorSource[info.Index], r, g, b);
             swatch.Background = GetCachedBrush(r, g, b);
 
             // MozaProfile.CaptureFromCurrent explicitly skips wheel-LED fields
@@ -589,10 +609,10 @@ namespace MozaPlugin.Devices
             for (int i = 0; i < count; i++)
             {
                 int ledIdx = startIdx + i;
-                _plugin.WriteColorIfWheelDetected($"wheel-knob-bg-color{ledIdx + 1}", r, g, b);
-                _data.KnobRingColors[ledIdx][0] = r;
-                _data.KnobRingColors[ledIdx][1] = g;
-                _data.KnobRingColors[ledIdx][2] = b;
+                // Wheel-LED write + live-cache invalidation.
+                _plugin.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{ledIdx + 1}", r, g, b, LedKind.Knob);
+                // B4: atomic 3-byte write.
+                _data.WriteLedColor(_data.KnobRingColors[ledIdx], r, g, b);
             }
             // Read each ring LED back so swatches reflect wheel ground-truth.
             var readCmds = new string[count];

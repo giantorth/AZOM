@@ -115,6 +115,15 @@ namespace MozaPlugin
         internal void ApplyPedalsToHardware(MozaProfile? profile) => _hardwareApplier.ApplyPedalsToHardware(profile);
         internal void ApplyAb9ToHardware(MozaProfile? profile) => _hardwareApplier.ApplyAb9ToHardware(profile);
         internal void ApplyWheelExtensionSettings(MozaWheelExtensionSettings extSettings, string? pageModelPrefix = null) => _hardwareApplier.ApplyWheelExtensionSettings(extSettings, pageModelPrefix);
+        /// <summary>
+        /// LED-colour write from UI handlers, gated on the live telemetry pipeline (see
+        /// <see cref="Hardware.HardwareApplier.WriteLedColorIfWheelDetected"/>). Skip
+        /// during active telemetry so per-click cmd 0x27 / cmd 0x1F writes don't
+        /// flicker the live overlay; the persisted overlay (set by the caller) is
+        /// pushed via the next ApplyWheelToHardware after telemetry stops.
+        /// </summary>
+        internal void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, Devices.LedKind kind)
+            => _hardwareApplier.WriteLedColorIfWheelDetected(command, r, g, b, kind);
         internal void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings) => _hardwareApplier.ApplyDashExtensionSettings(extSettings);
         internal void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings) => _hardwareApplier.ApplyBaseExtensionSettings(extSettings);
         internal void ClearLedsOnHardware() => _hardwareApplier.ClearLedsOnHardware();

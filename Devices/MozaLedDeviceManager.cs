@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using BA63Driver.Interfaces;
 using BA63Driver.Mapper;
 using SerialDash;
@@ -10,6 +12,24 @@ using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 namespace MozaPlugin.Devices
 {
     /// <summary>
+    /// Which sub-component of the wheel LED state is being invalidated. Used to tell
+    /// <see cref="MozaLedDeviceManager"/> that an out-of-band write (static settings push,
+    /// UI swatch click, profile apply) has clobbered the wheel's wire state for one or
+    /// more LED groups so the next live <c>Display()</c> frame must re-send instead of
+    /// being deduplicated against the now-stale <c>_last*</c> cache.
+    /// </summary>
+    [Flags]
+    internal enum LedKind
+    {
+        None   = 0,
+        Rpm    = 1 << 0,
+        Button = 1 << 1,
+        Knob   = 1 << 2,
+        Flag   = 1 << 3,
+        All    = Rpm | Button | Knob | Flag,
+    }
+
+    /// <summary>
     /// A virtual ILedDeviceManager that always reports as connected.
     /// SimHub's effects UI requires a connected device driver to enable LED configuration.
     /// This implementation captures the computed LED colors from Display() and forwards them
@@ -17,6 +37,88 @@ namespace MozaPlugin.Devices
     /// </summary>
     internal class MozaLedDeviceManager : ILedDeviceManager
     {
+        // ===== Cross-instance LED driver registry =====
+        //
+        // SimHub may instantiate multiple wheel device extensions (one per known wheel
+        // model the user has used); each owns its own MozaLedDeviceManager. Only one is
+        // ever "live" — the one whose ExpectedModelPrefix matches the currently
+        // connected wheel — but the static writers (HardwareApplier, UI handlers) need
+        // to invalidate the *live* one's cache without knowing which instance that is.
+        // The registry plus IsLiveAnywhere() / InvalidateLiveCacheAny() give them a
+        // single chokepoint that DTRT regardless of which driver is currently
+        // forwarding frames.
+        private static readonly List<MozaLedDeviceManager> s_instances = new List<MozaLedDeviceManager>();
+        private static readonly object s_instancesLock = new object();
+
+        // Last UTC tick at which any live (non-keepalive) wire frame went out from any
+        // MozaLedDeviceManager. Used by HardwareApplier and UI handlers to gate static
+        // writes — while telemetry is actively pumping, static colour writes (cmd 0x27,
+        // wheel-knob-bg-color, wheel-button-color, etc.) clobber the live frame buffer
+        // and the user sees the wheel revert to its stored EEPROM colours for ~1
+        // keepalive interval. Skipping those writes while live is active preserves the
+        // live overlay; the next ApplyWheelToHardware run after telemetry stops will
+        // push the persisted static colours.
+        private static long s_lastLiveSendUtcTicks;
+        // Window during which static writes are suppressed after the last live send.
+        // 750 ms gives headroom over the 1 s keepalive cadence — long enough that a
+        // run of unchanged frames (suppressed by the change-detection cache, only the
+        // keepalive fires) still keeps the gate engaged.
+        internal static readonly TimeSpan LivePathActiveWindow = TimeSpan.FromMilliseconds(750);
+
+        /// <summary>
+        /// True if any live LED frame went out within <see cref="LivePathActiveWindow"/>.
+        /// Static writers (HardwareApplier, UI handlers) check this before touching wheel
+        /// LED registers — the live pipeline owns those registers while it's active.
+        /// </summary>
+        internal static bool IsLiveAnywhere()
+        {
+            long t = Interlocked.Read(ref s_lastLiveSendUtcTicks);
+            if (t == 0) return false;
+            return (DateTime.UtcNow - new DateTime(t, DateTimeKind.Utc)) <= LivePathActiveWindow;
+        }
+
+        /// <summary>
+        /// Invalidate the live cache on every registered LED driver instance. Forces the
+        /// next Display() frame to re-send instead of dedup'ing against a now-stale
+        /// <c>_last*</c>. Called by every code path that writes to the same wheel wire
+        /// registers as the live pipeline (static settings push, UI swatch handlers,
+        /// profile apply).
+        /// </summary>
+        internal static void InvalidateLiveCacheAny(LedKind kind)
+        {
+            lock (s_instancesLock)
+            {
+                foreach (var inst in s_instances)
+                    inst.InvalidateLiveCache(kind);
+            }
+        }
+
+        private void RegisterInstance()
+        {
+            lock (s_instancesLock)
+            {
+                if (!s_instances.Contains(this)) s_instances.Add(this);
+            }
+        }
+
+        private void UnregisterInstance()
+        {
+            lock (s_instancesLock)
+            {
+                s_instances.Remove(this);
+            }
+        }
+
+        private void NoteLiveSend()
+        {
+            Interlocked.Exchange(ref s_lastLiveSendUtcTicks, DateTime.UtcNow.Ticks);
+        }
+
+        public MozaLedDeviceManager()
+        {
+            RegisterInstance();
+        }
+
         private Color[]? _lastLeds;
         private Color[]? _lastButtons;
         private readonly Color[] _lastFlagColors = new Color[MozaDeviceConstants.FlagLedCount];
@@ -146,7 +248,40 @@ namespace MozaPlugin.Devices
 
         public object GetDriverInstance() => this;
 
-        public void Close() { }
+        public void Close() { UnregisterInstance(); }
+
+        /// <summary>
+        /// Drop the cached "last-sent" state for one or more LED groups so the next
+        /// <see cref="Display"/> frame re-sends instead of being deduplicated against
+        /// the cache. Callers: anything that writes to the wheel's LED registers
+        /// outside the live pipeline (HardwareApplier.WriteKnobColors / WriteKnobRingColors
+        /// / WriteColorArray for LED commands, UI swatch handlers that fire
+        /// WriteColorIfWheelDetected). Without this, after a static write blanks the
+        /// wheel back to stock colours, the live pipeline waits up to a keepalive
+        /// interval before re-asserting (which the user sees as a flicker).
+        /// </summary>
+        internal void InvalidateLiveCache(LedKind kind)
+        {
+            if ((kind & LedKind.Rpm) != 0)
+            {
+                _lastLeds = null;
+                _lastRpmBitmask = -1;
+            }
+            if ((kind & LedKind.Button) != 0)
+            {
+                _lastButtons = null;
+                _lastButtonBitmask = -1;
+            }
+            if ((kind & LedKind.Knob) != 0)
+            {
+                _lastKnobs = null;
+                _lastKnobBitmask = -1;
+            }
+            if ((kind & LedKind.Flag) != 0)
+            {
+                _lastFlagColorsPrimed = false;
+            }
+        }
 
         public void ResetDetection() { }
 
@@ -351,13 +486,19 @@ namespace MozaPlugin.Devices
                     {
                         var overridden = (Color[])buttonColors.Clone();
                         int lim = Math.Min(overridden.Length, Math.Min(defaultFlags.Length, staticColors.Length));
-                        for (int i = 0; i < lim; i++)
+                        // B4: read every static-colour triplet under the colour lock —
+                        // UI handlers may be writing concurrently and a torn read
+                        // would push a 1-frame wrong-colour to the wheel.
+                        lock (plugin.Data.LedColorLock)
                         {
-                            if (!defaultFlags[i]) continue;
-                            var c = overridden[i];
-                            if (c.R != 0 || c.G != 0 || c.B != 0) continue;
-                            var sc = staticColors[i];
-                            overridden[i] = Color.FromArgb(sc[0], sc[1], sc[2]);
+                            for (int i = 0; i < lim; i++)
+                            {
+                                if (!defaultFlags[i]) continue;
+                                var c = overridden[i];
+                                if (c.R != 0 || c.G != 0 || c.B != 0) continue;
+                                var sc = staticColors[i];
+                                overridden[i] = Color.FromArgb(sc[0], sc[1], sc[2]);
+                            }
                         }
                         buttonColors = overridden;
                     }
@@ -427,9 +568,13 @@ namespace MozaPlugin.Devices
                             knobBitmask |= (1 << i);
                     }
 
-                    // Stamp activity whenever SimHub is actively driving knobs. Used
-                    // by the keepalive below to pause once SimHub goes idle so the
-                    // wheel can show its stored static primary/background colors.
+                    // **B2**: drop `_lastKnobActivityTime` as the keepalive gate (see the
+                    // keepalive block below) — the gate now uses _lastSendTime so any LED
+                    // activity (RPM/buttons/knobs) keeps the knob keepalive armed. This
+                    // avoids the case where a momentary all-black knob frame during
+                    // pause/transition stales the gate and lets the wheel revert to
+                    // stored static colours mid-game. _lastKnobActivityTime is kept as a
+                    // diagnostic field but no longer load-bearing.
                     if (knobBitmask != 0)
                         _lastKnobActivityTime = DateTime.UtcNow;
 
@@ -499,6 +644,9 @@ namespace MozaPlugin.Devices
                 if (anySent)
                 {
                     _lastSendTime = DateTime.UtcNow;
+                    // Mark the live-path active for the cross-instance gate that
+                    // suppresses static writes (HardwareApplier, UI handlers).
+                    NoteLiveSend();
                 }
                 else if (_lastLeds != null)
                 {
@@ -507,6 +655,11 @@ namespace MozaPlugin.Devices
                     {
                         _lastSendTime = now;
                         ResendLastState(plugin, isNewWheel, isOldWheel);
+                        // Keepalive is also a live send for the gate's purposes — the
+                        // wheel's render path can't distinguish change-driven from
+                        // keepalive frames, and a static write between them would
+                        // visibly flicker just as much.
+                        NoteLiveSend();
                     }
                 }
 
@@ -517,17 +670,16 @@ namespace MozaPlugin.Devices
                 // frame on its own cadence so the knob LED controller doesn't
                 // forget the state.
                 //
-                // Gated on KnobIdleTimeoutSeconds since the last non-black knob
-                // frame from SimHub: while telemetry is flowing the wheel needs
-                // the periodic refresh, but once SimHub goes idle the wheel
-                // must be allowed to revert to its stored static primary /
-                // background colors (otherwise the user-configured "active"
-                // colour set via wheel-knob{N}-active-color is invisible).
-                // Resumes automatically the next frame SimHub drives a knob.
+                // **B2**: keepalive is now gated on `_lastSendTime` (any LED activity
+                // within KnobIdleTimeoutSeconds) instead of `_lastKnobActivityTime`
+                // (last non-black knob frame only). The old gate stopped firing if
+                // SimHub sent a few all-black knob frames during a pause/transition,
+                // even though RPM/buttons were still flowing — the wheel would then
+                // revert to stored static knob colours, which the user sees as flicker.
                 if (isNewWheel && _lastKnobs != null && modelInfo?.KnobCount > 0)
                 {
                     var now = DateTime.UtcNow;
-                    bool dataFlowing = (now - _lastKnobActivityTime).TotalSeconds <= KnobIdleTimeoutSeconds;
+                    bool dataFlowing = (now - _lastSendTime).TotalSeconds <= KnobIdleTimeoutSeconds;
                     if (dataFlowing && (now - _lastKnobSendTime).TotalSeconds >= KeepaliveIntervalSeconds)
                     {
                         _lastKnobSendTime = now;
@@ -539,6 +691,7 @@ namespace MozaPlugin.Devices
                             plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
                                 BuildKnobBitmaskBytes(_lastKnobBitmask, windowMask));
                         }
+                        NoteLiveSend();
                     }
                 }
             }
@@ -700,9 +853,27 @@ namespace MozaPlugin.Devices
 
         // Merge physical-layer Individual-LED overrides onto a logical-channel array.
         // A raw slot with Alpha != 0 replaces the corresponding dst slot.
+        //
         // rawColors.Length is SimHub's max-end-position across Individual-LED
         // entries, not the declared physical LED count — clip to the available
         // window so short rawColors still apply overrides to the slots it covers.
+        //
+        // **Critical invariant for the bitmask + chunk encoder downstream:** the
+        // returned array MUST have at least `length` slots, and EVERY slot in
+        // [0, length) must be initialised to a deterministic value (the SimHub
+        // logical-channel value from `dst` if present, otherwise Color.Black). The
+        // bitmask loop in Display() iterates `i < count = Min(buttons.Length, ButtonLedCount)`,
+        // so a tail slot left as default Color.Empty looks like "off" (R=G=B=0) on the
+        // wire but came from uninitialised memory. The chunk encoder writes [idx, 0, 0, 0]
+        // for those slots, which is correct *if* the user actually wanted them off —
+        // but if their Individual-LED effect covers a window shorter than the physical
+        // count (very common when an effect was authored for a lower-button-count wheel
+        // like CS Pro and then loaded on KS Pro), they expected those tail slots to
+        // either retain the prior frame's colours or render the effect's "off" output.
+        // The current implementation silently drops them; we make the off explicit so
+        // (a) the bitmask is deterministic and (b) the chunk encoder always writes a
+        // full physical-count frame, never a truncated one that leaves stale LED state
+        // on the wheel.
         internal static Color[] ApplyOverrides(Color[] dst, Color[] rawColors, int offset, int length)
         {
             if (length <= 0 || offset >= rawColors.Length) return dst;
@@ -713,11 +884,26 @@ namespace MozaPlugin.Devices
             {
                 if (rawColors[offset + i].A != 0) { anyOverride = true; break; }
             }
+            // Honour "nothing is driving this channel right now" — don't manufacture an
+            // empty frame and wake the wheel into thinking telemetry started.
             if (!anyOverride) return dst;
 
             int outLen = Math.Max(dst.Length, length);
             var merged = new Color[outLen];
             Array.Copy(dst, merged, Math.Min(dst.Length, outLen));
+            // **A1 fix**: fill the tail slots [dst.Length, length) with explicit black.
+            // In exclusive mode dst is Color[0], so without this step the bitmask loop
+            // in Display() sees default Color.Empty (alpha=0, R=G=B=0) for every slot
+            // past `available` — same wire output (off) but produced from uninitialised
+            // memory rather than a deliberate choice. The chunk encoder iterates `count
+            // = Min(colors.Length, ButtonLedCount)`, so a short return here makes the
+            // wheel never receive entries for the tail LEDs; if a previous frame had
+            // lit them, the wheel retains that stale state until something drives them
+            // explicitly. Color.Black writes [idx, 0, 0, 0] in the chunk (same as
+            // Color.Empty would) but clears any prior live state in the wheel's frame
+            // buffer.
+            for (int i = dst.Length; i < length; i++)
+                merged[i] = Color.Black;
             for (int i = 0; i < available; i++)
             {
                 var r = rawColors[offset + i];

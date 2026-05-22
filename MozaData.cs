@@ -179,6 +179,34 @@ namespace MozaPlugin
         public volatile bool WheelDualStickSupported;
         public volatile int WheelRpmDisplayMode;
 
+        // Single lock guarding all wheel/dash LED colour byte[][] arrays for
+        // multi-byte RGB read/write atomicity. The arrays themselves are readonly
+        // refs (`byte[][]`), so the lock only needs to cover the sequence of byte
+        // accesses inside one [i] slot. Display() reads `sc[0]; sc[1]; sc[2]` for
+        // the WheelButtonDefaultDuringTelemetry override on the SimHub effect
+        // thread; UI handlers write `arr[i][0]=r; arr[i][1]=g; arr[i][2]=b;` on
+        // the WPF dispatcher. Without this lock a click during active telemetry
+        // can produce a single torn-RGB frame on the wheel (one byte from the new
+        // colour, two from the old). The window is small but real; the lock is
+        // free in the no-contention case (UI clicks are infrequent vs the 60 Hz
+        // Display tick).
+        public readonly object LedColorLock = new object();
+
+        /// <summary>
+        /// Atomic 3-byte RGB write into <paramref name="dst"/> under <see cref="LedColorLock"/>.
+        /// Use from UI handlers in place of three separate <c>dst[0]=…; dst[1]=…; dst[2]=…</c>
+        /// assignments.
+        /// </summary>
+        public void WriteLedColor(byte[] dst, byte r, byte g, byte b)
+        {
+            lock (LedColorLock)
+            {
+                dst[0] = r;
+                dst[1] = g;
+                dst[2] = b;
+            }
+        }
+
         // Wheel RPM colors (10 LEDs, [R, G, B] each)
         public readonly byte[][] WheelRpmColors = InitWheelRpmColorArray();
         public readonly byte[][] WheelRpmBlinkColors = InitRpmColorArray();
@@ -508,6 +536,19 @@ namespace MozaPlugin
         {
             if (data == null) return;
 
+            // **A5 gate**: drop wheel-LED colour responses while live telemetry is
+            // actively flowing. Even though writes are no longer gated (cmd 0x27 / cmd
+            // 0x1F land on the wheel as the user clicks), a read response that was
+            // already in flight before the write landed will carry the wheel's pre-
+            // write EEPROM value. If that response then writes into `_data`, the
+            // user's pick is silently clobbered in the in-memory mirror until the
+            // next read returns the post-write value. The race is small but real
+            // (interval between read send and read response, vs UI write landing).
+            // Disk + overlay still hold the user's pick correctly; the gate is
+            // only protecting the live `_data` mirror used by UI swatches.
+            if (Devices.MozaLedDeviceManager.IsLiveAnywhere() && IsWheelLedColorCommand(commandName))
+                return;
+
             // Color commands need at least 3 bytes (R, G, B)
             // Wheel RPM colors
             if (commandName.StartsWith("wheel-rpm-color") && !commandName.Contains("blink"))
@@ -744,11 +785,37 @@ namespace MozaPlugin
             return -1;
         }
 
-        private static void SetColor(byte[] target, byte[] source)
+        // Lock around the 3-byte copy so Display() / PackColors callers never
+        // observe a torn RGB. Source for wheel-response paths is the parser-
+        // allocated array, so it's safe to read outside the lock.
+        private void SetColor(byte[] target, byte[] source)
         {
-            target[0] = source[0];
-            target[1] = source[1];
-            target[2] = source[2];
+            lock (LedColorLock)
+            {
+                target[0] = source[0];
+                target[1] = source[1];
+                target[2] = source[2];
+            }
+        }
+
+        // A5: identifies wheel-side LED colour commands whose UpdateFromArray
+        // responses should be suppressed while live telemetry is active. Dash
+        // (`dash-rpm-color*` / `dash-flag-color*`) and base-ambient colours are
+        // *not* included — they don't conflict with the wheel's live pipeline.
+        // ES wheel (`wheel-old-*`) excluded — old-protocol wheel has no live
+        // colour pipeline that could race.
+        private static bool IsWheelLedColorCommand(string commandName)
+        {
+            // wheel-rpm-color{N} (but not wheel-rpm-blink-color)
+            if (commandName.StartsWith("wheel-rpm-color") && !commandName.Contains("blink"))
+                return true;
+            if (commandName.StartsWith("wheel-button-color")) return true;
+            if (commandName.StartsWith("wheel-flag-color")) return true;
+            if (commandName.StartsWith("wheel-knob-bg-color")) return true;
+            // wheel-knob{N}-active-color
+            if (commandName.StartsWith("wheel-knob") && commandName.EndsWith("-active-color"))
+                return true;
+            return false;
         }
     }
 }

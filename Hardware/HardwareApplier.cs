@@ -191,6 +191,11 @@ namespace MozaPlugin.Hardware
                     var rgb = MozaProfile.UnpackColor(idleColor[0]);
                     _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
                 }
+                // Invalidate the live cache after each Apply pass so the next live tick
+                // re-sends instead of dedup'ing against a frame whose underlying wheel
+                // state we just rewrote with the persisted static colours.
+                MozaLedDeviceManager.InvalidateLiveCacheAny(
+                    LedKind.Rpm | LedKind.Button | LedKind.Flag);
                 WriteKnobColors(knobBgColors, knobPrimaryColors);
                 WriteKnobRingColors(knobRingColors, knobRingBri);
 
@@ -572,6 +577,24 @@ namespace MozaPlugin.Hardware
             if (_detectionState.NewWheelDetected || _detectionState.OldWheelDetected)
                 _deviceManager.WriteColor(command, r, g, b);
         }
+
+        /// <summary>
+        /// Wheel LED colour write from UI handlers that also invalidates the live
+        /// cache for <paramref name="kind"/>. Writing during live telemetry is safe
+        /// per user confirmation (the next live frame overpaints the static value);
+        /// the cache invalidation just ensures the live pipeline can't dedup its
+        /// next frame against a stale cache after our write changed the wheel's
+        /// frame buffer. Use this from UI handlers for every wheel-LED colour
+        /// command (knob active, knob bg, RPM, button, flag); use the plain
+        /// <see cref="WriteColorIfWheelDetected"/> for non-LED commands (idle/sleep
+        /// colour, ambient colour, etc.).
+        /// </summary>
+        public void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, LedKind kind)
+        {
+            if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
+            _deviceManager.WriteColor(command, r, g, b);
+            MozaLedDeviceManager.InvalidateLiveCacheAny(kind);
+        }
         public void WriteColorIfDashDetected(string command, byte r, byte g, byte b)
         {
             if (_detectionState.DashDetected) _deviceManager.WriteColor(command, r, g, b);
@@ -659,6 +682,13 @@ namespace MozaPlugin.Hardware
         /// unless the active wheel exposes knob LED rings (W17 CS Pro / W18 KS Pro).
         /// Bulk Inactive fans out to all ring LEDs via per-LED writes (cmd 0x1F 0x03 0x01);
         /// Active drives cmd 0x27 ROLE=0.
+        ///
+        /// Writes are unconditional with respect to live telemetry — per user
+        /// confirmation, cmd 0x27 / cmd 0x1F 0x03 0x01 during live frames does not
+        /// visibly flicker the live overlay (the next live frame overpaints). After
+        /// every successful write batch we invalidate the live cache so the next live
+        /// tick re-sends instead of dedup'ing against a frame whose underlying wheel
+        /// state we just rewrote.
         /// </summary>
         public void WriteKnobColors(int[]? packedBulkInactive, int[]? packedActive)
         {
@@ -695,6 +725,7 @@ namespace MozaPlugin.Hardware
                     }
                 }
             }
+            MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);
         }
 
         /// <summary>
@@ -715,6 +746,7 @@ namespace MozaPlugin.Hardware
                 var rgb = MozaProfile.UnpackColor(packedColors[i]);
                 _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
             }
+            MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);
         }
 
         public static void UnpackPackedColor(int packed, byte[] dst)
