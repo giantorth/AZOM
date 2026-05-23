@@ -3897,14 +3897,24 @@ namespace MozaPlugin.Telemetry
             }
             else
             {
-                // grp 0x3F dev 0x17 display variants
+                // grp 0x3F dev 0x17 display variants. Slots 2 (buttons-bitmask)
+                // and 3 (knob-bitmask) skipped while LED telemetry is actively
+                // pumping: PitHouse-derived bridge captures only ever emit these
+                // with active=0/window=0 (286/286 in bridge-20260517-081336.jsonl),
+                // because PitHouse drives no dynamic knob telemetry. Our plugin
+                // does, and writing active=0/window=0 on top of an active
+                // telemetry session briefly drops the firmware out of "telemetry
+                // owns the LEDs" → it reverts to stored EEPROM defaults until the
+                // next non-zero frame arrives (~1 frame later), which the user
+                // sees as a default-colour flash every ~87 s.
                 int s = slot - 74;
+                bool liveActive = Devices.MozaLedDeviceManager.IsLiveAnywhere();
                 frame = s switch
                 {
                     0 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x19, 0x01, 0x00 }),
                     1 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x19, 0x03, 0x00 }),
-                    2 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
-                    3 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
+                    2 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
+                    3 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
                     4 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1F, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00 }),
                     5 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x21, 0x00, 0x00 }),
                     _ => null,
