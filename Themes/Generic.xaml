@@ -250,9 +250,14 @@
                                        HorizontalAlignment="Center"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
-                        <!-- position dot at end of active arc -->
+                        <!-- Position dot at end of active arc. Recompute() emits
+                             DotX/DotY as the dot's CENTER on the arc; Canvas.Left/Top
+                             anchor by top-left, so the negative margin (= -half the
+                             ellipse size) shifts the dot up-left so its center
+                             lands on the anchor. -->
                         <Canvas IsHitTestVisible="False">
                             <Ellipse Width="8" Height="8"
+                                     Margin="-4,-4,0,0"
                                      Fill="{StaticResource CyanBrush}"
                                      Effect="{StaticResource CyanGlowEffect}"
                                      Canvas.Left="{Binding DotX, RelativeSource={RelativeSource TemplatedParent}}"
