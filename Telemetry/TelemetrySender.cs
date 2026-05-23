@@ -465,16 +465,6 @@ namespace MozaPlugin.Telemetry
         // MgmtPort = first acked port (session 0x01, used for dashboard upload).
         // FlagByte = second acked port (session 0x02, used for tier definitions and fc:00 acks).
         private byte _mgmtPort;
-
-        // True when StartInner has already attempted a hard recovery (wide
-        // session close + port disconnect) in response to a wedge — the wheel
-        // not acking session-open frames within the 20s extended wait. Set on
-        // first attempt and reset on a successful session-open, so each wedge
-        // cycle gets ONE recovery before we fall through to "proceed with
-        // defaults". Persists across plugin reloads via the persistent-wire
-        // sender so a recovery triggered just before End() is remembered when
-        // the next Init reuses the sender.
-        private bool _hardRecoveryAttempted;
         public byte FlagByte { get; set; } = 0x02;
         public bool SendTelemetryMode { get; set; } = true;
         public bool SendSequenceCounter { get; set; } = true;
@@ -1049,7 +1039,13 @@ namespace MozaPlugin.Telemetry
             // Probe for available ports and open sessions. May run on a
             // background thread (dispatched by StartTelemetryIfReady) so the
             // serial read thread stays free to deliver fc:00 ack responses.
-            ProbeAndOpenSessions();
+            //
+            // Pass through isFirstStartInProcess so cold starts get the wide
+            // session close (0x01..0x0a) that flushes any stale wheel-side
+            // session state from a prior SimHub process. Game-switch reloads
+            // skip the wide close to preserve the configJson handshake on
+            // the persistent wire.
+            ProbeAndOpenSessions(isFirstStartInProcess);
             // Supersession gate: a new Start() arriving mid-probe cancels
             // our token. An external Stop() during the same window pushes
             // state to Idle — both signal "abandon this StartInner".
@@ -1717,17 +1713,31 @@ namespace MozaPlugin.Telemetry
         /// SendSessionOpen would be ignored. We close just enough to reclaim
         /// the host-managed slots.
         ///
-        /// Wheel-managed sessions (0x04..0x0a) are LEFT ALONE. Wheel device-
-        /// inits these to push state (0x05/0x07 file-transfer ack, 0x09 config-
-        /// Json state, 0x0a RPC). Closing them severs wheel-side state and
-        /// prevents the wheel from re-pushing configJson on session 0x09 —
-        /// without that handshake the dashboard never renders. Pithouse never
-        /// closes these sessions at startup either; verified in
+        /// Wheel-managed sessions (0x04..0x0a) are LEFT ALONE during a plugin
+        /// reload (game switch) — wheel device-inits these to push state
+        /// (0x05/0x07 file-transfer ack, 0x09 configJson state, 0x0a RPC).
+        /// Closing them severs wheel-side state and prevents the wheel from
+        /// re-pushing configJson on session 0x09 — without that handshake the
+        /// dashboard never renders. Pithouse never closes these sessions
+        /// mid-session either; verified in
         /// usb-capture/ksp/mozahubstartup.pcapng (no host close-burst, wheel
         /// device-inits 0x09 t=28.123 after host primes it with data on 0x09
         /// at t=2.345 / 6.346).
+        ///
+        /// On a COLD START (fresh SimHub process — see
+        /// <paramref name="isColdStart"/>), we DO close the full host-touchable
+        /// range 0x01..0x0a. The wheel may still be holding sessions open from
+        /// a prior SimHub instance that exited without a clean Stop(), and on
+        /// CS-Pro / KS-Pro that stale state silently swallows our session-open
+        /// frames until manual user intervention (toggling the plugin
+        /// "Connection enabled" off and on, which closes the port and forces
+        /// the wheel to reset). The wider close on cold start mimics that
+        /// recovery proactively. It re-pushes configJson on reconnect because
+        /// the wheel re-emits its state burst once we send a fresh open
+        /// request — the cold-start path always runs through that burst
+        /// anyway, so there's no handshake to disturb.
         /// </summary>
-        private void ProbeAndOpenSessions()
+        private void ProbeAndOpenSessions(bool isColdStart)
         {
             if (!_connection.IsConnected)
                 return;
@@ -1735,21 +1745,34 @@ namespace MozaPlugin.Telemetry
             const byte MgmtSession = 0x01;
             const byte TelemSession = 0x02;
             const int OpenAckTimeoutMs = 500;
-
-            // Reclaim any HOST-managed sessions left open by a prior SimHub
-            // crash/kill. Don't touch 0x04..0x10 — those are wheel-managed.
-            // TryCloseSession waits for the fc:00 ack: when the wheel acks,
-            // the close has definitively been processed and we can re-open
-            // against a clean state immediately. When it times out (silent
-            // wheel — bundle CS-Pro-1stLaunchAfterDll-20260518 saw 17s of
-            // wheel silence on connect), we proceed regardless and the
-            // sess=0x02 engagement watchdog recovers post-Active. The
-            // fixed Thread.Sleep(100) the old code used was strictly
-            // worse: wasted time on healthy wheels, not enough for slow
-            // ones, and no confirmation either way.
-            MozaLog.Debug("[Moza] Closing any stale host sessions (0x01..0x03)...");
             const int CloseAckTimeoutMs = 500;
-            for (byte port = 1; port <= 0x03; port++)
+
+            // Reclaim any sessions left open by a prior SimHub crash/kill.
+            // - Cold start in a fresh SimHub process: close 0x01..0x0A (wide).
+            //   The wide range covers host-managed slots PLUS wheel-managed
+            //   ones (0x04..0x0a) that the prior process may have left
+            //   half-engaged. CS-Pro / KS-Pro have been observed to silently
+            //   ignore fresh opens with that residual state in place; manually
+            //   toggling the plugin off/on recovers it because that path
+            //   closes the OS serial port and forces the wheel to drop its
+            //   sessions. The wide close emulates that recovery without
+            //   needing user intervention.
+            // - Plugin reload mid-SimHub (game switch via persistent wire):
+            //   close 0x01..0x03 only. Wheel-managed 0x04..0x0a are kept
+            //   intact so the configJson handshake (sess=0x09) stays bound —
+            //   if we closed it the wheel would need to re-emit its full
+            //   configJson burst and the dashboard would re-render. Verified
+            //   safe behaviour matches PitHouse's reload pattern.
+            //
+            // TryCloseSession waits up to 500ms for the fc:00 ack: when the
+            // wheel acks, the close has definitively been processed and we
+            // can re-open against a clean state immediately. Silent closes
+            // are accepted and we proceed regardless.
+            byte lastClosePort = isColdStart ? (byte)0x0A : (byte)0x03;
+            MozaLog.Debug(
+                $"[Moza] Closing any stale {(isColdStart ? "cold-start" : "host")} sessions " +
+                $"(0x01..0x{lastClosePort:X2}{(isColdStart ? " — wide" : "")})...");
+            for (byte port = 1; port <= lastClosePort; port++)
             {
                 if (!_connection.IsConnected) return;
                 bool acked = TryCloseSession(port, CloseAckTimeoutMs);
@@ -1802,68 +1825,14 @@ namespace MozaPlugin.Telemetry
                     if (telemetryPort == 0 && _connection.IsConnected)
                         telemetryPort = TryOpenSession(TelemSession, 1_000);
                 }
-                else if (!_hardRecoveryAttempted)
-                {
-                    // Wheel is wedged: didn't ack either session-open within
-                    // 20.5 s. Observed reliably after a plugin DLL update +
-                    // SimHub restart — the wheel still holds session state
-                    // from the prior SimHub process and silently ignores both
-                    // close and re-open frames against the host's clean slate.
-                    // Manually toggling the plugin "Connection enabled"
-                    // checkbox off and on recovers it; SimHub restart alone
-                    // does not. The off/on toggle works because it explicitly
-                    // closes the serial port (USB CDC ACM detach), which kicks
-                    // the wheel's session machine into resetting before the
-                    // next connect.
-                    //
-                    // Mimic that recovery here:
-                    //   1. Send session closes across the full 0x01..0x0a range
-                    //      (host-managed 0x01..0x03 PLUS wheel-managed
-                    //      0x04..0x0a). The wheel-managed closes are normally
-                    //      avoided because they break the configJson handshake
-                    //      — but in a wedge state nothing is flowing anyway, so
-                    //      this is the nuclear-reset option.
-                    //   2. Brief delay so the closes drain to the wire before
-                    //      we close the port.
-                    //   3. Disconnect the serial port; the plugin's reconnect
-                    //      timer (5 s cadence) re-opens it and the wheel-
-                    //      detection flow re-enters StartInner with a fresh
-                    //      handshake.
-                    //
-                    // _hardRecoveryAttempted gates against an infinite loop:
-                    // if the second StartInner also wedges, we fall through to
-                    // "proceed with defaults" instead of disconnecting again.
-                    _hardRecoveryAttempted = true;
-                    MozaLog.Warn(
-                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait — wheel " +
-                        "appears wedged. Sending wide session close (0x01..0x0a) and " +
-                        "force-disconnecting the serial port to recover.");
-                    try
-                    {
-                        for (byte port = 0x01; port <= 0x0A; port++)
-                        {
-                            if (!_connection.IsConnected) break;
-                            try { SendSessionClose(port); } catch { }
-                        }
-                        try { System.Threading.Thread.Sleep(150); } catch { }
-                        _connection.Disconnect();
-                    }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn($"[Moza] Hard recovery hit an exception: {ex.GetType().Name}: {ex.Message}");
-                    }
-                    // Abort the current cold-start. The reconnect path will
-                    // reach StartInner again with a fresh port; if that succeeds
-                    // we reset _hardRecoveryAttempted (see the "Sessions opened"
-                    // log site below), so the NEXT wedge can recover too.
-                    return;
-                }
                 else
                 {
                     MozaLog.Warn(
-                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait, " +
-                        "and hard recovery has already been attempted this lifetime — " +
-                        "proceeding with defaults; session watchdog will retry post-Active");
+                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait — " +
+                        "proceeding with defaults; session watchdog will retry post-Active. " +
+                        "If this recurs after a SimHub restart, the cold-start wide close " +
+                        "(0x01..0x0a above) should already have cleared any stale wheel " +
+                        "session state — escalate via wire trace if the wedge persists.");
                 }
             }
 
@@ -1882,17 +1851,12 @@ namespace MozaPlugin.Telemetry
                 FlagByte = telemetryPort;
                 MozaLog.Debug(
                     $"[Moza] Sessions opened: mgmt=0x{mgmtPort:X2} telem=0x{telemetryPort:X2}");
-                // Clean session open — re-arm hard recovery for future wedges.
-                _hardRecoveryAttempted = false;
             }
             else if (mgmtPort != 0)
             {
                 FlagByte = mgmtPort;
                 MozaLog.Warn(
                     $"[Moza] Telem session 0x{TelemSession:X2} did not ack, using mgmt 0x{mgmtPort:X2} for telemetry");
-                // Mgmt opened cleanly even if telem didn't — still considered
-                // recovered enough to re-arm.
-                _hardRecoveryAttempted = false;
             }
             else
             {
