@@ -3831,7 +3831,10 @@ namespace MozaPlugin.Telemetry
             //   44..57  = 14 grp 0x40 dev 0x17 1f01 scan
             //   58..69  = 12 grp 0x0E dev 0x12/13/17/19 discovery probes
             //   70..73  = 4 grp 0x1F dev 0x12 4f08-4f0b LED state reads
-            //   74..79  = 6 grp 0x3F dev 0x17 1901/1903/1a01/1a03/1f00/2100 display variants
+            //   74..79  = 2 grp 0x3F dev 0x17 1a01/1a03 display variants (slots
+            //             76/77; 74/75/78/79 deleted — see block below for why).
+            //             The 80-slot total is kept so other slots keep their
+            //             modulo offsets stable.
             const int totalCycle = 80;
             int slot = idx % totalCycle;
 
@@ -3897,26 +3900,39 @@ namespace MozaPlugin.Telemetry
             }
             else
             {
-                // grp 0x3F dev 0x17 display variants. Slots 2 (buttons-bitmask)
-                // and 3 (knob-bitmask) skipped while LED telemetry is actively
-                // pumping: PitHouse-derived bridge captures only ever emit these
-                // with active=0/window=0 (286/286 in bridge-20260517-081336.jsonl),
-                // because PitHouse drives no dynamic knob telemetry. Our plugin
-                // does, and writing active=0/window=0 on top of an active
-                // telemetry session briefly drops the firmware out of "telemetry
-                // owns the LEDs" → it reverts to stored EEPROM defaults until the
-                // next non-zero frame arrives (~1 frame later), which the user
-                // sees as a default-colour flash every ~87 s.
+                // grp 0x3F dev 0x17 display variants. Only slots 2 (buttons-
+                // bitmask) and 3 (knob-bitmask) survive, both gated on
+                // IsLiveAnywhere() — PitHouse-derived bridge captures only
+                // emit these with active=0/window=0 (286/286 in
+                // bridge-20260517-081336.jsonl) because PitHouse drives no
+                // dynamic knob telemetry. Our plugin does; writing those bytes
+                // on top of an active session briefly drops the firmware out
+                // of "telemetry owns the LEDs" → revert to EEPROM defaults
+                // until the next non-zero frame, which the user sees as a
+                // ~87 s default-colour flash.
+                //
+                // Slots 0/1/4/5 were here too at one point but a sweep across
+                // 55 bridge captures showed PitHouse never emits the exact
+                // bytes the plugin was sending: slot 0 (19 01 00) / slot 1
+                // (19 03 00) are mis-sized button/knob colour-chunk writes
+                // that the firmware would interpret as "set LED 0 to black"
+                // per the colour-commands padding rule. Slot 4
+                // (1F 00 FF 00 00 00 00) writes to an idx=0xFF padding slot
+                // and PitHouse never sends it. Slot 5 (21 00 00,
+                // wheel-idle-timeout=0) IS something PitHouse sends, but
+                // sporadically on user setting change, not periodically —
+                // emitting it every ~87 s silently overrides whatever
+                // idle-timeout the user set in the plugin UI. The legitimate
+                // path (UI / saved-settings apply) writes wheel-idle-timeout
+                // with the user's chosen value via
+                // MozaWheelSettingsControl.cs:1180 and HardwareApplier.cs:181;
+                // the widget-poll slot has no business reasserting 0 on top.
                 int s = slot - 74;
                 bool liveActive = Devices.MozaLedDeviceManager.IsLiveAnywhere();
                 frame = s switch
                 {
-                    0 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x19, 0x01, 0x00 }),
-                    1 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x19, 0x03, 0x00 }),
                     2 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
                     3 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
-                    4 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1F, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00 }),
-                    5 => BuildGenericFrame(0x3F, 0x17, new byte[] { 0x21, 0x00, 0x00 }),
                     _ => null,
                 };
             }
