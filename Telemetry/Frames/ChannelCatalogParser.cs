@@ -486,12 +486,44 @@ namespace MozaPlugin.Telemetry.Frames
                 // switch's set, so post-switch live catalogs aren't
                 // polluted by stale prior-dash back-refs that landed in
                 // _pendingIdxs in the same parse pass.
-                void CommitLiveSet()
+                // Commit live set for the just-walked END marker.
+                // `markerValue` is the u32 value of THIS END marker (taken
+                // from buffer[i+5..i+8] at the parse loop's current position),
+                // not _lastWheelEndMarker — which holds the LATEST end marker
+                // value in the buffer set by the pre-parse wire scan and is
+                // wrong for any non-final END in a multi-END buffer.
+                //
+                // Within a generation, the FIRST commit (markerValue differs
+                // from _committedEndMarker) defines that dashboard's channel
+                // set. Subsequent commits at the SAME markerValue are protocol
+                // re-affirmation bursts (back-refs the wheel emits to keep the
+                // full historical catalog mapping alive across dashboards) —
+                // they MUST NOT extend the live set or stale prior-dashboard
+                // idxs creep into the current dashboard's synth. Discarding
+                // them also implicitly preserves the FIRST commit's idxs
+                // against later subset bursts (e.g. wheel emitting {1,2,3}
+                // after first committing {1..9} would otherwise blank channels
+                // 4..9 — the dropped-Gear case).
+                void CommitLiveSet(uint markerValue)
                 {
                     if (_pendingIdxs.Count == 0) return;
-                    // Dedup: skip re-commit when the parse loop re-walks the
-                    // same buffer and produces the same pending set.
-                    if (_lastCommittedIdxs != null && _lastCommittedIdxs.SetEquals(_pendingIdxs))
+
+                    bool sameGeneration =
+                        _lastCommittedIdxs != null
+                        && markerValue == _committedEndMarker;
+                    if (sameGeneration)
+                    {
+                        // Re-affirmation burst within this generation —
+                        // ignore. The first commit at this markerValue is
+                        // authoritative for the current dashboard.
+                        _pendingIdxs.Clear();
+                        return;
+                    }
+
+                    var targetIdxs = new HashSet<int>(_pendingIdxs);
+
+                    // Dedup: skip re-commit when set matches the last one.
+                    if (_lastCommittedIdxs != null && _lastCommittedIdxs.SetEquals(targetIdxs))
                     {
                         _pendingIdxs.Clear();
                         return;
@@ -500,14 +532,14 @@ namespace MozaPlugin.Telemetry.Frames
                     // resolves from parsed (latest in this pass) first,
                     // falling back to _catalog (prior generations).
                     int maxIdx = 0;
-                    foreach (var ix in _pendingIdxs) if (ix > maxIdx) maxIdx = ix;
+                    foreach (var ix in targetIdxs) if (ix > maxIdx) maxIdx = ix;
                     int catCount = _catalog?.Count ?? 0;
                     int size = Math.Max(maxIdx, catCount);
                     var masked = new List<string>(size);
                     for (int k = 0; k < size; k++)
                     {
                         int oneIdx = k + 1;
-                        if (_pendingIdxs.Contains(oneIdx))
+                        if (targetIdxs.Contains(oneIdx))
                         {
                             if (parsed.TryGetValue(oneIdx, out var pu))
                                 masked.Add(pu);
@@ -523,10 +555,10 @@ namespace MozaPlugin.Telemetry.Frames
                     }
                     _liveCatalog = masked;
                     MozaLog.Debug(
-                        $"[Moza] Live catalog committed: end={_committedEndMarker}→{_lastWheelEndMarker} " +
-                        $"liveIdxs={{{string.Join(",", _pendingIdxs.OrderBy(x => x))}}}");
-                    _committedEndMarker = _lastWheelEndMarker;
-                    _lastCommittedIdxs = new HashSet<int>(_pendingIdxs);
+                        $"[Moza] Live catalog committed: end={_committedEndMarker}→{markerValue} " +
+                        $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}}");
+                    _committedEndMarker = markerValue;
+                    _lastCommittedIdxs = targetIdxs;
                     _pendingIdxs.Clear();
                 }
 
@@ -542,7 +574,11 @@ namespace MozaPlugin.Telemetry.Frames
                         if (buffer[i + 1] == 0x04 && buffer[i + 2] == 0
                             && buffer[i + 3] == 0 && buffer[i + 4] == 0)
                         {
-                            CommitLiveSet();
+                            uint markerValue = (uint)(buffer[i + 5]
+                                | (buffer[i + 6] << 8)
+                                | (buffer[i + 7] << 16)
+                                | (buffer[i + 8] << 24));
+                            CommitLiveSet(markerValue);
                             i += 9;
                             continue;
                         }
@@ -591,6 +627,19 @@ namespace MozaPlugin.Telemetry.Frames
                         continue;
                     }
 
+                    // Accepted URL prefixes on the wire:
+                    //   "v1/"            literal (no abbreviation)
+                    //   0x01             abbreviation for "v1/gameData/"
+                    //   0x5C 0x31  "\1"  abbreviation for "v1/gameData/"
+                    //   0x5C 0x70  "\p"  abbreviation for "v1/gameData/patch/"
+                    // The `\p` form was missing — channels like
+                    // `patch/TrackPositionPercent` were emitted by the wheel
+                    // as `\pTrackPositionPercent` and rejected here, never
+                    // entered _pendingIdxs, and got blanked out of LiveCatalog
+                    // on the dashboard-switch commit (the slot was visible to
+                    // the wheel but invisible to host synth → channel missing
+                    // from the channel-mapping grid and from the live tier-
+                    // def we sub back).
                     bool plausible = urlLen >= 3
                         && ((buffer[urlStart] == (byte)'v'
                              && buffer[urlStart + 1] == (byte)'1'
@@ -598,7 +647,8 @@ namespace MozaPlugin.Telemetry.Frames
                             || buffer[urlStart] == 0x01
                             || (buffer[urlStart] == 0x5C
                                 && urlLen >= 4
-                                && buffer[urlStart + 1] == 0x31));
+                                && (buffer[urlStart + 1] == 0x31
+                                    || buffer[urlStart + 1] == 0x70)));
                     if (!plausible) { sPlausReject++; i++; continue; }
 
                     // Stricter check: validate every byte of the URL body is in
@@ -618,7 +668,9 @@ namespace MozaPlugin.Telemetry.Frames
                     {
                         scanStart = urlStart + 1; scanLen = urlLen - 1;
                     }
-                    else if (buffer[urlStart] == 0x5C && buffer[urlStart + 1] == 0x31)
+                    else if (buffer[urlStart] == 0x5C
+                             && (buffer[urlStart + 1] == 0x31
+                                 || buffer[urlStart + 1] == 0x70))
                     {
                         scanStart = urlStart + 2; scanLen = urlLen - 2;
                     }
@@ -650,6 +702,17 @@ namespace MozaPlugin.Telemetry.Frames
                             .Replace("{RL}", "RearLeft")
                             .Replace("{RR}", "RearRight");
                         url = "v1/gameData/" + suffix;
+                        sAbbr++;
+                    }
+                    else if (buffer[urlStart] == 0x5C && buffer[urlStart + 1] == 0x70)
+                    {
+                        // \p (0x5C 0x70) abbreviation for "v1/gameData/patch/".
+                        // Observed for patch/TrackPositionPercent (track
+                        // completion %) and likely other patch/* channels that
+                        // Telemetry.json knows about — patch/TrackName,
+                        // patch/DisplayTrackName, patch/GameName, etc.
+                        url = "v1/gameData/patch/" + Encoding.ASCII.GetString(
+                            buffer, urlStart + 2, urlLen - 2);
                         sAbbr++;
                     }
                     else

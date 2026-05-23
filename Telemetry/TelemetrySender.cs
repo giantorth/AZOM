@@ -465,6 +465,16 @@ namespace MozaPlugin.Telemetry
         // MgmtPort = first acked port (session 0x01, used for dashboard upload).
         // FlagByte = second acked port (session 0x02, used for tier definitions and fc:00 acks).
         private byte _mgmtPort;
+
+        // True when StartInner has already attempted a hard recovery (wide
+        // session close + port disconnect) in response to a wedge — the wheel
+        // not acking session-open frames within the 20s extended wait. Set on
+        // first attempt and reset on a successful session-open, so each wedge
+        // cycle gets ONE recovery before we fall through to "proceed with
+        // defaults". Persists across plugin reloads via the persistent-wire
+        // sender so a recovery triggered just before End() is remembered when
+        // the next Init reuses the sender.
+        private bool _hardRecoveryAttempted;
         public byte FlagByte { get; set; } = 0x02;
         public bool SendTelemetryMode { get; set; } = true;
         public bool SendSequenceCounter { get; set; } = true;
@@ -1151,10 +1161,18 @@ namespace MozaPlugin.Telemetry
         /// 0x09 host-side; closing it would be a no-op or regression. The
         /// wheel's ~10–14s internal sess=0x09 timeout is the actual re-engage
         /// gate; <see cref="Lifecycle.SilenceGate.StopReopenSilenceMs"/> bridges it.
+        ///
+        /// Gated on <see cref="MozaPlugin.ShouldDriveDashboard"/>: on screenless
+        /// wheels Start() never ran, the host never opened any session, and the
+        /// closes would just emit three dashboard-session frames (group 0x43
+        /// dev=0x17 cmd `7C 00`) to a wheel that doesn't speak the session
+        /// layer. Captured as ~15 `7c 00` leak frames per long bundle (3 per
+        /// wheel-redetect cycle).
         /// </summary>
         private void CloseHostSessions()
         {
             if (!_connection.IsConnected) return;
+            if (MozaPlugin.Instance?.ShouldDriveDashboard() == false) return;
             try { SendSessionClose(0x01); } catch { }
             try { SendSessionClose(0x02); } catch { }
             try { SendSessionClose(0x03); } catch { }
@@ -1784,10 +1802,67 @@ namespace MozaPlugin.Telemetry
                     if (telemetryPort == 0 && _connection.IsConnected)
                         telemetryPort = TryOpenSession(TelemSession, 1_000);
                 }
+                else if (!_hardRecoveryAttempted)
+                {
+                    // Wheel is wedged: didn't ack either session-open within
+                    // 20.5 s. Observed reliably after a plugin DLL update +
+                    // SimHub restart — the wheel still holds session state
+                    // from the prior SimHub process and silently ignores both
+                    // close and re-open frames against the host's clean slate.
+                    // Manually toggling the plugin "Connection enabled"
+                    // checkbox off and on recovers it; SimHub restart alone
+                    // does not. The off/on toggle works because it explicitly
+                    // closes the serial port (USB CDC ACM detach), which kicks
+                    // the wheel's session machine into resetting before the
+                    // next connect.
+                    //
+                    // Mimic that recovery here:
+                    //   1. Send session closes across the full 0x01..0x0a range
+                    //      (host-managed 0x01..0x03 PLUS wheel-managed
+                    //      0x04..0x0a). The wheel-managed closes are normally
+                    //      avoided because they break the configJson handshake
+                    //      — but in a wedge state nothing is flowing anyway, so
+                    //      this is the nuclear-reset option.
+                    //   2. Brief delay so the closes drain to the wire before
+                    //      we close the port.
+                    //   3. Disconnect the serial port; the plugin's reconnect
+                    //      timer (5 s cadence) re-opens it and the wheel-
+                    //      detection flow re-enters StartInner with a fresh
+                    //      handshake.
+                    //
+                    // _hardRecoveryAttempted gates against an infinite loop:
+                    // if the second StartInner also wedges, we fall through to
+                    // "proceed with defaults" instead of disconnecting again.
+                    _hardRecoveryAttempted = true;
+                    MozaLog.Warn(
+                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait — wheel " +
+                        "appears wedged. Sending wide session close (0x01..0x0a) and " +
+                        "force-disconnecting the serial port to recover.");
+                    try
+                    {
+                        for (byte port = 0x01; port <= 0x0A; port++)
+                        {
+                            if (!_connection.IsConnected) break;
+                            try { SendSessionClose(port); } catch { }
+                        }
+                        try { System.Threading.Thread.Sleep(150); } catch { }
+                        _connection.Disconnect();
+                    }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Warn($"[Moza] Hard recovery hit an exception: {ex.GetType().Name}: {ex.Message}");
+                    }
+                    // Abort the current cold-start. The reconnect path will
+                    // reach StartInner again with a fresh port; if that succeeds
+                    // we reset _hardRecoveryAttempted (see the "Sessions opened"
+                    // log site below), so the NEXT wedge can recover too.
+                    return;
+                }
                 else
                 {
                     MozaLog.Warn(
-                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait — " +
+                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait, " +
+                        "and hard recovery has already been attempted this lifetime — " +
                         "proceeding with defaults; session watchdog will retry post-Active");
                 }
             }
@@ -1807,12 +1882,17 @@ namespace MozaPlugin.Telemetry
                 FlagByte = telemetryPort;
                 MozaLog.Debug(
                     $"[Moza] Sessions opened: mgmt=0x{mgmtPort:X2} telem=0x{telemetryPort:X2}");
+                // Clean session open — re-arm hard recovery for future wedges.
+                _hardRecoveryAttempted = false;
             }
             else if (mgmtPort != 0)
             {
                 FlagByte = mgmtPort;
                 MozaLog.Warn(
                     $"[Moza] Telem session 0x{TelemSession:X2} did not ack, using mgmt 0x{mgmtPort:X2} for telemetry");
+                // Mgmt opened cleanly even if telem didn't — still considered
+                // recovered enough to re-arm.
+                _hardRecoveryAttempted = false;
             }
             else
             {
@@ -2217,6 +2297,29 @@ namespace MozaPlugin.Telemetry
             // preserves Name, so subsequent calls can detect the synthesised
             // profile by Profile.Name == CatalogProfileName.
             Profile = synthesised;
+
+            // Notify the UI that the channel set has changed. The
+            // DashboardSelectionChanged event is normally raised at the
+            // moment the switch is INITIATED (by either the dropdown handler
+            // or OnWheelInitiatedSwitch), but at that point sender.Profile
+            // is either null or the prior dash's profile — so the channel-
+            // mapping grid populates with stale data and waits on the 500 ms
+            // RefreshTelemetryStatus polling tick to notice the new synth.
+            // Hash collisions in ComputeMappingDataSignature (24-bit hash +
+            // count masks) or a second switch arriving inside the 500 ms
+            // window can leave the grid stuck on the prior dash's channels.
+            // Raising here means the UI re-runs PopulateChannelMappingList
+            // against the live Profile deterministically. The early return
+            // at the top of MaybeSwapProfileForCatalog (catalog count +
+            // endMarker dedup) ensures this only fires when the wheel
+            // actually advanced state, not on every timer tick.
+            //
+            // Previously rolled back when the wheel was independently
+            // wedged at startup, but the wedge had a different root cause
+            // (sess=0x01/0x02 not engaging — now handled by the hard-
+            // recovery path in ProbeAndOpenSessions). Restoring with the
+            // same gating: only fires after a real catalog/endMarker advance.
+            MozaPlugin.Instance?.RaiseDashboardSelectionChangedInternal();
         }
 
         /// <summary>

@@ -1611,15 +1611,31 @@ namespace MozaPlugin
 
             _deviceManager.ReadSettings(StatusPollCommands);
 
-            // Device detection probes — only sent until each device is found
+            // Device detection probes — only sent until each device is found.
+            //
+            // For dash / handbrake / pedals we now use PitHouse-style empty
+            // presence probes (`0x00 dev=<id>` → `0x80 dev=<swap>`). The prior
+            // approach re-issued the first settings read (`dash-rpm-indicator-mode`
+            // etc.) every PollStatus tick; with no device attached the read
+            // never got a response and PendingResponseTracker amplified each
+            // probe by its 3-retry budget (200/400/800 ms backoff). Net result:
+            // 9 frames/tick of pure noise per absent sub-device. Empty probes
+            // are NOT tracked, so absent devices cost exactly one 5-byte frame
+            // per tick. ACK handling lives in OnPresenceProbeAck (called from
+            // OnMessageReceived) which flips DetectionState and kicks off the
+            // existing per-device settings read batch.
+            //
+            // Hub stays on the cmd-specific read path because hub shares
+            // device id 0x12 with the wheelbase main controller — an empty
+            // probe to 0x12 always ACKs from the base and can't distinguish.
             if (!DetectionState.NewWheelDetected && !DetectionState.OldWheelDetected)
                 _deviceManager.ProbeWheelDetection();
             if (!DetectionState.DashDetected)
-                _deviceManager.ReadSetting("dash-rpm-indicator-mode");
+                _deviceManager.SendPresenceProbe(MozaProtocol.DeviceDash);
             if (!DetectionState.HandbrakeDetected)
-                _deviceManager.ReadSetting("handbrake-direction");
+                _deviceManager.SendPresenceProbe(MozaProtocol.DeviceHandbrake);
             if (!DetectionState.PedalsDetected)
-                _deviceManager.ReadSetting("pedals-throttle-dir");
+                _deviceManager.SendPresenceProbe(MozaProtocol.DevicePedals);
             if (!DetectionState.HubDetected)
                 _deviceManager.ReadSetting("hub-port1-power");
 
@@ -1710,6 +1726,21 @@ namespace MozaPlugin
                 return;
             }
 
+            // Empty presence-probe ACK (PitHouse-style): host sent
+            // `7e 00 00 dev_id chk`, device replied `7e 00 80 swap(dev_id) chk`.
+            // The on-wire frame has been stripped of its 0x7e + length and
+            // checksum by MozaSerialConnection, so `data` here is
+            // {group=0x80, dev_id_swapped} — 2 bytes total. Route to the per-id
+            // first-sight detection helper. SendPresenceProbe in PollStatus is
+            // the only caller that emits empty probes today; the wheel itself
+            // never spontaneously sends these.
+            if (data.Length == 2 && data[0] == 0x80)
+            {
+                byte deviceId = MozaProtocol.SwapNibbles(data[1]);
+                OnPresenceProbeAck(deviceId);
+                return;
+            }
+
             var result = MozaResponseParser.Parse(data);
             if (!result.HasValue)
             {
@@ -1788,6 +1819,30 @@ namespace MozaPlugin
             _deviceManager.MarkWheelResponse(r.DeviceId);
             if (r.Name != null)
                 _deviceProber.DetectDevices(r.Name, r.IntValue, r.DeviceId);
+        }
+
+        /// <summary>
+        /// Dispatch an empty presence-probe ACK to the first-sight detection
+        /// helper for the matching sub-device. Only handles devices probed
+        /// via <see cref="MozaDeviceManager.SendPresenceProbe"/> from
+        /// PollStatus — currently dash / handbrake / pedals. Other device IDs
+        /// (e.g. wheel-on-base ACKs, AB9, Booster) reach this path harmlessly
+        /// and are ignored.
+        /// </summary>
+        private void OnPresenceProbeAck(byte deviceId)
+        {
+            switch (deviceId)
+            {
+                case MozaProtocol.DeviceDash:
+                    _deviceProber.MarkDashDetected();
+                    break;
+                case MozaProtocol.DeviceHandbrake:
+                    _deviceProber.MarkHandbrakeDetected();
+                    break;
+                case MozaProtocol.DevicePedals:
+                    _deviceProber.MarkPedalsDetected();
+                    break;
+            }
         }
 
         /// <summary>

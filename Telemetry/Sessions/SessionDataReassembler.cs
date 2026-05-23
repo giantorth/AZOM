@@ -301,6 +301,19 @@ namespace MozaPlugin.Telemetry.Sessions
         /// envelope yet (header too short, zlib decompression failed, etc).
         /// Caller is responsible for deciding when to call this — typically
         /// after seeing a session END marker or a complete RPC round-trip.
+        ///
+        /// NOTE: on sess=0x09 / 0x0a the inbound dispatcher copies starting
+        /// at byte 8 of the wire frame, which is the session-header ack field
+        /// (LE u16) — so the first 2 bytes of every buffer are the wheel's
+        /// ack value, NOT an envelope sentinel. The <c>buf[0] == 0x00</c>
+        /// branch below frequently misreads those bytes as an envelope and
+        /// computes a bogus compSize; the magic-scan fallback below is what
+        /// actually decompresses the real zlib stream a few bytes deeper.
+        /// A previous attempt to "early-return when envelope says not enough"
+        /// was reverted (commit history) because the bogus compSize threshold
+        /// can never be reached, leaving configJson permanently un-parsed.
+        /// The real fix would be to strip the 2 ack bytes before accumulating
+        /// — left as a follow-up.
         /// </summary>
         public byte[]? TryDecompress()
         {

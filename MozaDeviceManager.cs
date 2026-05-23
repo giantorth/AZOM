@@ -122,6 +122,26 @@ namespace MozaPlugin
         }
 
         /// <summary>
+        /// PitHouse-style empty presence probe: <c>7e 00 00 deviceId chk</c>. The
+        /// device responds with <c>7e 00 80 (deviceId&lt;&lt;swap) chk</c> if
+        /// alive. Cheap (single 5-byte frame) and NOT tracked by
+        /// <see cref="MozaPlugin.PendingResponses"/> — absent devices don't
+        /// burn the 3-attempt retry budget every PollStatus tick.
+        ///
+        /// Used for sub-device presence detection (dash / handbrake / pedals)
+        /// where the prior approach (re-issuing the first settings read every
+        /// 5 s) generated 3 retry frames per absent device per tick — the bulk
+        /// of the steady-state wire noise in single-base setups. The wheel +
+        /// base are detected via their cmd-specific responses and don't go
+        /// through this path.
+        /// </summary>
+        public void SendPresenceProbe(byte deviceId)
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(0x00, deviceId, null);
+        }
+
+        /// <summary>
         /// Send detection probes for all candidate wheel IDs simultaneously.
         /// Much faster than cycling through IDs one at a time (~2s vs ~12s worst case).
         /// </summary>

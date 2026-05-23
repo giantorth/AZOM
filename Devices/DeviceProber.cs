@@ -204,6 +204,44 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// First-sight detection cascade for the dashboard sub-device. Called
+        /// from the data-response path (parser case "dash-rpm-indicator-mode")
+        /// and from the empty-presence-probe path
+        /// (<see cref="MozaPlugin.OnPresenceProbeAck"/>). Idempotent — only the
+        /// first call does work.
+        /// </summary>
+        public void MarkDashDetected()
+        {
+            if (_detectionState.DashDetected) return;
+            _detectionState.DashDetected = true;
+            if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
+                _plugin.DeviceDefinitionDeployed = true;
+            _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _deviceManager.ReadSettings(DashSettingsReadCommands);
+            MozaLog.Info("[Moza] Dashboard detected");
+        }
+
+        /// <summary>First-sight detection cascade for the handbrake sub-device.</summary>
+        public void MarkHandbrakeDetected()
+        {
+            if (_detectionState.HandbrakeDetected) return;
+            _detectionState.HandbrakeDetected = true;
+            _plugin.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
+            MozaLog.Info("[Moza] Handbrake detected");
+        }
+
+        /// <summary>First-sight detection cascade for the pedals sub-device.</summary>
+        public void MarkPedalsDetected()
+        {
+            if (_detectionState.PedalsDetected) return;
+            _detectionState.PedalsDetected = true;
+            _plugin.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _deviceManager.ReadSettings(PedalsSettingsReadCommands);
+            MozaLog.Info("[Moza] Pedals detected");
+        }
+
+        /// <summary>
         /// Auto-detect connected devices based on response commands.
         /// First sight of a known response flips the matching detection flag
         /// and queues per-device settings reads + Apply*ToHardware.
@@ -263,15 +301,7 @@ namespace MozaPlugin.Devices
             switch (commandName)
             {
                 case "dash-rpm-indicator-mode":
-                    if (!_detectionState.DashDetected)
-                    {
-                        _detectionState.DashDetected = true;
-                        if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
-                            _plugin.DeviceDefinitionDeployed = true;
-                        _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                        _deviceManager.ReadSettings(DashSettingsReadCommands);
-                        MozaLog.Info("[Moza] Dashboard detected");
-                    }
+                    MarkDashDetected();
                     break;
 
                 case "base-ambient-brightness":
@@ -520,23 +550,11 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "handbrake-direction":
-                    if (!_detectionState.HandbrakeDetected)
-                    {
-                        _detectionState.HandbrakeDetected = true;
-                        _plugin.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                        _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
-                        MozaLog.Info("[Moza] Handbrake detected");
-                    }
+                    MarkHandbrakeDetected();
                     break;
 
                 case "pedals-throttle-dir":
-                    if (!_detectionState.PedalsDetected)
-                    {
-                        _detectionState.PedalsDetected = true;
-                        _plugin.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                        _deviceManager.ReadSettings(PedalsSettingsReadCommands);
-                        MozaLog.Info("[Moza] Pedals detected");
-                    }
+                    MarkPedalsDetected();
                     break;
 
                 case "hub-port1-power":
