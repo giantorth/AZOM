@@ -35,6 +35,13 @@ namespace MozaPlugin
         // process exit or on wheel unplug (Init checks "still connected?").
         private static MozaSerialConnection? s_persistentConnection;
         private static TelemetrySender? s_persistentTelemetrySender;
+        // Detection-flag bag captured alongside the persistent wire. When a
+        // game switch reloads the plugin while the hardware stays physically
+        // attached, restoring this preserves sub-device tab visibility
+        // (handbrake/pedals/hub/dash) instead of waiting for presence probes
+        // to re-ACK on the new instance — which is unreliable on the reused
+        // wire and would otherwise leave tabs hidden until SimHub restarts.
+        private static DeviceDetectionState? s_persistentDetectionState;
 
         private MozaSerialConnection _connection = null!;
         private MozaData _data = null!;
@@ -139,7 +146,7 @@ namespace MozaPlugin
         internal DashboardCache DashCache { get; private set; } = null!;
 
         // Device detection state shared with serial-reader, poll timer, UI, telemetry.
-        internal DeviceDetectionState DetectionState { get; } = new DeviceDetectionState();
+        internal DeviceDetectionState DetectionState { get; private set; } = new DeviceDetectionState();
 
         // AB9 host-rendered engine-vibration worker. See Devices/Ab9EngineVibrationWorker.cs.
         private Ab9EngineVibrationWorker? _ab9Worker;
@@ -455,6 +462,14 @@ namespace MozaPlugin
                 {
                     _connection = s_persistentConnection;
                     _usingPersistentWire = true;
+                    // Reuse the prior instance's detection bag so sub-device
+                    // tab visibility survives the reload. ResetDetectionFlags()
+                    // above already cleared our new-instance bag; swapping the
+                    // reference is safe because the collaborators that capture
+                    // it (HardwareApplier / DeviceProber / coordinator) are
+                    // constructed later in Init, after this swap.
+                    if (s_persistentDetectionState != null)
+                        DetectionState = s_persistentDetectionState;
                     MozaLog.Info("[Moza] Reusing persistent serial connection from prior plugin instance");
                 }
                 else
@@ -465,6 +480,10 @@ namespace MozaPlugin
                         try { s_persistentConnection.Dispose(); } catch { }
                         s_persistentConnection = null;
                     }
+                    // Wire is being rebuilt from scratch — drop any captured
+                    // detection state so the new instance re-probes everything
+                    // (the device may have changed during the gap).
+                    s_persistentDetectionState = null;
                     _connection = new MozaSerialConnection(
                         pid => MozaUsbIds.IsWheelbasePid(pid)
                                || MozaUsbIds.IsHubPid(pid)
@@ -991,10 +1010,31 @@ namespace MozaPlugin
             try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
             catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
 
-            // Clear detection flags up-front. If SimHub re-uses this plugin instance
-            // across load/unload, the next Init() also clears them — together this
-            // makes detection state deterministic on a fresh start.
-            ResetDetectionFlags();
+            // Decide up-front whether the persistent wire will survive this
+            // teardown — same condition the dispose step below uses. We need
+            // it now so detection state can be captured (vs. wiped) in lock-
+            // step with the wire.
+            bool keepWireAlive = _usingPersistentWire
+                                 || (_connection != null && _connection == s_persistentConnection
+                                     && _telemetrySender != null
+                                     && _telemetrySender == s_persistentTelemetrySender);
+
+            if (keepWireAlive)
+            {
+                // Wire stays; the device(s) on the other end are still those
+                // we already probed. Hand the detection bag to the next plugin
+                // instance so sub-device tabs (handbrake/pedals/hub/dash) stay
+                // visible across the reload — presence probes don't reliably
+                // re-ACK on the reused wire and would otherwise leave tabs
+                // permanently hidden until SimHub restarts.
+                s_persistentDetectionState = DetectionState;
+            }
+            else
+            {
+                // Clear detection flags so a future cold-start Init() doesn't
+                // see stale state from a wire that's about to be torn down.
+                ResetDetectionFlags();
+            }
 
             // 2. Persist settings and clear LEDs while connection is still alive.
             try { this.SaveCommonSettings("MozaPluginSettings", _settings); } catch { }
@@ -1030,11 +1070,8 @@ namespace MozaPlugin
 
             // 4. Persistent wire: skip Stop+Dispose if we own the static refs
             //    so the next Init picks up open sessions without the settle wait.
-            bool keepWireAlive = _usingPersistentWire
-                                 || (_connection != null && _connection == s_persistentConnection
-                                     && _telemetrySender != null
-                                     && _telemetrySender == s_persistentTelemetrySender);
-
+            //    (keepWireAlive was computed earlier so detection-state capture
+            //    could happen before ResetDetectionFlags() wiped the bag.)
             if (!keepWireAlive)
             {
                 _telemetrySender?.Stop();
@@ -1058,6 +1095,9 @@ namespace MozaPlugin
                     s_persistentConnection = null;
                 if (_telemetrySender == s_persistentTelemetrySender)
                     s_persistentTelemetrySender = null;
+                // Wire is gone — discard the captured detection bag too so the
+                // next Init re-probes against whatever's actually attached.
+                s_persistentDetectionState = null;
             }
             else
             {
