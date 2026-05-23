@@ -83,6 +83,17 @@ namespace MozaPlugin.Protocol
             // Wheelbase calibration (write group 42)
             AddCommand("base-calibration", "base", 0xFF, 42, new byte[] { 1 }, 2, "int");
 
+            // Partner-SDK (iRacing-MOZA bridge). iRacing POSTs each of these
+            // CoAP URIs exactly once per session as a capability probe; the
+            // wheel firmware persists the value to EEPROM (Tables 11 / 5 — see
+            // [INFO]param_manage.c echoes on group 0x0E). Wire format observed:
+            // CoAP LE int32 -> serial BE16 in the last 2 payload bytes (high
+            // 16 bits never populated). Verified 2026-05-23 via paired UDP +
+            // USB-CDC captures (tools/correlate_coap_serial.py).
+            AddCommand("base-feedforward",      "base", 0xFF, 0x2A, new byte[] { 0x40 }, 2, "int");
+            AddCommand("base-high-freq-torque", "base", 0xFF, 0x2A, new byte[] { 0x41 }, 2, "int");
+            AddCommand("base-motor-run-state",  "base", 0xFF, 0x2C, new byte[] { 0x01 }, 2, "int");
+
             // ===== MAIN DEVICE (device: main, read/write group 31) =====
             AddCommand("main-set-compat-mode",   "main", 0xFF, 31, new byte[] { 19 }, 1, "int");
             AddCommand("main-get-compat-mode",   "main", 31, 0xFF, new byte[] { 23 }, 1, "int");
@@ -181,6 +192,22 @@ namespace MozaPlugin.Protocol
             AddCommand("wheel-capabilities",   "wheel",  5, 0xFF, new byte[] { },                 0, "array"); // 0x05 → reply `01 02 1f 01` (no cmd echo in reply)
             AddCommand("wheel-mcu-uid",        "wheel",  6, 0xFF, new byte[] { },                 0, "array"); // 0x06 → 12-byte STM32 UID
             AddCommand("wheel-identity-11",    "wheel", 17, 0xFF, new byte[] { 4 },               0, "array"); // 0x11 cmd=04 → reply `04 01`
+
+            // ===== BASE IDENTITY (device 0x13) =====
+            // Same probe shapes as the wheel identity block above, just
+            // re-targeted at device "base" (0x13). PitHouse capture
+            // 2026-05-23 (iracing-pithouse-serial.pcapng) shows all five
+            // probes issued cold-start: groups 0x06 / 0x07 / 0x08 / 0x0F /
+            // 0x11 to device 0x13. Responses follow the standard
+            // group | 0x80 / nibble-swap-device convention; the parser's
+            // device-hint logic maps 0x31 → "base" so these don't collide
+            // with the wheel-* lookups in the shared response groups.
+            AddCommand("base-model-name",    "base",  7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("base-sw-version",    "base", 15, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("base-hw-version",    "base",  8, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("base-hw-sub",        "base",  8, 0xFF, new byte[] { 2 }, 0, "array");
+            AddCommand("base-mcu-uid",       "base",  6, 0xFF, new byte[] { },   0, "array");
+            AddCommand("base-identity-11",   "base", 17, 0xFF, new byte[] { 4 }, 0, "array");
 
             // ===== WHEEL SETTINGS (read group 64, write group 63) =====
             AddCommand("wheel-brightness",         "wheel", 64, 63, new byte[] { 1 },          1, "int");

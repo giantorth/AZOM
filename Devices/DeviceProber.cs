@@ -295,6 +295,29 @@ namespace MozaPlugin.Devices
                     _detectionState.BaseAmbientProbed = true;
                     _deviceManager.ReadSetting("base-ambient-brightness");
                     _deviceManager.ReadSettingForDevice("wheel-model-name", MozaProtocol.DeviceMain);
+                    // Base-identity probes (dev 0x13 direct). Populates
+                    // MozaData.BaseMcuUid / BaseSwVersion / BaseHwVersion /
+                    // BaseHwSubVersion / BaseModelName / BaseIdentity11 so
+                    // DeviceCatalog can synthesise the Motor + Wheel Base
+                    // manifest entries iRacing requires. PitHouse capture
+                    // 2026-05-23 issues the same probes at cold-start.
+                    //
+                    // ES-wheel caveat: on ES wheels device 0x13 *is* the
+                    // wheel, so these probes shadow wheel-model-name and the
+                    // base-* handlers populate Base* fields with the wheel's
+                    // identity. DeviceCatalog guards against acting on that
+                    // mis-attribution by checking _deviceManager.WheelDeviceId
+                    // before synthesising Motor / Wheel Base manifest entries.
+                    // We still issue the probes here because wheel detection
+                    // (and hence WheelDeviceId lock-in) happens *after* base
+                    // detection in the typical R5/R9/R12/R21/R25 flow — the
+                    // probes have to fly before we know whether to skip them.
+                    _deviceManager.ReadSetting("base-model-name");
+                    _deviceManager.ReadSetting("base-sw-version");
+                    _deviceManager.ReadSetting("base-hw-version");
+                    _deviceManager.ReadSetting("base-hw-sub");
+                    _deviceManager.ReadSetting("base-mcu-uid");
+                    _deviceManager.ReadSetting("base-identity-11");
                 }
             }
 

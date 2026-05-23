@@ -263,6 +263,16 @@ namespace MozaPlugin
         // Diagnostic only — stitched from group 0x07 cmd 0x01 + cmd 0x02 reads
         // against dev 0x12 (e.g. "R25 Black # MOT-1 -V01"). Not used for gating.
         public volatile string BaseModelName = "";
+        // ===== Base identity (device 0x13 — direct probes, mirror of the
+        // Wheel identity fields). Populated by base-model-name / base-sw-version
+        // / base-hw-version / base-hw-sub / base-mcu-uid / base-identity-11
+        // responses. DeviceCatalog consumes these to synthesise the Motor +
+        // Wheel Base manifest entries iRacing's CoAP client expects. =====
+        public volatile string BaseSwVersion = "";
+        public volatile string BaseHwVersion = "";
+        public volatile string BaseHwSubVersion = "";
+        public byte[] BaseMcuUid = System.Array.Empty<byte>();
+        public byte[] BaseIdentity11 = System.Array.Empty<byte>();
 
         // ===== FFB Equalizer (6 bands: 10/15/25/40/60/100 Hz, 0-400% where 100% = flat) =====
         public volatile int Equalizer1 = 100;
@@ -691,6 +701,34 @@ namespace MozaPlugin
             {
                 WheelMcuUid = (byte[])data.Clone();
             }
+            // Base identity (parallel to wheel identity, dev 0x13). Drives the
+            // Motor + Wheel Base manifest entries served at
+            // /MOZARacing/ProductDevice/{id} so iRacing's CoAP client engages
+            // beyond the device-list probe.
+            else if (commandName == "base-model-name")
+            {
+                BaseModelName = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "base-sw-version")
+            {
+                BaseSwVersion = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "base-hw-version")
+            {
+                BaseHwVersion = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "base-hw-sub")
+            {
+                BaseHwSubVersion = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "base-mcu-uid")
+            {
+                BaseMcuUid = (byte[])data.Clone();
+            }
+            else if (commandName == "base-identity-11")
+            {
+                BaseIdentity11 = (byte[])data.Clone();
+            }
             else if (commandName == "wheel-identity-11")
             {
                 WheelIdentity11 = (byte[])data.Clone();
@@ -761,6 +799,15 @@ namespace MozaPlugin
             DisplayDeviceType = System.Array.Empty<byte>();
             DisplayCapabilities = System.Array.Empty<byte>();
             DisplayIdentity11 = System.Array.Empty<byte>();
+            // Base identity — clear alongside wheel/display so a fresh
+            // connection re-probes and DeviceCatalog doesn't serve stale
+            // Motor / Wheel Base manifest entries from a previous session.
+            BaseModelName = "";
+            BaseSwVersion = "";
+            BaseHwVersion = "";
+            BaseHwSubVersion = "";
+            BaseMcuUid = System.Array.Empty<byte>();
+            BaseIdentity11 = System.Array.Empty<byte>();
             Last28x00Byte5 = 0;
             Last28x00ByteValid = false;
             Last28x01Byte4 = 0;

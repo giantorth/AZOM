@@ -13,7 +13,7 @@ namespace MozaPlugin.Sdk.Resources.Motor
     ///   <item><description>Scalar properties (GET ASCII text, POST LE int32) — most of the table.</description></item>
     ///   <item><description>CBOR pair / map — <c>LimitAngle</c>, <c>EqualizerAmp</c>.</description></item>
     ///   <item><description>Vendor gaps — <c>motorMoveTo</c>, <c>motorStopMove</c>: GET 4.05 / POST 4.00.</description></item>
-    ///   <item><description>Partner API accept-and-log — <c>Feedforward</c>, <c>HighFrequencyTorque</c>, <c>SetMotorRunState</c>.</description></item>
+    ///   <item><description>Partner API one-shot probes — <c>Feedforward</c>, <c>HighFrequencyTorque</c>, <c>SetMotorRunState</c>: forwarded to base via CDC (group 0x2A / 0x2C writes; persists to EEPROM Tables 11/5).</description></item>
     /// </list>
     /// <see cref="Lifecycle.LifecycleBindings"/> already owns <c>SoftReboot</c>
     /// and <c>CenterWheel</c>; do not duplicate them here.
@@ -75,10 +75,11 @@ namespace MozaPlugin.Sdk.Resources.Motor
             r.Bind(MotorMoveToUri,            new MotorMoveToResource());
             r.Bind(MotorStopMoveUri,          new MotorStopMoveResource());
 
-            // Partner API accept-and-log channels.
-            r.Bind(FeedforwardUri,            new MotorFeedforwardResource());
-            r.Bind(HighFrequencyTorqueUri,    new MotorHighFrequencyTorqueResource());
-            r.Bind(SetMotorRunStateUri,       new MotorSetMotorRunStateResource());
+            // Partner-API channels — one-shot capability probes that PitHouse
+            // forwards to wheelbase EEPROM. See class docs for CDC mapping.
+            r.Bind(FeedforwardUri,            new MotorFeedforwardResource(hw));
+            r.Bind(HighFrequencyTorqueUri,    new MotorHighFrequencyTorqueResource(hw));
+            r.Bind(SetMotorRunStateUri,       new MotorSetMotorRunStateResource(hw));
         }
     }
 }

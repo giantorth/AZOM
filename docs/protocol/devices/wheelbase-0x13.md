@@ -60,6 +60,8 @@ Group 42 is used for both writes (calibration, music set) and reads (music get).
 | music-enabled-get | `43 04` | R | 1 | int | Returns enabled state |
 | music-volume-set | `44 00` | W | 1 | int | 0x00 (mute) – 0xFF (max) |
 | music-volume-get | `44 01` | R | 1 | int | Returns current volume |
+| feedforward | `40` | W | 2 | int | **Partner-SDK / iRacing.** Wheel writes EEPROM (table not yet pinpointed). iRacing posts CoAP `/MOZARacing/ProductDevice/{id}/Feedforward` (4-byte LE int32, value 356 observed); PitHouse forwards as BE16 in the last two payload bytes — `7E 03 2A 13 40 [HI] [LO] [chk]`. Wheel acks `7E 03 AA 31 40 [HI] 00 [chk]`. One-shot per session (capability probe). Capture-verified 2026-05-23 (`iracing-pithouse-{udp,serial}.pcapng`, `tools/correlate_coap_serial.py`). |
+| high-freq-torque | `41` | W | 2 | int | **Partner-SDK / iRacing.** Same wire shape as `feedforward` (different cmd byte). Wheel writes EEPROM Table 11 Params 13 + 14 — firmware `[INFO]param_manage.c:340` log echoes the pair on group `0x0E` (debug-log channel). One-shot per session. |
 
 **Chime index range:** 1–10 (0x01–0x0A). 10 built-in chimes on R25 base.
 
@@ -83,6 +85,29 @@ Both produce ACK response: `7E 03 AA 31 43 0x 05 [chk]` (echo with group|0x80, d
 | mcu-temp | `04` | 2 | int | |
 | mosfet-temp | `05` | 2 | int | |
 | motor-temp | `06` | 2 | int | |
+
+### Group `0x2C` (44) — Motor run-state / partner-API extension (write-only)
+
+Partner-SDK extension surface — sole observed command is the iRacing run-state
+toggle. Distinct write group from `0x2A` and `0x29` because the firmware
+routes it to a different parameter table.
+
+| Command | ID | Bytes | Type | Notes |
+|---------|----|-------|------|-------|
+| motor-run-state | `01` | 2 | int | **Partner-SDK / iRacing.** iRacing posts CoAP `/MOZARacing/ProductDevice/{id}/SetMotorRunState` (4-byte LE int32, value `1` observed). Host forwards as BE16 in the last two payload bytes — `7E 03 2C 13 01 [HI] [LO] [chk]`. Wheel acks **zero-length** — `7E 00 AC 31 [chk]` — and the firmware then writes EEPROM Table 5 Param 6, plus flips `input_appmode` and `motor_mode debug_mode` (the latter two surface as `[INFO]base_model.c:192` and `[INFO]motor_mode.c:44` log echoes on group `0x0E`). One-shot per session. |
+
+**Frame example** (CoAP value `01 00 00 00` = 1):
+```
+7E 03 2C 13 01 00 01 CF                ← host→base (SetMotorRunState=1)
+7E 00 AC 31 [chk]                       ← base→host (zero-length ACK)
+[INFO]base_model.c:192 input_appmode:…  ← debug-log echo on group 0x0E
+[INFO]motor_mode.c:44 debug_mode disabled
+[INFO]param_manage.c:340 Table 5, Param 6 Written: 1087065796 (≈ 6.0 as float)
+```
+
+Capture-verified 2026-05-23 from paired UDP/CDC trace
+(`iracing-pithouse-{udp,serial}.pcapng`,
+`tools/correlate_coap_serial.py`).
 
 ### Group `0x2D` (45) — Sequence Counter / Discrete Events (write-only)
 

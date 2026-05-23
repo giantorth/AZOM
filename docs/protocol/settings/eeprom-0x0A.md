@@ -20,5 +20,5 @@ Known EEPROM tables:
 | Base | 2 | 38 | |
 | Motor | 3 | 76 | PID/encoder/field-weakening |
 | Wheel | 4 | 123 | |
-| Pedals | 5 | 45 | |
-| Unknown | 11 | 8 | |
+| Pedals | 5 | 45 | Param 6 also written by iRacing's `SetMotorRunState` CoAP probe (group `0x2C` cmd `0x01` — see [`../devices/wheelbase-0x13.md`](../devices/wheelbase-0x13.md) § Group 0x2C). The cell is dual-purpose; its pedals semantics on non-iRacing sessions are not yet decoded. |
+| Unknown | 11 | ≥14 | Partner-SDK / iRacing parameters. Params 13 + 14 are written as a pair by iRacing's `HighFrequencyTorque` CoAP probe (group `0x2A` cmd `0x41` — see [`../devices/wheelbase-0x13.md`](../devices/wheelbase-0x13.md) § Group 0x2A). Firmware `[INFO]param_manage.c:340` echoes the writes verbatim on group `0x0E`. Original "8 params" count was a lower bound from earlier captures; actual extent unknown. |

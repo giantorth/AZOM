@@ -95,6 +95,13 @@ namespace MozaPlugin.Protocol
             if (deviceHint == null && deviceId == MozaProtocol.DeviceMain)
                 deviceHint = "main";
 
+            // dev 0x13 → "base" so base-* identity probes (groups 6/7/8/15/17)
+            // resolve against the base-* command bucket rather than the
+            // wheel-* bucket that owns the same response groups. Required for
+            // the DeviceCatalog Motor/Wheel-Base manifest entries to populate.
+            if (deviceHint == null && deviceId == MozaProtocol.DeviceBase)
+                deviceHint = "base";
+
             // Explicit bus override (AB9 connection passes "ab9" to dodge dev 0x12 collision).
             if (busHint != null)
                 deviceHint = busHint;
