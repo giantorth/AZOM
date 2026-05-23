@@ -33,10 +33,14 @@ jobs:
         run: dotnet build -c Release --no-restore /p:Version=${{ steps.version.outputs.version }}
 
       - name: Stage release files
+        shell: pwsh
         run: |
           $staging = "staging"
-          New-Item -ItemType Directory -Path $staging -Force
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
           Copy-Item ./bin/x86/Release/MozaPlugin.dll $staging/
+          # All localized resources are embedded inside MozaPlugin.dll (see the
+          # i18n resource group in MozaPlugin.csproj), so the single DLL is the
+          # full deployment — no per-culture satellite folders to stage.
 
       - name: Zip release files
         run: Compress-Archive -Path ./staging/* -DestinationPath ./${{ env.ReleaseFileName }}

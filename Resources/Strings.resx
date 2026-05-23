@@ -433,4 +433,7 @@
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// what the wheel shows after the idle timeout elapses</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Speed</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Color</value></data>
+  <data name="Section_Language" xml:space="preserve"><value>LANGUAGE</value></data>
+  <data name="SliderLabel_Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Close and re-open this settings page to apply the new language. Auto follows SimHub's language setting, then the OS.</value></data>
 </root>

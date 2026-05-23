@@ -42,11 +42,11 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 ## Installation
 
-Download the latest `MozaPlugin_v*.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page and extract into your SimHub installation directory:
-
-- `MozaPlugin.dll` — copy to the SimHub root directory
+Download the latest `MozaPlugin_v*.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page and extract `MozaPlugin.dll` into your SimHub installation directory. That single file is the full plugin — every supported language is embedded inside it.
 
 Restart SimHub — the plugin appears under Settings > Plugins as "MOZA Control".
+
+> If you previously installed a build that shipped `es/`, `fr/`, `ru/` subfolders under your SimHub directory, delete those — they're stale satellite assemblies that the current build no longer produces.
 
 **Development builds.** The latest in-progress build from the `dev` branch is published as a pre-release: [MozaPlugin_dev.zip](https://github.com/giantorth/moza-simhub-plugin/releases/download/dev-latest/MozaPlugin_dev.zip). Expect bugs or broken features — use the stable release above if you need something reliable.
 
@@ -140,6 +140,12 @@ Wheels with an LCD dashboard (Vision GS, CS Pro, KS Pro, and FSR V2 confirmed; o
 ### Per-Game Profiles
 
 All settings are stored per-game via SimHub's profile system and switch automatically when you launch a different game. A profile selector sits at the top of the plugin panel.
+
+### Languages
+
+The plugin UI is localized into **English, Español, Français, Русский**. By default the plugin follows SimHub's own language setting (Settings > General > Culture in SimHub); if SimHub is set to a language the plugin doesn't ship yet, it falls back to your OS UI language, then English. A **Language** picker in the plugin's Options tab lets you override that auto-detection — useful if you want SimHub in one language and the MOZA pane in another.
+
+All translations are embedded directly into `MozaPlugin.dll` — no per-culture satellite assemblies, no extra files to deploy. Translations live in `Resources/Strings.<culture>.resx`. PRs adding a new language are welcome — see the i18n section in [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the four-step recipe.
 
 ### Hardware Configuration
 

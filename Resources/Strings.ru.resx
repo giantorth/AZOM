@@ -428,4 +428,7 @@
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// что показывает руль после истечения времени простоя</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Скорость</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Цвет</value></data>
+  <data name="Section_Language" xml:space="preserve"><value>ЯЗЫК</value></data>
+  <data name="SliderLabel_Language" xml:space="preserve"><value>Язык</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Закройте и снова откройте эту страницу настроек, чтобы применить новый язык. «Авто» следует языку SimHub, затем языку системы.</value></data>
 </root>

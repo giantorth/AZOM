@@ -428,4 +428,7 @@
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// ce que le volant affiche après expiration du délai d'inactivité</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Vitesse</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Couleur</value></data>
+  <data name="Section_Language" xml:space="preserve"><value>LANGUE</value></data>
+  <data name="SliderLabel_Language" xml:space="preserve"><value>Langue</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Fermez et rouvrez cette page de réglages pour appliquer la nouvelle langue. Auto suit la langue de SimHub, puis celle du système.</value></data>
 </root>

@@ -369,14 +369,15 @@ namespace MozaPlugin
                 _data = new MozaData();
                 _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings", () => new MozaPluginSettings());
 
-                // Set the UI culture from SimHub's own language setting BEFORE
-                // any WPF control is constructed — x:Static bindings in
-                // SettingsControl.xaml evaluate against Thread.CurrentUICulture
-                // at parse time, so a later assignment wouldn't retroactively
-                // re-translate the UI. (Note: SimHub doesn't propagate its
-                // chosen UI language onto plugin threads, hence reading the
+                // Set the UI culture BEFORE any WPF control is constructed —
+                // x:Static bindings in SettingsControl.xaml evaluate against
+                // Thread.CurrentUICulture at parse time, so a later assignment
+                // wouldn't retroactively re-translate the UI. Resolver checks
+                // the explicit picker pref first, then falls back to SimHub's
+                // own language, then the OS culture. (SimHub doesn't propagate
+                // its chosen language onto plugin threads, hence reading the
                 // setting ourselves in LanguageResolver.)
-                var resolvedCulture = LanguageResolver.Resolve();
+                var resolvedCulture = LanguageResolver.Resolve(_settings.PreferredLanguage);
                 Thread.CurrentThread.CurrentUICulture = resolvedCulture;
                 CultureInfo.DefaultThreadCurrentUICulture = resolvedCulture;
 
@@ -1264,14 +1265,14 @@ namespace MozaPlugin
             // The WPF UI thread predates plugin Init, so the CurrentUICulture
             // we assigned in Init lives on a different thread. Re-apply it here
             // (we are on the UI thread) so that {x:Static res:Strings.X} bindings
-            // in SettingsControl.xaml resolve against the SimHub-selected language
+            // in SettingsControl.xaml resolve against the resolved language
             // rather than the default thread culture.
-            var c = LanguageResolver.Resolve();
+            var c = LanguageResolver.Resolve(_settings?.PreferredLanguage);
             if (!Thread.CurrentThread.CurrentUICulture.Equals(c))
             {
                 MozaLog.Info($"[Moza] GetWPFSettingsControl: switching UI thread culture from " +
                              $"'{Thread.CurrentThread.CurrentUICulture.Name}' to '{c.Name}' " +
-                             $"(from SimHub Culture setting)");
+                             $"(PreferredLanguage='{_settings?.PreferredLanguage ?? "<auto>"}')");
                 Thread.CurrentThread.CurrentUICulture = c;
             }
             return new SettingsControl(this);

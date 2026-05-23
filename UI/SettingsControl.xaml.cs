@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using MozaPlugin.Devices;
+using MozaPlugin.Resources;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
@@ -111,6 +112,7 @@ namespace MozaPlugin
             InitProfilesTab();
             InitRedesignControls();
             InitSdkTab();
+            InitLanguageCombo();
             Instance = this;
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -2414,6 +2416,47 @@ namespace MozaPlugin
             var s = CurrentMBoosterSettings();
             if (c == null || s == null) return;
             _plugin.ApplyMBoosterToHardware(c, s);
+        }
+
+        // ------- Language picker (Options tab) -------
+        // null Culture = "Auto" row; otherwise a BCP-47 tag the user picked
+        // explicitly. Display is the language's own name so a user who can't
+        // read the current UI can still find theirs.
+        private sealed class LanguageOption
+        {
+            public string? Culture { get; set; }
+            public string Display { get; set; } = "";
+            public override string ToString() => Display;
+        }
+
+        private void InitLanguageCombo()
+        {
+            using (_suppressor.Begin())
+            {
+                var items = new List<LanguageOption>
+                {
+                    new LanguageOption { Culture = null, Display = "Auto" },
+                };
+                foreach (var code in LanguageResolver.SupportedCultures)
+                {
+                    var display = LanguageResolver.DisplayNames.TryGetValue(code, out var name) ? name : code;
+                    items.Add(new LanguageOption { Culture = code, Display = display });
+                }
+                LanguageCombo.ItemsSource = items;
+
+                var current = _plugin.Settings.PreferredLanguage;
+                LanguageCombo.SelectedItem = items.Find(i =>
+                    string.Equals(i.Culture ?? "", current ?? "", StringComparison.OrdinalIgnoreCase))
+                    ?? items[0];
+            }
+        }
+
+        private void LanguageCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            if (LanguageCombo.SelectedItem is not LanguageOption opt) return;
+            _plugin.Settings.PreferredLanguage = opt.Culture; // null = Auto
+            _plugin.SaveSettings();
         }
 
     }

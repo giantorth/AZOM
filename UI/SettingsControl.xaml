@@ -2006,6 +2006,18 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Language}" Icon="{StaticResource IconBolt}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_Language}" Style="{StaticResource SliderLabel}"/>
+                                    <ComboBox x:Name="LanguageCombo" Width="200" VerticalAlignment="Center"
+                                              SelectionChanged="LanguageCombo_Changed"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Static res:Strings.Hint_LanguageChangeRestart}"
+                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,8">

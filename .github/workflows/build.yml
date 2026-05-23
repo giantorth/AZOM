@@ -8,8 +8,10 @@ on:
       - "**.csproj"
       - "**.sln"
       - "**.xaml"
+      - "**.resx"
       - "libs/**"
       - "DeviceTemplates/**"
+      - "Resources/**"
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:

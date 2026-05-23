@@ -1,27 +1,61 @@
 ﻿//------------------------------------------------------------------------------
 // Strongly-typed accessor over MozaPlugin.Resources.Strings. Each property
-// returns the localized string for its key via ResourceManager + the ambient
-// Thread.CurrentUICulture. Adding a new key: append a one-line property below
-// AND add matching <data name="..."/> entries to every Strings.*.resx file.
+// returns the localized string for its key via a per-culture ResourceManager +
+// the ambient Thread.CurrentUICulture. Adding a new key: append a one-line
+// property below AND add matching <data name="..."/> entries to every
+// Strings.*.resx file. Adding a new culture: drop Strings.<lang>.resx in
+// Resources/, add a row to _byCulture below, add an EmbeddedResource entry in
+// MozaPlugin.csproj (WithCulture=false), and update LanguageResolver's
+// SupportedCultures + DisplayNames.
 //------------------------------------------------------------------------------
+using System.Collections.Generic;
 using System.Globalization;
 using System.Resources;
 
 namespace MozaPlugin.Resources
 {
     /// <summary>
-    /// A strongly-typed resource class for looking up localized strings. The
-    /// property accessors resolve through ResourceManager using the ambient
-    /// <see cref="System.Threading.Thread.CurrentUICulture"/>, which is set by
-    /// <c>LanguageResolver</c> during plugin Init.
+    /// Strongly-typed accessor for localized strings. All locales are embedded
+    /// inside the main MozaPlugin.dll (no per-culture satellite assemblies) so
+    /// the plugin ships as a single file. Each row in <see cref="_byCulture"/>
+    /// maps a BCP-47 tag to a <see cref="ResourceManager"/> reading one of the
+    /// embedded <c>.resources</c> blobs; <see cref="Get"/> walks the current UI
+    /// culture's parent chain looking for a match, falling back to neutral
+    /// (English) if nothing matches.
     /// </summary>
     public static class Strings
     {
-        private static readonly ResourceManager _rm =
-            new ResourceManager("MozaPlugin.Resources.Strings", typeof(Strings).Assembly);
+        // Each ResourceManager wraps a single embedded .resources blob in the
+        // main DLL. The baseName matches the ManifestResourceName set in
+        // MozaPlugin.csproj for each Strings.*.resx file.
+        private static readonly Dictionary<string, ResourceManager> _byCulture =
+            new Dictionary<string, ResourceManager>(System.StringComparer.OrdinalIgnoreCase)
+            {
+                { "",   new ResourceManager("MozaPlugin.Resources.Strings",    typeof(Strings).Assembly) },
+                { "es", new ResourceManager("MozaPlugin.Resources.Strings.es", typeof(Strings).Assembly) },
+                { "fr", new ResourceManager("MozaPlugin.Resources.Strings.fr", typeof(Strings).Assembly) },
+                { "ru", new ResourceManager("MozaPlugin.Resources.Strings.ru", typeof(Strings).Assembly) },
+            };
 
-        private static string Get(string key) =>
-            _rm.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+        private static string Get(string key)
+        {
+            // Walk CurrentUICulture's parent chain. "es-MX" tries "es-MX", then
+            // "es", then "" (invariant). Pass InvariantCulture to GetString so
+            // the ResourceManager reads from the resource we constructed it
+            // with rather than doing its own (satellite-based) culture lookup.
+            for (var c = CultureInfo.CurrentUICulture;
+                 c != null && !string.IsNullOrEmpty(c.Name);
+                 c = c.Parent)
+            {
+                if (_byCulture.TryGetValue(c.Name, out var rm))
+                {
+                    var s = rm.GetString(key, CultureInfo.InvariantCulture);
+                    if (!string.IsNullOrEmpty(s)) return s;
+                }
+                if (c.Equals(CultureInfo.InvariantCulture)) break;
+            }
+            return _byCulture[""].GetString(key, CultureInfo.InvariantCulture) ?? key;
+        }
 
         public static string TabHeader_Base => Get("TabHeader_Base");
         public static string TabHeader_Wheel => Get("TabHeader_Wheel");

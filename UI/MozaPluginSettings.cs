@@ -267,6 +267,12 @@ namespace MozaPlugin
         //       per-game values.
         public int SettingsSchemaVersion { get; set; } = 0;
 
+        // Explicit plugin-pane language override picked from the Options tab.
+        // null/empty/"auto" = auto-detect (LanguageResolver walks SimHub culture
+        // → OS culture → en). A BCP-47 tag like "es" / "fr" / "ru" pins the
+        // plugin to that language regardless of what SimHub or the OS reports.
+        public string? PreferredLanguage { get; set; }
+
         // Marks the wheel device extension as already drained into the per-page
         // bundle + overlay. MozaWheelExtensionSettings.ApplyTo gates on this:
         // once true, subsequent SetSettings calls (which fire every restart and

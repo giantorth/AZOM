@@ -64,22 +64,26 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- i18n resources. ManifestResourceName must be exact: ResourceManager looks
-         up "MozaPlugin.Resources.Strings" + ".<culture>.resources", so the en (neutral)
-         file must end in ".Strings.resources" and the es file in ".Strings.es.resources".
-         The default SDK naming would produce "MozaPlugin.Resources.Strings.resources" /
-         "MozaPlugin.Resources.Strings.es.resources" already, but we set it explicitly
-         so a future rename of the Resources/ folder can't silently break lookups. -->
+    <!-- i18n resources. Every locale is embedded directly into the main DLL
+         (no per-culture satellite assemblies) so deployment is a single file.
+         WithCulture=false tells MSBuild "this filename has a .<culture>. in it
+         but don't route it to a satellite" — the .resources blob gets bundled
+         in MozaPlugin.dll under the ManifestResourceName below. The custom
+         accessor in Resources/Strings.Designer.cs reads them via a per-culture
+         ResourceManager, so we don't depend on .NET's satellite resolver. -->
     <EmbeddedResource Update="Resources\Strings.resx">
       <ManifestResourceName>MozaPlugin.Resources.Strings</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Update="Resources\Strings.es.resx">
+      <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.es</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Update="Resources\Strings.fr.resx">
+      <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.fr</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Update="Resources\Strings.ru.resx">
+      <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.ru</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Include="Data\Telemetry.json" LogicalName="MozaPlugin.Data.Telemetry.json" />
@@ -140,18 +144,11 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Copy output DLL + per-culture satellite assemblies to SimHub folder on build.
-       Satellites live in $(OutputPath)<culture>/<AssemblyName>.resources.dll and need
-       to land in $(SIMHUB_PATH)/<culture>/, otherwise the runtime ResourceManager
-       falls back to the neutral (English) resources even when the user picks Spanish. -->
+  <!-- Copy output DLL to SimHub folder on build. All localized resources are
+       embedded inside MozaPlugin.dll (see i18n resource group above), so a
+       single file is the full deployment — no per-culture satellite folders. -->
   <Target Name="CopyToSimHub" AfterTargets="Build" Condition="'$(SIMHUB_PATH)' != ''">
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(SIMHUB_PATH)" />
-    <ItemGroup>
-      <_MozaSatelliteAssemblies Include="$(OutputPath)*\$(AssemblyName).resources.dll" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_MozaSatelliteAssemblies)"
-          DestinationFolder="$(SIMHUB_PATH)\%(RecursiveDir)"
-          Condition="'@(_MozaSatelliteAssemblies)' != ''" />
   </Target>
 
   <!-- Re-emit version attributes since GenerateAssemblyInfo is off. CI
