@@ -317,6 +317,7 @@ namespace MozaPlugin.Resources
         public static string Label_VersionPlaceholder => Get("Label_VersionPlaceholder");
         public static string Hint_AboutDescription => Get("Hint_AboutDescription");
         public static string Hint_SponsorshipsAppreciated => Get("Hint_SponsorshipsAppreciated");
+        public static string Hint_ThanksToTesters => Get("Hint_ThanksToTesters");
         public static string Button_Github => Get("Button_Github");
         public static string Button_JoinDiscord => Get("Button_JoinDiscord");
         public static string Button_SponsorDevelopment => Get("Button_SponsorDevelopment");
@@ -349,6 +350,8 @@ namespace MozaPlugin.Resources
         public static string Status_InstallFailedBadPackage => Get("Status_InstallFailedBadPackage");
         public static string Status_InstallFailedPendingRestart => Get("Status_InstallFailedPendingRestart");
         public static string Status_InstallFailedWriteDenied => Get("Status_InstallFailedWriteDenied");
+        public static string Section_Updates => Get("Section_Updates");
+        public static string Subtitle_Updates => Get("Subtitle_Updates");
         public static string Section_Bandwidth => Get("Section_Bandwidth");
         public static string Subtitle_Bandwidth => Get("Subtitle_Bandwidth");
         public static string Label_Inbound => Get("Label_Inbound");

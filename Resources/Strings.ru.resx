@@ -266,6 +266,35 @@
   <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
   <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Присоединиться к Discord проекта</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
+  <data name="Hint_ThanksToTesters" xml:space="preserve"><value>Огромное спасибо всем первым альфа- и бета-тестировщикам, которые потратили своё время — и нервы — пока я разбирался, как заставить работать протокол MOZA. Без вас этого плагина не существовало бы.</value></data>
+  <data name="Label_UpdateAvailable" xml:space="preserve"><value>Доступно обновление</value></data>
+  <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Открыть заметки о выпуске</value></data>
+  <data name="Button_SkipThisVersion" xml:space="preserve"><value>Пропустить эту версию</value></data>
+  <data name="Button_DismissUpdate" xml:space="preserve"><value>Закрыть</value></data>
+  <data name="Label_CheckForUpdates" xml:space="preserve"><value>Автоматически проверять обновления</value></data>
+  <data name="Label_ReleaseChannel" xml:space="preserve"><value>Канал выпусков</value></data>
+  <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Стабильный</value></data>
+  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Разработка</value></data>
+  <data name="Button_CheckNow" xml:space="preserve"><value>Проверить сейчас</value></data>
+  <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Не проверялось</value></data>
+  <data name="Status_UpdateChecking" xml:space="preserve"><value>Проверка…</value></data>
+  <data name="Status_UpdateUpToDate" xml:space="preserve"><value>Актуально</value></data>
+  <data name="Status_UpdateFailedNetwork" xml:space="preserve"><value>Ошибка проверки (сеть)</value></data>
+  <data name="Status_UpdateFailedHttp" xml:space="preserve"><value>Ошибка проверки (сервер)</value></data>
+  <data name="Status_UpdateFailedParse" xml:space="preserve"><value>Ошибка проверки (формат ответа)</value></data>
+  <data name="Button_InstallUpdate" xml:space="preserve"><value>Установить обновление</value></data>
+  <data name="Status_DownloadingStart" xml:space="preserve"><value>Начало загрузки…</value></data>
+  <data name="Status_Downloading" xml:space="preserve"><value>Загрузка {0}% ({1} из {2})</value></data>
+  <data name="Status_DownloadingIndeterminate" xml:space="preserve"><value>Загрузка… ({0})</value></data>
+  <data name="Status_Extracting" xml:space="preserve"><value>Распаковка…</value></data>
+  <data name="Status_Installing" xml:space="preserve"><value>Установка…</value></data>
+  <data name="Status_InstalledRestartRequired" xml:space="preserve"><value>Обновление установлено — перезапустите SimHub для загрузки v{0}</value></data>
+  <data name="Status_InstallFailed" xml:space="preserve"><value>Ошибка установки: {0}</value></data>
+  <data name="Status_InstallFailedBadPackage" xml:space="preserve"><value>пакет обновления повреждён</value></data>
+  <data name="Status_InstallFailedPendingRestart" xml:space="preserve"><value>предыдущая установка ожидает — сначала перезапустите SimHub</value></data>
+  <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>нет доступа на запись в папку плагина</value></data>
+  <data name="Section_Updates" xml:space="preserve"><value>ОБНОВЛЕНИЯ</value></data>
+  <data name="Subtitle_Updates" xml:space="preserve"><value>// встроенный уведомитель об обновлениях</value></data>
   <data name="Section_Bandwidth" xml:space="preserve"><value>ПРОПУСКНАЯ СПОСОБНОСТЬ</value></data>
   <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// последовательный трафик · 30-секундное окно</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>ВХОДЯЩИЙ</value></data>

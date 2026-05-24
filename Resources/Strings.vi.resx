@@ -266,6 +266,35 @@
   <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
   <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Tham gia Discord của dự án</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
+  <data name="Hint_ThanksToTesters" xml:space="preserve"><value>Xin gửi lời cảm ơn chân thành đến tất cả các tester alpha và beta đầu tiên — những người đã bỏ thời gian và sự kiên nhẫn của mình trong khi tôi tìm ra cách làm cho giao thức MOZA hoạt động. Plugin này sẽ không tồn tại nếu không có các bạn.</value></data>
+  <data name="Label_UpdateAvailable" xml:space="preserve"><value>Có bản cập nhật</value></data>
+  <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Mở ghi chú phát hành</value></data>
+  <data name="Button_SkipThisVersion" xml:space="preserve"><value>Bỏ qua phiên bản này</value></data>
+  <data name="Button_DismissUpdate" xml:space="preserve"><value>Đóng</value></data>
+  <data name="Label_CheckForUpdates" xml:space="preserve"><value>Tự động kiểm tra cập nhật</value></data>
+  <data name="Label_ReleaseChannel" xml:space="preserve"><value>Kênh phát hành</value></data>
+  <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Ổn định</value></data>
+  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Phát triển</value></data>
+  <data name="Button_CheckNow" xml:space="preserve"><value>Kiểm tra ngay</value></data>
+  <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Chưa từng kiểm tra</value></data>
+  <data name="Status_UpdateChecking" xml:space="preserve"><value>Đang kiểm tra…</value></data>
+  <data name="Status_UpdateUpToDate" xml:space="preserve"><value>Đã cập nhật</value></data>
+  <data name="Status_UpdateFailedNetwork" xml:space="preserve"><value>Kiểm tra thất bại (mạng)</value></data>
+  <data name="Status_UpdateFailedHttp" xml:space="preserve"><value>Kiểm tra thất bại (máy chủ)</value></data>
+  <data name="Status_UpdateFailedParse" xml:space="preserve"><value>Kiểm tra thất bại (định dạng phản hồi)</value></data>
+  <data name="Button_InstallUpdate" xml:space="preserve"><value>Cài đặt cập nhật</value></data>
+  <data name="Status_DownloadingStart" xml:space="preserve"><value>Bắt đầu tải xuống…</value></data>
+  <data name="Status_Downloading" xml:space="preserve"><value>Đang tải {0}% ({1} trên {2})</value></data>
+  <data name="Status_DownloadingIndeterminate" xml:space="preserve"><value>Đang tải… ({0})</value></data>
+  <data name="Status_Extracting" xml:space="preserve"><value>Đang giải nén…</value></data>
+  <data name="Status_Installing" xml:space="preserve"><value>Đang cài đặt…</value></data>
+  <data name="Status_InstalledRestartRequired" xml:space="preserve"><value>Đã cài đặt cập nhật — khởi động lại SimHub để tải v{0}</value></data>
+  <data name="Status_InstallFailed" xml:space="preserve"><value>Cài đặt thất bại: {0}</value></data>
+  <data name="Status_InstallFailedBadPackage" xml:space="preserve"><value>gói phát hành không hợp lệ</value></data>
+  <data name="Status_InstallFailedPendingRestart" xml:space="preserve"><value>cài đặt trước đó đang chờ — khởi động lại SimHub trước</value></data>
+  <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>không thể ghi vào thư mục plugin</value></data>
+  <data name="Section_Updates" xml:space="preserve"><value>CẬP NHẬT</value></data>
+  <data name="Subtitle_Updates" xml:space="preserve"><value>// trình thông báo cập nhật tích hợp</value></data>
   <data name="Section_Bandwidth" xml:space="preserve"><value>BĂNG THÔNG</value></data>
   <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// thông lượng cổng serial · cửa sổ 30 giây</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>ĐẾN</value></data>
