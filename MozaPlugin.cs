@@ -914,6 +914,12 @@ namespace MozaPlugin
         private string? _lastGearString;
         private DateTime _lastGearShiftSendUtc = DateTime.MinValue;
 
+        // AB9 per-shift trigger state. Separate gear-string latch and debounce
+        // timer from the wheelbase path so both devices can fire independently
+        // even if game-side debounce settings change.
+        private string? _lastAb9GearString;
+        private DateTime _lastAb9GearShiftSendUtc = DateTime.MinValue;
+
         // Fire a one-shot base-gearshift-event on gear change. Gated by
         // GearshiftVibration > 0 and a debounce. By default, transitions
         // *into* neutral don't fire (H-pattern produces two transitions
@@ -951,16 +957,69 @@ namespace MozaPlugin
             _deviceManager.WriteSetting("base-gearshift-event", 1);
         }
 
+        // Fire AB9 per-shift triggers (0x0D 0x01 + 0x0D 0x04 engage, or
+        // 0x0D 0x06 for transitions into neutral). AB9 firmware fires its
+        // stored gear-shift-vibration rumble pattern in response — see
+        // docs/protocol/devices/ab9-shifter.md and usb-capture/AB9/
+        // {all_gears,1-N}.pcapng for the empirical observation. The previous
+        // hypothesis that the AB9 fires rumble autonomously from its
+        // mechanical sensor without host involvement was wrong; without
+        // these triggers gear engagement produces zero haptic feedback.
+        //
+        // Shares the same GearshiftVibrateOnNeutral / GearshiftDebounceMs
+        // profile knobs as the wheelbase path (single source of truth for
+        // both devices) but tracks its own gear-string latch and debounce
+        // timer so an AB9-only or wheelbase-only setup still fires.
+        private void CheckAb9GearshiftEvent(GameData data)
+        {
+            if (_ab9Manager == null || !_ab9Manager.IsConnected) return;
+            if (!DetectionState.Ab9Detected) return;
+            var ab9Settings = _settings?.ProfileStore?.CurrentProfile?.Ab9;
+            if (ab9Settings == null || ab9Settings.GearShiftVibrationIntensity <= 0) return;
+
+            string? gear = data?.NewData?.Gear;
+            if (string.IsNullOrEmpty(gear)) return;
+            if (_lastAb9GearString == null)
+            {
+                _lastAb9GearString = gear;
+                return; // warm-up: record first value, don't fire
+            }
+            if (gear == _lastAb9GearString) return;
+            _lastAb9GearString = gear;
+
+            bool isNeutral = (gear == "N" || gear == "0");
+            var gsProfile = _settings?.ProfileStore?.CurrentProfile;
+            bool vibrateOnNeutral = gsProfile?.GearshiftVibrateOnNeutral == 1;
+            int debounceMs = gsProfile?.GearshiftDebounceMs ?? -1;
+            if (debounceMs < 0) debounceMs = 500;
+            if (isNeutral && !vibrateOnNeutral) return;
+
+            var now = DateTime.UtcNow;
+            if (debounceMs > 0 && (now - _lastAb9GearShiftSendUtc).TotalMilliseconds < debounceMs) return;
+            _lastAb9GearShiftSendUtc = now;
+
+            // engage trigger (0x0D 0x04) for any non-neutral gear,
+            // disengage (0x0D 0x06) for transitions into neutral.
+            _ab9Manager.SendGearShiftTrigger(engageNotDisengage: !isNeutral);
+        }
+
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
         {
             if (IsShuttingDown) return;
             _telemetrySender?.UpdateGameData(data.NewData);
             _telemetrySender?.SetGameRunning(data.GameRunning);
             CheckGearshiftEvent(data);
+            CheckAb9GearshiftEvent(data);
 
-            // Hand the latest RPM + game-running flag to the AB9 engine-vib worker.
+            // Hand the latest RPM + engine-on flag to the AB9 engine-vib worker.
+            // GameRunning stays true while paused or in menu, so we'd keep
+            // streaming buzz frames the whole time the user is in the pause
+            // menu without this gate. GamePaused / GameInMenu collapse the
+            // stream to silent-keepalive within one tick of the user pressing
+            // Esc / returning to the menu.
             double rpm = data.NewData?.Rpms ?? 0.0;
-            _ab9Worker?.PostFrame(rpm, data.GameRunning);
+            bool engineOn = data.GameRunning && !data.GamePaused && !data.GameInMenu;
+            _ab9Worker?.PostFrame(rpm, engineOn);
 
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
@@ -1115,6 +1174,13 @@ namespace MozaPlugin
             // are disposed; the tick gates on connection state but joining here
             // keeps shutdown deterministic.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
+
+            // Burst silent-slot frames + an engine-pulse OFF to stop the AB9
+            // effect immediately on shutdown. Without this the firmware keeps
+            // the last-streamed buzz running until its ~10 s keepalive timeout,
+            // which means users hear vibrations for ten seconds after closing
+            // SimHub mid-session. Worker is stopped above so this can't race.
+            try { _ab9Manager?.SendEngineSilence(); } catch { }
 
             // Dispose every mBooster controller — fires disable frames + closes
             // each connection. Must happen before MozaData is torn down so the

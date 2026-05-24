@@ -15,7 +15,12 @@ namespace MozaPlugin.Devices
     internal sealed class Ab9EngineVibrationWorker : IDisposable
     {
         // Period constant. See docs/protocol/devices/ab9-shifter.md.
-        private const double K = 3.95e11;
+        // Calibrated against real-hardware audible measurement: PitHouse driving
+        // a Cayman GT4 (~7700 RPM redline) at slider=100 Hz produces ~103 Hz
+        // audible buzz; the prior K=3.95e11 (derived from a capture session with
+        // uncertain RPM assumptions) produced ~145 Hz at the same operating
+        // point. Ratio 145/103 = 1.41 → K = 3.95e11 × 1.41 ≈ 5.56e11.
+        private const double K = 5.56e11;
         private const int TickPeriodMs = 11;
         // Sub-stream tick budgets at idle (RPM ~800). Scaled by rpm/IdleRpm at runtime.
         private const int KeepalivePairBaseTicks = 12;
@@ -40,12 +45,6 @@ namespace MozaPlugin.Devices
         private int _tickCount;
         private ushort _pulsePhase;
         private short _lowRatePhase;
-        // Bresenham accumulator (0..99) for slot-ID duty-cycle on the 0x0A 0x05
-        // stream. Each active tick adds `intensity`; when it crosses 100 we
-        // emit the effective slot (0x1996) and roll the accumulator. Yields N
-        // active frames per 100, distributed as evenly as possible so we don't
-        // get burst-then-silent envelopes that would feel pulsy at low N.
-        private int _slotDutyAccum;
 
         public Ab9EngineVibrationWorker(
             MozaAb9DeviceManager ab9Manager,
@@ -131,29 +130,17 @@ namespace MozaPlugin.Devices
 
             bool streamActive = gameOn && intensity > 0 && rpm > 100.0 && freqHz > 0.0;
 
-            // Slot-ID duty cycle. PitHouse modulates engine-vib intensity by
-            // adding/removing slot IDs in parallel — we approximate with a
-            // Bresenham duty cycle between slot 0x1996 (effective) and slot
-            // 0x0000 (silent placeholder per docs/protocol/devices/ab9-shifter.md).
-            // The 91 Hz tick rate means at 50 % intensity the slot alternates
-            // every frame, mechanically averaging to half effective amplitude;
-            // at low intensity it stays mostly 0x0000 with sparse 0x1996 frames.
-            // This gives the slider a perceptibly progressive feel instead of
-            // the previous binary on/off behaviour.
-            bool slotActive = false;
-            if (streamActive)
-            {
-                _slotDutyAccum += intensity;
-                if (_slotDutyAccum >= 100)
-                {
-                    _slotDutyAccum -= 100;
-                    slotActive = true;
-                }
-            }
-            else
-            {
-                _slotDutyAccum = 0;
-            }
+            // Slot ID is binary: active slot (0x1996) while streaming, silent
+            // slot (0x0000) otherwise. Earlier builds Bresenham-modulated this
+            // at the 91 Hz tick rate to scale intensity, but that produced an
+            // audible sub-bass rumble at low intensity (the on/off pattern beat
+            // at sub-frame rates). PitHouse modulates intensity by adding or
+            // removing parallel slot streams, never by toggling one slot in
+            // time — see docs/protocol/devices/ab9-shifter.md "Slider effects
+            // on the stream". Intensity scaling now happens entirely through
+            // the engine-pulse-pair amp16 (already linear, already PitHouse-
+            // faithful).
+            bool slotActive = streamActive;
 
             // 0x0A 0x05 engine-vibration refresh — every tick.
             uint period;
@@ -217,13 +204,11 @@ namespace MozaPlugin.Devices
                 _ab9.SendLowRatePair(_lowRatePhase);
             }
 
-            // 0x0D 0x01 sparse trigger is intentionally NOT emitted. PitHouse
-            // fires it in event-driven bursts (capture analysis: median delta
-            // 0.83 s, max 1295 s, 156/241 deltas < 1 s) — not on a fixed timer.
-            // Our previous 920-tick periodic emission produced a phantom
-            // gear-shift-like vibration every ~10 s. The trigger's purpose
-            // remains unresolved (see docs/protocol/devices/ab9-shifter.md);
-            // the Ab9Trigger.Sparse enum is kept for future event-driven use.
+            // 0x0D 0x01 (Sparse), 0x0D 0x04 (Engage), 0x0D 0x06 (Disengage) are
+            // event-driven, fired from MozaPlugin.CheckAb9GearshiftEvent on
+            // each SimHub gear-string transition — NOT emitted from this
+            // worker. See usb-capture/AB9/all_gears.pcapng / 1-N.pcapng and
+            // docs/protocol/devices/ab9-shifter.md.
         }
     }
 }

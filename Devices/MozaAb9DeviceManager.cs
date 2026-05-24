@@ -374,6 +374,29 @@ namespace MozaPlugin.Devices
             return true;
         }
 
+        /// <summary>
+        /// Emit a short burst of silence frames to stop the engine-vib effect
+        /// immediately when SimHub is shutting down. Without this the AB9
+        /// firmware keeps the last-streamed effect running until its ~10 s
+        /// keepalive timeout. Sends ~9 silent-slot vib-stream frames (one
+        /// 100 ms window at the running 91 Hz cadence) plus one engine-pulse
+        /// OFF to flush any in-flight pulse half-cycle. Caller is responsible
+        /// for stopping the engine-vib worker first so it can't race with us.
+        /// </summary>
+        public void SendEngineSilence()
+        {
+            if (!_connection.IsConnected) return;
+            const int silentFrameCount = 9;
+            for (int i = 0; i < silentFrameCount; i++)
+            {
+                SendEngineVibrationStream(active: false, periodTicks: 0x100000);
+            }
+            // Engine-pulse OFF half (amp16 = 0) flushes any active pulse.
+            SendEnginePulsePair(_lastEnginePulsePhase, intensity0to100: 0);
+        }
+
+        private ushort _lastEnginePulsePhase;
+
         // ===== Engine-pulse pair (Group 0x20 / cmd 0x0B 0x02 + 0x0B 0x03) =====
         //
         // 22-byte frames emitted as paired ON/OFF half-cycles. The 16-bit phase
@@ -400,6 +423,7 @@ namespace MozaPlugin.Devices
             if (intensity0to100 < 0) intensity0to100 = 0;
             if (intensity0to100 > 100) intensity0to100 = 100;
             ushort amp = (ushort)Math.Round(intensity0to100 / 100.0 * EnginePulseAmpFullScale);
+            _lastEnginePulsePhase = phase;
 
             var on  = BuildEnginePulseFrame(0x02, phase, amp);
             var off = BuildEnginePulseFrame(0x03, phase, 0x0000);
@@ -481,20 +505,31 @@ namespace MozaPlugin.Devices
             return frame;
         }
 
-        // ===== Trigger sub-cmds (Group 0x20 / cmd 0x0D 0x01/02/03/05) =====
+        // ===== Trigger sub-cmds (Group 0x20 / cmd 0x0D 0x01..0x06) =====
         //
         // 3-byte frames with a single payload byte (always 0x01 observed).
-        // 0x0D 0x02 + 0x0D 0x03 are a paired flat-rate keepalive (~9 Hz).
-        // 0x0D 0x05 is an RPM-tracking trigger (1.3..32 Hz with state).
-        // 0x0D 0x01 is sparse (~0.10 Hz), newly observed in the 2026-05-13 capture.
+        //   0x0D 0x01 (Sparse / Shift) — fires alongside per-shift events.
+        //              At idle (no shifts) appears at ~0.10 Hz; during active
+        //              gear cycling jumps to ~1.2 Hz. See usb-capture/AB9/
+        //              all_gears.pcapng + 1-N.pcapng.
+        //   0x0D 0x02 + 0x0D 0x03 — paired flat-rate keepalive (~9 Hz).
+        //   0x0D 0x04 (Engage)     — per-shift trigger when entering any non-
+        //                              neutral gear. Observed only during gear
+        //                              cycling; ACKed by device with standard
+        //                              0xA0 generic FFB ACK.
+        //   0x0D 0x05 (RpmTrack)   — RPM-tracking trigger (1.3..32 Hz with state).
+        //   0x0D 0x06 (Disengage)  — per-shift trigger when entering neutral.
+        //                              Same shape as Engage.
 
         public enum Ab9Trigger : byte
         {
             // Values are the sub-cmd lo byte on the wire.
-            Sparse    = 0x01,
+            Sparse     = 0x01,
             KeepaliveA = 0x02,
             KeepaliveB = 0x03,
-            RpmTrack  = 0x05,
+            Engage     = 0x04,
+            RpmTrack   = 0x05,
+            Disengage  = 0x06,
         }
 
         public bool SendTrigger(Ab9Trigger trigger)
@@ -513,16 +548,45 @@ namespace MozaPlugin.Devices
 
             // Route each trigger to its own lane so back-to-back same-kind pushes
             // don't coalesce, while still letting stale ones drop if the worker
-            // falls behind.
-            var lane = trigger switch
+            // falls behind. Per-shift events (Sparse/Engage/Disengage) bypass
+            // the latest-wins stream lane entirely — they're event-driven and
+            // must not drop or coalesce.
+            switch (trigger)
             {
-                Ab9Trigger.KeepaliveA => StreamKind.Ab9TriggerA,
-                Ab9Trigger.KeepaliveB => StreamKind.Ab9TriggerA,
-                Ab9Trigger.RpmTrack   => StreamKind.Ab9TriggerRpm,
-                Ab9Trigger.Sparse     => StreamKind.Ab9TriggerExtra,
-                _                     => StreamKind.Ab9TriggerExtra,
-            };
-            _connection.SendStream(lane, frame);
+                case Ab9Trigger.KeepaliveA:
+                case Ab9Trigger.KeepaliveB:
+                    _connection.SendStream(StreamKind.Ab9TriggerA, frame);
+                    break;
+                case Ab9Trigger.RpmTrack:
+                    _connection.SendStream(StreamKind.Ab9TriggerRpm, frame);
+                    break;
+                case Ab9Trigger.Sparse:
+                case Ab9Trigger.Engage:
+                case Ab9Trigger.Disengage:
+                    _connection.Send(frame);
+                    break;
+                default:
+                    _connection.SendStream(StreamKind.Ab9TriggerExtra, frame);
+                    break;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Fire the per-shift trigger pair PitHouse emits on each gear change.
+        /// Sends 0x0D 0x01 (Sparse) immediately followed by either 0x0D 0x04
+        /// (engage) or 0x0D 0x06 (disengage / into neutral). Both frames go
+        /// through the one-shot FIFO so they can't drop or reorder against
+        /// the engine-vib stream lanes. The AB9 firmware fires its stored
+        /// rumble pattern on the trigger; without it, gear engagements produce
+        /// no haptic feedback (verified empirically by the user 2026-05-24 and
+        /// in usb-capture/AB9/all_gears.pcapng / 1-N.pcapng).
+        /// </summary>
+        public bool SendGearShiftTrigger(bool engageNotDisengage)
+        {
+            if (!_connection.IsConnected) return false;
+            SendTrigger(Ab9Trigger.Sparse);
+            SendTrigger(engageNotDisengage ? Ab9Trigger.Engage : Ab9Trigger.Disengage);
             return true;
         }
 
