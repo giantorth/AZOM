@@ -104,8 +104,31 @@ namespace MozaPlugin.Telemetry.Frames
         // can re-encounter the same END marker, so without this dedup we
         // commit and log on every tick).
         private HashSet<int>? _lastCommittedIdxs;
-        // END-marker value at last commit. Diagnostic only.
+        // END-marker value at last commit. Diagnostic only (used in log).
         private uint _committedEndMarker;
+        // Set of every markerValue that has already triggered a commit
+        // since session start. Per the docs (session-02-channel-catalog.md
+        // §"Back-references and END-marker generations"), the wheel emits:
+        //   (a) keepalive ENDs at the CURRENT generation's marker (same
+        //       value as last commit — handled by the markerValue ==
+        //       _committedEndMarker fast path);
+        //   (b) historical re-affirmation ENDs at PRIOR generations'
+        //       markers, with full-URL records before them re-declaring
+        //       the prior dashboard's idxs (so the wheel's back-ref table
+        //       stays consistent on the host). These come at DIFFERENT
+        //       markerValues from the current generation but are NOT real
+        //       switches — they're the wheel replaying past mappings.
+        // The doc explicitly states "switch END markers bump to a new
+        // value", so any markerValue we've already committed in this
+        // session cannot be a real switch — it must be re-affirmation.
+        // Tracking the full set lets us drop case (b) cleanly; the prior
+        // single-uint check only caught case (a) and let (b) overwrite
+        // _liveCatalog with stale prior-dashboard idxs (observed
+        // 2026-05-24 on slot=1→slot=0 contracting switches: parse pass
+        // produced end=24→3 liveIdxs={1,2,3} followed by end=3→24
+        // liveIdxs={1..18}, leaving _liveCatalog with the 18 ETS2-ATS
+        // idxs instead of the 3 Simple Rally idxs).
+        private readonly HashSet<uint> _committedMarkers = new HashSet<uint>();
 
         /// <summary>u32 value of the most-recently-seen wheel-side END
         /// marker (tag 0x06) in a catalog push. PitHouse echoes this in
@@ -325,6 +348,7 @@ namespace MozaPlugin.Telemetry.Frames
             _lastActivityMs = 0;
             _liveCatalog = null;
             _committedEndMarker = 0;
+            _committedMarkers.Clear();
             _lastCommittedIdxs = null;
             _pendingIdxs.Clear();
         }
@@ -495,27 +519,34 @@ namespace MozaPlugin.Telemetry.Frames
                 //
                 // Within a generation, the FIRST commit (markerValue differs
                 // from _committedEndMarker) defines that dashboard's channel
-                // set. Subsequent commits at the SAME markerValue are protocol
-                // re-affirmation bursts (back-refs the wheel emits to keep the
-                // full historical catalog mapping alive across dashboards) —
-                // they MUST NOT extend the live set or stale prior-dashboard
-                // idxs creep into the current dashboard's synth. Discarding
-                // them also implicitly preserves the FIRST commit's idxs
-                // against later subset bursts (e.g. wheel emitting {1,2,3}
-                // after first committing {1..9} would otherwise blank channels
-                // 4..9 — the dropped-Gear case).
+                // set. Subsequent commits at the SAME markerValue are
+                // current-generation keepalive re-affirmation. Subsequent
+                // commits at a DIFFERENT-BUT-ALREADY-SEEN markerValue are
+                // PRIOR-GENERATION re-affirmation: the wheel re-declares
+                // older dashboards' full-URL mappings (so its back-ref table
+                // stays consistent on the host) terminated by the END
+                // marker of THAT older generation. Both cases must drop —
+                // commits at any previously-committed marker would let
+                // stale prior-dashboard idxs overwrite the current
+                // dashboard's _liveCatalog. The doc states "switch END
+                // markers bump to a new value", so a real switch always
+                // brings a markerValue not yet in _committedMarkers.
+                // Discarding same-marker bursts also implicitly preserves
+                // the FIRST commit's idxs against later subset bursts
+                // (e.g. wheel emitting {1,2,3} after first committing
+                // {1..9} would otherwise blank channels 4..9 — the
+                // dropped-Gear case).
                 void CommitLiveSet(uint markerValue)
                 {
                     if (_pendingIdxs.Count == 0) return;
 
-                    bool sameGeneration =
-                        _lastCommittedIdxs != null
-                        && markerValue == _committedEndMarker;
-                    if (sameGeneration)
+                    if (_committedMarkers.Contains(markerValue))
                     {
-                        // Re-affirmation burst within this generation —
-                        // ignore. The first commit at this markerValue is
-                        // authoritative for the current dashboard.
+                        // Either current-generation keepalive (markerValue
+                        // == _committedEndMarker) or prior-generation
+                        // re-affirmation (markerValue is some earlier
+                        // committed marker). Either way the first commit
+                        // at this markerValue was authoritative; drop.
                         _pendingIdxs.Clear();
                         return;
                     }
@@ -558,6 +589,7 @@ namespace MozaPlugin.Telemetry.Frames
                         $"[Moza] Live catalog committed: end={_committedEndMarker}→{markerValue} " +
                         $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}}");
                     _committedEndMarker = markerValue;
+                    _committedMarkers.Add(markerValue);
                     _lastCommittedIdxs = targetIdxs;
                     _pendingIdxs.Clear();
                 }

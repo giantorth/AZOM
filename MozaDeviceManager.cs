@@ -37,8 +37,30 @@ namespace MozaPlugin
 
         public void MarkWheelResponse(byte deviceId)
         {
-            if (_wheelDetected && deviceId == _wheelDeviceId)
-                _wheelRespondedSinceLastPoll = true;
+            // Match against the locked wheel ID once we have one; before lock,
+            // match any candidate ID so probe-time responses still count as
+            // "wheel is alive". The earlier _wheelDetected gate caused a race
+            // during SimHub plugin reload: the persistent DetectionState says
+            // the wheel is detected (and PollStatus's miss check is therefore
+            // armed), but this fresh MozaDeviceManager has _wheelDetected=false
+            // until ProbeWheelDetection completes, so wheel responses were
+            // ignored and the miss counter ran to threshold for no good reason.
+            if (_wheelDetected)
+            {
+                if (deviceId == _wheelDeviceId)
+                    _wheelRespondedSinceLastPoll = true;
+            }
+            else
+            {
+                for (int i = 0; i < WheelIdCandidates.Length; i++)
+                {
+                    if (deviceId == WheelIdCandidates[i])
+                    {
+                        _wheelRespondedSinceLastPoll = true;
+                        break;
+                    }
+                }
+            }
         }
 
         public void ResetWheelResponseFlag()
@@ -190,10 +212,17 @@ namespace MozaPlugin
             MozaLog.Info($"[Moza] Wheel locked on device ID {_wheelDeviceId}");
         }
 
-        // Default backoff for tracked reads: catch transient drops in 200ms,
-        // widen on each retry. 3 attempts × 200/400/800 ≈ 1.4 s budget total.
-        private static readonly int[] ReadRetryBackoffMs = { 200, 400, 800 };
-        private const int ReadRetryMaxAttempts = 3;
+        // Default backoff for tracked reads. Exponential growth caps at the
+        // array's last value, which PendingResponseTracker reuses indefinitely:
+        // {200, 400, 800, 1600, 3200, 6400, 10000} — fast catch of transient
+        // drops in the first ~1.4 s, then graceful widening up to one retry
+        // per 10 s. Entries are NOT dropped on attempt count; the tracker
+        // re-emits forever until the wheel acks or the connection drops.
+        // ReadRetryMaxAttempts is retained for API compatibility but ignored
+        // by the tracker.
+        private static readonly int[] ReadRetryBackoffMs =
+            { 200, 400, 800, 1600, 3200, 6400, 10000 };
+        private const int ReadRetryMaxAttempts = int.MaxValue;
 
         public bool ReadSettingForDevice(string commandName, byte deviceId)
         {

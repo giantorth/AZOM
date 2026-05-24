@@ -478,7 +478,53 @@ namespace MozaPlugin
                     // it (HardwareApplier / DeviceProber / coordinator) are
                     // constructed later in Init, after this swap.
                     if (s_persistentDetectionState != null)
+                    {
                         DetectionState = s_persistentDetectionState;
+                        // Drop the stale miss counter: the new instance has a
+                        // fresh _deviceManager (_wheelDetected=false until
+                        // ProbeWheelDetection re-locks), so its
+                        // WheelRespondedSinceLastPoll flag starts at false and
+                        // PollStatus would otherwise immediately add another
+                        // miss to whatever count survived the prior instance.
+                        // Without this reset, three rapid SimHub plugin
+                        // reloads can push the persisted miss counter past
+                        // WheelMissThreshold and fire a spurious hot-swap
+                        // ResetWheelDetection (with its 11 s silence gate)
+                        // even though the wheel never stopped responding.
+                        DetectionState.WheelPollMisses = 0;
+
+                        // Re-derive WheelModelInfo from the persisted model
+                        // name. WheelModelInfo itself is per-instance (set by
+                        // DeviceProber when the wheel-model-name response
+                        // arrives), but the model name is persisted on
+                        // DeviceDetectionState.LastKnownWheelModel — so on a
+                        // SimHub-driven plugin reload we know the model
+                        // immediately and don't have to wait for re-detection.
+                        //
+                        // The cost of NOT doing this: SimHub starts calling
+                        // the LED Display() callback within milliseconds of
+                        // plugin Init, BEFORE wheel-model-name finishes its
+                        // round-trip (~280 ms post wheel-locked on W17). With
+                        // WheelModelInfo still null in that window, rpmN
+                        // falls back to MozaDeviceConstants.RpmLedCount (10),
+                        // button and knob branches are gated out by the
+                        // `modelInfo != null` checks, and the wheel's
+                        // physical 16 RPM / 8 button / 4 knob LEDs collapse
+                        // to "10 RPM, no buttons, no knobs" for the entire
+                        // lifetime of the plugin instance. Manifests as the
+                        // last 6 RPM LEDs and all button/knob LEDs going
+                        // dark after a game switch — verified W17 capture
+                        // 2026-05-24.
+                        var savedModel = DetectionState.LastKnownWheelModel;
+                        if (!string.IsNullOrEmpty(savedModel))
+                        {
+                            WheelModelInfo = Devices.WheelModelInfo.FromModelName(savedModel);
+                            MozaLog.Debug(
+                                $"[Moza] Restored WheelModelInfo from persistent state: {savedModel} " +
+                                $"(rpm={WheelModelInfo?.RpmLedCount}, buttons={WheelModelInfo?.ButtonLedCount}, " +
+                                $"knobs={WheelModelInfo?.KnobCount}, flags={WheelModelInfo?.HasFlagLeds})");
+                        }
+                    }
                     MozaLog.Info("[Moza] Reusing persistent serial connection from prior plugin instance");
                 }
                 else
@@ -1678,6 +1724,9 @@ namespace MozaPlugin
             // Hot-swap may bind a different default dashboard; force kind=4 re-emit.
             _dashboardBindingCoordinator?.ClearLastAppliedDashboardKey();
             _telemetrySender?.ResetBindingTracking();
+            // Drop sunsets — the newly-attached wheel may support commands the
+            // previous one didn't, and any cross-device entries should re-try.
+            try { PendingResponses.Clear(); } catch { }
         }
 
         private void PollStatus(object sender, ElapsedEventArgs e)
@@ -1855,6 +1904,23 @@ namespace MozaPlugin
                 {
                     _deviceManager.MarkWheelResponse(MozaProtocol.SwapNibbles(data[1]));
                     return;
+                }
+
+                // Any wheel-targeted response counts as "wheel is alive" even if
+                // we can't decode the specific command. Prior behavior only
+                // marked alive on parsed reads / known echo prefixes — wheel
+                // read-responses outside those two paths (e.g. LED state poll
+                // group 2 with payload prefix `1F 03 02`) were logged as
+                // Unmatched and never reset PollStatus's miss counter. The
+                // wheel kept answering at ~5 s cadence, but every response
+                // looked like silence to the hot-swap detector, which
+                // incorrectly tripped after 3 ticks (15 s) and triggered an
+                // unnecessary Stop+silence-gate+restart cycle.
+                if (data.Length >= 2)
+                {
+                    byte dev = MozaProtocol.SwapNibbles(data[1]);
+                    if (dev == MozaProtocol.DeviceWheel)
+                        _deviceManager.MarkWheelResponse(dev);
                 }
 
                 _unmatched++;
