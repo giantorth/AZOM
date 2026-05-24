@@ -2015,6 +2015,15 @@ namespace MozaPlugin
                 Ab9EngineVibFreqSlider.Value = ab9.EngineVibrationFrequency;
                 SetValueText(Ab9EngineVibFreqValue, ab9.EngineVibrationFrequency + " Hz");
                 SetAb9Slider(Ab9GearShiftVibSlider,       Ab9GearShiftVibValue,       ab9.GearShiftVibrationIntensity);
+                Ab9GearShiftVibrateOnNeutralCheck.IsChecked = ab9.GearShiftVibrateOnNeutral;
+                int ab9DbMs = ab9.GearShiftDebounceMs;
+                if (ab9DbMs < 0) ab9DbMs = 0;
+                if (ab9DbMs > 1000) ab9DbMs = 1000;
+                // Snap to 50 ms grid in case a persisted value came from a
+                // manual edit / older build before the slider enforced ticks.
+                ab9DbMs = ((ab9DbMs + 25) / 50) * 50;
+                Ab9GearShiftDebounceSlider.Value = ab9DbMs;
+                Ab9GearShiftDebounceValue.Text = $"{ab9DbMs} ms";
             }
             _ab9UiSeeded = true;
         }
@@ -2127,6 +2136,33 @@ namespace MozaPlugin
             Ab9GearShiftVibValue.Text = v.ToString();
             GetOrCreateAb9Profile().GearShiftVibrationIntensity = v;
             _plugin.Ab9Manager?.SendGearShiftVibrationIntensity(v);
+            _plugin.SaveSettings();
+        }
+
+        // AB9-only "vibrate on neutral" — gates whether the per-shift
+        // 0x0D 0x06 (Disengage) trigger fires on any-gear→neutral transitions.
+        // Independent from the wheelbase GearshiftVibrateOnNeutralCheck so the
+        // AB9 can pulse for downshifts into N while the wheelbase stays quiet.
+        private void Ab9GearShiftVibrateOnNeutralCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            bool on = Ab9GearShiftVibrateOnNeutralCheck.IsChecked == true;
+            GetOrCreateAb9Profile().GearShiftVibrateOnNeutral = on;
+            _plugin.SaveSettings();
+        }
+
+        // AB9-only shift debounce. Same 0..1000 ms range and 50 ms grid as
+        // the wheelbase slider, but stored on Ab9Settings so the two devices
+        // can be tuned independently.
+        private void Ab9GearShiftDebounceSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int val = (int)Math.Round(e.NewValue);
+            val = ((val + 25) / 50) * 50;
+            if (val < 0) val = 0;
+            if (val > 1000) val = 1000;
+            Ab9GearShiftDebounceValue.Text = $"{val} ms";
+            GetOrCreateAb9Profile().GearShiftDebounceMs = val;
             _plugin.SaveSettings();
         }
 

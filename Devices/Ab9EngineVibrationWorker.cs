@@ -41,6 +41,7 @@ namespace MozaPlugin.Devices
         private volatile bool _stop;
         private volatile bool _active;
         private long _latestRpmBits;
+        private long _latestMaxRpmBits;
         private volatile bool _latestGameRunning;
         private int _tickCount;
         private ushort _pulsePhase;
@@ -80,9 +81,10 @@ namespace MozaPlugin.Devices
         public void Dispose() => Stop();
 
         /// <summary>Publish latest game state from the SimHub data-update thread.</summary>
-        public void PostFrame(double rpm, bool gameRunning)
+        public void PostFrame(double rpm, double maxRpm, bool gameRunning)
         {
             Interlocked.Exchange(ref _latestRpmBits, BitConverter.DoubleToInt64Bits(rpm));
+            Interlocked.Exchange(ref _latestMaxRpmBits, BitConverter.DoubleToInt64Bits(maxRpm));
             _latestGameRunning = gameRunning;
         }
 
@@ -126,9 +128,27 @@ namespace MozaPlugin.Devices
             // larger values still respect the cap.
             if (freqHz > MaxFreqHz) freqHz = MaxFreqHz;
             double rpm = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _latestRpmBits));
+            double maxRpm = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _latestMaxRpmBits));
             bool gameOn = _latestGameRunning;
 
             bool streamActive = gameOn && intensity > 0 && rpm > 100.0 && freqHz > 0.0;
+
+            // Scale the slider intensity by current/max RPM so the buzz fades
+            // in toward the slider value as the engine climbs to redline.
+            // Games that don't report MaxRpm (or report 0) bypass scaling so
+            // the slider behaves like a flat amplitude — better than silently
+            // collapsing to zero when the source data is missing. <100 RPM
+            // floor on maxRpm rejects obviously-bogus zero / idle-noise values.
+            double rpmFraction = 1.0;
+            if (maxRpm > 100.0)
+            {
+                rpmFraction = rpm / maxRpm;
+                if (rpmFraction < 0.0) rpmFraction = 0.0;
+                if (rpmFraction > 1.0) rpmFraction = 1.0;
+            }
+            int scaledIntensity = (int)Math.Round(intensity * rpmFraction);
+            if (scaledIntensity < 0) scaledIntensity = 0;
+            if (scaledIntensity > 100) scaledIntensity = 100;
 
             // Slot ID is binary: active slot (0x1996) while streaming, silent
             // slot (0x0000) otherwise. Earlier builds Bresenham-modulated this
@@ -162,7 +182,8 @@ namespace MozaPlugin.Devices
             {
                 _active = streamActive;
                 MozaLog.Debug($"[Moza/AB9] engine-vib {(streamActive ? "active" : "silent")} "
-                              + $"(rpm={rpm:F0} freq={freqHz:F1}Hz period={period} int={intensity})");
+                              + $"(rpm={rpm:F0}/{maxRpm:F0} freq={freqHz:F1}Hz period={period} "
+                              + $"int={intensity}→{scaledIntensity})");
             }
 
             // Sub-streams gated on `streamActive` — silent keepalive only otherwise.
@@ -181,14 +202,15 @@ namespace MozaPlugin.Devices
 
             // 0x0B 0x02/03 engine-pulse pair — RPM-scaled rate. The pair's
             // amp16 (offset 19-20 of the wire frame) scales linearly with
-            // `intensity`, which combined with the slot-ID duty cycle above
-            // gives a clean progressive response across the 0..100 slider range.
+            // `scaledIntensity` (slider × rpm/maxRpm), so the buzz fades up
+            // toward the slider setting as the engine climbs to redline
+            // instead of sitting at full amplitude from idle.
             int pulseInterval = Math.Max(2, (int)(EnginePulsePairBaseTicks / rpmFactor));
             if (tick % pulseInterval == 0)
             {
                 ushort step = (ushort)Math.Min(0xFFFF, (int)(32 + 78 * Math.Min(1.0, rpmFactor / 10.0)));
                 unchecked { _pulsePhase += step; }
-                _ab9.SendEnginePulsePair(_pulsePhase, intensity);
+                _ab9.SendEnginePulsePair(_pulsePhase, scaledIntensity);
             }
 
             // 0x0D 0x05 RPM-tracking trigger.

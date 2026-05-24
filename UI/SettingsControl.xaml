@@ -1666,19 +1666,39 @@
                         </ctrl:SectionCard>
 
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_GearShift}" Icon="{StaticResource IconShift}">
-                            <Grid Margin="0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_VibrationIntensity}" Style="{StaticResource SliderLabel}"/>
-                                <Slider Grid.Column="1" x:Name="Ab9GearShiftVibSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="Ab9GearShiftVibSlider_ValueChanged"/>
-                                <TextBox Grid.Column="2" x:Name="Ab9GearShiftVibValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=Ab9GearShiftVibSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0"/>
-                            </Grid>
+                            <StackPanel>
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_VibrationIntensity}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="Ab9GearShiftVibSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="Ab9GearShiftVibSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="Ab9GearShiftVibValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=Ab9GearShiftVibSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="0"/>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,4">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_VibrateOnNeutral}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="Ab9GearShiftVibrateOnNeutralCheck" VerticalAlignment="Center"
+                                                      Checked="Ab9GearShiftVibrateOnNeutralCheck_Changed" Unchecked="Ab9GearShiftVibrateOnNeutralCheck_Changed"/>
+                                </StackPanel>
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ShiftDebounce}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="Ab9GearShiftDebounceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="1000" TickFrequency="50" SmallChange="50" LargeChange="50" IsSnapToTickEnabled="True" ValueChanged="Ab9GearShiftDebounceSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="Ab9GearShiftDebounceValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=Ab9GearShiftDebounceSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="500 ms"/>
+                                </Grid>
+                            </StackPanel>
                         </ctrl:SectionCard>
 
                     </StackPanel>

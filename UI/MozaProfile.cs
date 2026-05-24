@@ -145,6 +145,16 @@ namespace MozaPlugin
         // pattern autonomously on every HID-detected gear engagement.
         public byte GearShiftVibrationIntensity { get; set; } = 0;
 
+        // AB9-specific gear-shift event tuning. Independent of the wheelbase
+        // GearshiftVibrateOnNeutral / GearshiftDebounceMs (which gate the
+        // base-gearshift-event push), since the AB9 path fires per-shift
+        // triggers (0x0D 0x01 + 0x04/0x06) through a different device and
+        // users want to tune the two devices separately — e.g. heavier
+        // debounce on the wheelbase to avoid double-kicks on H-pattern, but
+        // tighter on the AB9 to feel every gate engagement.
+        public bool GearShiftVibrateOnNeutral { get; set; } = false;
+        public int GearShiftDebounceMs { get; set; } = 500;
+
         public Ab9Settings Clone()
         {
             return new Ab9Settings
@@ -158,6 +168,8 @@ namespace MozaPlugin
                 EngineVibrationIntensity = EngineVibrationIntensity,
                 EngineVibrationFrequency = EngineVibrationFrequency,
                 GearShiftVibrationIntensity = GearShiftVibrationIntensity,
+                GearShiftVibrateOnNeutral = GearShiftVibrateOnNeutral,
+                GearShiftDebounceMs = GearShiftDebounceMs,
             };
         }
     }

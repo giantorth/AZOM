@@ -1004,10 +1004,11 @@ namespace MozaPlugin
         // mechanical sensor without host involvement was wrong; without
         // these triggers gear engagement produces zero haptic feedback.
         //
-        // Shares the same GearshiftVibrateOnNeutral / GearshiftDebounceMs
-        // profile knobs as the wheelbase path (single source of truth for
-        // both devices) but tracks its own gear-string latch and debounce
-        // timer so an AB9-only or wheelbase-only setup still fires.
+        // Gated by AB9-scoped knobs (Ab9Settings.GearShiftVibrateOnNeutral /
+        // GearShiftDebounceMs), separate from the wheelbase gearshift card —
+        // users tune the two devices independently (e.g. heavier debounce on
+        // the wheelbase to absorb H-pattern double-transitions, but tighter
+        // on the AB9 so every gate engagement registers).
         private void CheckAb9GearshiftEvent(GameData data)
         {
             if (_ab9Manager == null || !_ab9Manager.IsConnected) return;
@@ -1026,10 +1027,9 @@ namespace MozaPlugin
             _lastAb9GearString = gear;
 
             bool isNeutral = (gear == "N" || gear == "0");
-            var gsProfile = _settings?.ProfileStore?.CurrentProfile;
-            bool vibrateOnNeutral = gsProfile?.GearshiftVibrateOnNeutral == 1;
-            int debounceMs = gsProfile?.GearshiftDebounceMs ?? -1;
-            if (debounceMs < 0) debounceMs = 500;
+            bool vibrateOnNeutral = ab9Settings.GearShiftVibrateOnNeutral;
+            int debounceMs = ab9Settings.GearShiftDebounceMs;
+            if (debounceMs < 0) debounceMs = 0;
             if (isNeutral && !vibrateOnNeutral) return;
 
             var now = DateTime.UtcNow;
@@ -1049,15 +1049,18 @@ namespace MozaPlugin
             CheckGearshiftEvent(data);
             CheckAb9GearshiftEvent(data);
 
-            // Hand the latest RPM + engine-on flag to the AB9 engine-vib worker.
-            // GameRunning stays true while paused or in menu, so we'd keep
-            // streaming buzz frames the whole time the user is in the pause
-            // menu without this gate. GamePaused / GameInMenu collapse the
-            // stream to silent-keepalive within one tick of the user pressing
-            // Esc / returning to the menu.
+            // Hand the latest RPM, MaxRpm + engine-on flag to the AB9 engine-vib
+            // worker. GameRunning stays true while paused or in menu, so we'd
+            // keep streaming buzz frames the whole time the user is in the
+            // pause menu without this gate. GamePaused / GameInMenu collapse
+            // the stream to silent-keepalive within one tick of the user
+            // pressing Esc / returning to the menu. MaxRpm drives the worker's
+            // rpm/redline intensity scaling — games that don't report it fall
+            // back to flat (unscaled) amplitude.
             double rpm = data.NewData?.Rpms ?? 0.0;
+            double maxRpm = data.NewData?.MaxRpm ?? 0.0;
             bool engineOn = data.GameRunning && !data.GamePaused && !data.GameInMenu;
-            _ab9Worker?.PostFrame(rpm, engineOn);
+            _ab9Worker?.PostFrame(rpm, maxRpm, engineOn);
 
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
