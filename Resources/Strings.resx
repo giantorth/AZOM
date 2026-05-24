@@ -271,6 +271,21 @@
   <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
   <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Join the project Discord</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
+  <data name="Label_UpdateAvailable" xml:space="preserve"><value>Update available</value></data>
+  <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Open release notes</value></data>
+  <data name="Button_SkipThisVersion" xml:space="preserve"><value>Skip this version</value></data>
+  <data name="Button_DismissUpdate" xml:space="preserve"><value>Dismiss</value></data>
+  <data name="Label_CheckForUpdates" xml:space="preserve"><value>Check for updates automatically</value></data>
+  <data name="Label_ReleaseChannel" xml:space="preserve"><value>Release channel</value></data>
+  <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stable</value></data>
+  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Development</value></data>
+  <data name="Button_CheckNow" xml:space="preserve"><value>Check now</value></data>
+  <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Never checked</value></data>
+  <data name="Status_UpdateChecking" xml:space="preserve"><value>Checking…</value></data>
+  <data name="Status_UpdateUpToDate" xml:space="preserve"><value>Up to date</value></data>
+  <data name="Status_UpdateFailedNetwork" xml:space="preserve"><value>Check failed (network)</value></data>
+  <data name="Status_UpdateFailedHttp" xml:space="preserve"><value>Check failed (server)</value></data>
+  <data name="Status_UpdateFailedParse" xml:space="preserve"><value>Check failed (response format)</value></data>
   <data name="Section_Bandwidth" xml:space="preserve"><value>BANDWIDTH</value></data>
   <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// serial throughput · 30-second window</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>INBOUND</value></data>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Era;
+using MozaPlugin.UI.UpdateCheck;
 
 namespace MozaPlugin
 {
@@ -208,6 +209,40 @@ namespace MozaPlugin
         /// across restarts alternates dashboards naturally.
         /// </summary>
         public int AutoTestLastSlot { get; set; } = -1;
+
+        // ===== Update notifier =====
+        // In-plugin update check that hits the GitHub Releases API on plugin
+        // load (and at most once per 24h thereafter), compares to the running
+        // AssemblyInformationalVersion, and surfaces a banner in the About
+        // tab when a newer release is available. Opt-out via UpdateCheckEnabled.
+        // Network call is silent on failure for the automatic path; only the
+        // manual "Check now" button surfaces errors inline. See
+        // UI/UpdateCheck/UpdateCheckService.cs for the wire details.
+        public bool UpdateCheckEnabled { get; set; } = true;
+
+        // Release stream the checker follows. Stable = /releases/latest,
+        // Dev = /releases/tags/dev-latest. Persisted as int so JSON shape
+        // matches the existing enum convention (see TelemetryWheelEra).
+        public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
+
+        // Version the user clicked "Skip this version" on — the banner stays
+        // hidden as long as the latest published version still equals this
+        // string. When a newer version appears the banner re-shows.
+        public string LastSkippedVersion { get; set; } = "";
+
+        // UTC timestamp of the last successful (or failed) check; the
+        // automatic check skips while less than 24h has passed. DateTime.MinValue
+        // means "never checked" → check immediately on next Init.
+        public DateTime LastUpdateCheckUtc { get; set; } = DateTime.MinValue;
+
+        // Cached version string from the last successful check. Lets the About
+        // tab paint the banner immediately on open without waiting for a fresh
+        // network round-trip. Empty = no successful check yet (or 404 on dev-latest).
+        public string LastSeenLatestVersion { get; set; } = "";
+
+        // html_url from the last successful check — wired to the "Open release
+        // notes" banner button. Empty when LastSeenLatestVersion is empty.
+        public string LastSeenReleaseUrl { get; set; } = "";
 
         // ===== Third-party SDK emulation =====
         // Master toggle for the in-plugin CoAP/UDP server that mimics MOZA's

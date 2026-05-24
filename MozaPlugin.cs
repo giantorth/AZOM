@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Media;
 using GameReaderCommon;
@@ -19,6 +20,7 @@ using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
+using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin
@@ -42,6 +44,15 @@ namespace MozaPlugin
         // to re-ACK on the new instance — which is unreliable on the reused
         // wire and would otherwise leave tabs hidden until SimHub restarts.
         private static DeviceDetectionState? s_persistentDetectionState;
+
+        // Update-check dedupe: the GitHub Releases query is per-process, not
+        // per-plugin-Init. SimHub reloads the plugin on every game switch, so
+        // without this guard a user switching games could burn through the
+        // unauthenticated GitHub rate limit (60 req/hr per IP). Set once
+        // when the check kicks off in Init; never cleared. The "Check now"
+        // button in the About tab is the only way to force a re-check within
+        // the same SimHub process lifetime.
+        private static bool s_updateCheckStarted;
 
         private MozaSerialConnection _connection = null!;
         private MozaData _data = null!;
@@ -476,6 +487,15 @@ namespace MozaPlugin
                     global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.Start();
                     MozaLog.Debug("[Moza] Serial traffic capture armed from previous session — capturing now");
                 }
+
+                // Fire-and-forget update check against the GitHub Releases API.
+                // Throttled to once per 24h (LastUpdateCheckUtc) and deduped
+                // per-process (s_updateCheckStarted) so SimHub game switches
+                // don't multiply network calls. Persist-then-render: the
+                // result lands in _settings.LastSeenLatestVersion and the
+                // About-tab banner reads it on next open. Failures are silent
+                // here — the user-facing "Check now" button surfaces errors.
+                MaybeStartUpdateCheck();
 
                 // Read SimHub's global temperature unit preference (set at first launch)
                 var tempUnit = pluginManager.GetPropertyValue("DataCorePlugin.GameData.TemperatureUnit");
@@ -1337,6 +1357,62 @@ namespace MozaPlugin
         internal void PersistSettings()
         {
             ScheduleSave();
+        }
+
+        // Kicks off the background GitHub Releases query on a thread-pool
+        // thread, with a 24h throttle (LastUpdateCheckUtc) and a per-process
+        // dedupe (s_updateCheckStarted). Returns immediately; the result is
+        // persisted into _settings on completion. Failures swallow silently
+        // — the user can still trigger a foreground check from the About tab.
+        private void MaybeStartUpdateCheck()
+        {
+            try
+            {
+                if (_settings == null || !_settings.UpdateCheckEnabled) return;
+                if (s_updateCheckStarted) return;
+                if (DateTime.UtcNow - _settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
+                {
+                    MozaLog.Debug("[UpdateCheck] skipped — last check less than 24h ago");
+                    return;
+                }
+                s_updateCheckStarted = true;
+
+                var channel = _settings.UpdateChannel;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var result = await UpdateCheckService
+                            .CheckAsync(channel, CancellationToken.None)
+                            .ConfigureAwait(false);
+                        _settings.LastUpdateCheckUtc = DateTime.UtcNow;
+
+                        if (result.Success && !string.IsNullOrEmpty(result.LatestVersion))
+                        {
+                            _settings.LastSeenLatestVersion = result.LatestVersion;
+                            _settings.LastSeenReleaseUrl = result.ReleaseUrl;
+                            MozaLog.Debug(
+                                $"[UpdateCheck] {channel}: latest={result.LatestVersion}");
+                        }
+                        else if (!result.Success)
+                        {
+                            MozaLog.Debug(
+                                $"[UpdateCheck] {channel} failed: {result.ErrorKind} {result.ErrorMessage}");
+                        }
+
+                        try { this.SaveCommonSettings("MozaPluginSettings", _settings); }
+                        catch { /* persistence is best-effort */ }
+                    }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Debug($"[UpdateCheck] background task threw: {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[UpdateCheck] scheduler threw: {ex.Message}");
+            }
         }
 
         // Trace log helper — emit the active wheel page's sleep bundle state

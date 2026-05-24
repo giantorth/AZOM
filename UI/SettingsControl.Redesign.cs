@@ -153,6 +153,11 @@ namespace MozaPlugin
                 if (AboutVersionText != null)
                     AboutVersionText.Text = "v" + DiagnosticsTextBuilder.GetPluginVersion();
 
+                // Update-notification banner + settings (About tab). Reads
+                // persisted state from MozaPluginSettings populated by the
+                // fire-and-forget check kicked off from MozaPlugin.Init().
+                InitUpdateBannerControls();
+
                 // Connection pill initial sync
                 UpdateConnectionPill();
 
