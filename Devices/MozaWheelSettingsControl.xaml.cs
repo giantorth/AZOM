@@ -809,7 +809,18 @@ namespace MozaPlugin.Devices
 
                 if (showTelemetry && _data != null)
                 {
+                    // Fallback chain when _data hasn't been populated yet
+                    // (window between connect and first ApplyDashToHardware):
+                    // active profile → settings default (100). Avoids showing 0
+                    // on the slider — which would lie about the wheel's real
+                    // brightness and let a track-click commit 0 to the wire.
                     int b = _data.DashDisplayBrightness;
+                    if (b < 0)
+                    {
+                        var profile = _plugin?.Settings?.ProfileStore?.CurrentProfile;
+                        b = profile?.DashDisplayBrightness ?? -1;
+                        if (b < 0) b = _plugin?.Settings?.DashDisplayBrightness ?? 100;
+                    }
                     if (b < 0) b = 0; else if (b > 100) b = 100;
                     WheelDisplayBrightnessSlider.Value = b;
                     WheelDisplayBrightnessValue.Text = $"{b}";
@@ -1522,7 +1533,17 @@ namespace MozaPlugin.Devices
             _displayBrightnessDebounce?.Stop();
             if (_plugin == null || _data == null) return;
             int val = _data.DashDisplayBrightness;
-            if (val < 0) val = 0; else if (val > 100) val = 100;
+            // Sentinel guard: a real slider drag writes _data in ValueChanged
+            // before arming this timer, so val<0 here means the timer fired
+            // without any user input behind it (stale arm). Refuse the push
+            // so we don't clobber the wheel's existing brightness with 0.
+            if (val < 0)
+            {
+                global::MozaPlugin.MozaLog.Debug(
+                    "[Moza] DisplayBrightnessDebounce_Tick: skipping wire push — _data is sentinel");
+                return;
+            }
+            if (val > 100) val = 100;
             // allowZero: true — slider-to-zero is deliberate user intent; other call sites suppress 0.
             _plugin.TelemetrySender?.SendDashDisplayBrightness(val, allowZero: true);
             _plugin.SaveSettings();

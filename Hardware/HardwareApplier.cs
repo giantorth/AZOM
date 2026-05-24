@@ -1,5 +1,6 @@
 using System;
 using MozaPlugin.Devices;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Hardware
 {
@@ -241,6 +242,15 @@ namespace MozaPlugin.Hardware
         public void ApplyDashToHardware(MozaProfile? profile)
         {
             if (profile == null) return;
+
+            // SimHub auto-creates per-game profiles with all-sentinel dash fields
+            // and never routes them through SettingsMigrator. Without seeding,
+            // the >=0 guards below skip every write — _data keeps its sentinel
+            // default and the wire push never fires, so the wheel display sits
+            // at whatever value happened to be on it. Seed sentinels from the
+            // global defaults here; the helper is idempotent (sentinel-only).
+            if (_plugin.Settings != null)
+                new SettingsMigrator(_plugin.Settings).SeedProfileBaselineFromFlatFields(profile);
 
             if (profile.DashRpmBrightness     >= 0) _data.DashRpmBrightness     = profile.DashRpmBrightness;
             if (profile.DashFlagsBrightness   >= 0) _data.DashFlagsBrightness   = profile.DashFlagsBrightness;

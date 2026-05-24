@@ -244,7 +244,7 @@ namespace MozaPlugin
         public volatile int DashRpmDisplayMode;
         public volatile int DashRpmBrightness;
         public volatile int DashFlagsBrightness;
-        public volatile int DashDisplayBrightness;
+        public volatile int DashDisplayBrightness = -1;
         public volatile int DashDisplayStandbyMin;
 
         public readonly byte[][] DashRpmColors = InitRpmColorArray();

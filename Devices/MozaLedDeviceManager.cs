@@ -126,9 +126,6 @@ namespace MozaPlugin.Devices
         private LedDeviceState _lastState = new LedDeviceState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
             Array.Empty<Color>(), Array.Empty<Color>(), 1.0, 1.0, 1.0, 1.0);
-        private double _lastBrightness = -1;
-        private double _lastButtonsBrightness = -1;
-        private double _lastEncodersBrightness = -1;
 
         private Color[]? _lastKnobs;
 
@@ -201,9 +198,6 @@ namespace MozaPlugin.Devices
                 _lastRpmBitmask = -1;
                 _lastButtonBitmask = -1;
                 _lastKnobBitmask = -1;
-                _lastBrightness = -1;
-                _lastButtonsBrightness = -1;
-                _lastEncodersBrightness = -1;
                 _lastKnobSendTime = DateTime.MinValue;
                 _lastKnobActivityTime = DateTime.MinValue;
                 _ledsAwake = false;
@@ -621,44 +615,16 @@ namespace MozaPlugin.Devices
                     }
                 }
 
-                // --- Brightness (existing change detection) ---
-                if (rpmBrightness != _lastBrightness)
-                {
-                    _lastBrightness = rpmBrightness;
-                    if (isNewWheel)
-                        plugin.DeviceManager.WriteSetting("wheel-rpm-brightness", (int)(rpmBrightness * 100));
-                    else if (isOldWheel)
-                        plugin.DeviceManager.WriteSetting("wheel-old-rpm-brightness", (int)(rpmBrightness * 15));
-                    anySent = true;
-                }
-
-                // Flag brightness was previously slaved to SimHub's per-frame rpmBrightness
-                // here. Removed: SimHub passes 0 during scene transitions / no-game states,
-                // which would blank the flag LEDs (and was the source of the dashboard
-                // "incorrectly sending 0 brightness" bug). SimHub brightness now applies to
-                // wheel RPM + button LEDs only; flag LEDs use the stored config written via
-                // ApplySavedDashSettings on connect / plugin UI slider.
-
-                // Skip wheels with no button LEDs (e.g. the original CS) — the
-                // wheel doesn't know about wheel-buttons-brightness and the write
-                // just adds wire noise + a pending tracker entry that times out.
-                if (isNewWheel && (modelInfo?.ButtonLedCount ?? 0) > 0
-                    && buttonsBrightness != _lastButtonsBrightness)
-                {
-                    _lastButtonsBrightness = buttonsBrightness;
-                    plugin.DeviceManager.WriteSetting("wheel-buttons-brightness", (int)(buttonsBrightness * 100));
-                    anySent = true;
-                }
-
-                // Knob ring brightness: SimHub's per-LED-type "encoders" brightness slider
-                // drives the same wheel-knob-brightness setting that the device-page slider
-                // writes. Only wheels with knob ring LEDs (CS Pro / KS Pro) accept this.
-                if (isNewWheel && modelInfo?.KnobRingLeds != null && encodersBrightness != _lastEncodersBrightness)
-                {
-                    _lastEncodersBrightness = encodersBrightness;
-                    plugin.DeviceManager.WriteSetting("wheel-knob-brightness", (int)(encodersBrightness * 100));
-                    anySent = true;
-                }
+                // RPM / buttons / knob-ring brightness were previously slaved to SimHub's
+                // per-frame rpmBrightness / buttonsBrightness / encodersBrightness here.
+                // Removed: SimHub passes 0 during scene transitions / no-game states /
+                // plugin-disabled idles, which got written to the wheel's persistent
+                // brightness settings and left the LEDs dark until SimHub recovered (the
+                // user-visible "randomly went to 0" symptom). Matches the existing
+                // treatment of flag-LEDs (above) and the standalone dashboard
+                // (MozaDashLedDeviceManager) — brightness for these channels is now
+                // exclusively stored config, written via the plugin's UI sliders and
+                // re-applied on connect through ApplyWheelToHardware / WriteKnobRingColors.
 
                 // --- Keepalive: resend last state periodically for ES wheel compat ---
                 if (anySent)
