@@ -111,7 +111,7 @@ namespace MozaPlugin
             }
 
             string current = DiagnosticsTextBuilder.GetPluginVersion();
-            if (UpdateCheckService.CompareSemVer(latest, current) <= 0)
+            if (!UpdateCheckService.IsUpdateAvailable(latest, current, s.UpdateChannel))
             {
                 UpdateBannerBorder.Visibility = Visibility.Collapsed;
                 return;
@@ -393,7 +393,8 @@ namespace MozaPlugin
                     // available; otherwise show the timestamp.
                     string current = DiagnosticsTextBuilder.GetPluginVersion();
                     bool upToDate = string.IsNullOrEmpty(result.LatestVersion)
-                        || UpdateCheckService.CompareSemVer(result.LatestVersion, current) <= 0;
+                        || !UpdateCheckService.IsUpdateAvailable(
+                            result.LatestVersion, current, s.UpdateChannel);
                     if (upToDate)
                         UpdateLastCheckedText.Text = Strings.Status_UpdateUpToDate;
                     else

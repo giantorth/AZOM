@@ -269,6 +269,89 @@ namespace MozaPlugin.UI.UpdateCheck
         }
 
         /// <summary>
+        /// Decide whether <paramref name="latest"/> represents a build the
+        /// user should be offered as an update over <paramref name="current"/>.
+        /// SemVer ordering alone is wrong for the dev channel: two dev builds
+        /// in the same stable cycle share the MAJ.MIN.PAT core (the workflow
+        /// stamps "<i>next</i>-dev.&lt;sha&gt;" where <i>next</i> only bumps
+        /// when a new stable is tagged), so SemVer falls through to comparing
+        /// the 7-char git SHA as an alphanumeric prerelease identifier — a
+        /// near-random ordering that hides ~half of newer dev builds.
+        ///
+        /// The dev-latest GitHub tag is a rolling pointer reset on every push
+        /// to dev (see .github/workflows/dev-build.yml), so any dev-formatted
+        /// remote version whose SHA differs from the running one is, by
+        /// construction, newer. We special-case that here and otherwise defer
+        /// to spec-correct SemVer comparison.
+        /// </summary>
+        public static bool IsUpdateAvailable(
+            string latest, string current, UpdateChannel channel)
+        {
+            if (string.IsNullOrEmpty(latest)) return false;
+            if (string.IsNullOrEmpty(current)) return true;
+
+            if (channel == UpdateChannel.Dev
+                && TryParseDevBuildSha(latest, out int[]? coreL, out string shaL)
+                && TryParseDevBuildSha(current, out int[]? coreC, out string shaC)
+                && coreL![0] == coreC![0]
+                && coreL[1] == coreC[1]
+                && coreL[2] == coreC[2]
+                && !string.Equals(shaL, shaC, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return CompareSemVer(latest, current) > 0;
+        }
+
+        // Returns true when `version` matches the CI dev-build shape
+        // "MAJ.MIN.PAT-dev.<sha>" (any optional +build metadata stripped).
+        // The SHA portion may be any non-empty token after "dev."; we keep it
+        // lenient so a future commit-hash length change doesn't silently
+        // disable the dev-channel comparison override.
+        internal static bool TryParseDevBuildSha(
+            string version, out int[]? core, out string sha)
+        {
+            core = null;
+            sha = "";
+            if (string.IsNullOrEmpty(version)) return false;
+
+            // Drop +build metadata per SemVer §10 before parsing.
+            int plus = version.IndexOf('+');
+            string v = plus >= 0 ? version.Substring(0, plus) : version;
+
+            int dash = v.IndexOf('-');
+            if (dash < 0) return false;
+
+            string coreStr = v.Substring(0, dash);
+            string pre = v.Substring(dash + 1);
+
+            // Prerelease must start with "dev." and have a non-empty tail.
+            const string devPrefix = "dev.";
+            if (!pre.StartsWith(devPrefix, StringComparison.Ordinal)) return false;
+            string shaPart = pre.Substring(devPrefix.Length);
+            if (string.IsNullOrEmpty(shaPart)) return false;
+            // A SemVer prerelease can have more dot-separated identifiers
+            // after the SHA in principle; treat the next segment, if any, as
+            // belonging to the SHA identifier so we don't accidentally match
+            // unrelated formats. The CI never emits a second identifier.
+            int nextDot = shaPart.IndexOf('.');
+            if (nextDot >= 0) return false;
+
+            var parts = coreStr.Split('.');
+            if (parts.Length < 3) return false;
+            var parsed = new int[3];
+            for (int i = 0; i < 3; i++)
+            {
+                if (!int.TryParse(parts[i], out parsed[i])) return false;
+            }
+
+            core = parsed;
+            sha = shaPart;
+            return true;
+        }
+
+        /// <summary>
         /// Compare two SemVer strings. Returns &lt;0 if a&lt;b, 0 if equal,
         /// &gt;0 if a&gt;b. Tolerates malformed input by treating
         /// unparseable strings as equal — better to under-report an update
