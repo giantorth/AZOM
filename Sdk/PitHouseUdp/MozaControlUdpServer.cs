@@ -190,10 +190,17 @@ namespace MozaPlugin.Sdk.PitHouseUdp
                     var endpoint = new IPEndPoint(IPAddress.Loopback, desiredPort);
                     var udp = new UdpClient(endpoint);
 
-                    // 200 ms receive timeout so the loop polls _stopRequested
-                    // without blocking forever — same shutdown pattern as
-                    // MozaSdkCoapServer.
-                    udp.Client.ReceiveTimeout = 200;
+                    // No ReceiveTimeout: ReceiveLoop uses Socket.Poll for
+                    // its 200 ms wake-up budget. The prior approach set
+                    // ReceiveTimeout=200 and caught the resulting
+                    // SocketException(TimedOut) silently, but SimHub's
+                    // AppDomain.FirstChanceException listener logs every
+                    // thrown exception regardless of catch — at ~5 Hz it
+                    // spammed SimHub.txt with thousands of "First chance
+                    // exception" stack traces and made the log unusable
+                    // for real errors. Poll returns a bool on timeout
+                    // (no exception) so the steady-state idle loop stays
+                    // exception-free.
 
                     _udp = udp;
                     _boundPort = ((IPEndPoint)udp.Client.LocalEndPoint!).Port;
@@ -286,6 +293,30 @@ namespace MozaPlugin.Sdk.PitHouseUdp
 
             while (!_stopRequested && udp != null)
             {
+                // Wait up to 200 ms for data or stop-check budget. Poll
+                // returns false on timeout (no exception), true when data
+                // is ready / the socket is closed / an error is pending.
+                // Receive is only called when Poll says data is ready,
+                // so the idle loop never throws SocketException(TimedOut).
+                bool ready;
+                try
+                {
+                    ready = udp.Client.Poll(200_000, SelectMode.SelectRead);
+                }
+                catch (SocketException sx)
+                {
+                    if (sx.SocketErrorCode == SocketError.Interrupted) break;
+                    if (sx.SocketErrorCode == SocketError.OperationAborted) break;
+                    if (_stopRequested) break;
+                    MozaLog.Debug($"[PitHouseUdp] poll socket error: {sx.SocketErrorCode}: {sx.Message}");
+                    continue;
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+                if (!ready) continue;
+
                 IPEndPoint? remote = null;
                 byte[] datagram;
                 try
@@ -296,7 +327,6 @@ namespace MozaPlugin.Sdk.PitHouseUdp
                 }
                 catch (SocketException sx)
                 {
-                    if (sx.SocketErrorCode == SocketError.TimedOut) continue;
                     if (sx.SocketErrorCode == SocketError.Interrupted) break;
                     if (sx.SocketErrorCode == SocketError.OperationAborted) break;
                     if (_stopRequested) break;

@@ -99,6 +99,19 @@ namespace MozaPlugin.Telemetry.Dashboard
         public static WheelDashboardState? Parse(byte[] jsonBytes, out IReadOnlyList<string> missingFields)
         {
             missingFields = Array.Empty<string>();
+            // Cheap structural pre-check: skip JObject.Parse entirely when
+            // the buffer is obviously not a complete root JSON object yet.
+            // ConfigJsonClient.OnChunk calls us after every wire chunk —
+            // _deviceInbox.TryDecompress returns whatever DeflateStream has
+            // inflated so far, which is partial JSON (truncated mid-string)
+            // until the final chunk lands. Without this check JObject.Parse
+            // throws JsonReaderException(Unterminated string) once per
+            // chunk, the catch below absorbs it, but SimHub's
+            // AppDomain.FirstChanceException listener still logs every
+            // throw — spamming SimHub.txt during every configJson reload.
+            // The try/catch below stays as the backstop for edge cases
+            // where this heuristic passes but the inner JSON is malformed.
+            if (!LooksStructurallyComplete(jsonBytes)) return null;
             try
             {
                 string text = Encoding.UTF8.GetString(jsonBytes);
@@ -159,6 +172,69 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>Overload without missing-fields output, kept for existing callers.</summary>
         public static WheelDashboardState? Parse(byte[] jsonBytes) => Parse(jsonBytes, out _);
+
+        /// <summary>
+        /// One-pass byte scan that returns true only when <paramref name="jsonBytes"/>
+        /// holds a balanced root JSON object: starts with '{', ends with the
+        /// matching '}' at depth 0, and is not mid-string at end. Pure byte
+        /// scan — safe on UTF-8 because the structural characters '{', '}',
+        /// '"', '\\' are all ASCII (&lt; 0x80) and UTF-8 continuation bytes
+        /// never collide with ASCII codepoints. Used as a guard before
+        /// JObject.Parse to avoid throwing JsonReaderException on partial
+        /// chunk-assembly buffers.
+        /// </summary>
+        private static bool LooksStructurallyComplete(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0) return false;
+
+            int i = 0;
+            // Skip leading whitespace and NUL padding so a buffer that starts
+            // with stray nulls still resolves to its real first token.
+            while (i < bytes.Length && IsSkippableByte(bytes[i])) i++;
+            if (i >= bytes.Length || bytes[i] != (byte)'{') return false;
+
+            int depth = 0;
+            bool inString = false;
+            bool escape = false;
+
+            for (; i < bytes.Length; i++)
+            {
+                byte b = bytes[i];
+                if (escape) { escape = false; continue; }
+                if (inString)
+                {
+                    if (b == (byte)'\\') { escape = true; continue; }
+                    if (b == (byte)'"') inString = false;
+                    continue;
+                }
+                switch (b)
+                {
+                    case (byte)'"':
+                        inString = true;
+                        break;
+                    case (byte)'{':
+                        depth++;
+                        break;
+                    case (byte)'}':
+                        depth--;
+                        if (depth < 0) return false;
+                        if (depth == 0)
+                        {
+                            // Root closed — any remaining bytes must be
+                            // skippable (trailing whitespace or NUL padding).
+                            for (int j = i + 1; j < bytes.Length; j++)
+                                if (!IsSkippableByte(bytes[j])) return false;
+                            return true;
+                        }
+                        break;
+                }
+            }
+            // Reached end of buffer without root closing → incomplete.
+            return false;
+        }
+
+        private static bool IsSkippableByte(byte b)
+            => b == (byte)' ' || b == (byte)'\t' || b == (byte)'\r' || b == (byte)'\n' || b == 0;
 
         private static IReadOnlyList<WheelDashboardEntry> ReadDashboards(
             JObject root, string newKey, string oldKey)

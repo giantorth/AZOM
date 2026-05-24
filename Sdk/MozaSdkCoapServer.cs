@@ -196,10 +196,14 @@ namespace MozaPlugin.Sdk
                     var endpoint = new IPEndPoint(IPAddress.Loopback, desiredPort);
                     var udp = new UdpClient(endpoint);
 
-                    // 200 ms receive timeout so the loop can poll _stopRequested
-                    // without blocking forever on a quiet client. The timeout
-                    // surfaces as SocketException with SocketErrorCode = TimedOut.
-                    udp.Client.ReceiveTimeout = 200;
+                    // No ReceiveTimeout: ReceiveLoop uses Socket.Poll for
+                    // its 200 ms wake-up budget. ReceiveTimeout-based
+                    // polling threw SocketException(TimedOut) every 200 ms
+                    // and SimHub's AppDomain.FirstChanceException listener
+                    // logged each throw regardless of catch, which would
+                    // spam SimHub.txt when this server is enabled. Poll
+                    // returns a bool on timeout so the steady-state idle
+                    // loop stays exception-free.
 
                     _udp = udp;
                     _boundPort = ((IPEndPoint)udp.Client.LocalEndPoint!).Port;
@@ -254,11 +258,11 @@ namespace MozaPlugin.Sdk
                 _stopRequested = true;
                 t = _thread;
                 udp = _udp;
-                // Close inside the lock so the receive loop sees an
-                // ObjectDisposedException on its next Receive call. The
-                // ReceiveTimeout above also ensures the loop wakes up
-                // within 200 ms even on platforms where Close doesn't
-                // interrupt a blocked Receive.
+                // Close inside the lock so the receive loop's next
+                // Poll/Receive sees an ObjectDisposedException. Socket.Poll
+                // also has a 200 ms wake-up budget so the loop re-checks
+                // _stopRequested on every cycle even on platforms where
+                // Close doesn't promptly interrupt a blocked Receive.
                 try { udp?.Close(); } catch { }
             }
 
@@ -303,6 +307,33 @@ namespace MozaPlugin.Sdk
 
             while (!_stopRequested && udp != null)
             {
+                // Wait up to 200 ms for data or stop-check budget. Poll
+                // returns false on timeout (no exception), true when data
+                // is ready / the socket is closed / an error is pending.
+                // Receive is only called when Poll says data is ready,
+                // so the idle loop never throws SocketException(TimedOut)
+                // — that pattern surfaced through SimHub's
+                // AppDomain.FirstChanceException listener and would spam
+                // the log when this server is enabled.
+                bool ready;
+                try
+                {
+                    ready = udp.Client.Poll(200_000, SelectMode.SelectRead);
+                }
+                catch (SocketException sx)
+                {
+                    if (sx.SocketErrorCode == SocketError.Interrupted) break;
+                    if (sx.SocketErrorCode == SocketError.OperationAborted) break;
+                    if (_stopRequested) break;
+                    MozaLog.Debug($"[Sdk] CoAP poll socket error: {sx.SocketErrorCode}: {sx.Message}");
+                    continue;
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+                if (!ready) continue;
+
                 IPEndPoint? remote = null;
                 byte[] datagram;
                 try
@@ -313,8 +344,6 @@ namespace MozaPlugin.Sdk
                 }
                 catch (SocketException sx)
                 {
-                    // ReceiveTimeout → keep polling.
-                    if (sx.SocketErrorCode == SocketError.TimedOut) continue;
                     if (sx.SocketErrorCode == SocketError.Interrupted) break;
                     if (sx.SocketErrorCode == SocketError.OperationAborted) break;
                     if (_stopRequested) break;
