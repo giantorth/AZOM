@@ -169,6 +169,17 @@ namespace MozaPlugin.Telemetry
             var sender = _plugin.TelemetrySender;
             if (sender == null) return;
 
+            // Standalone dashboard retarget: CM2 (no wheelbase) routes screen
+            // telemetry to dev=0x12 (CM2 bridge/main) instead of the wheel's
+            // dev=0x17. Inbound dispatcher widens its accepted device fan-in
+            // when this mode flag is set.
+            bool standaloneDashboard = _plugin.ShouldUseStandaloneDashboardTarget();
+            byte targetDeviceId = standaloneDashboard
+                ? _plugin.PreferredStandaloneDashboardTargetDeviceId
+                : MozaProtocol.DeviceWheel;
+            sender.StandaloneDashboardMode = standaloneDashboard;
+            sender.TargetDeviceId = targetDeviceId;
+
             // Source from the current wheel's overlay (single source of truth).
             // When no wheel is identified yet, ActiveTelemetry* return defaults
             // → era Auto, paths empty, no profile loaded. The sender stays idle
@@ -679,10 +690,17 @@ namespace MozaPlugin.Telemetry
             if (t == null) return;
             if (!_plugin.ActiveTelemetryEnabled) return;
             if (!_connection.IsConnected) return;
-            if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
+            // Standalone dashboard (CM2) drives the pipeline without any wheel
+            // attached. Allow start as long as either a wheel detected OR a
+            // standalone dashboard is the connection target.
+            bool standaloneDashboard = _plugin.ShouldUseStandaloneDashboardTarget();
+            if (!_detectionState.NewWheelDetected
+                && !_detectionState.OldWheelDetected
+                && !standaloneDashboard) return;
             // Capability gate: known displayless wheels never get the dashboard
-            // pipeline; unknown models fall back to the runtime probe.
-            if (!_plugin.ShouldDriveDashboard())
+            // pipeline; unknown models fall back to the runtime probe. CM2
+            // standalone is always a dashboard — skip the wheel-display gate.
+            if (!standaloneDashboard && !_plugin.ShouldDriveDashboard())
             {
                 MozaLog.Info(
                     $"[Moza] Wheel '{_data?.WheelModelName}' has no display " +

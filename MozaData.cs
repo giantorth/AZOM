@@ -10,14 +10,22 @@ namespace MozaPlugin
         // Connection status
         public volatile bool IsBaseConnected;
         public volatile bool IsHubConnected;
+        /// <summary>
+        /// True when a standalone dashboard (e.g. CM2 Racing Dash on PID 0x0025) is
+        /// confirmed on the serial bus — either via USB-PID-driven detection in
+        /// <c>MozaPlugin.MarkStandaloneDashboardDetectedFromUsb</c> or because the
+        /// dashboard answered a dash-* settings read on the wire. Lets
+        /// <see cref="IsConnected"/> turn true without a wheelbase/hub present.
+        /// </summary>
+        public volatile bool IsDashboardConnected;
         public volatile bool BaseSettingsRead;
 
         /// <summary>
-        /// True when any Moza device is confirmed on the serial bus (base or hub).
-        /// Use this as the "can I send commands?" guard instead of IsBaseConnected,
-        /// which is only true when a wheelbase is present.
+        /// True when any Moza device is confirmed on the serial bus (base, hub,
+        /// or standalone dashboard). Use this as the "can I send commands?" guard
+        /// instead of IsBaseConnected, which is only true when a wheelbase is present.
         /// </summary>
-        public bool IsConnected => IsBaseConnected || IsHubConnected;
+        public bool IsConnected => IsBaseConnected || IsHubConnected || IsDashboardConnected;
 
         // Wheel identity (populated after wheel detection, cleared on disconnect)
         // Volatile: written from serial read thread, read from UI thread.
@@ -455,12 +463,13 @@ namespace MozaPlugin
                 case "wheel-old-rpm-brightness":     WheelESRpmBrightness = value; break;
                 case "wheel-knob-brightness":        KnobRingBrightness = value; break;
 
-                // Dash settings
-                case "dash-rpm-indicator-mode":  DashRpmIndicatorMode = value; break;
-                case "dash-flags-indicator-mode": DashFlagsIndicatorMode = value; break;
-                case "dash-rpm-display-mode":    DashRpmDisplayMode = value; break;
-                case "dash-rpm-brightness":      DashRpmBrightness = value; break;
-                case "dash-flags-brightness":    DashFlagsBrightness = value; break;
+                // Dash settings — receiving any of these confirms a dashboard
+                // is on the bus (whether wheel-bridged or standalone USB).
+                case "dash-rpm-indicator-mode":   DashRpmIndicatorMode = value; IsDashboardConnected = true; break;
+                case "dash-flags-indicator-mode": DashFlagsIndicatorMode = value; IsDashboardConnected = true; break;
+                case "dash-rpm-display-mode":     DashRpmDisplayMode = value; IsDashboardConnected = true; break;
+                case "dash-rpm-brightness":       DashRpmBrightness = value; IsDashboardConnected = true; break;
+                case "dash-flags-brightness":     DashFlagsBrightness = value; IsDashboardConnected = true; break;
 
                 // Base ambient LED settings
                 case "base-ambient-brightness":      BaseAmbientBrightness = value; break;

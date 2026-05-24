@@ -153,6 +153,31 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
+        /// <summary>Diagnostics block for standalone dashboard target (CM2 etc.).
+        /// Reports whether the open serial connection holds a Dashboard-PID port,
+        /// the active telemetry target dev_id, and whether the dashboard pipeline
+        /// is running in standalone mode. Empty when no Moza serial connection
+        /// is open or when a wheel is driving the pipeline instead.</summary>
+        public static string BuildStandaloneDashboardState(MozaPlugin plugin)
+        {
+            var conn = plugin?.Connection;
+            if (conn == null) return "(no MOZA serial connection)";
+            string pid = conn.DiscoveredPid ?? "(unknown)";
+            string pidDesc = Protocol.MozaUsbIds.Describe(conn.DiscoveredPid);
+            bool isDashPid = Protocol.MozaUsbIds.IsDashboardPid(conn.DiscoveredPid);
+            bool standalone = plugin?.ShouldUseStandaloneDashboardTarget() ?? false;
+            byte target = plugin?.TelemetrySender?.TargetDeviceId ?? Protocol.MozaProtocol.DeviceWheel;
+            string targetDesc = plugin?.TelemetrySender?.TargetDescription ?? $"0x{target:X2}";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"USB PID:        {pid} ({pidDesc})");
+            sb.AppendLine($"Dashboard PID:  {(isDashPid ? "yes" : "no")}");
+            sb.AppendLine($"DashDetected:   {plugin?.IsDashDetected ?? false}");
+            sb.AppendLine($"Standalone:     {standalone}");
+            sb.Append    ($"Target dev_id:  {targetDesc}");
+            return sb.ToString();
+        }
+
         public static string BuildDisplayIdentity(MozaData d)
         {
             if (string.IsNullOrEmpty(d.DisplayModelName) && d.DisplayMcuUid.Length == 0)

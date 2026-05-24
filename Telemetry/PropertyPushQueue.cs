@@ -82,7 +82,7 @@ namespace MozaPlugin.Telemetry
                 }
 
                 int seq = System.Math.Max(2, _sender.Session02OutboundSeq);
-                var frames = TierDefinitionBuilder.ChunkMessage(body, session, ref seq);
+                var frames = TierDefinitionBuilder.ChunkMessage(body, session, ref seq, _sender.TargetDeviceId);
                 var newSeqs = haveKind ? new List<int>(frames.Count) : null;
                 foreach (var frame in frames)
                 {

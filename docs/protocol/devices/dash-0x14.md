@@ -2,6 +2,8 @@
 
 > **This device is the external Moza MDD peripheral** — a separate physical unit, distinct from steering wheels with integrated display screens (device `0x17`). All captured live telemetry targets device `0x17`, not the MDD; whether the MDD uses the same protocol is unknown.
 
+> **CM2 standalone dashboard is a different device.** The CM2 Racing Dash (USB PID `0x0025`) does NOT respond to the legacy MDD command surface at dev=`0x14` for live LED telemetry — `usb-capture/CM2.md` lab tests (2026-05-21) confirmed the `0x41 FD DE` bitmask path at dev=`0x14` has no visible effect on CM2 LEDs. CM2 accepts meter-config writes on its bridge/main at dev=`0x12` under group `0x32` instead (brightness `17 00 FF`, stored colors `1B 00 FF <idx>`, mode/threshold family `18`/`19`/`11`/`0D`/`0E`/`05`). See [`main-hub-0x12.md`](main-hub-0x12.md) § "CM2 bridge/main routing".
+
 ### Group `0x32` / `0x33` (50 / 51) — Settings
 
 | Command | ID | Bytes | Type | Notes |

@@ -245,7 +245,8 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 tiers[i].Builder = new TelemetryFrameBuilder(
                     profile.Tiers[i], _sender.PropertyResolver,
-                    type02NConvention: false);
+                    type02NConvention: false,
+                    deviceId: _sender.TargetDeviceId);
             }
         }
 
@@ -316,7 +317,7 @@ namespace MozaPlugin.Telemetry.Frames
                 {
                     // V0: URL-based subscription. Sentinel 0xFF + tag 0x03 inline. No separate preamble.
                     byte[] message = TierDefinitionBuilder.BuildV0UrlSubscription(profile);
-                    var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq);
+                    var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     int channelCount = 0;
                     foreach (var t in profile.Tiers) channelCount += t.Channels.Count;
@@ -355,7 +356,7 @@ namespace MozaPlugin.Telemetry.Frames
                             0x07, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
                             0x03, 0x00, 0x00, 0x00, 0x00
                         };
-                        var preambleFrames = TierDefinitionBuilder.ChunkMessage(preambleMsg, tierDefSession, ref seq);
+                        var preambleFrames = TierDefinitionBuilder.ChunkMessage(preambleMsg, tierDefSession, ref seq, _sender.TargetDeviceId);
                         foreach (var frame in preambleFrames)
                             Send(frame);
                         preambleChunkCount = preambleFrames.Count;
@@ -429,7 +430,7 @@ namespace MozaPlugin.Telemetry.Frames
                         message = TierDefinitionBuilder.BuildTierDefinitionV2(
                             profile, flagBase, wheelCatalog: null);
                     }
-                    var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq);
+                    var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     MozaLog.Debug(
                         $"[Moza] Sending {(cspIdx ? "type02-section" : "v2-flat")} tier definition: " +

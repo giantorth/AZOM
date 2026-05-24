@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using MozaPlugin.Protocol;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Devices
@@ -19,9 +20,12 @@ namespace MozaPlugin.Devices
     internal static class DeviceDefinitionDeployer
     {
         private const string DashResource = "MozaPlugin.Devices.Dash.device.json";
+        private const string DashCm2Resource = "MozaPlugin.Devices.DashCm2.device.json";
         private const string OldProtoResource = "MozaPlugin.Devices.WheelOldProto.device.json";
         private const string BaseAmbientResource = "MozaPlugin.Devices.WheelBase.device.json";
         private const string DashDeviceName = "MOZA Dashboard";
+        private const string DashCm2DeviceName = "MOZA CM2 Racing Dash";
+        private const string DashCm2ProductName = "CM2 Racing Dash";
         private const string OldProtoDeviceName = "MOZA Old Protocol Wheel";
         private const string BaseAmbientDeviceName = "MOZA Wheel Base";
 
@@ -52,9 +56,15 @@ namespace MozaPlugin.Devices
                 discoveredPid);
         }
 
-        /// <summary>Deploy the embedded dashboard device definition.</summary>
+        /// <summary>
+        /// Deploy the embedded dashboard device definition. Routes by PID:
+        /// CM2 standalone (PID 0x0025) gets the 16-RPM-LED CM2 template;
+        /// every other dashboard PID gets the legacy SHDP template.
+        /// </summary>
         public static bool DeployDashboard(string? discoveredPid)
-            => DeployFromResource(DashDeviceName, DashResource, discoveredPid);
+            => string.Equals(discoveredPid, MozaUsbIds.PidDashboardCm2, StringComparison.OrdinalIgnoreCase)
+                ? DeployFromResource(DashCm2DeviceName, DashCm2Resource, discoveredPid, MozaDeviceConstants.DashCm2Guid)
+                : DeployFromResource(DashDeviceName, DashResource, discoveredPid, MozaDeviceConstants.DashGuid);
 
         /// <summary>
         /// Deploy the embedded "Wheel Base" device definition exposing the
@@ -64,14 +74,14 @@ namespace MozaPlugin.Devices
         /// it (R9/R12) should never see this file deployed.
         /// </summary>
         public static bool DeployBaseAmbient(string? discoveredPid)
-            => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid);
+            => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid, MozaDeviceConstants.BaseAmbientGuid);
 
         /// <summary>
         /// Deploy the old-protocol wheel device definition.
         /// Called once when an ES wheel is detected.
         /// </summary>
         public static bool DeployOldProtoWheel(string? discoveredPid)
-            => DeployFromResource(OldProtoDeviceName, OldProtoResource, discoveredPid);
+            => DeployFromResource(OldProtoDeviceName, OldProtoResource, discoveredPid, MozaDeviceConstants.WheelOldProtoGuid);
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
             int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid)
@@ -260,7 +270,7 @@ namespace MozaPlugin.Devices
             return new JArray(new JObject { ["Size"] = size });
         }
 
-        private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid)
+        private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid, string expectedDescriptorId)
         {
             try
             {
@@ -269,8 +279,54 @@ namespace MozaPlugin.Devices
                 var deviceDir = Path.Combine(userDefsDir, deviceName);
                 var deviceJsonPath = Path.Combine(deviceDir, "device.json");
 
-                if (File.Exists(deviceJsonPath))
-                    return false;
+                bool fileExists = File.Exists(deviceJsonPath);
+                bool stale = false;
+
+                if (fileExists)
+                {
+                    // Compare existing PID + DescriptorUniqueId against expected.
+                    // PID mismatch covers user moving between hardware variants;
+                    // DescriptorUniqueId mismatch covers the plugin shipping a new
+                    // template for the same PID (e.g. previously-deployed SHDP
+                    // template with PID 0x0025 must be replaced with the CM2
+                    // template that uses a different GUID).
+                    try
+                    {
+                        var existing = JObject.Parse(File.ReadAllText(deviceJsonPath));
+                        string? existingPid = existing
+                            .SelectToken("HardwareInterface.HardwareInterface.DeviceDetection.Pid")
+                            ?.Value<string>();
+                        string? existingDescriptorId = existing
+                            .SelectToken("DescriptorUniqueId")
+                            ?.Value<string>();
+                        string expectedPid = discoveredPid ?? FallbackPid;
+                        stale =
+                            !string.Equals(existingPid, expectedPid, StringComparison.OrdinalIgnoreCase)
+                            || !string.Equals(existingDescriptorId, expectedDescriptorId, StringComparison.OrdinalIgnoreCase);
+
+                        // CM2-specific guard: a user-renamed JSON (ProductName
+                        // changed from "CM2 Racing Dash") signals manual
+                        // intervention; rewrite to the shipped template.
+                        if (!stale
+                            && string.Equals(deviceName, DashCm2DeviceName, StringComparison.Ordinal))
+                        {
+                            string? productName = existing
+                                .SelectToken("DeviceDescription.ProductName")
+                                ?.Value<string>();
+                            if (!string.Equals(productName, DashCm2ProductName, StringComparison.Ordinal))
+                                stale = true;
+                        }
+                    }
+                    catch (Exception parseEx)
+                    {
+                        MozaLog.Warn(
+                            $"[Moza] Could not parse existing device.json for '{deviceName}', rewriting: {parseEx.Message}");
+                        stale = true;
+                    }
+
+                    if (!stale)
+                        return false;
+                }
 
                 var assembly = Assembly.GetExecutingAssembly();
                 using (var stream = assembly.GetManifestResourceStream(resourceName))
@@ -304,7 +360,8 @@ namespace MozaPlugin.Devices
                     File.WriteAllText(deviceJsonPath, json);
                 }
 
-                MozaLog.Info($"[Moza] Deployed device definition: {deviceName} (restart SimHub to add it)");
+                string action = stale ? "Refreshed" : "Deployed";
+                MozaLog.Info($"[Moza] {action} device definition: {deviceName} (restart SimHub to add it)");
                 return true;
             }
             catch (Exception ex)

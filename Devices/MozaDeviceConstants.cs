@@ -15,6 +15,7 @@ namespace MozaPlugin.Devices
         /// These are permanent — changing them orphans existing user device instances.
         /// </summary>
         public const string DashGuid          = "c97a4d00-a66d-4e2f-a9b4-e7fc348dcc33";
+        public const string DashCm2Guid       = "6a2d9b0f-8b1e-4d32-9c18-1f5ec8a81025";
         public const string WheelGenericGuid  = "ed153fcb-774d-4cea-97db-5f7096cd1099";
         public const string WheelOldProtoGuid = "5e70f006-ba71-4987-9e88-840d650b12ef";
         // Wheelbase ambient LED strip (18 LEDs across two physical 9-LED strips).
@@ -202,9 +203,10 @@ namespace MozaPlugin.Devices
             return null;
         }
 
-        /// <summary>Returns true if the DeviceTypeID is a known dashboard device.</summary>
+        /// <summary>Returns true if the DeviceTypeID is a known dashboard device (legacy SHDP or standalone CM2).</summary>
         public static bool IsDashDevice(string deviceTypeId) =>
-            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, DashGuid);
+            !string.IsNullOrEmpty(deviceTypeId)
+            && (Matches(deviceTypeId, DashGuid) || Matches(deviceTypeId, DashCm2Guid));
 
         /// <summary>Returns true if the DeviceTypeID is the wheel base ambient LED device.</summary>
         public static bool IsBaseAmbientDevice(string deviceTypeId) =>

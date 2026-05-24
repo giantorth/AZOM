@@ -25,6 +25,7 @@ expected to stay in sync.
 | `0x001E` | Shifter     | HGP                           | unconfirmed |
 | `0x001F` | Handbrake   | HBP                           | unconfirmed |
 | `0x0020` | Hub         | Universal HUB                 | confirmed   |
+| `0x0025` | Dashboard   | CM2 Racing Dash               | confirmed   |
 | `0x1000` | Ab9         | AB9 active shifter            | confirmed   |
 
 PID `0x0006` is reported by Windows as USB string `"MOZA R12 Base"`
@@ -47,6 +48,7 @@ CDC device.
 | `Shifter`   | *(none yet — placeholder for HGP/sequential CDC traffic)*                 | *(none)*                                                              |
 | `Handbrake` | *(none yet — placeholder for HBP CDC traffic)*                            | *(none)*                                                              |
 | `Hub`       | Same `MozaSerialConnection` instance as `Wheelbase` (the wheelbase filter admits hub PIDs) | `MozaProbeTarget.BaseAndHub` — registry direct-claims the hub port without re-probing; the post-session `0xE4` reply from `hub-port1-power` calls `MarkHubDetected()` to set `HubProbeSucceeded` for [`TelemetrySender`](../../../Telemetry/TelemetrySender.cs)'s 5-slot enumeration burst |
+| `Dashboard` | Same `MozaSerialConnection` instance as `Wheelbase` (the wheelbase filter admits dashboard PIDs) | Registry direct-claims the dashboard port; dashboard presence is confirmed from the USB PID itself (no wheelbase relay required), and screen telemetry / config writes address `dev_id=0x12` (CM2 bridge/main) instead of `0x14` |
 | `Unknown`   | Both `Wheelbase` and `Ab9` connections accept unknown PIDs as fallback    | Each runs its own probe; the first matching response wins             |
 
 ## Discovery path

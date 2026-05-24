@@ -281,7 +281,39 @@ namespace MozaPlugin
         /// </summary>
         internal DateTime StartupUtc { get; private set; } = DateTime.UtcNow;
 
-        internal bool IsDashDetected => DetectionState.DashDetected;
+        /// <summary>
+        /// True when the open serial port belongs to a Moza dashboard PID
+        /// (CM2 = 0x0025). Lets dashboard detection flip on USB PID alone,
+        /// without waiting for a wheelbase relay or wheel-side ack.
+        /// </summary>
+        private bool IsStandaloneDashboardUsbConnection =>
+            _connection?.IsConnected == true
+            && MozaUsbIds.IsDashboardPid(_connection.DiscoveredPid);
+
+        internal bool IsDashDetected =>
+            DetectionState.DashDetected || IsStandaloneDashboardUsbConnection;
+
+        /// <summary>
+        /// True iff the active dashboard pipeline must address a standalone
+        /// dashboard (CM2 bridge/main at dev=0x12) rather than a wheel-hosted
+        /// display at dev=0x17. Requires: dashboard detected, no wheel detected,
+        /// and the open USB PID classified as Dashboard.
+        /// </summary>
+        internal bool ShouldUseStandaloneDashboardTarget()
+        {
+            if (!DetectionState.DashDetected && !IsStandaloneDashboardUsbConnection) return false;
+            if (DetectionState.NewWheelDetected || DetectionState.OldWheelDetected) return false;
+            return MozaUsbIds.IsDashboardPid(_connection?.DiscoveredPid);
+        }
+
+        /// <summary>
+        /// Target dev_id for screen telemetry / session-control frames when
+        /// driving a standalone dashboard. Pinned to <see cref="MozaProtocol.DeviceMain"/>
+        /// (0x12 = CM2 bridge/main) — the verified target for CM2; a future
+        /// second standalone dash model can override here.
+        /// </summary>
+        internal byte PreferredStandaloneDashboardTargetDeviceId => MozaProtocol.DeviceMain;
+
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
@@ -542,6 +574,7 @@ namespace MozaPlugin
                     _connection = new MozaSerialConnection(
                         pid => MozaUsbIds.IsWheelbasePid(pid)
                                || MozaUsbIds.IsHubPid(pid)
+                               || MozaUsbIds.IsDashboardPid(pid)
                                || !MozaUsbIds.IsKnownMozaPid(pid),
                         MozaProbeTarget.BaseAndHub,
                         disableProbeFallback);
@@ -718,6 +751,16 @@ namespace MozaPlugin
                 // Publish Instance only after all resources are wired so a partial-init
                 // throw can't leave a half-built plugin reachable from background callbacks.
                 Instance = this;
+
+                // Standalone dashboard reuse path: if the persistent
+                // serial connection is still alive and the open port is
+                // a Dashboard PID (CM2 = 0x0025), flip detection + deploy
+                // device.json + apply profile + start telemetry without
+                // waiting for the TryConnect tick. Covers SimHub reload-
+                // without-restart and the cold-init-with-already-open-port
+                // case. The call is idempotent and safe on every Init.
+                if (_connection != null && _connection.IsConnected)
+                    MarkStandaloneDashboardDetectedFromUsb("init");
 
                 // Third-party SDK emulation. Two independent toggles:
                 //   - SdkEmulationEnabled gates the CoAP server (40266) and
@@ -1610,6 +1653,7 @@ namespace MozaPlugin
                 {
                     _unmatched = 0;
                     MozaLog.Info("[Moza] Connected to MOZA device");
+                    MarkStandaloneDashboardDetectedFromUsb("serial connect");
                     _deviceManager.ReadSettings(StatusPollCommands);
                     _deviceManager.ProbeWheelDetection();
                     _deviceManager.ReadSetting("dash-rpm-indicator-mode");
@@ -1642,6 +1686,54 @@ namespace MozaPlugin
             {
                 Interlocked.Exchange(ref _connectingFlag, 0);
             }
+        }
+
+        /// <summary>
+        /// Flip dashboard detection on USB-PID alone when the open port is a
+        /// Moza dashboard PID (CM2 = 0x0025). Idempotent. On rising edge
+        /// deploys the CM2 device.json, reads CM2 settings, applies the
+        /// current dash profile, and asks the binding coordinator to apply
+        /// telemetry settings + start the sender. Each phase is wrapped in
+        /// try/catch so a single failed phase doesn't abort the rest of the
+        /// detection sequence. Called from <see cref="Init"/> (covers
+        /// persistent-connection reuse and reload-without-restart) and from
+        /// <see cref="TryConnect"/> (covers normal first-connect).
+        /// </summary>
+        private bool MarkStandaloneDashboardDetectedFromUsb(string reason)
+        {
+            if (!IsStandaloneDashboardUsbConnection)
+                return false;
+
+            bool rising = !DetectionState.DashDetected;
+            DetectionState.DashDetected = true;
+            _data.IsDashboardConnected = true;
+
+            if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
+                DeviceDefinitionDeployed = true;
+
+            if (rising)
+            {
+                MozaLog.Info(
+                    $"[Moza] Standalone dashboard detected from USB PID " +
+                    $"{_connection.DiscoveredPid} ({MozaUsbIds.Describe(_connection.DiscoveredPid)}; {reason})");
+                try { _deviceManager.ReadSettings(Devices.DeviceProber.DashSettingsReadCommands); }
+                catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone dashboard settings probe skipped: {ex.Message}"); }
+            }
+
+            try { ApplyDashToHardware(_settings?.ProfileStore?.CurrentProfile); }
+            catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone dashboard profile apply skipped: {ex.Message}"); }
+
+            try
+            {
+                ApplyTelemetrySettings();
+                StartTelemetryIfReady();
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[Moza] Standalone dashboard telemetry start skipped: {ex.Message}");
+            }
+
+            return true;
         }
 
         /// <summary>Open the AB9 shifter's dedicated CDC port (PID 0x1000) and probe identity.</summary>
@@ -1714,7 +1806,15 @@ namespace MozaPlugin
         {
             MozaLog.Debug($"[Moza] {reason}");
             _telemetrySender?.Stop();
+            // Preserve dash detection when this serial connection is a
+            // standalone dashboard (CM2). Wheel hot-swap shouldn't blank a
+            // CM2's detection — the dash is the connection, not a wheel
+            // peripheral. ResetWheel() clears DashDetected unconditionally,
+            // so re-assert it for standalone-USB dashboards.
+            bool preserveStandaloneDash = IsStandaloneDashboardUsbConnection;
             DetectionState.ResetWheel();
+            if (preserveStandaloneDash)
+                DetectionState.DashDetected = true;
             WheelModelInfo = null;
             _data.ClearWheelIdentity();
             _deviceManager.ResetWheelDetection();

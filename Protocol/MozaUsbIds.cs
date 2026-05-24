@@ -17,6 +17,7 @@ namespace MozaPlugin.Protocol
         Shifter,
         Handbrake,
         Hub,
+        Dashboard,
         Ab9,
         MBooster,
     }
@@ -39,6 +40,7 @@ namespace MozaPlugin.Protocol
         public const string PidShifterHgp      = "0x001E";
         public const string PidHandbrakeHbp    = "0x001F";
         public const string PidHub             = "0x0020";
+        public const string PidDashboardCm2    = "0x0025";
 
         // Single source of truth. ushort key keeps lookups allocation-
         // free on the cache-refresh hot path in MozaPortDiscovery.
@@ -58,6 +60,7 @@ namespace MozaPlugin.Protocol
                 [0x001E] = new InventoryEntry(MozaDeviceCategory.Shifter,   "HGP shifter (unconfirmed)"),
                 [0x001F] = new InventoryEntry(MozaDeviceCategory.Handbrake, "HBP handbrake (unconfirmed)"),
                 [0x0020] = new InventoryEntry(MozaDeviceCategory.Hub,       "Universal HUB"),
+                [0x0025] = new InventoryEntry(MozaDeviceCategory.Dashboard, "CM2 Racing Dash"),
                 [0x1000] = new InventoryEntry(MozaDeviceCategory.Ab9,       "AB9 active shifter"),
             };
 
@@ -104,6 +107,8 @@ namespace MozaPlugin.Protocol
         public static bool IsHandbrakePid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.Handbrake;
         public static bool IsHubPid(string? pid)       => Categorize(pid) == MozaDeviceCategory.Hub;
         public static bool IsHubPid(ushort pid)        => Categorize(pid) == MozaDeviceCategory.Hub;
+        public static bool IsDashboardPid(string? pid) => Categorize(pid) == MozaDeviceCategory.Dashboard;
+        public static bool IsDashboardPid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.Dashboard;
         public static bool IsMBoosterPid(string? pid)  => Categorize(pid) == MozaDeviceCategory.MBooster;
         public static bool IsMBoosterPid(ushort pid)   => Categorize(pid) == MozaDeviceCategory.MBooster;
 

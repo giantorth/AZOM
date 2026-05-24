@@ -26,8 +26,24 @@ namespace MozaPlugin.Telemetry.Inbound
             if (_sender.StateIsIdle) return;
             // data layout: [group, device, cmdPayload...]
             if (data.Length < 4) return;
-            // Only process 0xC3 (response to 0x43) from device 0x71 (nibble-swapped 0x17).
-            if (data[0] != 0xC3 || data[1] != 0x71) return;
+            // Only process 0xC3 (response to 0x43) from the active target.
+            // Standard wheel target = 0x71 (nibble-swapped 0x17). Standalone
+            // dashboards (CM2) answer on their bridge/main 0x21 (nibble-swapped
+            // 0x12); accept the broader set of swapped device ids when the
+            // sender is in standalone-dashboard mode so the wheel-side and
+            // dash-side answer paths both reach the dispatcher.
+            if (data[0] != 0xC3) return;
+            bool targetMatches = data[1] == _sender.TargetDeviceIdSwapped;
+            if (!targetMatches && _sender.IsStandaloneDashboardTarget)
+            {
+                // TODO(cm2): narrow this fan-in once CM2 wire-traces nail down
+                // exactly which dev-ids CM2 answers on for each command family.
+                targetMatches =
+                    data[1] == MozaProtocol.SwapNibbles(MozaProtocol.DeviceMain)
+                    || data[1] == MozaProtocol.SwapNibbles(MozaProtocol.DeviceDash)
+                    || data[1] == MozaProtocol.SwapNibbles(MozaProtocol.DeviceWheel);
+            }
+            if (!targetMatches) return;
 
             byte cmd1 = data[2];
             byte cmd2 = data[3];

@@ -28,10 +28,12 @@ namespace MozaPlugin.Telemetry.Frames
         private readonly TelemetryBitWriter? _bitWriter;
 
         public TelemetryFrameBuilder(DashboardProfile profile)
-            : this(profile, propertyResolver: null, type02NConvention: false) { }
+            : this(profile, propertyResolver: null, type02NConvention: false,
+                deviceId: MozaProtocol.DeviceWheel) { }
 
         public TelemetryFrameBuilder(DashboardProfile profile, Func<string, double>? propertyResolver)
-            : this(profile, propertyResolver, type02NConvention: false) { }
+            : this(profile, propertyResolver, type02NConvention: false,
+                deviceId: MozaProtocol.DeviceWheel) { }
 
         /// <summary>
         /// Build a frame builder. If <paramref name="propertyResolver"/> is supplied,
@@ -45,10 +47,16 @@ namespace MozaPlugin.Telemetry.Frames
         /// PitHouse capture wireshark/csp/start-game-change-dash.pcapng — CSP
         /// frame `7e 0b 43 17 7d 23 32 00 23 32 1d 20 1f 00` has N=11 with
         /// data=1 byte, matching 10+1.
+        ///
+        /// <paramref name="deviceId"/> stamps the device-id byte at frame[3].
+        /// Defaults to <see cref="MozaProtocol.DeviceWheel"/> (0x17) for wheels;
+        /// pass <see cref="MozaProtocol.DeviceMain"/> (0x12) for the CM2 standalone
+        /// dashboard so the wheel/dash firmware decodes the value frames correctly.
         /// </summary>
         public TelemetryFrameBuilder(DashboardProfile profile,
             Func<string, double>? propertyResolver,
-            bool type02NConvention)
+            bool type02NConvention,
+            byte deviceId = MozaProtocol.DeviceWheel)
         {
             _profile = profile;
 
@@ -106,7 +114,7 @@ namespace MozaPlugin.Telemetry.Frames
                 ? (byte)(10 + dataLen)
                 : (byte)(2 + 6 + dataLen);
             _frameBuffer[2] = MozaProtocol.TelemetrySendGroup;  // 43
-            _frameBuffer[3] = MozaProtocol.DeviceWheel;         // 17
+            _frameBuffer[3] = deviceId;                         // 0x17 wheel / 0x12 CM2 main
             _frameBuffer[4] = 0x7D;                             // cmdId[0]
             _frameBuffer[5] = 0x23;                             // cmdId[1]
             _frameBuffer[6] = 0x32;                             // header prefix
@@ -314,13 +322,13 @@ namespace MozaPlugin.Telemetry.Frames
         /// Build a stub frame for a tier with no active channels.
         /// Frame contains the full fixed header but no data bytes.
         /// </summary>
-        public static byte[] BuildStubFrame(byte flagByte)
+        public static byte[] BuildStubFrame(byte flagByte, byte deviceId = MozaProtocol.DeviceWheel)
         {
             var frame = new byte[HeaderLen + ChecksumLen];
             frame[0] = MozaProtocol.MessageStart;
             frame[1] = (byte)(2 + 6);  // N legacy: cmd+prefix, no data
             frame[2] = MozaProtocol.TelemetrySendGroup;
-            frame[3] = MozaProtocol.DeviceWheel;
+            frame[3] = deviceId;
             frame[4] = 0x7D;
             frame[5] = 0x23;
             frame[6] = 0x32;

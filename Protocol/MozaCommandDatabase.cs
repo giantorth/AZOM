@@ -346,6 +346,42 @@ namespace MozaPlugin.Protocol
             // Dash flag default colors (write-only, id [8, 0])
             AddCommand("dash-flag-colors", "dash", 0xFF, 50, new byte[] { 8, 0 }, 18, "array");
 
+            // ===== CM2 STANDALONE DASHBOARD METER CONFIG (dev=0x12, write grp 0x32) =====
+            // Verified working in usb-capture/CM2.md lab 2026-05-21: standalone CM2
+            // receives meter-config writes on its bridge/main (dev=0x12) under group
+            // 0x32. Distinct from legacy dash-* commands at dev=0x14 — those did
+            // *not* drive the CM2's LEDs in lab tests. All commands are write-only
+            // (read_group=0xFF) to avoid colliding with dash-* read paths at grp 51.
+            //
+            // device-type "cm2-main" routes via MozaDeviceManager.GetDeviceId → 0x12.
+            //
+            // - 17 00 FF + value : indicator brightness (lab-verified visible effect)
+            // - 18 00 + value    : normal mode (0=off, 1=telemetry, 2=forced-on)
+            // - 19 00 + value    : standby mode
+            // - 11 00 + value    : RPM group mode (1 = SimHub/telemetry mode)
+            // - 11 02 + value    : flag group mode (1 = SimHub/telemetry mode)
+            // - 0D + value       : RPM regulation mode (encoding TBV — write both
+            //                      percent and absolute thresholds until confirmed)
+            // - 05 + 10 B        : RPM percent thresholds (10-byte ramp)
+            // - 0E <i> + u32     : RPM absolute threshold per rung (10 thresholds)
+            // - 1B 00 FF <i> + RGB : per-LED stored color (16 LEDs, persists across
+            //                      replug — use only for profile apply, not per-frame)
+            AddCommand("cm2-indicator-brightness", "cm2-main", 0xFF, 0x32, new byte[] { 0x17, 0x00, 0xFF }, 1, "int");
+            AddCommand("cm2-normal-mode",          "cm2-main", 0xFF, 0x32, new byte[] { 0x18, 0x00 }, 1, "int");
+            AddCommand("cm2-standby-mode",         "cm2-main", 0xFF, 0x32, new byte[] { 0x19, 0x00 }, 1, "int");
+            AddCommand("cm2-rpm-group-mode",       "cm2-main", 0xFF, 0x32, new byte[] { 0x11, 0x00 }, 1, "int");
+            AddCommand("cm2-flag-group-mode",      "cm2-main", 0xFF, 0x32, new byte[] { 0x11, 0x02 }, 1, "int");
+            AddCommand("cm2-rpm-regulation-mode",  "cm2-main", 0xFF, 0x32, new byte[] { 0x0D }, 1, "int");
+            // 10-byte percent ramp (one byte per RPM rung, 0..100).
+            AddCommand("cm2-rpm-percent-thresholds", "cm2-main", 0xFF, 0x32, new byte[] { 0x05 }, 10, "array");
+            // Per-rung absolute RPM thresholds (10 rungs, u32 each).
+            for (byte i = 0; i < 10; i++)
+                AddCommand($"cm2-rpm-absolute-threshold{i + 1}", "cm2-main", 0xFF, 0x32, new byte[] { 0x0E, i }, 4, "int");
+            // Per-LED stored color (16 LEDs on CM2 — all 16 are RPM positions per
+            // user-confirmed hardware layout). cmd `1B 00 FF <i>` + RGB.
+            for (byte i = 0; i < 16; i++)
+                AddCommand($"cm2-stored-color{i + 1}", "cm2-main", 0xFF, 0x32, new byte[] { 0x1B, 0x00, 0xFF, i }, 3, "array");
+
             // ===== HANDBRAKE (device: handbrake, read group 91, write group 92) =====
             AddCommand("handbrake-direction",        "handbrake", 91, 92, new byte[] { 1 },  2, "int");
             AddCommand("handbrake-min",              "handbrake", 91, 92, new byte[] { 2 },  2, "int");

@@ -1513,6 +1513,9 @@ namespace MozaPlugin
             sb.AppendLine("=== Display sub-device identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data));
             sb.AppendLine();
+            sb.AppendLine("=== Standalone dashboard ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildStandaloneDashboardState(_plugin));
+            sb.AppendLine();
             sb.AppendLine("=== Dashboard state ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildDashboardState(_plugin));
             sb.AppendLine();

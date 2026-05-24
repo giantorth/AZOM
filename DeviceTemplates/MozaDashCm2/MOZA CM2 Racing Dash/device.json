@@ -1,0 +1,39 @@
+{
+  "DescriptorUniqueId": "6a2d9b0f-8b1e-4d32-9c18-1f5ec8a81025",
+  "SchemaVersion": 1,
+  "MinimumSimHubVersion": "9.11.8",
+  "DeviceDescription": {
+    "BrandName": "MOZA",
+    "ProductName": "CM2 Racing Dash"
+  },
+  "LedsFeature": {
+    "IsIndividualLedsSectionEnabled": true,
+    "PhysicalLedsMappings": {
+      "Items": [
+        { "SourceRole": 1, "SourceIndex": 0, "RepeatCount": 16, "RepeatMode": 1 },
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+      ]
+    },
+    "LogicalTelemetryLeds": {
+      "LedCount": 16,
+      "Segments": [],
+      "IsEnabled": true
+    },
+    "IsEnabled": true
+  },
+  "HardwareInterface": {
+    "HardwareInterface": {
+      "TypeName": "LedsStandardHIDProtocol",
+      "IsSerialNumberPickerEnabled": false,
+      "HIDUsagePage": "0xFF00",
+      "HIDUsage": "0x77",
+      "HIDReportId": "0x68",
+      "HIDReportSize": 64,
+      "DeviceDetection": {
+        "Vid": "0x346E",
+        "Pid": "__DETECT_PID__"
+      }
+    }
+  },
+  "IsLocked": true
+}

@@ -261,17 +261,114 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(profile.DashFlagColors, _data.DashFlagColors);
 
             if (!_detectionState.DashDetected || !_data.IsConnected) return;
+
+            // CM2 standalone path: route via the verified group-0x32 / dev=0x12
+            // surface (`cm2-*` commands). The legacy dash-* writes at dev=0x14
+            // had no visible effect on CM2 in usb-capture/CM2.md lab tests, so
+            // skip the per-LED color and indicator-mode writes for CM2.
+            // Brightness goes through both paths as belt-and-suspenders: the
+            // cm2-indicator-brightness write is the authoritative one, but
+            // sending the legacy dash-rpm-brightness too costs nothing and
+            // might engage on different firmware revisions.
+            bool isCm2 = _plugin.ShouldUseStandaloneDashboardTarget();
+
             if (profile.DashRpmBrightness   >= 0) _deviceManager.WriteSetting("dash-rpm-brightness", profile.DashRpmBrightness);
             if (profile.DashFlagsBrightness >= 0) _deviceManager.WriteSetting("dash-flags-brightness", profile.DashFlagsBrightness);
             var sender = _plugin.TelemetrySender;
             if (profile.DashDisplayBrightness   >= 0) sender?.SendDashDisplayBrightness(profile.DashDisplayBrightness);
             if (profile.DashDisplayStandbyMin >= 0) sender?.SendDashDisplayStandbyMinutes(profile.DashDisplayStandbyMin);
-            // dash-flags-indicator-mode forced to 1: firmware default 0 silently drops flag colour writes.
-            _deviceManager.WriteSetting("dash-flags-indicator-mode", 1);
 
-            WriteColorArray(profile.DashRpmColors, "dash-rpm-color", 10);
-            WriteColorArray(profile.DashRpmBlinkColors, "dash-rpm-blink-color", 10);
-            WriteColorArray(profile.DashFlagColors, "dash-flag-color", 6);
+            if (isCm2)
+            {
+                ApplyCm2DashboardConfig(profile);
+            }
+            else
+            {
+                // Legacy SHDP dashboard: dash-flags-indicator-mode forced to 1
+                // (firmware default 0 silently drops flag colour writes).
+                _deviceManager.WriteSetting("dash-flags-indicator-mode", 1);
+
+                WriteColorArray(profile.DashRpmColors, "dash-rpm-color", 10);
+                WriteColorArray(profile.DashRpmBlinkColors, "dash-rpm-blink-color", 10);
+                WriteColorArray(profile.DashFlagColors, "dash-flag-color", 6);
+            }
+        }
+
+        /// <summary>
+        /// Write the CM2-specific meter-config + persistent-color stack on
+        /// dev=0x12 (CM2 bridge/main). Sub-cmds and behavior verified in
+        /// usb-capture/CM2.md (2026-05-21 lab notes). Called from
+        /// <see cref="ApplyDashToHardware"/> when the connection target is a
+        /// standalone CM2 (PID 0x0025).
+        /// </summary>
+        private void ApplyCm2DashboardConfig(MozaProfile profile)
+        {
+            // Meter mode toggles — required to put CM2 firmware in SimHub
+            // telemetry mode so screen widgets + LED ramp follow value frames.
+            // TODO(cm2): cm2-normal-mode 1 vs 2 visually similar in CM2.md
+            // lab — confirm 1 is the correct SimHub-mode value via capture.
+            _deviceManager.WriteSetting("cm2-normal-mode", 1);
+            _deviceManager.WriteSetting("cm2-rpm-group-mode", 1);
+            _deviceManager.WriteSetting("cm2-flag-group-mode", 1);
+
+            // RPM regulation mode + thresholds. CM2.md notes percent-vs-absolute
+            // encoding is not independently verified, so we write BOTH (percent
+            // mode + percent thresholds, plus absolute thresholds derived from
+            // MaxRpm) and let the firmware honour whichever it actually uses.
+            // TODO(cm2): confirm regulation-mode encoding via capture.
+            _deviceManager.WriteSetting("cm2-rpm-regulation-mode", 0);
+
+            // Default percent ramp: 50,55,60,…,95 covering the upper half of
+            // the rev range. CM2 has 16 physical LEDs but the firmware accepts
+            // a 10-entry percent ramp (one entry per "rung"; the firmware
+            // interpolates across physical positions).
+            byte[] percentRamp = new byte[] { 50, 55, 60, 65, 70, 75, 80, 85, 90, 95 };
+            _deviceManager.WriteArray("cm2-rpm-percent-thresholds", percentRamp);
+
+            // Absolute thresholds derived from MaxRpm (fallback 8000 per
+            // CM2.md). Each rung gets (rpm * (i+1) / 10) so the 10 thresholds
+            // span 10%..100% of the configured max.
+            int maxRpm = 8000;
+            // TODO(cm2): plumb MaxRpm from active game when SimHub provides it
+            // (currently using a sensible static default).
+            for (byte i = 0; i < 10; i++)
+            {
+                int threshold = (int)((long)maxRpm * (i + 1) / 10);
+                _deviceManager.WriteSetting($"cm2-rpm-absolute-threshold{i + 1}", threshold);
+            }
+
+            // Indicator brightness — authoritative path for CM2. Reuse the
+            // existing DashRpmBrightness slider as the source so the UI knob
+            // does not double up; the legacy dash-rpm-brightness write above
+            // is kept for compatibility.
+            if (profile.DashRpmBrightness >= 0)
+                _deviceManager.WriteSetting("cm2-indicator-brightness", profile.DashRpmBrightness);
+
+            // 16 stored per-LED colors. The legacy SHDP profile only has 10
+            // RPM + 6 flag colors; map them across the 16 physical CM2
+            // positions: RPM colors 1-10 → cm2-stored-color1..10; flag colors
+            // 1-6 → cm2-stored-color11..16. This makes the existing dash UI
+            // continue to drive useful colors until a CM2-specific 16-color
+            // settings field replaces it. CM2.md confirms 1B 00 FF <i> + RGB
+            // visibly updates the matching LED at dev=0x12.
+            if (profile.DashRpmColors != null)
+            {
+                int rpmCount = System.Math.Min(profile.DashRpmColors.Length, 10);
+                for (int i = 0; i < rpmCount; i++)
+                {
+                    var rgb = MozaProfile.UnpackColor(profile.DashRpmColors[i]);
+                    _deviceManager.WriteColor($"cm2-stored-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                }
+            }
+            if (profile.DashFlagColors != null)
+            {
+                int flagCount = System.Math.Min(profile.DashFlagColors.Length, 6);
+                for (int i = 0; i < flagCount; i++)
+                {
+                    var rgb = MozaProfile.UnpackColor(profile.DashFlagColors[i]);
+                    _deviceManager.WriteColor($"cm2-stored-color{i + 11}", rgb[0], rgb[1], rgb[2]);
+                }
+            }
         }
 
         /// <summary>

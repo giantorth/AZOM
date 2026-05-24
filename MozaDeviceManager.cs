@@ -288,6 +288,42 @@ namespace MozaPlugin
             return WriteArray(commandName, new byte[] { r, g, b });
         }
 
+        // ============================================================
+        // Per-device-id override helpers. Used to retarget existing
+        // commands at a different device (e.g. driving CM2's live RPM
+        // LEDs via the wheel's `wheel-send-rpm-telemetry` /
+        // `wheel-telemetry-rpm-colors` commands sent to dev=0x12 instead
+        // of the wheel's default dev=0x17). Caller picks the deviceId
+        // explicitly; <see cref="GetDeviceId"/> is bypassed.
+        // ============================================================
+
+        public bool WriteSettingForDevice(string commandName, byte deviceId, int value)
+        {
+            if (!_connection.IsConnected) return false;
+            var cmd = MozaCommandDatabase.Get(commandName);
+            if (cmd == null) return false;
+            var msg = cmd.BuildWriteInt(deviceId, value);
+            if (msg == null) return false;
+            _connection.Send(msg);
+            return true;
+        }
+
+        public bool WriteArrayForDevice(string commandName, byte deviceId, byte[] payload)
+        {
+            if (!_connection.IsConnected) return false;
+            var cmd = MozaCommandDatabase.Get(commandName);
+            if (cmd == null) return false;
+            var msg = cmd.BuildWriteMessage(deviceId, payload);
+            if (msg == null) return false;
+            _connection.Send(msg);
+            return true;
+        }
+
+        public bool WriteColorForDevice(string commandName, byte deviceId, byte r, byte g, byte b)
+        {
+            return WriteArrayForDevice(commandName, deviceId, new byte[] { r, g, b });
+        }
+
         public void ReadSettings(params string[] commandNames)
         {
             foreach (var name in commandNames)
@@ -335,15 +371,19 @@ namespace MozaPlugin
         {
             switch (deviceType)
             {
-                case "base":   return MozaProtocol.DeviceBase;
-                case "pedals": return MozaProtocol.DevicePedals;
-                case "wheel":  return _wheelDeviceId;
-                case "dash":   return MozaProtocol.DeviceDash;
-                case "hub":       return MozaProtocol.DeviceHub;
-                case "main":      return MozaProtocol.DeviceMain;
+                case "base":     return MozaProtocol.DeviceBase;
+                case "pedals":   return MozaProtocol.DevicePedals;
+                case "wheel":    return _wheelDeviceId;
+                case "dash":     return MozaProtocol.DeviceDash;
+                case "hub":      return MozaProtocol.DeviceHub;
+                case "main":     return MozaProtocol.DeviceMain;
+                // CM2 standalone dashboard: meter-config commands address the
+                // CM2 bridge/main at dev=0x12 (verified working in usb-capture/CM2.md
+                // lab 2026-05-21); distinct from legacy dash commands at dev=0x14.
+                case "cm2-main": return MozaProtocol.DeviceMain;
                 case "handbrake": return MozaProtocol.DeviceHandbrake;
-                case "ab9":       return MozaProtocol.DeviceAb9;
-                default:          return MozaProtocol.DeviceBase;
+                case "ab9":      return MozaProtocol.DeviceAb9;
+                default:         return MozaProtocol.DeviceBase;
             }
         }
     }

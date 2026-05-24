@@ -94,6 +94,7 @@
     <EmbeddedResource Include="DeviceTemplates\MozaWheelGeneric\MOZA Racing Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelGeneric.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelOldProto\MOZA Old Protocol Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelOldProto.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashShdp\MOZA Dashboard\device.json" LogicalName="MozaPlugin.Devices.Dash.device.json" />
+    <EmbeddedResource Include="DeviceTemplates\MozaDashCm2\MOZA CM2 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm2.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelBase\MOZA Wheel Base\device.json" LogicalName="MozaPlugin.Devices.WheelBase.device.json" />
     <!-- Factory dashboards shipped with MOZA wheel firmware. Copied verbatim
          from PitHouse `bin/dashes/<Name>/<Name>.mzdash`. Name underscores in

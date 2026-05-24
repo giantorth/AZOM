@@ -256,6 +256,80 @@ namespace MozaPlugin.Telemetry
             set => _policy = value ?? EraPolicy.For(MozaWheelEra.Auto);
         }
 
+        // Target device id for screen-telemetry and session-control frames.
+        // Default = DeviceWheel (0x17). Switched to DeviceMain (0x12) by
+        // DashboardBindingCoordinator when a standalone dashboard (CM2) is
+        // connected without a wheel. The setter invalidates per-tier
+        // frame builders + cached display frames so the new dev_id takes
+        // effect on the next frame emit.
+        private byte _targetDeviceId = MozaProtocol.DeviceWheel;
+
+        internal byte TargetDeviceId
+        {
+            get => _targetDeviceId;
+            set
+            {
+                byte next = value == 0 ? MozaProtocol.DeviceWheel : value;
+                if (_targetDeviceId == next) return;
+                _targetDeviceId = next;
+                _cachedDisplayConfigFrames = null;
+                _cachedDisplayConfigPageCount = 0;
+                // Rebuild per-tier frame builders with the new dev_id so value
+                // frames address the right device on the next tick.
+                RebuildFrameBuildersForTargetDevice();
+                MozaLog.Debug($"[Moza] Telemetry target device set to {TargetDescription}");
+            }
+        }
+
+        internal byte TargetDeviceIdSwapped => MozaProtocol.SwapNibbles(_targetDeviceId);
+
+        private bool _standaloneDashboardMode;
+        internal bool StandaloneDashboardMode
+        {
+            get => _standaloneDashboardMode;
+            set => _standaloneDashboardMode = value;
+        }
+
+        /// <summary>True when the telemetry target is a standalone dashboard
+        /// (CM2 bridge/main or legacy dash device). Drives the inbound
+        /// dispatcher's broader device-id fan-in.</summary>
+        internal bool IsStandaloneDashboardTarget =>
+            _standaloneDashboardMode
+            || _targetDeviceId == MozaProtocol.DeviceMain
+            || _targetDeviceId == MozaProtocol.DeviceDash;
+
+        internal string TargetDescription
+        {
+            get
+            {
+                string label;
+                if (IsStandaloneDashboardTarget && _targetDeviceId == MozaProtocol.DeviceMain)
+                    label = "CM2 bridge/main";
+                else if (_targetDeviceId == MozaProtocol.DeviceDash)
+                    label = "dashboard";
+                else if (_targetDeviceId == MozaProtocol.DeviceWheel)
+                    label = "wheel";
+                else
+                    label = "custom";
+                return $"0x{_targetDeviceId:X2} ({label})";
+            }
+        }
+
+        private void RebuildFrameBuildersForTargetDevice()
+        {
+            var profile = _profile;
+            var tiers = _tiers;
+            if (profile == null || tiers == null) return;
+            for (int i = 0; i < tiers.Length && i < profile.Tiers.Count; i++)
+            {
+                if (tiers[i] == null) continue;
+                tiers[i].Builder = new TelemetryFrameBuilder(
+                    profile.Tiers[i], PropertyResolver,
+                    type02NConvention: false,
+                    deviceId: _targetDeviceId);
+            }
+        }
+
         // Session 0x09 configJson RPC. Device pushes dashboard state; we reply
         // with the canonical library list. See docs/protocol/dashboard-upload/config-rpc-session-09.md.
         private readonly ConfigJsonClient _configJson = new ConfigJsonClient();
@@ -429,6 +503,9 @@ namespace MozaPlugin.Telemetry
         private static readonly byte[] _dashKeepaliveFrameDash = BuildKeepaliveFrame(MozaProtocol.DeviceDash);
         private static readonly byte[] _dashKeepaliveFrame15 = BuildKeepaliveFrame(0x15);
         private static readonly byte[] _dashKeepaliveFrameWheel = BuildKeepaliveFrame(MozaProtocol.DeviceWheel);
+        // CM2 standalone dashboard pings its bridge/main at 0x12; the dash/15/wheel
+        // trio above never reaches CM2's expected target.
+        private static readonly byte[] _dashKeepaliveFrameMain = BuildKeepaliveFrame(MozaProtocol.DeviceMain);
 
         // Peripheral output-poll frames — wire-parity polls (handbrake/pedals).
         // Cadence: presence ~22 Hz, handbrake-output ~10 Hz, pedals ~7 Hz.
@@ -739,7 +816,8 @@ namespace MozaPlugin.Telemetry
                         // detection is correct — the previous heuristic wrongly
                         // pinned Type02 N for this wheel.
                         Builder = new TelemetryFrameBuilder(tier, PropertyResolver,
-                            type02NConvention: false),
+                            type02NConvention: false,
+                            deviceId: _targetDeviceId),
                         TickInterval = tickInterval,
                         // Snapshot the pristine (pre-filter) channel list so
                         // ApplySubscription can refilter from scratch each call.
@@ -2098,7 +2176,15 @@ namespace MozaPlugin.Telemetry
             MozaWheelEra resolved;
             string reason;
             int catalogCount = _catalogParser.Count;
-            if (catalogCount > 0)
+            if (IsStandaloneDashboardTarget)
+            {
+                // CM2 standalone dashboard runs Type02-era firmware (verified by
+                // dev_id=0x12 / group=0x32 protocol surface). Without this pin,
+                // the policy resolver waits for a wheel catalog that never arrives.
+                resolved = MozaWheelEra.Era2026;
+                reason = $"standalone dashboard target {TargetDescription}";
+            }
+            else if (catalogCount > 0)
             {
                 resolved = MozaWheelEra.Era2026;
                 reason = $"wheel-catalog={catalogCount}";
@@ -2312,7 +2398,7 @@ namespace MozaPlugin.Telemetry
                 byte[] json = TileServerStateBuilder.BuildEmptyStateJson();
                 byte[] payload = TileServerStateBuilder.BuildFullBlob(json);
                 int seq = 1;
-                var frames = TierDefinitionBuilder.ChunkMessage(payload, 0x03, ref seq);
+                var frames = TierDefinitionBuilder.ChunkMessage(payload, 0x03, ref seq, _targetDeviceId);
                 foreach (var frame in frames)
                     _connection.Send(frame);
                 MozaLog.Debug(
@@ -2358,7 +2444,7 @@ namespace MozaPlugin.Telemetry
             lock (_session09SeqLock)
             {
                 int seq = _session09OutboundSeq + 1;
-                var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq);
+                var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq, _targetDeviceId);
                 chunkCount = frames.Count;
                 foreach (var frame in frames)
                 {
@@ -2428,7 +2514,7 @@ namespace MozaPlugin.Telemetry
             var end = new byte[]
             {
                 MozaProtocol.MessageStart, 0x06,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
                 0x7C, 0x00,
                 session, 0x00,
                 (byte)(seq & 0xFF), (byte)((seq >> 8) & 0xFF),
@@ -2463,7 +2549,7 @@ namespace MozaPlugin.Telemetry
         private byte[] BuildDisplayFrame(byte cmd)
         {
             var frame = new byte[] { MozaProtocol.MessageStart, 0x01,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
                 cmd, 0x00 };
             frame[5] = MozaProtocol.CalculateWireChecksum(frame);
             return frame;
@@ -2475,7 +2561,7 @@ namespace MozaPlugin.Telemetry
             frame[0] = MozaProtocol.MessageStart;
             frame[1] = (byte)(1 + data.Length); // N = cmd + data
             frame[2] = MozaProtocol.TelemetrySendGroup;
-            frame[3] = MozaProtocol.DeviceWheel;
+            frame[3] = _targetDeviceId;
             frame[4] = cmd;
             Array.Copy(data, 0, frame, 5, data.Length);
             frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame);
@@ -2857,7 +2943,7 @@ namespace MozaPlugin.Telemetry
             lock (_session01SeqLock)
             {
                 var frames = Frames.TierDefinitionBuilder.ChunkMessage(
-                    msg, session: 0x01, seq: ref _session01OutboundSeq);
+                    msg, session: 0x01, seq: ref _session01OutboundSeq, deviceId: _targetDeviceId);
                 foreach (var f in frames)
                     _connection.Send(f);
             }
@@ -3271,7 +3357,7 @@ namespace MozaPlugin.Telemetry
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
                 0x7C, 0x00,
                 session, 0x81,          // session byte + type (channel open)
                 port, 0x00,             // seq = port (LE)
@@ -3288,7 +3374,7 @@ namespace MozaPlugin.Telemetry
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x05,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
                 0xFC, 0x00,
                 session,
                 (byte)(ackSeq & 0xFF),
@@ -3315,7 +3401,7 @@ namespace MozaPlugin.Telemetry
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
                 0x7C, 0x00,
                 session, 0x01,                  // type=0x01 (data chunk)
                 (byte)(seq & 0xFF),
@@ -3432,7 +3518,7 @@ namespace MozaPlugin.Telemetry
                 int seq = _session02OutboundSeq;
                 foreach (var vframe in prebuilt)
                 {
-                    var frames = TierDefinitionBuilder.ChunkMessage(vframe, FlagByte, ref seq);
+                    var frames = TierDefinitionBuilder.ChunkMessage(vframe, FlagByte, ref seq, _targetDeviceId);
                     foreach (var frame in frames)
                     {
                         if (_state == TelemetryState.Idle || !_connection.IsConnected)
@@ -3767,6 +3853,10 @@ namespace MozaPlugin.Telemetry
             _connection.Send(_dashKeepaliveFrameDash);
             _connection.Send(_dashKeepaliveFrame15);
             _connection.Send(_dashKeepaliveFrameWheel);
+            // CM2 standalone path: add a ping at 0x12 (CM2 bridge/main) so the
+            // device keeps its connection state warm against the active target.
+            if (IsStandaloneDashboardTarget && _targetDeviceId == MozaProtocol.DeviceMain)
+                _connection.Send(_dashKeepaliveFrameMain);
         }
 
         private static byte[] BuildKeepaliveFrame(byte dev)

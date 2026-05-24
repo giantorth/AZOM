@@ -1,5 +1,31 @@
 ## Main (Device `0x12` / 18)
 
+> Device id `0x12` is shared across several physical devices on the bus — it is the wheelbase main controller, the universal hub, the AB9 active shifter, the mBooster pedals, and the CM2 standalone dashboard's bridge/main. Disambiguation happens at the USB level (each device exposes its own VID/PID composite) and via group context (group `0x32` writes addressed to `0x12` belong to the CM2 standalone dashboard, not the wheelbase main).
+
+### CM2 bridge/main routing
+
+The CM2 Racing Dash (USB PID `0x0025`, plugin-side category `Dashboard`) addresses its meter-config and LED writes at dev=`0x12` under group `0x32` — distinct from legacy MDD-style dashboards which use dev=`0x14` under group `0x32`/`0x33`. Lab-verified working commands (per `usb-capture/CM2.md` 2026-05-21):
+
+| Command intent | Sub-cmd | Payload | Verified visible effect |
+|---|---|---|---|
+| Indicator brightness | `17 00 FF` | int | ✓ brightness changes |
+| Normal mode | `18 00` | int (0=off, 1=telemetry, 2=forced-on) | mode 1/2 visually similar in lab |
+| Standby mode | `19 00` | int | |
+| RPM group mode | `11 00` | int (1 = SimHub mode) | |
+| Flag group mode | `11 02` | int (1 = SimHub mode) | |
+| RPM regulation mode | `0D` | int (0=percent, 1=absolute — TBV) | |
+| RPM percent thresholds | `05` | 10 bytes | |
+| RPM absolute thresholds | `0E <index>` | u32 RPM per rung | |
+| Per-LED stored color | `1B 00 FF <index>` | byte[3] RGB | ✓ persists across replug |
+
+CM2 has 16 physical RPM LEDs (no buttons, no separate flag strip per user-confirmed hardware layout). Physical order: logical 1–3 left side bottom-to-top, 4–13 top row left-to-right, 14–16 right side top-to-bottom.
+
+The legacy dashboard `0x41 FD DE` bitmask path (dev=`0x14`) does NOT visibly drive CM2 LEDs in lab tests. The plugin's CM2 path uses the wheel's RPM-bar live commands (`wheel-telemetry-rpm-colors` cmd `25 00`, `wheel-send-rpm-telemetry` cmd `26 00`) under group `0x3F` retargeted to dev=`0x12` as the working hypothesis for live LED telemetry — **unverified by capture**; needs confirmation against a real CM2 wire-trace.
+
+Screen widget value frames go to dev=`0x12` (CM2 bridge/main) for CM2; wheel-resident displays use dev=`0x17`. See [`../telemetry/live-stream.md`](../telemetry/live-stream.md) § Target device id.
+
+Plugin implementation: `MozaPlugin.ShouldUseStandaloneDashboardTarget()` returns true when the open USB port has a Dashboard-category PID and no wheel is detected; the dashboard binding coordinator then pins `TelemetrySender.TargetDeviceId = 0x12`.
+
 ### Group `0x1E` (30) — Output (read-only)
 
 | Command | ID | Bytes | Type | Notes |

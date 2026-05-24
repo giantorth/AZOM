@@ -478,8 +478,14 @@ namespace MozaPlugin.Telemetry.Frames
         /// Each chunk: session(1) + type(1) + seq(2 LE) + payload(≤54 net + 4 CRC) inside a moza frame.
         /// ALL chunks have a 4-byte CRC-32 trailer (verified by CRC computation against
         /// every chunk in moza-startup-1 and moza-startup-2 captures, including final chunks).
+        ///
+        /// <paramref name="deviceId"/> stamps the device-id byte at frame[3]. Defaults
+        /// to <see cref="MozaProtocol.DeviceWheel"/> (0x17); pass
+        /// <see cref="MozaProtocol.DeviceMain"/> (0x12) for the CM2 standalone
+        /// dashboard target.
         /// </summary>
-        public static List<byte[]> ChunkMessage(byte[] message, byte session, ref int seq)
+        public static List<byte[]> ChunkMessage(byte[] message, byte session, ref int seq,
+            byte deviceId = MozaProtocol.DeviceWheel)
         {
             const int MaxNetPerChunk = 54;  // 58 total - 4 CRC
 
@@ -502,13 +508,13 @@ namespace MozaPlugin.Telemetry.Frames
                     payload[chunkSize + 3] = (byte)((crc >> 24) & 0xFF);
                 }
 
-                // Build the moza frame: 7E [N] 43 17 7C 00 [session] [type=01] [seq LE] [payload] [checksum]
+                // Build the moza frame: 7E [N] 43 <dev> 7C 00 [session] [type=01] [seq LE] [payload] [checksum]
                 int n = 2 + 1 + 1 + 2 + payload.Length; // cmd(2) + session(1) + type(1) + seq(2) + payload
                 var frame = new byte[4 + n + 1]; // start(1) + N(1) + group(1) + device(1) + n_payload + checksum(1)
                 frame[0] = MozaProtocol.MessageStart;
                 frame[1] = (byte)n;
                 frame[2] = MozaProtocol.TelemetrySendGroup;
-                frame[3] = MozaProtocol.DeviceWheel;
+                frame[3] = deviceId;
                 frame[4] = 0x7C;
                 frame[5] = 0x00;
                 frame[6] = session;
