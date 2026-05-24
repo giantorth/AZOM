@@ -31,6 +31,21 @@ namespace MozaPlugin.Devices
         // Engine-vib frequency slider cap (matches the UI slider's Maximum).
         // Older saved profiles may still carry larger values; clamp at use time.
         private const double MaxFreqHz = 200.0;
+        // Pulse-pair emission rate (0x0B 0x02/03 — see ab9-shifter.md).
+        // PitHouse fires at ~1.7 Hz at idle and ~34 Hz at redline; intensity
+        // slider attenuates this multiplicatively.
+        private const double PulseRateIdleHz = 1.7;
+        private const double PulseRateRedlineHz = 34.0;
+        // Safety roll-off: how fast pulse-pair rate is allowed to drop. 500 ms
+        // from redline (34 Hz) to silent is the design point — short enough to
+        // feel responsive on a real gear-shift cut, long enough that game
+        // pause / engine-off / slider-to-zero produce an audible fade rather
+        // than a click.
+        private const double PulseRateRollOffHzPerSec = (PulseRateRedlineHz / 0.5);
+        // Below this rate, treat the stream as effectively silent — flip slot
+        // to 0x0000 and stop emitting pulse pairs. Avoids a long tail of
+        // sub-1-Hz pulses at the bottom of the fade.
+        private const double PulseRateSilentThresholdHz = 0.5;
 
         private readonly MozaAb9DeviceManager _ab9;
         private readonly DeviceDetectionState _detectionState;
@@ -46,6 +61,14 @@ namespace MozaPlugin.Devices
         private int _tickCount;
         private ushort _pulsePhase;
         private short _lowRatePhase;
+        // Slew-rate limited pulse-pair rate. Cuts the audible-click that
+        // would otherwise happen on abrupt drops (slider → 0, game pause,
+        // engine off mid-drive). Rise is instant for responsiveness; fall
+        // decays at PulseRateRollOffHzPerSec.
+        private double _smoothedRateHz;
+        // Last computed period during an active stream — held during a fade
+        // so the oscillator doesn't lurch when RPM drops to 0 mid-fade.
+        private uint _lastActivePeriod = 0x100000;
 
         public Ab9EngineVibrationWorker(
             MozaAb9DeviceManager ab9Manager,
@@ -131,7 +154,7 @@ namespace MozaPlugin.Devices
             double maxRpm = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _latestMaxRpmBits));
             bool gameOn = _latestGameRunning;
 
-            bool streamActive = gameOn && intensity > 0 && rpm > 100.0 && freqHz > 0.0;
+            bool rawActive = gameOn && intensity > 0 && rpm > 100.0 && freqHz > 0.0;
 
             // Engine-RPM relative to redline (0..1). Drives the engine-pulse
             // pair RATE per the PitHouse envelope: ~1.7 Hz at idle, ~34 Hz
@@ -144,39 +167,79 @@ namespace MozaPlugin.Devices
             else
                 rpmRedlineFraction = Math.Min(1.0, Math.Max(0.0, rpm / 8000.0));
 
-            // Slot ID is binary: active slot (0x1996) while streaming, silent
-            // slot (0x0000) otherwise. PitHouse's intensity slider mostly
-            // toggles between these two states at the wire level — the
-            // perceived intensity envelope comes from engine-pulse-pair
-            // density, not slot-side amplitude.
-            bool slotActive = streamActive;
+            // Target pulse-pair emission rate (Hz). The intensity slider
+            // multiplicatively attenuates a purely-RPM-driven baseline rate,
+            // so slider=0 → silent, slider=50 → half PitHouse rate at every
+            // RPM, slider=100 → full PitHouse rate. amp16 stays at the
+            // constant 0x2328 PitHouse uses (verified across 17,603 capture
+            // frames) — see docs/protocol/devices/ab9-shifter.md.
+            double rpmDrivenHz = PulseRateIdleHz
+                                 + (PulseRateRedlineHz - PulseRateIdleHz) * rpmRedlineFraction;
+            double targetRateHz = rawActive ? (intensity / 100.0) * rpmDrivenHz : 0.0;
+
+            // Slew-rate limit on the down direction only. Rise stays instant
+            // so a user revving the engine or pushing the slider up feels
+            // responsive. Drops (game pause, RPM → 0, slider → 0, engine off
+            // mid-drive) decay over ~500 ms to avoid an audible click as the
+            // device firmware sees pulse-pair frames suddenly stop.
+            double rollOffPerTick = PulseRateRollOffHzPerSec * TickPeriodMs / 1000.0;
+            if (targetRateHz < _smoothedRateHz)
+                _smoothedRateHz = Math.Max(targetRateHz, _smoothedRateHz - rollOffPerTick);
+            else
+                _smoothedRateHz = targetRateHz;
+
+            // Effective stream state: raw-active OR still fading down.
+            bool fading = !rawActive && _smoothedRateHz > PulseRateSilentThresholdHz;
+            bool effectiveStreaming = rawActive || fading;
+
+            // Slot ID is binary: active slot (0x1996) while streaming or
+            // fading, silent slot (0x0000) once the fade completes. PitHouse's
+            // intensity slider toggles between these two states at the wire
+            // level — the perceived intensity envelope comes from
+            // engine-pulse-pair density, not slot-side amplitude.
+            bool slotActive = effectiveStreaming;
 
             // 0x0A 0x05 engine-vibration refresh — every tick.
             uint period;
-            if (streamActive)
+            if (rawActive)
             {
                 double p = K / (rpm * freqHz);
                 if (p < MozaAb9DeviceManager.MinPeriodTicks) p = MozaAb9DeviceManager.MinPeriodTicks;
                 if (p > MozaAb9DeviceManager.MaxPeriodTicks) p = MozaAb9DeviceManager.MaxPeriodTicks;
                 period = (uint)p;
+                _lastActivePeriod = period;
+            }
+            else if (fading)
+            {
+                // Hold the last computed period during the fade so the
+                // oscillator frequency doesn't slide bizarrely as RPM goes
+                // to 0 (which would push period → MaxPeriodTicks and produce
+                // a downward pitch slur over the fade).
+                period = _lastActivePeriod;
             }
             else
             {
-                // Stable midpoint when silent so the frame payload stays well-formed.
+                // Stable midpoint when fully silent so the frame payload
+                // stays well-formed.
                 period = 0x100000;
             }
             _ab9.SendEngineVibrationStream(slotActive, period);
 
-            if (streamActive != _active)
+            if (effectiveStreaming != _active)
             {
-                _active = streamActive;
-                MozaLog.Debug($"[Moza/AB9] engine-vib {(streamActive ? "active" : "silent")} "
+                _active = effectiveStreaming;
+                MozaLog.Debug($"[Moza/AB9] engine-vib {(effectiveStreaming ? "active" : "silent")} "
                               + $"(rpm={rpm:F0}/{maxRpm:F0} freq={freqHz:F1}Hz period={period} "
-                              + $"int={intensity} rpmRel={rpmRedlineFraction:F2})");
+                              + $"int={intensity} rpmRel={rpmRedlineFraction:F2} "
+                              + $"rate={_smoothedRateHz:F1}/{targetRateHz:F1}Hz)");
             }
 
-            // Sub-streams gated on `streamActive` — silent keepalive only otherwise.
-            if (!streamActive)
+            // Sub-streams gated on `effectiveStreaming`. During a fade, all
+            // four sub-streams (vib-stream, keepalive, RPM-track, low-rate)
+            // continue running so the device doesn't see the FFB session go
+            // dark — only the engine-pulse pair throttles down with the
+            // slewed rate.
+            if (!effectiveStreaming)
             {
                 _tickCount++;
                 return;
@@ -190,30 +253,13 @@ namespace MozaPlugin.Devices
                 _ab9.SendKeepalivePair();
 
             // 0x0B 0x02/03 engine-pulse pair — emission RATE modulates audible
-            // intensity. PitHouse fires the pair at ~1.7 Hz at idle and ~34 Hz
-            // near redline (linear-ish in RPM); see capture analysis in
-            // docs/protocol/devices/ab9-shifter.md. The intensity slider
-            // multiplicatively attenuates that RPM-driven rate, so:
-            //   slider = 0   → silent
-            //   slider = 50  → half PitHouse rate at every RPM
-            //   slider = 100 → full PitHouse rate
-            //
-            // amp16 is held at constant 0x2328 (PitHouse-faithful, verified
-            // across 17,603 capture frames) by passing `100` to
-            // SendEnginePulsePair — which maps 100 → 0x2328 in the manager.
-            // Pre-2026-05-24, the plugin scaled amp16 by slider, but (a) the
-            // pulse-frame layout was off-by-one so the device firmware was
-            // already reading amp16 from a different field, and (b) PitHouse
-            // never modulates amp16 anyway — those bugs combined are what
-            // produced the binary-slider report.
-            const double PulseRateIdleHz = 1.7;
-            const double PulseRateRedlineHz = 34.0;
-            double rpmDrivenHz = PulseRateIdleHz
-                                 + (PulseRateRedlineHz - PulseRateIdleHz) * rpmRedlineFraction;
-            double pulseRateHz = (intensity / 100.0) * rpmDrivenHz;
-            if (pulseRateHz > 0.01)
+            // intensity. Uses the slewed `_smoothedRateHz` so abrupt
+            // transitions fade rather than click. amp16 is held at constant
+            // 0x2328 (PitHouse-faithful) by passing `100` to
+            // SendEnginePulsePair — see ab9-shifter.md for why.
+            if (_smoothedRateHz > PulseRateSilentThresholdHz)
             {
-                int pulseInterval = Math.Max(2, (int)Math.Round(1000.0 / TickPeriodMs / pulseRateHz));
+                int pulseInterval = Math.Max(2, (int)Math.Round(1000.0 / TickPeriodMs / _smoothedRateHz));
                 if (tick % pulseInterval == 0)
                 {
                     ushort step = (ushort)Math.Min(0xFFFF, (int)(32 + 78 * Math.Min(1.0, rpmFactor / 10.0)));
