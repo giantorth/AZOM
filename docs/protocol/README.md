@@ -14,6 +14,7 @@ Hierarchical split of the original `docs/moza-protocol.md`. Layout is **function
 | [`tier-definition/`](tier-definition/) | Session 0x01/0x02 handshake, device description, channel catalog response variants (CSP v0 / VGS v2), config parameters |
 | [`dashboard-upload/`](dashboard-upload/) | Dashboard upload paths (A: session 0x01 FF-prefix, B: session 0x04 sub-msg), config RPC, mgmt RPC, sub-msg headers, chunk trailers |
 | [`channel-config/`](channel-config/) | Group 0x40 burst, post-upload / active display cycle |
+| [`pithouse-udp/`](pithouse-udp/) | Second PitHouse external API — plain CBOR-over-UDP on port 40288. Used by the RallySimFans launcher (RBR) for steering-lock control and likely by other wheel-config tools that don't link the MOZA SDK DLL. Distinct from the CoAP SDK on port 40266 (see [`identity/device-catalog-manifest.md`](identity/device-catalog-manifest.md)). |
 | [`leds/`](leds/) | LED color commands, base ambient strips (`0x20/0x22`), wheel LED group architecture (`0x3F/0x40` extended) |
 | [`settings/`](settings/) | Wheel settings (`0x3F/0x40`, dev `0x17`), dashboard settings (`0x32/0x33`, dev `0x14`), EEPROM direct access (`0x0A`) |
 | [`periodic/`](periodic/) | Group `0x0E` parameter reader, `0x1F`, `0x28`, `0x29`, `0x2B` periodic / occasional commands |

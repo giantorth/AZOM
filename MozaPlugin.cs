@@ -55,6 +55,7 @@ namespace MozaPlugin
         // see Init()). Null when disabled, so the UI tab uses null-conditional
         // access.
         private Sdk.MozaSdkCoapServer? _sdkServer;
+        private Sdk.PitHouseUdp.MozaControlUdpServer? _controlUdpServer;
         private Sdk.CoapStubManager? _sdkStubManager;
         internal global::MozaPlugin.Protocol.PendingResponseTracker PendingResponses { get; }
             = new global::MozaPlugin.Protocol.PendingResponseTracker();
@@ -296,6 +297,13 @@ namespace MozaPlugin
         /// recent-requests buffer.
         /// </summary>
         internal Sdk.MozaSdkCoapServer? SdkServer => _sdkServer;
+
+        /// <summary>
+        /// PitHouse-compatible plain-UDP control server (port 40288 by default).
+        /// Started/stopped alongside <see cref="SdkServer"/> — both are part of
+        /// the third-party SDK emulation surface.
+        /// </summary>
+        internal Sdk.PitHouseUdp.MozaControlUdpServer? ControlUdpServer => _controlUdpServer;
 
         /// <summary>
         /// Live CoAP-stub child-process manager when SDK emulation is
@@ -665,31 +673,50 @@ namespace MozaPlugin
                 // throw can't leave a half-built plugin reachable from background callbacks.
                 Instance = this;
 
-                // Third-party SDK emulation (CoAP server + name-impersonation stub). Gated
-                // on the persisted Settings.SdkEmulationEnabled flag — toggling
-                // it requires a plugin restart for the change to take effect
-                // (matches the description shown in the UI tab). Failures here
-                // are logged and swallowed so a port conflict / bad permission
-                // doesn't prevent the rest of the plugin from initialising.
+                // Third-party SDK emulation. Two independent toggles:
+                //   - SdkEmulationEnabled gates the CoAP server (40266) and
+                //     the name-impersonation stub the official MOZA SDK DLL
+                //     looks for in process enumeration.
+                //   - UdpControlEnabled gates the plain-UDP-CBOR control
+                //     surface (40288) third-party wheel-config tools use.
+                // Either or both can be on. Each start path catches its own
+                // failures so one bad port doesn't take the other down.
+                // Toggling either requires a plugin restart for the change
+                // to take effect (matches the description shown in the UI).
                 if (_settings.SdkEmulationEnabled)
                 {
                     try
                     {
                         _sdkStubManager = new Sdk.CoapStubManager();
                         _sdkStubManager.Start();
-                        _sdkServer = new Sdk.MozaSdkCoapServer(_data, _hardwareApplier, _settings);
+                        _sdkServer = new Sdk.MozaSdkCoapServer(_data, _hardwareApplier);
                         _sdkServer.Start();
-                        MozaLog.Info("[Sdk] Third-party SDK emulation enabled");
+                        MozaLog.Info("[Sdk] CoAP SDK server enabled");
                     }
                     catch (Exception ex)
                     {
-                        MozaLog.Error($"[Sdk] Failed to start SDK emulation: {ex.Message}");
-                        // Partial-failure cleanup so a half-started SDK feature
-                        // doesn't leave a stub process / bound port behind.
+                        MozaLog.Error($"[Sdk] Failed to start CoAP SDK server: {ex.Message}");
                         try { _sdkServer?.Stop(); } catch { /* swallow */ }
                         try { _sdkStubManager?.Stop(); } catch { /* swallow */ }
                         _sdkServer = null;
                         _sdkStubManager = null;
+                    }
+                }
+
+                if (_settings.UdpControlEnabled)
+                {
+                    try
+                    {
+                        _controlUdpServer = new Sdk.PitHouseUdp.MozaControlUdpServer(
+                            _data, _hardwareApplier);
+                        _controlUdpServer.Start();
+                        MozaLog.Info("[Sdk] UDP control server enabled");
+                    }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Error($"[Sdk] Failed to start UDP control server: {ex.Message}");
+                        try { _controlUdpServer?.Stop(); } catch { /* swallow */ }
+                        _controlUdpServer = null;
                     }
                 }
             }
@@ -736,6 +763,8 @@ namespace MozaPlugin
             // CoAP receive thread can't dispatch into half-disposed handlers.
             try { _sdkServer?.Stop(); _sdkServer?.Dispose(); _sdkServer = null; }
             catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
+            try { _controlUdpServer?.Stop(); _controlUdpServer?.Dispose(); _controlUdpServer = null; }
+            catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
             try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
             catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
 
@@ -1005,9 +1034,13 @@ namespace MozaPlugin
 
             // Tear down SDK emulation up-front. The CoAP receive thread holds
             // references into MozaData and HardwareApplier; stop it before the
-            // rest of the wire stack disposes those out from under it.
+            // rest of the wire stack disposes those out from under it. The
+            // PitHouse UDP control server holds the same references and uses
+            // the same shutdown pattern.
             try { _sdkServer?.Stop(); _sdkServer?.Dispose(); _sdkServer = null; }
             catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
+            try { _controlUdpServer?.Stop(); _controlUdpServer?.Dispose(); _controlUdpServer = null; }
+            catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
             try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
             catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
 

@@ -2171,7 +2171,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="{x:Static res:Strings.TabHeader_CoAP}">
+            <TabItem Header="{x:Static res:Strings.TabHeader_Sdk}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
 
@@ -2186,34 +2186,49 @@
                                     <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
                                               Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
                                 </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Text="{x:Static res:Strings.Label_PortNumber}" Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="SdkCoapPortText"
+                                               Text="40266"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Foreground="{StaticResource TextDimBrush}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_UdpControl}"
+                                          Subtitle="{x:Static res:Strings.Subtitle_UdpControl}"
+                                          Icon="{StaticResource IconBolt}">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
+                                           Text="{x:Static res:Strings.Hint_UdpControlEnabled}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_UdpPort}" Style="{StaticResource SliderLabel}"/>
-                                    <TextBox x:Name="SdkCoapPortBox" Width="100" VerticalAlignment="Center"
-                                             FontFamily="{StaticResource FontMono}"
-                                             LostFocus="SdkCoapPortBox_LostFocus"
-                                             KeyDown="SdkCoapPortBox_KeyDown"/>
-                                    <TextBlock Text="{x:Static res:Strings.Hint_UdpPortRange}"
-                                               Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
+                                              Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <TextBlock Text="{x:Static res:Strings.Label_PortNumber}" Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock x:Name="UdpControlPortText"
+                                               Text="40288"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Foreground="{StaticResource TextDimBrush}"
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
 
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_Status}" Icon="{StaticResource IconDiag}">
                             <StackPanel>
-                                <Grid Margin="0,4,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="200"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.Label_CoapServer}" Style="{StaticResource LabelText}"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" x:Name="SdkServerStatusText"
-                                               Text="{x:Static res:Strings.Option_Disabled}"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Foreground="{StaticResource TextDimBrush}"
-                                               VerticalAlignment="Center"/>
-                                </Grid>
+                                <TextBlock x:Name="SdkServerStatusText"
+                                           Text="{x:Static res:Strings.Option_Disabled}"
+                                           FontFamily="{StaticResource FontMono}"
+                                           Foreground="{StaticResource TextDimBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,8"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                     <Button x:Name="SdkRefreshStatusButton" Content="{x:Static res:Strings.Button_Refresh}"
                                             Click="SdkRefreshStatusButton_Click" MinWidth="100"/>
@@ -2225,12 +2240,25 @@
                                           Subtitle="{x:Static res:Strings.Subtitle_RecentRequests}"
                                           Icon="{StaticResource IconDiag}">
                             <StackPanel>
+                                <TextBlock Text="{x:Static res:Strings.Label_CoapServer}"
+                                           Style="{StaticResource MutedHintText}"
+                                           Margin="0,0,0,4"/>
                                 <ListBox x:Name="SdkRecentRequestsList"
                                          FontFamily="{StaticResource FontMono}" FontSize="11"
                                          Background="{StaticResource BgDeepBrush}"
                                          Foreground="{StaticResource TextDimBrush}"
                                          BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                                          Height="180"
+                                         HorizontalContentAlignment="Stretch"/>
+                                <TextBlock Text="{x:Static res:Strings.Label_UdpControlServer}"
+                                           Style="{StaticResource MutedHintText}"
+                                           Margin="0,12,0,4"/>
+                                <ListBox x:Name="ControlUdpRecentRequestsList"
+                                         FontFamily="{StaticResource FontMono}" FontSize="11"
+                                         Background="{StaticResource BgDeepBrush}"
+                                         Foreground="{StaticResource TextDimBrush}"
+                                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                         Height="120"
                                          HorizontalContentAlignment="Stretch"/>
                             </StackPanel>
                         </ctrl:SectionCard>

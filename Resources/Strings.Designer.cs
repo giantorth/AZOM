@@ -68,7 +68,7 @@ namespace MozaPlugin.Resources
         public static string TabHeader_Options => Get("TabHeader_Options");
         public static string TabHeader_Upload => Get("TabHeader_Upload");
         public static string TabHeader_WheelFiles => Get("TabHeader_WheelFiles");
-        public static string TabHeader_CoAP => Get("TabHeader_CoAP");
+        public static string TabHeader_Sdk => Get("TabHeader_Sdk");
         public static string TabHeader_About => Get("TabHeader_About");
         public static string Brand_Unofficial => Get("Brand_Unofficial");
         public static string Brand_Moza => Get("Brand_Moza");
@@ -301,10 +301,14 @@ namespace MozaPlugin.Resources
         public static string Subtitle_CoapServer => Get("Subtitle_CoapServer");
         public static string Hint_CoapServerEnabled => Get("Hint_CoapServerEnabled");
         public static string SliderLabel_EnableCoapServer => Get("SliderLabel_EnableCoapServer");
-        public static string SliderLabel_UdpPort => Get("SliderLabel_UdpPort");
-        public static string Hint_UdpPortRange => Get("Hint_UdpPortRange");
+        public static string Section_UdpControl => Get("Section_UdpControl");
+        public static string Subtitle_UdpControl => Get("Subtitle_UdpControl");
+        public static string Hint_UdpControlEnabled => Get("Hint_UdpControlEnabled");
+        public static string SliderLabel_EnableUdpControl => Get("SliderLabel_EnableUdpControl");
+        public static string Label_PortNumber => Get("Label_PortNumber");
         public static string Section_Status => Get("Section_Status");
         public static string Label_CoapServer => Get("Label_CoapServer");
+        public static string Label_UdpControlServer => Get("Label_UdpControlServer");
         public static string Section_RecentRequests => Get("Section_RecentRequests");
         public static string Subtitle_RecentRequests => Get("Subtitle_RecentRequests");
         public static string Section_About => Get("Section_About");

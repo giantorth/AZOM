@@ -218,20 +218,34 @@ namespace MozaPlugin
         // plugin restart — Stream 7 wires the actual server lifecycle.
         public bool SdkEmulationEnabled { get; set; } = false;
 
-        // UDP port the embedded CoAP server binds when SdkEmulationEnabled is
-        // true. Defaults to 40266 — the port literal hardcoded in MOZA_SDK.dll
-        // (both the official 1.0.1.8 build and iRacing's customized variant
-        // load `mov dx, 0x9D4A` into the libcoap address-setup call). The SDK
-        // does NOT discover the port; if we bind anywhere else, third-party
-        // apps never reach our handlers. Exposed as a setting only to allow
-        // re-pointing if MOZA ever changes the constant. Range 1024-65535.
-        public int SdkCoapPort { get; set; } = 40266;
-
         // Always bind to loopback (127.0.0.1) only. Hidden from the UI in v1
         // because exposing the partner-API to LAN traffic has no legitimate
         // use case and only adds attack surface — but plumbed through so a
         // future power-user switch can flip it without a settings migration.
         public bool SdkBindLoopbackOnly { get; set; } = true;
+
+        // NOTE: ports for both UDP surfaces are NOT settings — they are
+        // protocol-mandated and not actually configurable in practice.
+        //   * CoAP SDK port 40266 is hardcoded as `mov dx, 0x9D4A` in
+        //     MOZA_SDK.dll (both the official 1.0.1.8 build and iRacing's
+        //     customized variant); the SDK does not discover the port.
+        //   * UDP control port 40288 is the value third-party wheel-config
+        //     tools assume by default; clients also accept an override
+        //     from a settings.ini, but letting a SimHub user pick a port
+        //     just guarantees the SDK / clients can't reach them.
+        // The constants live with the server classes
+        // (MozaSdkCoapServer + MozaControlUdpServer). If MOZA ever changes
+        // the literals in a firmware/SDK update, change them there.
+
+        // Independent enable for the plain-UDP-CBOR control surface
+        // (MozaControlUdpServer on port 40288). Separate from
+        // SdkEmulationEnabled so a user can run the CoAP server without the
+        // UDP server or vice-versa. Default true so existing users with
+        // SdkEmulationEnabled=true keep the previous combined behaviour
+        // without a migration; users who want CoAP-only can flip this off
+        // explicitly. When false, no UDP listener binds and clients on
+        // 40288 silently fail to connect.
+        public bool UdpControlEnabled { get; set; } = true;
 
         // ===== Profile system (SimHub native) =====
         public MozaProfileStore ProfileStore { get; set; } = new MozaProfileStore();

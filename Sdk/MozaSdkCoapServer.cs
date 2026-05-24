@@ -21,7 +21,7 @@ namespace MozaPlugin.Sdk
     /// Lifecycle:
     /// <list type="number">
     ///   <item><see cref="Start"/> binds a <see cref="UdpClient"/> to
-    ///   <c>127.0.0.1:Settings.SdkCoapPort</c> (loopback only — the
+    ///   <c>127.0.0.1:</c><see cref="CoapPort"/> (loopback only — the
     ///   <see cref="MozaPluginSettings.SdkBindLoopbackOnly"/> flag is plumbed
     ///   for future use but ignored in v1, by design) and spawns a single
     ///   receive thread.</item>
@@ -40,6 +40,15 @@ namespace MozaPlugin.Sdk
     /// </summary>
     public sealed class MozaSdkCoapServer : IDisposable
     {
+        /// <summary>
+        /// CoAP listener port — hardcoded as `mov dx, 0x9D4A` in MOZA_SDK.dll
+        /// (both the official 1.0.1.8 build and iRacing's customized variant).
+        /// The SDK does not discover the port; binding anywhere else means
+        /// every consumer that links the vendor DLL is silently unable to
+        /// reach our handlers. Not exposed as a setting for that reason.
+        /// </summary>
+        public const int CoapPort = 40266;
+
         /// <summary>Maximum number of rows retained in <see cref="RecentRequests"/>.</summary>
         public const int RecentRequestCapacity = 20;
 
@@ -62,7 +71,6 @@ namespace MozaPlugin.Sdk
             }
         }
 
-        private readonly MozaPluginSettings _settings;
         private readonly DeviceCatalog _catalog;
         private readonly CoapResourceRegistry _registry;
         private readonly ObserveRegistry _observers = new ObserveRegistry();
@@ -90,27 +98,24 @@ namespace MozaPlugin.Sdk
         private readonly Dictionary<string, int> _noisyCounters = new Dictionary<string, int>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Build a server bound to <paramref name="settings"/>'s CoAP port.
+        /// Build a server bound to the fixed <see cref="CoapPort"/>.
         /// All handlers are registered up-front — no late binding.
         /// </summary>
         /// <param name="data">Live device-state model. Resource handlers read from
         ///   this for GET responses and write through <paramref name="hw"/> for POSTs.</param>
         /// <param name="hw">Hardware applier used by POST handlers to push values
         ///   onto the wheelbase / dash / pedals / etc.</param>
-        /// <param name="settings">Persisted settings — provides the bind port.</param>
         /// <remarks>
         /// Constructor is internal because <see cref="HardwareApplier"/> is an
         /// internal type; the public read-only surface (Status, IsRunning,
         /// RecentRequests, etc.) remains accessible to external callers via
         /// <see cref="MozaPlugin.SdkServer"/>.
         /// </remarks>
-        internal MozaSdkCoapServer(MozaData data, HardwareApplier hw, MozaPluginSettings settings)
+        internal MozaSdkCoapServer(MozaData data, HardwareApplier hw)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (hw == null) throw new ArgumentNullException(nameof(hw));
-            if (settings == null) throw new ArgumentNullException(nameof(settings));
 
-            _settings = settings;
             _catalog = new DeviceCatalog(data);
             _registry = new CoapResourceRegistry(_catalog);
             ResourceBindings.RegisterAll(_registry, _catalog, data, hw);
@@ -182,8 +187,7 @@ namespace MozaPlugin.Sdk
                     return;
                 }
 
-                int desiredPort = _settings.SdkCoapPort;
-                if (desiredPort < 0 || desiredPort > 65535) desiredPort = 40266;
+                int desiredPort = CoapPort;
 
                 try
                 {

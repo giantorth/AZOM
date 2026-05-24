@@ -97,9 +97,16 @@ MozaPlugin/
 │   │   ├── Pedal/                                NonLinear, OutDir, Calibrate*
 │   │   ├── Handbrake/
 │   │   └── Shifter/                              AutoBlip* — gap returns (PITHOUSENOTREADY / NOINSTALLSDK)
-│   └── ResourceBindings.cs                       Central registration
+│   ├── ResourceBindings.cs                       Central registration
+│   └── PitHouseUdp/                              ← second PitHouse external API (port 40288, plain CBOR-over-UDP)
+│       ├── MozaControlUdpServer.cs               Listener + dispatcher (mirrors MozaSdkCoapServer lifecycle)
+│       ├── PitHousePacket.cs                     Envelope DTO: {Head: {PacketId, Version, ReplyPort?}, Payload}
+│       ├── IPitHousePacketHandler.cs             Handler interface + PitHouseReplyContext
+│       └── Handlers/
+│           ├── SteerLockWriteHandler.cs          PacketId 3 — MotSetSteer_LimitAngle / MaximumAngle → base-{limit,max-angle}
+│           └── SteerLockReadHandler.cs           PacketId 4 — MotGetSteer_* read-back via Head.ReplyPort
 ├── UI/SettingsControl.xaml + .Sdk.cs             "Third-party SDK" tab
-├── UI/MozaPluginSettings.cs                      SdkEmulationEnabled / SdkCoapPort / SdkBindLoopbackOnly
+├── UI/MozaPluginSettings.cs                      SdkEmulationEnabled / SdkCoapPort / SdkBindLoopbackOnly / ControlUdpPort
 └── MozaPlugin.csproj                             Embed PitHouseStub.exe as resource
 
 PitHouseStub/                                     ← sibling project
@@ -118,6 +125,7 @@ The stub binary is embedded inside `MozaPlugin.dll` as a manifest resource (`Moz
 5. ✅ **UI tab** (`SettingsControl.xaml` + `.Sdk.cs` + 3 new `MozaPluginSettings` props). Live status binding; 20-row rolling request log.
 6. ✅ **Resource handlers** (~85 small files across the eight `Resources/*` subdirectories). All test suites pass.
 7. ✅ **CoAP server + MozaPlugin lifecycle wiring.** 5/5 server tests pass.
+8. ✅ **PitHouse UDP control server (2026-05-23)** — `Sdk/PitHouseUdp/*` (5 files, ~400 LOC). Second PitHouse-equivalent external API on port 40288, plain CBOR-over-UDP (no CoAP). Used by RallySimFans (RBR) to read/write steering lock; canonical protocol reference at [`../protocol/pithouse-udp/README.md`](../protocol/pithouse-udp/README.md). Starts and stops alongside the CoAP server under the same `SdkEmulationEnabled` gate. Independent bind failures (40288 conflict vs 40266 conflict) don't take the other server down. Extension point for new PacketIds is one handler class + one `RegisterHandler` call.
 
 ## Integration test results (Wine + real wheel, 2026-05-20)
 

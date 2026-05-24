@@ -14,7 +14,7 @@
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
   <data name="TabHeader_Upload" xml:space="preserve"><value>Téléverser</value></data>
   <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Fichiers du volant</value></data>
-  <data name="TabHeader_CoAP" xml:space="preserve"><value>CoAP</value></data>
+  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>À propos</value></data>
   <data name="Brand_Unofficial" xml:space="preserve"><value>NON OFFICIEL</value></data>
   <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>
@@ -241,15 +241,19 @@
   <data name="Button_Delete" xml:space="preserve"><value>SUPPRIMER</value></data>
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Désactivé temporairement.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>SERVEUR COAP</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// serveur CoAP/UDP intégré sur loopback</value></data>
+  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// serveur CoAP intégré sur loopback</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle SDK CoAP intégré.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Activer le serveur SDK CoAP</value></data>
-  <data name="SliderLabel_UdpPort" xml:space="preserve"><value>Port UDP</value></data>
-  <data name="Hint_UdpPortRange" xml:space="preserve"><value>(1024-65535, par défaut 40266)</value></data>
+  <data name="Section_UdpControl" xml:space="preserve"><value>CONTRÔLE UDP</value></data>
+  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// surface de contrôle CBOR-sur-UDP simple</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle UDP intégré pour les outils tiers de configuration de volant.</value></data>
+  <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Activer le serveur de contrôle UDP</value></data>
+  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
+  <data name="Label_UdpControlServer" xml:space="preserve"><value>Contrôle UDP</value></data>
   <data name="Section_Status" xml:space="preserve"><value>ÉTAT</value></data>
   <data name="Label_CoapServer" xml:space="preserve"><value>Serveur CoAP</value></data>
   <data name="Section_RecentRequests" xml:space="preserve"><value>REQUÊTES RÉCENTES</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 20 dernières requêtes CoAP · en direct</value></data>
+  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 20 dernières requêtes par serveur · en direct</value></data>
   <data name="Section_About" xml:space="preserve"><value>À PROPOS</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// plugin SimHub open source</value></data>
   <data name="Label_UnofficialMozaPlugin" xml:space="preserve"><value>Plugin non officiel MOZA pour SimHub</value></data>

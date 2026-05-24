@@ -11,6 +11,13 @@ PitHouse's SDK CoAP server exposes the connected hardware to clients
 Capture-verified 2026-05-23 from `iracing-pithouse-udp.pcapng`
 (localhost UDP 40266↔55356).
 
+> **Related:** PitHouse exposes a **second** external API on port 40288 —
+> plain CBOR-over-UDP without the CoAP wrapper — used by tools that don't
+> link the MOZA SDK DLL (RallySimFans / RBR is the first confirmed
+> consumer). See [`../pithouse-udp/README.md`](../pithouse-udp/README.md).
+> Both protocols reach the same wheelbase EEPROM cells through the same
+> `HardwareApplier` commands.
+
 ## Per-device manifest fields (fixed order)
 
 | Field | CBOR type | Width | Notes |

@@ -42,11 +42,14 @@ namespace MozaPlugin.Sdk.Resources.Motor
         public override CoapResourceResponse HandleGet(CoapResourceRequest req)
         {
             // Preserve the captured key order. WriteMap(KeyValuePair list)
-            // emits in list order; the Dictionary overload would not.
+            // emits in list order; the Dictionary overload would not. Wire
+            // values are degrees; the wheelbase stores half-degrees in
+            // _data.MaxAngle / _data.Limit so we multiply by 2 to convert
+            // (same boundary conversion as Sdk/PitHouseUdp/Handlers/SteerLockReadHandler).
             var entries = new List<KeyValuePair<string, object>>
             {
-                new KeyValuePair<string, object>("GameMaximumAngle", _data.MaxAngle),
-                new KeyValuePair<string, object>("LimitAngle", _data.Limit),
+                new KeyValuePair<string, object>("GameMaximumAngle", _data.MaxAngle * 2),
+                new KeyValuePair<string, object>("LimitAngle", _data.Limit * 2),
             };
             byte[] payload = CborWriter.WriteMap(entries);
             return CoapResourceResponse.Content(payload, PayloadCodec.CFCbor);
@@ -68,10 +71,16 @@ namespace MozaPlugin.Sdk.Resources.Motor
                 return CoapResourceResponse.BadRequest("malformed CBOR: " + ex.Message);
             }
 
+            // Wire degrees → half-degree raw. The plugin's own slider does
+            // the same divide before writing — see
+            // UI/SettingsControl.xaml.cs RotationSlider_ValueChanged. Without
+            // this conversion the wheel applies 2× the requested lock or
+            // silently clamps, which manifests as "client wrote but the
+            // wheel didn't change angle".
             if (map.TryGetValue("GameMaximumAngle", out int gameMax))
-                _hardware.WriteIfBaseConnected("base-max-angle", gameMax);
+                _hardware.WriteIfBaseConnected("base-max-angle", gameMax / 2);
             if (map.TryGetValue("LimitAngle", out int limit))
-                _hardware.WriteIfBaseConnected("base-limit", limit);
+                _hardware.WriteIfBaseConnected("base-limit", limit / 2);
 
             return CoapResourceResponse.Valid();
         }
