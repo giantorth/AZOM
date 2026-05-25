@@ -54,6 +54,24 @@ Wheel plugged in cold, then Assetto Corsa started:
 | **Game starts** | t=30.568s | `0x41/FD:DE` enable + `0x2D/F5:31` seq counter start simultaneously |
 | **Telemetry** | t=30.600s | `0x43/7D:23` live data (flag=0x02). ~31 frames/s steady state |
 
+### Hot-attach timing (wheel clipped onto a running plugin)
+
+The cold-start tables above assume the wheel is already powered when the host opens its sessions. **Attaching the wheel to the base while the host is already running has very different timing** because the wheel boots in two phases:
+
+| t (s) | Event | Notes |
+|-------|-------|-------|
+| 0.00 | Wheel physically clipped to base | Wheel MCU power-on |
+| ~0.05 | `wheel-telemetry-mode` reads start to answer | Wheel MCU is alive; settings reads on group 0x40 dev=0x17 round-trip normally |
+| 0.05–20 | **Display sub-device still booting** | Wheel ignores all `0x43 dev=0x17` traffic addressed to its display channel — including session-open frames `7c:00 type=0x81` on sess=0x01/0x02 |
+| ~20.0 | Display sub-device identity probe burst answers | All ten `0x43 7C` responses (`87 "Display"`, HW/FW, MCU UID, etc.) arrive within ~30 ms of each other. **From this moment the wheel acks session opens normally.** |
+| ~20.1 | Host opens sess=0x01/0x02 — both fc:00-ack within ~10 ms | First time the wheel engages the dashboard pipeline |
+| ~20.1–20.3 | Wheel pushes channel catalog on sess=0x01/0x02 + sess=0x09 configJson burst | Same shape as cold-start; just shifted in time by the display boot |
+| ~20.5 | First `7d:23` telemetry on flag=0x02 | Live values start updating |
+
+**Verified W17 capture 2026-05-25** (`moza-wire-20260525-084125.jsonl`, R5 base, COM33, plugin v0.18-dev with display-detected gate).
+
+A plugin that starts the session pipeline on wheel-MCU detection alone — without waiting for the display — sees no fc:00 acks and no catalog push for the full ~20 s display boot, and the wheel never engages sess=0x01/0x02 (its view: those sessions were never opened, since the open frames arrived while the display was still booting). The dashboard layout renders locally on the wheel from its own stored mzdash but every channel sits at zero until SimHub is restarted. The plugin gate documented in [`identity/display-sub-device.md`](identity/display-sub-device.md) bridges this window — see that page for the implementation hook.
+
 ### Game-start handshake — from live capture (R5 base, W17, 2026-04-29)
 
 Within ~1.5 s of the first game-tick frame, in addition to the streams above:

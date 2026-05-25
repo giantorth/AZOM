@@ -133,6 +133,16 @@ namespace MozaPlugin.Telemetry.Inbound
             {
                 _sender.Uploader.NoteDeviceInit(session);
             }
+            // sess=0x09 device-init is the wheel's first reliable
+            // "session-layer ready" signal during a slow hot-attach boot —
+            // wakes ProbeAndOpenSessions's 20 s extended wait so the host can
+            // retry the sess=0x01/0x02 opens that timed out while the wheel
+            // was still booting. Constrained to 0x09 because in every wire
+            // trace the wheel opens 0x09 first; broadening this would risk
+            // false-positives from upload / RPC sessions later in the
+            // pipeline.
+            if (session == 0x09)
+                _sender.MarkWheelReadyObserved();
         }
 
         private void HandleSessionData(byte[] data, byte session)

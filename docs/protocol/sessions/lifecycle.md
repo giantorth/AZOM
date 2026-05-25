@@ -142,3 +142,9 @@ PitHouse never sees the push.
 5. Device opens 0x0A last, variably (t=38s or later).
 
 **Sessions 0x08 and 0x09 are retransmitted** until host sends `fc:00` ack. Real wheel sends each up to 3 times at 1 s intervals. Sim implementations should do same if host doesn't ACK immediately.
+
+### Hot-attach: wait for display before opening sessions
+
+The opening order above assumes the wheel is already booted when the host opens its sessions. **Hot-attach (wheel clipped onto a running host)** has very different timing: the wheel MCU answers settings reads ~immediately but its **display sub-device takes ~20 s to boot**, and the wheel silently drops every `7c:00 type=0x81` open frame addressed to its display channel during that window. A host that opens 0x01/0x02 on first wheel-MCU response (e.g. a `wheel-telemetry-mode` read returning a valid frame) gets no fc:00 acks and no subsequent device-initiated open of 0x04/0x06/0x08/0x09/0x0a — the wheel never engaged from its own side, so the dashboard renders locally with zero channel data.
+
+Hosts should defer the sess=0x01/0x02 open burst until the display sub-device identity probe completes (`87 "<display name>"` response on `0x43 dev=0x17`, or any of the parallel HW/FW/MCU-UID responses). See [`../identity/display-sub-device.md`](../identity/display-sub-device.md) and [`../startup-timeline.md`](../startup-timeline.md) for the full timing breakdown and the plugin's gating hook.

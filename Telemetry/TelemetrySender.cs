@@ -128,6 +128,16 @@ namespace MozaPlugin.Telemetry
         internal volatile int _lastAckedSeq = -1;
         private readonly ManualResetEventSlim _ackReceived = new ManualResetEventSlim(false);
 
+        // Wheel session-layer readiness latch. Set by TelemetryInboundDispatcher
+        // when the wheel pushes its first spontaneous sess=0x09 device-init
+        // (type=0x81) — the most reliable "I'm alive and ready for session-level
+        // traffic" signal the wheel emits during a slow hot-attach boot
+        // (~20s after wheel-telemetry-mode reads first succeed). Consumed by
+        // ProbeAndOpenSessions to retry sess=0x01/0x02 opens that timed out
+        // while the wheel was still booting.
+        internal volatile bool _wheelReadyObserved;
+
+
         // Upload handshake state.
         internal int _mgmtAckSeq;
         private readonly ManualResetEventSlim _mgmtResponseEvent = new ManualResetEventSlim(false);
@@ -1722,6 +1732,24 @@ namespace MozaPlugin.Telemetry
         internal TileServerStateParser TileServerParser => _tileServerParser;
         internal ManualResetEventSlim AckReceived => _ackReceived;
         internal ManualResetEventSlim MgmtResponseEvent => _mgmtResponseEvent;
+
+        /// <summary>Latch set by <see cref="Inbound.TelemetryInboundDispatcher"/>
+        /// the first time the wheel pushes a spontaneous sess=0x09 device-init
+        /// (type=0x81). Consumed by <see cref="ProbeAndOpenSessions"/> to detect
+        /// the slow-bring-up hot-attach case where the wheel's session layer
+        /// comes online after the initial 500 ms open-ack budget but before the
+        /// 20 s extended-wait timeout. Also wakes <see cref="_ackReceived"/> so
+        /// the extended wait returns immediately.</summary>
+        internal void MarkWheelReadyObserved()
+        {
+            _wheelReadyObserved = true;
+            _ackReceived.Set();
+        }
+
+        /// <summary>Clear the wheel-ready latch — called at Start/Stop
+        /// boundaries via <see cref="Watchdog.SessionWatchdogManager.Reset"/>
+        /// so a subsequent reconnect re-arms detection from a clean slate.</summary>
+        internal void ResetWheelReadyObserved() => _wheelReadyObserved = false;
         internal long SubscriptionResponseDeadlineTicksField
         {
             get => _subscriptionResponseDeadlineTicks;
@@ -2010,14 +2038,42 @@ namespace MozaPlugin.Telemetry
                     $"{OpenAckTimeoutMs}ms — waiting up to {ExtendedAckWaitMs}ms for slow-bring-up " +
                     "wheel (CS-Pro on Universal Hub takes ~14 s)");
                 bool gotLateAck;
+                _wheelReadyObserved = false;
                 try { _ackReceived.Reset(); }
                 catch (ObjectDisposedException) { return; }
                 try { gotLateAck = _ackReceived.Wait(ExtendedAckWaitMs); }
                 catch (ObjectDisposedException) { return; }
                 if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                if (gotLateAck)
+                // Belt-and-suspenders: even if the Wait timed out, the
+                // dispatcher may have flipped _wheelReadyObserved in the
+                // microseconds between timeout-fire and our read. Honour it.
+                byte ackedSession = _lastAckedSession;
+                bool wheelReadyWake = _wheelReadyObserved
+                    && ackedSession != MgmtSession
+                    && ackedSession != TelemSession;
+                if (wheelReadyWake)
                 {
-                    byte ackedSession = _lastAckedSession;
+                    // Wheel just came online via sess=0x09 device-init in
+                    // response to our nudge. Its initial sess=0x01/0x02 opens
+                    // (sent before the wheel's session layer was up) were
+                    // dropped on the wheel side — re-issue both with a wider
+                    // budget now that the wheel is demonstrably listening.
+                    // Verified 2026-05-25 W17 hot-attach: first fc:00 on
+                    // sess=0x02 follows within ~1 s of a fresh open frame
+                    // from the wheel-ready point.
+                    const int WheelReadyRetryMs = 2_000;
+                    MozaLog.Info(
+                        "[Moza] Wheel session-layer ready observed (sess=0x09 device-init) — " +
+                        $"retrying sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens with " +
+                        $"{WheelReadyRetryMs}ms budget");
+                    if (_connection.IsConnected)
+                        mgmtPort = TryOpenSession(MgmtSession, WheelReadyRetryMs);
+                    if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
+                    if (_connection.IsConnected)
+                        telemetryPort = TryOpenSession(TelemSession, WheelReadyRetryMs);
+                }
+                else if (gotLateAck)
+                {
                     MozaLog.Info(
                         $"[Moza] Late ack on sess=0x{ackedSession:X2} after extended wait " +
                         "— wheel is alive, proceeding with cold-start");

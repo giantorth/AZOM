@@ -34,7 +34,11 @@ During dashboard upload, Pithouse runs same probe against **Display** sub-module
 
 SM-C/SM-D suffix distinguishes main controller from display controller. Display has no capability flags.
 
-**Timing:** Pithouse probes Display at ~t=9.97s — AFTER telemetry starts (t=9.88). Not a prerequisite for telemetry.
+**Timing — cold start (wheel attached at host start):** Pithouse probes Display at ~t=9.97s — AFTER telemetry starts (t=9.88). On a cold start the display is already powered up when the host begins probing, and the response arrives within ~100 ms. Not a prerequisite for telemetry on this path.
+
+**Timing — hot-attach (wheel attached to running host):** The display sub-device boots **substantially later than the wheel MCU**. Verified W17 capture 2026-05-25: wheel MCU answered `wheel-telemetry-mode` reads at t=0 (the moment the wheel was physically clipped onto the wheelbase); the display sub-device did not respond to the `0x43` identity probe burst until t≈20 s. During the intervening window the wheel ignores host session-open frames (`7c:00 type=0x81` on sess=0x01/0x02) — the wheel acks them on the wire only after the display has finished booting. A host that fires the session pipeline on wheel-MCU detection alone (before the display is up) gets neither fc:00 acks nor a channel-catalog push, and the dashboard layout renders locally on the wheel with every channel stuck at zero until SimHub restarts.
+
+**Plugin gate:** `DashboardBindingCoordinator.StartTelemetryIfReady` defers `TelemetrySender.Start()` until `MozaPlugin.IsDisplayDetected == true` for any wheel where `WheelModelInfo.HasDisplay != false`. `DeviceProber`'s `display-model-name` case calls `StartTelemetryIfReady` again once the identity response decodes, so the deferral is self-recovering. `PollStatus` re-issues `SendDisplayProbe()` every 5 s while the wheel is detected but the display isn't, so a probe lost to USB jitter doesn't permanently wedge the gate. Screenless wheels (`HasDisplay == false`) skip the gate entirely via `ShouldDriveDashboard()`. Standalone CM2 dashboards skip it too — they ARE the dashboard target, no separate sub-device boot.
 
 **Plugin probe sequence** (from `moza-startup.json` 2026-04-12):
 

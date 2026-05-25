@@ -132,6 +132,9 @@ namespace MozaPlugin.Telemetry.Watchdog
             _configJsonLastChunkUtcTicks = 0;
             _configJsonLastPrimeRetryUtcTicks = 0;
             // _configJsonLastEscalationUtcTicks NOT reset — cooldown spans restarts.
+            // Clear the wheel-ready latch so a subsequent reconnect re-arms
+            // detection from a clean slate (consumed by ProbeAndOpenSessions).
+            _sender.ResetWheelReadyObserved();
         }
 
         // ───── Tick loops (called by sender's tick driver) ────────────────

@@ -715,6 +715,28 @@ namespace MozaPlugin.Telemetry
                 return;
             }
 
+            // Display-readiness gate. Even when WheelModelInfo says "has
+            // display", the display sub-device boots ~18 s after the wheel
+            // MCU becomes responsive on hot-attach (verified W17 capture
+            // 2026-05-25). Starting the session pipeline while the display
+            // is still booting means the wheel never acks our sess=0x01/0x02
+            // opens and never engages the catalog push — dashboard layout
+            // renders locally on the wheel but no channel data ever reaches
+            // it. The display-model-name handler in DeviceProber.cs (line
+            // ~512) re-calls StartTelemetryIfReady once the probe completes,
+            // and PollStatus re-probes every 5 s while the wheel is
+            // detected but the display isn't — so deferring here is safe
+            // and self-recovering. Standalone CM2 dashboards skip this gate
+            // (they ARE the dashboard target, no separate sub-device boot).
+            if (!standaloneDashboard && !_plugin.IsDisplayDetected)
+            {
+                MozaLog.Debug(
+                    $"[Moza] Display sub-device not yet detected " +
+                    $"(HasDisplay={_plugin.WheelModelInfo?.HasDisplay?.ToString() ?? "unknown"}) — " +
+                    "deferring telemetry start until display probe completes");
+                return;
+            }
+
             // We're past ActiveTelemetryEnabled, so telemetry IS enabled for this
             // wheel. Sync the sender's per-profile flag here so it's correct even
             // when an earlier ApplyProfile fired before the wheel GUID resolved.
