@@ -867,12 +867,13 @@ namespace MozaPlugin
                         else
                         {
                             // Persistent reference exists but the child is gone
-                            // (crashed / killed externally). Dispose the husk
+                            // (crashed / killed externally). Tear down the husk
                             // before allocating a fresh manager so its job-handle
-                            // / process-handle don't leak.
+                            // / process-handle don't leak. Bounded so a Wine-side
+                            // JobObject.Dispose wedge can't block Init.
                             if (s_persistentSdkStubManager != null)
                             {
-                                try { s_persistentSdkStubManager.Dispose(); } catch { }
+                                try { s_persistentSdkStubManager.TryStop(1500); } catch { }
                                 s_persistentSdkStubManager = null;
                             }
                             _sdkStubManager = new Sdk.CoapStubManager();
@@ -902,10 +903,13 @@ namespace MozaPlugin
                 {
                     // SDK emulation toggled OFF. If a prior session left a
                     // persistent stub running, stop it now so the registry
-                    // redirect doesn't outlive the user's intent.
+                    // redirect doesn't outlive the user's intent. Bounded —
+                    // a Wine-side wedge in Stop()/JobObject.Dispose can't
+                    // block Init; JobObject's KILL_ON_JOB_CLOSE backstops
+                    // the child cleanup on process exit if Stop() times out.
                     if (s_persistentSdkStubManager != null)
                     {
-                        try { s_persistentSdkStubManager.Stop(); } catch { }
+                        try { s_persistentSdkStubManager.TryStop(1500); } catch { }
                         s_persistentSdkStubManager = null;
                     }
                 }
@@ -976,11 +980,12 @@ namespace MozaPlugin
             // persistent stub, do NOT Stop it here — the next Init expects to
             // inherit it. Only drop our local ref. Disposal gated on
             // !ReferenceEquals matches the connection/sender pattern above.
+            // Bounded TryStop so a Wine-side wedge can't block CleanupPartialInit.
             bool ownStubManager = _sdkStubManager != null
                 && !ReferenceEquals(_sdkStubManager, s_persistentSdkStubManager);
             if (ownStubManager)
             {
-                try { _sdkStubManager?.Stop(); }
+                try { _sdkStubManager?.TryStop(1500); }
                 catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
             }
             _sdkStubManager = null;
@@ -1362,7 +1367,10 @@ namespace MozaPlugin
             }
             else
             {
-                try { _sdkStubManager?.Stop(); }
+                // Bounded so the End() flow (often runs on the SimHub UI
+                // thread) can't get pinned by a Wine-side wedge in
+                // Process.Kill / JobObject.Dispose.
+                try { _sdkStubManager?.TryStop(1500); }
                 catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
                 if (_sdkStubManager != null
                     && ReferenceEquals(_sdkStubManager, s_persistentSdkStubManager))
@@ -1528,25 +1536,14 @@ namespace MozaPlugin
             }
             catch { }
             // Stop the persistent CoAP stub on full process exit so its child
-            // process (and the registry redirect) don't outlive SimHub. The
-            // stub manager's Stop() can wedge under Wine/Proton (the exact
-            // failure mode that drove making it persistent in the first
-            // place), so wrap in a Task with a 1.5 s budget — well inside
-            // the ~2 s ProcessExit window — and let the runtime kill our
-            // child via the JobObject's KILL_ON_JOB_CLOSE flag if Stop()
-            // doesn't return in time.
-            try
-            {
-                var stub = s_persistentSdkStubManager;
-                if (stub != null)
-                {
-                    var task = System.Threading.Tasks.Task.Run(() =>
-                    {
-                        try { stub.Stop(); } catch { }
-                    });
-                    try { task.Wait(1500); } catch { }
-                }
-            }
+            // process (and the registry redirect) don't outlive SimHub.
+            // TryStop bounds the call at 1.5 s — well inside the ~2 s
+            // ProcessExit budget — so a Wine-side wedge in Process.Kill or
+            // JobObject.Dispose can't keep us from returning. If TryStop
+            // times out the JobObject's KILL_ON_JOB_CLOSE backstops the
+            // child cleanup on process exit, and the next launch's
+            // orphan sweep handles the case where even that didn't fire.
+            try { s_persistentSdkStubManager?.TryStop(1500); }
             catch { }
         }
 

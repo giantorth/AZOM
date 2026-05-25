@@ -180,6 +180,18 @@ namespace MozaPlugin.Sdk
                         return;
                     }
 
+                    // Sweep orphan stub processes from prior crashed sessions
+                    // before spawning our own. JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                    // is supposed to kill the child when the parent process
+                    // dies, but Wine/Proton has historically had gaps in that
+                    // semantics. Without this sweep, a SimHub hard-crash leaves
+                    // the stub child running; the next launch spawns another
+                    // one and the orphan accumulates port/registry conflicts.
+                    // Once per process — gated by static. Only matches by full
+                    // exe path, so a real PitHouse install (different path) is
+                    // never touched.
+                    KillOrphanStubProcesses(exePath);
+
                     // Create the JobObject up front. Anonymous (lpName=null)
                     // so we don't collide with other instances of SimHub.
                     var jobRaw = NativeMethods.CreateJobObject(IntPtr.Zero, null);
@@ -361,6 +373,126 @@ namespace MozaPlugin.Sdk
                 if (_disposed) return;
                 _disposed = true;
                 CleanupProcessLocked();
+            }
+        }
+
+        /// <summary>
+        /// Bounded variant of <see cref="Stop"/>. Spawns Stop on a worker
+        /// thread and waits at most <paramref name="timeoutMs"/> milliseconds
+        /// for it to return. Use this at every Stop() call site that runs on
+        /// a thread the user is waiting on (SimHub UI thread during End(),
+        /// ProcessExit, etc.) so a Wine-side wedge in Process.Kill or
+        /// JobObject.Dispose can never block the caller.
+        ///
+        /// <para>Returns <c>true</c> if Stop() actually completed inside the
+        /// budget; <c>false</c> on timeout. On timeout the inner Stop()
+        /// continues running on the ThreadPool — that's intentional: the
+        /// JobObject's <c>KILL_ON_JOB_CLOSE</c> flag still backstops child
+        /// cleanup when the parent eventually exits, and the next plugin
+        /// launch's orphan sweep cleans up if even that fails.</para>
+        /// </summary>
+        public bool TryStop(int timeoutMs)
+        {
+            if (timeoutMs <= 0) timeoutMs = 1500;
+            var task = System.Threading.Tasks.Task.Run(() =>
+            {
+                try { Stop(); }
+                catch (Exception ex)
+                {
+                    try { MozaLog.Warn($"[Moza] CoAP stub Stop() raised: {ex.GetType().Name}: {ex.Message}"); } catch { }
+                }
+            });
+            bool completed;
+            try { completed = task.Wait(timeoutMs); }
+            catch { completed = false; }
+            if (!completed)
+            {
+                try
+                {
+                    MozaLog.Warn(
+                        $"[Moza] CoAP stub Stop() timed out after {timeoutMs} ms — abandoning. " +
+                        "JobObject KILL_ON_JOB_CLOSE will reap the child on process exit; " +
+                        "orphan sweep covers the case where Wine doesn't honor it.");
+                }
+                catch { }
+            }
+            return completed;
+        }
+
+        // Process-once gate. The sweep needs to run only on the FIRST Start()
+        // in this SimHub process — after our own child has been spawned,
+        // any matching process is by definition ours (or an inherited
+        // descendant of ours), and killing it would be a regression.
+        private static int s_orphanSweepDone;
+
+        /// <summary>
+        /// Kill any running process whose <see cref="Process.MainModule"/>
+        /// path matches <paramref name="ourExePath"/>. These are stub
+        /// children orphaned by a prior SimHub crash where the JobObject's
+        /// <c>KILL_ON_JOB_CLOSE</c> didn't fire — typically Wine/Proton
+        /// gaps in that semantic. Only matches our own extracted exe path,
+        /// so a real PitHouse install (different path) is never touched.
+        ///
+        /// <para>Idempotent within a process via <see cref="s_orphanSweepDone"/>.
+        /// Failures are non-fatal (logged at Debug) — we'd rather lose a
+        /// kill than fail Start().</para>
+        /// </summary>
+        private static void KillOrphanStubProcesses(string ourExePath)
+        {
+            if (System.Threading.Interlocked.Exchange(ref s_orphanSweepDone, 1) != 0) return;
+            if (string.IsNullOrEmpty(ourExePath)) return;
+
+            string exeName;
+            try { exeName = Path.GetFileNameWithoutExtension(ourExePath); }
+            catch { return; }
+            if (string.IsNullOrEmpty(exeName)) return;
+
+            Process[] candidates;
+            try { candidates = Process.GetProcessesByName(exeName); }
+            catch (Exception ex)
+            {
+                try { MozaLog.Debug($"[Moza] Orphan-sweep enumerate failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
+                return;
+            }
+
+            int killed = 0;
+            foreach (var p in candidates)
+            {
+                try
+                {
+                    string? path = null;
+                    try { path = p.MainModule?.FileName; }
+                    catch
+                    {
+                        // Access-denied (different user / elevated) or
+                        // already-exited race: skip rather than guess.
+                        continue;
+                    }
+                    if (!string.Equals(path, ourExePath, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    int pid = p.Id;
+                    try
+                    {
+                        p.Kill();
+                        try { p.WaitForExit(500); } catch { }
+                        killed++;
+                        try { MozaLog.Info($"[Moza] Orphan-sweep killed prior-session stub PID {pid} (path={path})"); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try { MozaLog.Warn($"[Moza] Orphan-sweep kill PID {pid} failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
+                    }
+                }
+                finally
+                {
+                    try { p.Dispose(); } catch { }
+                }
+            }
+
+            if (killed == 0)
+            {
+                try { MozaLog.Debug($"[Moza] Orphan-sweep: no prior-session stub processes found ({candidates.Length} candidate(s) checked)"); } catch { }
             }
         }
 
