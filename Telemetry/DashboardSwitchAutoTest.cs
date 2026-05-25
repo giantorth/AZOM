@@ -132,67 +132,19 @@ namespace MozaPlugin.Telemetry
             int gen = _telemetry.SubscriptionGen;
             if (gen == 0) return; // wait for first subscription
 
-            _dashList = _telemetry.WheelReportedDashboards;
-            if (_dashList == null || _dashList.Count < 2)
-            {
-                var cache = _resolveDashCache();
-                if (cache != null)
-                {
-                    var sorted = cache.CachedNames
-                        .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    if (sorted.Count >= 2)
-                        _dashList = sorted;
-                }
-            }
-            if (_dashList == null || _dashList.Count < 2)
-            {
-                if (_elapsedMs >= IdleTimeoutMs)
-                {
-                    MozaLog.Debug("[Moza] AUTO-TEST: <2 dashboards after 30s, skipping");
-                    _state = State.Done;
-                }
-                return;
-            }
-
-            // Resolve current slot from active profile name (best effort).
-            string currentName = _telemetry.ActiveProfileName ?? "";
-            _startSlot = -1;
-            for (int i = 0; i < _dashList.Count; i++)
-            {
-                if (string.Equals(_dashList[i], currentName,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    _startSlot = i;
-                    break;
-                }
-            }
-
-            // Deterministic target slot for v1↔v2 wire-diff comparisons:
-            //   start on slot 0 → switch to slot 1
-            //   start on any other slot → switch to slot 0
-            // Identical input across both pipeline runs is required for the
-            // byte-level diff to be meaningful. Old alternation logic removed.
-            _targetSlot = (_startSlot == 0) ? 1 : 0;
-            if (_targetSlot >= _dashList.Count) _targetSlot = 0;
-            if (_startSlot == _targetSlot)
-                _targetSlot = (_targetSlot + 1) % _dashList.Count;
-
-            _prevSubscriptionGen = gen;
-            _framesAtPhaseStart = _telemetry.FramesSent;
-            _telemetry.TestMode = true;
-            _elapsedMs = 0;
-
-            string startName = _startSlot >= 0 && _startSlot < _dashList.Count
-                ? _dashList[_startSlot] : currentName;
-            string targetName = _dashList[_targetSlot];
-            // Emit phase marker BEFORE setting TestMode so the diff tool sees
-            // the marker as the first frame of the PreSwitchTest window.
+            // Test-mode-only operation: the harness's only job is to flip
+            // TestMode on once the initial subscription has settled, then
+            // sit in Done. Dashboard switching, string burst, and post-switch
+            // phases are all suppressed so the wheel keeps streaming TestSignal
+            // data on a single dashboard — used to investigate dashboard-update
+            // breakdowns that appear without any switching action.
+            string currentName = _telemetry.ActiveProfileName ?? "?";
             _telemetry.SendPhaseMarker(PhaseEnterPreSwitchTest);
-            Transition(State.PreSwitchTest,
-                $"start=\"{startName}\"(slot={_startSlot}) " +
-                $"target=\"{targetName}\"(slot={_targetSlot}) " +
-                $"subGen={gen}");
+            _telemetry.TestMode = true;
+            MozaLog.Debug(
+                $"[Moza] AUTO-TEST: TestMode-only enabled dash=\"{currentName}\" " +
+                $"subGen={gen} — staying in TestMode, no switching");
+            _state = State.Done;
         }
 
         private void TickPreSwitchTest()

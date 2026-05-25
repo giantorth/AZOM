@@ -15,13 +15,24 @@ namespace MozaPlugin.Telemetry.Lifecycle
     /// </summary>
     internal sealed class HotSwitchCoordinator
     {
-        /// <summary>Burst length. PitHouse captures show 3 emissions for
-        /// small dashboards and up to 13 for multi-package; 4 covers the
-        /// small case with margin. Each emission rebuilds tier-def with
-        /// the wheel's most-recent END marker, so even if the first
-        /// emission echoes a stale END the wheel hadn't pushed yet, a
-        /// later emission picks up the updated value and the wheel binds
-        /// then.</summary>
+        /// <summary>Burst-length floor. Always emit at least this many tier-
+        /// def re-applications before considering an early exit. Three matches
+        /// PitHouse's small-dashboard cadence. The minimum exists because a
+        /// single emission isn't enough — if the first one races the wheel's
+        /// END-marker push, the wheel may echo a stale generation and we need
+        /// at least one follow-up to converge.</summary>
+        public const int MinEmissions = 3;
+
+        /// <summary>Burst-length cap. Stops the burst even when the wheel
+        /// keeps reporting "not fully bound" — covers a wheel that's genuinely
+        /// pathological so we don't spend forever cycling. Eight covers the
+        /// PitHouse 3-13 range with margin without risking saturation.</summary>
+        public const int MaxEmissions = 8;
+
+        /// <summary>Legacy fixed burst length. Used when the caller passes
+        /// <c>null</c> to <see cref="MarkEmission"/> — i.e., when bind
+        /// completeness isn't measurable for this era (V0Url, V2Compact).
+        /// Preserves the prior pre-adaptive behaviour for those wheels.</summary>
         public const int EmissionCount = 4;
 
         /// <summary>Min spacing between subsequent emissions in the burst.
@@ -37,7 +48,11 @@ namespace MozaPlugin.Telemetry.Lifecycle
         public const int FirstEmissionFallbackMs = 1500;
 
         // ── State ─────────────────────────────────────────────────────────
+        // Pending count is the residual emission budget. Arm sets it to
+        // MaxEmissions; the adaptive logic in MarkEmission clamps to MinEmissions
+        // when the wheel reports bound, or EmissionCount in legacy mode.
         private int _pendingReemit;
+        private int _emissionsSent;
         private int _armTickMs;
         private int _lastEmissionTickMs;
 
@@ -48,17 +63,21 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
         public bool IsBurstPending => Volatile.Read(ref _pendingReemit) != 0;
         public int RemainingEmissions => Math.Max(0, Volatile.Read(ref _pendingReemit));
+        public int EmissionsSent => Volatile.Read(ref _emissionsSent);
         public int ArmTickMs => _armTickMs;
         public int LastEmissionTickMs => _lastEmissionTickMs;
 
         /// <summary>Queue a fresh burst. Resets pacing so the first
         /// emission runs the catalog-END handshake gate rather than the
-        /// pacing gate.</summary>
+        /// pacing gate. The pending counter is set to <see cref="MaxEmissions"/>
+        /// up front; <see cref="MarkEmission"/> clamps it down based on
+        /// per-emission bind reports.</summary>
         public void ArmBurst()
         {
             _armTickMs = Environment.TickCount;
             _lastEmissionTickMs = 0;
-            Interlocked.Exchange(ref _pendingReemit, EmissionCount);
+            Interlocked.Exchange(ref _emissionsSent, 0);
+            Interlocked.Exchange(ref _pendingReemit, MaxEmissions);
         }
 
         /// <summary>Decide whether the tick handler should emit a tier-def
@@ -117,17 +136,55 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// <summary>Record that the caller successfully emitted a tier-def
         /// re-application. Stamps the pacing timestamp and decrements the
         /// remaining counter. Returns the new remaining count (0 = burst
-        /// complete).</summary>
-        public int MarkEmission()
+        /// complete).
+        ///
+        /// <para><paramref name="boundComplete"/> drives the adaptive cap:</para>
+        /// <list type="bullet">
+        /// <item><c>null</c> — bind info isn't available for this era (V0Url,
+        /// V2Compact). Caps the burst at the legacy <see cref="EmissionCount"/>
+        /// (4) to preserve pre-adaptive behaviour for older wheels.</item>
+        /// <item><c>true</c> — wheel-catalog covers every channel we emitted.
+        /// Stops early after at least <see cref="MinEmissions"/> (3) have gone
+        /// out — saves wire bandwidth on the common case where the first
+        /// emission already binds correctly.</item>
+        /// <item><c>false</c> — channels still unbound. Keep emitting up to
+        /// <see cref="MaxEmissions"/> (8) so a wheel that's slowly publishing
+        /// its catalog has more chances to converge.</item>
+        /// </list>
+        /// </summary>
+        public int MarkEmission(bool? boundComplete = null)
         {
             _lastEmissionTickMs = Environment.TickCount;
+            int newSent = Interlocked.Increment(ref _emissionsSent);
             int newRemaining = Interlocked.Decrement(ref _pendingReemit);
-            if (newRemaining <= 0)
+
+            int cap = boundComplete switch
             {
-                // Burst done. Clear so the next switch can re-arm cleanly.
+                null  => EmissionCount,                              // legacy
+                true  => Math.Max(MinEmissions, EmissionCount),      // bound: stop at min
+                false => MaxEmissions,                               // not bound: extend
+            };
+            // Bound-with-min-reached: clamp the residual to zero.
+            if (boundComplete == true && newSent >= MinEmissions)
+            {
                 Interlocked.Exchange(ref _pendingReemit, 0);
                 return 0;
             }
+
+            // Hit the legacy cap (no bind info) — stop.
+            if (boundComplete == null && newSent >= cap)
+            {
+                Interlocked.Exchange(ref _pendingReemit, 0);
+                return 0;
+            }
+
+            // Hit the hard max — stop regardless.
+            if (newSent >= MaxEmissions || newRemaining <= 0)
+            {
+                Interlocked.Exchange(ref _pendingReemit, 0);
+                return 0;
+            }
+
             return newRemaining;
         }
     }

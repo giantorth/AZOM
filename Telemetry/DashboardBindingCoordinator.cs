@@ -670,6 +670,12 @@ namespace MozaPlugin.Telemetry
             _plugin.SaveSettings();
             if (enabled)
             {
+                // Explicit user re-enable clears any prior park / restart
+                // budget so the new attempt starts from a clean slate. Without
+                // this, a previously-parked pipeline (e.g. sess=0x09 retry
+                // exhausted) refuses subsequent recovery attempts and the
+                // user toggle has no visible effect.
+                _plugin.TelemetrySender?.Recovery.Reset();
                 ApplyTelemetrySettings();
                 StartTelemetryIfReady();
             }

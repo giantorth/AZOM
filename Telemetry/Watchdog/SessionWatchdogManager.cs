@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Telemetry.Watchdog
@@ -175,25 +174,16 @@ namespace MozaPlugin.Telemetry.Watchdog
 
             if (_s09RetryRounds >= S09RetryMaxRounds)
             {
-                MozaLog.Warn(
-                    $"[Moza] sess=0x09 retry budget exhausted after {S09RetryMaxRounds} rounds " +
-                    "— wheel never engaged the configJson handshake. Parking dashboard pipeline " +
-                    "(closing sessions 0x01/0x02/0x03, transitioning to Idle) to prevent port wedge. " +
+                // Route through RecoveryDispatcher.Park — its Stop()+raise-event
+                // sequence is identical to the prior inline path AND it sets the
+                // shared parked flag so subsequent watchdog escalations from other
+                // sessions don't queue restart work onto a torn-down pipeline.
+                _sender.Recovery.Park(
+                    $"sess=0x09 retry budget exhausted after {S09RetryMaxRounds} rounds " +
+                    "— wheel never engaged the configJson handshake. " +
                     "Cause is usually a wheel with no display sub-device or a wheel that refused the " +
                     "dashboard session — common for displayless wheels that slipped past the static " +
                     "HasDisplay gate. A wheel hot-swap or telemetry toggle will re-attempt.");
-                // Defer Stop+Park to a worker thread so the rest of the current tick
-                // (TickConfigJsonStuckWatchdog, TickEmitWidgetPoll, etc.) can complete
-                // without operating on torn-down state.
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try { _sender.Stop(); }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn($"[Moza] sess=0x09 park Stop() raised: {ex.GetType().Name}: {ex.Message}");
-                    }
-                    try { _sender.RaiseDashboardPipelineParked(); } catch { }
-                });
             }
         }
 
@@ -207,6 +197,11 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (_sender.StateIsIdle) return;
             if (!_sender.ConnectionIsConnected) return;
             if (_sender.ConfigJsonHasLastState) return;
+            // Hot-switch burst pacing owns sess=0x01/0x02 traffic for ~4s
+            // post-switch; injecting a prime+open-request mid-burst stomps the
+            // wheel's catalog-END handshake. See the matching guard in
+            // TickSession01EngagementWatchdog for the original incident.
+            if (_sender.HotSwitchBurstPending) return;
             long gapTs = _sender.ConfigJsonLastForwardGapUtcTicks;
             if (gapTs == 0) return;
 
@@ -255,6 +250,10 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (!_sender.ConnectionIsConnected) return;
             if (_sender.ConfigJsonHasLastState) return;
             if (_configJsonLastChunkUtcTicks == 0) return;
+            // Hot-switch burst pacing owns the recovery surface during the
+            // ~4 s burst window; deferring the stuck-state restart until the
+            // burst settles keeps the burst from being stomped mid-emission.
+            if (_sender.HotSwitchBurstPending) return;
 
             // Working dashboard despite missing library list — catalog + subscription is enough.
             bool haveCatalog = _sender.CatalogCount > 0;
@@ -271,18 +270,10 @@ namespace MozaPlugin.Telemetry.Watchdog
             _configJsonLastEscalationUtcTicks = now;
             _configJsonGapCount = 0;
             _configJsonLastChunkUtcTicks = now;
-            MozaLog.Warn(
-                "[Moza] configJson stuck-state watchdog: " +
+            _sender.Recovery.RequestRestart(
+                "configJson stuck-state watchdog: " +
                 $"chunks arrived but no valid state for {ConfigJsonNoStateRestartTimeoutTicks / TimeSpan.TicksPerMillisecond / 1000}s, " +
-                "and no catalog/subscription either — triggering full RestartForSwitch");
-            ThreadPool.QueueUserWorkItem(_ =>
-            {
-                try { _sender.RestartForSwitch(); }
-                catch (Exception ex)
-                {
-                    MozaLog.Warn($"[Moza] RestartForSwitch from stuck-state watchdog failed: {ex.Message}");
-                }
-            });
+                "and no catalog/subscription either");
         }
 
         /// <summary>Sess=0x02 engagement: re-arm (close+open+init+resubscribe) if no inbound; escalate on exhaustion.</summary>
@@ -294,6 +285,12 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (_s02ReArmRounds >= S02ReArmMaxRounds) return;
             // Defensive: skip silently if a tick fires before NoteActiveStateEntered.
             if (_activeStateEnteredTickCount == 0) return;
+            // Hot-switch burst is mid-flight: HotSwitchCoordinator's emission
+            // pacing depends on uninterrupted sess=0x01/0x02 traffic, and a
+            // re-arm's close+open+ApplySubscription clobbers the burst. Same
+            // failure mode as the documented W17 incident on the sess=0x01
+            // watchdog (2026-05-20 17:55:08); applies symmetrically here.
+            if (_sender.HotSwitchBurstPending) return;
 
             int now = Environment.TickCount;
             if (_s02ReArmRounds == 0)
@@ -330,18 +327,8 @@ namespace MozaPlugin.Telemetry.Watchdog
 
             if (_s02ReArmRounds >= S02ReArmMaxRounds)
             {
-                MozaLog.Warn(
-                    $"[Moza] sess=0x02 re-arm budget exhausted after {S02ReArmMaxRounds} rounds " +
-                    "— escalating to full RestartForSwitch (Stop+Start cycle)");
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try { _sender.RestartForSwitch(); }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn(
-                            $"[Moza] RestartForSwitch from sess=0x02 watchdog failed: {ex.Message}");
-                    }
-                });
+                _sender.Recovery.RequestRestart(
+                    $"sess=0x02 re-arm budget exhausted after {S02ReArmMaxRounds} rounds");
             }
         }
 
@@ -407,18 +394,8 @@ namespace MozaPlugin.Telemetry.Watchdog
 
             if (_s01ReArmRounds >= S01ReArmMaxRounds)
             {
-                MozaLog.Warn(
-                    $"[Moza] sess=0x{mgmt:X2} re-arm budget exhausted after {S01ReArmMaxRounds} rounds " +
-                    "— escalating to full RestartForSwitch (Stop+Start cycle)");
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try { _sender.RestartForSwitch(); }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn(
-                            $"[Moza] RestartForSwitch from sess=0x{mgmt:X2} watchdog failed: {ex.Message}");
-                    }
-                });
+                _sender.Recovery.RequestRestart(
+                    $"sess=0x{mgmt:X2} (mgmt) re-arm budget exhausted after {S01ReArmMaxRounds} rounds");
             }
         }
 
@@ -438,6 +415,20 @@ namespace MozaPlugin.Telemetry.Watchdog
                 MozaLog.Warn(
                     $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     $"buffer preserved, keeping cached state — no recovery action");
+                return;
+            }
+
+            // Burst-active gating: a hot-switch tier-def burst is paced by
+            // HotSwitchCoordinator and depends on uninterrupted session
+            // traffic; injecting prime+open-request frames mid-burst stomps
+            // the catalog-END handshake. Defer the gap response until burst
+            // settles — the wheel's own retransmit timer will keep covering
+            // missing chunks in the meantime.
+            if (_sender.HotSwitchBurstPending)
+            {
+                MozaLog.Debug(
+                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    "deferring recovery — hot-switch burst in flight");
                 return;
             }
 
@@ -499,18 +490,9 @@ namespace MozaPlugin.Telemetry.Watchdog
                 _configJsonLastEscalationUtcTicks = now;
                 _configJsonGapCount = 0;
                 _configJsonLastPrimeRetryUtcTicks = 0;
-                MozaLog.Warn(
-                    $"[Moza] {tag} configJson recovery escalation: " +
-                    "no cached state and prime+open-request didn't recover the burst — " +
-                    "triggering full RestartForSwitch");
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try { _sender.RestartForSwitch(); }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn($"[Moza] {tag} RestartForSwitch from gap recovery failed: {ex.Message}");
-                    }
-                });
+                _sender.Recovery.RequestRestart(
+                    $"{tag} configJson recovery escalation: " +
+                    "no cached state and prime+open-request didn't recover the burst");
                 return;
             }
 
