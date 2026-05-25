@@ -38,6 +38,20 @@ namespace MozaPlugin
         private static MozaSerialConnection? s_persistentConnection;
         private static TelemetrySender? s_persistentTelemetrySender;
 
+        // CoAP stub child-process manager. Persistent for the same reason the
+        // wire is: stopping and restarting the stub on every plugin reload is
+        // wasted work (the stub is a long-lived "PitHouse impersonator" child
+        // process with no per-plugin-instance state) AND under Wine/Proton the
+        // teardown path (Process.Kill + JobObject.Dispose) intermittently
+        // hangs — observed 2026-05-25: End() on the SECOND game switch wedged
+        // in CoapStubManager.Stop() between RestoreRegistryRedirect (logged)
+        // and the "CoAP stub stopped" line (never logged). Leaving the stub
+        // alive across reloads avoids the unsafe teardown path entirely.
+        //
+        // Disposed on full process exit (OnAppDomainProcessExit) AND on cold-
+        // start re-entry when SdkEmulationEnabled was toggled off.
+        private static Sdk.CoapStubManager? s_persistentSdkStubManager;
+
         // AppDomain.ProcessExit registration is one-shot per process. End()
         // intentionally leaves the persistent wire alive across plugin
         // reloads (game switches) — the wheel never sees the 10–14 s
@@ -835,8 +849,39 @@ namespace MozaPlugin
                 {
                     try
                     {
-                        _sdkStubManager = new Sdk.CoapStubManager();
-                        _sdkStubManager.Start();
+                        // Reuse the persistent stub manager from a prior
+                        // plugin instance if its child process is still
+                        // alive. Avoids Stop+Restart thrash (registry
+                        // re-redirect, CreateProcess, AssignProcessToJobObject)
+                        // on every game switch — and sidesteps the Wine/Proton
+                        // teardown hang that wedges Stop() between registry
+                        // restore and Process.Kill / JobObject.Dispose.
+                        if (s_persistentSdkStubManager != null
+                            && s_persistentSdkStubManager.IsRunning)
+                        {
+                            _sdkStubManager = s_persistentSdkStubManager;
+                            MozaLog.Info(
+                                "[Sdk] Reusing persistent CoAP stub from prior plugin instance " +
+                                $"(status={_sdkStubManager.Status})");
+                        }
+                        else
+                        {
+                            // Persistent reference exists but the child is gone
+                            // (crashed / killed externally). Dispose the husk
+                            // before allocating a fresh manager so its job-handle
+                            // / process-handle don't leak.
+                            if (s_persistentSdkStubManager != null)
+                            {
+                                try { s_persistentSdkStubManager.Dispose(); } catch { }
+                                s_persistentSdkStubManager = null;
+                            }
+                            _sdkStubManager = new Sdk.CoapStubManager();
+                            _sdkStubManager.Start();
+                            s_persistentSdkStubManager = _sdkStubManager;
+                        }
+                        // SDK server holds refs to _data + _hardwareApplier
+                        // (both per-instance), so it MUST be recreated each
+                        // Init — it cannot be persistent like the stub manager.
                         _sdkServer = new Sdk.MozaSdkCoapServer(_data, _hardwareApplier);
                         _sdkServer.Start();
                         MozaLog.Info("[Sdk] CoAP SDK server enabled");
@@ -845,9 +890,23 @@ namespace MozaPlugin
                     {
                         MozaLog.Error($"[Sdk] Failed to start CoAP SDK server: {ex.Message}");
                         try { _sdkServer?.Stop(); } catch { /* swallow */ }
-                        try { _sdkStubManager?.Stop(); } catch { /* swallow */ }
+                        // Don't Stop() the stub manager from this catch — it
+                        // may be the persistent one and a Wine-side Stop()
+                        // hang is exactly the failure we're avoiding. Leave
+                        // it running; the next Init re-evaluates via IsRunning.
                         _sdkServer = null;
                         _sdkStubManager = null;
+                    }
+                }
+                else
+                {
+                    // SDK emulation toggled OFF. If a prior session left a
+                    // persistent stub running, stop it now so the registry
+                    // redirect doesn't outlive the user's intent.
+                    if (s_persistentSdkStubManager != null)
+                    {
+                        try { s_persistentSdkStubManager.Stop(); } catch { }
+                        s_persistentSdkStubManager = null;
                     }
                 }
 
@@ -913,8 +972,18 @@ namespace MozaPlugin
             catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
             try { _controlUdpServer?.Stop(); _controlUdpServer?.Dispose(); _controlUdpServer = null; }
             catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
-            try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
-            catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+            // Mirror End()'s persistent-stub policy: if this Init reused the
+            // persistent stub, do NOT Stop it here — the next Init expects to
+            // inherit it. Only drop our local ref. Disposal gated on
+            // !ReferenceEquals matches the connection/sender pattern above.
+            bool ownStubManager = _sdkStubManager != null
+                && !ReferenceEquals(_sdkStubManager, s_persistentSdkStubManager);
+            if (ownStubManager)
+            {
+                try { _sdkStubManager?.Stop(); }
+                catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+            }
+            _sdkStubManager = null;
 
             try
             {
@@ -1264,17 +1333,42 @@ namespace MozaPlugin
             catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
             try { _controlUdpServer?.Stop(); _controlUdpServer?.Dispose(); _controlUdpServer = null; }
             catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
-            try { _sdkStubManager?.Stop(); _sdkStubManager = null; }
-            catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
 
             // Decide up-front whether the persistent wire will survive this
             // teardown — same condition the dispose step below uses. We need
             // it now so detection state can be captured (vs. wiped) in lock-
-            // step with the wire.
+            // step with the wire AND so the CoAP stub manager teardown below
+            // can match the wire's persistence decision.
             bool keepWireAlive = _usingPersistentWire
                                  || (_connection != null && _connection == s_persistentConnection
                                      && _telemetrySender != null
                                      && _telemetrySender == s_persistentTelemetrySender);
+
+            // CoAP stub manager: persist across game-switch reloads alongside
+            // the wire. Stopping the stub on every End()+Init() cycle (a) is
+            // wasted work (the stub holds no per-plugin-instance state) and
+            // (b) intermittently HANGS under Wine/Proton — Stop() wedged on
+            // the 2026-05-25 second-game-switch path between the registry
+            // restore log and the Process.Kill / JobObject.Dispose call.
+            //
+            // When keepWireAlive=true we just drop the instance ref; the
+            // persistent static keeps the child process alive for the next
+            // plugin instance to reuse via the IsRunning check in Init.
+            // When the wire is being torn down (true cold-start reset, not a
+            // game switch), stop the stub too and clear the static.
+            if (keepWireAlive)
+            {
+                _sdkStubManager = null;
+            }
+            else
+            {
+                try { _sdkStubManager?.Stop(); }
+                catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+                if (_sdkStubManager != null
+                    && ReferenceEquals(_sdkStubManager, s_persistentSdkStubManager))
+                    s_persistentSdkStubManager = null;
+                _sdkStubManager = null;
+            }
 
             if (keepWireAlive)
             {
@@ -1431,6 +1525,27 @@ namespace MozaPlugin
             {
                 var conn = s_persistentConnection;
                 conn?.Dispose();
+            }
+            catch { }
+            // Stop the persistent CoAP stub on full process exit so its child
+            // process (and the registry redirect) don't outlive SimHub. The
+            // stub manager's Stop() can wedge under Wine/Proton (the exact
+            // failure mode that drove making it persistent in the first
+            // place), so wrap in a Task with a 1.5 s budget — well inside
+            // the ~2 s ProcessExit window — and let the runtime kill our
+            // child via the JobObject's KILL_ON_JOB_CLOSE flag if Stop()
+            // doesn't return in time.
+            try
+            {
+                var stub = s_persistentSdkStubManager;
+                if (stub != null)
+                {
+                    var task = System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try { stub.Stop(); } catch { }
+                    });
+                    try { task.Wait(1500); } catch { }
+                }
             }
             catch { }
         }
