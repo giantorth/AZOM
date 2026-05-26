@@ -639,7 +639,32 @@ namespace MozaPlugin.Protocol
                             break;
                         }
                         int payloadLength = rx[frameStart + 1];
-                        if (payloadLength < 2 || payloadLength > 64)
+                        // LEN field counts CMD bytes only (group + dev + chk
+                        // are framing). The lower bound was historically `< 2`
+                        // as defensive noise rejection, but that silently
+                        // dropped legitimate short wheel responses:
+                        //   LEN=0  → `7E 00 [group] [dev] [chk]` — presence-
+                        //            probe ACKs (e.g. `7E 00 80 dev_swap chk`),
+                        //            simple polled-status responses (e.g.
+                        //            `7E 00 C0 31 7C` channel-cfg response
+                        //            from base, `7E 00 A2 21 4E` from main).
+                        //   LEN=1  → `7E 01 [group] [dev] [cmd] [chk]` — minimal
+                        //            session-mgmt responses (e.g. `7E 01 C3 71
+                        //            80 40` SerialStream wheel response).
+                        // Rejecting these produced silent resyncs (no DROP log,
+                        // since neither frameError nor cksumFail fired) at
+                        // ~3/s steady-state, and the rest of the plugin never
+                        // got to see these frames — including `MozaPlugin
+                        // .OnMessageReceived`'s `data.Length == 2 && data[0]
+                        // == 0x80` presence-probe ACK handler, which was
+                        // unreachable in practice. Accept any non-negative LEN;
+                        // the checksum still has to validate, so a stray byte
+                        // run that happens to look like `7E N` only survives if
+                        // its checksum byte also coincidentally matches (1/256).
+                        // Upper bound raised to 200 — larger than any observed
+                        // wheel frame, matches the catalog parser's record-size
+                        // ceiling for symmetric framing assumptions.
+                        if (payloadLength > 200)
                         {
                             // Invalid length — skip this start byte and resync on
                             // the next 0x7E. Common at connect when junk precedes
