@@ -1533,6 +1533,9 @@ namespace MozaPlugin
             sb.AppendLine();
             sb.AppendLine("=== Wheel response on 0x02 (post-subscription window) ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildSubscriptionResponse(_plugin));
+            sb.AppendLine();
+            sb.AppendLine("=== Firmware debug (wire group 0x0E) ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildFirmwareDebug(_plugin));
             return sb.ToString();
         }
 

@@ -93,6 +93,18 @@ namespace MozaPlugin
         private MozaAb9DeviceManager _ab9Manager = null!;
         private MozaMBoosterRegistry? _mboosterRegistry;
 
+        // Captures unsolicited firmware-debug frames (raw wire group 0x0E,
+        // subtype 0x05) for the Diagnostics tab. Owned by the plugin so the
+        // ring buffer's lifetime matches the connection's: cleared on
+        // disconnect so chatter from a prior wheel doesn't leak into a new
+        // session's diagnostics view. See OnMessageReceived (0x0E branch)
+        // for the capture site and DiagnosticsTextBuilder.BuildFirmwareDebug
+        // for the render site.
+        private readonly global::MozaPlugin.Diagnostics.FirmwareDebugLog _firmwareDebugLog
+            = new global::MozaPlugin.Diagnostics.FirmwareDebugLog();
+        internal global::MozaPlugin.Diagnostics.FirmwareDebugLog FirmwareDebugLogForDiagnostics
+            => _firmwareDebugLog;
+
         // Third-party SDK (CoAP-over-UDP) emulation server + name-impersonation
         // stub process. Both are gated on Settings.SdkEmulationEnabled and
         // require a plugin restart to toggle (no runtime enable/disable —
@@ -2087,6 +2099,10 @@ namespace MozaPlugin
                 if (_connection.Connect())
                 {
                     _unmatched = 0;
+                    // Drop any firmware-debug chatter captured from a prior
+                    // (possibly different) wheel — the diagnostics tab should
+                    // only show what THIS connection has produced.
+                    _firmwareDebugLog.Clear();
                     MozaLog.Info("[Moza] Connected to MOZA device");
                     MarkStandaloneDashboardDetectedFromUsb("serial connect");
                     _deviceManager.ReadSettings(StatusPollCommands);
@@ -2424,7 +2440,40 @@ namespace MozaPlugin
             // Shutdown guard: serial reader may deliver frames after End() begins.
             if (IsShuttingDown) return;
 
-            // Filter firmware debug noise before parsing/logging
+            // Firmware debug frames (raw wire group 0x0E, subtype 0x05) carry
+            // unsolicited ASCII status / log lines from the wheel-bus firmware
+            // (main bridge / wheel / display). They're not part of the
+            // request/response protocol — capture for diagnostics visibility,
+            // then short-circuit so MozaResponseParser doesn't waste cycles
+            // trying to match them against the command database.
+            if (data.Length >= 4
+                && data[0] == MozaProtocol.FirmwareDebugGroup
+                && data[2] == 0x05)
+            {
+                byte rawDeviceId = data[1];
+                string text;
+                try
+                {
+                    // Body is ASCII text starting at data[3]. Trim trailing
+                    // newline / null padding so the ring buffer entries are
+                    // compact and don't contain control chars that mess up
+                    // the diagnostics text layout. Non-printable bytes
+                    // become '?' under the ASCII decode's error replacement.
+                    text = System.Text.Encoding.ASCII
+                        .GetString(data, 3, data.Length - 3)
+                        .TrimEnd('\n', '\r', '\0');
+                }
+                catch
+                {
+                    text = $"<{data.Length - 3} bytes>";
+                }
+                _firmwareDebugLog.Record(rawDeviceId, text);
+                MozaLog.Debug(
+                    $"[Moza] firmware-debug src={(rawDeviceId == 0x21 ? "main" : rawDeviceId == 0x71 ? "wheel" : rawDeviceId == 0xB1 ? "display" : $"0x{rawDeviceId:X2}")}: {text}");
+                return;
+            }
+            // Other 0x0E variants we don't yet know how to decode — drop
+            // silently (preserves prior behaviour for unknown subtypes).
             if (data.Length >= 1 && data[0] == MozaProtocol.FirmwareDebugGroup)
                 return;
 

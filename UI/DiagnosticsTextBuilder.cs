@@ -392,6 +392,45 @@ namespace MozaPlugin.UI
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>Render the most recent unsolicited firmware-debug frames
+        /// (raw wire group 0x0E, subtype 0x05). These are ASCII log lines the
+        /// wheel-bus firmware emits during normal operation — parameter
+        /// writes, init traces, occasional warnings — captured by
+        /// <see cref="FirmwareDebugLog"/> for visibility. Empty by default
+        /// because nothing else in the plugin acts on these; when present
+        /// they're useful for understanding what the firmware is doing
+        /// across init / dashboard switches / setting writes.</summary>
+        public static string BuildFirmwareDebug(MozaPlugin plugin)
+        {
+            var log = plugin.FirmwareDebugLogForDiagnostics;
+            var entries = log.Snapshot();
+            if (entries.Length == 0)
+                return $"(no firmware-debug frames captured; total received={log.TotalReceived})";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Recent frames: {entries.Length} shown / {log.TotalReceived} total received");
+            // Render newest first so the most recent activity is at the top
+            // of the section (and the oldest, least relevant lines slide off
+            // the visible area first on long scrolls). Limit to last 64 so a
+            // burst doesn't dominate the diagnostics view.
+            int limit = Math.Min(entries.Length, 64);
+            for (int i = entries.Length - 1; i >= entries.Length - limit; i--)
+            {
+                var e = entries[i];
+                // Local-time stamp keeps the format consistent with the rest
+                // of the diagnostics tab (manifest already shows UTC).
+                string ts = e.TimestampUtc.ToLocalTime().ToString("HH:mm:ss.fff");
+                // Empty lines are continuation fragments (the firmware
+                // sometimes splits a single log line across two 0x0E
+                // frames); skip rendering them to keep the section readable
+                // — they're still in the bundle's moza-log.txt for full
+                // forensic context.
+                if (e.Text.Length == 0) continue;
+                sb.AppendLine($"  {ts} [{e.SourceName,-7}] {e.Text}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
         public static string BuildSubscriptionResponse(MozaPlugin plugin)
         {
             var chunks = plugin.SubscriptionResponseForDiagnostics;
