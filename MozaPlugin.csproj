@@ -91,6 +91,10 @@
       <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.vi</ManifestResourceName>
     </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Strings.zh-Hans.resx">
+      <WithCulture>false</WithCulture>
+      <ManifestResourceName>MozaPlugin.Resources.Strings.zh-Hans</ManifestResourceName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Data\Telemetry.json" LogicalName="MozaPlugin.Data.Telemetry.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelGeneric\MOZA Racing Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelGeneric.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelOldProto\MOZA Old Protocol Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelOldProto.device.json" />
