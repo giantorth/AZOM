@@ -269,11 +269,28 @@ namespace MozaPlugin.Telemetry
             int chCount = 0;
             if (profile != null)
                 foreach (var t in profile.Tiers) chCount += t.Channels.Count;
+            // Catalog-only continuity: when the user has no mzdash file for
+            // the new dashboard (profile == null) AND the sender already has
+            // a synthesised catalog-only profile loaded, KEEP it. The
+            // alternative — assigning null and letting MaybeSwap re-synth on
+            // the next tick — sends the wheel a torn-down-and-rebuilt tier-
+            // def for no semantic gain, which we've observed (2026-05-26
+            // moza-wire-...-043633) wedge sess=0x01 in a close/reopen loop
+            // when the user rapid-fires dashboard switches. MaybeSwap will
+            // still pick up any genuine catalog/endMarker change on a future
+            // tick. The non-null case proceeds normally so a user-loaded
+            // mzdash always wins over the synth.
+            bool keepExistingSynth =
+                profile == null
+                && sender.Profile != null
+                && sender.Profile.Name == TelemetrySender.CatalogProfileName;
             MozaLog.Debug(
                 $"[Moza] ApplyTelemetrySettings: setting profile=" +
                 $"{profile?.Name ?? "null"} tiers={tierCount} channels={chCount} " +
-                $"mzdash={mzdashName} settingName={telemName}");
-            sender.Profile = profile;
+                $"mzdash={mzdashName} settingName={telemName}" +
+                (keepExistingSynth ? " (keeping existing synth — catalog-only mode unchanged)" : ""));
+            if (!keepExistingSynth)
+                sender.Profile = profile;
             sender.MzdashContent = mzdashContent;
             sender.MzdashName = mzdashName;
 

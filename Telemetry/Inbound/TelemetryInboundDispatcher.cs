@@ -371,6 +371,12 @@ namespace MozaPlugin.Telemetry.Inbound
         private void HandleSessionEnd(byte[] data, byte session)
         {
             int closeSeq = data.Length >= 8 ? data[6] | (data[7] << 8) : 0;
+            // Diagnostic visibility for wheel-initiated CLOSE. Tracks repeat
+            // rate per session and warns on "close storms" so the silent
+            // firmware-rejection failure mode surfaces in logs without a
+            // wire trace. Does not alter recovery behaviour — that stays
+            // with the engagement watchdogs below.
+            _sender.Watchdog.NoteWheelInitiatedClose(session);
             // Dispatcher-owned sessions: route exclusively.
             if (_sender.Dispatcher.GetOwner(session) != null)
             {

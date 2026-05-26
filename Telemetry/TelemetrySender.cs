@@ -796,11 +796,12 @@ namespace MozaPlugin.Telemetry
             get => _profile;
             set
             {
-                // Idempotency guard. Callers (ApplyTelemetrySettings,
-                // OnWheelInitiatedSwitch, OnDashboardSwitched,
-                // MaybeSwapProfileForCatalog) can fire this setter several
-                // times in close succession with the same source profile —
-                // e.g. UI combo click → ApplyTelemetrySettings → next tick
+                // Idempotency guard, layer 1 — reference identity. Callers
+                // (ApplyTelemetrySettings, OnWheelInitiatedSwitch,
+                // OnDashboardSwitched, MaybeSwapProfileForCatalog) can fire
+                // this setter several times in close succession with the
+                // same source profile — e.g. UI combo click →
+                // ApplyTelemetrySettings → next tick
                 // MaybeSwapProfileForCatalog sees catalog unchanged but
                 // assigns the cached synthesised profile back in. Each
                 // re-assignment re-runs the multi-broadcast expansion (~N
@@ -809,6 +810,37 @@ namespace MozaPlugin.Telemetry
                 // pristine snapshot. Reference-compare so the same input
                 // → no-op; null-to-null also short-circuits cleanly.
                 if (ReferenceEquals(value, _lastProfileSourceRef)) return;
+
+                // Idempotency guard, layer 2 — content equality. The
+                // catalog-synthesis path (MaybeSwapProfileForCatalog) builds
+                // a fresh MultiStreamProfile instance every call from the
+                // wheel's current catalog. If catalog content hasn't
+                // changed, the new instance is byte-equivalent to the
+                // previously-assigned one even though their object refs
+                // differ — and that triggers the same full FrameBuilder
+                // rebuild + tier-def re-emission as a real change. The
+                // wheel firmware has been observed (2026-05-26
+                // moza-wire-...-043633) to wedge sess=0x01 into a close-
+                // reopen loop when bombarded with 9 functionally-identical
+                // tier-defs in a few seconds. Catching content-equivalent
+                // assignments here means downstream rebuild + emission
+                // only fires on actual change. Hot-switch / cold-start
+                // emissions still work because they call
+                // ApplySubscription which sends tier-def directly, not via
+                // the Profile setter side effect.
+                //
+                // Gate on _profile being live too. If _profile was cleared
+                // (Stop/Reset path) but _lastProfileSourceRef still points
+                // at the prior assignment, the content match would no-op
+                // away the rebuild we actually need to bring _profile back.
+                if (value != null && _profile != null && _lastProfileSourceRef != null
+                    && AreProfileContentsEquivalent(value, _lastProfileSourceRef))
+                {
+                    // Swap the source ref to the latest instance so
+                    // ReferenceEquals catches further repeats at layer 1.
+                    _lastProfileSourceRef = value;
+                    return;
+                }
                 // Off→on transition (telemetry was disabled, user re-enabled
                 // it / selected a profile from the empty state): treat as an
                 // explicit "fresh attempt" signal and forgive any prior
@@ -961,6 +993,53 @@ namespace MozaPlugin.Telemetry
         // expansion) before assigning to _profile, so we'd never match the
         // original input against the post-expansion stored profile.
         private MultiStreamProfile? _lastProfileSourceRef;
+
+        /// <summary>Structural equality check for two MultiStreamProfile
+        /// instances. Returns true iff the wire shape they would produce
+        /// (tier count, per-tier channel set + bit widths, string channel
+        /// URLs) is identical. Used by the Profile setter to no-op
+        /// content-equivalent re-assignments — different instance, same
+        /// payload from the wheel's perspective.
+        ///
+        /// Intentionally compares only the fields that affect the emitted
+        /// tier-def + value-frame layout. Fields like SimHubProperty and
+        /// SimHubPropertyScale are NOT compared because user-mapping
+        /// changes mutate them in-place on the existing profile (rebinding
+        /// the host's value source without changing the wire format) —
+        /// see ChannelDefinition.SimHubProperty's class doc for the
+        /// invariant.</summary>
+        private static bool AreProfileContentsEquivalent(
+            MultiStreamProfile a,
+            MultiStreamProfile b)
+        {
+            if (!string.Equals(a.Name, b.Name, System.StringComparison.Ordinal)) return false;
+            if (a.Tiers.Count != b.Tiers.Count) return false;
+            for (int i = 0; i < a.Tiers.Count; i++)
+            {
+                var ta = a.Tiers[i];
+                var tb = b.Tiers[i];
+                if (ta.PackageLevel != tb.PackageLevel) return false;
+                if (ta.TotalBits != tb.TotalBits) return false;
+                if (ta.FlagByte != tb.FlagByte) return false;
+                if (ta.Channels.Count != tb.Channels.Count) return false;
+                for (int j = 0; j < ta.Channels.Count; j++)
+                {
+                    var ca = ta.Channels[j];
+                    var cb = tb.Channels[j];
+                    if (ca.BitWidth != cb.BitWidth) return false;
+                    if (!string.Equals(ca.Url, cb.Url, System.StringComparison.OrdinalIgnoreCase)) return false;
+                    if (!string.Equals(ca.Compression, cb.Compression, System.StringComparison.OrdinalIgnoreCase)) return false;
+                }
+            }
+            if (a.StringChannels.Count != b.StringChannels.Count) return false;
+            for (int i = 0; i < a.StringChannels.Count; i++)
+            {
+                if (!string.Equals(a.StringChannels[i].Url, b.StringChannels[i].Url,
+                                   System.StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return true;
+        }
 
         // Per-string-channel emission state: last-sent value and tick timestamp.
         // Keyed by channel URL (case-insensitive). The wheel re-indexes URLs per
@@ -3060,15 +3139,18 @@ namespace MozaPlugin.Telemetry
             int curLen = _catalogParser.BufferLength;
             if (curLen > _catalogParser.LastParsedBufferLen)
             {
+                // TryParse internally trims bytes up to the last committed
+                // END marker, so in normal operation buffers stay bounded
+                // to in-flight content (typically a few hundred bytes per
+                // dashboard switch). The hard-limit wipe below only fires
+                // when the wheel has gone N kB without an END marker the
+                // parser could trim against (e.g. wheel keeps re-sending
+                // back-refs without bounding them with a new END value).
                 _catalogParser.TryParse();
-                // Buffer-overrun guard: post-renegotiate noise can fill a
-                // session's buffer with redundant end-marker bytes; drop only
-                // the overflowing session(s) since the parser keeps the merged
-                // catalog cached. Per-session so end-marker spam on one
-                // session can't wipe another session's still-unparsed records.
-                if (_catalogParser.MaxSessionBufferLength > 4096)
+                const int HardLimitBytes = 65536;
+                if (_catalogParser.MaxSessionBufferLength > HardLimitBytes)
                 {
-                    _catalogParser.ClearOverflowingSessions(4096);
+                    _catalogParser.ClearOverflowingSessions(HardLimitBytes);
                 }
             }
         }

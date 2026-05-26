@@ -64,6 +64,55 @@ namespace MozaPlugin.Telemetry.Watchdog
         private const int S01ReArmMaxRounds = 5;
         private const int S01InitialGraceMs = 20_000;
 
+        // ── wheel-initiated CLOSE storm tracking ──────────────────────────
+        // The wheel may emit `c3 71 7c 00 <sess> 00 <seq>` (type=0x00, close)
+        // on a session the HOST opened. Observed in 2026-05-26
+        // moza-wire-...-043633: wheel emitted CLOSE on sess=0x01 every ~1 s
+        // for 15+ seconds while the host kept pushing tier-def chunks to
+        // sess=0x01. The CLOSE is the wheel saying "I am not in the state
+        // you think I am" — usually after firmware confusion from rapid
+        // tier-def re-emissions. Tracked here so we can (a) surface it
+        // loudly via a single WARN per storm rather than silently absorbing
+        // it, and (b) escalate to a clean recovery path when the storm
+        // crosses a threshold.
+        //
+        // Per-session sliding-window state. Indexed by session id 0x01..0x09;
+        // unused slots stay at default(0).
+        private const int CloseStormSessionMax = 16; // indexes 0x00..0x0F covered
+        private readonly int[] _closeStormFirstTickMs = new int[CloseStormSessionMax];
+        private readonly int[] _closeStormCount = new int[CloseStormSessionMax];
+        private readonly int[] _closeStormLastWarnTickMs = new int[CloseStormSessionMax];
+        // Window in ms used to count consecutive closes as "a storm".
+        // Wheel sends keepalive END markers on sess=0x02 once per second in
+        // healthy operation, which is NOT a session close — those go through
+        // a different path. CLOSEs (type=0x00) at this rate represent
+        // session rejection, which the wheel only does when it has been
+        // bombarded; 5 s catches every real instance we've observed without
+        // tagging single occasional closes.
+        private const int CloseStormWindowMs = 5_000;
+        // Single close inside the window = quiet log + start window.
+        // 3 closes = WARN log explaining the symptom; one WARN per storm.
+        // (One-per-storm dedup uses _closeStormLastWarnTickMs.)
+        private const int CloseStormWarnThreshold = 3;
+        // Min gap between WARN re-emissions for the same session, so a long-
+        // running storm doesn't spam the log on every additional close.
+        private const int CloseStormWarnCooldownMs = 10_000;
+        // Escalation to full sender restart: if the storm crosses this count
+        // inside CloseStormRestartWindowMs, the engagement watchdog clearly
+        // can't recover us (it would have re-armed and engaged sess=0x01
+        // before we accumulated this many closes). At the wheel's observed
+        // ~1 CLOSE/s cadence this means 10 closes in 30 s ≈ full minute of
+        // sustained rejection. Higher threshold means we don't restart on a
+        // brief firmware hiccup; window is wide enough to count steady-state
+        // 1 Hz storms without timing out.
+        private const int CloseStormRestartThreshold = 10;
+        private const int CloseStormRestartWindowMs = 30_000;
+        // One-shot guard per session so we don't request restart repeatedly
+        // while the requested restart is in flight (RequestRestart is async).
+        // Reset by Reset() at restart boundaries so a subsequent storm can
+        // trigger another restart if needed.
+        private readonly int[] _closeStormRestartRequested = new int[CloseStormSessionMax];
+
         // ── configJson gap / stuck-state ──────────────────────────────────
         private int _configJsonGapCount;
         private long _configJsonLastChunkUtcTicks;
@@ -115,6 +164,104 @@ namespace MozaPlugin.Telemetry.Watchdog
                 _session01EngagedUtcTicks = DateTime.UtcNow.Ticks;
         }
 
+        /// <summary>Called from the inbound dispatcher when the wheel sends a
+        /// type=0x00 session-close chunk. The wheel CLOSE-ing a session we
+        /// believe is engaged is an unambiguous rejection signal — engagement
+        /// is revoked here so <see cref="TickSession01EngagementWatchdog"/>
+        /// (or sess=0x02) can re-arm with backoff. Without this revoke the
+        /// engagement flag latched-true at the first fc:00 ack and the
+        /// watchdog never fired again, so a wheel that engaged once and
+        /// later rejected stayed stuck forever (2026-05-26
+        /// moza-wire-...-045658).
+        ///
+        /// On top of the per-CLOSE recovery hook, sustained storms
+        /// (≥ CloseStormRestartThreshold closes in CloseStormRestartWindowMs)
+        /// escalate to a full sender restart via Recovery.RequestRestart
+        /// — the engagement watchdog's close+open+resubscribe sequence
+        /// sends MORE tier-def to the wheel, which is exactly what's
+        /// confused its firmware in the first place; tearing the whole
+        /// session down and rebuilding from scratch breaks that loop.
+        ///
+        /// Each CLOSE also drives the close-storm WARN log (visibility),
+        /// gated to one WARN per CloseStormWarnCooldownMs to keep the log
+        /// readable.</summary>
+        public void NoteWheelInitiatedClose(byte session)
+        {
+            if (session >= CloseStormSessionMax) return;
+            int now = Environment.TickCount;
+
+            // Recovery, layer 1 — revoke engagement on the affected session
+            // so its engagement watchdog re-fires. Fires on EVERY inbound
+            // CLOSE, not just storms: a single wheel-initiated CLOSE on a
+            // session we believe is engaged is already a contradiction the
+            // watchdog should resolve.
+            if (session == _sender.MgmtPort && _session01EngagedUtcTicks != 0)
+            {
+                _session01EngagedUtcTicks = 0;
+                MozaLog.Debug(
+                    $"[Moza] sess=0x{session:X2} engagement revoked due to " +
+                    "wheel-initiated CLOSE — engagement watchdog will re-arm.");
+            }
+            // sess=0x02 has its own engagement signal (first-inbound) which
+            // is also useful to revoke on close.
+            if (session == _sender.FlagByte && _session02FirstInboundUtcTicks != 0)
+            {
+                _session02FirstInboundUtcTicks = 0;
+                MozaLog.Debug(
+                    $"[Moza] sess=0x{session:X2} (telem) first-inbound flag " +
+                    "revoked due to wheel-initiated CLOSE.");
+            }
+
+            // Slide the window: if it's been longer than CloseStormWindowMs
+            // since the first close in this session's tracked storm, restart
+            // counting. Otherwise increment.
+            int sinceFirst = now - _closeStormFirstTickMs[session];
+            if (_closeStormCount[session] == 0 || sinceFirst > CloseStormWindowMs)
+            {
+                _closeStormFirstTickMs[session] = now;
+                _closeStormCount[session] = 1;
+                MozaLog.Debug(
+                    $"[Moza] sess=0x{session:X2} wheel-initiated CLOSE (first in window) — " +
+                    "either a normal end-of-stream or the start of a rejection storm; " +
+                    "logging at DEBUG until threshold reached.");
+                return;
+            }
+            _closeStormCount[session]++;
+            if (_closeStormCount[session] >= CloseStormWarnThreshold)
+            {
+                int sinceWarn = now - _closeStormLastWarnTickMs[session];
+                if (_closeStormLastWarnTickMs[session] == 0 || sinceWarn > CloseStormWarnCooldownMs)
+                {
+                    _closeStormLastWarnTickMs[session] = now;
+                    MozaLog.Warn(
+                        $"[Moza] sess=0x{session:X2} CLOSE storm: " +
+                        $"{_closeStormCount[session]} wheel-initiated closes in " +
+                        $"{sinceFirst} ms. Wheel is rejecting our session — typically " +
+                        "caused by rapid tier-def re-emissions confusing firmware state. " +
+                        "Engagement watchdog will re-arm; if storm persists, sender will " +
+                        "escalate to full restart.");
+                }
+            }
+            // Recovery, layer 2 — sustained storm escalation. If we've taken
+            // CloseStormRestartThreshold closes inside CloseStormRestartWindowMs,
+            // the engagement watchdog's incremental re-arm clearly isn't
+            // breaking us out (it would have engaged sess=0x01 long before
+            // we got this deep). Full restart tears down every session,
+            // re-runs session-close cold start, re-probes display, and
+            // rebuilds the subscription from scratch — the wheel firmware
+            // gets a clean slate.
+            if (_closeStormCount[session] >= CloseStormRestartThreshold
+                && sinceFirst <= CloseStormRestartWindowMs
+                && _closeStormRestartRequested[session] == 0)
+            {
+                _closeStormRestartRequested[session] = 1;
+                _sender.Recovery.RequestRestart(
+                    $"sess=0x{session:X2} CLOSE storm: " +
+                    $"{_closeStormCount[session]} wheel-initiated closes in " +
+                    $"{sinceFirst} ms — escalating to full sender restart.");
+            }
+        }
+
         public void NoteConfigJsonChunkArrived()
         {
             _configJsonLastChunkUtcTicks = DateTime.UtcNow.Ticks;
@@ -148,6 +295,13 @@ namespace MozaPlugin.Telemetry.Watchdog
             _configJsonLastChunkUtcTicks = 0;
             _configJsonLastPrimeRetryUtcTicks = 0;
             _configJsonGapTickEscalations = 0;
+            for (int s = 0; s < CloseStormSessionMax; s++)
+            {
+                _closeStormFirstTickMs[s] = 0;
+                _closeStormCount[s] = 0;
+                _closeStormLastWarnTickMs[s] = 0;
+                _closeStormRestartRequested[s] = 0;
+            }
             // _configJsonLastEscalationUtcTicks NOT reset — cooldown spans restarts.
             // Clear the wheel-ready latch so a subsequent reconnect re-arms
             // detection from a clean slate (consumed by ProbeAndOpenSessions).

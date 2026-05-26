@@ -98,12 +98,6 @@ namespace MozaPlugin.Telemetry.Frames
         // cleared for the next generation.
         private readonly HashSet<int> _pendingIdxs = new HashSet<int>();
         private volatile List<string>? _liveCatalog;
-        // Snapshot of _pendingIdxs at the last commit. Used to skip
-        // redundant updates + log lines when re-parses produce the same
-        // live set (the parse loop re-walks the full buffer each pass and
-        // can re-encounter the same END marker, so without this dedup we
-        // commit and log on every tick).
-        private HashSet<int>? _lastCommittedIdxs;
         // END-marker value at last commit. Diagnostic only (used in log).
         private uint _committedEndMarker;
         // Set of every markerValue that has already triggered a commit
@@ -322,13 +316,25 @@ namespace MozaPlugin.Telemetry.Frames
             _lastParseLen = 0;
         }
 
-        /// <summary>Clear only the session buffers whose individual size
-        /// exceeds <paramref name="maxPerSession"/>. Used by the post-
-        /// renegotiate overflow guard so that end-marker spam on one session
-        /// doesn't wipe another session's still-unparsed catalog records.
-        /// Returns the number of sessions cleared. Per-session seq-dedup map
-        /// entries are dropped for cleared sessions so a fresh advert can
-        /// re-fill the buffer.</summary>
+        /// <summary>Hard-limit safety net: wipe any session buffer that
+        /// individually exceeds <paramref name="maxPerSession"/> bytes.
+        ///
+        /// Proactive trimming inside <see cref="TryParse"/> (drop bytes up
+        /// to and including the last committed END marker) keeps the buffer
+        /// bounded to in-flight bytes in normal operation, so this method
+        /// should never fire — it exists only as a defence against
+        /// pathological scenarios where the wheel never sends a new END
+        /// marker (no committed boundary to trim against). Set the limit
+        /// well above the largest plausible in-flight generation so a
+        /// long but legitimate burst doesn't get wiped.
+        ///
+        /// IMPORTANT: this is destructive. Any in-flight (uncommitted)
+        /// bytes in the wiped session are lost — the wheel will need to
+        /// re-send the generation for the host to catch up. Per-session
+        /// seq-dedup entries are dropped so the resend isn't rejected as
+        /// a retransmit.
+        ///
+        /// Returns the number of sessions wiped.</summary>
         public int ClearOverflowingSessions(int maxPerSession)
         {
             int cleared = 0;
@@ -345,13 +351,81 @@ namespace MozaPlugin.Telemetry.Frames
                     _sessionOrder.RemoveAt(i);
                     _highestSeqAppended.Remove(sess);
                     cleared++;
-                    MozaLog.Debug(
-                        $"[Moza] Catalog parser: overflow-clear sess=0x{sess:X2} ({wiped} bytes > {maxPerSession})");
+                    MozaLog.Warn(
+                        $"[Moza] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
+                        "proactive trim failed to bound this session (no committed END marker in buffer). " +
+                        "Any in-flight catalog data is LOST; wheel must re-send to recover.");
                 }
                 if (cleared > 0)
                     _lastParseLen = 0;
             }
             return cleared;
+        }
+
+        /// <summary>Drop bytes from the front of each session buffer up to
+        /// and including the latest END marker whose value is already in
+        /// <see cref="_committedMarkers"/>. Called at the end of every
+        /// <see cref="TryParse"/> pass to keep buffers bounded to in-flight
+        /// content only.
+        ///
+        /// Safety: the back-ref handler resolves idx → URL from
+        /// <see cref="_catalog"/> (the merged historical map), NOT from the
+        /// buffer, so dropping the original tag-0x04 / tag-0x06 record
+        /// bytes does not break future back-ref resolution. The
+        /// <see cref="_committedMarkers"/> set keeps us idempotent: any
+        /// already-committed END marker the wheel re-sends as a keepalive
+        /// is still dropped (correctly) on the next parse.
+        ///
+        /// Bytes AFTER the latest committed END (in-flight content for the
+        /// next generation that hasn't yet been bounded by a NEW END
+        /// marker) are preserved.
+        ///
+        /// If no committed END marker is present in a session's buffer,
+        /// nothing is trimmed for that session — there is no safe boundary,
+        /// and all bytes are potentially in-flight content the parser will
+        /// need on a future pass.</summary>
+        private void TrimProcessedBytes()
+        {
+            lock (_bufferLock)
+            {
+                int newTotal = 0;
+                foreach (var sess in _sessionOrder)
+                {
+                    if (!_buffersBySession.TryGetValue(sess, out var buf) || buf.Count == 0)
+                        continue;
+
+                    // Forward scan: find offset of byte immediately AFTER
+                    // the latest END marker (0x06 0x04 0x00 0x00 0x00 u32)
+                    // whose value is in _committedMarkers. Iterating forward
+                    // and overwriting `trimTo` means the last match wins,
+                    // matching the "latest committed END" requirement.
+                    int trimTo = 0;
+                    int n = buf.Count;
+                    for (int i = 0; i + 8 < n; i++)
+                    {
+                        if (buf[i] != 0x06) continue;
+                        if (buf[i + 1] != 0x04
+                            || buf[i + 2] != 0
+                            || buf[i + 3] != 0
+                            || buf[i + 4] != 0) continue;
+                        uint val = (uint)(buf[i + 5]
+                            | (buf[i + 6] << 8)
+                            | (buf[i + 7] << 16)
+                            | (buf[i + 8] << 24));
+                        if (_committedMarkers.Contains(val))
+                            trimTo = i + 9; // byte immediately past this END
+                    }
+                    if (trimTo > 0)
+                        buf.RemoveRange(0, trimTo);
+                    newTotal += buf.Count;
+                }
+                // Re-stamp _lastParseLen so the "buffer grew since last
+                // parse" trigger in TickAbsorbCatalogIfChanged compares
+                // against the POST-trim total rather than the pre-trim one
+                // (which would otherwise look like a buffer shrink and
+                // suppress the next parse even if new bytes arrive).
+                _lastParseLen = newTotal;
+            }
         }
 
         /// <summary>Reset both buffers AND parsed catalog. Use only on full session
@@ -365,7 +439,6 @@ namespace MozaPlugin.Telemetry.Frames
             _liveCatalog = null;
             _committedEndMarker = 0;
             _committedMarkers.Clear();
-            _lastCommittedIdxs = null;
             _pendingIdxs.Clear();
         }
 
@@ -450,10 +523,13 @@ namespace MozaPlugin.Telemetry.Frames
             // across passes would let URLs from an in-flight (uncommitted)
             // generation pollute the FIRST commit of the next pass — that
             // commit would erroneously include them in a prior generation's
-            // live set. The buffer is append-only, so any in-flight URLs
-            // get re-parsed on the next pass and accumulate correctly into
-            // a fresh pending; when their END marker eventually lands they
-            // commit cleanly without contamination from prior carry-over.
+            // live set. TrimProcessedBytes at the end of each parse keeps
+            // post-commit bytes out of the buffer, but pre-commit in-flight
+            // bytes are preserved (they sit after the latest committed END
+            // marker) — those get re-parsed on the next pass and accumulate
+            // correctly into a fresh pending; when their END marker
+            // eventually lands they commit cleanly without contamination
+            // from prior carry-over.
             _pendingIdxs.Clear();
 
             var parsed = new Dictionary<int, string>();
@@ -470,10 +546,22 @@ namespace MozaPlugin.Telemetry.Frames
 
             foreach (var (session, buffer) in snapshots)
             {
-                // Pre-scan: any tag=0x04 records present? Buffer fills with end-
-                // marker noise (06 04 ... val) post-renegotiate; parsing every tick
-                // is wasted work. Skip + suppress logging unless URL records exist.
+                // Pre-scan: any tag=0x04 URL records OR tag=0x06 END markers
+                // present? Skip the (expensive) parse + diag logging when the
+                // buffer has neither.
+                //
+                // END markers MUST trigger the walk even without URL records:
+                // a chunk that only carries a 0x06 marker still needs to be
+                // processed so CommitLiveSet can commit pending content from
+                // prior chunks (or, if the marker is new and pending is empty,
+                // so subsequent passes accumulate against the correct prior
+                // generation). Skipping END-only chunks was the second half
+                // of the 2026-05-25 Nebula bug — after the brute-force buffer
+                // wipe lost the URL records, the lone END=324 chunk that
+                // arrived afterwards never made it into the parse loop and
+                // _liveCatalog was frozen on the prior dashboard forever.
                 bool hasUrlRecord = false;
+                bool hasEndMarker = false;
                 for (int b = 0; b + 5 < buffer.Length; b++)
                 {
                     if (buffer[b] == 0x04)
@@ -486,8 +574,22 @@ namespace MozaPlugin.Telemetry.Frames
                             break;
                         }
                     }
+                    else if (!hasEndMarker
+                             && b + 8 < buffer.Length
+                             && buffer[b] == 0x06
+                             && buffer[b + 1] == 0x04
+                             && buffer[b + 2] == 0
+                             && buffer[b + 3] == 0
+                             && buffer[b + 4] == 0)
+                    {
+                        hasEndMarker = true;
+                        // Don't break — keep looking for URL records so the
+                        // diagnostic log line accurately reflects what's
+                        // present. URL records short-circuit; END markers
+                        // are a fallback.
+                    }
                 }
-                if (!hasUrlRecord) continue;
+                if (!hasUrlRecord && !hasEndMarker) continue;
 
                 int distinctIdxBefore = parsed.Count;
                 int sFull = 0, sPrefix = 0, sAbbr = 0;
@@ -569,12 +671,19 @@ namespace MozaPlugin.Telemetry.Frames
 
                     var targetIdxs = new HashSet<int>(_pendingIdxs);
 
-                    // Dedup: skip re-commit when set matches the last one.
-                    if (_lastCommittedIdxs != null && _lastCommittedIdxs.SetEquals(targetIdxs))
-                    {
-                        _pendingIdxs.Clear();
-                        return;
-                    }
+                    // No SetEquals dedup here: two real switches CAN produce
+                    // identical idx sets with different URL content (e.g.,
+                    // dash A uses idxs 1-5 with URLs {Speed, RPM, Gear, Lap,
+                    // Fuel}; user switches to dash B which also uses idxs 1-5
+                    // but with URLs {SpeedMph, EngineTemp, Gear, BestLap,
+                    // FuelPct}). Skipping the commit on idx-set match would
+                    // leave _liveCatalog pointing at dash A's URLs even
+                    // though the wheel has re-bound those idxs to dash B's
+                    // URLs in _catalog (via the full-URL records). The
+                    // _committedMarkers.Contains(markerValue) check above
+                    // already prevents redundant commits at the SAME end
+                    // value; per-pass commits at DIFFERENT end values must
+                    // always fire so URL changes propagate.
                     // Build masked positional catalog. URL at each idx
                     // resolves from parsed (latest in this pass) first,
                     // falling back to _catalog (prior generations).
@@ -606,7 +715,6 @@ namespace MozaPlugin.Telemetry.Frames
                         $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}}");
                     _committedEndMarker = markerValue;
                     _committedMarkers.Add(markerValue);
-                    _lastCommittedIdxs = targetIdxs;
                     _pendingIdxs.Clear();
                 }
 
@@ -649,26 +757,38 @@ namespace MozaPlugin.Telemetry.Frames
                         // the existing catalog at this idx; record the same idx
                         // in our parse map so merge preserves the binding.
                         //
-                        // Back-refs do NOT add to _pendingIdxs (the live set).
-                        // The wheel emits back-refs for every historical idx
-                        // it has ever announced as part of its periodic
-                        // keepalive — they're indistinguishable on the wire
-                        // from "this idx is part of the new dashboard". If
-                        // we credited back-refs to the live set, post-switch
-                        // commits would balloon with stale historical idxs
-                        // that aren't actually in the current dashboard.
-                        // Full URL records (handled below) ARE unambiguous:
-                        // the wheel only emits a full URL when the dashboard
-                        // declares that idx, so the live set is built solely
-                        // from full URLs (+ prefix/abbrev forms).
+                        // Successful back-refs DO add to _pendingIdxs. Earlier
+                        // versions excluded them on the theory that keepalive
+                        // bursts re-announce every historical idx via back-ref
+                        // and would balloon the live set with stale entries.
+                        // That theory was wrong in practice: keepalive bursts
+                        // terminate at an ALREADY-COMMITTED end marker, so the
+                        // _committedMarkers.Contains(markerValue) drop at the
+                        // top of CommitLiveSet clears any pending the keepalive
+                        // accumulated before it can affect _liveCatalog.
+                        //
+                        // Crediting back-refs is REQUIRED for dashboard
+                        // switches that re-use existing wheel idxs without
+                        // re-announcing them as full URLs (verified 2026-05-25
+                        // moza-wire-20260525-204404 trace: Nebula switch sent
+                        // back-refs for idxs 5-8 + full URLs for idxs 1-4,
+                        // followed by a NEW end marker; the back-ref'd 5-8
+                        // were dropped from _pendingIdxs, so the new end
+                        // committed only {1..4} instead of {1..8} and the
+                        // synthesised profile filter then stripped the back-
+                        // ref'd channels as "not in catalog").
                         if (existingCatalog != null && idx >= 1 && idx <= existingCatalog.Count
                             && !string.IsNullOrEmpty(existingCatalog[idx - 1]))
                         {
                             parsed[idx] = existingCatalog[idx - 1];
+                            _pendingIdxs.Add(idx);
                             sBackref++;
                         }
                         else
                         {
+                            // Cannot resolve to a URL — skip pending so we
+                            // don't commit an empty-string slot into the
+                            // live set.
                             sBackrefFail++;
                         }
                         i += 5 + (int)param;
@@ -785,27 +905,28 @@ namespace MozaPlugin.Telemetry.Frames
                 totalSizeReject += sSizeReject; totalPlausReject += sPlausReject;
             }
 
-            if (perSessionStats.Count == 0) return;
-
-            // Per-session breakdown — one line per session that contributed URL
-            // records. Lets diag readers spot which session lost which records.
-            foreach (var s in perSessionStats)
+            if (perSessionStats.Count > 0)
             {
-                int newOnSess = s.distinctIdxAfter - s.distinctIdxBefore;
+                // Per-session breakdown — one line per session that contributed URL
+                // records. Lets diag readers spot which session lost which records.
+                foreach (var s in perSessionStats)
+                {
+                    int newOnSess = s.distinctIdxAfter - s.distinctIdxBefore;
+                    MozaLog.Debug(
+                        $"[Moza] Catalog parse sess=0x{s.session:X2}: " +
+                        $"full={s.full} prefix={s.prefix} abbr={s.abbr} " +
+                        $"backref={s.backref} backrefFail={s.backrefFail} " +
+                        $"sizeReject={s.sizeReject} plausReject={s.plausReject} " +
+                        $"distinct-idx+={newOnSess}");
+                }
+                // Aggregate summary line, preserves the pre-split format for
+                // anyone grepping for "Catalog parse stats: full=...".
                 MozaLog.Debug(
-                    $"[Moza] Catalog parse sess=0x{s.session:X2}: " +
-                    $"full={s.full} prefix={s.prefix} abbr={s.abbr} " +
-                    $"backref={s.backref} backrefFail={s.backrefFail} " +
-                    $"sizeReject={s.sizeReject} plausReject={s.plausReject} " +
-                    $"distinct-idx+={newOnSess}");
+                    $"[Moza] Catalog parse stats: full={totalFull} prefix={totalPrefix} " +
+                    $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
+                    $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +
+                    $"distinct-idx={parsed.Count}");
             }
-            // Aggregate summary line, preserves the pre-split format for
-            // anyone grepping for "Catalog parse stats: full=...".
-            MozaLog.Debug(
-                $"[Moza] Catalog parse stats: full={totalFull} prefix={totalPrefix} " +
-                $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
-                $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +
-                $"distinct-idx={parsed.Count}");
 
             if (parsed.Count > 0)
             {
@@ -845,6 +966,21 @@ namespace MozaPlugin.Telemetry.Frames
             // helper above) at each tag-0x06 END marker. By the time we get
             // here, every committed generation has already been published
             // to _liveCatalog. No post-merge commit needed.
+
+            // Proactive buffer trim: drop bytes up to and including the
+            // latest END marker we've committed (either just now in this
+            // parse pass, or in a prior pass). Keeps each session buffer
+            // bounded to in-flight bytes for the next generation. Without
+            // this, the append-only buffer grows unbounded as keepalive
+            // END markers accumulate, eventually tripping the hard-limit
+            // safety wipe which loses any in-flight bytes too. See
+            // _committedMarkers / TrimProcessedBytes docs for safety
+            // argument.
+            //
+            // Run unconditionally — committedMarkers may have entries from
+            // prior parse passes that older buffer bytes can be trimmed
+            // against, even if this particular pass added nothing new.
+            TrimProcessedBytes();
         }
 
         /// <summary>Compare two catalogs for value-equality. Helper used by
