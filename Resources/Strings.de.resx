@@ -117,9 +117,9 @@
   <data name="Label_Throttle" xml:space="preserve"><value>GAS</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>BREMSE</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>KUPPLUNG</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>GAS · RICHTUNG & BEREICH</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>BREMSE · RICHTUNG & BEREICH</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>KUPPLUNG · RICHTUNG & BEREICH</value></data>
+  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>GAS · RICHTUNG &amp; BEREICH</value></data>
+  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>BREMSE · RICHTUNG &amp; BEREICH</value></data>
+  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>KUPPLUNG · RICHTUNG &amp; BEREICH</value></data>
   <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>GAS-AUSGABEKURVE</value></data>
   <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>BREMSEN-AUSGABEKURVE</value></data>
   <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>KUPPLUNGS-AUSGABEKURVE</value></data>
@@ -208,7 +208,7 @@
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Ära 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto ermittelt die Firmware-Ära aus dem Handshake des Lenkrads und wählt das passende Protokoll. Nur überschreiben, falls die Telemetrie nicht funktioniert.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>
-  <data name="Button_ClearAllSettings" xml:space="preserve"><value>ALLE EINSTELLUNGEN & PROFILE LÖSCHEN</value></data>
+  <data name="Button_ClearAllSettings" xml:space="preserve"><value>ALLE EINSTELLUNGEN &amp; PROFILE LÖSCHEN</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Damit werden alle Plugin-Einstellungen und Profile auf ihre Standardwerte zurückgesetzt.</value></data>
   <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Funktioniert noch nicht</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Der Dashboard-Upload ist in Entwicklung und überträgt aktuell KEINE Dateien an das Lenkrad.</value></data>
