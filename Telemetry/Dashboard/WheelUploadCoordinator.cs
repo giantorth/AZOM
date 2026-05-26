@@ -146,6 +146,49 @@ namespace MozaPlugin.Telemetry.Dashboard
         public bool UploadDashboard { get; set; } = true;
         public byte UploadSessionOverride { get; set; } = 0;
 
+        /// <summary>
+        /// Outcome of the most recent upload attempt — what actually
+        /// happened from the wheel's perspective. Surfaced via
+        /// <see cref="UploadCompleted"/> so callers (TelemetrySender,
+        /// diagnostics) can see when an upload silently failed instead of
+        /// having to scan log files for the right Warn line.
+        /// </summary>
+        public enum UploadOutcome
+        {
+            /// <summary>Wheel acked the final type=0x03 chunk.</summary>
+            Succeeded,
+            /// <summary>Wheel already has the same MD5 — no upload needed.</summary>
+            SkippedHashMatch,
+            /// <summary>Wheel never device-inited an FT session inside the 60 s window.</summary>
+            NoFtSession,
+            /// <summary>Wheel never acked the path-registration sub-msg (sub-msg 1).</summary>
+            SubMsg1AckTimeout,
+            /// <summary>Wheel acked sub-msg 1 but stopped acking content chunks.</summary>
+            SubMsg2AckTimeout,
+            /// <summary>An exception unwound the upload thread.</summary>
+            ExceptionThrown,
+            /// <summary>TelemetrySender flipped to Idle while the upload was in flight.</summary>
+            Aborted,
+        }
+
+        /// <summary>
+        /// Fires once per <see cref="RunBackgroundUpload"/> attempt with the
+        /// terminal outcome. Subscribers should be fast and exception-safe;
+        /// the event is invoked on the upload worker thread.
+        /// </summary>
+        public event Action<UploadOutcome>? UploadCompleted;
+
+        private void FireUploadCompleted(UploadOutcome outcome)
+        {
+            try { UploadCompleted?.Invoke(outcome); }
+            catch (Exception ex)
+            {
+                MozaLog.Warn(
+                    $"[Moza] UploadCompleted subscriber threw: " +
+                    $"{ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
         private int _disposed;
 
         public WheelUploadCoordinator(
@@ -448,9 +491,10 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public void RunBackgroundUpload()
         {
+            UploadOutcome outcome = UploadOutcome.Aborted;
             try
             {
-                if (_shouldAbort()) return;
+                if (_shouldAbort()) { outcome = UploadOutcome.Aborted; return; }
 
                 // 60 s ceiling: covers the slowest firmware observed (~11 s) with
                 // headroom. If the wheel hasn't opened an FT session by then it
@@ -464,15 +508,21 @@ namespace MozaPlugin.Telemetry.Dashboard
                         $"[Moza] No file-transfer session device-opened within " +
                         $"{FtBurstWaitMs}ms — skipping dashboard upload. " +
                         "Wheel may render previously-cached dashboard.");
+                    outcome = UploadOutcome.NoFtSession;
                     return;
                 }
 
-                if (_shouldAbort()) return;
-                SendDashboardUpload();
+                if (_shouldAbort()) { outcome = UploadOutcome.Aborted; return; }
+                outcome = SendDashboardUpload();
             }
             catch (Exception ex)
             {
+                outcome = UploadOutcome.ExceptionThrown;
                 MozaLog.Warn($"[Moza] Background dashboard upload failed: {ex.Message}");
+            }
+            finally
+            {
+                FireUploadCompleted(outcome);
             }
         }
 
@@ -495,11 +545,13 @@ namespace MozaPlugin.Telemetry.Dashboard
             return 0x04;
         }
 
-        private void SendDashboardUpload()
+        private UploadOutcome SendDashboardUpload()
         {
             var content = MzdashContent;
-            if (content == null || content.Length == 0) return;
-            if (!_connection.IsConnected) return;
+            // No content / no link is "nothing to do", not a failure. Treat
+            // as Aborted so the caller can distinguish from a real attempt.
+            if (content == null || content.Length == 0) return UploadOutcome.Aborted;
+            if (!_connection.IsConnected) return UploadOutcome.Aborted;
 
             // Pick the upload session from the wheel's device-init burst.
             byte uploadSess = ChooseUploadSession();
@@ -512,7 +564,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             {
                 MozaLog.Debug(
                     $"[Moza] Dashboard \"{MzdashName}\" already loaded on wheel (hash match) — skipping upload");
-                return;
+                return UploadOutcome.SkippedHashMatch;
             }
 
             // Arm the cross-session ack stream. _isUploadInFlight gates b2h
@@ -528,7 +580,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             _isUploadInFlight = true;
             try
             {
-                SendDashboardUploadInner(content, uploadSess);
+                return SendDashboardUploadInner(content, uploadSess);
             }
             finally
             {
@@ -597,7 +649,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
         }
 
-        private void SendDashboardUploadInner(byte[] content, byte uploadSess)
+        private UploadOutcome SendDashboardUploadInner(byte[] content, byte uploadSess)
         {
 
             string dashboardName = !string.IsNullOrEmpty(MzdashName) ? MzdashName : "dashboard";
@@ -779,7 +831,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     // session cleanly so the wheel doesn't sit in a half-open
                     // upload state.
                     _sendSessionEnd(uploadSess, (ushort)_outboundSeq);
-                    return;
+                    return UploadOutcome.SubMsg1AckTimeout;
                 }
             }
             _ = fellBack;
@@ -828,7 +880,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         $"(last bw={LastBytesWritten} total={LastTotalSize}) — aborting upload");
                     _outboundSeq = seq2;
                     _sendSessionEnd(uploadSess, (ushort)_outboundSeq);
-                    return;
+                    return UploadOutcome.SubMsg2AckTimeout;
                 }
 
                 // Sanity check on intermediate chunks: bytes_written should
@@ -868,6 +920,8 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (refreshChunks > 0)
                 MozaLog.Debug(
                     $"[Moza] Session 0x{uploadSess:X2} post-upload state refresh: {refreshChunks} chunks");
+
+            return UploadOutcome.Succeeded;
         }
 
         /// <summary>

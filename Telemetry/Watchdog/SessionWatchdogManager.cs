@@ -69,6 +69,16 @@ namespace MozaPlugin.Telemetry.Watchdog
         private long _configJsonLastChunkUtcTicks;
         private long _configJsonLastEscalationUtcTicks;
         private long _configJsonLastPrimeRetryUtcTicks;
+        // Hard cap on the tick-path prime+open-request retries. HandleConfigJsonGap
+        // already escalates to RequestRestart at ConfigJsonGapRestartAt because
+        // it counts inbound-gap events. The TICK path (TickConfigJsonGapEscalation)
+        // fires when no chunks at all are flowing — exactly the case where
+        // HandleConfigJsonGap never gets a chance to increment its counter.
+        // Without this cap, the tick path would emit prime+open every cooldown
+        // window indefinitely. Reset on real inbound progress (chunk arrival)
+        // via NoteConfigJsonChunkArrived, and on Reset().
+        private int _configJsonGapTickEscalations;
+        private const int ConfigJsonGapTickEscalationCap = 3;
         // Passive wait window before active prime+open-request: wheel's
         // outstanding-ack timer (~1.3 s) gets headroom before host escalates.
         private const int ConfigJsonGapPassiveWaitMs = 5_000;
@@ -105,13 +115,19 @@ namespace MozaPlugin.Telemetry.Watchdog
                 _session01EngagedUtcTicks = DateTime.UtcNow.Ticks;
         }
 
-        public void NoteConfigJsonChunkArrived() =>
+        public void NoteConfigJsonChunkArrived()
+        {
             _configJsonLastChunkUtcTicks = DateTime.UtcNow.Ticks;
+            // Real progress: forgive the tick-path escalation streak so the
+            // cap counts only consecutive un-acked nudges.
+            _configJsonGapTickEscalations = 0;
+        }
 
         public void ResetConfigJsonGapTracking()
         {
             _configJsonGapCount = 0;
             _configJsonLastPrimeRetryUtcTicks = 0;
+            _configJsonGapTickEscalations = 0;
         }
 
         public void NoteActiveStateEntered() => _activeStateEnteredTickCount = Environment.TickCount;
@@ -131,6 +147,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             _configJsonGapCount = 0;
             _configJsonLastChunkUtcTicks = 0;
             _configJsonLastPrimeRetryUtcTicks = 0;
+            _configJsonGapTickEscalations = 0;
             // _configJsonLastEscalationUtcTicks NOT reset — cooldown spans restarts.
             // Clear the wheel-ready latch so a subsequent reconnect re-arms
             // detection from a clean slate (consumed by ProbeAndOpenSessions).
@@ -225,16 +242,38 @@ namespace MozaPlugin.Telemetry.Watchdog
             // Prefer 0x0a if the wheel's been talking on it instead.
             if (_sender.Session09InboundSeq == 0 && _configJsonLastChunkUtcTicks != 0)
                 session = 0x0a;
+            // Tick-path escalation cap: if HandleConfigJsonGap is never
+            // triggered (zero chunks arriving at all), the gap-count counter
+            // never advances to ConfigJsonGapRestartAt and the prime+open
+            // nudges would loop indefinitely. After the cap is reached,
+            // escalate to RecoveryDispatcher instead of emitting another
+            // nudge. RecoveryDispatcher's debounce + rate-cap takes over from
+            // here (parks if restarts don't help).
+            if (_configJsonGapTickEscalations >= ConfigJsonGapTickEscalationCap)
+            {
+                if (now - _configJsonLastEscalationUtcTicks < ConfigJsonEscalationCooldownTicks)
+                    return;
+                _configJsonLastEscalationUtcTicks = now;
+                _configJsonGapTickEscalations = 0;
+                _sender.Recovery.RequestRestart(
+                    $"sess=0x{session:X2} configJson tick watchdog: " +
+                    $"{ConfigJsonGapTickEscalationCap} prime+open nudges produced no chunks " +
+                    $"(gap age={gapAgeMs}ms)");
+                return;
+            }
+
             try
             {
                 MozaLog.Warn(
                     $"[Moza] sess=0x{session:X2} configJson gap stale " +
                     $"({gapAgeMs}ms ≥ {ConfigJsonGapPassiveWaitMs}ms passive-wait window) — " +
                     $"wheel didn't auto-retransmit. " +
-                    $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4})");
+                    $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4}, " +
+                    $"nudge {_configJsonGapTickEscalations + 1}/{ConfigJsonGapTickEscalationCap})");
                 _sender.SendSessionPrime(session, (ushort)primeSeq);
                 SendConfigJsonOpenRequest(session, (ushort)recoveryOpenSeq);
                 _configJsonLastPrimeRetryUtcTicks = now;
+                _configJsonGapTickEscalations++;
                 if (_configJsonGapCount == 0) _configJsonGapCount = 1;
             }
             catch (Exception ex)

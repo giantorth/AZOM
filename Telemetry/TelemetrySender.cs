@@ -800,6 +800,17 @@ namespace MozaPlugin.Telemetry
                 // pristine snapshot. Reference-compare so the same input
                 // → no-op; null-to-null also short-circuits cleanly.
                 if (ReferenceEquals(value, _lastProfileSourceRef)) return;
+                // Off→on transition (telemetry was disabled, user re-enabled
+                // it / selected a profile from the empty state): treat as an
+                // explicit "fresh attempt" signal and forgive any prior
+                // recovery-budget exhaustion so the new attempt starts with a
+                // clean budget. The existing wheel-hot-swap path covers the
+                // hardware-change case (ResetBindingTracking); this covers
+                // the user-driven case.
+                if (value != null && _lastProfileSourceRef == null)
+                {
+                    try { _recovery.Reset(); } catch { }
+                }
                 _lastProfileSourceRef = value;
 
                 if (value != null && value.Tiers.Count > 0)
@@ -1023,6 +1034,31 @@ namespace MozaPlugin.Telemetry
                 sendSessionEnd: SendSessionEnd,
                 sendAndTrackChunk: SendAndTrackChunk,
                 sendSessionOpen: SendSessionOpen);
+
+            // Single-line outcome log per upload attempt. Without this, a
+            // silent failure (e.g. NoFtSession) only shows up as a Warn deep
+            // in the worker thread and is easy to miss in the diagnostics
+            // bundle. Logged at Info for Succeeded/Skipped (visible at the
+            // default level) and Warn for everything else.
+            _uploader.UploadCompleted += outcome =>
+            {
+                string name = string.IsNullOrEmpty(_uploader.MzdashName) ? "dashboard" : _uploader.MzdashName;
+                switch (outcome)
+                {
+                    case WheelUploadCoordinator.UploadOutcome.Succeeded:
+                        MozaLog.Info($"[Moza] Dashboard upload \"{name}\": Succeeded");
+                        break;
+                    case WheelUploadCoordinator.UploadOutcome.SkippedHashMatch:
+                        MozaLog.Info($"[Moza] Dashboard upload \"{name}\": SkippedHashMatch");
+                        break;
+                    case WheelUploadCoordinator.UploadOutcome.Aborted:
+                        MozaLog.Debug($"[Moza] Dashboard upload \"{name}\": Aborted");
+                        break;
+                    default:
+                        MozaLog.Warn($"[Moza] Dashboard upload \"{name}\": {outcome}");
+                        break;
+                }
+            };
         }
 
         // Caller passes the MozaPlugin instance directly because Init may call
@@ -2788,6 +2824,24 @@ namespace MozaPlugin.Telemetry
         // snapshot via the latest-wins stream slots.
         private int _tickInProgress;
 
+        // Frame-build / tick failure escalation. The outer catch in
+        // OnTimerElapsedInner used to swallow every exception as Warn — a
+        // repeatable bug (null resolver entry, malformed channel def, …)
+        // would freeze the dashboard with no recovery attempt. Streak counter
+        // resets on the first successful tick body; once it hits the
+        // threshold we hand off to RecoveryDispatcher (which has its own
+        // debounce + rate-cap + park) and reset the counter so the same
+        // flap doesn't immediately re-escalate inside the debounce window.
+        private int _consecutiveTickFailures;
+        private const int TickFailureRestartThreshold = 10;
+
+        // Tracks whether the previous tick observed a live connection.
+        // Used to detect the disconnected→connected transition so we can
+        // forgive any prior recovery-budget exhaustion: a wheel that just
+        // came back is observably a different situation than the one whose
+        // earlier failures parked the pipeline.
+        private bool _lastTickSawConnected;
+
         private void OnTimerElapsed(object sender, ElapsedEventArgs e)
         {
             if (Interlocked.CompareExchange(ref _tickInProgress, 1, 0) != 0)
@@ -2804,7 +2858,19 @@ namespace MozaPlugin.Telemetry
 
         private void OnTimerElapsedInner()
         {
-            if (_state == TelemetryState.Idle || !_connection.IsConnected)
+            bool currentlyConnected = _connection.IsConnected;
+            bool wasConnected = _lastTickSawConnected;
+            _lastTickSawConnected = currentlyConnected;
+            if (currentlyConnected && !wasConnected)
+            {
+                // Reconnect transition: forgive any prior restart-budget
+                // exhaustion / park. The wheel is observably back; if the
+                // root cause is still present the watchdogs will re-escalate
+                // from a clean budget.
+                try { _recovery.Reset(); } catch { }
+            }
+
+            if (_state == TelemetryState.Idle || !currentlyConnected)
                 return;
 
             try
@@ -2866,10 +2932,35 @@ namespace MozaPlugin.Telemetry
 
                 TickEmitWidgetPoll();
                 TickEmitSlowPath();
+
+                // Successful tick — clear the failure streak so a single
+                // transient throw doesn't add to a stale earlier streak.
+                _consecutiveTickFailures = 0;
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Telemetry send error: {ex.Message}");
+                _consecutiveTickFailures++;
+                // First throw of a streak: include the full stack so
+                // post-mortem analysis has something to bite into. Later
+                // throws in the same streak log only the message to keep
+                // the ring buffer / log file from drowning.
+                if (_consecutiveTickFailures == 1)
+                    MozaLog.Warn($"[Moza] Telemetry send error: {ex.GetType().Name}: {ex}");
+                else
+                    MozaLog.Warn(
+                        $"[Moza] Telemetry send error #{_consecutiveTickFailures}: " +
+                        $"{ex.GetType().Name}: {ex.Message}");
+
+                if (_consecutiveTickFailures >= TickFailureRestartThreshold)
+                {
+                    // Hand the restart decision to RecoveryDispatcher — its
+                    // debounce + rate-cap keep this from looping forever if
+                    // the bug is persistent (parks the pipeline instead).
+                    _recovery.RequestRestart(
+                        $"tick body threw {_consecutiveTickFailures} times in a row " +
+                        $"({ex.GetType().Name}: {ex.Message})");
+                    _consecutiveTickFailures = 0;
+                }
             }
         }
 

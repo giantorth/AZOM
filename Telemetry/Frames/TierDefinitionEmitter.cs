@@ -191,8 +191,21 @@ namespace MozaPlugin.Telemetry.Frames
 
         /// <summary>
         /// Filter to catalog + sort by catalog idx per unique Channels list.
-        /// Broadcast replicas share lists by reference, so each unique list
-        /// is mutated once. Recomputes TotalBits/Bytes.
+        /// Builds a FRESH list per unique source-list reference rather than
+        /// mutating in place — the tick thread iterates the same list from
+        /// <see cref="TelemetryFrameBuilder.BuildFrameFromSnapshot"/> and an
+        /// in-place RemoveAll/Sort there would trip "Collection was modified"
+        /// or emit a torn frame. Broadcast replicas that share a source list
+        /// still share the resulting list, so per-tick FrameBuilder behavior
+        /// is unchanged. Recomputes TotalBits/Bytes from the new lists.
+        ///
+        /// The atomic publication happens via the subsequent
+        /// <see cref="RebuildFrameBuildersFromProfile"/> call: each
+        /// <c>TierState.Builder</c> is replaced with a fresh
+        /// <see cref="TelemetryFrameBuilder"/> bound to the new list, and
+        /// reference assignment of a class field is atomic in C#. A tick that
+        /// captured the old builder before the swap reads the old list to
+        /// completion; the next tick sees the new builder + new list.
         /// </summary>
         public void SortTierChannelsByCatalogIdx(
             MultiStreamProfile profile,
@@ -203,26 +216,38 @@ namespace MozaPlugin.Telemetry.Frames
             int IdxFor(ChannelDefinition c)
                 => idxByUrl.TryGetValue(c.Url ?? "", out var ix) ? ix : 0;
 
-            // Dedupe by Channels reference: broadcast replicas share the same list.
-            var sortedRefs = new List<object>();
+            // Build one fresh filtered+sorted list per unique source-list
+            // reference. List<T> doesn't override Equals/GetHashCode, so a
+            // Dictionary keyed on the list uses reference identity, which is
+            // exactly the dedup invariant the broadcast-replica share assumes.
+            var resultsBySourceList =
+                new Dictionary<List<ChannelDefinition>, List<ChannelDefinition>>();
             foreach (var tier in profile.Tiers)
             {
                 if (tier.Channels == null || tier.Channels.Count == 0) continue;
-                bool already = false;
-                foreach (var seen in sortedRefs)
-                {
-                    if (object.ReferenceEquals(seen, tier.Channels)) { already = true; break; }
-                }
-                if (already) continue;
-                sortedRefs.Add(tier.Channels);
-                var list = (List<ChannelDefinition>)tier.Channels;
-                list.RemoveAll(c => IdxFor(c) <= 0);
-                list.Sort((a, b) => IdxFor(a).CompareTo(IdxFor(b)));
+                var src = (List<ChannelDefinition>)tier.Channels;
+                if (resultsBySourceList.ContainsKey(src)) continue;
+                var filtered = new List<ChannelDefinition>(src.Count);
+                foreach (var c in src)
+                    if (IdxFor(c) > 0) filtered.Add(c);
+                filtered.Sort((a, b) => IdxFor(a).CompareTo(IdxFor(b)));
+                resultsBySourceList[src] = filtered;
             }
 
-            // Recompute TotalBits/TotalBytes so FrameBuilder buffers resize.
+            // Publish the new lists. Each tier sharing a source ref gets the
+            // same fresh result ref, preserving the broadcast-replica share.
+            // TotalBits/Bytes are recomputed from the NEW list so the
+            // FrameBuilder buffer (sized from these in RebuildFrameBuilders…)
+            // matches the published channel set exactly.
             foreach (var tier in profile.Tiers)
             {
+                if (tier.Channels != null
+                    && tier.Channels.Count > 0
+                    && resultsBySourceList.TryGetValue(
+                        (List<ChannelDefinition>)tier.Channels, out var fresh))
+                {
+                    tier.Channels = fresh;
+                }
                 int bits = 0;
                 foreach (var ch in tier.Channels) bits += ch.BitWidth;
                 tier.TotalBits = bits;
@@ -385,13 +410,19 @@ namespace MozaPlugin.Telemetry.Frames
                             var st = tiers[i];
                             if (st?.OriginalChannels == null) continue;
                             var tier = profile.Tiers[i];
-                            if (tier.Channels is List<ChannelDefinition> list)
-                            {
-                                list.Clear();
-                                list.AddRange(st.OriginalChannels);
-                                tier.TotalBits = st.OriginalTotalBits;
-                                tier.TotalBytes = st.OriginalTotalBytes;
-                            }
+                            // Assign a FRESH list rather than Clear()+AddRange() on
+                            // the existing tier.Channels: the tick thread may still
+                            // be iterating the old list through the previous
+                            // FrameBuilder, and in-place mutation here would race.
+                            // The old list is left untouched; it stays valid for
+                            // any in-flight read and is GC'd after the FrameBuilder
+                            // gets rebound below in RebuildFrameBuildersFromProfile.
+                            // A copy keeps OriginalChannels from being aliased onto
+                            // the live tier (so a future in-place edit, however
+                            // unlikely, can't corrupt the pristine snapshot).
+                            tier.Channels = new List<ChannelDefinition>(st.OriginalChannels);
+                            tier.TotalBits = st.OriginalTotalBits;
+                            tier.TotalBytes = st.OriginalTotalBytes;
                         }
                     }
 

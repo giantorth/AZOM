@@ -73,7 +73,18 @@ namespace MozaPlugin.Telemetry.Frames
 
             byte[] ascii = Utf8NoBom.GetBytes(value);
             int strlen = ascii.Length;
-            if (strlen > MaxStringLength) strlen = MaxStringLength;
+            if (strlen > MaxStringLength)
+            {
+                strlen = MaxStringLength;
+                // If the byte at the cut would have been a UTF-8 continuation
+                // byte (0b10xxxxxx), the cut splits a multi-byte sequence and
+                // the wheel sees an orphan tail. Walk back until the cut lands
+                // on a sequence boundary (next byte is ASCII or a leading
+                // multi-byte byte 0b11xxxxxx). Worst case loses 3 trailing
+                // bytes — a single CJK codepoint or accented Latin character.
+                while (strlen > 0 && (ascii[strlen] & 0xC0) == 0x80)
+                    strlen--;
+            }
 
             using var ms = new MemoryStream(5 + 2 + strlen);
             using var w = new BinaryWriter(ms);
