@@ -289,6 +289,32 @@ namespace MozaPlugin.UI
                 $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of {budgetTargetBytes}B target, peak={budget.PeakBurstBytes})");
             sb.AppendLine(
                 $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} resync={errs.FrameStartScanResyncs}");
+            // Resync skip-size distribution. Helps tell single-byte stray
+            // padding (USB / driver idle bytes — harmless) from multi-byte
+            // gaps (wire corruption — worth investigating). drops=0
+            // cksumFail=0 with a 1B-dominated histogram means the wire is
+            // healthy and the resync count is just inter-frame noise.
+            if (errs.FrameStartScanResyncs > 0 && errs.ResyncSkipHistogram != null)
+            {
+                var h = errs.ResyncSkipHistogram;
+                string[] labels = { "1B", "2B", "3-4B", "5-8B", "9-16B", "17-32B", "33-64B", ">64B" };
+                var hsb = new StringBuilder();
+                bool first = true;
+                for (int i = 0; i < h.Length; i++)
+                {
+                    if (h[i] == 0) continue;
+                    if (!first) hsb.Append("  ");
+                    hsb.Append(labels[i]).Append('=').Append(h[i]);
+                    first = false;
+                }
+                sb.AppendLine($"  ResyncSkipDist:   {hsb}");
+                if (errs.RecentResyncSamples != null && errs.RecentResyncSamples.Length > 0)
+                {
+                    sb.AppendLine($"  RecentResyncs:    (last {errs.RecentResyncSamples.Length}, newest first)");
+                    for (int i = errs.RecentResyncSamples.Length - 1; i >= 0; i--)
+                        sb.AppendLine($"    {errs.RecentResyncSamples[i]}");
+                }
+            }
             sb.AppendLine($"DisplayDetected:    {(ts?.DisplayDetected ?? plugin.IsDisplayDetected)}");
             sb.AppendLine($"DisplayModelName:   {Blank(ts?.DisplayModelName ?? plugin.DisplayModelName)}");
             sb.AppendLine($"WheelEra:           {plugin.ActiveTelemetryWheelEra}");
