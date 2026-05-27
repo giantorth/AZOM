@@ -248,6 +248,15 @@ namespace MozaPlugin
         /// </summary>
         internal void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, Devices.LedKind kind)
             => _hardwareApplier.WriteLedColorIfWheelDetected(command, r, g, b, kind);
+        /// <summary>
+        /// Re-push the stored static palette for an LED group from MozaData to
+        /// the wheel's EEPROM. Called from the per-group mode combo handlers on
+        /// transition to Static (val=2) to bring EEPROM back in sync with any
+        /// edits the user made while the group was in SimHub mode (those edits
+        /// land in _data + overlay but the wheel write is suppressed by the
+        /// per-group gate in WriteLedColorIfWheelDetected).
+        /// </summary>
+        internal void RepushStaticPalette(Devices.LedKind kind) => _hardwareApplier.RepushStaticPalette(kind);
         internal void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings) => _hardwareApplier.ApplyDashExtensionSettings(extSettings);
         internal void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings) => _hardwareApplier.ApplyBaseExtensionSettings(extSettings);
         internal void ClearLedsOnHardware() => _hardwareApplier.ClearLedsOnHardware();
@@ -2460,20 +2469,21 @@ namespace MozaPlugin
                 }
             }
 
-            // Read Group 3 ring LED colors once after group detected + model resolved
+            // Group 3 (knob ring) brightness read once after group detected +
+            // model resolved. The per-LED ring COLORS (wheel-knob-bg-color{N})
+            // are no longer read on the PollStatus path — they're driven by
+            // tab activation in MozaWheelSettingsControl.WheelTabs_SelectionChanged
+            // (gated on WheelKnobLedMode == 2 / Static), same policy as the
+            // RPM and Button color reads. Brightness is a single non-color
+            // status read, kept here as part of capability discovery.
             if (!DetectionState.Group3ColorsRead && DetectionState.NewWheelDetected && IsWheelLedGroupPresent(3))
             {
                 var model = WheelModelInfo;
                 if (model?.KnobRingLeds != null && model.KnobRingLedTotal > 0)
                 {
                     DetectionState.Group3ColorsRead = true;
-                    int total = model.KnobRingLedTotal;
-                    var cmds = new string[total + 1];
-                    cmds[0] = "wheel-knob-brightness";
-                    for (int i = 0; i < total; i++)
-                        cmds[i + 1] = $"wheel-knob-bg-color{i + 1}";
-                    _deviceManager.ReadSettingsPaced(cmds);
-                    MozaLog.Debug($"[Moza] Reading knob ring LED colors ({total} LEDs)");
+                    _deviceManager.ReadSetting("wheel-knob-brightness");
+                    MozaLog.Debug($"[Moza] Read knob ring brightness (color reads deferred to Knobs-tab activation)");
                 }
             }
 

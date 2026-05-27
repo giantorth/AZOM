@@ -43,7 +43,6 @@ namespace MozaPlugin.Hardware
         public void ApplyWheelToHardware(MozaProfile? profile)
         {
             if (profile == null) return;
-            bool deviceLive = _data.IsConnected;
 
             var ov = _plugin.GetCurrentWheelOverlay(profile);
 
@@ -148,8 +147,21 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(knobRingColors, _data.KnobRingColors);
             if (knobRingBri >= 0) _data.KnobRingBrightness = knobRingBri;
 
-            // Hardware writes (skipped when wheel/connection isn't live).
-            if (!deviceLive) return;
+            // Hardware writes — gated per-section on the matching detection
+            // flag. NOT gated on _data.IsConnected: that's the "any device
+            // responded" proxy, which is false on a fresh MozaData (hot-reload
+            // case where _data = new MozaData() but the serial wire and the
+            // wheel's prior detection state are preserved via
+            // s_persistentConnection / s_persistentDetectionState). Gating
+            // the whole method on IsConnected meant ApplyProfile fired at
+            // Init couldn't write anything until base-mcu-temp / hub-* /
+            // dash-* echoed back to flip IsConnected, and DeviceProber's
+            // wheel-model-name handler skips its re-apply path when
+            // LastKnownWheelModel was preserved — so static-mode colors
+            // never reached the wheel on game switch. _deviceManager.WriteX
+            // already checks _connection.IsConnected and returns false on
+            // a dead wire, so per-section gates plus the connection-level
+            // check is enough.
             if (_detectionState.NewWheelDetected)
             {
                 // Capability snapshot for the active wheel. Falls back to
@@ -260,7 +272,10 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(profile.DashRpmBlinkColors, _data.DashRpmBlinkColors);
             MozaProfile.UnpackColorsInto(profile.DashFlagColors, _data.DashFlagColors);
 
-            if (!_detectionState.DashDetected || !_data.IsConnected) return;
+            // Per-section gate only — _data.IsConnected check dropped for
+            // the hot-reload-with-persistent-wire case (see ApplyWheelToHardware
+            // comment). _deviceManager.WriteX bails on a dead wire.
+            if (!_detectionState.DashDetected) return;
 
             // CM2 standalone path: route via the verified group-0x32 / dev=0x12
             // surface (`cm2-*` commands). The legacy dash-* writes at dev=0x14
@@ -387,7 +402,9 @@ namespace MozaPlugin.Hardware
             if (profile.BaseAmbientStartupColor   >= 0) UnpackPackedColor(profile.BaseAmbientStartupColor, _data.BaseAmbientStartupColor);
             if (profile.BaseAmbientShutdownColor  >= 0) UnpackPackedColor(profile.BaseAmbientShutdownColor, _data.BaseAmbientShutdownColor);
 
-            if (!_detectionState.BaseAmbientLedSupported || !_data.IsConnected) return;
+            // Per-section gate only — see ApplyWheelToHardware comment for why
+            // _data.IsConnected was dropped here.
+            if (!_detectionState.BaseAmbientLedSupported) return;
             if (profile.BaseAmbientBrightness     >= 0) _deviceManager.WriteSetting("base-ambient-brightness", profile.BaseAmbientBrightness);
             if (profile.BaseAmbientStandbyMode    >= 0) _deviceManager.WriteSetting("base-ambient-standby-mode", profile.BaseAmbientStandbyMode);
             if (profile.BaseAmbientIndicatorState >= 0) _deviceManager.WriteSetting("base-ambient-indicator-state", profile.BaseAmbientIndicatorState);
@@ -710,9 +727,123 @@ namespace MozaPlugin.Hardware
         public void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, LedKind kind)
         {
             if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
+
+            // Per-group SimHub-mode gate, symmetric with the read-side gate
+            // in MozaWheelSettingsControl.WheelTabs_SelectionChanged. Mode
+            // values per group (MozaData): 0=Off, 1=SimHub/telemetry-driven,
+            // 2=Static. Suppress UI-initiated static-color writes when the
+            // group is in SimHub mode — the live pipeline owns the wheel's
+            // color registers for that group, and a static write briefly
+            // clobbers the live frame buffer until the next live frame
+            // overpaints (visible 1-keepalive flicker). Caller writes to
+            // _data + persisted overlay BEFORE invoking us, so the user's
+            // intent survives — it just doesn't reach the wheel while live
+            // is rendering this group. When the user switches the group
+            // back to Static, the mode-change handler in
+            // MozaWheelSettingsControl re-pushes the stored palette so the
+            // EEPROM catches up with anything edited during SimHub mode.
+            int? groupMode = kind switch
+            {
+                LedKind.Rpm    => _data.WheelTelemetryMode,
+                LedKind.Button => _data.WheelButtonsLedMode,
+                LedKind.Knob   => _data.WheelKnobLedMode,
+                _ => (int?)null,  // Flag / None / combined: no mode tracking, write through
+            };
+            if (groupMode == 1)
+            {
+                MozaLog.Debug(
+                    $"[Moza] LED write '{command}' suppressed: group {kind} in SimHub mode " +
+                    "(live pipeline owns the frame buffer; _data and overlay updated regardless)");
+                return;
+            }
+
             _deviceManager.WriteColor(command, r, g, b);
             MozaLedDeviceManager.InvalidateLiveCacheAny(kind);
         }
+
+        /// <summary>
+        /// Re-push the stored static palette for a group from <c>_data</c> to the
+        /// wheel's EEPROM. Called from the per-group mode combo handlers when the
+        /// user transitions a group to Static mode (val=2). Required because
+        /// <see cref="WriteLedColorIfWheelDetected"/> suppresses static-color
+        /// writes while the group is in SimHub mode; the suppressed writes still
+        /// land in <c>_data</c> and the persisted overlay, but the wheel EEPROM
+        /// falls out of sync. Re-pushing on transition-to-Static brings EEPROM
+        /// back to match <c>_data</c> so the static colors the user picked while
+        /// in SimHub mode actually appear when they switch back.
+        ///
+        /// Bypasses the SimHub-mode gate intentionally: this is invoked AFTER
+        /// the mode flip, when the group is already in Static, so the gate
+        /// would allow writes anyway — going direct keeps the call independent
+        /// of any future gate changes.
+        /// </summary>
+        public void RepushStaticPalette(LedKind kind)
+        {
+            if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
+            var model = _plugin.WheelModelInfo;
+            if (model == null) return;
+
+            switch (kind)
+            {
+                case LedKind.Rpm:
+                {
+                    int count = model.RpmLedCount;
+                    if (count <= 0 || !_detectionState.IsWheelLedGroupPresent(0)) return;
+                    var src = _data.WheelRpmColors;
+                    int len = Math.Min(src.Length, count);
+                    for (int i = 0; i < len; i++)
+                    {
+                        var rgb = src[i];
+                        _deviceManager.WriteColor($"wheel-rpm-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                    }
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Rpm);
+                    break;
+                }
+                case LedKind.Button:
+                {
+                    int count = model.ButtonLedCount;
+                    if (count <= 0 || !_detectionState.IsWheelLedGroupPresent(1)) return;
+                    var src = _data.WheelButtonColors;
+                    int len = Math.Min(src.Length, count);
+                    for (int i = 0; i < len; i++)
+                    {
+                        var rgb = src[i];
+                        _deviceManager.WriteColor($"wheel-button-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                    }
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Button);
+                    break;
+                }
+                case LedKind.Knob:
+                {
+                    int knobs = model.KnobCount;
+                    if (knobs <= 0) return;
+
+                    // Per-knob "Active" LED color (cmd 0x27 ROLE=0).
+                    var prim = _data.WheelKnobPrimaryColors;
+                    int primLen = Math.Min(prim.Length, knobs);
+                    for (int i = 0; i < primLen; i++)
+                    {
+                        var rgb = prim[i];
+                        _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
+                    }
+
+                    // Per-ring-LED "background" color (cmd 0x1F 0x03 0x01).
+                    if (model.KnobRingLeds != null && _detectionState.IsWheelLedGroupPresent(3))
+                    {
+                        var bg = _data.WheelKnobBackgroundColors;
+                        int bgLen = Math.Min(bg.Length, model.KnobRingLedTotal);
+                        for (int i = 0; i < bgLen; i++)
+                        {
+                            var rgb = bg[i];
+                            _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                        }
+                    }
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);
+                    break;
+                }
+            }
+        }
+
         public void WriteColorIfDashDetected(string command, byte r, byte g, byte b)
         {
             if (_detectionState.DashDetected) _deviceManager.WriteColor(command, r, g, b);
