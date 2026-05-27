@@ -62,6 +62,27 @@ namespace MozaPlugin.Telemetry.Frames
         // at indexes 10/11/13/14 parsed as garbage even though the wire bytes
         // were clean per CRC + per-record validation.
         private readonly Dictionary<byte, int> _highestSeqAppended = new();
+        // Per-session Environment.TickCount of last successful append. Used by
+        // the stale-garbage cleanup in TryParse: when a session has buffered
+        // bytes but ZERO valid catalog records (sFull+sPrefix+sAbbr+sBackref==0)
+        // AND no new bytes have arrived for StaleGarbageThresholdMs, the
+        // buffer is non-catalog noise that the wheel sent on a catalog session
+        // and the parser has held onto forever waiting for an END marker that
+        // will never come. Observed on the issue-#43 user's bundle: 51 bytes
+        // of W13-display identity-like content landed on sess=0x02 (FlagByte)
+        // pre-capture, parser correctly rejected every record (sizeReject=3
+        // backrefFail=1 distinctIdx=0), but with no END marker the buffer
+        // sat for 208 s rejecting the same bytes on every parse pass and
+        // would have stayed indefinitely. Dropping the noise lets the next
+        // legitimate catalog burst start clean.
+        private readonly Dictionary<byte, int> _lastAppendTickMs = new();
+        // Threshold above which a no-progress session buffer is considered
+        // stale noise rather than in-flight catalog data. Set to 30 s — well
+        // above any plausible wheel inter-chunk gap during an actual catalog
+        // emission (PH bridge captures show full catalog bursts complete in
+        // under 5 s) but short enough to clean up before the buffer
+        // accumulates more garbage on top.
+        private const int StaleGarbageThresholdMs = 30_000;
         private volatile List<string>? _catalog;
         // Cached URL → 1-based idx for the current _catalog. Published
         // together with _catalog and read without locking; FindIdxByUrl is
@@ -251,6 +272,7 @@ namespace MozaPlugin.Telemetry.Frames
                 }
                 for (int i = 0; i < length; i++)
                     buf.Add(chunkBytes[offset + i]);
+                _lastAppendTickMs[session] = Environment.TickCount;
                 // Scan the FULL session buffer (not just the new chunk —
                 // the END marker may straddle chunk boundaries) for the
                 // most recent tag 0x06 size=4 record and capture its u32
@@ -312,6 +334,7 @@ namespace MozaPlugin.Telemetry.Frames
                 // Drop seq-dedup tracking too — fresh buffer means fresh
                 // session, retransmit memory should not bleed across.
                 _highestSeqAppended.Clear();
+                _lastAppendTickMs.Clear();
             }
             _lastParseLen = 0;
         }
@@ -350,6 +373,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _buffersBySession.Remove(sess);
                     _sessionOrder.RemoveAt(i);
                     _highestSeqAppended.Remove(sess);
+                    _lastAppendTickMs.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
                         $"[Moza] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
@@ -865,6 +889,22 @@ namespace MozaPlugin.Telemetry.Frames
                         suffix = suffix
                             .Replace("\\t", "TyreTemp")
                             .Replace("\\P", "TyrePressure")
+                            // \b → "BrakeTemp": fourth member of the tire-corner
+                            // instrumentation family (alongside TyreTemp via \t
+                            // and TyrePressure via \P). Inferred — not directly
+                            // observed in any PH bridge capture (none of those
+                            // wheels emit BrakeTemp channels), but the issue
+                            // #43 user's broken catalog showed 4 corrupted
+                            // entries at \bRearRight / \bFrontRight / \bRearLeft
+                            // / \bFrontLeft positioned alongside the parallel
+                            // TyreTemp/TyrePressure rows for the same corners,
+                            // which is the only sensible expansion. Their
+                            // working capture had the same channels as full
+                            // "BrakeTempXxx" names, confirming the channel
+                            // family exists on the wheel side. If a future
+                            // PH capture shows \b expanding to something else,
+                            // revisit.
+                            .Replace("\\b", "BrakeTemp")
                             .Replace("{FL}", "FrontLeft")
                             .Replace("{FR}", "FrontRight")
                             .Replace("{RL}", "RearLeft")
@@ -926,6 +966,49 @@ namespace MozaPlugin.Telemetry.Frames
                     $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
                     $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +
                     $"distinct-idx={parsed.Count}");
+            }
+
+            // Stale-garbage cleanup. Sessions that produced zero valid records
+            // (full+prefix+abbr+backref == 0) AND haven't been appended to in
+            // StaleGarbageThresholdMs are holding non-catalog noise — drop them
+            // so the parser doesn't keep emitting the same backrefFail/sizeReject
+            // counters on every pass, and so subsequent legitimate catalog
+            // chunks start from a clean buffer. Sessions that previously
+            // contributed valid records have those records preserved in
+            // _catalog, so clearing the buffer loses nothing recoverable.
+            // The pre-scan-skipped sessions (no URL/END at all) are NOT in
+            // perSessionStats, so iterate _sessionOrder directly and check
+            // staleness for any buffer with no current-pass valid records.
+            int nowTick = Environment.TickCount;
+            var validRecordsBySession = new Dictionary<byte, bool>();
+            foreach (var s in perSessionStats)
+                validRecordsBySession[s.session] = (s.full + s.prefix + s.abbr + s.backref) > 0;
+            lock (_bufferLock)
+            {
+                for (int i = _sessionOrder.Count - 1; i >= 0; i--)
+                {
+                    byte sess = _sessionOrder[i];
+                    if (!_buffersBySession.TryGetValue(sess, out var sBuf) || sBuf.Count == 0)
+                        continue;
+                    // Sessions absent from validRecordsBySession were pre-scan-
+                    // skipped (no URL/END found) — treat as "no valid records".
+                    if (validRecordsBySession.TryGetValue(sess, out bool hadValid) && hadValid)
+                        continue;
+                    if (!_lastAppendTickMs.TryGetValue(sess, out int lastAppend))
+                        continue;
+                    int ageMs = nowTick - lastAppend;
+                    if (ageMs < StaleGarbageThresholdMs)
+                        continue;
+                    int wiped = sBuf.Count;
+                    _buffersBySession.Remove(sess);
+                    _sessionOrder.RemoveAt(i);
+                    _highestSeqAppended.Remove(sess);
+                    _lastAppendTickMs.Remove(sess);
+                    MozaLog.Debug(
+                        $"[Moza] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
+                        $"({wiped}B, no valid records, last append {ageMs / 1000}s ago) — " +
+                        "wheel sent non-catalog bytes that the parser has been re-rejecting.");
+                }
             }
 
             if (parsed.Count > 0)
