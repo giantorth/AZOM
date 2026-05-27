@@ -210,49 +210,57 @@ namespace MozaPlugin.Telemetry.Frames
         }
 
         /// <summary>
-        /// PitHouse-shape tier-def body (no preamble — caller emits the
-        /// preamble TLV separately on first send per session). Layout per
-        /// docs/protocol/findings/2026-05-03-pithouse-tierdef-reference.md:
+        /// PitHouse-shape tier-def body for V2 compact (VGS-class) firmware:
+        /// flat layout with prior-flag enables, back-to-back tier records,
+        /// single trailing END marker. The structure shape was empirically
+        /// verified working at cold-start on VGS firmware (m Formula 1
+        /// dashboard renders correctly with this layout); only the END u32
+        /// value semantics were corrected post-refactor.
+        ///
+        /// Layout:
         ///   [ENABLE 0x00 size=1 flag] × flagBase  (prior-flag enables)
         ///   [TIER 0x01 size=1+16N flag channel_records] × profile.Tiers.Count
-        ///   [END 0x06 size=4 max_channel_idx]
+        ///   [END 0x06 size=4 endMarkerCounter]
         ///
-        /// Channel index resolution: when <paramref name="wheelCatalog"/> is
-        /// non-null + non-empty, indices come from the wheel's advertised
-        /// catalog (1-based position). Otherwise indices fall back to
-        /// alphabetic ordering of channel URLs across all tiers (legacy).
-        /// END value uses the max channel idx referenced in this message —
-        /// "max-ever-seen" semantics noted in findings doc require session
-        /// state the caller must track separately.
+        /// Channel indices: 1-based alphabetic-by-URL across all tiers,
+        /// deduped. Pre-Type02 firmware (VGS, GS V2P, F1, FSR) doesn't index
+        /// against a wheel catalog — host-assigned alphabetic order is the
+        /// only source of truth.
+        ///
+        /// END value: echoes the wheel's most-recent
+        /// <c>0x06 04 00 00 00 &lt;u32&gt;</c> marker from its catalog stream
+        /// (handshake version). The previous implementation wrote
+        /// <c>maxChIdxSeen</c> which doesn't match what the wheel announces;
+        /// post-switch the wheel rejected tier-defs as stale-generation and
+        /// stopped committing widget bindings. See
+        /// <c>docs/protocol/tier-definition/version-2-compact-vgs.md</c>
+        /// "Per-tier end-marker" (2026-05-17 finding). Pass 0 for cold-start
+        /// before the wheel has pushed any END marker.
         /// </summary>
-        public static byte[] BuildTierDefinitionV2(MultiStreamProfile profile, byte flagBase,
-            System.Collections.Generic.IReadOnlyList<string>? wheelCatalog)
+        private static byte[] BuildTierDefinitionV2Compact(MultiStreamProfile profile, byte flagBase,
+            uint endMarkerCounter)
         {
             using var ms = new MemoryStream();
             using var w = new BinaryWriter(ms);
 
-            Dictionary<string, int> idxByUrl;
-            if (wheelCatalog != null && wheelCatalog.Count > 0)
+            // Alphabetic-by-URL across all tiers, deduped (the broadcast-
+            // expanded profile repeats URLs N×, which would inflate indices
+            // if every occurrence got its own slot).
+            var idxByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var unique = new List<ChannelDefinition>();
+            foreach (var ch in profile.Tiers.SelectMany(t => t.Channels))
             {
-                idxByUrl = ChannelCatalogParser.BuildIdxByUrl(wheelCatalog);
+                if (seen.Add(ch.Url)) unique.Add(ch);
             }
-            else
-            {
-                // Fallback: alphabetic-by-URL across all tiers, deduped (the
-                // broadcast-expanded profile repeats URLs N×, which would
-                // inflate indices if every occurrence got its own slot).
-                idxByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var unique = new List<ChannelDefinition>();
-                foreach (var ch in profile.Tiers.SelectMany(t => t.Channels))
-                {
-                    if (seen.Add(ch.Url)) unique.Add(ch);
-                }
-                unique.Sort((a, b) => string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase));
-                for (int i = 0; i < unique.Count; i++)
-                    idxByUrl[unique[i].Url] = i + 1;
-            }
+            unique.Sort((a, b) => string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase));
+            for (int i = 0; i < unique.Count; i++)
+                idxByUrl[unique[i].Url] = i + 1;
 
+            // Prior-flag enables: ENABLE record for every flag from 0 up to
+            // flagBase-1. Empirically required (pre-refactor) for VGS to
+            // accept post-switch tier-defs; keeping until a VGS PH capture
+            // proves the broadcast-structured pattern works.
             for (int f = 0; f < flagBase; f++)
             {
                 w.Write((byte)0x00);
@@ -260,15 +268,15 @@ namespace MozaPlugin.Telemetry.Frames
                 w.Write((byte)f);
             }
 
-            int maxIdx = 0;
             for (int t = 0; t < profile.Tiers.Count; t++)
             {
                 var tier = profile.Tiers[t];
                 byte flag = (byte)(flagBase + t);
 
-                // Drop channels with chIdx=0 — W17 silently rejects the
-                // whole tier-def if any record carries chIdx=0. See
-                // docs/protocol/findings/.
+                // Drop chIdx=0 entries as a safety guard. With alphabetic
+                // indexing this should never fire — every URL in the profile
+                // gets a non-zero idx. Kept defensive in case a future
+                // caller passes channels with null URLs.
                 var resolved = new List<(int chIndex, ChannelDefinition ch)>(tier.Channels.Count);
                 foreach (var ch in tier.Channels)
                 {
@@ -285,7 +293,6 @@ namespace MozaPlugin.Telemetry.Frames
                 w.Write(flag);
                 foreach (var (chIndex, ch) in resolved)
                 {
-                    if (chIndex > maxIdx) maxIdx = chIndex;
                     uint compCode = LookupCompressionCode(ch.Compression);
                     w.Write((uint)chIndex);
                     w.Write(compCode);
@@ -294,35 +301,45 @@ namespace MozaPlugin.Telemetry.Frames
                 }
             }
 
+            // Trailing END marker echoing the wheel's counter.
             w.Write((byte)0x06);
             w.Write((uint)4);
-            w.Write((uint)maxIdx);
+            w.Write(endMarkerCounter);
 
             return ms.ToArray();
         }
 
         /// <summary>
         /// Build the complete tier definition message bytes from a MultiStreamProfile.
-        /// Production callers use <see cref="BuildTierDefinitionV2"/> directly; this
-        /// 2-arg overload is the legacy entry point retained for tests and emits the
-        /// same V2 shape with alphabetic channel indices (no wheel catalog).
+        /// 2-arg overload kept for tests and any caller without per-emission
+        /// state (no end-marker echo, no prev-subscription transition).
         /// </summary>
         public static byte[] BuildTierDefinitionMessage(MultiStreamProfile profile, byte flagBase)
-            => BuildTierDefinitionV2(profile, flagBase, wheelCatalog: null);
+            => BuildTierDefinitionMessage(profile, flagBase,
+                includeEnableEntries: true,
+                useWheelCatalogIndices: false,
+                wheelCatalog: null);
 
         /// <summary>
-        /// Build the V2 compact tier-def message.
+        /// Build a V2 compact tier-def message. Layout differs by wheel firmware:
+        /// Type02-era (W17/W18/KS Pro/R5+) uses the broadcast-structured shape
+        /// with wheel-catalog channel indices; VGS-class (VGS / GS V2P / F1 /
+        /// FSR) uses the flat prior-flag-enables shape with alphabetic indices.
+        /// Both shapes echo the wheel's current END marker.
         /// </summary>
-        /// <param name="includeEnableEntries">When true, prepends paired `[0x00] [4B=1] [1B flag]`
-        /// enable entries for each tier (legacy 2025-11 firmware behavior). Post-2026-04 CSP
-        /// PitHouse captures (`wireshark/csp/startup, change knob colors, ...pcapng`) omit
-        /// these — newer firmware only sees `0x01`-tag tier defs + `0x06`-tag end marker
-        /// per the host outbound stream on session 0x01.</param>
-        /// <param name="useWheelCatalogIndices">When true, the channel index in the tier-def
-        /// body is taken from the wheel's advertised catalog (1-based position) instead of
-        /// the host-assigned alphabetic index. PitHouse always uses wheel-catalog indices —
-        /// matching them is a prerequisite for the wheel correlating value frames against
-        /// the subscription.</param>
+        /// <param name="useWheelCatalogIndices">Selects the wheel-firmware
+        /// path. True = Type02 broadcast structure with wheel-catalog
+        /// indexing. False = VGS flat structure with alphabetic indexing.</param>
+        /// <param name="endMarkerCounter">The wheel's most-recent
+        /// <c>0x06 04 00 00 00 &lt;u32&gt;</c> END marker value from its
+        /// catalog stream. The wheel treats this as a tier-def version
+        /// handshake — a mismatched END is treated as a duplicate / stale
+        /// and the wheel does not commit widget bindings. See
+        /// <c>docs/protocol/tier-definition/version-2-compact-vgs.md</c>
+        /// "Per-tier end-marker" (2026-05-17 finding, verified against
+        /// Type02 captures; VGS application of the same handshake is
+        /// inferred from the same doc). Pass 0 for cold-start before the
+        /// wheel has pushed any END marker.</param>
         public static byte[] BuildTierDefinitionMessage(MultiStreamProfile profile, byte flagBase,
             bool includeEnableEntries,
             bool useWheelCatalogIndices,
@@ -330,100 +347,23 @@ namespace MozaPlugin.Telemetry.Frames
             uint endMarkerCounter = 0,
             byte? prevFlagBase = null, int prevTierCount = 0, int prevSubPerBroadcast = 0)
         {
-            // Type02 path: emit PitHouse-exact section ordering observed in
-            // `wireshark/csp/startup, change knob colors, ...pcapng`:
-            //   tier 0 def
-            //   end count=0 separator
-            //   enable flag 0
-            //   tier 1 def
-            //   tier 2 def
-            //   end count=0 final
-            //   enable flag 1
-            //   enable flag 2
-            // Detected by useWheelCatalogIndices=true (only Type02 callers set
-            // that). Other callers fall through to the legacy flat layout.
-            if (useWheelCatalogIndices && wheelCatalog != null && profile.Tiers.Count > 0)
+            if (profile.Tiers.Count == 0)
+                return Array.Empty<byte>();
+
+            if (useWheelCatalogIndices && wheelCatalog != null && wheelCatalog.Count > 0)
             {
-                return BuildTierDefinitionMessageType02(profile, flagBase, wheelCatalog,
-                    endMarkerCounter, prevFlagBase, prevTierCount, prevSubPerBroadcast);
+                return BuildTierDefinitionMessageType02(profile, flagBase,
+                    wheelCatalog,
+                    endMarkerCounter,
+                    prevFlagBase, prevTierCount, prevSubPerBroadcast);
             }
 
-            using var ms = new MemoryStream();
-            using var w = new BinaryWriter(ms);
-
-            // Assign 1-based channel indices. Default is alphabetic across all tiers,
-            // but when targeting a wheel that has advertised a catalog we must use
-            // its order so the wheel can correlate subscription with value frames.
-            var allChannels = profile.Tiers
-                .SelectMany(t => t.Channels)
-                .OrderBy(c => c.Url, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var channelIndexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            if (useWheelCatalogIndices && wheelCatalog != null)
-            {
-                for (int i = 0; i < wheelCatalog.Count; i++)
-                {
-                    string url = wheelCatalog[i];
-                    if (!string.IsNullOrEmpty(url))
-                        channelIndexMap[url] = i + 1; // 1-based per wheel catalog order
-                }
-            }
-            else
-            {
-                for (int i = 0; i < allChannels.Count; i++)
-                    channelIndexMap[allChannels[i].Url] = i + 1;
-            }
-
-            // PitHouse-exact format (R5 base, W17 wheel, Nebula in-game capture
-            // 2026-04-29 bridge-20260429-201848.jsonl): tier-def stream is
-            //   [tier_def 0x01] [end-marker 0x06 val=0x00000000]
-            //   [tier_def 0x01] [end-marker 0x06 val=0x04000000] [enable 0x00 val=tier_idx]
-            //   [tier_def 0x01] [end-marker 0x06 val=0x04000000]
-            // i.e. each subsequent tier preceded by a per-tier enable, and each
-            // tier followed by an end-marker with constant value (0 for first,
-            // 4 for subsequent — interpretation TBD). The previous plugin shape
-            // emitted N enables up front then all tier_defs back-to-back with a
-            // single trailing 0x06; wheel parser rejects that (no widget
-            // updates verified live 2026-04-29).
-            for (int i = 0; i < profile.Tiers.Count; i++)
-            {
-                // Enable entry preceding tiers 1..N-1 (not before tier 0).
-                if (includeEnableEntries && i > 0)
-                {
-                    w.Write((byte)0x00);     // tag
-                    w.Write((uint)1);        // size
-                    w.Write((byte)(i - 1));  // tier index of the PREVIOUS tier
-                }
-
-                var tier = profile.Tiers[i];
-                byte flag = (byte)(flagBase + i);
-                int numChannels = tier.Channels.Count;
-                uint size = (uint)(1 + numChannels * 16); // flag byte + 16 per channel
-
-                w.Write((byte)0x01);         // tag
-                w.Write(size);               // size (LE)
-                w.Write(flag);               // flag byte for this tier
-
-                foreach (var ch in tier.Channels)
-                {
-                    int chIndex;
-                    if (!channelIndexMap.TryGetValue(ch.Url, out chIndex)) chIndex = 0;
-                    uint compCode;
-                    compCode = LookupCompressionCode(ch.Compression);
-                    w.Write((uint)chIndex);   // channel index (LE)
-                    w.Write(compCode);        // compression code (LE)
-                    w.Write((uint)ch.BitWidth); // bit width (LE)
-                    w.Write((uint)0);         // reserved
-                }
-
-                // Per-tier end-marker. PitHouse: 0 for first tier, 4 for rest.
-                w.Write((byte)0x06);
-                w.Write((uint)4);
-                w.Write((uint)(i == 0 ? 0 : 4));
-            }
-
-            return ms.ToArray();
+            // VGS path: flat prior-flag-enable layout with wheelEND echo.
+            // includeEnableEntries / prevFlagBase / prevTierCount /
+            // prevSubPerBroadcast are Type02-only concepts and are ignored
+            // here — VGS's prior-flag enables are computed from flagBase
+            // directly.
+            return BuildTierDefinitionV2Compact(profile, flagBase, endMarkerCounter);
         }
 
         /// <summary>

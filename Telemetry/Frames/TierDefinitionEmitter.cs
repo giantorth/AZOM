@@ -440,31 +440,24 @@ namespace MozaPlugin.Telemetry.Frames
                     // END u32: echo of the wheel's most-recent END marker. PitHouse
                     // handshake: wheel sends tag=0x06 size=4 value=u32 announcing a
                     // tier-def version; PitHouse emits tier-def with the SAME u32
-                    // in its END marker. Mismatched END = wheel treats as duplicate.
-                    // Fallback 0 for cold-start.
+                    // in its END marker. Mismatched END = wheel treats as duplicate
+                    // and does not commit widget bindings (verified across both
+                    // Type02 and VGS firmware, see version-2-compact-vgs.md). 0 is
+                    // the cold-start fallback before the wheel has pushed any END.
                     uint endForThisEmission = _sender.CatalogParser.LastWheelEndMarker;
-                    byte[] message;
-                    if (cspIdx)
-                    {
-                        message = TierDefinitionBuilder.BuildTierDefinitionMessage(
-                            profile, flagBase,
-                            includeEnableEntries: true,
-                            useWheelCatalogIndices: true,
-                            wheelCatalog: _sender.CatalogParser.Catalog,
-                            endMarkerCounter: endForThisEmission,
-                            prevFlagBase: prevSub?.FlagBase,
-                            prevTierCount: prevSub?.TierCount ?? 0,
-                            prevSubPerBroadcast: prevSub?.SubTiersPerBroadcast ?? 0);
-                    }
-                    else
-                    {
-                        message = TierDefinitionBuilder.BuildTierDefinitionV2(
-                            profile, flagBase, wheelCatalog: null);
-                    }
+                    byte[] message = TierDefinitionBuilder.BuildTierDefinitionMessage(
+                        profile, flagBase,
+                        includeEnableEntries: true,
+                        useWheelCatalogIndices: cspIdx,
+                        wheelCatalog: _sender.CatalogParser.Catalog,
+                        endMarkerCounter: endForThisEmission,
+                        prevFlagBase: prevSub?.FlagBase,
+                        prevTierCount: prevSub?.TierCount ?? 0,
+                        prevSubPerBroadcast: prevSub?.SubTiersPerBroadcast ?? 0);
                     var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     MozaLog.Debug(
-                        $"[Moza] Sending {(cspIdx ? "type02-section" : "v2-flat")} tier definition: " +
+                        $"[Moza] Sending v2 tier definition ({(cspIdx ? "type02" : "compact")}): " +
                         $"flagBase=0x{flagBase:X2}, end={endForThisEmission} (echoing wheel), " +
                         $"prev={(prevSub != null ? $"0x{prevSub.FlagBase:X2}/{prevSub.TierCount}t/{prevSub.SubTiersPerBroadcast}spb" : "none")}, " +
                         $"preamble ({preambleChunkCount} chunks)" +
@@ -482,39 +475,44 @@ namespace MozaPlugin.Telemetry.Frames
                     // Snapshot catalog size for grow-subscription detection.
                     _sender.CatalogCountAtLastSubscription = _sender.CatalogParser.Count;
 
-                    // Tier-def binding completeness check. Channels whose URL isn't
-                    // in the wheel's catalog get chIndex=0 → wheel can't bind them.
-                    // If unbound > 0 → schedule kind=4 re-emit to nudge wheel re-advertise.
-                    if (cspIdx)
+                    // Tier-def binding completeness check. For Type02 this means
+                    // "wheel knows about every URL we sent" — channels with URLs
+                    // not in the wheel catalog get chIndex=0 and W17 silently
+                    // rejects the whole tier-def. For V2Compact (VGS) the wheel
+                    // doesn't index by catalog position, but the wheel's known
+                    // channel pool IS bounded by what it advertised at cold-start;
+                    // an "unbound" URL still indicates a dashboard asking for a
+                    // channel the wheel can't render. Both eras: report unbound
+                    // and schedule a kind=4 re-emit to nudge the wheel to
+                    // re-advertise its catalog. Also feeds the HotSwitchCoordinator
+                    // adaptive burst length via LastTierDefTotalCount.
+                    var catalogSnapshot = _sender.CatalogParser.Catalog;
+                    if (catalogSnapshot != null && catalogSnapshot.Count > 0)
                     {
-                        var catalogSnapshot = _sender.CatalogParser.Catalog;
-                        if (catalogSnapshot != null && catalogSnapshot.Count > 0)
+                        var have = new HashSet<string>(
+                            catalogSnapshot, StringComparer.OrdinalIgnoreCase);
+                        int unbound = 0, total = 0;
+                        string? firstUnboundUrl = null;
+                        foreach (var t2 in profile.Tiers)
+                        foreach (var c2 in t2.Channels)
                         {
-                            var have = new HashSet<string>(
-                                catalogSnapshot, StringComparer.OrdinalIgnoreCase);
-                            int unbound = 0, total = 0;
-                            string? firstUnboundUrl = null;
-                            foreach (var t2 in profile.Tiers)
-                            foreach (var c2 in t2.Channels)
+                            total++;
+                            if (string.IsNullOrEmpty(c2.Url) || !have.Contains(c2.Url))
                             {
-                                total++;
-                                if (string.IsNullOrEmpty(c2.Url) || !have.Contains(c2.Url))
-                                {
-                                    unbound++;
-                                    if (firstUnboundUrl == null) firstUnboundUrl = c2.Url;
-                                }
+                                unbound++;
+                                if (firstUnboundUrl == null) firstUnboundUrl = c2.Url;
                             }
-                            _lastTierDefUnboundCount = unbound;
-                            _lastTierDefTotalCount = total;
-                            if (unbound > 0)
-                            {
-                                MozaLog.Warn(
-                                    $"[Moza] Tier-def has {unbound}/{total} unbound channels " +
-                                    $"(chIndex=0; wheel catalog has {catalogSnapshot.Count} entries). " +
-                                    $"First unbound: {firstUnboundUrl ?? "(null)"}. " +
-                                    "Scheduling kind=4 re-emit to nudge wheel re-advertise.");
-                                _sender.ScheduleCatalogResyncProbeInternal();
-                            }
+                        }
+                        _lastTierDefUnboundCount = unbound;
+                        _lastTierDefTotalCount = total;
+                        if (unbound > 0)
+                        {
+                            MozaLog.Warn(
+                                $"[Moza] Tier-def has {unbound}/{total} unbound channels " +
+                                $"(URL not in wheel catalog of {catalogSnapshot.Count} entries). " +
+                                $"First unbound: {firstUnboundUrl ?? "(null)"}. " +
+                                "Scheduling kind=4 re-emit to nudge wheel re-advertise.");
+                            _sender.ScheduleCatalogResyncProbeInternal();
                         }
                     }
 
