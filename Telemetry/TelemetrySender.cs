@@ -1529,6 +1529,16 @@ namespace MozaPlugin.Telemetry
             _tierDefEmitter.Reset();
             _autoResolutionDone = false;
             _retransmitter.Clear();
+            // Bump the HotSwitchCoordinator arm count so the catalog parser
+            // treats the NEXT post-Start commit as a fresh-session boundary
+            // (REPLACE _liveCatalog) instead of UNIONing the new wheel
+            // session's catalog with the prior session's stale entries.
+            // Critical on disconnect/reconnect: wheel display takes ~20 s
+            // to boot after USB re-attach, so the first catalog batch from
+            // the freshly-booted display lands long after Stop+Start with
+            // no other signal we can use to detect "this is a different
+            // wheel session." The arm-count bump is the explicit boundary.
+            _hotSwitch.NotifySessionBoundary();
             // Take the seq lock so this Clear can't race a mid-flight
             // enumeration of the property-push dict. Pre-fix the unsynchronised
             // narrow window made the race invisible, but the new

@@ -2253,6 +2253,13 @@ namespace MozaPlugin
             // connection. They'd otherwise keep retrying after reconnect
             // against a fresh wheel that may not even speak the same protocol.
             try { PendingResponses.Clear(); } catch { }
+            // Reset Hub-probe back-off so the next reconnect re-enters the
+            // aggressive 30 s probe window. Without this, a user attaching
+            // a Hub during the disconnect window would face up to 60 s of
+            // Hub-detection latency after reconnect because the back-off
+            // counter rolled into the once-per-60s mode mid-session.
+            _hubProbeFirstTickMs = 0;
+            _hubProbeLastTickMs = 0;
             if (DetectionState.NewWheelDetected || DetectionState.OldWheelDetected || DetectionState.DashDetected)
                 ResetWheelDetection("Serial disconnect — resetting wheel detection");
         }

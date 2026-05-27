@@ -103,6 +103,22 @@ namespace MozaPlugin.Telemetry.Lifecycle
             Interlocked.Increment(ref _armCount);
         }
 
+        /// <summary>
+        /// Bump the arm count without scheduling emissions. Called by
+        /// <see cref="TelemetrySender.Stop"/> so that any subsequent
+        /// catalog commit (e.g. after wheel disconnect/reconnect) is
+        /// treated as a fresh-session REPLACE boundary by the catalog
+        /// parser — without this, the wheel's first post-reconnect
+        /// catalog batch would UNION with the stale prior-session
+        /// _liveCatalog. Wheel display takes ~20 s to boot after USB
+        /// re-attach, so we can't rely on time alone to detect that the
+        /// session is fresh; the explicit boundary signal is required.
+        /// </summary>
+        public void NotifySessionBoundary()
+        {
+            Interlocked.Increment(ref _armCount);
+        }
+
         /// <summary>Decide whether the tick handler should emit a tier-def
         /// re-application this tick. Encapsulates the catalog-END handshake
         /// gate (first emission) and the EmissionSpacingMs pacing gate
