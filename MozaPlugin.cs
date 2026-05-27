@@ -3120,26 +3120,44 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Firmware era for the current wheel page. Returns Auto when wheel
-        /// not identified — the auto-resolver picks from the wheel's response.
+        /// Firmware era for the current wheel page. Reads the per-page-GUID
+        /// override for the connected wheel; when no wheel has identified yet
+        /// (UI opened before hardware came up), falls back to the
+        /// <see cref="MozaDeviceConstants.WheelGenericGuid"/> bucket so the
+        /// user's pick made before the wheel was visible still applies.
+        /// Returns <see cref="MozaWheelEra.Auto"/> only when neither bucket
+        /// holds an explicit value.
         /// </summary>
         internal MozaWheelEra ActiveTelemetryWheelEra
         {
             get
             {
+                if (_settings?.WheelTelemetryEraByPageGuid == null) return MozaWheelEra.Auto;
                 var g = GetCurrentWheelPageGuid();
-                if (!g.HasValue || _settings?.WheelTelemetryEraByPageGuid == null) return MozaWheelEra.Auto;
-                if (!_settings.WheelTelemetryEraByPageGuid.TryGetValue(g.Value, out var v) || v < 0)
-                    return MozaWheelEra.Auto;
-                return (MozaWheelEra)v;
+                if (g.HasValue
+                    && _settings.WheelTelemetryEraByPageGuid.TryGetValue(g.Value, out var v)
+                    && v >= 0)
+                    return (MozaWheelEra)v;
+                if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic)
+                    && _settings.WheelTelemetryEraByPageGuid.TryGetValue(generic, out var gv)
+                    && gv >= 0)
+                    return (MozaWheelEra)gv;
+                return MozaWheelEra.Auto;
             }
             set
             {
-                var g = GetCurrentWheelPageGuid();
-                if (!g.HasValue) return;
                 if (_settings == null) return;
                 if (_settings.WheelTelemetryEraByPageGuid == null)
                     _settings.WheelTelemetryEraByPageGuid = new Dictionary<Guid, int>();
+                // Specific wheel identified → write the per-wheel override.
+                // Otherwise stash under WheelGenericGuid so the user's pick
+                // survives until the wheel shows up; the getter falls back
+                // to this bucket when the per-wheel entry is missing.
+                var g = GetCurrentWheelPageGuid();
+                if (!g.HasValue
+                    && Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic))
+                    g = generic;
+                if (!g.HasValue) return;
                 _settings.WheelTelemetryEraByPageGuid[g.Value] = (int)value;
             }
         }

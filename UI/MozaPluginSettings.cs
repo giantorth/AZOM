@@ -221,7 +221,7 @@ namespace MozaPlugin
 
         // Release stream the checker follows. Stable = /releases/latest,
         // Dev = /releases/tags/dev-latest. Persisted as int so JSON shape
-        // matches the existing enum convention (see TelemetryWheelEra).
+        // matches the existing enum convention.
         public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
 
         // Version the user clicked "Skip this version" on — the banner stays
@@ -413,32 +413,6 @@ namespace MozaPlugin
 
         // Download dashboards from the wheel when it reports them.
         public bool TelemetryDownloadDashboard { get; set; } = false;
-
-        // Legacy tier-def variant setting (pre-MozaFirmwareEra). Migrated into
-        // TelemetryWheelEra on first load (see MozaPlugin.ApplyTelemetrySettings).
-        // Kept around so older saved settings continue to round-trip during migration.
-        //   0 = URL-based subscription (CSP-style) → Era2024
-        //   2 = Compact numeric (VGS-style)        → Era2025
-        // -1 = sentinel meaning "migrated, ignore".
-        public int TelemetryProtocolVersion { get; set; } = -1;
-
-        // Legacy MozaFirmwareEra serialization slot. Older builds wrote the
-        // firmware-era enum here as an int (Auto=0, TierDefV2_Upload8B=1,
-        // TierDefV2_Upload6B=2, TierDefV0_Upload6B=4, TierDefV2_Type02=5).
-        // We capture that int by mapping the JSON key "TelemetryFirmwareEra"
-        // into this property; ApplyTelemetrySettings drains it into
-        // TelemetryWheelEra and clears to -1 to mark as migrated.
-        // Sentinel -1 = no legacy value present (fresh install or already migrated).
-        [Newtonsoft.Json.JsonProperty("TelemetryFirmwareEra")]
-        public int TelemetryFirmwareEraLegacy { get; set; } = -1;
-
-        // Wheel firmware era. Drives every wire-protocol axis (tier-def
-        // session, encoding, preamble policy, blind-retransmit, upload
-        // header) via Telemetry/EraPolicy.cs. Default Auto probes the wheel
-        // at session start and picks Era2024/Era2025/Era2026 from catalog
-        // presence + wheel-model identity.
-        public MozaWheelEra TelemetryWheelEra { get; set; }
-            = MozaWheelEra.Auto;
 
         // Telemetry send rate in Hz
         public int TelemetrySendRateHz { get; set; } = 20;

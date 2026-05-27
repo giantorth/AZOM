@@ -1413,15 +1413,40 @@ namespace MozaPlugin
 
         private void InitTelemetryTab()
         {
-            if (_telemetryUIInitialized) return;
-            _telemetryUIInitialized = true;
-
-            using (_suppressor.Begin())
+            // One-shot init for controls whose state is purely settings-driven
+            // and doesn't change after load (upload/download toggles — hidden
+            // anyway). The firmware-era combo isn't covered here because it
+            // needs to re-sync once a wheel identifies: per-page-GUID lookup
+            // returns Auto before the wheel's model name is known, and the
+            // settings-tab is built before that point. See RefreshTelemetryTab.
+            if (!_telemetryUIInitialized)
             {
-                var s = _plugin.Settings;
-                UploadDashboardCheck.IsChecked = s.TelemetryUploadDashboard;
-                DownloadDashboardCheck.IsChecked = s.TelemetryDownloadDashboard;
-                FirmwareEraCombo.SelectedIndex = (int)s.TelemetryWheelEra;
+                _telemetryUIInitialized = true;
+                using (_suppressor.Begin())
+                {
+                    var s = _plugin.Settings;
+                    UploadDashboardCheck.IsChecked = s.TelemetryUploadDashboard;
+                    DownloadDashboardCheck.IsChecked = s.TelemetryDownloadDashboard;
+                }
+            }
+
+            RefreshTelemetryTab();
+        }
+
+        // Re-syncs UI controls that depend on per-wheel state which only
+        // resolves after the wheel identifies. Safe to call repeatedly; uses
+        // the suppressor to keep SelectionChanged handlers from firing on
+        // programmatic writes.
+        private void RefreshTelemetryTab()
+        {
+            int desired = (int)_plugin.ActiveTelemetryWheelEra;
+            if (desired < 0 || desired > 3) desired = (int)MozaWheelEra.Auto;
+            if (FirmwareEraCombo.SelectedIndex != desired)
+            {
+                using (_suppressor.Begin())
+                {
+                    FirmwareEraCombo.SelectedIndex = desired;
+                }
             }
         }
 
