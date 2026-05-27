@@ -71,6 +71,16 @@ namespace MozaPlugin.Protocol
         private volatile SerialPort? _port;
         private Thread? _readThread;
         private Thread? _writeThread;
+        // Priority lane: unpaced FIFO for tiny, time-critical frames (fc:00 session
+        // acks). Drained ahead of one-shot every WriteLoop iteration so an ack
+        // can't get buried behind a 1000-chunk tier-def burst — the wheel times
+        // out sessions whose acks lag more than ~1 s and silently drops them.
+        // Verified: PH sess=0x02 ack-lag stays ≤ 870 ms even during heavy bursts
+        // across 9 PitHouse bridge captures (median 35–95 ms idle, 50–354 ms busy);
+        // the plugin's single-FIFO setup let user-bundle sess=0x07 acks lag 4.5 s+
+        // during dashboard switch tier-def floods, matching the "telemetry dies
+        // after switch" symptom on issue #43.
+        private readonly ConcurrentQueue<byte[]> _priorityQueue = new ConcurrentQueue<byte[]>();
         // One-shot lane: FIFO + 4 ms burst pacing (bases drop unpaced rapid writes).
         private readonly ConcurrentQueue<byte[]> _oneShotQueue = new ConcurrentQueue<byte[]>();
         // Stream lane: per-kind latest-wins slots, unpaced. SendStream overwrites pending values.
@@ -367,6 +377,7 @@ namespace MozaPlugin.Protocol
         private bool TryOpen(string portName)
         {
             // Drain any stale messages from a previous connection
+            while (_priorityQueue.TryDequeue(out _)) { }
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
@@ -483,6 +494,21 @@ namespace MozaPlugin.Protocol
                 _oneShotQueue.Enqueue(message);
         }
 
+        /// <summary>
+        /// Enqueue a tiny, time-critical frame (fc:00 session ack) on the priority
+        /// lane. WriteLoop drains this lane ahead of the one-shot FIFO and applies
+        /// no pacing — acks are 10 bytes, negligible against the write budget, and
+        /// the wheel times out sessions whose acks lag past ~1 s. Use only for
+        /// frames the wheel will treat as overdue if delayed (acks); regular
+        /// commands should still use <see cref="Send"/> so they share the paced
+        /// queue with tier-def chunks and respect the bandwidth budget.
+        /// </summary>
+        public void SendPriority(byte[] message)
+        {
+            if (message != null)
+                _priorityQueue.Enqueue(message);
+        }
+
         /// <summary>Enqueue a periodic-stream frame with latest-wins coalescing per <see cref="StreamKind"/>.</summary>
         public void SendStream(StreamKind kind, byte[] message)
         {
@@ -492,9 +518,10 @@ namespace MozaPlugin.Protocol
             Interlocked.Exchange(ref _streamSlots[idx], message);
         }
 
-        /// <summary>Drop one-shot FIFO + all stream slots + the OS write buffer (Stop button halts the wheel instantly).</summary>
+        /// <summary>Drop priority + one-shot FIFOs + all stream slots + the OS write buffer (Stop button halts the wheel instantly).</summary>
         public void FlushPendingWrites()
         {
+            while (_priorityQueue.TryDequeue(out _)) { }
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
@@ -532,6 +559,7 @@ namespace MozaPlugin.Protocol
                     try { _port?.Close(); } catch { }
                     _port = null;
                 }
+                while (_priorityQueue.TryDequeue(out _)) { }
                 while (_oneShotQueue.TryDequeue(out _)) { }
                 for (int k = 0; k < _streamSlots.Length; k++)
                     Interlocked.Exchange(ref _streamSlots[k], null);
@@ -814,6 +842,28 @@ namespace MozaPlugin.Protocol
             while (_running)
             {
                 bool didWork = false;
+
+                // 0) Priority lane: drain all queued fc:00 acks first, unpaced.
+                //    Acks are 10 bytes each and the wheel times out sessions whose
+                //    acks lag — they must NOT sit behind a tier-def burst in the
+                //    one-shot FIFO. Loop drains all queued acks each iteration so
+                //    a flurry of inbound chunks (every wheel tick during a switch)
+                //    doesn't leave the back of the line stuck for another cycle.
+                while (_priorityQueue.TryDequeue(out var ackMsg))
+                {
+                    int writtenAck = WriteFrame(ackMsg, ref stuffBuf, MozaProtocol.StuffedFrameSize(ackMsg));
+                    if (writtenAck > 0)
+                    {
+                        writeCount++;
+                        lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
+                        // Don't claim "lastWasOneShot" — priority writes shouldn't
+                        // count toward the 4ms one-shot inter-frame gate (acks
+                        // back-to-back are fine; they're tiny and the wheel handles
+                        // bursts of acks without issue per PH wire traces).
+                        lastWasOneShot = false;
+                        didWork = true;
+                    }
+                }
 
                 // 1) One-shot FIFO with 4 ms inter-write pacing (bases drop unpaced bursts).
                 //    WriteBudget extends the gate under bandwidth pressure.

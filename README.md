@@ -9,9 +9,11 @@
 > [!NOTE]
 > MOZA is a registered trademark of Gudsen Technology Co., Ltd. This project is not affiliated with, endorsed by, or sponsored by MOZA or Gudsen Technology. All trademarks are the property of their respective owners.
 
-A SimHub plugin that communicates directly with MOZA Racing hardware over serial, providing hardware configuration and LED control through SimHub's native device and effects system. Provides a complete replacement for Pithouse.
+![Wheel Startup](docs/examples/IMG_7111.gif)
 
-Built using the amazing work of [Boxflat](https://github.com/Lawstorant/boxflat) and the intial reverse-engineering of the the [MOZA serial protocol](docs/protocol/README.md).
+A SimHub plugin that provides complete replacement software for your MOZA hardware.
+
+Built using the amazing work of [Boxflat](https://github.com/Lawstorant/boxflat), Linux MOZA control software.
 
 > [!WARNING]
 > If you [sponsor future development efforts](https://github.com/sponsors/giantorth) the money will just be used to buy more MOZA hardware.
@@ -20,10 +22,12 @@ Built using the amazing work of [Boxflat](https://github.com/Lawstorant/boxflat)
 
 MOZA makes excellent sim racing hardware, but their companion software — Pithouse — is Windows-only. Linux users have no official way to manage LED effects or stream telemetry to your wheel's dashboard. SimHub, on the other hand, runs on Linux (via Proton/Wine), opening the door for cross-platform hardware control with built-in telemetry support.
 
-This plugin opens up MOZA hardware to the wider world of SimHub.  Drive your leds using [ATSR](https://github.com/ATSR-Alex/ATSR-Hub-EVO/) or [DNR](https://www.danielnewmanracing.com/) plugins.  Map any data point from the thousands in SimHub to display on your wheel dashboards.
+This plugin opens up MOZA hardware to the wider world of SimHub.  Drive your leds using [ATSR-EVO](https://github.com/ATSR-Alex/ATSR-Hub-EVO/) plugin.  Map any data point from the thousands in SimHub to display on your wheel dashboards.
 The goal is to expand the functionality of MOZA devices to a wider audience by providing tools that work across multiple platforms.  
 
 ![MOZA Plugin Settings](docs/Screenshot.png)
+
+![Dash Channels](docs/DashChannels.png)
 
 > [!IMPORTANT]
 > **Close Pithouse before using this plugin.** Both applications communicate with MOZA hardware over the same serial port and cannot be open simultaneously. Pithouse must be fully closed (not just minimized) before SimHub can connect.
@@ -41,13 +45,22 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 ## Installation
 
-Download the latest `MozaPlugin_v*.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page and extract `MozaPlugin.dll` into your SimHub installation directory. That single file is the full plugin — every supported language is embedded inside it.
+1. Download the latest `MozaPlugin.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page.
+2. Extract `MozaPlugin.dll` into your SimHub installation directory. 
+
+> Simhub defaults to `C:\Program Files (x86)\SimHub\`
 
 Restart SimHub — the plugin appears under Settings > Plugins as "MOZA Control".
 
 **Development builds.** The latest in-progress build from the `dev` branch is published as a pre-release: [MozaPlugin_dev.zip](https://github.com/giantorth/moza-simhub-plugin/releases/download/dev-latest/MozaPlugin_dev.zip). Expect bugs or broken features — use the stable release above if you need something reliable.
 
 **Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11+.
+
+## This Plugin is Better With ATSR-EVO
+
+<p align="center"><a href="https://github.com/ATSR-Alex/ATSR-Hub-EVO/"><img src="docs/atsr-logomark-mono-white-lrg.webp" alt="ATSR-EVO" width="400"></a></p>
+
+ ATSR-Hub EVO uses a custom LED framework which allows for advanced telemetry and input driven effects and animations. Drive your wheel LEDs in incredibly advanced ways.  
 
 ## Discord
 
@@ -98,34 +111,9 @@ TBD:
 - Stand-alone dashboards
 - Older generation wheels not in the list below
 
-
-### Per-Model LED Configuration
-
-Each wheel model has a dedicated SimHub device definition with the correct LED layout. The plugin detects the connected wheel model via firmware queries and deploys the matching definition on first detection.
-
-| Device Name | Model Prefix | RPM | Buttons | Flags | Button Mapping |
-|-------------|:------------:|:---:|:-------:|:-----:|----------------|
-| MOZA GS V2 Pro | GS V2P | 10 | 10 | No | Contiguous (5 left + 5 right) |
-| MOZA CS V2 | CS V2.1 | 10 | 6 | No | Non-contiguous: positions 1,2,4,7,9,10 |
-| MOZA CS Pro | W17 | 16 | 8 | No | Contiguous; 4 knobs (12 ring LEDs each) |
-| MOZA KS Pro | W18 | 18 | 14 | No | Contiguous; 5 knobs (12/12/8/12/12 ring LEDs) |
-| MOZA KS | KS | 10 | 10 | No | Contiguous |
-| MOZA FSR V2 | W13 | 16 | 10 | No | Contiguous |
-| MOZA Vision GS | VGS | 10 | 8 | No | Contiguous |
-| MOZA TSW | TSW | 10 | 14 | No | Contiguous |
-| MOZA RS V2 | RS V2 | 10 | 14 | No | Contiguous |
-| MOZA Racing Wheel | *(generic)* | 10 | 14 | No | Contiguous (fallback for unknown models) |
-| MOZA Old Protocol Wheel | *(ES wheels)* | 10 | 0 | No | RPM LEDs only |
-| MOZA Dashboard | — | 10 | 0 | Yes | RPM + flag LEDs |
-| MOZA Wheel Base | *(R21/R25/R27)* | 18 | 0 | No | Ambient LED ring (telemetry strip) |
-
-On wheels with flag LEDs, SimHub sees a single combined telemetry strip laid out as `[flag 1-3][RPM 1-N][flag 4-6]`. Configure flag zones in SimHub's effects UI on those slots.
-
-If your wheel model isn't listed or incorrect, the generic "MOZA Racing Wheel" definition is deployed. Check the SimHub log for the `[Moza] Wheel model:` line and report the model name string so a dedicated definition can be added.
-
 ### Dashboard Support
 
-![Dash Channels](docs/DashChannels.png)
+<img src="docs/examples/IMG_7105.gif" alt="Custom Displays" width="320" align="left" style="margin: 0 10 1em 1em;" />
 
 Wheels with an LCD dashboard (Vision GS, CS Pro, KS Pro, and FSR V2 confirmed; others likely work) can receive live telemetry from SimHub — speed, RPM, gear, lap times, fuel, tyre wear, and so on — streamed via MOZA's multi-tier binary telemetry protocol.
 

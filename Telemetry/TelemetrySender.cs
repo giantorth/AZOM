@@ -1107,6 +1107,12 @@ namespace MozaPlugin.Telemetry
             _recovery = new Lifecycle.RecoveryDispatcher(this);
             _watchdog = new SessionWatchdogManager(this);
             _slotTracker = new Display.WheelSlotTracker(this);
+            // Wire the catalog parser to HotSwitchCoordinator's arm count.
+            // This is the switch-boundary signal that gates REPLACE vs UNION
+            // in CommitLiveSet — see ChannelCatalogParser._getArmCount field
+            // docs. Every ArmBurst (host- or wheel-initiated switch) bumps
+            // the count, so even rapid-fire switches get clean boundaries.
+            _catalogParser.SetArmCountProvider(() => _hotSwitch.ArmCount);
             _propertyPushQueue = new PropertyPushQueue(this);
             _tierDefEmitter = new Frames.TierDefinitionEmitter(this);
             _inboundDispatcher = new Inbound.TelemetryInboundDispatcher(this);
@@ -1523,6 +1529,16 @@ namespace MozaPlugin.Telemetry
             _tierDefEmitter.Reset();
             _autoResolutionDone = false;
             _retransmitter.Clear();
+            // Bump the HotSwitchCoordinator arm count so the catalog parser
+            // treats the NEXT post-Start commit as a fresh-session boundary
+            // (REPLACE _liveCatalog) instead of UNIONing the new wheel
+            // session's catalog with the prior session's stale entries.
+            // Critical on disconnect/reconnect: wheel display takes ~20 s
+            // to boot after USB re-attach, so the first catalog batch from
+            // the freshly-booted display lands long after Stop+Start with
+            // no other signal we can use to detect "this is a different
+            // wheel session." The arm-count bump is the explicit boundary.
+            _hotSwitch.NotifySessionBoundary();
             // Take the seq lock so this Clear can't race a mid-flight
             // enumeration of the property-push dict. Pre-fix the unsynchronised
             // narrow window made the race invisible, but the new
@@ -2790,7 +2806,12 @@ namespace MozaPlugin.Telemetry
                         _session09OutboundSeq = seq;
                         return;
                     }
-                    _connection.Send(frame);
+                    // SendAndTrackChunk: PH bridge captures show wheel acks
+                    // sess=0x09 chunks at ~62% rate, so retransmit protection
+                    // recovers the ~38% that get dropped. configJson reply
+                    // is the source of the wheel's dashboard library list —
+                    // losing it leaves the wheel's UI showing stale entries.
+                    SendAndTrackChunk(frame);
                 }
                 _session09OutboundSeq = seq;
             }
@@ -3340,8 +3361,16 @@ namespace MozaPlugin.Telemetry
             {
                 var frames = Frames.TierDefinitionBuilder.ChunkMessage(
                     msg, session: 0x01, seq: ref _session01OutboundSeq, deviceId: _targetDeviceId);
+                // SendAndTrackChunk instead of Send: strings ride sess=0x01 just
+                // like tier-def and FF-record property pushes (PropertyPushQueue
+                // already uses Track), so a lost string chunk gets retransmitted
+                // until acked instead of waiting for the 15 s keepalive to
+                // re-send a fresh value. Wheel acks sess=0x01 chunks at 10-90%
+                // across PH bridge captures, so most strings will be acked-and-
+                // dropped from the retransmit queue on the first send; the
+                // protection only fires when one actually gets lost.
                 foreach (var f in frames)
-                    _connection.Send(f);
+                    SendAndTrackChunk(f);
             }
         }
 
@@ -3904,7 +3933,15 @@ namespace MozaPlugin.Telemetry
                 0x00
             };
             frame[9] = MozaProtocol.CalculateWireChecksum(frame);
-            _connection.Send(frame);
+            // Priority lane: acks must not get buried behind tier-def bursts in
+            // the one-shot FIFO. Wheel times out sessions whose acks lag past
+            // ~1 s and silently drops them (observed root cause of issue #43
+            // "telemetry dies after dashboard switch"): during the switch, the
+            // ~1300-frame tier-def burst stalled sess=0x02 acks behind 4ms-paced
+            // FIFO, wheel concluded sess=0x02 was dead, telemetry never recovered
+            // until full handshake reset. PH wire traces show sess=0x02 ack-lag
+            // stays ≤ 870 ms even under heavy h2b load.
+            _connection.SendPriority(frame);
         }
 
         /// <summary>

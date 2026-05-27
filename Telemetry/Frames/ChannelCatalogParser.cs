@@ -62,6 +62,27 @@ namespace MozaPlugin.Telemetry.Frames
         // at indexes 10/11/13/14 parsed as garbage even though the wire bytes
         // were clean per CRC + per-record validation.
         private readonly Dictionary<byte, int> _highestSeqAppended = new();
+        // Per-session Environment.TickCount of last successful append. Used by
+        // the stale-garbage cleanup in TryParse: when a session has buffered
+        // bytes but ZERO valid catalog records (sFull+sPrefix+sAbbr+sBackref==0)
+        // AND no new bytes have arrived for StaleGarbageThresholdMs, the
+        // buffer is non-catalog noise that the wheel sent on a catalog session
+        // and the parser has held onto forever waiting for an END marker that
+        // will never come. Observed on the issue-#43 user's bundle: 51 bytes
+        // of W13-display identity-like content landed on sess=0x02 (FlagByte)
+        // pre-capture, parser correctly rejected every record (sizeReject=3
+        // backrefFail=1 distinctIdx=0), but with no END marker the buffer
+        // sat for 208 s rejecting the same bytes on every parse pass and
+        // would have stayed indefinitely. Dropping the noise lets the next
+        // legitimate catalog burst start clean.
+        private readonly Dictionary<byte, int> _lastAppendTickMs = new();
+        // Threshold above which a no-progress session buffer is considered
+        // stale noise rather than in-flight catalog data. Set to 30 s — well
+        // above any plausible wheel inter-chunk gap during an actual catalog
+        // emission (PH bridge captures show full catalog bursts complete in
+        // under 5 s) but short enough to clean up before the buffer
+        // accumulates more garbage on top.
+        private const int StaleGarbageThresholdMs = 30_000;
         private volatile List<string>? _catalog;
         // Cached URL → 1-based idx for the current _catalog. Published
         // together with _catalog and read without locking; FindIdxByUrl is
@@ -100,6 +121,24 @@ namespace MozaPlugin.Telemetry.Frames
         private volatile List<string>? _liveCatalog;
         // END-marker value at last commit. Diagnostic only (used in log).
         private uint _committedEndMarker;
+        // Switch-boundary signal: arm-count from HotSwitchCoordinator. Every
+        // ArmBurst (host-initiated OR wheel-initiated switch) increments the
+        // counter. CommitLiveSet REPLACES _liveCatalog on the first commit
+        // observing a new arm count (real switch boundary — clears stale
+        // entries from prior dashboard), then UNIONs subsequent commits at
+        // the same arm count (multi-batch publication of the same dashboard's
+        // catalog — preserves entries across all batches in the burst).
+        //
+        // Replaces an earlier time-based gate that assumed users wouldn't
+        // switch dashboards within 10 s of each other — wrong, rapid-fire
+        // dashboard switching is a normal user pattern. Arm-count is an
+        // event-driven signal that fires exactly on real switch boundaries
+        // regardless of timing. Callback because the parser doesn't directly
+        // depend on HotSwitchCoordinator; TelemetrySender wires it at
+        // construction.
+        private Func<int>? _getArmCount;
+        private int _lastSeenArmCount = -1;
+        public void SetArmCountProvider(Func<int>? getArmCount) => _getArmCount = getArmCount;
         // Set of every markerValue that has already triggered a commit
         // since session start. Per the docs (session-02-channel-catalog.md
         // §"Back-references and END-marker generations"), the wheel emits:
@@ -251,6 +290,7 @@ namespace MozaPlugin.Telemetry.Frames
                 }
                 for (int i = 0; i < length; i++)
                     buf.Add(chunkBytes[offset + i]);
+                _lastAppendTickMs[session] = Environment.TickCount;
                 // Scan the FULL session buffer (not just the new chunk —
                 // the END marker may straddle chunk boundaries) for the
                 // most recent tag 0x06 size=4 record and capture its u32
@@ -312,6 +352,7 @@ namespace MozaPlugin.Telemetry.Frames
                 // Drop seq-dedup tracking too — fresh buffer means fresh
                 // session, retransmit memory should not bleed across.
                 _highestSeqAppended.Clear();
+                _lastAppendTickMs.Clear();
             }
             _lastParseLen = 0;
         }
@@ -350,6 +391,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _buffersBySession.Remove(sess);
                     _sessionOrder.RemoveAt(i);
                     _highestSeqAppended.Remove(sess);
+                    _lastAppendTickMs.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
                         $"[Moza] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
@@ -440,6 +482,7 @@ namespace MozaPlugin.Telemetry.Frames
             _committedEndMarker = 0;
             _committedMarkers.Clear();
             _pendingIdxs.Clear();
+            _lastSeenArmCount = -1;
         }
 
         /// <summary>Returns the total buffer length (across sessions) the last
@@ -671,6 +714,23 @@ namespace MozaPlugin.Telemetry.Frames
 
                     var targetIdxs = new HashSet<int>(_pendingIdxs);
 
+                    // Switch-boundary detection via HotSwitchCoordinator arm
+                    // count. The first commit observed after a new arm count
+                    // (a real switch event — host-initiated SwitchToProfile or
+                    // wheel-initiated slot-record) REPLACES _liveCatalog.
+                    // Subsequent commits at the same arm count UNION with
+                    // prior _liveCatalog — these are continuation batches of
+                    // the same publication burst (CS-Pro W17 sends 3-4 END
+                    // markers within ~5 s during a single switch, each carrying
+                    // a different idx subset; UNION preserves the full set).
+                    // Rapid-fire user switches each bump the arm count, so a
+                    // back-to-back A→B→C sequence correctly REPLACES on each
+                    // boundary regardless of timing.
+                    int currentArmCount = _getArmCount?.Invoke() ?? 0;
+                    bool firstSinceArm = currentArmCount != _lastSeenArmCount;
+                    bool useUnion = !firstSinceArm && _liveCatalog != null;
+                    _lastSeenArmCount = currentArmCount;
+
                     // No SetEquals dedup here: two real switches CAN produce
                     // identical idx sets with different URL content (e.g.,
                     // dash A uses idxs 1-5 with URLs {Speed, RPM, Gear, Lap,
@@ -690,7 +750,8 @@ namespace MozaPlugin.Telemetry.Frames
                     int maxIdx = 0;
                     foreach (var ix in targetIdxs) if (ix > maxIdx) maxIdx = ix;
                     int catCount = _catalog?.Count ?? 0;
-                    int size = Math.Max(maxIdx, catCount);
+                    int liveCount = useUnion ? (_liveCatalog?.Count ?? 0) : 0;
+                    int size = Math.Max(Math.Max(maxIdx, catCount), liveCount);
                     var masked = new List<string>(size);
                     for (int k = 0; k < size; k++)
                     {
@@ -704,15 +765,35 @@ namespace MozaPlugin.Telemetry.Frames
                             else
                                 masked.Add("");
                         }
+                        else if (useUnion
+                                 && _liveCatalog != null
+                                 && k < _liveCatalog.Count
+                                 && !string.IsNullOrEmpty(_liveCatalog[k]))
+                        {
+                            // Same-burst UNION: preserve idxs from prior
+                            // commits in this same publication burst (same
+                            // arm count). Wheel emits the post-switch catalog
+                            // in multiple END-marker batches; without this
+                            // union the last batch's idx subset would blank
+                            // everything else (observed CS-Pro W17 8→6→4 ch
+                            // shrinkage across a single switch's batches).
+                            masked.Add(_liveCatalog[k]);
+                        }
                         else
                         {
                             masked.Add("");
                         }
                     }
                     _liveCatalog = masked;
+                    int liveNonEmpty = 0;
+                    for (int k = 0; k < masked.Count; k++)
+                        if (!string.IsNullOrEmpty(masked[k])) liveNonEmpty++;
                     MozaLog.Debug(
                         $"[Moza] Live catalog committed: end={_committedEndMarker}→{markerValue} " +
-                        $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}}");
+                        $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}} " +
+                        (useUnion
+                            ? $"(same-burst UNION arm={currentArmCount}, total live={liveNonEmpty})"
+                            : $"(replace arm={currentArmCount})"));
                     _committedEndMarker = markerValue;
                     _committedMarkers.Add(markerValue);
                     _pendingIdxs.Clear();
@@ -865,6 +946,22 @@ namespace MozaPlugin.Telemetry.Frames
                         suffix = suffix
                             .Replace("\\t", "TyreTemp")
                             .Replace("\\P", "TyrePressure")
+                            // \b → "BrakeTemp": fourth member of the tire-corner
+                            // instrumentation family (alongside TyreTemp via \t
+                            // and TyrePressure via \P). Inferred — not directly
+                            // observed in any PH bridge capture (none of those
+                            // wheels emit BrakeTemp channels), but the issue
+                            // #43 user's broken catalog showed 4 corrupted
+                            // entries at \bRearRight / \bFrontRight / \bRearLeft
+                            // / \bFrontLeft positioned alongside the parallel
+                            // TyreTemp/TyrePressure rows for the same corners,
+                            // which is the only sensible expansion. Their
+                            // working capture had the same channels as full
+                            // "BrakeTempXxx" names, confirming the channel
+                            // family exists on the wheel side. If a future
+                            // PH capture shows \b expanding to something else,
+                            // revisit.
+                            .Replace("\\b", "BrakeTemp")
                             .Replace("{FL}", "FrontLeft")
                             .Replace("{FR}", "FrontRight")
                             .Replace("{RL}", "RearLeft")
@@ -926,6 +1023,49 @@ namespace MozaPlugin.Telemetry.Frames
                     $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
                     $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +
                     $"distinct-idx={parsed.Count}");
+            }
+
+            // Stale-garbage cleanup. Sessions that produced zero valid records
+            // (full+prefix+abbr+backref == 0) AND haven't been appended to in
+            // StaleGarbageThresholdMs are holding non-catalog noise — drop them
+            // so the parser doesn't keep emitting the same backrefFail/sizeReject
+            // counters on every pass, and so subsequent legitimate catalog
+            // chunks start from a clean buffer. Sessions that previously
+            // contributed valid records have those records preserved in
+            // _catalog, so clearing the buffer loses nothing recoverable.
+            // The pre-scan-skipped sessions (no URL/END at all) are NOT in
+            // perSessionStats, so iterate _sessionOrder directly and check
+            // staleness for any buffer with no current-pass valid records.
+            int nowTick = Environment.TickCount;
+            var validRecordsBySession = new Dictionary<byte, bool>();
+            foreach (var s in perSessionStats)
+                validRecordsBySession[s.session] = (s.full + s.prefix + s.abbr + s.backref) > 0;
+            lock (_bufferLock)
+            {
+                for (int i = _sessionOrder.Count - 1; i >= 0; i--)
+                {
+                    byte sess = _sessionOrder[i];
+                    if (!_buffersBySession.TryGetValue(sess, out var sBuf) || sBuf.Count == 0)
+                        continue;
+                    // Sessions absent from validRecordsBySession were pre-scan-
+                    // skipped (no URL/END found) — treat as "no valid records".
+                    if (validRecordsBySession.TryGetValue(sess, out bool hadValid) && hadValid)
+                        continue;
+                    if (!_lastAppendTickMs.TryGetValue(sess, out int lastAppend))
+                        continue;
+                    int ageMs = nowTick - lastAppend;
+                    if (ageMs < StaleGarbageThresholdMs)
+                        continue;
+                    int wiped = sBuf.Count;
+                    _buffersBySession.Remove(sess);
+                    _sessionOrder.RemoveAt(i);
+                    _highestSeqAppended.Remove(sess);
+                    _lastAppendTickMs.Remove(sess);
+                    MozaLog.Debug(
+                        $"[Moza] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
+                        $"({wiped}B, no valid records, last append {ageMs / 1000}s ago) — " +
+                        "wheel sent non-catalog bytes that the parser has been re-rejecting.");
+                }
             }
 
             if (parsed.Count > 0)

@@ -50,8 +50,25 @@ not just the docs.
 |---|---|---|---|
 | `76 31 2F …` (`v1/…`) | literal | URL as-is | `sFull` |
 | `01 …` | `0x01` prefix | `"v1/gameData/" + rest` | `sPrefix` |
-| `5C 31 …` (`\1…`) | `\1` abbreviation | `"v1/gameData/" + rest`, with `\t` → `TyreTemp`, `\P` → `TyrePressure`, `{FL}`/`{FR}`/`{RL}`/`{RR}` → `FrontLeft`/`FrontRight`/`RearLeft`/`RearRight` placeholder expansion | `sAbbr` |
+| `5C 31 …` (`\1…`) | `\1` abbreviation | `"v1/gameData/" + rest`, with `\t` → `TyreTemp`, `\P` → `TyrePressure`, `\b` → `BrakeTemp` (inferred, see below), `{FL}`/`{FR}`/`{RL}`/`{RR}` → `FrontLeft`/`FrontRight`/`RearLeft`/`RearRight` placeholder expansion | `sAbbr` |
 | `5C 70 …` (`\p…`) | `\p` abbreviation | `"v1/gameData/patch/" + rest` — used for the `patch/*` channels documented in [`../telemetry/channels.md`](../telemetry/channels.md) (`patch/TrackPositionPercent`, `patch/TrackName`, `patch/DisplayTrackName`, `patch/GameName`, etc.) | `sAbbr` |
+
+Discovery of `\b` (2026-05-26, inferred not directly observed): issue #43
+user's diagnostics bundle showed 4 corrupted catalog entries
+`v1/gameData/\bRearRight`, `\bFrontRight`, `\bRearLeft`, `\bFrontLeft` at
+adjacent indices to the corresponding `TyreTemp*` and `TyrePressure*`
+channels for the same tire corners. Same user's earlier capture had those
+channels as full-text `BrakeTempFrontLeft/Right/RearLeft/Right`, confirming
+the channel family exists on the wheel side. The wheel had emitted the
+abbreviated form `\1\b{XX}` and the parser left `\b` (5C 62) as literal
+bytes because no replacement was registered, producing the rendered
+`\bXxxx` output. Added `\b` → `BrakeTemp` to the Replace chain by
+analogy with `\t` (TyreTemp) and `\P` (TyrePressure) — same tire-corner
+instrumentation family, same encoding pattern. **No PH bridge capture
+contains either the literal `BrakeTemp` text or the `5C 62` byte
+sequence**, so this expansion is pattern-inferred rather than wire-verified.
+If a future PH capture shows `\b` expanding to a different token,
+revisit. The previous `\p` discovery follows.
 
 Discovery of `\p` (2026-05-22): on a Simple Rally Mini Dash post-switch
 emission, idx 4 carried URL body `5C 70 54 72 61 63 6B 50 6F 73 69 74 69 6F 6E 50 65 72 63 65 6E 74`

@@ -67,6 +67,16 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private int _emissionsSent;
         private int _armTickMs;
         private int _lastEmissionTickMs;
+        // Monotonic counter incremented on every ArmBurst call. Read by
+        // ChannelCatalogParser as the switch-boundary signal: any commit
+        // that observes a different arm count than the prior commit is the
+        // FIRST commit since a new switch (REPLACE _liveCatalog). Subsequent
+        // commits at the same arm count are continuation of the same
+        // publication burst (UNION). This replaces a time-based gate that
+        // failed for rapid back-to-back switches — users can click switch
+        // dashboards in succession faster than any meaningful quiet window.
+        private int _armCount;
+        public int ArmCount => Volatile.Read(ref _armCount);
 
         /// <summary>Feature flag. When false, dashboard switches cycle the
         /// full Stop+Start pipeline; when true, switches stay in this hot
@@ -90,6 +100,23 @@ namespace MozaPlugin.Telemetry.Lifecycle
             _lastEmissionTickMs = 0;
             Interlocked.Exchange(ref _emissionsSent, 0);
             Interlocked.Exchange(ref _pendingReemit, MaxEmissions);
+            Interlocked.Increment(ref _armCount);
+        }
+
+        /// <summary>
+        /// Bump the arm count without scheduling emissions. Called by
+        /// <see cref="TelemetrySender.Stop"/> so that any subsequent
+        /// catalog commit (e.g. after wheel disconnect/reconnect) is
+        /// treated as a fresh-session REPLACE boundary by the catalog
+        /// parser — without this, the wheel's first post-reconnect
+        /// catalog batch would UNION with the stale prior-session
+        /// _liveCatalog. Wheel display takes ~20 s to boot after USB
+        /// re-attach, so we can't rely on time alone to detect that the
+        /// session is fresh; the explicit boundary signal is required.
+        /// </summary>
+        public void NotifySessionBoundary()
+        {
+            Interlocked.Increment(ref _armCount);
         }
 
         /// <summary>Decide whether the tick handler should emit a tier-def

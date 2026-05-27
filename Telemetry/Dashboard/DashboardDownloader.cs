@@ -793,7 +793,11 @@ namespace MozaPlugin.Telemetry.Dashboard
                 0x00
             };
             frame[9] = MozaProtocol.CalculateWireChecksum(frame);
-            _connection.Send(frame);
+            // Priority lane: matches TelemetrySender.SendSessionAck — fc:00
+            // session acks are time-critical (wheel session timeouts ~1 s) and
+            // must not get buried behind tier-def or upload-chunk bursts in the
+            // one-shot FIFO. See MozaSerialConnection._priorityQueue.
+            _connection.SendPriority(frame);
         }
 
         /// <summary>

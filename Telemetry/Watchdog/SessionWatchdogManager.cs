@@ -21,6 +21,18 @@ namespace MozaPlugin.Telemetry.Watchdog
 
         // ── sess=0x02 engagement watchdog ─────────────────────────────────
         private long _session02FirstInboundUtcTicks;
+        // Stamped on EVERY sess=0x02 inbound chunk (not just the first).
+        // Used by TickSession02EngagementWatchdog to detect the silent-death
+        // case: wheel engaged once (set first-inbound), then went silent
+        // without an explicit type=0x00 CLOSE chunk. Without this, the
+        // watchdog gate trusted the first-inbound flag forever and never
+        // re-armed (observed root cause path on issue #43: wheel sent one
+        // sess=0x02 chunk early, set the flag, then stopped sending after
+        // a dashboard switch — watchdog stayed disarmed for the rest of the
+        // session). Stall threshold below is set well above the PH p999
+        // inter-frame gap (14 s observed across 47k samples) so healthy
+        // idle gaps never trip it.
+        private long _session02LastInboundUtcTicks;
         private int _activeStateEnteredTickCount;
         private int _s02ReArmRounds;
         private int _s02ReArmLastTickCount;
@@ -28,6 +40,13 @@ namespace MozaPlugin.Telemetry.Watchdog
             { 3_000, 5_000, 7_000, 10_000, 15_000 };
         private const int S02ReArmMaxRounds = 5;
         private const int S02InitialGraceMs = 3_000;
+        // Silent-death threshold. Engagement is treated as stale once no
+        // sess=0x02 inbound chunk has been observed within this window. Set
+        // to 20 s — PH bridge captures show p999 inter-frame gap of 14290 ms
+        // on healthy sessions across 47,352 samples, so 20 s leaves 6 s
+        // headroom past the 99.9th percentile of legitimate quiet intervals
+        // before re-arming (which sends a disruptive close+open+resubscribe).
+        private const int S02StallThresholdMs = 20_000;
 
         // ── sess=0x01 (mgmt) engagement watchdog ──────────────────────────
         // Symmetric to the sess=0x02 watchdog. ProbeAndOpenSessions emits
@@ -57,12 +76,27 @@ namespace MozaPlugin.Telemetry.Watchdog
         // the wheel has genuinely failed to engage on its own. Slower
         // (>20 s) hardware falls into the re-arm path as before.
         private long _session01EngagedUtcTicks;
+        // Stamped on EVERY sess=0x01 engagement signal (fc:00 ack OR 7c:00
+        // data chunk), parallel to _session02LastInboundUtcTicks. Catches the
+        // silent-death case the engaged-flag-only check missed: wheel acked
+        // sess=0x01 once early on, set the engaged flag, then went silent
+        // post-switch without an explicit CLOSE — watchdog stayed disarmed
+        // forever even though no fresh ack or data had arrived. Issue #43
+        // user's bundle showed zero sess=0x01 inbound activity across the
+        // entire 2-minute wire capture despite the engaged flag being set
+        // from pre-capture traffic. Same fix pattern as sess=0x02.
+        private long _session01LastInboundUtcTicks;
         private int _s01ReArmRounds;
         private int _s01ReArmLastTickCount;
         private static readonly int[] S01ReArmBackoffMs =
             { 5_000, 7_000, 10_000, 15_000, 20_000 };
         private const int S01ReArmMaxRounds = 5;
         private const int S01InitialGraceMs = 20_000;
+        // Silent-death threshold on sess=0x01. PH bridge captures show p999
+        // inter-frame gap of 4913 ms across 31,829 b2h sess=0x01 samples
+        // (acks + data combined), so 20 s leaves >4× headroom past the
+        // 99.9th percentile of legitimate quiet intervals on healthy wheels.
+        private const int S01StallThresholdMs = 20_000;
 
         // ── wheel-initiated CLOSE storm tracking ──────────────────────────
         // The wheel may emit `c3 71 7c 00 <sess> 00 <seq>` (type=0x00, close)
@@ -148,20 +182,31 @@ namespace MozaPlugin.Telemetry.Watchdog
 
         // ───── Notification API (called by sender/inbound dispatch) ───────
 
-        /// <summary>Called when sess=FlagByte (0x02) receives its first inbound chunk.</summary>
+        /// <summary>Called for every sess=FlagByte (0x02) inbound chunk.
+        /// Stamps the first-inbound time once (engagement) and the
+        /// last-inbound time every call (used by stall detection to revoke
+        /// engagement when the wheel silently stops sending without an
+        /// explicit CLOSE).</summary>
         public void NoteSession02FirstInbound()
         {
+            long now = DateTime.UtcNow.Ticks;
             if (_session02FirstInboundUtcTicks == 0)
-                _session02FirstInboundUtcTicks = DateTime.UtcNow.Ticks;
+                _session02FirstInboundUtcTicks = now;
+            _session02LastInboundUtcTicks = now;
         }
 
         /// <summary>Called when sess=MgmtPort receives an fc:00 ack or any 7c:00
         /// data chunk. Either is sufficient proof the mgmt session is alive on
-        /// the wheel side. Idempotent — first hit arms, subsequent are no-ops.</summary>
+        /// the wheel side. Stamps the first-engaged time once (latched) and
+        /// the last-inbound time every call — the latter feeds stall detection
+        /// so the watchdog can re-arm if the wheel goes silent post-engagement
+        /// without sending an explicit CLOSE.</summary>
         public void NoteSession01Engaged()
         {
+            long now = DateTime.UtcNow.Ticks;
             if (_session01EngagedUtcTicks == 0)
-                _session01EngagedUtcTicks = DateTime.UtcNow.Ticks;
+                _session01EngagedUtcTicks = now;
+            _session01LastInboundUtcTicks = now;
         }
 
         /// <summary>Called from the inbound dispatcher when the wheel sends a
@@ -198,6 +243,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (session == _sender.MgmtPort && _session01EngagedUtcTicks != 0)
             {
                 _session01EngagedUtcTicks = 0;
+                _session01LastInboundUtcTicks = 0;
                 MozaLog.Debug(
                     $"[Moza] sess=0x{session:X2} engagement revoked due to " +
                     "wheel-initiated CLOSE — engagement watchdog will re-arm.");
@@ -207,6 +253,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (session == _sender.FlagByte && _session02FirstInboundUtcTicks != 0)
             {
                 _session02FirstInboundUtcTicks = 0;
+                _session02LastInboundUtcTicks = 0;
                 MozaLog.Debug(
                     $"[Moza] sess=0x{session:X2} (telem) first-inbound flag " +
                     "revoked due to wheel-initiated CLOSE.");
@@ -285,10 +332,12 @@ namespace MozaPlugin.Telemetry.Watchdog
             _s09RetryRounds = 0;
             _s09RetryLastTickCount = 0;
             _session02FirstInboundUtcTicks = 0;
+            _session02LastInboundUtcTicks = 0;
             _activeStateEnteredTickCount = 0;
             _s02ReArmRounds = 0;
             _s02ReArmLastTickCount = 0;
             _session01EngagedUtcTicks = 0;
+            _session01LastInboundUtcTicks = 0;
             _s01ReArmRounds = 0;
             _s01ReArmLastTickCount = 0;
             _configJsonGapCount = 0;
@@ -477,7 +526,30 @@ namespace MozaPlugin.Telemetry.Watchdog
         {
             if (!_sender.StateIsActive) return;
             if (!_sender.ConnectionIsConnected) return;
-            if (_session02FirstInboundUtcTicks != 0) return;
+            // Engagement gate: previously checked only "ever-seen inbound",
+            // which latched true forever after the first chunk and prevented
+            // re-arming when the wheel silently went quiet post-switch (issue
+            // #43 root cause path). Now ALSO checks that recent inbound is
+            // present — engaged-but-stalled triggers re-arm so a silent-death
+            // session gets a close+open+resubscribe cycle instead of hanging
+            // forever. The 20 s threshold sits above the PH p999 inter-frame
+            // gap (14 s on 47k samples) so it never trips healthy idle wheels.
+            if (_session02FirstInboundUtcTicks != 0)
+            {
+                long nowUtc = DateTime.UtcNow.Ticks;
+                long stallTicks = TimeSpan.FromMilliseconds(S02StallThresholdMs).Ticks;
+                if (nowUtc - _session02LastInboundUtcTicks < stallTicks) return;
+                // Stale: revoke engagement, reset re-arm counter so backoff
+                // restarts from round 0. The watchdog's existing close+open+
+                // resubscribe sequence below then runs as if we never engaged.
+                MozaLog.Warn(
+                    $"[Moza] sess=0x02 engaged but inbound stale " +
+                    $"({(nowUtc - _session02LastInboundUtcTicks) / TimeSpan.TicksPerMillisecond} ms " +
+                    $"since last chunk, threshold {S02StallThresholdMs} ms) — " +
+                    "revoking engagement to allow watchdog re-arm.");
+                _session02FirstInboundUtcTicks = 0;
+                _s02ReArmRounds = 0;
+            }
             if (_s02ReArmRounds >= S02ReArmMaxRounds) return;
             // Defensive: skip silently if a tick fires before NoteActiveStateEntered.
             if (_activeStateEnteredTickCount == 0) return;
@@ -537,7 +609,23 @@ namespace MozaPlugin.Telemetry.Watchdog
         {
             if (!_sender.StateIsActive) return;
             if (!_sender.ConnectionIsConnected) return;
-            if (_session01EngagedUtcTicks != 0) return;
+            // Engagement gate with stall detection: same fix as
+            // TickSession02EngagementWatchdog. If engaged but recent inbound
+            // is older than S01StallThresholdMs, revoke engagement so the
+            // watchdog re-arms instead of trusting a stale engaged flag.
+            if (_session01EngagedUtcTicks != 0)
+            {
+                long nowUtc = DateTime.UtcNow.Ticks;
+                long stallTicks = TimeSpan.FromMilliseconds(S01StallThresholdMs).Ticks;
+                if (nowUtc - _session01LastInboundUtcTicks < stallTicks) return;
+                MozaLog.Warn(
+                    $"[Moza] sess=0x{_sender.MgmtPort:X2} (mgmt) engaged but inbound stale " +
+                    $"({(nowUtc - _session01LastInboundUtcTicks) / TimeSpan.TicksPerMillisecond} ms " +
+                    $"since last fc:00/data, threshold {S01StallThresholdMs} ms) — " +
+                    "revoking engagement to allow watchdog re-arm.");
+                _session01EngagedUtcTicks = 0;
+                _s01ReArmRounds = 0;
+            }
             if (_s01ReArmRounds >= S01ReArmMaxRounds) return;
             if (_activeStateEnteredTickCount == 0) return;
             // Don't fight a hot-switch burst in flight. The burst's tier-def
