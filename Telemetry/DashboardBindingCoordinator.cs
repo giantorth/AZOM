@@ -757,6 +757,15 @@ namespace MozaPlugin.Telemetry
             // We're past ActiveTelemetryEnabled, so telemetry IS enabled for this
             // wheel. Sync the sender's per-profile flag here so it's correct even
             // when an earlier ApplyProfile fired before the wheel GUID resolved.
+            // Done BEFORE the FramesSent short-circuit because the canonical
+            // recovery scenario is: persistent sender running (FramesSent>0)
+            // with ProfileTelemetryEnabled=false from a race during plugin
+            // hot-reload. The old order returned at FramesSent>0 before this
+            // flag flipped, leaving emission permanently suppressed until the
+            // user manually re-enabled — exactly the 2026-05-27 CS-Pro bundle
+            // symptom. Setting it here makes the persistent-sender path heal
+            // itself on the next wheel-detect tick instead of needing user
+            // intervention.
             t.ProfileTelemetryEnabled = true;
 
             // Already running — don't restart.

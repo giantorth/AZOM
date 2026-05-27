@@ -660,6 +660,14 @@ namespace MozaPlugin.Telemetry
         // alongside _gameRunning, so a disabled profile suppresses live
         // emission while the timer keeps running.
         private volatile bool _profileTelemetryEnabled = true;
+        // Tick of last "value-frame emission suppressed because telemetry is
+        // disabled for the active overlay" reminder log. Driven by
+        // TickEmitValueFrames so users with a disabled overlay see in
+        // SimHub.txt (INFO level) that the dash isn't updating BECAUSE of
+        // the per-overlay toggle, not because the plugin is broken. Reminder
+        // fires every SuppressedReminderMs while the gate stays closed.
+        private int _profileTelemetryDisabledLastReminderTickMs;
+        private const int SuppressedReminderMs = 30_000;
         public bool ProfileTelemetryEnabled
         {
             get => _profileTelemetryEnabled;
@@ -668,7 +676,33 @@ namespace MozaPlugin.Telemetry
                 if (_profileTelemetryEnabled != value)
                 {
                     _profileTelemetryEnabled = value;
-                    MozaLog.Debug($"[Moza] ProfileTelemetryEnabled changed to {value}");
+                    // INFO level so the transition lands in SimHub.txt by
+                    // default — users debugging "my dash stopped updating
+                    // after I changed profiles" need to see this without
+                    // having to enable DEBUG logging. The per-overlay
+                    // telemetry-enable bit defaults to false for any overlay
+                    // that hasn't had the toggle flipped on, so switching
+                    // SimHub profiles can silently kill emission. Observed
+                    // 2026-05-27 CS-Pro bundle: user switched profiles, dash
+                    // froze, fixed it by toggling telemetry back on.
+                    if (value)
+                    {
+                        MozaLog.Info("[Moza] Wheel telemetry enabled — resuming value-frame emission");
+                        // Reset reminder window so the next disable-cycle's
+                        // first reminder doesn't fire instantly.
+                        _profileTelemetryDisabledLastReminderTickMs = 0;
+                    }
+                    else
+                    {
+                        MozaLog.Info(
+                            "[Moza] Wheel telemetry DISABLED for the active SimHub overlay — " +
+                            "value frames will be suppressed until you toggle telemetry on for this overlay. " +
+                            "Wheel-side keepalives continue but the dashboard will not update.");
+                        // Stamp NOW so the periodic reminder doesn't fire
+                        // before SuppressedReminderMs has elapsed since the
+                        // disable event itself.
+                        _profileTelemetryDisabledLastReminderTickMs = Environment.TickCount;
+                    }
                 }
             }
         }
@@ -3210,7 +3244,24 @@ namespace MozaPlugin.Telemetry
             // telemetry; TestMode override re-enables emission so the user
             // can verify wheel rendering.
             if (!TestMode && !_profileTelemetryEnabled)
+            {
+                // Periodic reminder so the user sees in SimHub.txt that
+                // value frames are being suppressed BECAUSE of the per-
+                // overlay toggle, not a plugin malfunction. The transition
+                // log fires once on the disable event but is easily missed
+                // if the user goes back to investigate minutes later;
+                // 30-second cadence keeps the log honest without spamming.
+                int nowTickMs = Environment.TickCount;
+                if (nowTickMs - _profileTelemetryDisabledLastReminderTickMs >= SuppressedReminderMs)
+                {
+                    _profileTelemetryDisabledLastReminderTickMs = nowTickMs;
+                    MozaLog.Info(
+                        "[Moza] Wheel telemetry is disabled for the active SimHub overlay " +
+                        "(value-frame emission suppressed). Toggle telemetry on for this overlay " +
+                        "to resume dashboard updates.");
+                }
                 return;
+            }
 
             byte subFlagBase = _activeSubscription?.FlagBase ?? 0;
             for (int i = 0; i < tiers.Length; i++)

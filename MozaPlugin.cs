@@ -3258,24 +3258,29 @@ namespace MozaPlugin
                 }
             }
 
-            // Sync telemetry pipeline to the new overlay's enable state. We do NOT
-            // stop/pause the sender here — parity polls keep the wheel engaged;
-            // ProfileTelemetryEnabled gates value/string emission inside the sender.
+            // Telemetry-enable state is wheel-level, not profile-level — see
+            // the design comment on WheelTelemetryEnabledByPageGuid: "Whether
+            // telemetry runs for a wheel is a wheel-level decision; the per-
+            // game decision (which dashboard, which mzdash) stays on the
+            // profile's WheelOverride." A SimHub profile change doesn't
+            // change which physical wheel is attached, so re-evaluating
+            // ProfileTelemetryEnabled here is incorrect — the state should
+            // only change in response to user toggle (SetTelemetryEnabled)
+            // or a wheel physically attaching/detaching (StartTelemetryIfReady
+            // line 760 syncs on wheel detect; OnSerialDisconnected handles
+            // detach via Stop). The prior re-evaluation here caused a silent
+            // dash-freeze when a plugin hot-reload ran ApplyProfile before
+            // WheelDeviceExtension.Init populated WheelModelName (observed
+            // 2026-05-27 CS-Pro bundle: 3 ms race killed value-frame
+            // emission until manual re-enable).
+            //
+            // We still apply telemetry settings (dashboard mapping, mzdash
+            // resolution) and kick StartTelemetryIfReady so an inactive
+            // sender starts up — but we leave ProfileTelemetryEnabled alone.
             try
             {
-                bool wantOn = ActiveTelemetryEnabled;
-                var sender = _telemetrySender;
-                if (sender != null)
-                    sender.ProfileTelemetryEnabled = wantOn;
-                if (wantOn)
-                {
-                    ApplyTelemetrySettings();
-                    StartTelemetryIfReady();
-                }
-                else
-                {
-                    Interlocked.Exchange(ref _telemetryStartRequested, 0);
-                }
+                ApplyTelemetrySettings();
+                StartTelemetryIfReady();
             }
             catch (Exception ex)
             {
