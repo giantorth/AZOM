@@ -223,7 +223,27 @@ namespace MozaPlugin.Telemetry.Dashboard
             // a wheel firmware that opens 0x05/0x07 (KS Pro on Universal Hub)
             // gets routed for inbound chunks even before SendDashboardUpload runs.
             if (session != 0x09 && session != 0x0a)
+            {
+                byte prevActive = ActiveSession;
                 ActiveSession = session;
+                // ActiveSession change = the host's per-session reassembler
+                // (_inbox) is now pointed at a different wheel session whose
+                // seq numbering is independent of the previous one. Without
+                // this clear, _inbox carries the prior session's _lastSeq
+                // (typically 6 from the wheel's initial open burst) and the
+                // first chunk on the new session (seq=8 in the issue #43 user
+                // bundle: wheel devinited 0x07 with type=0x81 seq=7 then
+                // pushed type=0x01 seq=8) gets flagged as a forward gap
+                // (expected 7, got 8 — 57 spurious warnings across 2 minutes).
+                // The wheel's actual upload seq starts at the next chunk
+                // after its devinit OPEN, so resetting on session change
+                // lets the reassembler accept that as the new burst's first.
+                if (prevActive != session)
+                {
+                    try { _inbox.Clear(); } catch { }
+                    _inboxAckWalkOffset = 0;
+                }
+            }
         }
 
         /// <summary>Notify the coordinator of an inbound chunk on the upload

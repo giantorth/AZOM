@@ -598,14 +598,40 @@ namespace MozaPlugin.Telemetry.Frames
 
             _tierDefBlindSentRounds++;
             _tierDefBlindLastTickCount = Environment.TickCount;
+            // Selective retransmit on rounds > 1: skip frames whose seqs are
+            // no longer in SessionRetransmitter (i.e., the wheel has already
+            // acked them). Round 1 always sends every frame because the seq
+            // tracker is freshly populated and acks haven't arrived yet.
+            // Reduces queue pressure proportional to ack rate — PH bridge
+            // captures show wheels acking 15-90% of sess=0x01 chunks, so
+            // dropping acked re-sends is a multiplicative bandwidth saving
+            // without changing behavior for unresponsive wheels (which still
+            // get the full re-send budget).
+            int sent = 0, skipped = 0;
             for (int i = 0; i < _tierDefBlindFrames.Length; i++)
             {
                 if (_sender.StateIsIdle || !_sender.ConnectionIsConnected) break;
-                _sender.SendRawFrame(_tierDefBlindFrames[i]);
+                var frame = _tierDefBlindFrames[i];
+                if (frame == null) continue;
+                if (_tierDefBlindSentRounds > 1 && frame.Length >= 10)
+                {
+                    byte sess = frame[6];
+                    int seq = frame[8] | (frame[9] << 8);
+                    if (!_sender.Retransmitter.Contains(sess, seq))
+                    {
+                        // Already acked — don't waste a slot in the priority-
+                        // free one-shot lane.
+                        skipped++;
+                        continue;
+                    }
+                }
+                _sender.SendRawFrame(frame);
+                sent++;
             }
             MozaLog.Debug(
                 $"[Moza] Blind retransmit round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
-                $"({_tierDefBlindFrames.Length} chunks, next gate {gateMs}ms)");
+                $"({sent}/{_tierDefBlindFrames.Length} chunks sent, {skipped} already acked, " +
+                $"next gate {gateMs}ms)");
             if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)
                 _tierDefBlindFrames = null;
         }

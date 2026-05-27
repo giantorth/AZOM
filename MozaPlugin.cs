@@ -119,6 +119,21 @@ namespace MozaPlugin
         private Timer _pollTimer = null!;
         private Timer _retryTimer = null!;
         private Timer _reconnectTimer = null!;
+        // Hub-probe back-off: the hub-port1-power read (cmd=100 / 0x64) is the
+        // only way to distinguish a Universal Hub from the wheelbase main
+        // controller (they share device id 0x12), so we have to probe it. But
+        // the probe got sent every 5 s status-poll tick forever when no Hub
+        // was present, and the wheelbase firmware logs an "Unexpected cmd: 100"
+        // warning for each one — 52 warnings in 4 minutes on the issue #43
+        // user's bundle, who has no Hub. Throttle: aggressive for the first
+        // 30 s after first probe (covers Hub-present-from-start within poll
+        // cadence), then back off to once per 60 s (covers hot-plug within
+        // ~60 s of attaching). Both timestamps in Environment.TickCount; 0 =
+        // "not yet probed".
+        private int _hubProbeFirstTickMs;
+        private int _hubProbeLastTickMs;
+        private const int HubProbeAggressiveMs = 30_000;
+        private const int HubProbeBackoffMs = 60_000;
         private int _connectingFlag;
         private MozaHidReader _hidReader = null!;
         private PluginManager _pluginManager = null!;
@@ -2356,7 +2371,34 @@ namespace MozaPlugin
             if (!DetectionState.PedalsDetected)
                 _deviceManager.SendPresenceProbe(MozaProtocol.DevicePedals);
             if (!DetectionState.HubDetected)
-                _deviceManager.ReadSetting("hub-port1-power");
+            {
+                int now = Environment.TickCount;
+                bool shouldProbe;
+                if (_hubProbeFirstTickMs == 0)
+                {
+                    // First probe ever — fire and start the aggressive window.
+                    _hubProbeFirstTickMs = now;
+                    shouldProbe = true;
+                }
+                else if ((now - _hubProbeFirstTickMs) < HubProbeAggressiveMs)
+                {
+                    // Inside the aggressive window: probe every poll tick.
+                    shouldProbe = true;
+                }
+                else
+                {
+                    // Past the aggressive window: probe at most once per
+                    // HubProbeBackoffMs so wheelbase firmware stops logging
+                    // "Unexpected cmd: 100" warnings on every tick. Hot-plug
+                    // detection latency capped at HubProbeBackoffMs.
+                    shouldProbe = (now - _hubProbeLastTickMs) >= HubProbeBackoffMs;
+                }
+                if (shouldProbe)
+                {
+                    _hubProbeLastTickMs = now;
+                    _deviceManager.ReadSetting("hub-port1-power");
+                }
+            }
 
             // Re-probe display sub-device until fully identified — initial probe
             // can race power-up and return only partial identity. Skip for wheels
