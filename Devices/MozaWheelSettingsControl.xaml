@@ -130,7 +130,8 @@
         <!-- Capability-driven tabs (matches the new plugin-pane tab styling:
              cyan underline on active, transparent header strip). -->
         <TabControl x:Name="WheelTabs" Style="{StaticResource MozaTabControl}"
-                    Margin="0,4,0,0">
+                    Margin="0,4,0,0"
+                    SelectionChanged="WheelTabs_SelectionChanged">
 
             <!-- ==================== INPUTS TAB ==================== -->
             <!-- Migrated from plugin-pane WheelTab in Phase 6. Handlers forward to

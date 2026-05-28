@@ -248,6 +248,15 @@ namespace MozaPlugin
         /// </summary>
         internal void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, Devices.LedKind kind)
             => _hardwareApplier.WriteLedColorIfWheelDetected(command, r, g, b, kind);
+        /// <summary>
+        /// Re-push the stored static palette for an LED group from MozaData to
+        /// the wheel's EEPROM. Called from the per-group mode combo handlers on
+        /// transition to Static (val=2) to bring EEPROM back in sync with any
+        /// edits the user made while the group was in SimHub mode (those edits
+        /// land in _data + overlay but the wheel write is suppressed by the
+        /// per-group gate in WriteLedColorIfWheelDetected).
+        /// </summary>
+        internal void RepushStaticPalette(Devices.LedKind kind) => _hardwareApplier.RepushStaticPalette(kind);
         internal void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings) => _hardwareApplier.ApplyDashExtensionSettings(extSettings);
         internal void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings) => _hardwareApplier.ApplyBaseExtensionSettings(extSettings);
         internal void ClearLedsOnHardware() => _hardwareApplier.ClearLedsOnHardware();
@@ -2460,20 +2469,21 @@ namespace MozaPlugin
                 }
             }
 
-            // Read Group 3 ring LED colors once after group detected + model resolved
+            // Group 3 (knob ring) brightness read once after group detected +
+            // model resolved. The per-LED ring COLORS (wheel-knob-bg-color{N})
+            // are no longer read on the PollStatus path — they're driven by
+            // tab activation in MozaWheelSettingsControl.WheelTabs_SelectionChanged
+            // (gated on WheelKnobLedMode == 2 / Static), same policy as the
+            // RPM and Button color reads. Brightness is a single non-color
+            // status read, kept here as part of capability discovery.
             if (!DetectionState.Group3ColorsRead && DetectionState.NewWheelDetected && IsWheelLedGroupPresent(3))
             {
                 var model = WheelModelInfo;
                 if (model?.KnobRingLeds != null && model.KnobRingLedTotal > 0)
                 {
                     DetectionState.Group3ColorsRead = true;
-                    int total = model.KnobRingLedTotal;
-                    var cmds = new string[total + 1];
-                    cmds[0] = "wheel-knob-brightness";
-                    for (int i = 0; i < total; i++)
-                        cmds[i + 1] = $"wheel-knob-bg-color{i + 1}";
-                    _deviceManager.ReadSettingsPaced(cmds);
-                    MozaLog.Debug($"[Moza] Reading knob ring LED colors ({total} LEDs)");
+                    _deviceManager.ReadSetting("wheel-knob-brightness");
+                    MozaLog.Debug($"[Moza] Read knob ring brightness (color reads deferred to Knobs-tab activation)");
                 }
             }
 
@@ -3110,26 +3120,44 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Firmware era for the current wheel page. Returns Auto when wheel
-        /// not identified — the auto-resolver picks from the wheel's response.
+        /// Firmware era for the current wheel page. Reads the per-page-GUID
+        /// override for the connected wheel; when no wheel has identified yet
+        /// (UI opened before hardware came up), falls back to the
+        /// <see cref="MozaDeviceConstants.WheelGenericGuid"/> bucket so the
+        /// user's pick made before the wheel was visible still applies.
+        /// Returns <see cref="MozaWheelEra.Auto"/> only when neither bucket
+        /// holds an explicit value.
         /// </summary>
         internal MozaWheelEra ActiveTelemetryWheelEra
         {
             get
             {
+                if (_settings?.WheelTelemetryEraByPageGuid == null) return MozaWheelEra.Auto;
                 var g = GetCurrentWheelPageGuid();
-                if (!g.HasValue || _settings?.WheelTelemetryEraByPageGuid == null) return MozaWheelEra.Auto;
-                if (!_settings.WheelTelemetryEraByPageGuid.TryGetValue(g.Value, out var v) || v < 0)
-                    return MozaWheelEra.Auto;
-                return (MozaWheelEra)v;
+                if (g.HasValue
+                    && _settings.WheelTelemetryEraByPageGuid.TryGetValue(g.Value, out var v)
+                    && v >= 0)
+                    return (MozaWheelEra)v;
+                if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic)
+                    && _settings.WheelTelemetryEraByPageGuid.TryGetValue(generic, out var gv)
+                    && gv >= 0)
+                    return (MozaWheelEra)gv;
+                return MozaWheelEra.Auto;
             }
             set
             {
-                var g = GetCurrentWheelPageGuid();
-                if (!g.HasValue) return;
                 if (_settings == null) return;
                 if (_settings.WheelTelemetryEraByPageGuid == null)
                     _settings.WheelTelemetryEraByPageGuid = new Dictionary<Guid, int>();
+                // Specific wheel identified → write the per-wheel override.
+                // Otherwise stash under WheelGenericGuid so the user's pick
+                // survives until the wheel shows up; the getter falls back
+                // to this bucket when the per-wheel entry is missing.
+                var g = GetCurrentWheelPageGuid();
+                if (!g.HasValue
+                    && Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic))
+                    g = generic;
+                if (!g.HasValue) return;
                 _settings.WheelTelemetryEraByPageGuid[g.Value] = (int)value;
             }
         }
@@ -3258,24 +3286,29 @@ namespace MozaPlugin
                 }
             }
 
-            // Sync telemetry pipeline to the new overlay's enable state. We do NOT
-            // stop/pause the sender here — parity polls keep the wheel engaged;
-            // ProfileTelemetryEnabled gates value/string emission inside the sender.
+            // Telemetry-enable state is wheel-level, not profile-level — see
+            // the design comment on WheelTelemetryEnabledByPageGuid: "Whether
+            // telemetry runs for a wheel is a wheel-level decision; the per-
+            // game decision (which dashboard, which mzdash) stays on the
+            // profile's WheelOverride." A SimHub profile change doesn't
+            // change which physical wheel is attached, so re-evaluating
+            // ProfileTelemetryEnabled here is incorrect — the state should
+            // only change in response to user toggle (SetTelemetryEnabled)
+            // or a wheel physically attaching/detaching (StartTelemetryIfReady
+            // line 760 syncs on wheel detect; OnSerialDisconnected handles
+            // detach via Stop). The prior re-evaluation here caused a silent
+            // dash-freeze when a plugin hot-reload ran ApplyProfile before
+            // WheelDeviceExtension.Init populated WheelModelName (observed
+            // 2026-05-27 CS-Pro bundle: 3 ms race killed value-frame
+            // emission until manual re-enable).
+            //
+            // We still apply telemetry settings (dashboard mapping, mzdash
+            // resolution) and kick StartTelemetryIfReady so an inactive
+            // sender starts up — but we leave ProfileTelemetryEnabled alone.
             try
             {
-                bool wantOn = ActiveTelemetryEnabled;
-                var sender = _telemetrySender;
-                if (sender != null)
-                    sender.ProfileTelemetryEnabled = wantOn;
-                if (wantOn)
-                {
-                    ApplyTelemetrySettings();
-                    StartTelemetryIfReady();
-                }
-                else
-                {
-                    Interlocked.Exchange(ref _telemetryStartRequested, 0);
-                }
+                ApplyTelemetrySettings();
+                StartTelemetryIfReady();
             }
             catch (Exception ex)
             {

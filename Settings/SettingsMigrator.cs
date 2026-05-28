@@ -42,7 +42,6 @@ namespace MozaPlugin.Settings
                 ranV4Plus = true;
                 MigrateMzdashFolderToPerPage(profiles);
                 MigrateTelemetryEnabledToPerPage(profiles);
-                MigrateWheelEraToPerPage(profiles);
                 MigrateWheelSleepToPerPage(profiles);
                 MigrateWheelIdleToPerPage(profiles);
             }
@@ -73,30 +72,6 @@ namespace MozaPlugin.Settings
                 else
                     MozaLog.Info("[Moza] Schema v9 repair: reseeded profile baselines from flat fields where sentinel.");
                 return true;
-            }
-
-            // Drain legacy era encodings into the flat TelemetryWheelEra.
-            // Older settings stored the era via TelemetryFirmwareEraLegacy (enum)
-            // or TelemetryProtocolVersion (0=URL, 2=compact).
-            if (_settings.TelemetryWheelEra == MozaWheelEra.Auto)
-            {
-                if (_settings.TelemetryFirmwareEraLegacy >= 0)
-                {
-                    _settings.TelemetryWheelEra = _settings.TelemetryFirmwareEraLegacy switch
-                    {
-                        1 /* TierDefV2_Upload8B */ => MozaWheelEra.Era2025,
-                        2 /* TierDefV2_Upload6B */ => MozaWheelEra.Era2025,
-                        4 /* TierDefV0_Upload6B */ => MozaWheelEra.Era2024,
-                        5 /* TierDefV2_Type02   */ => MozaWheelEra.Era2026,
-                        _ /* 0 Auto or unknown  */ => MozaWheelEra.Auto,
-                    };
-                }
-                else if (_settings.TelemetryProtocolVersion != -1)
-                {
-                    _settings.TelemetryWheelEra = _settings.TelemetryProtocolVersion == 0
-                        ? MozaWheelEra.Era2024
-                        : MozaWheelEra.Era2025;
-                }
             }
 
             // Resolve "single model" for UID-keyed translation.
@@ -307,12 +282,11 @@ namespace MozaPlugin.Settings
                 }
             }
 
-            // v4..v9 step: per-wheel-page dict seeding. Re-run unconditionally —
-            // the era helper needs a second pass to pick up the value drained
-            // from TelemetryFirmwareEraLegacy / TelemetryProtocolVersion above.
+            // v4..v9 step: per-wheel-page dict seeding. Re-run unconditionally
+            // so older settings JSONs get their flat-field values hoisted into
+            // the per-page dicts.
             MigrateMzdashFolderToPerPage(profiles);
             MigrateTelemetryEnabledToPerPage(profiles);
-            MigrateWheelEraToPerPage(profiles);
             MigrateWheelSleepToPerPage(profiles);
             MigrateWheelIdleToPerPage(profiles);
 
@@ -598,59 +572,6 @@ namespace MozaPlugin.Settings
         }
 
         /// <summary>
-        /// Move <c>TelemetryWheelEra</c> from per-overlay storage onto
-        /// <see cref="MozaPluginSettings.WheelTelemetryEraByPageGuid"/>.
-        /// </summary>
-        private void MigrateWheelEraToPerPage(List<MozaProfile> profiles)
-        {
-            if (_settings == null) return;
-            if (_settings.WheelTelemetryEraByPageGuid == null)
-                _settings.WheelTelemetryEraByPageGuid = new Dictionary<Guid, int>();
-
-            foreach (var profile in profiles)
-            {
-                if (profile.WheelOverridesByPageGuid == null) continue;
-                foreach (var kvp in profile.WheelOverridesByPageGuid)
-                {
-                    var ov = kvp.Value;
-                    if (ov?.LegacyJsonFields == null) continue;
-                    if (ov.LegacyJsonFields.TryGetValue("TelemetryWheelEra", out var tok)
-                        && tok != null)
-                    {
-                        int v;
-                        try { v = tok.ToObject<int>(); }
-                        catch { v = -1; }
-                        if (v >= 0
-                            && !_settings.WheelTelemetryEraByPageGuid.ContainsKey(kvp.Key))
-                            _settings.WheelTelemetryEraByPageGuid[kvp.Key] = v;
-                    }
-                    ov.LegacyJsonFields.Remove("TelemetryWheelEra");
-                    if (ov.LegacyJsonFields.Count == 0) ov.LegacyJsonFields = null;
-                }
-            }
-
-            // Seed every known page from flat field when unset. Auto (0) is "no opinion".
-            int flatEra = (int)_settings.TelemetryWheelEra;
-            if (flatEra > 0)
-            {
-                foreach (var (prefix, _, _) in WheelModelInfo.KnownModels)
-                {
-                    var guidStr = MozaDeviceConstants.ResolveWheelGuid(prefix);
-                    if (!Guid.TryParse(guidStr, out var pageGuid)) continue;
-                    if (!_settings.WheelTelemetryEraByPageGuid.ContainsKey(pageGuid))
-                        _settings.WheelTelemetryEraByPageGuid[pageGuid] = flatEra;
-                }
-                if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var gg)
-                    && !_settings.WheelTelemetryEraByPageGuid.ContainsKey(gg))
-                    _settings.WheelTelemetryEraByPageGuid[gg] = flatEra;
-                if (Guid.TryParse(MozaDeviceConstants.WheelOldProtoGuid, out var og)
-                    && !_settings.WheelTelemetryEraByPageGuid.ContainsKey(og))
-                    _settings.WheelTelemetryEraByPageGuid[og] = flatEra;
-            }
-            _settings.TelemetryWheelEra = MozaWheelEra.Auto;
-        }
-
-        /// <summary>
         /// Move <c>TelemetryEnabled</c> from per-overlay storage onto
         /// <see cref="MozaPluginSettings.WheelTelemetryEnabledByPageGuid"/>.
         /// OR-merges across profiles.
@@ -776,8 +697,6 @@ namespace MozaPlugin.Settings
             _settings.WheelMzdashFolderByUid = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             _settings.TelemetryChannelMappingsByWheel = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.OrdinalIgnoreCase);
             _settings.TelemetryChannelMappings = null;
-            _settings.TelemetryProtocolVersion = -1;
-            _settings.TelemetryFirmwareEraLegacy = -1;
             _settings.TelemetryProfileName = "";
             _settings.TelemetryMzdashPath = "";
         }

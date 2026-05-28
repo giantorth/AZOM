@@ -219,6 +219,12 @@ namespace MozaPlugin
         // ===== Work mode =====
         public int WorkMode { get; set; } = -1;             // 0/1
 
+        // Wheelbase gear-shift vibration intensity (cmd 0x2E base, 0..5).
+        // Per-profile so each game gets its own feel. Distinct from the
+        // plugin-side coalescing tuning below (GearshiftVibrateOnNeutral /
+        // GearshiftDebounceMs) — this one controls the wheelbase's own rumble.
+        public int GearshiftVibration { get; set; } = -1;
+
         // ===== Wheel LED settings =====
         public int WheelTelemetryMode { get; set; } = -1;
         public int WheelKnobLedMode { get; set; } = -1;
@@ -370,6 +376,7 @@ namespace MozaPlugin
             GameDamper = p.GameDamper; GameFriction = p.GameFriction;
             GameInertia = p.GameInertia; GameSpring = p.GameSpring;
             WorkMode = p.WorkMode;
+            GearshiftVibration = p.GearshiftVibration;
 
             // Wheel LED
             WheelTelemetryMode = p.WheelTelemetryMode;
@@ -512,6 +519,7 @@ namespace MozaPlugin
             GameDamper = data.GameDamper; GameFriction = data.GameFriction;
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;
             WorkMode = data.WorkMode;
+            GearshiftVibration = data.GearshiftVibration;
 
             // FFB Equalizer
             Equalizer1 = data.Equalizer1; Equalizer2 = data.Equalizer2; Equalizer3 = data.Equalizer3;

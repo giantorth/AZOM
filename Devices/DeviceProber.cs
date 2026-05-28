@@ -433,8 +433,22 @@ namespace MozaPlugin.Devices
                             if (DeviceDefinitionDeployer.DeployForModel(currentModel, _connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
 
-                            // Page GUID resolvable — push the overlay-layered wheel settings.
-                            _plugin.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                            // First-sight wheel detect — fire the FULL ApplyProfile,
+                            // not just ApplyWheelToHardware. The Init-time
+                            // AutoApplyProfileOnLaunch call at MozaPlugin.InitProfileSystem
+                            // fired when no wheel was detected yet, so all the
+                            // per-section gates (NewWheelDetected, DashDetected, ...)
+                            // were false and nothing wrote. Now that the wheel is
+                            // up, re-run the full profile apply so colors / brightness
+                            // / modes / dash / base etc. all land on hardware. The
+                            // call is idempotent: Apply*ToHardware reads from the
+                            // profile + overlay, not from device-modified _data
+                            // state, so re-firing after the Init-time no-op pass
+                            // produces the same writes regardless of how much of
+                            // _data has been populated by intervening read responses.
+                            var initialProfile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+                            if (initialProfile != null)
+                                _plugin.ApplyProfile(initialProfile);
 
                             // Auto-load this wheel's mzdash folder if configured.
                             var ovFolder = _plugin.ActiveTelemetryMzdashFolder;

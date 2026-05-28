@@ -43,7 +43,6 @@ namespace MozaPlugin.Hardware
         public void ApplyWheelToHardware(MozaProfile? profile)
         {
             if (profile == null) return;
-            bool deviceLive = _data.IsConnected;
 
             var ov = _plugin.GetCurrentWheelOverlay(profile);
 
@@ -148,8 +147,21 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(knobRingColors, _data.KnobRingColors);
             if (knobRingBri >= 0) _data.KnobRingBrightness = knobRingBri;
 
-            // Hardware writes (skipped when wheel/connection isn't live).
-            if (!deviceLive) return;
+            // Hardware writes — gated per-section on the matching detection
+            // flag. NOT gated on _data.IsConnected: that's the "any device
+            // responded" proxy, which is false on a fresh MozaData (hot-reload
+            // case where _data = new MozaData() but the serial wire and the
+            // wheel's prior detection state are preserved via
+            // s_persistentConnection / s_persistentDetectionState). Gating
+            // the whole method on IsConnected meant ApplyProfile fired at
+            // Init couldn't write anything until base-mcu-temp / hub-* /
+            // dash-* echoed back to flip IsConnected, and DeviceProber's
+            // wheel-model-name handler skips its re-apply path when
+            // LastKnownWheelModel was preserved — so static-mode colors
+            // never reached the wheel on game switch. _deviceManager.WriteX
+            // already checks _connection.IsConnected and returns false on
+            // a dead wire, so per-section gates plus the connection-level
+            // check is enough.
             if (_detectionState.NewWheelDetected)
             {
                 // Capability snapshot for the active wheel. Falls back to
@@ -260,7 +272,10 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(profile.DashRpmBlinkColors, _data.DashRpmBlinkColors);
             MozaProfile.UnpackColorsInto(profile.DashFlagColors, _data.DashFlagColors);
 
-            if (!_detectionState.DashDetected || !_data.IsConnected) return;
+            // Per-section gate only — _data.IsConnected check dropped for
+            // the hot-reload-with-persistent-wire case (see ApplyWheelToHardware
+            // comment). _deviceManager.WriteX bails on a dead wire.
+            if (!_detectionState.DashDetected) return;
 
             // CM2 standalone path: route via the verified group-0x32 / dev=0x12
             // surface (`cm2-*` commands). The legacy dash-* writes at dev=0x14
@@ -387,7 +402,9 @@ namespace MozaPlugin.Hardware
             if (profile.BaseAmbientStartupColor   >= 0) UnpackPackedColor(profile.BaseAmbientStartupColor, _data.BaseAmbientStartupColor);
             if (profile.BaseAmbientShutdownColor  >= 0) UnpackPackedColor(profile.BaseAmbientShutdownColor, _data.BaseAmbientShutdownColor);
 
-            if (!_detectionState.BaseAmbientLedSupported || !_data.IsConnected) return;
+            // Per-section gate only — see ApplyWheelToHardware comment for why
+            // _data.IsConnected was dropped here.
+            if (!_detectionState.BaseAmbientLedSupported) return;
             if (profile.BaseAmbientBrightness     >= 0) _deviceManager.WriteSetting("base-ambient-brightness", profile.BaseAmbientBrightness);
             if (profile.BaseAmbientStandbyMode    >= 0) _deviceManager.WriteSetting("base-ambient-standby-mode", profile.BaseAmbientStandbyMode);
             if (profile.BaseAmbientIndicatorState >= 0) _deviceManager.WriteSetting("base-ambient-indicator-state", profile.BaseAmbientIndicatorState);
@@ -469,33 +486,129 @@ namespace MozaPlugin.Hardware
         {
             if (profile == null) return;
 
-            ApplyBaseSettingIfSet(profile.Limit, v => { _data.Limit = v; _data.MaxAngle = v; }, "base-limit", "base-max-angle");
-            ApplyBaseSettingIfSet(profile.FfbStrength, v => _data.FfbStrength = v, "base-ffb-strength");
-            ApplyBaseSettingIfSet(profile.Torque, v => _data.Torque = v, "base-torque");
-            ApplyBaseSettingIfSet(profile.Speed, v => _data.Speed = v, "base-speed");
-            ApplyBaseSettingIfSet(profile.Damper, v => _data.Damper = v, "base-damper");
-            ApplyBaseSettingIfSet(profile.Friction, v => _data.Friction = v, "base-friction");
-            ApplyBaseSettingIfSet(profile.Inertia, v => _data.Inertia = v, "base-inertia");
-            ApplyBaseSettingIfSet(profile.Spring, v => _data.Spring = v, "base-spring");
-            ApplyBaseSettingIfSet(profile.SpeedDamping, v => _data.SpeedDamping = v, "base-speed-damping");
-            ApplyBaseSettingIfSet(profile.SpeedDampingPoint, v => _data.SpeedDampingPoint = v, "base-speed-damping-point");
-            ApplyBaseSettingIfSet(profile.NaturalInertia, v => _data.NaturalInertia = v, "base-natural-inertia");
-            ApplyBaseSettingIfSet(profile.SoftLimitStiffness, v => _data.SoftLimitStiffness = v, "base-soft-limit-stiffness");
-            ApplyBaseSettingIfSet(profile.SoftLimitRetain, v => _data.SoftLimitRetain = v, "base-soft-limit-retain");
-            ApplyBaseSettingIfSet(profile.FfbReverse, v => _data.FfbReverse = v, "base-ffb-reverse");
-            ApplyBaseSettingIfSet(profile.Protection, v => _data.Protection = v, "base-protection");
-            ApplyBaseSettingIfSet(profile.GameDamper, v => _data.GameDamper = v, "main-set-damper-gain");
-            ApplyBaseSettingIfSet(profile.GameFriction, v => _data.GameFriction = v, "main-set-friction-gain");
-            ApplyBaseSettingIfSet(profile.GameInertia, v => _data.GameInertia = v, "main-set-inertia-gain");
-            ApplyBaseSettingIfSet(profile.GameSpring, v => _data.GameSpring = v, "main-set-spring-gain");
-            ApplyBaseSettingIfSet(profile.WorkMode, v => _data.WorkMode = v, "main-set-work-mode");
+            // Debug-level — fires on every game switch / wheel-detect /
+            // dashboard re-apply, which is too noisy for SimHub.txt. The
+            // in-process MozaLog ring buffer still records it so future bug
+            // reports can pull it from the Diagnostics tab export.
+            // Show both the persisted BaseDetected (the actual gate) and the
+            // volatile IsBaseConnected (which is false on the hot-reload that
+            // ate the writes before the 2026-05-27 gate fix).
+            MozaLog.Debug(
+                $"[Moza] ApplyBaseToHardware '{profile.Name}': " +
+                $"Limit={profile.Limit} ({(profile.Limit >= 0 ? (profile.Limit * 2) + "°" : "skip")}), " +
+                $"FfbStrength={profile.FfbStrength}, Torque={profile.Torque}, Speed={profile.Speed}, " +
+                $"BaseDetected={_detectionState.BaseDetected}, " +
+                $"_data.IsBaseConnected={_data.IsBaseConnected}, baseSettingsRead={_data.BaseSettingsRead}");
+
+            // Each call below is the SOLE site that names a base/motor field
+            // in this method. The helper handles the full lifecycle in one
+            // pass: sentinel→seed-from-_data (so SimHub-auto-created profiles
+            // inherit current device state instead of silently skipping the
+            // write — the 2026-05-27 "rotation angle carries over to new
+            // profile" pattern) → mirror to _data → write to the wire when
+            // BaseDetected (persisted across plugin reloads). Adding a new
+            // base/motor setting requires one line here, one line each in
+            // MozaProfile.CopyProfilePropertiesFrom and CaptureFromCurrent,
+            // and the field declaration itself — no parallel seed list to
+            // drift out of sync.
+            Apply(() => profile.Limit,              v => profile.Limit              = v,
+                  () => _data.Limit,                v => { _data.Limit = v; _data.MaxAngle = v; },
+                  "base-limit", "base-max-angle");
+            Apply(() => profile.FfbStrength,        v => profile.FfbStrength        = v,
+                  () => _data.FfbStrength,          v => _data.FfbStrength          = v,
+                  "base-ffb-strength");
+            Apply(() => profile.Torque,             v => profile.Torque             = v,
+                  () => _data.Torque,               v => _data.Torque               = v,
+                  "base-torque");
+            Apply(() => profile.Speed,              v => profile.Speed              = v,
+                  () => _data.Speed,                v => _data.Speed                = v,
+                  "base-speed");
+            Apply(() => profile.Damper,             v => profile.Damper             = v,
+                  () => _data.Damper,               v => _data.Damper               = v,
+                  "base-damper");
+            Apply(() => profile.Friction,           v => profile.Friction           = v,
+                  () => _data.Friction,             v => _data.Friction             = v,
+                  "base-friction");
+            Apply(() => profile.Inertia,            v => profile.Inertia            = v,
+                  () => _data.Inertia,              v => _data.Inertia              = v,
+                  "base-inertia");
+            Apply(() => profile.Spring,             v => profile.Spring             = v,
+                  () => _data.Spring,               v => _data.Spring               = v,
+                  "base-spring");
+            Apply(() => profile.SpeedDamping,       v => profile.SpeedDamping       = v,
+                  () => _data.SpeedDamping,         v => _data.SpeedDamping         = v,
+                  "base-speed-damping");
+            Apply(() => profile.SpeedDampingPoint,  v => profile.SpeedDampingPoint  = v,
+                  () => _data.SpeedDampingPoint,    v => _data.SpeedDampingPoint    = v,
+                  "base-speed-damping-point");
+            Apply(() => profile.NaturalInertia,     v => profile.NaturalInertia     = v,
+                  () => _data.NaturalInertia,       v => _data.NaturalInertia       = v,
+                  "base-natural-inertia");
+            Apply(() => profile.SoftLimitStiffness, v => profile.SoftLimitStiffness = v,
+                  () => _data.SoftLimitStiffness,   v => _data.SoftLimitStiffness   = v,
+                  "base-soft-limit-stiffness");
+            Apply(() => profile.SoftLimitRetain,    v => profile.SoftLimitRetain    = v,
+                  () => _data.SoftLimitRetain,      v => _data.SoftLimitRetain      = v,
+                  "base-soft-limit-retain");
+            Apply(() => profile.FfbReverse,         v => profile.FfbReverse         = v,
+                  () => _data.FfbReverse,           v => _data.FfbReverse           = v,
+                  "base-ffb-reverse");
+            Apply(() => profile.Protection,         v => profile.Protection         = v,
+                  () => _data.Protection,           v => _data.Protection           = v,
+                  "base-protection");
+            Apply(() => profile.GameDamper,         v => profile.GameDamper         = v,
+                  () => _data.GameDamper,           v => _data.GameDamper           = v,
+                  "main-set-damper-gain");
+            Apply(() => profile.GameFriction,       v => profile.GameFriction       = v,
+                  () => _data.GameFriction,         v => _data.GameFriction         = v,
+                  "main-set-friction-gain");
+            Apply(() => profile.GameInertia,        v => profile.GameInertia        = v,
+                  () => _data.GameInertia,          v => _data.GameInertia          = v,
+                  "main-set-inertia-gain");
+            Apply(() => profile.GameSpring,         v => profile.GameSpring         = v,
+                  () => _data.GameSpring,           v => _data.GameSpring           = v,
+                  "main-set-spring-gain");
+            Apply(() => profile.WorkMode,           v => profile.WorkMode           = v,
+                  () => _data.WorkMode,             v => _data.WorkMode             = v,
+                  "main-set-work-mode");
+            Apply(() => profile.GearshiftVibration, v => profile.GearshiftVibration = v,
+                  () => _data.GearshiftVibration,   v => _data.GearshiftVibration   = v,
+                  "base-gearshift-vibration");
+
+            // Local helper — does seed + mirror + write in one pass. Closes
+            // over `profile` and `_data` via the enclosing scope so callers
+            // only need to provide the field accessors and command names.
+            void Apply(
+                Func<int> profileGet, Action<int> profileSet,
+                Func<int> dataGet,    Action<int> dataSet,
+                params string[] commands)
+            {
+                int val = profileGet();
+                if (val < 0)
+                {
+                    // Profile field at sentinel — seed from current device state.
+                    // Requires BaseSettingsRead so we don't propagate uninitialized
+                    // zeros from a fresh MozaData (hot-reload before first echo).
+                    if (!_data.BaseSettingsRead) return;
+                    int seed = dataGet();
+                    if (seed < 0) return;  // _data sentinel too — nothing to apply
+                    val = seed;
+                    profileSet(val);
+                }
+                dataSet(val);
+                if (_detectionState.BaseDetected)
+                    foreach (var cmd in commands)
+                        _deviceManager.WriteSetting(cmd, val);
+            }
 
             // FFB Equalizer (sentinel = -1000): mirror always, write when live.
+            // Gate on the persisted BaseDetected (not volatile _data.IsBaseConnected)
+            // for the same reason as ApplyBaseSettingIfSet — see the comment there.
             void ApplyEq(int val, Action<int> setData, string cmd)
             {
                 if (val <= -1000) return;
                 setData(val);
-                if (_data.IsBaseConnected) _deviceManager.WriteSetting(cmd, val);
+                if (_detectionState.BaseDetected) _deviceManager.WriteSetting(cmd, val);
             }
             ApplyEq(profile.Equalizer1, v => _data.Equalizer1 = v, "base-equalizer1");
             ApplyEq(profile.Equalizer2, v => _data.Equalizer2 = v, "base-equalizer2");
@@ -510,7 +623,8 @@ namespace MozaPlugin.Hardware
             if (profile.FfbCurveY3 >= 0) _data.FfbCurveY3 = profile.FfbCurveY3;
             if (profile.FfbCurveY4 >= 0) _data.FfbCurveY4 = profile.FfbCurveY4;
             if (profile.FfbCurveY5 >= 0) _data.FfbCurveY5 = profile.FfbCurveY5;
-            if (!_data.IsBaseConnected) return;
+            // Persisted BaseDetected gate (see ApplyBaseSettingIfSet comment).
+            if (!_detectionState.BaseDetected) return;
             // X breakpoints always written when live (device doesn't persist them).
             _deviceManager.WriteSetting("base-ffb-curve-x1", 20);
             _deviceManager.WriteSetting("base-ffb-curve-x2", 40);
@@ -655,15 +769,21 @@ namespace MozaPlugin.Hardware
             if (value < 0) return;
             if (_detectionState.DashDetected) _deviceManager.WriteSetting(command, value);
         }
+        // The "base connected" gate uses the persisted DetectionState flag
+        // (set on first base-mcu-temp echo and preserved across SimHub plugin
+        // reloads via s_persistentDetectionState), not the volatile
+        // _data.IsBaseConnected — see the ApplyBaseSettingIfSet comment for
+        // the hot-reload rationale. _deviceManager.WriteSetting still bails
+        // on a dead wire, so this is correct even mid-reconnect.
         public void WriteIfBaseConnected(string command, int value)
         {
             if (value < 0) return;
-            if (_data.IsBaseConnected) _deviceManager.WriteSetting(command, value);
+            if (_detectionState.BaseDetected) _deviceManager.WriteSetting(command, value);
         }
         public void WriteFloatIfBaseConnected(string command, int value)
         {
             if (value < 0) return;
-            if (_data.IsBaseConnected) _deviceManager.WriteFloat(command, value);
+            if (_detectionState.BaseDetected) _deviceManager.WriteFloat(command, value);
         }
         public void WriteIfHandbrakeDetected(string command, int value)
         {
@@ -710,9 +830,123 @@ namespace MozaPlugin.Hardware
         public void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, LedKind kind)
         {
             if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
+
+            // Per-group SimHub-mode gate, symmetric with the read-side gate
+            // in MozaWheelSettingsControl.WheelTabs_SelectionChanged. Mode
+            // values per group (MozaData): 0=Off, 1=SimHub/telemetry-driven,
+            // 2=Static. Suppress UI-initiated static-color writes when the
+            // group is in SimHub mode — the live pipeline owns the wheel's
+            // color registers for that group, and a static write briefly
+            // clobbers the live frame buffer until the next live frame
+            // overpaints (visible 1-keepalive flicker). Caller writes to
+            // _data + persisted overlay BEFORE invoking us, so the user's
+            // intent survives — it just doesn't reach the wheel while live
+            // is rendering this group. When the user switches the group
+            // back to Static, the mode-change handler in
+            // MozaWheelSettingsControl re-pushes the stored palette so the
+            // EEPROM catches up with anything edited during SimHub mode.
+            int? groupMode = kind switch
+            {
+                LedKind.Rpm    => _data.WheelTelemetryMode,
+                LedKind.Button => _data.WheelButtonsLedMode,
+                LedKind.Knob   => _data.WheelKnobLedMode,
+                _ => (int?)null,  // Flag / None / combined: no mode tracking, write through
+            };
+            if (groupMode == 1)
+            {
+                MozaLog.Debug(
+                    $"[Moza] LED write '{command}' suppressed: group {kind} in SimHub mode " +
+                    "(live pipeline owns the frame buffer; _data and overlay updated regardless)");
+                return;
+            }
+
             _deviceManager.WriteColor(command, r, g, b);
             MozaLedDeviceManager.InvalidateLiveCacheAny(kind);
         }
+
+        /// <summary>
+        /// Re-push the stored static palette for a group from <c>_data</c> to the
+        /// wheel's EEPROM. Called from the per-group mode combo handlers when the
+        /// user transitions a group to Static mode (val=2). Required because
+        /// <see cref="WriteLedColorIfWheelDetected"/> suppresses static-color
+        /// writes while the group is in SimHub mode; the suppressed writes still
+        /// land in <c>_data</c> and the persisted overlay, but the wheel EEPROM
+        /// falls out of sync. Re-pushing on transition-to-Static brings EEPROM
+        /// back to match <c>_data</c> so the static colors the user picked while
+        /// in SimHub mode actually appear when they switch back.
+        ///
+        /// Bypasses the SimHub-mode gate intentionally: this is invoked AFTER
+        /// the mode flip, when the group is already in Static, so the gate
+        /// would allow writes anyway — going direct keeps the call independent
+        /// of any future gate changes.
+        /// </summary>
+        public void RepushStaticPalette(LedKind kind)
+        {
+            if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
+            var model = _plugin.WheelModelInfo;
+            if (model == null) return;
+
+            switch (kind)
+            {
+                case LedKind.Rpm:
+                {
+                    int count = model.RpmLedCount;
+                    if (count <= 0 || !_detectionState.IsWheelLedGroupPresent(0)) return;
+                    var src = _data.WheelRpmColors;
+                    int len = Math.Min(src.Length, count);
+                    for (int i = 0; i < len; i++)
+                    {
+                        var rgb = src[i];
+                        _deviceManager.WriteColor($"wheel-rpm-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                    }
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Rpm);
+                    break;
+                }
+                case LedKind.Button:
+                {
+                    int count = model.ButtonLedCount;
+                    if (count <= 0 || !_detectionState.IsWheelLedGroupPresent(1)) return;
+                    var src = _data.WheelButtonColors;
+                    int len = Math.Min(src.Length, count);
+                    for (int i = 0; i < len; i++)
+                    {
+                        var rgb = src[i];
+                        _deviceManager.WriteColor($"wheel-button-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                    }
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Button);
+                    break;
+                }
+                case LedKind.Knob:
+                {
+                    int knobs = model.KnobCount;
+                    if (knobs <= 0) return;
+
+                    // Per-knob "Active" LED color (cmd 0x27 ROLE=0).
+                    var prim = _data.WheelKnobPrimaryColors;
+                    int primLen = Math.Min(prim.Length, knobs);
+                    for (int i = 0; i < primLen; i++)
+                    {
+                        var rgb = prim[i];
+                        _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
+                    }
+
+                    // Per-ring-LED "background" color (cmd 0x1F 0x03 0x01).
+                    if (model.KnobRingLeds != null && _detectionState.IsWheelLedGroupPresent(3))
+                    {
+                        var bg = _data.WheelKnobBackgroundColors;
+                        int bgLen = Math.Min(bg.Length, model.KnobRingLedTotal);
+                        for (int i = 0; i < bgLen; i++)
+                        {
+                            var rgb = bg[i];
+                            _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                        }
+                    }
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);
+                    break;
+                }
+            }
+        }
+
         public void WriteColorIfDashDetected(string command, byte r, byte g, byte b)
         {
             if (_detectionState.DashDetected) _deviceManager.WriteColor(command, r, g, b);
@@ -728,17 +962,13 @@ namespace MozaPlugin.Hardware
         }
 
         // ===== Per-cluster sentinel-guarded helpers =====
-
-        public void ApplyBaseSettingIfSet(int value, Action<int> setData, params string[] commands)
-        {
-            if (value < 0) return;
-            setData(value);
-            if (_data.IsBaseConnected)
-            {
-                foreach (var cmd in commands)
-                    _deviceManager.WriteSetting(cmd, value);
-            }
-        }
+        //
+        // Base/motor settings used to live in a public ApplyBaseSettingIfSet
+        // here, called once per field from ApplyBaseToHardware alongside a
+        // parallel seed-from-_data block. Those merged into the local `Apply`
+        // helper inside ApplyBaseToHardware (one call site per field, seed +
+        // mirror + write in one pass) — single source of truth, no parallel
+        // list to drift out of sync. See the comment block above the helper.
 
         public void ApplyHandbrakeSettingIfSet(int value, Action<int> setData, string command)
         {

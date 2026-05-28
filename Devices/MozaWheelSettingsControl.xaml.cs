@@ -96,6 +96,101 @@ namespace MozaPlugin.Devices
             EnsureInputsLiveTimer();
         }
 
+        /// <summary>
+        /// Tab activation in the wheel-settings TabControl. Triggers a single
+        /// on-demand read of the LED colors for the activated tab so the swatch
+        /// row reflects the wheel's currently-stored static palette without
+        /// requiring continuous background polling.
+        ///
+        /// Replaces the prior periodic TickEmitLedStatePolls + widget-poll
+        /// color-read slots (removed 2026-05-27). Those scanned LED state at
+        /// ~1 Hz forever and produced "Unexpected cmd: 31" firmware warnings
+        /// on the Universal HUB path.
+        ///
+        /// Per-group SimHub-mode gating: each LED group (RPM / Buttons / Knobs)
+        /// has its own mode field (0=Off, 1=SimHub/telemetry-driven, 2=Static).
+        /// We fire the read when the activated tab's group is NOT in SimHub
+        /// mode — Off and Static both allow reads (EEPROM holds the configured
+        /// palette regardless of whether LEDs are physically rendering). Only
+        /// SimHub mode blocks: the live pipeline owns the wheel's frame buffer
+        /// and a static-color read during that may either return transient
+        /// telemetry colors or briefly stall the live render. The check is
+        /// intentionally per-group rather than the global
+        /// MozaLedDeviceManager.IsLiveAnywhere() flag: knob ring telemetry
+        /// being active shouldn't block reads on the RPM tab if the RPM
+        /// group itself is in Static or Off mode.
+        ///
+        /// When the read is skipped due to mode, the swatches retain whatever
+        /// the wheel-detect initial probe in DeviceProber populated plus any
+        /// explicit UI-driven writes since.
+        /// </summary>
+        private void WheelTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Filter to the WheelTabs control's own selection event — child
+            // ComboBoxes etc. also raise SelectionChanged and would otherwise
+            // re-trigger this every dropdown interaction.
+            if (!ReferenceEquals(e.OriginalSource, WheelTabs)) return;
+            if (_device == null || _plugin == null || _data == null) return;
+
+            var selected = WheelTabs.SelectedItem as TabItem;
+            if (selected == null) return;
+
+            var info = _plugin.WheelModelInfo;
+            if (info == null) return;
+
+            var cmds = new System.Collections.Generic.List<string>();
+            string groupLabel;
+            int groupMode;
+            if (ReferenceEquals(selected, RpmTab))
+            {
+                groupLabel = "RPM";
+                groupMode = _data.WheelTelemetryMode;
+                if (groupMode == 1) goto skipReadByMode;
+                for (int i = 1; i <= info.RpmLedCount; i++)
+                    cmds.Add($"wheel-rpm-color{i}");
+            }
+            else if (ReferenceEquals(selected, ButtonsTab))
+            {
+                groupLabel = "Buttons";
+                groupMode = _data.WheelButtonsLedMode;
+                if (groupMode == 1) goto skipReadByMode;
+                for (int i = 1; i <= info.ButtonLedCount; i++)
+                    cmds.Add($"wheel-button-color{i}");
+            }
+            else if (ReferenceEquals(selected, KnobsTab))
+            {
+                groupLabel = "Knobs";
+                groupMode = _data.WheelKnobLedMode;
+                if (groupMode == 1) goto skipReadByMode;
+                int knobs = Math.Min(info.KnobCount, 5);
+                for (int k = 1; k <= knobs; k++)
+                    cmds.Add($"wheel-knob{k}-active-color");
+                int ringTotal = info.KnobRingLedTotal;
+                for (int i = 1; i <= ringTotal; i++)
+                    cmds.Add($"wheel-knob-bg-color{i}");
+            }
+            else
+            {
+                return;
+            }
+
+            if (cmds.Count == 0) return;
+            MozaLog.Debug(
+                $"[Moza] Tab '{selected.Name}' activated: reading {cmds.Count} {groupLabel} LED color(s) on-demand");
+            _device.ReadSettingsPaced(cmds.ToArray());
+            return;
+
+skipReadByMode:
+            // Mode values: 0=Off, 1=SimHub, 2=Static. Block only on SimHub
+            // (live pipeline owns the wheel's color registers for this group).
+            // Off and Static both proceed — EEPROM holds the configured palette
+            // and the read is safe regardless of whether LEDs are physically
+            // rendering.
+            MozaLog.Debug(
+                $"[Moza] Tab '{selected.Name}' activated: skipping {groupLabel} LED color read " +
+                $"(group mode={groupMode} = SimHub; reads only gate-block on mode=1)");
+        }
+
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             if (ReferenceEquals(Instance, this)) Instance = null;
@@ -1044,6 +1139,10 @@ namespace MozaPlugin.Devices
             _data!.WheelTelemetryMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelTelemetryMode = val);
             _plugin.WriteIfWheelDetected("wheel-telemetry-mode", val);
+            // Transition to Static: re-push stored palette so EEPROM picks up
+            // edits the user made while the group was in SimHub mode (writes
+            // were suppressed by the per-group gate in HardwareApplier).
+            if (val == 2) _plugin.RepushStaticPalette(LedKind.Rpm);
             _plugin.SaveSettings();
         }
 
@@ -1144,6 +1243,7 @@ namespace MozaPlugin.Devices
             _data!.WheelKnobLedMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobLedMode = val);
             _plugin.WriteIfWheelDetected("wheel-knob-led-mode", val);
+            if (val == 2) _plugin.RepushStaticPalette(LedKind.Knob);
             _plugin.SaveSettings();
         }
 
@@ -1155,6 +1255,7 @@ namespace MozaPlugin.Devices
             _data!.WheelButtonsLedMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelButtonsLedMode = val);
             _plugin.WriteIfWheelDetected("wheel-buttons-led-mode", val);
+            if (val == 2) _plugin.RepushStaticPalette(LedKind.Button);
             _plugin.SaveSettings();
         }
 
