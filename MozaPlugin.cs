@@ -275,6 +275,16 @@ namespace MozaPlugin
         // AB9 host-rendered engine-vibration worker. See Devices/Ab9EngineVibrationWorker.cs.
         private Ab9EngineVibrationWorker? _ab9Worker;
 
+        // Control Mapper IVariantProvider bridge — see ControlMapper/. Registration
+        // is reflection-based against an internal SimHub API, so the bridge is wrapped
+        // in defensive guards and gated on MozaPluginSettings.EnableControlMapperVariants.
+        // Constructed in Init when the toggle is on; null otherwise.
+        private ControlMapper.ControlMapperBridge? _controlMapperBridge;
+        // Tick budget for retrying registration in DataUpdate when ControlMapperPlugin
+        // wasn't loaded yet at Init time. ~50 ticks (~0.8 s at 60 Hz). 0 = stop trying.
+        private int _controlMapperRetryTicks;
+        private const int ControlMapperRegisterRetryTickBudget = 50;
+
         // Guard against concurrent/duplicate telemetry Start() dispatch.
         // Internal so DashboardBindingCoordinator can Interlocked.* against it.
         internal int _telemetryStartRequested;
@@ -857,6 +867,27 @@ namespace MozaPlugin
                 _deviceProber = new DeviceProber(this, _connection, _deviceManager, _data, DetectionState);
                 _dashboardBindingCoordinator = new DashboardBindingCoordinator(this, _data, _connection, DetectionState);
 
+                // Control Mapper variant-provider integration. Construction is in
+                // a try/catch so a TypeLoadException from a missing/renamed SimHub
+                // internal type cannot poison plugin Init. Registration is attempted
+                // immediately; if ControlMapperPlugin isn't loaded yet, DataUpdate
+                // retries up to ControlMapperRegisterRetryTickBudget ticks.
+                if (_settings != null && _settings.EnableControlMapperVariants)
+                {
+                    try
+                    {
+                        _controlMapperBridge = new ControlMapper.ControlMapperBridge();
+                        if (!_controlMapperBridge.TryRegister(_pluginManager))
+                            _controlMapperRetryTicks = ControlMapperRegisterRetryTickBudget;
+                    }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Warn(
+                            $"[Moza] ControlMapper bridge construction failed — {ex.GetBaseException().Message}");
+                        _controlMapperBridge = null;
+                    }
+                }
+
                 // Now safe to initialize the profile system — ApplyProfile (called
                 // by AutoApplyProfile on the initially selected game's profile)
                 // delegates to _hardwareApplier which is now constructed.
@@ -1273,6 +1304,27 @@ namespace MozaPlugin
             bool engineOn = data.GameRunning && !data.GamePaused && !data.GameInMenu;
             _ab9Worker?.PostFrame(rpm, maxRpm, engineOn);
 
+            // Control Mapper variant-provider bridge: drive wheel-change detection
+            // each tick when registered; otherwise retry registration up to the
+            // tick budget (ControlMapperPlugin may not be loaded at Init time).
+            if (_controlMapperBridge != null)
+            {
+                if (_controlMapperBridge.IsRegistered)
+                {
+                    _controlMapperBridge.Poll();
+                }
+                else if (_controlMapperRetryTicks > 0 && !_controlMapperBridge.IsGivenUp)
+                {
+                    _controlMapperRetryTicks--;
+                    if (_controlMapperBridge.TryRegister(pluginManager))
+                        _controlMapperRetryTicks = 0;
+                    else if (_controlMapperRetryTicks == 0 && !_controlMapperBridge.IsGivenUp)
+                        MozaLog.Warn(
+                            "[Moza] ControlMapper bridge: ControlMapperPlugin never became available — " +
+                            "giving up retry. Variant integration disabled this session.");
+                }
+            }
+
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
             // Lock-free fast path: when no mBoosters are registered (the
@@ -1426,6 +1478,12 @@ namespace MozaPlugin
             // are disposed; the tick gates on connection state but joining here
             // keeps shutdown deterministic.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
+
+            // Remove the Control Mapper variant provider so a plugin reload
+            // (game switch) doesn't leave a dead provider in VariantHelper's
+            // list. The bridge is null when the toggle was off or construction
+            // failed in Init.
+            try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
 
             // Burst silent-slot frames + an engine-pulse OFF to stop the AB9
             // effect immediately on shutdown. Without this the firmware keeps
