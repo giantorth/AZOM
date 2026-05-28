@@ -97,6 +97,11 @@ namespace MozaPlugin.Devices
         internal static readonly (string Prefix, string FriendlyName, WheelModelInfo Info)[] KnownModels =
         {
             ("GS V2P",  "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            // Some GS V2 Pro firmware variants report the bare prefix "GS"
+            // instead of "GS V2P" (observed on RS21-D02-MC GW). Same physical
+            // layout — 10 RPM + 10 button LEDs, no display. Must come after
+            // "GS V2P" so the longer prefix matches first when present.
+            ("GS",      "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
             ("CS V2.1", "CS V2",      new WheelModelInfo(10, 6,  false, new[] { 0, 1, 3, 6, 8, 9 }, 0, hasDisplay: false)),
             // CS Pro / KS Pro expose rotary encoders with configurable background +
             // primary colors (protocol groups 0..KnobCount-1 via cmd 0x27).
