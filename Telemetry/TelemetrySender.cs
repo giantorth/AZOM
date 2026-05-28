@@ -2512,9 +2512,18 @@ namespace MozaPlugin.Telemetry
         /// tier-def + channel config, and atomically publishes the new
         /// subscription state for the telemetry tick handler.
         /// </summary>
-        /// <param name="isDashSwitch">True when switching dashboards (advance
-        /// flag counter). False for initial connect (reset to 0).</param>
-        internal void ApplySubscription(bool force)
+        /// <param name="force">When true, bypass the no-op early-out in
+        /// <see cref="MaybeSwapProfileForCatalog"/> and re-emit unconditionally.</param>
+        /// <param name="reuseFlagBase">When true and an ActiveSubscription
+        /// already exists, the new tier-def emits at the SAME flagBase as the
+        /// prior emission (and does not advance <see cref="NextFlagBase"/>).
+        /// Set by the catalog-growth re-emit path so newly-discovered URLs bind
+        /// into the existing subscription instead of starting a new one.
+        /// Also suppresses the destructive in-body clears
+        /// (<see cref="_retransmitter"/>, <see cref="_propertyPushQueue"/>,
+        /// <see cref="_subscriptionResponseChunks"/>) which would otherwise wipe
+        /// pending chunks the wheel hasn't acked yet on a same-base re-emit.</param>
+        internal void ApplySubscription(bool force, bool reuseFlagBase = false)
         {
             // First-call era resolution. Auto-mode picks Era2024/2025/2026
             // here based on the wheel's catalog push (or absence thereof) and
@@ -2537,12 +2546,19 @@ namespace MozaPlugin.Telemetry
 
             // Preamble is one-shot per session (captures: bridge-20260503-*).
             // Don't reset _tierDefPreambleSent here — session start handles it.
-            _retransmitter.Clear();
-            _propertyPushQueue.Clear();
-            lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
-            _subscriptionResponseDeadlineTicks = 0;
+            // Same-base re-emits (reuseFlagBase=true) skip these clears: the
+            // wheel's existing binding stays valid, so wiping in-flight retx
+            // entries and queued FF property pushes mid-flight would kill the
+            // blind-retx safety net for chunks already on the wire.
+            if (!reuseFlagBase)
+            {
+                _retransmitter.Clear();
+                _propertyPushQueue.Clear();
+                lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
+                _subscriptionResponseDeadlineTicks = 0;
+            }
 
-            _tierDefEmitter.SendTierDefinition();
+            _tierDefEmitter.SendTierDefinition(reuseFlagBase);
             SendChannelConfig();
 
             int chCount = 0;
@@ -3699,15 +3715,20 @@ namespace MozaPlugin.Telemetry
                 return;
             }
 
-            // Pure catalog-growth path (no hot switch pending).
+            // Pure catalog-growth path (no hot switch pending). Reuse the
+            // existing flagBase: this is not a new subscription generation,
+            // it's a binding refresh for late-arriving URLs within the same
+            // dashboard. Advancing flagBase would invalidate the wheel's
+            // existing channel bindings and silently drop subsequent value
+            // frames (dashboard freezes on last good values).
             if (idle < CatalogGrowthQuietMs) return;
             int p = _catalogCountAtLastSubscription;
             MozaLog.Debug(
                 $"[Moza] Re-applying tier-def: catalog grew {p}→{cur} " +
-                $"(idle {idle}ms ≥ {CatalogGrowthQuietMs}ms)");
+                $"(idle {idle}ms ≥ {CatalogGrowthQuietMs}ms, reusing flagBase)");
             try
             {
-                ApplySubscription(force: true);
+                ApplySubscription(force: true, reuseFlagBase: true);
                 _catalogCountAtLastSubscription = _catalogParser.Count;
             }
             catch (Exception ex)

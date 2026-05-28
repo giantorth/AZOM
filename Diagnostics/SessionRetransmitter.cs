@@ -31,6 +31,15 @@ namespace MozaPlugin.Diagnostics
         private const int InitialBackoffMs = 100;
         private const int MaxBackoffMs = 2000;
 
+        // Hard cap so a stalled session (wheel not acking) can't grow the queue
+        // unboundedly. Sized for ~4× peak realistic burst: a hot-switch + property-
+        // push storm under Grids-class profiles is ~500 unacked chunks; 2048
+        // absorbs back-to-back stalls without dropping legitimate in-flight chunks
+        // (~720 KB at ~350 B/entry). Eviction is LRU by LastSentTicks — a chunk
+        // that just got retx'd is more recently useful than one waiting on first
+        // retry, so we drop the staler entry.
+        private const int MaxQueueSize = 2048;
+
         private sealed class Pending
         {
             public byte[] Frame = Array.Empty<byte>();
@@ -49,6 +58,11 @@ namespace MozaPlugin.Diagnostics
         private int _lastWrapWarnTickCount;
         private const int SeqWrapWarnThreshold = 60000;
         private const int WrapWarnIntervalMs = 60000;
+
+        // Throttled eviction warn — same pattern as wrap warn so a backed-up
+        // session doesn't spam logs.
+        private int _lastEvictWarnTickCount;
+        private const int EvictWarnIntervalMs = 60000;
 
         public int QueueSize { get { lock (_lock) return _queue.Count; } }
 
@@ -77,6 +91,10 @@ namespace MozaPlugin.Diagnostics
             };
             bool warn = false;
             int queueSize = 0;
+            bool evictWarn = false;
+            int evictedSeq = 0;
+            byte evictedSession = 0;
+            int evictedQueueSize = 0;
             lock (_lock)
             {
                 _queue[(session, seq)] = entry;
@@ -87,11 +105,48 @@ namespace MozaPlugin.Diagnostics
                     warn = true;
                     queueSize = _queue.Count;
                 }
+
+                if (_queue.Count > MaxQueueSize)
+                {
+                    // LRU by LastSentTicks — drop the entry whose last send is
+                    // furthest in the past. A chunk that just got retx'd is more
+                    // recently useful than one waiting on first retry.
+                    (byte, int) victimKey = default;
+                    int victimTicks = int.MaxValue;
+                    bool haveVictim = false;
+                    foreach (var kv in _queue)
+                    {
+                        if (!haveVictim || kv.Value.LastSentTicks < victimTicks)
+                        {
+                            victimTicks = kv.Value.LastSentTicks;
+                            victimKey = kv.Key;
+                            haveVictim = true;
+                        }
+                    }
+                    if (haveVictim)
+                    {
+                        _queue.Remove(victimKey);
+                        evictedSession = victimKey.Item1;
+                        evictedSeq = victimKey.Item2;
+                        evictedQueueSize = _queue.Count;
+                        if (entry.LastSentTicks - _lastEvictWarnTickCount >= EvictWarnIntervalMs)
+                        {
+                            _lastEvictWarnTickCount = entry.LastSentTicks;
+                            evictWarn = true;
+                        }
+                    }
+                }
             }
             if (warn)
             {
                 global::MozaPlugin.MozaLog.Warn(
                     $"[Moza] session 0x{session:X2} seq approaching u16 wrap: {seq} (queue={queueSize})");
+            }
+            if (evictWarn)
+            {
+                global::MozaPlugin.MozaLog.Warn(
+                    $"[Moza] retransmit queue over cap {MaxQueueSize}, evicted oldest " +
+                    $"sess=0x{evictedSession:X2} seq={evictedSeq} (queue={evictedQueueSize})");
             }
         }
 
