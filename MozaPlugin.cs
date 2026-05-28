@@ -921,7 +921,9 @@ namespace MozaPlugin
                 // Reading from settings here (rather than via a callback) is
                 // fine because the flag is JSON-ignored and only set
                 // programmatically at runtime — see MozaPluginSettings.
-                _telemetrySender.EnableHotRenegotiation = _settings.EnableHotRenegotiation;
+                // _settings is assigned earlier in this method (line ~580); the
+                // null-forgiving operator silences CS8602 without a runtime check.
+                _telemetrySender.EnableHotRenegotiation = _settings!.EnableHotRenegotiation;
                 MozaLog.Info(
                     $"[Moza] Hot re-negotiation feature flag: " +
                     $"settings={_settings.EnableHotRenegotiation} " +
@@ -2684,10 +2686,17 @@ namespace MozaPlugin
                 {
                     byte grp = MozaProtocol.ToggleBit7(data[0]);
                     byte dev = MozaProtocol.SwapNibbles(data[1]);
+                    // BitConverter.ToString rejects startIndex == value.Length on
+                    // .NET Framework even when length == 0, so guard the
+                    // payload-only frames (e.g. bare `c0 71` wheel ACKs).
+                    int showLen = Math.Min(data.Length - 2, 8);
+                    string payload = showLen > 0
+                        ? BitConverter.ToString(data, 2, showLen)
+                        : "(empty)";
                     MozaLog.Debug(
                         $"[Moza] Unmatched #{_unmatched}: rawGroup=0x{data[0]:X2} group=0x{grp:X2} " +
                         $"rawDev=0x{data[1]:X2} dev={dev} len={data.Length} " +
-                        $"payload={BitConverter.ToString(data, 2, Math.Min(data.Length - 2, 8))}");
+                        $"payload={payload}");
                 }
                 return;
             }

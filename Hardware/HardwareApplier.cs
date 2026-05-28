@@ -171,9 +171,10 @@ namespace MozaPlugin.Hardware
                 var model = _plugin.WheelModelInfo ?? WheelModelInfo.Default;
                 int rpmCount = model.RpmLedCount;
                 int btnCount = model.ButtonLedCount;
-                bool hasRpm  = rpmCount > 0;
-                bool hasBtn  = btnCount > 0;
-                bool hasKnob = model.KnobCount > 0;
+                bool hasRpm        = rpmCount > 0;
+                bool hasBtn        = btnCount > 0;
+                bool hasKnob       = model.KnobCount > 0;
+                bool hasSleepLight = model.HasSleepLight;
 
                 if (telemMode      >= 0)            _deviceManager.WriteSetting("wheel-telemetry-mode", telemMode);
                 if (idleEffect     >= 0 && hasRpm)  _deviceManager.WriteSetting("wheel-telemetry-idle-effect", idleEffect);
@@ -190,12 +191,12 @@ namespace MozaPlugin.Hardware
                 if (knobIdleEffect >= 0 && knobIdleSpeed >= 0 && hasKnob)
                     _deviceManager.WriteArray("wheel-knob-idle-interval",
                         BuildIdleIntervalPayload(knobIdleEffect, knobIdleSpeed));
-                if (sleepMode    >= 0) _deviceManager.WriteSetting("wheel-idle-mode", sleepMode);
-                if (sleepTimeout >= 0) _deviceManager.WriteSetting("wheel-idle-timeout", sleepTimeout);
-                if (sleepMode >= 0 && sleepSpeed >= 0)
+                if (sleepMode    >= 0 && hasSleepLight) _deviceManager.WriteSetting("wheel-idle-mode", sleepMode);
+                if (sleepTimeout >= 0 && hasSleepLight) _deviceManager.WriteSetting("wheel-idle-timeout", sleepTimeout);
+                if (sleepMode >= 0 && sleepSpeed >= 0 && hasSleepLight)
                     _deviceManager.WriteArray("wheel-idle-speed",
                         BuildIdleIntervalPayload(sleepMode, sleepSpeed));
-                if (sleepColor != null && sleepColor.Length > 0)
+                if (sleepColor != null && sleepColor.Length > 0 && hasSleepLight)
                 {
                     var rgb = MozaProfile.UnpackColor(sleepColor[0]);
                     _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
@@ -211,7 +212,7 @@ namespace MozaPlugin.Hardware
                 WriteColorArray(buttonColors, "wheel-button-color", btnCount);
                 if (_detectionState.DashDetected)
                     WriteColorArray(flagColors, "dash-flag-color", 6);
-                if (idleColor != null && idleColor.Length > 0)
+                if (idleColor != null && idleColor.Length > 0 && hasSleepLight)
                 {
                     var rgb = MozaProfile.UnpackColor(idleColor[0]);
                     _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);

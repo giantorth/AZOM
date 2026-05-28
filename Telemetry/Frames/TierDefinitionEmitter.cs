@@ -249,7 +249,8 @@ namespace MozaPlugin.Telemetry.Frames
                     tier.Channels = fresh;
                 }
                 int bits = 0;
-                foreach (var ch in tier.Channels) bits += ch.BitWidth;
+                if (tier.Channels != null)
+                    foreach (var ch in tier.Channels) bits += ch.BitWidth;
                 tier.TotalBits = bits;
                 tier.TotalBytes = (bits + 7) / 8;
             }
