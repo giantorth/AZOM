@@ -51,6 +51,7 @@ namespace MozaPlugin.ControlMapper
         private PropertyInfo? _csmIsEnabledProp;
         private PropertyInfo? _descControllerIDProp;
         private PropertyInfo? _descVendorIDProp;
+        private PropertyInfo? _descProductIdProp;
         private PropertyInfo? _descVariantProp;
         private PropertyInfo? _stateAvailableProp;
         private bool _diagResolveAttempted;
@@ -418,9 +419,7 @@ namespace MozaPlugin.ControlMapper
                 try { desc = _csmDescriptionProp.GetValue(entry); }
                 catch { continue; }
                 if (desc == null) continue;
-                int vid = 0;
-                try { vid = Convert.ToInt32(_descVendorIDProp.GetValue(desc)); } catch { }
-                if (vid != Protocol.MozaProtocol.VendorId) continue;
+                if (!IsMozaWheelbaseOrHubDesc(desc)) continue;
                 mozaCount++;
                 string variant = (_descVariantProp.GetValue(desc) as string) ?? "<null>";
                 object? cidObj = null;
@@ -472,6 +471,7 @@ namespace MozaPlugin.ControlMapper
                 _csmIsEnabledProp = csmType.GetProperty("IsEnabled");
                 _descControllerIDProp = descType.GetProperty("ControllerID");
                 _descVendorIDProp = descType.GetProperty("VendorID");
+                _descProductIdProp = descType.GetProperty("ProductId");
                 _descVariantProp = descType.GetProperty("Variant");
                 _stateAvailableProp = stateType.GetProperty("Available");
             }
@@ -482,6 +482,32 @@ namespace MozaPlugin.ControlMapper
         }
 
         private static int GetHash(object o) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o);
+
+        /// <summary>
+        /// Returns true iff the given <c>ControllerDescription</c> represents a
+        /// MOZA wheelbase or hub — i.e. a USB endpoint that can carry a
+        /// swappable wheel. Keeps the bridge's per-mapping bookkeeping (clone-
+        /// description on Add, auto-create per variant, diag dump) narrowed to
+        /// devices that actually have a wheel variant, so MOZA pedals /
+        /// shifters / handbrakes / mBoosters / dashboards under VID 0x346E are
+        /// left alone. Matches <see cref="MozaVariantProvider.GetVariant"/>'s
+        /// own filter so the variant pipeline and the bridge agree on scope.
+        /// </summary>
+        private bool IsMozaWheelbaseOrHubDesc(object? desc)
+        {
+            if (desc == null) return false;
+            if (_descVendorIDProp == null || _descProductIdProp == null) return false;
+            int vid;
+            try { vid = Convert.ToInt32(_descVendorIDProp.GetValue(desc)); }
+            catch { return false; }
+            if (vid != Protocol.MozaProtocol.VendorId) return false;
+            int pid;
+            try { pid = Convert.ToInt32(_descProductIdProp.GetValue(desc)); }
+            catch { return false; }
+            ushort pidU = unchecked((ushort)pid);
+            return Protocol.MozaUsbIds.IsWheelbasePid(pidU)
+                || Protocol.MozaUsbIds.IsHubPid(pidU);
+        }
 
         /// <summary>
         /// If the currently-attached MOZA wheel has no matching
@@ -504,6 +530,7 @@ namespace MozaPlugin.ControlMapper
                 || _settingsControllerMappingsProp == null
                 || _csmDescriptionProp == null
                 || _descVendorIDProp == null
+                || _descProductIdProp == null
                 || _descVariantProp == null) return;
 
             // Resolve current wheel variant from the plugin's live state.
@@ -530,8 +557,7 @@ namespace MozaPlugin.ControlMapper
                 object? desc;
                 try { desc = _csmDescriptionProp.GetValue(entry); } catch { continue; }
                 if (desc == null) continue;
-                int vid; try { vid = Convert.ToInt32(_descVendorIDProp.GetValue(desc)); } catch { continue; }
-                if (vid != Protocol.MozaProtocol.VendorId) continue;
+                if (!IsMozaWheelbaseOrHubDesc(desc)) continue;
                 primaryMoza ??= entry;
                 string variant = (_descVariantProp.GetValue(desc) as string) ?? string.Empty;
                 if (string.Equals(variant, currentVariant, StringComparison.OrdinalIgnoreCase))
@@ -722,16 +748,12 @@ namespace MozaPlugin.ControlMapper
         private void DetachMozaDescription(object csm, string? currentVariant)
         {
             if (_csmDescriptionProp == null || _descVendorIDProp == null
-                || _descVariantProp == null) return;
+                || _descProductIdProp == null || _descVariantProp == null) return;
 
             object? desc;
             try { desc = _csmDescriptionProp.GetValue(csm); } catch { return; }
             if (desc == null) return;
-
-            int vid;
-            try { vid = Convert.ToInt32(_descVendorIDProp.GetValue(desc)); }
-            catch { return; }
-            if (vid != Protocol.MozaProtocol.VendorId) return;
+            if (!IsMozaWheelbaseOrHubDesc(desc)) return;
 
             // Build an independent clone of the description.
             Type descType = desc.GetType();
