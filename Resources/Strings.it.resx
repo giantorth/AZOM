@@ -18,6 +18,7 @@
   <data name="TabHeader_Upload" xml:space="preserve"><value>Caricamento</value></data>
   <data name="TabHeader_WheelFiles" xml:space="preserve"><value>File Volante</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="TabHeader_Import" xml:space="preserve"><value>Importa</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Informazioni</value></data>
   <data name="Brand_Unofficial" xml:space="preserve"><value>NON UFFICIALE</value></data>
   <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>

@@ -100,6 +100,16 @@ namespace MozaPlugin
             InitRedesignControls();
             InitSdkTab();
             InitLanguageCombo();
+
+            // Inline PitHouse import wizard (Import tab). Instantiated here
+            // rather than as a named XAML element because a generated typed
+            // field of MozaPlugin.UI.Import.* collides with the MozaPlugin
+            // class name. Hand it the plugin and route Apply to ApplyImportPlan.
+            var importControl = new UI.Import.PitHouseImportControl();
+            importControl.Initialize(_plugin);
+            importControl.ApplyRequested += ApplyImportPlan;
+            ImportTab.Content = importControl;
+
             Instance = this;
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };

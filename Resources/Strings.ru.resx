@@ -15,6 +15,7 @@
   <data name="TabHeader_Upload" xml:space="preserve"><value>Загрузка</value></data>
   <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Файлы руля</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="TabHeader_Import" xml:space="preserve"><value>Импорт</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>О программе</value></data>
   <data name="Brand_Unofficial" xml:space="preserve"><value>НЕОФИЦИАЛЬНО</value></data>
   <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>

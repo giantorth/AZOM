@@ -72,6 +72,7 @@ namespace MozaPlugin.Resources
         public static string TabHeader_Upload => Get("TabHeader_Upload");
         public static string TabHeader_WheelFiles => Get("TabHeader_WheelFiles");
         public static string TabHeader_Sdk => Get("TabHeader_Sdk");
+        public static string TabHeader_Import => Get("TabHeader_Import");
         public static string TabHeader_About => Get("TabHeader_About");
         public static string Brand_Unofficial => Get("Brand_Unofficial");
         public static string Brand_Moza => Get("Brand_Moza");

@@ -262,17 +262,12 @@
                 <Button Grid.Column="3" x:Name="RefreshButton" Content="{x:Static res:Strings.Button_Refresh}"
                         Click="RefreshButton_Click" VerticalAlignment="Center"/>
 
-                <!-- Right-aligned group: Import button + Profile selector. Both
-                     sit at the far right edge of the top bar so the Import
-                     button is adjacent to the dropdown it targets. -->
+                <!-- Right-aligned profile selector. Preset import now lives in
+                     its own "Import" tab, so the top bar carries just the
+                     active-profile dropdown here. -->
                 <StackPanel Grid.Column="4" Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
-                    <Button x:Name="ImportProfileButton"
-                            Content="{x:Static res:Strings.Button_ImportProfile}"
-                            Click="ImportProfileButton_Click"
-                            Margin="0,0,12,0"
-                            VerticalAlignment="Center"/>
                     <profilescommon:ProfileList x:Name="ProfileListControl"
                                                 VerticalAlignment="Center"/>
                 </StackPanel>
@@ -2295,6 +2290,13 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+
+            <!-- ==================== IMPORT TAB ==================== -->
+            <!-- Content is the PitHouseImportControl, instantiated in code-behind
+                 and assigned to ImportTab.Content. Done in code rather than as a
+                 named XAML element because a generated typed field of
+                 MozaPlugin.UI.Import.* collides with the MozaPlugin class name. -->
+            <TabItem x:Name="ImportTab" Header="{x:Static res:Strings.TabHeader_Import}"/>
 
             <TabItem Header="{x:Static res:Strings.TabHeader_About}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">

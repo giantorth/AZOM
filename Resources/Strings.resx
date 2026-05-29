@@ -22,6 +22,7 @@
   <data name="TabHeader_Upload" xml:space="preserve"><value>Upload</value></data>
   <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Wheel Files</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
   <data name="Brand_Unofficial" xml:space="preserve"><value>UNOFFICIAL</value></data>
   <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>

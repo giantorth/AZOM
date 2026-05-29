@@ -1,43 +1,18 @@
 using System;
-using System.Windows;
 using MozaPlugin.UI.Import;
-using MozaPlugin.Resources;
 
 namespace MozaPlugin
 {
     /// <summary>
     /// Partial-class continuation of <see cref="SettingsControl"/> that holds
-    /// the "Import Profile" button click handler. Pops a
-    /// <see cref="PitHouseImportDialog"/>, then on user OK merges the chosen
-    /// PitHouse preset into the active <see cref="MozaProfile"/> and pushes
-    /// to live hardware via the existing apply path.
+    /// the import-apply path. The Import tab hosts a
+    /// <see cref="PitHouseImportControl"/> which raises ApplyRequested with the
+    /// chosen plan; <see cref="ApplyImportPlan"/> merges the PitHouse preset
+    /// into the active <see cref="MozaProfile"/> and pushes to live hardware via
+    /// the existing apply path.
     /// </summary>
     public partial class SettingsControl
     {
-        private void ImportProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var dlg = new PitHouseImportDialog(_plugin)
-                {
-                    Owner = Window.GetWindow(this),
-                };
-                bool? result = dlg.ShowDialog();
-                if (result != true || dlg.Plan == null) return;
-
-                ApplyImportPlan(dlg.Plan);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    Window.GetWindow(this),
-                    ex.Message,
-                    Strings.Import_DialogTitle,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
         private void ApplyImportPlan(ImportPlan plan)
         {
             // 1) Mutate the active profile + mBooster settings via the per-diff

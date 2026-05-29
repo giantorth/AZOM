@@ -8,21 +8,46 @@ using MozaPlugin.Resources;
 
 namespace MozaPlugin.UI.Import
 {
-    public partial class PitHouseImportDialog : Window
+    /// <summary>
+    /// Embeddable version of the PitHouse preset import wizard. Hosts the same
+    /// two-phase picker → confirm state machine the old
+    /// <c>PitHouseImportDialog</c> Window did, but lives inline inside the
+    /// settings "Import" tab. The host (<see cref="SettingsControl"/>) calls
+    /// <see cref="Initialize"/> with the plugin instance after its own
+    /// InitializeComponent, and subscribes to <see cref="ApplyRequested"/> to
+    /// run the existing apply path when the user clicks Apply.
+    /// </summary>
+    public partial class PitHouseImportControl : UserControl
     {
-        private readonly MozaPlugin _plugin;
+        private MozaPlugin? _plugin;
         private string? _customPathOverride;
 
-        // Selected preset + built plan, populated when Next is clicked. The
-        // caller pulls these via SelectedPreset / Plan once DialogResult is true.
+        // Selected preset + built plan, populated when Next is clicked.
         public PitHousePreset? SelectedPreset { get; private set; }
         public ImportPlan? Plan { get; private set; }
 
-        public PitHouseImportDialog(MozaPlugin plugin)
+        /// <summary>
+        /// Raised when the user clicks Apply on a valid <see cref="ImportPlan"/>.
+        /// The host routes this to its ApplyImportPlan(ImportPlan) which mutates
+        /// the active profile, pushes to hardware, and refreshes the UI.
+        /// </summary>
+        public event Action<ImportPlan>? ApplyRequested;
+
+        // Parameterless ctor required for XAML instantiation. Does NOT touch
+        // _plugin — the host calls Initialize once the plugin is available.
+        public PitHouseImportControl()
+        {
+            InitializeComponent();
+        }
+
+        /// <summary>
+        /// Wires up the plugin reference and populates the preset lists. Safe to
+        /// call right after the host's InitializeComponent — the visual tree is
+        /// already built by then.
+        /// </summary>
+        public void Initialize(MozaPlugin plugin)
         {
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
-            InitializeComponent();
-
             _customPathOverride = plugin.Settings?.PitHousePresetsPathOverride;
             RefreshLists();
         }
@@ -71,7 +96,7 @@ namespace MozaPlugin.UI.Import
 
                 string picked = fbd.SelectedPath ?? "";
                 _customPathOverride = picked;
-                if (_plugin.Settings != null)
+                if (_plugin?.Settings != null)
                 {
                     _plugin.Settings.PitHousePresetsPathOverride = picked;
                     try { _plugin.SaveSettings(); } catch { /* persistence is best-effort */ }
@@ -120,7 +145,7 @@ namespace MozaPlugin.UI.Import
                 Filter = "PitHouse preset (*.json)|*.json|All files (*.*)|*.*",
                 Title = Strings.Import_DialogTitle,
             };
-            if (dlg.ShowDialog(this) != true) return;
+            if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
 
             LoadPresetAndConfirm(dlg.FileName);
         }
@@ -142,7 +167,7 @@ namespace MozaPlugin.UI.Import
             if (preset == null)
             {
                 System.Windows.MessageBox.Show(
-                    this, error, Strings.Import_DialogTitle,
+                    Window.GetWindow(this), error, Strings.Import_DialogTitle,
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -150,10 +175,10 @@ namespace MozaPlugin.UI.Import
             ImportPlan plan;
             if (string.Equals(preset.DeviceType, "Motor", StringComparison.OrdinalIgnoreCase))
             {
-                var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+                var profile = _plugin?.Settings?.ProfileStore?.CurrentProfile;
                 if (profile == null)
                 {
-                    System.Windows.MessageBox.Show(this,
+                    System.Windows.MessageBox.Show(Window.GetWindow(this),
                         "No active SimHub profile.",
                         Strings.Import_DialogTitle,
                         MessageBoxButton.OK, MessageBoxImage.Error);
@@ -163,14 +188,14 @@ namespace MozaPlugin.UI.Import
             }
             else if (string.Equals(preset.DeviceType, "Pedals", StringComparison.OrdinalIgnoreCase))
             {
-                var registry = _plugin.MBoosterRegistry;
+                var registry = _plugin?.MBoosterRegistry;
                 IReadOnlyList<MBoosterDeviceController> controllers =
                     registry?.Devices ?? Array.Empty<MBoosterDeviceController>();
                 plan = PitHousePedalsMapper.BuildPlan(preset, controllers);
             }
             else
             {
-                System.Windows.MessageBox.Show(this,
+                System.Windows.MessageBox.Show(Window.GetWindow(this),
                     string.Format(Strings.Import_Error_UnsupportedType, preset.DeviceType),
                     Strings.Import_DialogTitle,
                     MessageBoxButton.OK, MessageBoxImage.Error);
@@ -203,7 +228,7 @@ namespace MozaPlugin.UI.Import
         {
             if (SelectedPreset == null || Plan == null) return;
 
-            string profileName = _plugin.Settings?.ProfileStore?.CurrentProfile?.Name
+            string profileName = _plugin?.Settings?.ProfileStore?.CurrentProfile?.Name
                                  ?? "(unknown)";
 
             // Header card key/value rows.
@@ -258,9 +283,6 @@ namespace MozaPlugin.UI.Import
             else
                 FooterStatusText.Text = $"{changedCount} of {totalMapped} setting{(totalMapped == 1 ? "" : "s")} will change";
 
-            // Header bar reflects the active phase.
-            TopBarSubtitle.Text = $"// Applying “{SelectedPreset.Name}” to “{profileName}”";
-
             PickerPanel.Visibility = Visibility.Collapsed;
             ConfirmPanel.Visibility = Visibility.Visible;
 
@@ -282,17 +304,23 @@ namespace MozaPlugin.UI.Import
             ApplyButton.Visibility = Visibility.Collapsed;
             BackButton.Visibility = Visibility.Collapsed;
             FooterStatusText.Text = "";
-            TopBarSubtitle.Text = "// Apply a MOZA Pit House preset to the active profile and hardware";
         }
 
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = true;
-        }
+            if (Plan == null) return;
 
-        private void Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
+            string applied = SelectedPreset?.Name ?? "";
+
+            // Hand the plan to the host, which runs the mutate/push/refresh path.
+            ApplyRequested?.Invoke(Plan);
+
+            // Return to the picker phase and surface a confirmation caption.
+            // Back_Click clears SelectedPreset/Plan and resets the footer, so
+            // capture the name first and set the caption afterwards.
+            Back_Click(sender, e);
+            RefreshLists();
+            FooterStatusText.Text = $"applied “{applied}” to the active profile";
         }
     }
 }
