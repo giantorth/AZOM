@@ -37,6 +37,7 @@ namespace MozaPlugin.Devices
             using (_suppressor.Begin())
             {
                 InitializeComponent();
+                DashMgmtHostCm2.Content = new WheelUi.DashboardManagementControl();
 
                 if (ResolvePlugin())
                     BuildColorSwatches();
@@ -258,6 +259,12 @@ namespace MozaPlugin.Devices
             bool dashConnected = LinkedLedDriver?.IsConnected() ?? false;
             StatusDot.Fill = dashConnected ? Brushes.LimeGreen : Brushes.Red;
             StatusText.Text = dashConnected ? "Connected" : "Disconnected";
+
+            // Dashboard tab (dash selection + channel mapping + files) shows for
+            // a CM2 — behind the base or standalone-USB.
+            DashMgmtTab.Visibility =
+                (_plugin.IsCm2BehindBaseCandidate || _plugin.ShouldUseStandaloneDashboardTarget())
+                    ? Visibility.Visible : Visibility.Collapsed;
 
             bool dashDetected = dashConnected;
 

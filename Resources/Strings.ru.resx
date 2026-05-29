@@ -366,6 +366,7 @@
   <data name="Toggle_On" xml:space="preserve"><value>ВКЛ</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Ввод</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Табло</value></data>
+  <data name="TabHeader_Leds" xml:space="preserve"><value>LEDs</value></data>
   <data name="TabHeader_Rpm" xml:space="preserve"><value>RPM</value></data>
   <data name="TabHeader_Buttons" xml:space="preserve"><value>Кнопки</value></data>
   <data name="TabHeader_Knobs" xml:space="preserve"><value>Энкодеры</value></data>

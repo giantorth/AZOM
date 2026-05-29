@@ -366,6 +366,7 @@
   <data name="Toggle_On" xml:space="preserve"><value>BẬT</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Đầu vào</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Bảng điều khiển</value></data>
+  <data name="TabHeader_Leds" xml:space="preserve"><value>LEDs</value></data>
   <data name="TabHeader_Rpm" xml:space="preserve"><value>RPM</value></data>
   <data name="TabHeader_Buttons" xml:space="preserve"><value>Nút bấm</value></data>
   <data name="TabHeader_Knobs" xml:space="preserve"><value>Núm xoay</value></data>

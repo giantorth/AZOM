@@ -74,6 +74,11 @@
                 </StackPanel>
             </Border>
 
+            <TabControl x:Name="DashTabs" Style="{StaticResource MozaTabControl}" Margin="0,4,0,0">
+
+            <TabItem x:Name="DashLedsTab" Header="{x:Static res:Strings.TabHeader_Leds}">
+                <StackPanel>
+
             <StackPanel x:Name="DashNotDetectedPanel">
                 <TextBlock Text="{x:Static res:Strings.Status_SearchingForDashboard}"
                            Style="{StaticResource MutedHintText}" FontStyle="Italic" Margin="0,10"/>
@@ -164,6 +169,13 @@
                 </ctrl:SectionCard>
 
             </StackPanel>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem x:Name="DashMgmtTab" Header="{x:Static res:Strings.TabHeader_Dashboard}" Visibility="Collapsed">
+                <ContentControl x:Name="DashMgmtHostCm2"/>
+            </TabItem>
+
+            </TabControl>
         </StackPanel>
-    <!-- /ScrollViewer -->
 </UserControl>

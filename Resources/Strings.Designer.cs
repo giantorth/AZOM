@@ -436,6 +436,7 @@ namespace MozaPlugin.Resources
         // ----- MozaWheelSettingsControl
         public static string TabHeader_Inputs => Get("TabHeader_Inputs");
         public static string TabHeader_Dashboard => Get("TabHeader_Dashboard");
+        public static string TabHeader_Leds => Get("TabHeader_Leds");
         public static string TabHeader_Rpm => Get("TabHeader_Rpm");
         public static string TabHeader_Buttons => Get("TabHeader_Buttons");
         public static string TabHeader_Knobs => Get("TabHeader_Knobs");

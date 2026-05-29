@@ -215,12 +215,8 @@ namespace MozaPlugin.Devices
             if (_detectionState.DashDetected) return;
             _detectionState.DashDetected = true;
 
-            // Prototype (2026-05): a dash sub-device on the wheelbase bus paired
-            // with a wheel that has no display of its own is an external CM2-class
-            // dashboard reached through the base, not the legacy wheel meter. The
-            // base owns the COM port so we can't read the CM2's USB PID — instead
-            // deploy the CM2 profile and confirm via a display-identity probe at
-            // 0x12 (CM2 bridge/main). See MozaPlugin.IsCm2BehindBaseCandidate.
+            // CM2 reached through the wheelbase: deploy the CM2 profile and
+            // confirm via a display-identity probe at 0x12.
             bool cm2BehindBase = _plugin.IsCm2BehindBaseCandidate;
             if (cm2BehindBase)
                 _deviceManager.SendDisplayProbe(MozaProtocol.DeviceMain);
@@ -234,10 +230,7 @@ namespace MozaPlugin.Devices
                 ? "[Moza] Dashboard detected (CM2 on wheelbase bus — deployed CM2 profile, probing display identity at 0x12)"
                 : "[Moza] Dashboard detected");
 
-            // CM2-on-base: re-apply telemetry settings now that the candidate
-            // condition holds so the sender retargets screen telemetry to 0x12,
-            // then start it. Mirrors the standalone-USB CM2 path. Wrapped so a
-            // failed phase doesn't abort detection.
+            // CM2-on-base: retarget screen telemetry to 0x12 and start it.
             if (cm2BehindBase)
             {
                 try { _plugin.ApplyTelemetrySettings(); _plugin.StartTelemetryIfReady(); }
@@ -561,11 +554,7 @@ namespace MozaPlugin.Devices
                     if (!string.IsNullOrEmpty(_data.DisplayModelName))
                     {
                         MozaLog.Debug($"[Moza] Display model: {_data.DisplayModelName}");
-                        // Prototype: a display answering on the wheelbase bus
-                        // (screenless/displayless wheel, no standalone-USB CM2)
-                        // confirms the CM2-on-base case. The CM2 profile was
-                        // already deployed at MarkDashDetected; re-assert the
-                        // 0x12 telemetry routing now that identity is in hand.
+                        // CM2-on-base confirmed by display identity — re-assert 0x12 routing.
                         if (_plugin.IsCm2BehindBaseCandidate)
                         {
                             MozaLog.Info($"[Moza] CM2-on-base display confirmed: {_data.DisplayModelName} — routing screen telemetry to 0x12");

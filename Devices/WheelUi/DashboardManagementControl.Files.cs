@@ -6,13 +6,10 @@ using System.Windows.Media;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.WheelUi
 {
-    // Files sub-tab on the wheel device page — combines the legacy plugin-pane
-    // "Upload" + "Wheel Files" tabs. Visible only when the wheel has reported
-    // a dashboard (same gate as the Dashboard tab). All handlers used to live
-    // on SettingsControl; moved here because the feature is wheel-scoped.
-    public partial class MozaWheelSettingsControl
+    // Files section: dashboard upload + on-device dashboard inventory.
+    public partial class DashboardManagementControl
     {
         // Source bytes + name held while the user picks; pushed to the
         // uploader on UploadNow_Click. Decouples picking from uploading so the

@@ -110,14 +110,8 @@ namespace MozaPlugin
         /// </summary>
         public void SendDisplayProbe() => SendDisplayProbe(MozaProtocol.DeviceWheel);
 
-        /// <summary>
-        /// Same identity cascade as <see cref="SendDisplayProbe()"/> but aimed at
-        /// an explicit device id. A CM2 wired through the wheelbase answers the
-        /// display identity at the CM2 bridge/main id (0x12 = <see cref="MozaProtocol.DeviceMain"/>)
-        /// rather than the wheel's 0x17 — see <see cref="MozaPlugin.IsCm2BehindBaseCandidate"/>.
-        /// Targeting 0x12 also keeps these 11 frames off a screenless wheel at
-        /// 0x17, which would otherwise stop servicing settings reads.
-        /// </summary>
+        /// <summary>Identity cascade aimed at an explicit device id (0x12 for a
+        /// CM2 wired through the wheelbase; 0x17 for a wheel-hosted display).</summary>
         public void SendDisplayProbe(byte dev)
         {
             if (!_connection.IsConnected) return;
