@@ -119,9 +119,14 @@ namespace MozaPlugin.Telemetry.Sessions
                 int id = (int)idTok;
                 lock (_lock)
                 {
-                    _replies[id] = uncompressed;
+                    // Only store when a waiter is still outstanding. A reply that
+                    // arrives after Call() timed out (and removed its waiter+entry)
+                    // would otherwise linger in _replies forever.
                     if (_waiters.TryGetValue(id, out var waiter))
+                    {
+                        _replies[id] = uncompressed;
                         waiter.Set();
+                    }
                 }
             }
             catch (Exception ex)

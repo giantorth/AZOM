@@ -27,7 +27,7 @@ namespace MozaPlugin.Protocol
 
         public byte[]? BuildReadMessage(byte deviceId)
         {
-            if (ReadGroup == 0xFF) // -1 means not readable
+            if (ReadGroup == 0xFF) // 0xFF sentinel = not readable
                 return null;
 
             int payloadLength = CommandId.Length + PayloadBytes;

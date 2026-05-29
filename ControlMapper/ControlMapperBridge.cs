@@ -56,6 +56,12 @@ namespace MozaPlugin.ControlMapper
         private PropertyInfo? _stateAvailableProp;
         private bool _diagResolveAttempted;
         private string? _lastDiagVariant;
+        // Cached so Unregister can detach the CollectionChanged handler: the
+        // publisher (SimHub's ControllerMappings) outlives a plugin reload, and
+        // RemoveEventHandler needs the exact Delegate instance AddEventHandler used.
+        private EventInfo? _mappingsCollChangedEvent;
+        private Delegate? _mappingsCollChangedHandler;
+        private object? _mappingsCollChangedTarget;
 
         // Set of variants we've auto-created mappings for this session.
         // Prevents re-creating after the user explicitly deletes one.
@@ -341,7 +347,10 @@ namespace MozaPlugin.ControlMapper
             // ControllerID, so once one MOZA mapping exists the UI hides the
             // wheelbase entirely — even when the current variant has no
             // mapping. This bypasses that UI bottleneck.
-            try { AutoCreateVariantMappingIfNeeded(); }
+            // Wheel variant resolved once per tick; shared by auto-create and
+            // the diagnostic dump below (was computed independently in both).
+            string? currentVariant = ComputeCurrentVariant();
+            try { AutoCreateVariantMappingIfNeeded(currentVariant); }
             catch (Exception ex)
             {
                 MozaLog.Debug($"[Moza] CM auto-create: {ex.Message}");
@@ -353,14 +362,6 @@ namespace MozaPlugin.ControlMapper
             // is mutating saved Variant strings during a wheel swap.
             try
             {
-                string? currentVariant = null;
-                string? wm = MozaPlugin.Instance?.Data?.WheelModelName;
-                if (!string.IsNullOrEmpty(wm))
-                {
-                    string prefix = Devices.WheelModelInfo.ExtractPrefix(wm!);
-                    if (!string.IsNullOrEmpty(prefix))
-                        currentVariant = Devices.WheelModelInfo.GetFriendlyName(prefix);
-                }
                 if (!string.Equals(currentVariant, _lastDiagVariant, StringComparison.Ordinal))
                 {
                     DumpMappingsState(currentVariant ?? "<none>");
@@ -519,7 +520,16 @@ namespace MozaPlugin.ControlMapper
         /// ControllerID — even when the user is on a different variant that
         /// doesn't have a slot yet.
         /// </summary>
-        private void AutoCreateVariantMappingIfNeeded()
+        // Resolve the current wheel variant friendly-name from live plugin state.
+        private static string? ComputeCurrentVariant()
+        {
+            string? wm = MozaPlugin.Instance?.Data?.WheelModelName;
+            if (string.IsNullOrEmpty(wm)) return null;
+            string prefix = Devices.WheelModelInfo.ExtractPrefix(wm!);
+            return string.IsNullOrEmpty(prefix) ? null : Devices.WheelModelInfo.GetFriendlyName(prefix);
+        }
+
+        private void AutoCreateVariantMappingIfNeeded(string? currentVariant)
         {
             if (!_diagResolveAttempted)
             {
@@ -533,15 +543,6 @@ namespace MozaPlugin.ControlMapper
                 || _descProductIdProp == null
                 || _descVariantProp == null) return;
 
-            // Resolve current wheel variant from the plugin's live state.
-            string? currentVariant = null;
-            string? wm = MozaPlugin.Instance?.Data?.WheelModelName;
-            if (!string.IsNullOrEmpty(wm))
-            {
-                string prefix = Devices.WheelModelInfo.ExtractPrefix(wm!);
-                if (!string.IsNullOrEmpty(prefix))
-                    currentVariant = Devices.WheelModelInfo.GetFriendlyName(prefix);
-            }
             if (string.IsNullOrEmpty(currentVariant)) return;
             if (_autoCreatedVariants.Contains(currentVariant!)) return;
 
@@ -686,11 +687,33 @@ namespace MozaPlugin.ControlMapper
                         nameof(OnControllerMappingsChanged),
                         BindingFlags.NonPublic | BindingFlags.Instance)!);
                 evt.AddEventHandler(mappingsObj, handler);
+                _mappingsCollChangedEvent = evt;
+                _mappingsCollChangedHandler = handler;
+                _mappingsCollChangedTarget = mappingsObj;
                 MozaLog.Debug("[Moza] CM diag: subscribed to ControllerMappings.CollectionChanged");
             }
             catch (Exception ex)
             {
                 MozaLog.Debug($"[Moza] CM diag: subscribe failed: {ex.Message}");
+            }
+        }
+
+        // Detach the CollectionChanged handler subscribed in
+        // HookMappingsCollectionChanged. Must run on every teardown — the
+        // publisher lives in SimHub and would otherwise keep this bridge alive.
+        private void UnhookMappingsCollectionChanged()
+        {
+            if (_mappingsCollChangedEvent == null
+                || _mappingsCollChangedHandler == null
+                || _mappingsCollChangedTarget == null)
+                return;
+            try { _mappingsCollChangedEvent.RemoveEventHandler(_mappingsCollChangedTarget, _mappingsCollChangedHandler); }
+            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: unsubscribe failed: {ex.Message}"); }
+            finally
+            {
+                _mappingsCollChangedEvent = null;
+                _mappingsCollChangedHandler = null;
+                _mappingsCollChangedTarget = null;
             }
         }
 
@@ -797,6 +820,9 @@ namespace MozaPlugin.ControlMapper
         /// </summary>
         public void Unregister()
         {
+            // Detach the CollectionChanged handler first — it can be subscribed
+            // even when provider registration never completed (_registered == false).
+            UnhookMappingsCollectionChanged();
             if (!_registered) return;
             try
             {

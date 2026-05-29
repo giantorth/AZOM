@@ -300,6 +300,10 @@ namespace MozaPlugin.Sdk
 
                         _process = p;
                         _processHandle = pi.hProcess;
+                        // Ownership of the raw process handle now belongs to
+                        // CleanupProcessLocked; clear the local so the catch below
+                        // can't double-close it if a later step throws.
+                        pi.hProcess = IntPtr.Zero;
                         _jobHandle = jobHandle;
                         _status = $"Running (PID {p.Id})";
                         _lastError = null;

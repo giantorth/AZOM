@@ -49,6 +49,13 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// keeps changing the catalog.</summary>
         public const int MaxNudges = 8;
 
+        // Arm() fires from the UI thread (SwitchToProfile) and the serial-read
+        // thread (wheel-initiated switch); TickIfArmed from the timer thread.
+        // All state access is serialized here so the 64-bit timestamp fields
+        // aren't torn on x86. No method calls out to the sender under the lock,
+        // so there is no re-entrancy/deadlock risk (the caller acts on the
+        // returned TickDecision outside this class).
+        private readonly object _lock = new object();
         private bool _armed;
         private int _targetSlot = -1;
         private long _armedUtcTicks;
@@ -58,27 +65,30 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private int _matchCount;
         private int _nudgesSent;
 
-        public bool IsArmed => _armed;
-        public int TargetSlot => _targetSlot;
-        public int MatchCount => _matchCount;
-        public int NudgesSent => _nudgesSent;
+        public bool IsArmed { get { lock (_lock) return _armed; } }
+        public int TargetSlot { get { lock (_lock) return _targetSlot; } }
+        public int MatchCount { get { lock (_lock) return _matchCount; } }
+        public int NudgesSent { get { lock (_lock) return _nudgesSent; } }
 
         /// <summary>Arm the watcher against a specific slot. Resets all
         /// counters — a switch arriving while a prior convergence is still
         /// in flight cancels the prior cycle and starts fresh.</summary>
         public void Arm(int slot, long nowUtcTicks)
         {
-            _armed = true;
-            _targetSlot = slot;
-            _armedUtcTicks = nowUtcTicks;
-            // Treat arm as the first "sample time" so the first nudge
-            // doesn't fire until SampleIntervalMs has elapsed — gives the
-            // HOT burst a chance to land first.
-            _lastSampleUtcTicks = nowUtcTicks;
-            _hasSample = false;
-            _matchCount = 0;
-            _nudgesSent = 0;
-            _lastSignature = 0;
+            lock (_lock)
+            {
+                _armed = true;
+                _targetSlot = slot;
+                _armedUtcTicks = nowUtcTicks;
+                // Treat arm as the first "sample time" so the first nudge
+                // doesn't fire until SampleIntervalMs has elapsed — gives the
+                // HOT burst a chance to land first.
+                _lastSampleUtcTicks = nowUtcTicks;
+                _hasSample = false;
+                _matchCount = 0;
+                _nudgesSent = 0;
+                _lastSignature = 0;
+            }
         }
 
         /// <summary>Cancel the watcher. Called from <c>Stop()</c> /
@@ -86,8 +96,11 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// to nudge against a stale slot.</summary>
         public void Disarm()
         {
-            _armed = false;
-            _targetSlot = -1;
+            lock (_lock)
+            {
+                _armed = false;
+                _targetSlot = -1;
+            }
         }
 
         /// <summary>Caller drives this each steady-state tick. Returns true
@@ -103,60 +116,63 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// so we don't measure mid-burst.</param>
         public TickDecision TickIfArmed(long nowUtcTicks, int currentSignature, bool busy)
         {
-            if (!_armed) return TickDecision.NoAction;
-
-            if ((nowUtcTicks - _armedUtcTicks) >= (long)DeadlineMs * TimeSpan.TicksPerMillisecond)
+            lock (_lock)
             {
-                Disarm();
-                return TickDecision.DeadlineExpired;
-            }
+                if (!_armed) return TickDecision.NoAction;
 
-            // Don't sample / nudge while HOT burst owns the wire.
-            // Slide the "last sample" forward so the post-burst gap is
-            // measured from busy-clear, not from arm.
-            if (busy)
-            {
-                _lastSampleUtcTicks = nowUtcTicks;
-                return TickDecision.NoAction;
-            }
-
-            // Spacing gate.
-            long intervalTicks = (long)SampleIntervalMs * TimeSpan.TicksPerMillisecond;
-            if ((nowUtcTicks - _lastSampleUtcTicks) < intervalTicks)
-                return TickDecision.NoAction;
-
-            _lastSampleUtcTicks = nowUtcTicks;
-
-            // Take the sample. Update match streak.
-            if (!_hasSample)
-            {
-                _lastSignature = currentSignature;
-                _hasSample = true;
-                _matchCount = 1;
-            }
-            else if (currentSignature == _lastSignature)
-            {
-                _matchCount++;
-                if (_matchCount >= StableSampleThreshold)
+                if ((nowUtcTicks - _armedUtcTicks) >= (long)DeadlineMs * TimeSpan.TicksPerMillisecond)
                 {
                     Disarm();
-                    return TickDecision.Converged;
+                    return TickDecision.DeadlineExpired;
                 }
-            }
-            else
-            {
-                // Catalog moved — restart the streak with the new value.
-                _lastSignature = currentSignature;
-                _matchCount = 1;
-            }
 
-            if (_nudgesSent >= MaxNudges)
-            {
-                Disarm();
-                return TickDecision.MaxNudgesReached;
+                // Don't sample / nudge while HOT burst owns the wire.
+                // Slide the "last sample" forward so the post-burst gap is
+                // measured from busy-clear, not from arm.
+                if (busy)
+                {
+                    _lastSampleUtcTicks = nowUtcTicks;
+                    return TickDecision.NoAction;
+                }
+
+                // Spacing gate.
+                long intervalTicks = (long)SampleIntervalMs * TimeSpan.TicksPerMillisecond;
+                if ((nowUtcTicks - _lastSampleUtcTicks) < intervalTicks)
+                    return TickDecision.NoAction;
+
+                _lastSampleUtcTicks = nowUtcTicks;
+
+                // Take the sample. Update match streak.
+                if (!_hasSample)
+                {
+                    _lastSignature = currentSignature;
+                    _hasSample = true;
+                    _matchCount = 1;
+                }
+                else if (currentSignature == _lastSignature)
+                {
+                    _matchCount++;
+                    if (_matchCount >= StableSampleThreshold)
+                    {
+                        Disarm();
+                        return TickDecision.Converged;
+                    }
+                }
+                else
+                {
+                    // Catalog moved — restart the streak with the new value.
+                    _lastSignature = currentSignature;
+                    _matchCount = 1;
+                }
+
+                if (_nudgesSent >= MaxNudges)
+                {
+                    Disarm();
+                    return TickDecision.MaxNudgesReached;
+                }
+                _nudgesSent++;
+                return TickDecision.EmitNudge;
             }
-            _nudgesSent++;
-            return TickDecision.EmitNudge;
         }
 
         public enum TickDecision

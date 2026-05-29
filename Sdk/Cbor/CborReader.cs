@@ -18,6 +18,11 @@ namespace MozaPlugin.Sdk.Cbor
         private const byte MajorArray = 4;
         private const byte MajorMap = 5;
 
+        // Datagrams arrive unauthenticated over UDP, so a forged payload must
+        // not be able to exhaust the stack via deep nesting. PitHouse envelopes
+        // are ≤2 levels deep; 16 is generous headroom.
+        private const int MaxDepth = 16;
+
         /// <summary>
         /// Decode a CBOR-encoded array of text strings into a
         /// <see cref="List{String}"/>. Throws if the payload is not a single
@@ -67,7 +72,7 @@ namespace MozaPlugin.Sdk.Cbor
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             int offset = 0;
-            var result = ReadItem(data, ref offset);
+            var result = ReadItem(data, ref offset, 0);
             if (offset != data.Length)
                 throw new CborFormatException($"Trailing bytes after top-level item: consumed {offset} of {data.Length}.");
             return result;
@@ -84,7 +89,7 @@ namespace MozaPlugin.Sdk.Cbor
                 throw new CborFormatException($"Array length {arg} exceeds Int32.MaxValue.");
 
             int count = (int)arg;
-            var list = new List<string>(count);
+            var list = new List<string>(SafeInitialCapacity(count, data.Length - offset));
             for (int i = 0; i < count; i++)
             {
                 list.Add(ReadText(data, ref offset, $"array element {i}"));
@@ -101,7 +106,7 @@ namespace MozaPlugin.Sdk.Cbor
                 throw new CborFormatException($"Map pair-count {arg} exceeds Int32.MaxValue.");
 
             int count = (int)arg;
-            var dict = new Dictionary<string, int>(count, StringComparer.Ordinal);
+            var dict = new Dictionary<string, int>(SafeInitialCapacity(count, data.Length - offset), StringComparer.Ordinal);
             for (int i = 0; i < count; i++)
             {
                 string key = ReadText(data, ref offset, $"map key {i}");
@@ -117,8 +122,10 @@ namespace MozaPlugin.Sdk.Cbor
             return dict;
         }
 
-        private static object ReadItem(byte[] data, ref int offset)
+        private static object ReadItem(byte[] data, ref int offset, int depth)
         {
+            if (depth > MaxDepth)
+                throw new CborFormatException($"CBOR nesting exceeds depth {MaxDepth} (possible malicious payload).");
             ReadHeader(data, ref offset, out byte majorType, out ulong arg);
             switch (majorType)
             {
@@ -138,16 +145,16 @@ namespace MozaPlugin.Sdk.Cbor
                     if (arg > int.MaxValue)
                         throw new CborFormatException($"Array length {arg} exceeds Int32.MaxValue.");
                     int alen = (int)arg;
-                    var arr = new List<object>(alen);
+                    var arr = new List<object>(SafeInitialCapacity(alen, data.Length - offset));
                     for (int i = 0; i < alen; i++)
-                        arr.Add(ReadItem(data, ref offset));
+                        arr.Add(ReadItem(data, ref offset, depth + 1));
                     return arr;
 
                 case MajorMap:
                     if (arg > int.MaxValue)
                         throw new CborFormatException($"Map pair-count {arg} exceeds Int32.MaxValue.");
                     int mlen = (int)arg;
-                    var map = new Dictionary<string, object>(mlen, StringComparer.Ordinal);
+                    var map = new Dictionary<string, object>(SafeInitialCapacity(mlen, data.Length - offset), StringComparer.Ordinal);
                     for (int i = 0; i < mlen; i++)
                     {
                         // Generic decoder still requires string keys —
@@ -161,7 +168,7 @@ namespace MozaPlugin.Sdk.Cbor
                         string key = ReadTextPayload(data, ref offset, (int)kArg);
                         if (map.ContainsKey(key))
                             throw new CborFormatException($"Duplicate map key '{key}'.");
-                        map[key] = ReadItem(data, ref offset);
+                        map[key] = ReadItem(data, ref offset, depth + 1);
                     }
                     return map;
 
@@ -169,6 +176,16 @@ namespace MozaPlugin.Sdk.Cbor
                     throw new CborFormatException(
                         $"Major type {majorType} is not supported by this subset (only 0, 3, 4, 5).");
             }
+        }
+
+        // Cap an attacker-supplied collection length to the bytes actually
+        // remaining: every element consumes at least one byte, so a forged
+        // huge length header cannot pre-allocate a giant List/Dictionary.
+        private static int SafeInitialCapacity(int declaredLength, int remainingBytes)
+        {
+            if (declaredLength < 0) return 0;
+            if (remainingBytes < 0) remainingBytes = 0;
+            return Math.Min(declaredLength, remainingBytes);
         }
 
         private static string ReadText(byte[] data, ref int offset, string context)

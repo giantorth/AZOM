@@ -115,9 +115,8 @@ namespace MozaPlugin.Protocol
             frame[2] = 0x00;
             frame[3] = DeviceMotor;
             frame[4] = MozaProtocol.CalculateWireChecksum(frame, 4);
-            // Sanity-check the hard-coded expected checksum once at build time.
-            // CalculateWireChecksum yields 0x9d for this body (verified against
-            // protocol note § 3 keepalive).
+            // CalculateWireChecksum yields 0x9d for this keepalive body
+            // (protocol note § 3 keepalive).
             return frame;
         }
 

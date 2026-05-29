@@ -1562,13 +1562,16 @@ namespace MozaPlugin.Telemetry
             _sessions.Reset();
             _dispatcher.Reset();
             _session09InboundSeq = 0;
-            _session09OutboundSeq = 0;
+            // Reset the outbound seq counters under their guarding locks so a
+            // tick still mid-burst can't clobber the reset (separate, non-nested
+            // leaf locks — no ordering deadlock; each section is a field write).
+            lock (_session09SeqLock) { _session09OutboundSeq = 0; }
             // Re-arm so the next sess=0x09 device-init re-confirms the
             // canonical dashboard list to the wheel.
             _session09ReplySent = false;
             _watchdog.Reset();
-            _session02OutboundSeq = 0;
-            _session01OutboundSeq = 0;
+            lock (_session02SeqLock) { _session02OutboundSeq = 0; }
+            lock (_session01SeqLock) { _session01OutboundSeq = 0; }
             // Reset 0x0a seq for symmetry — fresh Start re-opens 0x0a from
             // zero wheel-side. Prevents stale-seq retransmits re-emitting
             // into a new session. See docs/protocol/sessions/chunk-format.md.
@@ -2322,7 +2325,8 @@ namespace MozaPlugin.Telemetry
             // seq counters so SendSessionPropertyBody (Math.Max(2, seq))
             // and SendTierDefinition (Math.Max(2, seq+1)) produce
             // correct first-use values.
-            _session02OutboundSeq = TelemSession + 1; // port=2 → first data seq=3
+            // Under the seq lock for consistency with the tick-thread writers.
+            lock (_session02SeqLock) { _session02OutboundSeq = TelemSession + 1; } // port=2 → first data seq=3
 
             if (telemetryPort != 0)
             {
@@ -4068,6 +4072,12 @@ namespace MozaPlugin.Telemetry
         /// <see cref="TelemetryFrameBuilder.BuildV0ValueFrame"/>; chunked
         /// through the session-data layer with monotonically advancing seq.
         /// </summary>
+        // Per-URL host channel lookup for the V0 path, cached by profile
+        // reference (Profile setter is the only reassignment site; mapping edits
+        // mutate channel fields in place but never the URL set).
+        private System.Collections.Generic.Dictionary<string, ChannelDefinition>? _v0ByUrl;
+        private MultiStreamProfile? _v0ByUrlProfile;
+
         private void SendV0ValueFrames(GameDataSnapshot snapshot)
         {
             var profile = _profile;
@@ -4092,20 +4102,31 @@ namespace MozaPlugin.Telemetry
                 catalog = profileChannels;
             }
 
-            // Build per-URL host channel lookup once per tick. Channels not in
-            // the host profile still get a frame — wheel's dashboard may bind
-            // to URLs the host doesn't have local metadata for, and missing
-            // values block widget render. Default compression = uint32_t,
-            // resolved value = 0 (live) or test triangle.
-            var byUrl = new System.Collections.Generic.Dictionary<string, ChannelDefinition>(
-                StringComparer.OrdinalIgnoreCase);
-            if (profile != null)
+            // Per-URL host channel lookup, rebuilt only when the profile changes
+            // (not every tick). Channels not in the host profile still get a
+            // frame — wheel's dashboard may bind to URLs the host doesn't have
+            // local metadata for, and missing values block widget render.
+            // Default compression = uint32_t, resolved value = 0 (live) or test.
+            if (_v0ByUrl == null || !ReferenceEquals(_v0ByUrlProfile, profile))
             {
-                foreach (var tier in profile.Tiers)
-                    foreach (var ch in tier.Channels)
-                        if (!string.IsNullOrEmpty(ch.Url) && !byUrl.ContainsKey(ch.Url))
-                            byUrl[ch.Url] = ch;
+                var map = new System.Collections.Generic.Dictionary<string, ChannelDefinition>(
+                    StringComparer.OrdinalIgnoreCase);
+                if (profile != null)
+                {
+                    foreach (var tier in profile.Tiers)
+                        foreach (var ch in tier.Channels)
+                            if (!string.IsNullOrEmpty(ch.Url) && !map.ContainsKey(ch.Url))
+                                map[ch.Url] = ch;
+                }
+                _v0ByUrl = map;
+                _v0ByUrlProfile = profile;
             }
+            var byUrl = _v0ByUrl;
+
+            // Test-mode wall-clock once per tick (was recomputed per channel).
+            long nowMs = TestMode
+                ? System.Diagnostics.Stopwatch.GetTimestamp() * 1000L / System.Diagnostics.Stopwatch.Frequency
+                : 0L;
 
             // Compute every per-channel value frame BEFORE entering the lock
             // so SimHub property resolution (PluginManager.GetPropertyValue
@@ -4128,8 +4149,6 @@ namespace MozaPlugin.Telemetry
                 {
                     if (ch != null)
                     {
-                        long nowMs = System.Diagnostics.Stopwatch.GetTimestamp() * 1000L /
-                                     System.Diagnostics.Stopwatch.Frequency;
                         value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
                     }
                     else
@@ -4318,15 +4337,16 @@ namespace MozaPlugin.Telemetry
 
         private byte[] BuildChannelEnableFrame(byte page, byte channelIndex)
         {
-            var frame = new System.Collections.Generic.List<byte>
+            var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 5,
                 MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
                 0x1E, page,
                 channelIndex, 0x00, 0x00,
+                0x00,
             };
-            frame.Add(MozaProtocol.CalculateWireChecksum(frame.ToArray()));
-            return frame.ToArray();
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
         }
 
         // Game-start handshake: PitHouse re-fires a small set of frames within
@@ -4403,26 +4423,28 @@ namespace MozaPlugin.Telemetry
 
         private byte[] BuildGroup40Frame(byte cmd1, byte cmd2)
         {
-            var frame = new System.Collections.Generic.List<byte>
+            var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 2,
                 MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
                 cmd1, cmd2,
+                0x00,
             };
-            frame.Add(MozaProtocol.CalculateWireChecksum(frame.ToArray()));
-            return frame.ToArray();
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
         }
 
         private byte[] BuildGroup40Frame3(byte cmd1, byte cmd2, byte cmd3)
         {
-            var frame = new System.Collections.Generic.List<byte>
+            var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 3,
                 MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
                 cmd1, cmd2, cmd3,
+                0x00,
             };
-            frame.Add(MozaProtocol.CalculateWireChecksum(frame.ToArray()));
-            return frame.ToArray();
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
         }
 
         // ── Cached frame construction ───────────────────────────────────────

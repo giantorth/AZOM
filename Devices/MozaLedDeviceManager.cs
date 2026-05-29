@@ -244,6 +244,17 @@ namespace MozaPlugin.Devices
 
         public void Close() { UnregisterInstance(); }
 
+        // Allocation-free Color[] equality. SequenceEqual allocates two
+        // enumerators per call; this runs on every Display() frame.
+        private static bool ColorsEqual(Color[]? a, Color[]? b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a == null || b == null || a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+                if (a[i] != b[i]) return false;
+            return true;
+        }
+
         /// <summary>
         /// Drop the cached "last-sent" state for one or more LED groups so the next
         /// <see cref="Display"/> frame re-sends instead of being deduplicated against
@@ -406,7 +417,7 @@ namespace MozaPlugin.Devices
                 }
 
                 // --- RPM LEDs ---
-                bool rpmChanged = _lastLeds == null || !rpmColors.SequenceEqual(_lastLeds);
+                bool rpmChanged = !ColorsEqual(rpmColors, _lastLeds);
                 bool shouldSendRpm = rpmChanged || (!limitUpdates && forceRefresh);
 
                 if (shouldSendRpm)
@@ -511,7 +522,7 @@ namespace MozaPlugin.Devices
                         buttonColors = overridden;
                     }
 
-                    bool buttonsChanged = _lastButtons == null || !buttonColors.SequenceEqual(_lastButtons);
+                    bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
                     bool shouldSendButtons = buttonsChanged || (!limitUpdates && forceRefresh);
 
                     if (shouldSendButtons)
@@ -596,7 +607,7 @@ namespace MozaPlugin.Devices
 
                     if (knobsActive)
                     {
-                        bool knobsChanged = _lastKnobs == null || !knobColors.SequenceEqual(_lastKnobs);
+                        bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
                         bool shouldSendKnobs = knobsChanged || (!limitUpdates && forceRefresh);
 
                         if (shouldSendKnobs)

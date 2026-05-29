@@ -518,6 +518,11 @@ namespace MozaPlugin.Protocol
             Interlocked.Exchange(ref _streamSlots[idx], message);
         }
 
+        // Set by FlushPendingWrites (any thread), serviced by the write thread.
+        // DiscardOutBuffer must run on the write thread so it never races the
+        // unlocked _port.Write there (SerialPort is not thread-safe).
+        private volatile bool _flushRequested;
+
         /// <summary>Drop priority + one-shot FIFOs + all stream slots + the OS write buffer (Stop button halts the wheel instantly).</summary>
         public void FlushPendingWrites()
         {
@@ -525,11 +530,8 @@ namespace MozaPlugin.Protocol
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
-            lock (_lock)
-            {
-                try { _port?.DiscardOutBuffer(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza] DiscardOutBuffer: {ex.Message}"); }
-            }
+            // Defer the OS-buffer discard to the write thread (see _flushRequested).
+            _flushRequested = true;
         }
 
         // Record an I/O failure. Throttles log spam and force-closes the port
@@ -581,6 +583,10 @@ namespace MozaPlugin.Protocol
             // marginal even for valid frames.
             var rx = new List<byte>(capacity: 8192);
             var tmp = new byte[4096];
+            // Reusable de-stuff scratch (grown on demand) so each received frame
+            // doesn't allocate a fresh byte[] on the high-frequency RX path. Only
+            // the per-frame `data` copy handed to subscribers is freshly allocated.
+            byte[] destuff = new byte[256];
 
             while (_running)
             {
@@ -703,7 +709,8 @@ namespace MozaPlugin.Protocol
                         int needed = payloadLength + 3; // group + device + payload + checksum
                         // Walk wire bytes starting after [start, len], collapsing
                         // 0x7E 0x7E wire pairs back to a single 0x7E body byte.
-                        var raw = new byte[needed];
+                        if (needed > destuff.Length) destuff = new byte[needed];
+                        byte[] raw = destuff;
                         int decoded = 0;
                         int wirePos = frameStart + 2;
                         bool frameError = false;
@@ -753,11 +760,11 @@ namespace MozaPlugin.Protocol
                         // directly from raw + payloadLength.
                         byte expected = MozaProtocol.CalculateWireChecksumFromParts(
                             (byte)payloadLength, raw, payloadLength + 2);
-                        byte actual = raw[raw.Length - 1];
+                        byte actual = raw[needed - 1];
                         if (expected != actual)
                         {
                             Interlocked.Increment(ref _checksumFailures);
-                            int nn = Math.Min(8, raw.Length);
+                            int nn = Math.Min(8, needed);
                             string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
                             MozaLog.Debug(
                                 $"[Moza] DROP checksum mismatch: expected=0x{expected:X2} actual=0x{actual:X2} " +
@@ -842,6 +849,15 @@ namespace MozaPlugin.Protocol
             while (_running)
             {
                 bool didWork = false;
+
+                // Serviced here (write thread) so DiscardOutBuffer never races
+                // _port.Write below. Set by FlushPendingWrites on the Stop path.
+                if (_flushRequested)
+                {
+                    _flushRequested = false;
+                    try { _port?.DiscardOutBuffer(); }
+                    catch (Exception ex) { MozaLog.Debug($"[Moza] DiscardOutBuffer: {ex.Message}"); }
+                }
 
                 // 0) Priority lane: drain all queued fc:00 acks first, unpaced.
                 //    Acks are 10 bytes each and the wheel times out sessions whose

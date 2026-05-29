@@ -490,6 +490,15 @@ namespace MozaPlugin.Telemetry.Dashboard
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            // Wake any worker blocked in Wait() (the FT-burst wait is up to 60s)
+            // before disposing the events, so it re-checks _shouldAbort and exits
+            // rather than racing the handle disposal. RunBackgroundUpload's
+            // catch(Exception) is the backstop if the race is still lost.
+            try { _sessionOpened.Set(); } catch (ObjectDisposedException) { }
+            try { _subMsg1Response.Set(); } catch (ObjectDisposedException) { }
+            try { _subMsg2Response.Set(); } catch (ObjectDisposedException) { }
+            try { _ackProgress.Set(); } catch (ObjectDisposedException) { }
+            try { _endReceived.Set(); } catch (ObjectDisposedException) { }
             try { _sessionOpened.Dispose(); } catch { }
             try { _subMsg1Response.Dispose(); } catch { }
             try { _subMsg2Response.Dispose(); } catch { }

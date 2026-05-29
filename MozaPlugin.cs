@@ -568,7 +568,6 @@ namespace MozaPlugin
             // Reset detection flags so a plugin reload doesn't carry over stale
             // "device detected" state from the prior session.
             ResetDetectionFlags();
-            // A fresh Init means we don't know what dashboard the wheel is
             // Belt-and-braces for the defensive double-Init path above. Coordinator
             // is null on a brand-new instance; only fires after a re-Init.
             _dashboardBindingCoordinator?.ClearLastAppliedDashboardKey();
@@ -1132,6 +1131,24 @@ namespace MozaPlugin
                 catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
             }
             _sdkStubManager = null;
+
+            // Mirror End()'s detach: these are subscribed early in Init (before
+            // throw-prone steps), and _telemetrySender may be the process-lifetime
+            // persistent instance that survives a failed Init — so a missed -=
+            // here leaks the coordinator and the whole plugin graph it roots onto
+            // the persistent sender's invocation list.
+            try
+            {
+                if (_telemetrySender != null && _dashboardBindingCoordinator != null)
+                {
+                    _telemetrySender.DashboardPipelineParked -= _dashboardBindingCoordinator.OnDashboardPipelineParked;
+                    _telemetrySender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnWheelInitiatedSwitch;
+                }
+            }
+            catch { }
+            // Remove the Control Mapper variant provider from SimHub's global
+            // VariantHelper list (same reason as End()).
+            try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
 
             try
             {
@@ -1913,11 +1930,6 @@ namespace MozaPlugin
             // The WPF UI thread predates plugin Init, so the CurrentUICulture
             // we assigned in Init lives on a different thread. Re-apply it here
             // (we are on the UI thread) so that {x:Static res:Strings.X} bindings
-            // in SettingsControl.xaml resolve against the user's choice rather
-            // than the default thread culture.
-            // The WPF UI thread predates plugin Init, so the CurrentUICulture
-            // we assigned in Init lives on a different thread. Re-apply it here
-            // (we are on the UI thread) so that {x:Static res:Strings.X} bindings
             // in SettingsControl.xaml resolve against the resolved language
             // rather than the default thread culture.
             var c = LanguageResolver.Resolve(_settings?.PreferredLanguage);
@@ -1938,9 +1950,11 @@ namespace MozaPlugin
             // intact but mid-teardown. A throw inside a property getter destabilises
             // SimHub's property polling, so each getter returns a sentinel default.
             this.AttachDelegate("Moza.BaseConnected", () => _data?.IsBaseConnected ?? false);
-            this.AttachDelegate("Moza.McuTemp", () => _data == null ? 0.0 : _propertyResolver.ConvertTemp(_data.McuTemp));
-            this.AttachDelegate("Moza.MosfetTemp", () => _data == null ? 0.0 : _propertyResolver.ConvertTemp(_data.MosfetTemp));
-            this.AttachDelegate("Moza.MotorTemp", () => _data == null ? 0.0 : _propertyResolver.ConvertTemp(_data.MotorTemp));
+            // _propertyResolver is constructed later in Init than RegisterProperties
+            // runs, so guard it too — SimHub may read these before it exists.
+            this.AttachDelegate("Moza.McuTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.McuTemp));
+            this.AttachDelegate("Moza.MosfetTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MosfetTemp));
+            this.AttachDelegate("Moza.MotorTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MotorTemp));
             this.AttachDelegate("Moza.BaseState", () => _data?.BaseState ?? 0);
             this.AttachDelegate("Moza.FfbStrength", () => (_data?.FfbStrength ?? 0) / 10);
             this.AttachDelegate("Moza.MaxAngle", () => (_data?.MaxAngle ?? 0) * 2);

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
+using MozaPlugin.Telemetry.Protocol;
 using MozaPlugin.Telemetry.TestMode;
 
 namespace MozaPlugin.Telemetry.Frames
@@ -22,6 +23,13 @@ namespace MozaPlugin.Telemetry.Frames
 
         private readonly DashboardProfile _profile;
         private readonly Func<GameDataSnapshot, double>[] _resolvers;
+
+        // Per-channel encode path resolved once at construction (a channel's
+        // compression code never changes), so the per-frame loop skips the three
+        // CompressionTable string-dictionary lookups TelemetryEncoder would do.
+        private enum EncKind : byte { Float, Double, Bits }
+        private readonly EncKind[] _encKind;
+        private readonly Func<double, ulong>?[] _encFn;
 
         // Pre-allocated buffers reused every frame to avoid GC pressure
         private readonly byte[] _frameBuffer;
@@ -74,6 +82,8 @@ namespace MozaPlugin.Telemetry.Frames
             // is two property reads + one branch on top of the existing
             // resolver dispatch — sub-µs even on long tier lists.
             _resolvers = new Func<GameDataSnapshot, double>[profile.Channels.Count];
+            _encKind = new EncKind[profile.Channels.Count];
+            _encFn = new Func<double, ulong>?[profile.Channels.Count];
             for (int i = 0; i < profile.Channels.Count; i++)
             {
                 var ch = profile.Channels[i];
@@ -98,6 +108,18 @@ namespace MozaPlugin.Telemetry.Frames
                 {
                     var channel = ch;
                     _resolvers[i] = s => s.GetField(channel.SimHubField);
+                }
+
+                // Resolve the encode path once. Mirrors TelemetryEncoder's
+                // IsFloat → IsDouble → Encode precedence exactly.
+                if (ch.Compression == "float")
+                    _encKind[i] = EncKind.Float;
+                else if (CompressionTable.TryGetByName(ch.Compression, out var de) && de.BitWidth == 64)
+                    _encKind[i] = EncKind.Double;
+                else
+                {
+                    _encKind[i] = EncKind.Bits;
+                    _encFn[i] = CompressionTable.TryGetByName(ch.Compression, out var be) ? be.Encode : null;
                 }
             }
 
@@ -130,6 +152,35 @@ namespace MozaPlugin.Telemetry.Frames
 
         public DashboardProfile Profile => _profile;
 
+        // Pack one channel's value using the pre-resolved encode path. _bitWriter
+        // is non-null here (callers guard). Matches TelemetryEncoder semantics:
+        // float → WriteFloat, 64-bit → WriteDouble, else encode-and-pack with the
+        // cached entry delegate (or the (uint)(int) fallback when uncatalogued).
+        private void WriteChannel(int i, double value, int bitWidth)
+        {
+            switch (_encKind[i])
+            {
+                case EncKind.Float:
+                    _bitWriter!.WriteFloat((float)value);
+                    break;
+                case EncKind.Double:
+                    _bitWriter!.WriteDouble(value);
+                    break;
+                default:
+                    var fn = _encFn[i];
+                    uint enc;
+                    if (fn != null)
+                        enc = (uint)fn(value);
+                    else
+                    {
+                        if (double.IsNaN(value) || double.IsInfinity(value)) value = 0.0;
+                        enc = (uint)(int)value;
+                    }
+                    _bitWriter!.WriteBits(enc, bitWidth);
+                    break;
+            }
+        }
+
         /// <summary>Build frame from live game data.</summary>
         public byte[] BuildFrame(StatusDataBase? gameData, byte flagByte) =>
             BuildFrameFromSnapshot(GameDataSnapshot.FromStatusData(gameData), flagByte);
@@ -145,16 +196,9 @@ namespace MozaPlugin.Telemetry.Frames
 
                 for (int i = 0; i < _profile.Channels.Count; i++)
                 {
-                    var ch = _profile.Channels[i];
                     double value = _resolvers[i](snapshot);
                     if (double.IsNaN(value) || double.IsInfinity(value)) value = 0.0;
-
-                    if (TelemetryEncoder.IsFloat(ch.Compression))
-                        _bitWriter.WriteFloat((float)value);
-                    else if (TelemetryEncoder.IsDouble(ch.Compression))
-                        _bitWriter.WriteDouble(value);
-                    else
-                        _bitWriter.WriteBits(TelemetryEncoder.Encode(ch.Compression, value), ch.BitWidth);
+                    WriteChannel(i, value, _profile.Channels[i].BitWidth);
                 }
             }
 
@@ -194,13 +238,7 @@ namespace MozaPlugin.Telemetry.Frames
                 {
                     var ch = _profile.Channels[i];
                     double value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
-
-                    if (TelemetryEncoder.IsFloat(ch.Compression))
-                        _bitWriter.WriteFloat((float)value);
-                    else if (TelemetryEncoder.IsDouble(ch.Compression))
-                        _bitWriter.WriteDouble(value);
-                    else
-                        _bitWriter.WriteBits(TelemetryEncoder.Encode(ch.Compression, value), ch.BitWidth);
+                    WriteChannel(i, value, ch.BitWidth);
                 }
             }
 

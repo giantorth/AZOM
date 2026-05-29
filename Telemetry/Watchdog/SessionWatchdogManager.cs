@@ -244,6 +244,11 @@ namespace MozaPlugin.Telemetry.Watchdog
             {
                 _session01EngagedUtcTicks = 0;
                 _session01LastInboundUtcTicks = 0;
+                // Reset the re-arm budget so an already-exhausted watchdog can
+                // actually re-arm (matches the stall-revoke path); the != 0 gate
+                // means this fires once per engagement cycle, not per close.
+                _s01ReArmRounds = 0;
+                _s01ReArmLastTickCount = 0;
                 MozaLog.Debug(
                     $"[Moza] sess=0x{session:X2} engagement revoked due to " +
                     "wheel-initiated CLOSE — engagement watchdog will re-arm.");
@@ -254,6 +259,8 @@ namespace MozaPlugin.Telemetry.Watchdog
             {
                 _session02FirstInboundUtcTicks = 0;
                 _session02LastInboundUtcTicks = 0;
+                _s02ReArmRounds = 0;
+                _s02ReArmLastTickCount = 0;
                 MozaLog.Debug(
                     $"[Moza] sess=0x{session:X2} (telem) first-inbound flag " +
                     "revoked due to wheel-initiated CLOSE.");
