@@ -23,9 +23,9 @@ USB packet with both opens.
 
 Wheel emits `type=0x81` opens during connect for `0x04`, `0x06`, `0x08`,
 `0x09`, `0x0A` (older firmware) or `0x05`/`0x07`/`0x09`/`0x0A` (KS Pro on
-Universal Hub). Plugin handler
-[`OnMessageDuringPreamble`](../../../Telemetry/TelemetrySender.cs)
-(line 1296) handles each:
+Universal Hub). The inbound handler
+[`TelemetryInboundDispatcher.HandleDeviceInit`](../../../Telemetry/Inbound/TelemetryInboundDispatcher.cs)
+(subscribed from `TelemetrySender`) handles each (illustrative):
 
 ```csharp
 if (type == 0x81) {
@@ -58,10 +58,15 @@ Key behaviors:
 
 ### Stale-session reclaim
 
-Before opening, plugin sends `type=0x00` end markers on ports `0x01..0x10`
-to reclaim stale sessions left by a previous SimHub crash. Without this,
-fresh opens are silently ignored — the wheel still considers the previous
-host-port active and won't accept a new `type=0x81` for the same byte.
+Before opening, plugin sends `type=0x00` end markers to reclaim stale
+sessions. The range depends on the start kind (`ProbeAndOpenSessions`):
+a **cold start** (fresh SimHub process) closes the wide `0x01..0x0A` range
+to flush stale wheel-side state a prior process may have left half-engaged;
+a **mid-process plugin reload** (game switch) closes only host-managed
+`0x01..0x03`, leaving wheel-managed `0x04..0x0A` intact so the configJson
+handshake stays bound. Without this, fresh opens are silently ignored — the
+wheel still considers the previous host-port active and won't accept a new
+`type=0x81` for the same byte.
 
 ```
 7E 06 43 17 7C 00 [session] 00 00 00 [chk]    # type=0x00 end marker
@@ -84,18 +89,20 @@ anything. New `b2h 7c 00 09 81 ...` device-init events do not fire until
 the timer expires. See [`../findings/2026-05-08-wheel-sess09-timeout.md`](../findings/2026-05-08-wheel-sess09-timeout.md)
 for wire-trace evidence and the timing matrix.
 
-The plugin handles this with a **silence gate** in `Stop`/`StartInner`:
+The plugin handles this with a **silence gate**, now its own class
+`Telemetry/Lifecycle/SilenceGate.cs`:
 
-- `Stop()` records `_lastStopUtcTicks = DateTime.UtcNow.Ticks` at the very
-  end (after the close burst has been queued + slept-for-drain).
+- `Stop()` arms it via `_silenceGate.MarkStopped(...)` at the very end
+  (after the close burst has been queued + slept-for-drain).
 - `StartInner()`, running on a ThreadPool thread (so the UI doesn't
-  block), computes elapsed since `_lastStopUtcTicks` and
-  `Thread.Sleep`s the remainder up to `MinSilenceAfterStopMs = 11000` (11s).
-- `_lastStopUtcTicks` is **static**, so it survives plugin instance recycle
-  inside the same SimHub process. Game-switch reloads the plugin (new
-  instance) but the wheel-side timeout is wall-clock and applies across
-  both instances.
-- Cold-start (`_lastStopUtcTicks == 0` initially) skips the gate.
+  block), reads the remaining wait via
+  `_silenceGate.RemainingStopReopenWaitMs(preStopTicks)` and `Thread.Sleep`s
+  it, up to `SilenceGate.StopReopenSilenceMs = 11000` (11s).
+- The timestamp (`_lastStopUtcTicks`, now a private static field of
+  `SilenceGate`) survives plugin instance recycle inside the same SimHub
+  process. Game-switch reloads the plugin (new instance) but the wheel-side
+  timeout is wall-clock and applies across both instances.
+- Cold-start (first start in the process) skips the gate.
 
 Dashboard switches **do NOT route through Stop+Start in the current default**
 (`EnableHotRenegotiation = true` in `MozaPluginSettings`). The hot-reneg path
@@ -117,22 +124,23 @@ A normal user dashboard switch in default config never trips the silence gate.
 ### sess=0x09 establishment retry
 
 Even with the silence gate, a single dropped chunk under Wine SerialPort
-R/W contention can stall the prime+open-request emission. The plugin runs
-`TickRetryS09IfNotEstablished` once per tick during Active state:
+R/W contention can stall the prime+open-request emission. The retry loop
+lives in `SessionWatchdogManager.TickRetryS09IfNotEstablished`, driven once
+per Active tick by `TelemetrySender`:
 
-- Guard: `_state != Idle` AND `!_connection.IsConnected ? skip` AND
-  `_sessions.GetOrCreate(0x09).DeviceInitiated == false` AND
-  `_s09RetryRounds < S09RetryMaxRounds (10)` AND `now - _s09RetryLastTickCount
-  >= S09RetryIntervalMs (1000)`.
+- Guard: connected AND `_sessions.GetOrCreate(0x09).DeviceInitiated == false`
+  AND `_s09RetryRounds < S09RetryMaxRounds (10)`. The inter-round gate is an
+  **exponential backoff** array `S09BackoffMs = {250, 500, 1000, 2000, 3000,
+  5000, 7000, 10000, 12000, 15000}` indexed by round (not a fixed 1000 ms).
 - Re-emits `SendSessionPrime(0x09, ...)` + `SendConfigJsonOpenRequest(0x09, ...)`
-  with fresh seqs (advances `0x000B + round*0x10` to dodge wheel-side
-  dedupe).
+  with fresh seqs (prime seq `0x0001 + round`, open-request seq
+  `0x000B + round*0x10`, to dodge wheel-side dedupe).
 - Stops automatically when wheel device-inits 0x09 (the chunk handler
   sets `info.DeviceInitiated = true`).
-- Logs `[Moza] sess=0x09 not yet device-initiated; retry round N/10` on
-  each emit; logs `retry budget exhausted` warning at round 10.
-- Resets `_s09RetryRounds = 0` in `Stop()` so each Start cycle gets a
-  fresh budget.
+- On budget exhaustion at round 10 it routes through
+  `RecoveryDispatcher.Park(...)` (raises `DashboardPipelineParked`) rather
+  than an inline Stop.
+- `Stop()` resets the round counter so each Start cycle gets a fresh budget.
 
 Retry guard is `DeviceInitiated == false` — established sessions are
 untouched, including post-dashboard-switch sessions where 0x09 stays
@@ -160,8 +168,9 @@ sends an ACK for every received chunk, not cumulatively.
 
 ### Source
 
+[`Telemetry/Inbound/TelemetryInboundDispatcher.cs`](../../../Telemetry/Inbound/TelemetryInboundDispatcher.cs)
+(`OnMessageDuringPreamble`, `HandleDeviceInit`).
 [`Telemetry/TelemetrySender.cs`](../../../Telemetry/TelemetrySender.cs)
-(`OnMessageDuringPreamble`, `SendSessionOpen`, `SendSessionAck`,
-`SendSessionClose`).
+(`SendSessionOpen`, `SendSessionAck`, `SendSessionClose`).
 [`Telemetry/Sessions/SessionRegistry.cs`](../../../Telemetry/Sessions/SessionRegistry.cs)
 (`SessionRegistry`, `SessionInfo`).

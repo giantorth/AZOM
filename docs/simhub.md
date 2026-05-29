@@ -755,7 +755,7 @@ RemapperWorker.UpdateVariantProviders() {
 }
 ```
 
-If the user has `RecognizeIndiviualWheels` off, the variant pipeline is dead — every `GetVariant` call returns null and `AquireController`'s variant check (below) fails on every saved mapping. **This is a hard prerequisite** to document for users.
+If the user has `RecognizeIndiviualWheels` off, the variant pipeline is dead — every `GetVariant` call returns null and `AquireController`'s variant check (below) fails on every saved mapping. **This is a hard prerequisite** to document for users. (The MOZA bridge's `TryRegister` deliberately calls `VariantHelper.Start()` to force-create the provider list and insert `MozaVariantProvider` even when the toggle is off, so enabling "Recognize individual wheels" takes effect immediately — the provider is already present and waiting; the toggle remains the master gate for `GetVariant` returning non-null.)
 
 `RemapperWorker.UpdateControllerList` is wired into `variantHelper.VariantChanged` in `RemapperWorker.ctor`. So provider-side `VariantChanged` → `VariantHelper.VariantChanged` → `UpdateControllerList()` → controller re-enumeration.
 
@@ -925,6 +925,8 @@ SimHub's variant model implicitly assumes each variant maps to a distinct Direct
 - **NOT** persuade the Add Source Controller UI to offer the wheelbase a second time. The Add dropdown is sourced from `UnmappedControllers` filtered by ControllerID — once any saved mapping references that GUID, the device is hidden, regardless of variant. ✗
 
 Workaround: programmatically build a new `ControllerSourceMapping` (clone an existing MOZA mapping's description, stamp `Variant` to the current wheel, reassign) and add it to `ControlMapperPluginSettings.ControllerMappings` from inside the plugin's data loop — bypass the UI add entirely.
+
+The shipping plugin **already does this** in `ControlMapperBridge`: `AutoCreateVariantMappingIfNeeded()` auto-creates a per-variant mapping each tick when the attached wheel has no slot (guarded by a once-per-session `_autoCreatedVariants` set so a user-deleted mapping does not reappear), and `DetachMozaDescription()` deep-clones shared `Description` references on `Add` so SimHub's by-reference `CopyFrom` updater can't rewrite a saved mapping's Variant on a later wheel change.
 
 ### WPF dispatcher requirement
 

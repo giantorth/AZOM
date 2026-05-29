@@ -4,13 +4,18 @@ Replicates Pithouse's observed preamble with direct session allocation.
 
 ### Startup phases
 
-**Phase 0 — Session open + config** (~200ms–1.2s, before timer starts):
-1. Send type=0x00 end markers on ports 0x01..0x10 to reclaim stale sessions (e.g. from previous SimHub crash). Without this, stale session causes fresh open to be silently ignored. Sleep 100ms.
-2. Send type=0x81 session opens for 0x01 (mgmt), 0x02 (telem = `FlagByte`), 0x03 (aux, fire-and-forget). Wait up to 500ms each for fc:00 ack. Proceed with PitHouse defaults if neither acks — real wheels silently accept data on these sessions even without explicit ack. `Start()` dispatched to background thread so serial read thread stays free to deliver fc:00 acks.
-3. If `TelemetryUploadDashboard` enabled, upload `.mzdash` file on **session 0x04** (device-initiated file transfer, 2025-11 firmware) via `DashboardUploader.BuildUpload()` → `TierDefinitionBuilder.ChunkMessage()`. Plugin waits for device to open session 0x04 (type=0x81), ACKs, then sends sub-msg 1 (path registration) + sub-msg 2 (file content) per [`../dashboard-upload/path-b-session-04.md`](../dashboard-upload/path-b-session-04.md). Waits up to 2s for wheel acknowledgment, then send type=0x00 end marker. 500ms sleep after END so state-refresh burst arrives before upload phase returns.
-4. Send sub-message 1 preamble (`07 04 00 00 00 02 00 00 00 03 00 00 00 00`) as 7c:00 data on telemetry session — prepares wheel's tier config parser.
-5. Send tier definition as 7c:00 data chunks on telemetry session (channel indices, compression codes, bit widths). **Flag bytes 0x00-based, NOT session-port-based.**
-6. Send Display sub-device identity probe via 0x43.
+**Phase 0 — Session open + config** (before the tick timer starts; `StartInner`):
+1. Reclaim stale sessions with type=0x00 end markers — a cold start closes the wide `0x01..0x0A` range, a mid-process reload closes only `0x01..0x03` (see [session-management](session-management.md) § Stale-session reclaim). Sleep ~100ms.
+2. Send type=0x81 session opens for 0x01 (mgmt) and 0x02 (telem = `FlagByte`); wait up to 500ms each for fc:00 ack. Proceed with PitHouse defaults if neither acks — real wheels silently accept data even without explicit ack. (`Start()` runs on a background thread so the serial read thread stays free to deliver fc:00 acks.)
+3. Hub only: `SendHubSlotEnumeration()` (5-slot Form B burst).
+4. Prime + open-request session 0x09 (`PrimeAndOpenSession09`) for the configJson handshake.
+5. Queue the dashboard upload to the ThreadPool (`QueueBackgroundUploadIfReady`) — a **60s background FT-burst budget**, deliberately decoupled so it never stalls tier-def/timer (NOT a synchronous 2s foreground wait). The upload runs on **session 0x04** (or whichever FT session the wheel device-inits) per [`../dashboard-upload/path-b-session-04.md`](../dashboard-upload/path-b-session-04.md).
+6. Open session 0x03 (aux) and send an empty tile-server state blob via `SendTileServerState()`.
+7. Wait for the channel-catalog burst to go quiet (`WaitForChannelCatalogQuiet`), parse it, then `MaybeSwapProfileForCatalog`.
+8. Send the sess=0x02 init handshake; probe the Display sub-device via 0x43.
+9. Arm the tick timer.
+
+The V2 preamble + tier definition are **not** sent in Phase 0 — tier-def first emits at the Preamble→Active transition (`ApplySubscription` in `TickPreamble`), once the tick timer is running. Flag bytes are 0x00-based, not session-port-based.
 
 **Phase 1 — Preamble** (~1 second, timer running):
 7. Ack incoming 7c:00 channel data on telemetry session with fc:00 (session=FlagByte).
@@ -27,4 +32,4 @@ Replicates Pithouse's observed preamble with direct session allocation.
 
 RPM LEDs (`0x3F/1A:00`) and button LEDs (`0x3F/1A:01`) handled separately by `MozaDashLedDeviceManager` and `MozaLedDeviceManager`. Zero preamble.
 
-**Disable → re-enable:** `Stop()` resets `FramesSent`; caller clears dispatch guard so re-enable performs full fresh startup (new port probing, new tier definition, new preamble). Required because wheel's session state may have changed while telemetry disabled.
+**Disable → re-enable:** `Stop()` resets `FramesSent`. `Start()` short-circuits when the sender is already Active with a live connection (persistent-sender reuse across a game-switch plugin reload); concurrent `Start()` calls are serialized via `_startSemaphore` and a cancelling `_startCts` (supersession — a second Start cancels the prior in-flight `StartInner`). A true re-enable still runs the full probe/tier-def/preamble, but only after the silence gate and only when not reusing a live persistent sender.
