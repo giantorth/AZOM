@@ -12,12 +12,12 @@ for the open frame layout.
 |---------|--------------|---------------|
 | `0x01` | Management — wheel identity, log push, channel catalog binary | Plugin opens with `type=0x81`; waits up to **500 ms** for `fc:00` ACK before proceeding |
 | `0x02` | Telemetry — `FlagByte`, tier definition + FF-prefixed settings push | Same as 0x01; opens in same USB write |
-| `0x03` | Aux — historical tile-server channel | **Fire-and-forget**: opened for doc compliance; plugin never writes here, but ACKs any unsolicited device data so wheel doesn't retransmit-stall |
+| `0x03` | Aux — tile-server channel | Plugin opens it, then sends an empty tile-server state blob (12-byte envelope + zlib, chunked) once per connect via `SendTileServerState()`. Host→wheel only — the wheel never pushes back, but the plugin ACKs any unsolicited data |
 
 Plugin builds `7E 0A 43 17 7C 00 [session] 81 [port] [port] FD 02 [chk]`
-for each via [`SendSessionOpen`](../../../Telemetry/TelemetrySender.cs)
-(line 1762). The two telemetry sessions are sent concurrently so the
-wheel sees one USB packet with both opens.
+for each via [`SendSessionOpen`](../../../Telemetry/TelemetrySender.cs).
+The two telemetry sessions are sent concurrently so the wheel sees one
+USB packet with both opens.
 
 ### Device-initiated sessions
 

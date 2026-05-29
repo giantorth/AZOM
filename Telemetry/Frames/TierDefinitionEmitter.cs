@@ -249,7 +249,8 @@ namespace MozaPlugin.Telemetry.Frames
                     tier.Channels = fresh;
                 }
                 int bits = 0;
-                foreach (var ch in tier.Channels) bits += ch.BitWidth;
+                if (tier.Channels != null)
+                    foreach (var ch in tier.Channels) bits += ch.BitWidth;
                 tier.TotalBits = bits;
                 tier.TotalBytes = (bits + 7) / 8;
             }
@@ -276,7 +277,18 @@ namespace MozaPlugin.Telemetry.Frames
         }
 
         /// <summary>Send the tier-definition (7c:00 type=0x01 chunks on sess=0x02).</summary>
-        public void SendTierDefinition()
+        /// <param name="reuseFlagBase">
+        /// When true and an ActiveSubscription already exists, emit the new tier-def
+        /// at the SAME flagBase as the prior emission and do NOT advance
+        /// <see cref="TelemetrySender.NextFlagBase"/>. Used by the catalog-growth
+        /// re-emit path so the wheel's existing channel bindings stay valid while
+        /// newly-discovered URLs get bound at the same base. Without this, the wheel
+        /// keeps rendering at the prior base while host value frames arrive at the
+        /// new base — dashboard freezes on last good values. Falls through to fresh-
+        /// base behavior if ActiveSubscription is null (defensive; shouldn't occur
+        /// in practice since the growth path only fires in Active state).
+        /// </param>
+        public void SendTierDefinition(bool reuseFlagBase = false)
         {
             var profile = _sender.ProfileRef;
             if (profile == null || profile.Tiers.Count == 0)
@@ -434,8 +446,15 @@ namespace MozaPlugin.Telemetry.Frames
                         RebuildFrameBuildersFromProfile();
                     }
 
-                    byte flagBase = _sender.NextFlagBase;
                     var prevSub = _sender.ActiveSubscription;
+                    // Reuse path: emit at the prior subscription's flagBase so the
+                    // wheel's existing channel→idx bindings stay valid. Pass
+                    // prevFlagBase=null/prevTierCount=0 to BuildTierDefinitionMessage
+                    // to suppress the prior-broadcast ENABLE records — those would
+                    // re-arm flags the SAME tier records are about to redefine.
+                    bool doReuse = reuseFlagBase && prevSub != null;
+                    // doReuse guarantees prevSub != null; null-forgiving is safe.
+                    byte flagBase = doReuse ? prevSub!.FlagBase : _sender.NextFlagBase;
 
                     // END u32: echo of the wheel's most-recent END marker. PitHouse
                     // handshake: wheel sends tag=0x06 size=4 value=u32 announcing a
@@ -451,14 +470,15 @@ namespace MozaPlugin.Telemetry.Frames
                         useWheelCatalogIndices: cspIdx,
                         wheelCatalog: _sender.CatalogParser.Catalog,
                         endMarkerCounter: endForThisEmission,
-                        prevFlagBase: prevSub?.FlagBase,
-                        prevTierCount: prevSub?.TierCount ?? 0,
-                        prevSubPerBroadcast: prevSub?.SubTiersPerBroadcast ?? 0);
+                        prevFlagBase: doReuse ? (byte?)null : prevSub?.FlagBase,
+                        prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0),
+                        prevSubPerBroadcast: doReuse ? 0 : (prevSub?.SubTiersPerBroadcast ?? 0));
                     var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     MozaLog.Debug(
                         $"[Moza] Sending v2 tier definition ({(cspIdx ? "type02" : "compact")}): " +
-                        $"flagBase=0x{flagBase:X2}, end={endForThisEmission} (echoing wheel), " +
+                        $"flagBase=0x{flagBase:X2}{(doReuse ? " (reused)" : "")}, " +
+                        $"end={endForThisEmission} (echoing wheel), " +
                         $"prev={(prevSub != null ? $"0x{prevSub.FlagBase:X2}/{prevSub.TierCount}t/{prevSub.SubTiersPerBroadcast}spb" : "none")}, " +
                         $"preamble ({preambleChunkCount} chunks)" +
                         $" + {message.Length} bytes in {frames.Count} chunks " +
@@ -471,7 +491,10 @@ namespace MozaPlugin.Telemetry.Frames
                         subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile),
                         profileName: profile.Name);
                     _sender.IncrementSubscriptionGen();
-                    _sender.NextFlagBase = (byte)(flagBase + profile.Tiers.Count);
+                    if (!doReuse)
+                    {
+                        _sender.NextFlagBase = (byte)(flagBase + profile.Tiers.Count);
+                    }
                     // Snapshot catalog size for grow-subscription detection.
                     _sender.CatalogCountAtLastSubscription = _sender.CatalogParser.Count;
 

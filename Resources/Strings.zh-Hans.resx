@@ -464,4 +464,22 @@
   <data name="Section_Language" xml:space="preserve"><value>语言</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>语言</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>关闭并重新打开此设置页面以应用新语言。“自动”会先跟随 SimHub 的语言设置,再跟随系统语言。</value></data>
+  <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
+  <data name="Button_ImportProfile" xml:space="preserve"><value>导入配置…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>导入 PitHouse 预设</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>浏览文件…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>力反馈底座 (Motor)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>踏板</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>未找到 PitHouse 预设文件夹。请设置自定义路径或使用浏览。</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>设置文件夹…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>正在将"{0}"应用到配置"{1}"。以下设置将被更改：</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>此预设中的所有值已与您的活动配置匹配。</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>未导入（插件中无对应项）：</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>应用</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>取消</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>下一步</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>返回</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>从系统任意位置选择 PitHouse 预设 JSON 文件。</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>文件不是有效的 JSON: {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>不支持的预设类型 "{0}"。仅支持 Motor 和 Pedals 预设。</value></data>
 </root>

@@ -195,6 +195,7 @@ skipReadByMode:
         {
             if (ReferenceEquals(Instance, this)) Instance = null;
             StopInputsLiveTimer();
+            StopMappingValueTimer();
             _refreshTimer.Stop();
 
             if (_dashEventSubscribedPlugin != null)

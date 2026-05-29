@@ -808,7 +808,10 @@ namespace MozaPlugin.Telemetry.Frames
                         // END marker: tag 0x06, size=4 (LE), u32 value.
                         // Records BEFORE this byte belong to the now-ending
                         // generation; records AFTER belong to the next.
-                        if (buffer[i + 1] == 0x04 && buffer[i + 2] == 0
+                        // The loop guard only ensures i+6 is in-bounds, so the
+                        // full 9-byte record (through i+8) must be checked here.
+                        if (i + 8 < buffer.Length
+                            && buffer[i + 1] == 0x04 && buffer[i + 2] == 0
                             && buffer[i + 3] == 0 && buffer[i + 4] == 0)
                         {
                             uint markerValue = (uint)(buffer[i + 5]

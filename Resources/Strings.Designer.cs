@@ -531,5 +531,24 @@ namespace MozaPlugin.Resources
         public static string Subtitle_SleepLight => Get("Subtitle_SleepLight");
         public static string SliderLabel_Speed => Get("SliderLabel_Speed");
         public static string SliderLabel_Color => Get("SliderLabel_Color");
+
+        // PitHouse preset import (Button_ImportProfile + Import_*).
+        public static string Button_ImportProfile => Get("Button_ImportProfile");
+        public static string Import_DialogTitle => Get("Import_DialogTitle");
+        public static string Import_Tab_Browse => Get("Import_Tab_Browse");
+        public static string Import_Category_Motor => Get("Import_Category_Motor");
+        public static string Import_Category_Pedals => Get("Import_Category_Pedals");
+        public static string Import_NoFolderFound => Get("Import_NoFolderFound");
+        public static string Import_SetCustomFolder => Get("Import_SetCustomFolder");
+        public static string Import_ConfirmHeader => Get("Import_ConfirmHeader");
+        public static string Import_NoChangesHeader => Get("Import_NoChangesHeader");
+        public static string Import_NotImportedHeader => Get("Import_NotImportedHeader");
+        public static string Import_ApplyButton => Get("Import_ApplyButton");
+        public static string Import_CancelButton => Get("Import_CancelButton");
+        public static string Import_NextButton => Get("Import_NextButton");
+        public static string Import_BackButton => Get("Import_BackButton");
+        public static string Import_BrowseDescription => Get("Import_BrowseDescription");
+        public static string Import_Error_InvalidJson => Get("Import_Error_InvalidJson");
+        public static string Import_Error_UnsupportedType => Get("Import_Error_UnsupportedType");
     }
 }

@@ -179,16 +179,23 @@ namespace MozaPlugin.Devices
             }
 
             // Reconnect any healthy-port-but-disconnected controllers (port
-            // wedged, restored on next attempt).
+            // wedged, restored on next attempt). Snapshot under the lock, then
+            // connect outside it: SerialPort.Open can block ~600ms under Wine
+            // and must not stall other _lock holders (the telemetry/HID fan-out
+            // takes _lock every tick).
+            List<MBoosterDeviceController>? toReconnect = null;
             lock (_lock)
             {
                 foreach (var c in _order)
-                {
                     if (!c.IsConnected)
-                    {
-                        try { c.TryConnect(); }
-                        catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Reconnect: {ex.Message}"); }
-                    }
+                        (toReconnect ??= new List<MBoosterDeviceController>()).Add(c);
+            }
+            if (toReconnect != null)
+            {
+                foreach (var c in toReconnect)
+                {
+                    try { c.TryConnect(); }
+                    catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Reconnect: {ex.Message}"); }
                 }
             }
         }

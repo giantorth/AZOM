@@ -62,6 +62,17 @@ namespace MozaPlugin.Devices
         public int BrowSegmentSize { get; }
 
         /// <summary>
+        /// Whether this wheel has the sleep-light / idle-light feature (mode 0x20,
+        /// timeout 0x21, speed 0x22, color 0x24 on group 0x3F dev 0x17). Modern
+        /// wheels support it; the legacy bare-"CS" prefix (RPM-only, no buttons /
+        /// knobs / flags) does NOT — pushing those writes confuses its firmware
+        /// into a Table 8 read-fail loop that makes the wheel periodically stop
+        /// answering presence polls. Default <c>true</c>; flip to <c>false</c>
+        /// on models known to lack the feature.
+        /// </summary>
+        public bool HasSleepLight { get; }
+
+        /// <summary>
         /// Returns the Group 3 start index for the given knob (0-based).
         /// E.g. CS Pro knob 2 → 12 (skip knob 0's 12 LEDs).
         /// </summary>
@@ -86,6 +97,11 @@ namespace MozaPlugin.Devices
         internal static readonly (string Prefix, string FriendlyName, WheelModelInfo Info)[] KnownModels =
         {
             ("GS V2P",  "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            // Some GS V2 Pro firmware variants report the bare prefix "GS"
+            // instead of "GS V2P" (observed on RS21-D02-MC GW). Same physical
+            // layout — 10 RPM + 10 button LEDs, no display. Must come after
+            // "GS V2P" so the longer prefix matches first when present.
+            ("GS",      "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
             ("CS V2.1", "CS V2",      new WheelModelInfo(10, 6,  false, new[] { 0, 1, 3, 6, 8, 9 }, 0, hasDisplay: false)),
             // CS Pro / KS Pro expose rotary encoders with configurable background +
             // primary colors (protocol groups 0..KnobCount-1 via cmd 0x27).
@@ -108,10 +124,13 @@ namespace MozaPlugin.Devices
             // bare prefix "CS" with no version suffix. 10 RGB RPM LEDs, no button
             // / flag / knob LEDs, no display. Must come after "CS V2.1" so the
             // longer prefix is matched first for newer firmware reports.
-            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false)),
+            // hasSleepLight=false: pushing wheel-idle-mode/timeout/speed/color at
+            // this wheel triggers a Table 8 read-fail storm in its firmware that
+            // makes it intermittently unresponsive.
+            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
         };
 
-        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0)
+        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true)
         {
             RpmLedCount = rpmLedCount;
             ButtonLedCount = buttonLedCount;
@@ -125,6 +144,7 @@ namespace MozaPlugin.Devices
             KnobRingLedTotal = total;
             HasDisplay = hasDisplay;
             BrowSegmentSize = browSegmentSize;
+            HasSleepLight = hasSleepLight;
         }
 
         /// <summary>

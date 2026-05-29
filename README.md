@@ -6,6 +6,9 @@
 [![Stars](https://img.shields.io/github/stars/giantorth/moza-simhub-plugin?label=Star&logo=github&color=yellow)](https://github.com/giantorth/moza-simhub-plugin/stargazers)
 # Unofficial MOZA SimHub Plugin
 
+![Logo](docs/Logo.png)
+
+
 > [!NOTE]
 > MOZA is a registered trademark of Gudsen Technology Co., Ltd. This project is not affiliated with, endorsed by, or sponsored by MOZA or Gudsen Technology. All trademarks are the property of their respective owners.
 
@@ -45,7 +48,7 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 ## Installation
 
-1. Download the latest `MozaPlugin.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page.
+1. Download the latest `MozaPlugin_<version>.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page.
 2. Extract `MozaPlugin.dll` into your SimHub installation directory. 
 
 > Simhub defaults to `C:\Program Files (x86)\SimHub\`
@@ -54,7 +57,7 @@ Restart SimHub — the plugin appears under Settings > Plugins as "MOZA Control"
 
 **Development builds.** The latest in-progress build from the `dev` branch is published as a pre-release: [MozaPlugin_dev.zip](https://github.com/giantorth/moza-simhub-plugin/releases/download/dev-latest/MozaPlugin_dev.zip). Expect bugs or broken features — use the stable release above if you need something reliable.
 
-**Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11+.
+**Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11.8+.
 
 ## This Plugin is Better With ATSR-EVO
 
@@ -80,7 +83,7 @@ MOZA wheels and dashboards register as native SimHub devices, appearing in SimHu
 
 ![Device Panel](docs/Device.png)
 
-- **Per-Model Device Definitions** — Each new wheel attached will get a generated device definition with the LED layout baked in. Definitions are deployed automatically on first detection — just connect your hardware, restart SimHub, and add the device. Requires SimHub 9.11+
+- **Per-Model Device Definitions** — Each new wheel attached will get a generated device definition with the LED layout baked in. Definitions are deployed automatically on first detection — just connect your hardware, restart SimHub, and add the device. Requires SimHub 9.11.8+
 - **LED Effects System** — Use SimHub's full Button and Telemetry effects configuration UI (RPM indicators, flags, speed limiter animations, scripted effects, etc.) to control your wheel and dashboard LEDs
 - **Per-Game Device Profiles** — SimHub's device profile system saves and restores LED effect configurations per game
 - **Model-Aware Connection** — Only the device matching the currently connected wheel reports as connected. Swap wheels and the correct device activates automatically
@@ -134,13 +137,13 @@ All settings are stored per-game via SimHub's profile system and switch automati
 
 ### Languages
 
-The plugin UI is localized into **English, Español, Français, Русский**. By default the plugin follows SimHub's own language setting (Settings > General > Culture in SimHub); if SimHub is set to a language the plugin doesn't ship yet, it falls back to your OS UI language, then English. A **Language** picker in the plugin's Options tab lets you override that auto-detection — useful if you want SimHub in one language and the MOZA pane in another.
+The plugin UI is localized into **English, Deutsch, Español, Français, Italiano, Русский, Tiếng Việt, and 简体中文** (8 languages). By default the plugin follows SimHub's own language setting (Settings > General > Culture in SimHub); if SimHub is set to a language the plugin doesn't ship yet, it falls back to your OS UI language, then English. A **Language** picker in the plugin's Options tab lets you override that auto-detection — useful if you want SimHub in one language and the MOZA pane in another.
 
 All translations are embedded directly into `MozaPlugin.dll` — no per-culture satellite assemblies, no extra files to deploy. Translations live in `Resources/Strings.<culture>.resx`. PRs adding a new language are welcome — see the i18n section in [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the four-step recipe.
 
 ### Hardware Configuration
 
-The plugin panel (Settings > Plugins > MOZA Control) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, Hub, Options, LEDs, Wheel Files, Diagnostics). The Diagnostics tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
+The plugin panel (Settings > Plugins > MOZA Control) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, SDK, About). The About tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
 
 The Universal Hub gets its own tab listing each connected port and the device attached to it, polled every 2 seconds.
 
@@ -154,19 +157,30 @@ Full configuration support for the MOZA AB9 active shifter, surfaced under its o
 
 - **Mechanical layout** — 5+R, 6+R (two patterns), 7+R (two patterns), or Sequential.
 - **Feel** — mechanical resistance, spring, natural damping, natural friction, and max output torque limit, each on a 0–100 slider.
-- **Engine vibration** — intensity (0–100) and frequency (0–300 Hz) for engine-driven shaker effect.
+- **Engine vibration** — intensity (0–100) and frequency (0–200 Hz) for engine-driven shaker effect.
 - **Gear-shift vibration** — pulse intensity (0–100) on every shift.
+
+### mBooster Pedals
+
+MOZA mBooster pedal haptics get their own **mBooster** tab when one or more units are connected. Each unit is assigned a role (Throttle, Brake, or Clutch), and the plugin renders pedal haptic effects host-side from live telemetry:
+
+- **ABS** — pulse when ABS activates.
+- **Lockup** — vibration as a tyre approaches lockup under braking.
+- **Threshold** — feedback near the brake-pressure threshold.
+- **Engine continuous** — RPM-driven continuous vibration.
+
+An experimental calibration section is also available per device.
 
 ### Diagnostics & Serial Capture
 
-The Diagnostics tab includes a **Serial traffic capture** section for bug reports:
+The About tab includes a **Serial traffic capture** section for bug reports:
 
 - **Start capture** records every TX/RX serial frame (wheelbase + AB9 pipes) with millisecond timestamps in memory. Nothing is written to disk while capturing, and the buffer is wiped each time SimHub restarts.
 - **Stop capture** reveals the captured frames inline (hex dump, one frame per line) and unlocks the export buttons. Per-direction labels (`T`/`R`) and pipe labels (`wheelbase` / `ab9`) make it easy to correlate with protocol docs.
 - **Export bundle (ZIP)** writes a timestamped archive containing:
   - `manifest.txt` — bundle header (plugin version, OS, capture summary)
   - `serial-capture.txt` — TX/RX frame log
-  - `diagnostics.txt` — snapshot of the Diagnostics tab text (identity, dashboard state, session info)
+  - `diagnostics.txt` — snapshot of the About tab's diagnostic report (identity, dashboard state, session info)
   - `moza-log.txt` — every `[Moza]` log line emitted by the plugin since launch (pulled from the in-process `MozaLog` ring buffer, so flush cadence and SimHub log-file location don't matter)
 - **Copy capture to clipboard** copies the frame log without exporting a file.
 
@@ -179,9 +193,9 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | Property | Type | Description |
 |----------|------|-------------|
 | `Moza.BaseConnected` | bool | Wheelbase connection status |
-| `Moza.McuTemp` | double | MCU temperature (°C) |
-| `Moza.MosfetTemp` | double | MOSFET temperature (°C) |
-| `Moza.MotorTemp` | double | Motor temperature (°C) |
+| `Moza.McuTemp` | double | MCU temperature (°C or °F, per the temperature-unit setting) |
+| `Moza.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
+| `Moza.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
 | `Moza.BaseState` | int | Wheelbase state |
 | `Moza.FfbStrength` | int | FFB strength (%) |
 | `Moza.MaxAngle` | int | Max steering angle (degrees) |

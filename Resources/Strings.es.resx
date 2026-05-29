@@ -469,4 +469,22 @@
   <data name="Section_Language" xml:space="preserve"><value>IDIOMA</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Idioma</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Cierra y vuelve a abrir esta página de ajustes para aplicar el nuevo idioma. Auto sigue el idioma de SimHub y luego el del sistema.</value></data>
+  <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
+  <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORTAR PERFIL…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>Importar preset de PitHouse</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>Buscar archivo…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>Base de volante (Motor)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>Pedales</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>Carpeta de presets de PitHouse no encontrada. Configura una ruta personalizada o usa Buscar.</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>Configurar carpeta…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Aplicando "{0}" al perfil "{1}". Cambiarán los siguientes ajustes:</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>Todos los valores de este preset ya coinciden con tu perfil activo.</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>No importado (sin equivalente en el plugin):</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>APLICAR</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>CANCELAR</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>SIGUIENTE</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>ATRÁS</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Selecciona un archivo JSON de preset de PitHouse desde cualquier ubicación.</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>El archivo no es JSON válido: {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Tipo de preset no compatible "{0}". Solo se admiten presets de Motor y Pedales.</value></data>
 </root>

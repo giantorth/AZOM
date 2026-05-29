@@ -464,4 +464,22 @@
   <data name="Section_Language" xml:space="preserve"><value>NGÔN NGỮ</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Ngôn ngữ</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Đóng và mở lại trang cài đặt này để áp dụng ngôn ngữ mới. Tự động sẽ theo ngôn ngữ của SimHub, rồi đến hệ điều hành.</value></data>
+  <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
+  <data name="Button_ImportProfile" xml:space="preserve"><value>NHẬP HỒ SƠ…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>Nhập cài đặt PitHouse</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>Duyệt tệp…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>Đế vô-lăng (Motor)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>Không tìm thấy thư mục cài đặt PitHouse. Đặt đường dẫn tùy chỉnh hoặc dùng Duyệt.</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>Đặt thư mục…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Đang áp dụng "{0}" vào hồ sơ "{1}". Các cài đặt sau sẽ thay đổi:</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>Tất cả các giá trị trong cài đặt này đã khớp với hồ sơ đang hoạt động.</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>Không nhập (không có tương đương trong plugin):</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>ÁP DỤNG</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>HỦY</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>TIẾP</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>QUAY LẠI</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Chọn một tệp JSON cài đặt PitHouse từ bất kỳ vị trí nào.</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Tệp không phải JSON hợp lệ: {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Loại cài đặt không hỗ trợ "{0}". Chỉ hỗ trợ cài đặt Motor và Pedals.</value></data>
 </root>

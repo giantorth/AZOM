@@ -52,6 +52,7 @@ namespace MozaPlugin
         // would otherwise create N Runs/frame; we recycle them in place.
         private Run[]? _activeButtonRuns;
         private Run[]? _activeButtonSeparatorRuns;
+        private bool _activeButtonsShowingNone;
 
         // Cache of the previous tick's hint list so RefreshDisplay only assigns
         // ItemsSource when the set genuinely changes. ItemsControl rebuilds its
@@ -244,8 +245,7 @@ namespace MozaPlugin
         {
             if (!connected || _data.ButtonCount == 0)
             {
-                ActiveButtonsText.Inlines.Clear();
-                ActiveButtonsText.Inlines.Add(new Run("None"));
+                ShowNoneOnce();
                 return;
             }
 
@@ -265,21 +265,35 @@ namespace MozaPlugin
 
             var now = DateTime.UtcNow;
             int count = _data.ButtonCount;
+
+            // Record presses and decide whether anything is visible this tick.
+            // While at least one button is within its 1s fade window we rebuild
+            // every tick (the fade needs it); once fully idle we render "None"
+            // once and skip the per-tick Inlines churn entirely.
+            bool anyActive = false;
+            for (int i = 0; i < count; i++)
+            {
+                if (_data.ButtonStates[i]) _buttonLastPressed[i] = now;
+                if ((now - _buttonLastPressed[i]).TotalSeconds < 1.0) anyActive = true;
+            }
+            if (!anyActive)
+            {
+                ShowNoneOnce();
+                return;
+            }
+            _activeButtonsShowingNone = false;
+
             ActiveButtonsText.Inlines.Clear();
             int emitted = 0;
             for (int i = 0; i < count; i++)
             {
-                bool pressed = _data.ButtonStates[i];
-                if (pressed)
-                    _buttonLastPressed[i] = now;
-
                 if ((now - _buttonLastPressed[i]).TotalSeconds < 1.0)
                 {
                     if (emitted > 0)
                         ActiveButtonsText.Inlines.Add(_activeButtonSeparatorRuns![emitted - 1]);
 
                     var run = _activeButtonRuns[i];
-                    if (pressed)
+                    if (_data.ButtonStates[i])
                     {
                         run.FontWeight = FontWeights.Bold;
                         run.Foreground = Brushes.White;
@@ -295,9 +309,16 @@ namespace MozaPlugin
                     emitted++;
                 }
             }
+        }
 
-            if (emitted == 0)
-                ActiveButtonsText.Inlines.Add(new Run("None"));
+        // Render the "None" placeholder once and latch it, so the idle case
+        // doesn't rebuild the InlineCollection (and allocate a Run) every tick.
+        private void ShowNoneOnce()
+        {
+            if (_activeButtonsShowingNone) return;
+            ActiveButtonsText.Inlines.Clear();
+            ActiveButtonsText.Inlines.Add(new Run("None"));
+            _activeButtonsShowingNone = true;
         }
 
         private void UpdateHandbrakeButtonStatus(bool connected)

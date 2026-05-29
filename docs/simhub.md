@@ -707,6 +707,258 @@ DeviceDriver.Display(
 
 **LED pipeline event:** `PluginManager.OnLedsUpdate` is an `internal static event` that fires after LED data is computed each frame. Not accessible from plugins without reflection. The `ILedDeviceManager.Display()` injection is the supported path.
 
+## Control Mapper Variant Providers
+
+SimHub's Control Mapper supports a "variant" concept — a per-attached-wheel string that lets the same DirectInput controller track different button-mapping bundles. Fanatec and Simucube ship built-in providers (`FanatecVariantProvider`, `SimucubeVariantProvider`); the registration surface for third-party providers is **not public** and requires reflection. The IL findings below come from `SimHub.Plugins.dll` version `1.0.9631.22016`.
+
+### Public surface
+
+```csharp
+namespace SimHub.Plugins.OutputPlugins.ControlRemapper.Variants;
+
+public interface IVariantProvider
+{
+    string GetVariant(int vendorid, int productid);
+}
+```
+
+By convention (matching `FanatecVariantProvider` / `SimucubeVariantProvider`), providers also expose a public `EventHandler` event named exactly **`VariantChanged`**. `VariantHelper` reflects on this event by name when it subscribes — fire the event when your detected variant changes and the helper triggers controller re-enumeration.
+
+### The variant pipeline
+
+```
+ControlMapperPlugin (public — discoverable via PluginManager.GetPlugin<T>())
+  └── remapperWorker        (RemapperWorker, private field)
+        ├── settings              (ControlMapperPluginSettings, public field)
+        │     └── RecognizeIndiviualWheels (bool, user toggle — note SimHub's typo)
+        ├── variantHelper         (VariantHelper, private field)
+        │     └── VariantProviders (List<IVariantProvider>, private field) ← REGISTRATION TARGET
+        └── directInput           (SharpDX.DirectInput.DirectInput)
+```
+
+**`VariantHelper.GetVariant(int vid, int pid)`** decompiled:
+
+```csharp
+if (!Settings.RecognizeIndiviualWheels) return null;   // MASTER GATE
+if (VariantProviders == null) return null;
+return VariantProviders.Select(p => p.GetVariant(vid, pid)).FirstOrDefault(v => v != null);
+```
+
+**Lazy-initialization gotcha**: `VariantProviders` is null until `VariantHelper.Start()` runs. `Start()` is called from `RemapperWorker.UpdateVariantProviders()`, which gates on the user toggle:
+
+```csharp
+RemapperWorker.UpdateVariantProviders() {
+    if (settings.RecognizeIndiviualWheels)
+        variantHelper.Start();   // creates the list, adds Simucube + Fanatec, subscribes to providers' VariantChanged
+    else
+        variantHelper.Stop();    // unsubscribes
+}
+```
+
+If the user has `RecognizeIndiviualWheels` off, the variant pipeline is dead — every `GetVariant` call returns null and `AquireController`'s variant check (below) fails on every saved mapping. **This is a hard prerequisite** to document for users.
+
+`RemapperWorker.UpdateControllerList` is wired into `variantHelper.VariantChanged` in `RemapperWorker.ctor`. So provider-side `VariantChanged` → `VariantHelper.VariantChanged` → `UpdateControllerList()` → controller re-enumeration.
+
+### Registering a custom provider
+
+There is no public API. The reflection chain (defensive: every step can fail if SimHub renames an internal):
+
+```csharp
+Assembly pmAsm = pluginManager.GetType().Assembly;
+Type cmType = pmAsm.GetType("SimHub.Plugins.OutputPlugins.ControlRemapper.ControlMapperPlugin");
+
+// PluginManager.GetPlugin<T>() — public, generic, no-arg
+MethodInfo getPlugin = pluginManager.GetType().GetMethod(
+    "GetPlugin", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+object cmInstance = getPlugin.MakeGenericMethod(cmType).Invoke(pluginManager, null);
+
+object rw = cmType.GetField("remapperWorker", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(cmInstance);
+object vh = rw.GetType().GetField("variantHelper", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(rw);
+
+FieldInfo providersField = vh.GetType().GetField(
+    "VariantProviders", BindingFlags.NonPublic | BindingFlags.Instance);
+
+// Lazy-materialize the list if the user hasn't flipped RecognizeIndiviualWheels yet
+if (providersField.GetValue(vh) == null) {
+    vh.GetType().GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(vh, null);
+}
+
+((IList)providersField.GetValue(vh)).Add(myProvider);
+
+// Refresh subscriptions — Start() unconditionally re-subscribes to every provider
+// (yes, this double-subscribes the original Fanatec + Simucube providers; benign noise,
+// not a correctness bug, since SimHub doesn't track subscription counts itself).
+rw.GetType().GetMethod(
+    "UpdateVariantProviders",
+    BindingFlags.NonPublic | BindingFlags.Instance).Invoke(rw, null);
+
+// Force an immediate re-enumeration so the new provider's variant lands on the first
+// pass (controllers attached before our bridge registered are otherwise stamped with
+// variant=null until the next VariantChanged fires).
+rw.GetType().GetMethod(
+    "UpdateControllerList",
+    BindingFlags.NonPublic | BindingFlags.Instance).Invoke(rw, null);
+```
+
+### How variant flows through controller enumeration
+
+`RemapperWorker.UpdateControllerList` walks `directInput.GetDevices()`. The per-device closure (`<>c__DisplayClass64_2.<UpdateControllerList>b__1`) does:
+
+1. Build a fresh `ControllerDescription` via `ToControllerDescription`, which stamps `Variant = variantHelper.GetVariant(VID, PID)` — i.e. **our provider's current value**.
+
+2. Run a **match cascade** against `settings.ControllerMappings` (a `FirstOrDefault` chain). All three predicates are **variant-aware**:
+
+   | Predicate (compiler-generated) | Match condition |
+   |--------------------------------|-----------------|
+   | `b__2` (first FirstOrDefault) | `m.Description.InterfacePath == newDesc.InterfacePath && m.Description.Variant?.ToLower() == newDesc.Variant?.ToLower()` |
+   | `b__3` (second) | `m.Description.ControllerID == deviceInstance.InstanceGuid && m.Description.Variant?.ToLower() == newDesc.Variant?.ToLower()` |
+   | `b__10` (third, gated on `IsUniquePIDVID && MatchControllerOnPIDVID`) | `m.Description.VendorID == newDesc.VendorID && m.Description.ProductId == newDesc.ProductId && m.Description.Variant?.ToLower() == newDesc.Variant?.ToLower()` |
+
+3. If matched: `match.ControllerDescription.CopyFrom(newDesc)` — updates the saved mapping's description fields in place (including `Variant`; idempotent when the values are already equal).
+
+4. `UpdateOrAdd` into `settings.AvailableControllers` (`ObservableCollection<ControllerDescription>`). Predicate `b__4` is also variant-aware (ControllerID + Variant); updater `b__6` calls `existing.CopyFrom(newDesc)`.
+
+5. **If the cascade returns null**: device is unmapped for the current variant. Add `deviceInstance.InstanceGuid` to a local `unmappedGuids` list, then `UpdateOrAdd` into `settings.UnmappedControllers`. **Predicate `b__7` is ControllerID-only** — no variant check — and updater `b__9` calls `existing.CopyFrom(newDesc)`. **This is the trap**, see below.
+
+6. Add `deviceInstance.InstanceGuid` to `foundGuids` (a local list).
+
+After the per-device loop:
+
+```csharp
+foreach (m in settings.ControllerMappings)
+    m.ControllerState.Available = foundGuids.Contains(m.Description.ControllerID);
+CleanCollection(settings.UnmappedControllers, unmappedGuids);     // strips entries whose ControllerID isn't in the GUID list
+CleanCollection(settings.AvailableControllers, foundGuids);
+```
+
+So **`Available` is "is the DirectInput device currently plugged in"**, NOT "does this mapping's variant match." Mappings whose stored Variant doesn't match the live wheel still show `Available=true` if the wheelbase is connected. SimHub UI typically renders this as "online," which is misleading but isn't where input dispatch is gated.
+
+### Input dispatch gating: `SharpHelper.AquireController`
+
+The real per-variant gate. Called from `ProcessControllers` before any input is polled:
+
+```csharp
+bool AquireController(DirectInput directInput, ControllerSourceMapping mapping, VariantHelper helper, …) {
+    if (mapping.ControllerState.Device != null) {
+        if (!mapping.IsEnabled)        { cleanup; return false; }
+        if (!mapping.ControllerState.Available) { cleanup; return false; }
+        if (mapping.ControllerState.AcquireDebouncer.Debounce()) return false;
+
+        // First variant check (when device already acquired):
+        if (SharpHelper.GetCurrentVariant(mapping, helper) != mapping.Description.Variant) {
+            SharpHelper.SetAsUnplugged(mapping);       // sets ControllerStatus = Disconnected
+            return false;
+        }
+    } else {
+        try {
+            mapping.ControllerState.Device = SharpHelper.CreateJoystick(directInput, mapping.Description.ControllerID);
+            // …onConnected.Invoke()…
+        } catch { SharpHelper.SetAsUnplugged(mapping); return false; }
+
+        // Second variant check (after acquire), ToLower-normalized:
+        if (SharpHelper.GetCurrentVariant(mapping, helper)?.ToLower() != mapping.Description.Variant?.ToLower()) {
+            mapping.ControllerState.Device.Dispose();
+            mapping.ControllerState.Device = null;
+            SharpHelper.SetAsUnplugged(mapping);
+            return false;
+        }
+    }
+    return mapping.ControllerState.Device != null;
+}
+
+// SharpHelper.GetCurrentVariant — calls our provider via the helper:
+string GetCurrentVariant(ControllerSourceMapping mapping, VariantHelper helper) {
+    return helper.GetVariant(mapping.Description.VendorID, mapping.Description.ProductId);
+}
+
+// SharpHelper.SetAsUnplugged — minimal:
+void SetAsUnplugged(ControllerSourceMapping mapping) {
+    mapping.ControllerState.ControllerStatus = ControllerStatus.Disconnected;
+}
+```
+
+`ProcessControllers` short-circuits the input loop body on `AquireController` returning false, so **per-variant input dispatch works correctly** even when `Available` is variant-agnostic.
+
+### Shared-reference pitfalls
+
+**`ControllerSourceMapping.set_ControllerDescription`** stores its argument **by reference** — no clone:
+
+```csharp
+set_ControllerDescription(value) {
+    if (Equals(this.<ControllerDescription>k__BackingField, value)) return;
+    this.<ControllerDescription>k__BackingField = value;
+    OnControllerDescriptionChanged();   // subscribes to the description's PropertyChanged
+}
+```
+
+**`ControlMapperPluginSettings.AddController`** (the method "Add Source Controller" calls):
+
+```csharp
+void AddController(ControllerDescription description) {
+    if (description == null) return;
+    var csm = new ControllerSourceMapping();
+    csm.ControllerDescription = description;     // SHARED reference
+    this.ControllerMappings.Add(csm);            // fires CollectionChanged on the dispatcher
+    UpdateControllerList();
+}
+```
+
+The UI typically passes a description that lives in `settings.AvailableControllers` or `settings.UnmappedControllers`, so the new `ControllerSourceMapping` and the source collection now **share the same `ControllerDescription` instance**.
+
+**The trap**: `UpdateOrAdd` into `UnmappedControllers` (b__7, ControllerID-only) calls `existing.CopyFrom(newDesc)` whenever the shared description happens to be re-found. The shared description's `Variant` gets overwritten with the live wheel's variant on every wheel change — and the saved mapping silently inherits the rewrite.
+
+**Workaround when programmatically adding (or when intercepting `CollectionChanged`)**: deep-clone the description so the new mapping owns its own object:
+
+```csharp
+ControllerDescription clone = new ControllerDescription();
+clone.CopyFrom(newCsm.ControllerDescription);
+clone.Variant = currentDetectedVariant;   // what the user actually meant to add
+newCsm.ControllerDescription = clone;
+```
+
+### Single-DirectInput-device hardware
+
+SimHub's variant model implicitly assumes each variant maps to a distinct DirectInput `InstanceGuid` — Fanatec / Simucube wheels enumerate as separate Windows joystick devices when the user swaps wheels. For hardware like MOZA where the wheelbase keeps the same `InstanceGuid` regardless of which wheel is attached (wheel identity arrives via the serial protocol, not USB device-tree changes), the variant provider can still:
+
+- **Disambiguate the display label** in Add Source Controller via `Description.Variant`. ✓
+- **Gate input dispatch** via `AquireController`'s variant check. ✓
+- **NOT** persuade the Add Source Controller UI to offer the wheelbase a second time. The Add dropdown is sourced from `UnmappedControllers` filtered by ControllerID — once any saved mapping references that GUID, the device is hidden, regardless of variant. ✗
+
+Workaround: programmatically build a new `ControllerSourceMapping` (clone an existing MOZA mapping's description, stamp `Variant` to the current wheel, reassign) and add it to `ControlMapperPluginSettings.ControllerMappings` from inside the plugin's data loop — bypass the UI add entirely.
+
+### WPF dispatcher requirement
+
+`ControlMapperPluginSettings.ControllerMappings` is an `ObservableCollection<ControllerSourceMapping>` bound to a WPF `CollectionView`. **All modifications must run on the UI dispatcher thread**. Background-thread `Add` throws:
+
+```
+This type of CollectionView does not support changes to its
+SourceCollection from a thread different from the Dispatcher thread.
+```
+
+The exception fires AFTER the backing `List<T>` is mutated, so `Count` rises but the WPF view never sees the change notification — UI stays out of sync, and a subsequent UI-thread modification can throw too. Marshal via:
+
+```csharp
+var dispatcher = System.Windows.Application.Current?.Dispatcher;
+if (dispatcher == null || dispatcher.CheckAccess())
+    mappings.Add(csm);
+else
+    dispatcher.BeginInvoke(new Action(() => mappings.Add(csm)));
+```
+
+### Key types
+
+| Type | Namespace | Public/Internal |
+|------|-----------|------------------|
+| `IVariantProvider` | `…ControlRemapper.Variants` | **public** |
+| `VariantHelper` | `…ControlRemapper.Variants` | internal (constructor takes `ControlMapperPluginSettings`) |
+| `ControlMapperPlugin` | `…ControlRemapper` | public |
+| `RemapperWorker` | `…ControlRemapper` | public type, members internal/private |
+| `SharpHelper` | `…ControlRemapper.Helpers` | internal (note: `Aquire`, not `Acquire`) |
+| `ControllerSourceMapping` | `…ControlRemapper.Models` | public |
+| `ControllerDescription` | `…ControlRemapper.Models` | public |
+| `ControllerState` | `…ControlRemapper.Models` | public |
+| `ControlMapperPluginSettings` | `…ControlRemapper.Models` | public |
+
 ## MahApps Metro
 
 SimHub's UI is built on [MahApps.Metro](https://mahapps.com/). Plugin UIs can use MahApps controls (`MetroComboBox`, `ToggleSwitch`, etc.) for consistent styling. The assemblies are already loaded by SimHub at runtime.

@@ -32,7 +32,13 @@ namespace MozaPlugin.Telemetry
             if (!string.IsNullOrEmpty(path) && path.StartsWith("@internal/", StringComparison.Ordinal))
                 return ResolveInternalChannel(path);
 
-            return PropertyCoercion.Coerce(_pluginManager?.GetPropertyValue(path), path);
+            // A throwing property must not abort the whole frame tick (mirrors
+            // the guard in ResolveAsString); an unresolvable channel reads 0.
+            try
+            {
+                return PropertyCoercion.Coerce(_pluginManager?.GetPropertyValue(path), path);
+            }
+            catch { return 0.0; }
         }
 
         public string? ResolveAsString(string path)

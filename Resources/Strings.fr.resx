@@ -464,4 +464,22 @@
   <data name="Section_Language" xml:space="preserve"><value>LANGUE</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Langue</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Fermez et rouvrez cette page de réglages pour appliquer la nouvelle langue. Auto suit la langue de SimHub, puis celle du système.</value></data>
+  <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
+  <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORTER PROFIL…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>Importer un préréglage PitHouse</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>Parcourir un fichier…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>Base du volant (Moteur)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>Pédales</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>Dossier des préréglages PitHouse introuvable. Définissez un chemin personnalisé ou utilisez Parcourir.</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>Définir le dossier…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Application de « {0} » au profil « {1} ». Les paramètres suivants seront modifiés :</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>Toutes les valeurs de ce préréglage correspondent déjà à votre profil actif.</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>Non importé (pas d'équivalent dans le plugin) :</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>APPLIQUER</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>ANNULER</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>SUIVANT</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>RETOUR</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Choisissez un fichier JSON de préréglage PitHouse n'importe où sur votre système.</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Le fichier n'est pas du JSON valide : {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Type de préréglage non pris en charge « {0} ». Seuls les préréglages Motor et Pédales sont pris en charge.</value></data>
 </root>

@@ -464,4 +464,22 @@
   <data name="Section_Language" xml:space="preserve"><value>ЯЗЫК</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Язык</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Закройте и снова откройте эту страницу настроек, чтобы применить новый язык. «Авто» следует языку SimHub, затем языку системы.</value></data>
+  <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
+  <data name="Button_ImportProfile" xml:space="preserve"><value>ИМПОРТ ПРОФИЛЯ…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>Импорт пресета PitHouse</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>Выбрать файл…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>База руля (Мотор)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>Папка пресетов PitHouse не найдена. Укажите пользовательский путь или используйте «Обзор».</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>Указать папку…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Применение «{0}» к профилю «{1}». Изменятся следующие настройки:</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>Все значения этого пресета уже совпадают с вашим активным профилем.</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>Не импортировано (нет аналога в плагине):</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>ПРИМЕНИТЬ</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>ОТМЕНА</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>ДАЛЕЕ</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>НАЗАД</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Выберите JSON-файл пресета PitHouse в любом месте системы.</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Файл не является корректным JSON: {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Неподдерживаемый тип пресета «{0}». Поддерживаются только пресеты Motor и Pedals.</value></data>
 </root>

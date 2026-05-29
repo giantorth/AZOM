@@ -471,4 +471,22 @@
   <data name="Section_Language" xml:space="preserve"><value>LANGUAGE</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Language</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Close and re-open this settings page to apply the new language. Auto follows SimHub's language setting, then the OS.</value></data>
+  <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
+  <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORT PROFILE…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>Import PitHouse Preset</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>Browse for file…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>Wheel base (Motor)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>Pedals</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>PitHouse Presets folder not found. Set a custom path or use Browse.</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>Set folder…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Applying "{0}" to profile "{1}". The following settings will change:</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>All values in this preset already match your active profile.</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>Not imported (no plugin equivalent):</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>APPLY</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>CANCEL</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>NEXT</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>BACK</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Pick a PitHouse preset JSON file from anywhere on your system.</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>File is not valid JSON: {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Unsupported preset type "{0}". Only Motor and Pedals presets are supported.</value></data>
 </root>

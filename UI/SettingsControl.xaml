@@ -262,11 +262,20 @@
                 <Button Grid.Column="3" x:Name="RefreshButton" Content="{x:Static res:Strings.Button_Refresh}"
                         Click="RefreshButton_Click" VerticalAlignment="Center"/>
 
-                <!-- Profile selector (right-aligned via column 4 stretch) -->
-                <profilescommon:ProfileList Grid.Column="4" x:Name="ProfileListControl"
-                                            Margin="18,0,0,0"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Center"/>
+                <!-- Right-aligned group: Import button + Profile selector. Both
+                     sit at the far right edge of the top bar so the Import
+                     button is adjacent to the dropdown it targets. -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button x:Name="ImportProfileButton"
+                            Content="{x:Static res:Strings.Button_ImportProfile}"
+                            Click="ImportProfileButton_Click"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center"/>
+                    <profilescommon:ProfileList x:Name="ProfileListControl"
+                                                VerticalAlignment="Center"/>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -140,6 +140,13 @@ namespace MozaPlugin.Devices
                     plugin.UnregisterActiveModelPrefix(_expectedModelPrefix);
                 MozaLog.Debug("[Moza] Device extension ended");
             }
+
+            // Drop the LED driver from the static instance registry so it isn't
+            // retained for the process lifetime after the device detaches; reset
+            // the latch so a re-attach re-injects a fresh driver.
+            try { _ledDriver?.Close(); } catch { }
+            _ledDriver = null;
+            _driverInjected = false;
         }
 
         public override void DataUpdate(PluginManager pluginManager, ref GameData data)

@@ -352,7 +352,17 @@ namespace MozaPlugin.Telemetry
             // when the sender is running. StartInner's first action is Stop() — true cold-start.
             if (Interlocked.CompareExchange(ref _plugin._telemetryStartRequested, 1, 0) != 0) return;
             MozaLog.Info("[Moza] Restarting telemetry sender (full cold-start)");
-            ThreadPool.QueueUserWorkItem(_ => t.Start());
+            // Same guard as StartTelemetryIfReady: an unobserved exception on a
+            // ThreadPool thread can take down the SimHub host process.
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try { t.Start(); }
+                catch (ObjectDisposedException) { /* plugin disposed mid-start */ }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[Moza] Telemetry restart failed: {ex.GetType().Name}: {ex.Message}");
+                }
+            });
         }
 
         /// <summary>

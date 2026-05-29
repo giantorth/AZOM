@@ -1,0 +1,439 @@
+<Window x:Class="MozaPlugin.UI.Import.PitHouseImportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:res="clr-namespace:MozaPlugin.Resources"
+        Title="{x:Static res:Strings.Import_DialogTitle}"
+        Width="720" Height="560"
+        MinWidth="520" MinHeight="400"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        Background="#FF2D2D30"
+        TextElement.Foreground="{DynamicResource TextBrush}"
+        TextElement.FontFamily="{DynamicResource FontUi}"
+        TextElement.FontSize="13">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaTheme.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <Style TargetType="Button" BasedOn="{StaticResource MozaButton}"/>
+            <Style TargetType="ScrollBar" BasedOn="{StaticResource MozaScrollBar}"/>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <!-- Top-level layout: header / body / footer in three explicit rows.
+         Star row for body propagates a finite vertical constraint down to
+         every child, so ScrollViewers actually get a height. Every previous
+         attempt nested DockPanels inside Grids inside DockPanels and the
+         star-row constraint chain broke somewhere along the way. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===== Header strip ===== -->
+        <Border Grid.Row="0"
+                Background="{StaticResource TopBarBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="22,12">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{x:Static res:Strings.Import_DialogTitle}"
+                           FontFamily="{StaticResource FontUi}"
+                           FontWeight="SemiBold"
+                           FontSize="15"
+                           Foreground="{StaticResource TextBrush}"
+                           VerticalAlignment="Center"/>
+                <TextBlock x:Name="TopBarSubtitle"
+                           Text="// pick a MOZA Pit House preset to apply"
+                           FontFamily="{StaticResource FontMono}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextFaintBrush}"
+                           Margin="14,0,0,0"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Body ===== -->
+        <Grid Grid.Row="1" Margin="22,16">
+
+            <!-- Picker phase -->
+            <Grid x:Name="PickerPanel">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>  <!-- folder strip -->
+                    <RowDefinition Height="*"/>     <!-- tabs -->
+                </Grid.RowDefinitions>
+
+                <!-- Folder source + Set folder button -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource BgPanelBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,8"
+                        Margin="0,0,0,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="FOLDER"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextFaintBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="1" x:Name="FolderHintText"
+                                   Text=""
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextDimBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <Button Grid.Column="2" x:Name="SetFolderButton"
+                                Content="{x:Static res:Strings.Import_SetCustomFolder}"
+                                Click="SetFolderButton_Click"
+                                Margin="12,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Category tabs: Motor / Pedals / Browse -->
+                <TabControl Grid.Row="1"
+                            x:Name="CategoryTabs"
+                            Style="{StaticResource MozaTabControl}"
+                            SelectionChanged="CategoryTabs_SelectionChanged">
+                    <TabItem x:Name="MotorTab"
+                             Header="{x:Static res:Strings.Import_Category_Motor}">
+                        <Grid Margin="0,12,0,0">
+                            <ListBox x:Name="MotorList"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{StaticResource TextBrush}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     MouseDoubleClick="PresetList_MouseDoubleClick"
+                                     SelectionChanged="PresetList_SelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayLabel}"
+                                                   Padding="6,4"
+                                                   Foreground="{StaticResource TextBrush}"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock x:Name="MotorEmptyText"
+                                       Text="// no Motor presets in this folder"
+                                       FontFamily="{StaticResource FontMono}"
+                                       Foreground="{StaticResource TextFaintBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                        </Grid>
+                    </TabItem>
+                    <TabItem x:Name="PedalsTab"
+                             Header="{x:Static res:Strings.Import_Category_Pedals}">
+                        <Grid Margin="0,12,0,0">
+                            <ListBox x:Name="PedalsList"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{StaticResource TextBrush}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     MouseDoubleClick="PresetList_MouseDoubleClick"
+                                     SelectionChanged="PresetList_SelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayLabel}"
+                                                   Padding="6,4"
+                                                   Foreground="{StaticResource TextBrush}"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock x:Name="PedalsEmptyText"
+                                       Text="// no Pedals presets in this folder"
+                                       FontFamily="{StaticResource FontMono}"
+                                       Foreground="{StaticResource TextFaintBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="{x:Static res:Strings.Import_Tab_Browse}">
+                        <StackPanel Margin="6,16,0,0">
+                            <TextBlock Text="{x:Static res:Strings.Import_BrowseDescription}"
+                                       Foreground="{StaticResource TextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,12"/>
+                            <Button x:Name="BrowseButton"
+                                    Content="{x:Static res:Strings.Import_Tab_Browse}"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource MozaButtonPrimary}"
+                                    Click="BrowseButton_Click"/>
+                        </StackPanel>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+            <!-- Confirm phase (overlaps picker; toggle Visibility) -->
+            <Grid x:Name="ConfirmPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>  <!-- preset/profile summary -->
+                    <RowDefinition Height="*"/>     <!-- diff list -->
+                    <RowDefinition Height="Auto"/>  <!-- fatal-error banner -->
+                    <RowDefinition Height="Auto"/>  <!-- not-imported list -->
+                </Grid.RowDefinitions>
+
+                <!-- Summary header (PRESET / PROFILE) -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource BgPanelBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,10"
+                        Margin="0,0,0,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="PRESET"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextFaintBrush}"
+                                   Margin="0,0,16,4"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="ConfirmPresetText"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource CyanBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                   Text="PROFILE"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextFaintBrush}"
+                                   Margin="0,0,16,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ConfirmProfileText"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource TextBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+                </Border>
+
+                <!-- Diff list: ScrollViewer + ItemsControl in its own Star row -->
+                <Border Grid.Row="1"
+                        Background="{StaticResource BgCardBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="0,0,0,1"
+                                Padding="12,8">
+                            <TextBlock Text="CHANGES"
+                                       FontFamily="{StaticResource FontMono}"
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextFaintBrush}"/>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="DiffList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- Row layout: a 3px cyan stripe on the
+                                             left (only when Changed=true) makes
+                                             changed rows pop without dimming
+                                             unchanged rows so hard they become
+                                             unreadable. The new-value column
+                                             stays cyan on changed rows, muted on
+                                             unchanged. The x:Names below use
+                                             "DiffRow*" prefixes that don't
+                                             collide with any StaticResource
+                                             style key (the earlier crash). -->
+                                        <Grid Margin="0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="20"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Rectangle x:Name="DiffRowAccent"
+                                                       Grid.Column="0"
+                                                       Width="3"
+                                                       Fill="{StaticResource CyanBrush}"
+                                                       Opacity="0"
+                                                       Margin="0,1"/>
+                                            <TextBlock x:Name="DiffRowLabel"
+                                                       Grid.Column="1"
+                                                       Text="{Binding Label}"
+                                                       Foreground="{StaticResource TextBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"
+                                                       Padding="12,2,0,2"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding OldDisplay}"
+                                                       FontFamily="{StaticResource FontMono}"
+                                                       Foreground="{StaticResource TextFaintBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="3"
+                                                       Text="→"
+                                                       Foreground="{StaticResource TextFaintBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="DiffRowNewValue"
+                                                       Grid.Column="4"
+                                                       Text="{Binding NewDisplay}"
+                                                       FontFamily="{StaticResource FontMono}"
+                                                       Foreground="{StaticResource CyanBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Padding="0,2,12,2"/>
+                                        </Grid>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding Changed}" Value="True">
+                                                <Setter TargetName="DiffRowAccent"
+                                                        Property="Opacity" Value="1"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Changed}" Value="False">
+                                                <Setter TargetName="DiffRowLabel"
+                                                        Property="Foreground"
+                                                        Value="{StaticResource TextMutedBrush}"/>
+                                                <Setter TargetName="DiffRowNewValue"
+                                                        Property="Foreground"
+                                                        Value="{StaticResource TextMutedBrush}"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <TextBlock Grid.Row="1" x:Name="NoChangesText"
+                                   Text="{x:Static res:Strings.Import_NoChangesHeader}"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TextFaintBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+
+                <!-- Fatal-error banner -->
+                <Border Grid.Row="2"
+                        x:Name="FatalErrorBanner"
+                        Background="{StaticResource AmberSoftBrush}"
+                        BorderBrush="{StaticResource AmberBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,8"
+                        Margin="0,12,0,0"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="FatalErrorText"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource AmberBrush}"/>
+                </Border>
+
+                <!-- Not-imported list -->
+                <Border Grid.Row="3"
+                        x:Name="NotImportedCard"
+                        Background="{StaticResource BgPanelBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,8"
+                        Margin="0,12,0,0"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="{x:Static res:Strings.Import_NotImportedHeader}"
+                                   FontFamily="{StaticResource FontMono}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextFaintBrush}"
+                                   Margin="0,0,0,4"/>
+                        <ScrollViewer Grid.Row="1" MaxHeight="90" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="NotImportedList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource TextFaintBrush}"
+                                                   Padding="0,1"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- ===== Footer button bar ===== -->
+        <Border Grid.Row="2"
+                Background="{StaticResource BgPanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="22,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" x:Name="FooterStatusText"
+                           FontFamily="{StaticResource FontMono}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextFaintBrush}"
+                           VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="BackButton"
+                            Content="{x:Static res:Strings.Import_BackButton}"
+                            Width="88" Margin="0,0,8,0"
+                            Visibility="Collapsed"
+                            Click="Back_Click"/>
+                    <Button x:Name="CancelButton"
+                            Content="{x:Static res:Strings.Import_CancelButton}"
+                            Width="88" Margin="0,0,8,0"
+                            Click="Cancel_Click"/>
+                    <Button x:Name="NextButton"
+                            Content="{x:Static res:Strings.Import_NextButton}"
+                            Width="88" IsDefault="True" IsEnabled="False"
+                            Style="{StaticResource MozaButtonPrimary}"
+                            Click="Next_Click"/>
+                    <Button x:Name="ApplyButton"
+                            Content="{x:Static res:Strings.Import_ApplyButton}"
+                            Width="88" IsDefault="True"
+                            Visibility="Collapsed"
+                            Style="{StaticResource MozaButtonPrimary}"
+                            Click="Apply_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

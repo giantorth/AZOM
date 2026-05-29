@@ -596,25 +596,23 @@ namespace MozaPlugin.Telemetry
         private static readonly byte[] _pedalBrakeOutFrame     = BuildShortFrame(0x25, 0x19, new byte[] { 0x02, 0x00, 0x00 });
         private static readonly byte[] _pedalClutchOutFrame    = BuildShortFrame(0x25, 0x19, new byte[] { 0x03, 0x00, 0x00 });
 
-        // Periodic LED state poll fields removed 2026-05-27.
+        // LED state read polls (`0x40/0x17 1F 03 [group] 00 00 00 00`).
+        // Group 1 (RPM bar) ~1 Hz; group 2 (Single) ~0.2 Hz.
         //
-        // The frames `1F 03 01 00 00 00 00` and `1F 03 02 00 00 00 00` use
-        // sub-commands that are not in the documented MozaCommandDatabase
-        // read set (the valid LED-color reads use `1F <group> 0xFF <index>`,
-        // see e.g. wheel-rpm-color / wheel-button-color / wheel-knob-bg-color).
-        // Universal HUB firmware consequently logs `Unexpected cmd: 31` once
-        // per poll — observed 117 warnings in 14 minutes on the 2026-05-27
-        // CS-Pro W17 bundle. The polls additionally read only LED index 0
-        // of each group, which gives no useful "state cache" coverage —
-        // every other LED on the wheel goes unread.
-        //
-        // LED color reads are now on-demand only: triggered from
-        // MozaWheelSettingsControl's tab-activation handler (RpmTab,
-        // ButtonsTab, KnobsTab), guarded by MozaLedDeviceManager.IsLiveAnywhere()
-        // so a read fired while the real-time telemetry pipeline is writing
-        // game-state colors doesn't return transient live values into the
-        // static-config cache. The wheel-detect initial probe in DeviceProber
-        // still fills the cache once at hot-attach.
+        // The 1F 03 [group] sub-cmd shape is not in the documented MozaCommandDatabase
+        // read set and Universal HUB firmware logs an `Unexpected cmd: 31` per poll
+        // (W17 CS-Pro observed ~8/min). The polls were deleted on 2026-05-27 for
+        // exactly that reason — but the deletion regressed RPM-LED telemetry-mode
+        // engagement on the GS V2 Pro (firmware variant reporting bare "GS"):
+        // wheel-telemetry-rpm-colors / wheel-send-rpm-telemetry frames no longer
+        // visibly light the RPM strip without these read polls in the keepalive
+        // mix. See `project_parity_polls_load_bearing` memory — the wheel uses
+        // the *requests* (not their responses) as the host-is-live heartbeat for
+        // per-group telemetry engagement; ~1 Hz is enough. Restored 2026-05-28.
+        // If the firmware-warning noise becomes a problem, replace with a
+        // documented read-set shape rather than removing entirely.
+        private static readonly byte[] _ledStatePollGroup1 = BuildShortFrame(0x40, 0x17, new byte[] { 0x1F, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00 });
+        private static readonly byte[] _ledStatePollGroup2 = BuildShortFrame(0x40, 0x17, new byte[] { 0x1F, 0x03, 0x02, 0x00, 0x00, 0x00, 0x00 });
 
         private static byte[] BuildShortFrame(byte group, byte dev, byte[] payload)
         {
@@ -1564,13 +1562,16 @@ namespace MozaPlugin.Telemetry
             _sessions.Reset();
             _dispatcher.Reset();
             _session09InboundSeq = 0;
-            _session09OutboundSeq = 0;
+            // Reset the outbound seq counters under their guarding locks so a
+            // tick still mid-burst can't clobber the reset (separate, non-nested
+            // leaf locks — no ordering deadlock; each section is a field write).
+            lock (_session09SeqLock) { _session09OutboundSeq = 0; }
             // Re-arm so the next sess=0x09 device-init re-confirms the
             // canonical dashboard list to the wheel.
             _session09ReplySent = false;
             _watchdog.Reset();
-            _session02OutboundSeq = 0;
-            _session01OutboundSeq = 0;
+            lock (_session02SeqLock) { _session02OutboundSeq = 0; }
+            lock (_session01SeqLock) { _session01OutboundSeq = 0; }
             // Reset 0x0a seq for symmetry — fresh Start re-opens 0x0a from
             // zero wheel-side. Prevents stale-seq retransmits re-emitting
             // into a new session. See docs/protocol/sessions/chunk-format.md.
@@ -2324,7 +2325,8 @@ namespace MozaPlugin.Telemetry
             // seq counters so SendSessionPropertyBody (Math.Max(2, seq))
             // and SendTierDefinition (Math.Max(2, seq+1)) produce
             // correct first-use values.
-            _session02OutboundSeq = TelemSession + 1; // port=2 → first data seq=3
+            // Under the seq lock for consistency with the tick-thread writers.
+            lock (_session02SeqLock) { _session02OutboundSeq = TelemSession + 1; } // port=2 → first data seq=3
 
             if (telemetryPort != 0)
             {
@@ -2512,9 +2514,18 @@ namespace MozaPlugin.Telemetry
         /// tier-def + channel config, and atomically publishes the new
         /// subscription state for the telemetry tick handler.
         /// </summary>
-        /// <param name="isDashSwitch">True when switching dashboards (advance
-        /// flag counter). False for initial connect (reset to 0).</param>
-        internal void ApplySubscription(bool force)
+        /// <param name="force">When true, bypass the no-op early-out in
+        /// <see cref="MaybeSwapProfileForCatalog"/> and re-emit unconditionally.</param>
+        /// <param name="reuseFlagBase">When true and an ActiveSubscription
+        /// already exists, the new tier-def emits at the SAME flagBase as the
+        /// prior emission (and does not advance <see cref="NextFlagBase"/>).
+        /// Set by the catalog-growth re-emit path so newly-discovered URLs bind
+        /// into the existing subscription instead of starting a new one.
+        /// Also suppresses the destructive in-body clears
+        /// (<see cref="_retransmitter"/>, <see cref="_propertyPushQueue"/>,
+        /// <see cref="_subscriptionResponseChunks"/>) which would otherwise wipe
+        /// pending chunks the wheel hasn't acked yet on a same-base re-emit.</param>
+        internal void ApplySubscription(bool force, bool reuseFlagBase = false)
         {
             // First-call era resolution. Auto-mode picks Era2024/2025/2026
             // here based on the wheel's catalog push (or absence thereof) and
@@ -2537,12 +2548,19 @@ namespace MozaPlugin.Telemetry
 
             // Preamble is one-shot per session (captures: bridge-20260503-*).
             // Don't reset _tierDefPreambleSent here — session start handles it.
-            _retransmitter.Clear();
-            _propertyPushQueue.Clear();
-            lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
-            _subscriptionResponseDeadlineTicks = 0;
+            // Same-base re-emits (reuseFlagBase=true) skip these clears: the
+            // wheel's existing binding stays valid, so wiping in-flight retx
+            // entries and queued FF property pushes mid-flight would kill the
+            // blind-retx safety net for chunks already on the wire.
+            if (!reuseFlagBase)
+            {
+                _retransmitter.Clear();
+                _propertyPushQueue.Clear();
+                lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
+                _subscriptionResponseDeadlineTicks = 0;
+            }
 
-            _tierDefEmitter.SendTierDefinition();
+            _tierDefEmitter.SendTierDefinition(reuseFlagBase);
             SendChannelConfig();
 
             int chCount = 0;
@@ -3089,9 +3107,7 @@ namespace MozaPlugin.Telemetry
                 // freeze on last-value within ~5 min. ~1 Hz cadence is enough
                 // at ~12% of PitHouse's full ~7-22 Hz wire cost.
                 TickEmitPeripheralPolls();
-                // TickEmitLedStatePolls removed 2026-05-27 — see field-block
-                // comment near _ledStatePollGroup1. LED color reads are now
-                // tab-activation-driven via MozaWheelSettingsControl.
+                TickEmitLedStatePolls();
                 TickEmitRetransmits();
                 _tierDefEmitter.TickEmitTierDefBlindRetransmits();
                 _watchdog.TickRetryS09IfNotEstablished();
@@ -3479,6 +3495,18 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        /// <summary>LED state polls. Group 1 ~1 Hz, group 2 ~0.2 Hz. Load-bearing
+        /// for per-group telemetry engagement on the GS V2 Pro — see the field-
+        /// block comment near <c>_ledStatePollGroup1</c>.</summary>
+        private void TickEmitLedStatePolls()
+        {
+            int slow = Math.Max(8, 1000 / _baseTickMs);
+            if (_tickCounter % slow == 3 * slow / 5)
+                _connection.Send(_ledStatePollGroup1);
+            if (_tickCounter % (slow * 5) == 4 * slow / 5)
+                _connection.Send(_ledStatePollGroup2);
+        }
+
         /// <summary>Retransmit unacked session-data chunks. Per-chunk
         /// exponential backoff (100ms → 200 → 400 … capped at 2s) so a stuck
         /// chunk doesn't keep flooding the link at fixed cadence. PitHouse
@@ -3699,15 +3727,20 @@ namespace MozaPlugin.Telemetry
                 return;
             }
 
-            // Pure catalog-growth path (no hot switch pending).
+            // Pure catalog-growth path (no hot switch pending). Reuse the
+            // existing flagBase: this is not a new subscription generation,
+            // it's a binding refresh for late-arriving URLs within the same
+            // dashboard. Advancing flagBase would invalidate the wheel's
+            // existing channel bindings and silently drop subsequent value
+            // frames (dashboard freezes on last good values).
             if (idle < CatalogGrowthQuietMs) return;
             int p = _catalogCountAtLastSubscription;
             MozaLog.Debug(
                 $"[Moza] Re-applying tier-def: catalog grew {p}→{cur} " +
-                $"(idle {idle}ms ≥ {CatalogGrowthQuietMs}ms)");
+                $"(idle {idle}ms ≥ {CatalogGrowthQuietMs}ms, reusing flagBase)");
             try
             {
-                ApplySubscription(force: true);
+                ApplySubscription(force: true, reuseFlagBase: true);
                 _catalogCountAtLastSubscription = _catalogParser.Count;
             }
             catch (Exception ex)
@@ -4039,6 +4072,12 @@ namespace MozaPlugin.Telemetry
         /// <see cref="TelemetryFrameBuilder.BuildV0ValueFrame"/>; chunked
         /// through the session-data layer with monotonically advancing seq.
         /// </summary>
+        // Per-URL host channel lookup for the V0 path, cached by profile
+        // reference (Profile setter is the only reassignment site; mapping edits
+        // mutate channel fields in place but never the URL set).
+        private System.Collections.Generic.Dictionary<string, ChannelDefinition>? _v0ByUrl;
+        private MultiStreamProfile? _v0ByUrlProfile;
+
         private void SendV0ValueFrames(GameDataSnapshot snapshot)
         {
             var profile = _profile;
@@ -4063,20 +4102,31 @@ namespace MozaPlugin.Telemetry
                 catalog = profileChannels;
             }
 
-            // Build per-URL host channel lookup once per tick. Channels not in
-            // the host profile still get a frame — wheel's dashboard may bind
-            // to URLs the host doesn't have local metadata for, and missing
-            // values block widget render. Default compression = uint32_t,
-            // resolved value = 0 (live) or test triangle.
-            var byUrl = new System.Collections.Generic.Dictionary<string, ChannelDefinition>(
-                StringComparer.OrdinalIgnoreCase);
-            if (profile != null)
+            // Per-URL host channel lookup, rebuilt only when the profile changes
+            // (not every tick). Channels not in the host profile still get a
+            // frame — wheel's dashboard may bind to URLs the host doesn't have
+            // local metadata for, and missing values block widget render.
+            // Default compression = uint32_t, resolved value = 0 (live) or test.
+            if (_v0ByUrl == null || !ReferenceEquals(_v0ByUrlProfile, profile))
             {
-                foreach (var tier in profile.Tiers)
-                    foreach (var ch in tier.Channels)
-                        if (!string.IsNullOrEmpty(ch.Url) && !byUrl.ContainsKey(ch.Url))
-                            byUrl[ch.Url] = ch;
+                var map = new System.Collections.Generic.Dictionary<string, ChannelDefinition>(
+                    StringComparer.OrdinalIgnoreCase);
+                if (profile != null)
+                {
+                    foreach (var tier in profile.Tiers)
+                        foreach (var ch in tier.Channels)
+                            if (!string.IsNullOrEmpty(ch.Url) && !map.ContainsKey(ch.Url))
+                                map[ch.Url] = ch;
+                }
+                _v0ByUrl = map;
+                _v0ByUrlProfile = profile;
             }
+            var byUrl = _v0ByUrl;
+
+            // Test-mode wall-clock once per tick (was recomputed per channel).
+            long nowMs = TestMode
+                ? System.Diagnostics.Stopwatch.GetTimestamp() * 1000L / System.Diagnostics.Stopwatch.Frequency
+                : 0L;
 
             // Compute every per-channel value frame BEFORE entering the lock
             // so SimHub property resolution (PluginManager.GetPropertyValue
@@ -4099,8 +4149,6 @@ namespace MozaPlugin.Telemetry
                 {
                     if (ch != null)
                     {
-                        long nowMs = System.Diagnostics.Stopwatch.GetTimestamp() * 1000L /
-                                     System.Diagnostics.Stopwatch.Frequency;
                         value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
                     }
                     else
@@ -4289,15 +4337,16 @@ namespace MozaPlugin.Telemetry
 
         private byte[] BuildChannelEnableFrame(byte page, byte channelIndex)
         {
-            var frame = new System.Collections.Generic.List<byte>
+            var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 5,
                 MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
                 0x1E, page,
                 channelIndex, 0x00, 0x00,
+                0x00,
             };
-            frame.Add(MozaProtocol.CalculateWireChecksum(frame.ToArray()));
-            return frame.ToArray();
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
         }
 
         // Game-start handshake: PitHouse re-fires a small set of frames within
@@ -4374,26 +4423,28 @@ namespace MozaPlugin.Telemetry
 
         private byte[] BuildGroup40Frame(byte cmd1, byte cmd2)
         {
-            var frame = new System.Collections.Generic.List<byte>
+            var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 2,
                 MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
                 cmd1, cmd2,
+                0x00,
             };
-            frame.Add(MozaProtocol.CalculateWireChecksum(frame.ToArray()));
-            return frame.ToArray();
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
         }
 
         private byte[] BuildGroup40Frame3(byte cmd1, byte cmd2, byte cmd3)
         {
-            var frame = new System.Collections.Generic.List<byte>
+            var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 3,
                 MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
                 cmd1, cmd2, cmd3,
+                0x00,
             };
-            frame.Add(MozaProtocol.CalculateWireChecksum(frame.ToArray()));
-            return frame.ToArray();
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
         }
 
         // ── Cached frame construction ───────────────────────────────────────
@@ -4575,16 +4626,22 @@ namespace MozaPlugin.Telemetry
                 byte b4 = (byte)(0x02 + (s % 5));
                 frame = BuildGroup40Bytes(new byte[] { 0x1E, sub, b4, 0x00, 0x00 });
             }
+            else if (slot < 44)
+            {
+                // 1F 00 FF XX — RPM-bar color reads (indices 2-15). Part of
+                // the parity-poll keepalive set; on the GS V2 Pro the wheel
+                // needs to see these requests landing periodically or the
+                // RPM-LED group stops responding to telemetry-mode writes
+                // (see field-block comment near _ledStatePollGroup1).
+                byte b5 = (byte)(0x02 + (slot - 30));
+                frame = BuildGroup40Bytes(new byte[] { 0x1F, 0x00, 0xFF, b5, 0x00, 0x00, 0x00 });
+            }
             else if (slot < 58)
             {
-                // Slots 30-43 (1F 00 FF XX, RPM-bar color indices 2-15)
-                // and 44-57 (1F 01 FF XX, Button color indices 2-15) removed
-                // 2026-05-27. These were periodic LED-color reads, redundant
-                // with the wheel-detect initial probe in DeviceProber and the
-                // new tab-activation reads in MozaWheelSettingsControl. The
-                // 80-slot cycle structure is preserved so other slots keep
-                // their modulo offsets stable; these slots emit nothing.
-                frame = null;
+                // 1F 01 FF XX — Button color reads (indices 2-15). Same
+                // keepalive role as the RPM-bar reads above.
+                byte b5 = (byte)(0x02 + (slot - 44));
+                frame = BuildGroup40Bytes(new byte[] { 0x1F, 0x01, 0xFF, b5, 0x00, 0x00, 0x00 });
             }
             else if (slot < 70)
             {

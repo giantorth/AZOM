@@ -275,6 +275,16 @@ namespace MozaPlugin
         // AB9 host-rendered engine-vibration worker. See Devices/Ab9EngineVibrationWorker.cs.
         private Ab9EngineVibrationWorker? _ab9Worker;
 
+        // Control Mapper IVariantProvider bridge — see ControlMapper/. Registration
+        // is reflection-based against an internal SimHub API, so the bridge is wrapped
+        // in defensive guards and gated on MozaPluginSettings.EnableControlMapperVariants.
+        // Constructed in Init when the toggle is on; null otherwise.
+        private ControlMapper.ControlMapperBridge? _controlMapperBridge;
+        // Tick budget for retrying registration in DataUpdate when ControlMapperPlugin
+        // wasn't loaded yet at Init time. ~50 ticks (~0.8 s at 60 Hz). 0 = stop trying.
+        private int _controlMapperRetryTicks;
+        private const int ControlMapperRegisterRetryTickBudget = 50;
+
         // Guard against concurrent/duplicate telemetry Start() dispatch.
         // Internal so DashboardBindingCoordinator can Interlocked.* against it.
         internal int _telemetryStartRequested;
@@ -558,7 +568,6 @@ namespace MozaPlugin
             // Reset detection flags so a plugin reload doesn't carry over stale
             // "device detected" state from the prior session.
             ResetDetectionFlags();
-            // A fresh Init means we don't know what dashboard the wheel is
             // Belt-and-braces for the defensive double-Init path above. Coordinator
             // is null on a brand-new instance; only fires after a re-Init.
             _dashboardBindingCoordinator?.ClearLastAppliedDashboardKey();
@@ -857,6 +866,27 @@ namespace MozaPlugin
                 _deviceProber = new DeviceProber(this, _connection, _deviceManager, _data, DetectionState);
                 _dashboardBindingCoordinator = new DashboardBindingCoordinator(this, _data, _connection, DetectionState);
 
+                // Control Mapper variant-provider integration. Construction is in
+                // a try/catch so a TypeLoadException from a missing/renamed SimHub
+                // internal type cannot poison plugin Init. Registration is attempted
+                // immediately; if ControlMapperPlugin isn't loaded yet, DataUpdate
+                // retries up to ControlMapperRegisterRetryTickBudget ticks.
+                if (_settings != null && _settings.EnableControlMapperVariants)
+                {
+                    try
+                    {
+                        _controlMapperBridge = new ControlMapper.ControlMapperBridge();
+                        if (!_controlMapperBridge.TryRegister(_pluginManager))
+                            _controlMapperRetryTicks = ControlMapperRegisterRetryTickBudget;
+                    }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Warn(
+                            $"[Moza] ControlMapper bridge construction failed — {ex.GetBaseException().Message}");
+                        _controlMapperBridge = null;
+                    }
+                }
+
                 // Now safe to initialize the profile system — ApplyProfile (called
                 // by AutoApplyProfile on the initially selected game's profile)
                 // delegates to _hardwareApplier which is now constructed.
@@ -890,7 +920,9 @@ namespace MozaPlugin
                 // Reading from settings here (rather than via a callback) is
                 // fine because the flag is JSON-ignored and only set
                 // programmatically at runtime — see MozaPluginSettings.
-                _telemetrySender.EnableHotRenegotiation = _settings.EnableHotRenegotiation;
+                // _settings is assigned earlier in this method (line ~580); the
+                // null-forgiving operator silences CS8602 without a runtime check.
+                _telemetrySender.EnableHotRenegotiation = _settings!.EnableHotRenegotiation;
                 MozaLog.Info(
                     $"[Moza] Hot re-negotiation feature flag: " +
                     $"settings={_settings.EnableHotRenegotiation} " +
@@ -1100,6 +1132,24 @@ namespace MozaPlugin
             }
             _sdkStubManager = null;
 
+            // Mirror End()'s detach: these are subscribed early in Init (before
+            // throw-prone steps), and _telemetrySender may be the process-lifetime
+            // persistent instance that survives a failed Init — so a missed -=
+            // here leaks the coordinator and the whole plugin graph it roots onto
+            // the persistent sender's invocation list.
+            try
+            {
+                if (_telemetrySender != null && _dashboardBindingCoordinator != null)
+                {
+                    _telemetrySender.DashboardPipelineParked -= _dashboardBindingCoordinator.OnDashboardPipelineParked;
+                    _telemetrySender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnWheelInitiatedSwitch;
+                }
+            }
+            catch { }
+            // Remove the Control Mapper variant provider from SimHub's global
+            // VariantHelper list (same reason as End()).
+            try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
+
             try
             {
                 if (_connection != null)
@@ -1273,6 +1323,27 @@ namespace MozaPlugin
             bool engineOn = data.GameRunning && !data.GamePaused && !data.GameInMenu;
             _ab9Worker?.PostFrame(rpm, maxRpm, engineOn);
 
+            // Control Mapper variant-provider bridge: drive wheel-change detection
+            // each tick when registered; otherwise retry registration up to the
+            // tick budget (ControlMapperPlugin may not be loaded at Init time).
+            if (_controlMapperBridge != null)
+            {
+                if (_controlMapperBridge.IsRegistered)
+                {
+                    _controlMapperBridge.Poll();
+                }
+                else if (_controlMapperRetryTicks > 0 && !_controlMapperBridge.IsGivenUp)
+                {
+                    _controlMapperRetryTicks--;
+                    if (_controlMapperBridge.TryRegister(pluginManager))
+                        _controlMapperRetryTicks = 0;
+                    else if (_controlMapperRetryTicks == 0 && !_controlMapperBridge.IsGivenUp)
+                        MozaLog.Warn(
+                            "[Moza] ControlMapper bridge: ControlMapperPlugin never became available — " +
+                            "giving up retry. Variant integration disabled this session.");
+                }
+            }
+
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
             // Lock-free fast path: when no mBoosters are registered (the
@@ -1426,6 +1497,12 @@ namespace MozaPlugin
             // are disposed; the tick gates on connection state but joining here
             // keeps shutdown deterministic.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
+
+            // Remove the Control Mapper variant provider so a plugin reload
+            // (game switch) doesn't leave a dead provider in VariantHelper's
+            // list. The bridge is null when the toggle was off or construction
+            // failed in Init.
+            try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
 
             // Burst silent-slot frames + an engine-pulse OFF to stop the AB9
             // effect immediately on shutdown. Without this the firmware keeps
@@ -1853,11 +1930,6 @@ namespace MozaPlugin
             // The WPF UI thread predates plugin Init, so the CurrentUICulture
             // we assigned in Init lives on a different thread. Re-apply it here
             // (we are on the UI thread) so that {x:Static res:Strings.X} bindings
-            // in SettingsControl.xaml resolve against the user's choice rather
-            // than the default thread culture.
-            // The WPF UI thread predates plugin Init, so the CurrentUICulture
-            // we assigned in Init lives on a different thread. Re-apply it here
-            // (we are on the UI thread) so that {x:Static res:Strings.X} bindings
             // in SettingsControl.xaml resolve against the resolved language
             // rather than the default thread culture.
             var c = LanguageResolver.Resolve(_settings?.PreferredLanguage);
@@ -1878,9 +1950,11 @@ namespace MozaPlugin
             // intact but mid-teardown. A throw inside a property getter destabilises
             // SimHub's property polling, so each getter returns a sentinel default.
             this.AttachDelegate("Moza.BaseConnected", () => _data?.IsBaseConnected ?? false);
-            this.AttachDelegate("Moza.McuTemp", () => _data == null ? 0.0 : _propertyResolver.ConvertTemp(_data.McuTemp));
-            this.AttachDelegate("Moza.MosfetTemp", () => _data == null ? 0.0 : _propertyResolver.ConvertTemp(_data.MosfetTemp));
-            this.AttachDelegate("Moza.MotorTemp", () => _data == null ? 0.0 : _propertyResolver.ConvertTemp(_data.MotorTemp));
+            // _propertyResolver is constructed later in Init than RegisterProperties
+            // runs, so guard it too — SimHub may read these before it exists.
+            this.AttachDelegate("Moza.McuTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.McuTemp));
+            this.AttachDelegate("Moza.MosfetTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MosfetTemp));
+            this.AttachDelegate("Moza.MotorTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MotorTemp));
             this.AttachDelegate("Moza.BaseState", () => _data?.BaseState ?? 0);
             this.AttachDelegate("Moza.FfbStrength", () => (_data?.FfbStrength ?? 0) / 10);
             this.AttachDelegate("Moza.MaxAngle", () => (_data?.MaxAngle ?? 0) * 2);
@@ -2626,10 +2700,17 @@ namespace MozaPlugin
                 {
                     byte grp = MozaProtocol.ToggleBit7(data[0]);
                     byte dev = MozaProtocol.SwapNibbles(data[1]);
+                    // BitConverter.ToString rejects startIndex == value.Length on
+                    // .NET Framework even when length == 0, so guard the
+                    // payload-only frames (e.g. bare `c0 71` wheel ACKs).
+                    int showLen = Math.Min(data.Length - 2, 8);
+                    string payload = showLen > 0
+                        ? BitConverter.ToString(data, 2, showLen)
+                        : "(empty)";
                     MozaLog.Debug(
                         $"[Moza] Unmatched #{_unmatched}: rawGroup=0x{data[0]:X2} group=0x{grp:X2} " +
                         $"rawDev=0x{data[1]:X2} dev={dev} len={data.Length} " +
-                        $"payload={BitConverter.ToString(data, 2, Math.Min(data.Length - 2, 8))}");
+                        $"payload={payload}");
                 }
                 return;
             }

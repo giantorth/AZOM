@@ -35,6 +35,20 @@ namespace MozaPlugin.Telemetry.Dashboard
             try { _sessionOpened.Dispose(); } catch { }
         }
 
+        // Event ops tolerate disposal: a plugin reload can dispose this
+        // downloader while Execute is mid-wait on the worker thread, or while an
+        // inbound handler fires a Set from the read thread.
+        private static bool SafeWait(ManualResetEventSlim e, int ms)
+        { try { return e.Wait(ms); } catch (ObjectDisposedException) { return false; } }
+        private static void SafeReset(ManualResetEventSlim e)
+        { try { e.Reset(); } catch (ObjectDisposedException) { } }
+        private static void SafeSet(ManualResetEventSlim e)
+        { try { e.Set(); } catch (ObjectDisposedException) { } }
+        // Returns true ("done") on disposal so wait-loops exit promptly rather
+        // than spinning to their deadline.
+        private static bool SafeIsSet(ManualResetEventSlim e)
+        { try { return e.IsSet; } catch (ObjectDisposedException) { return true; } }
+
         private const int WindowSize = 4;
         private byte _session; // dynamic: whichever FT session the wheel device-inits
         public byte ActiveSession => _session;
@@ -100,7 +114,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             if (ackSeq > _lastAckedSeq)
                 _lastAckedSeq = ackSeq;
-            _ackReceived.Set();
+            SafeSet(_ackReceived);
         }
 
         /// <summary>Device-init (type 0x81) on our claimed session.</summary>
@@ -108,13 +122,13 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             _session = session;
             _deviceInitSeq = openSeq;
-            _sessionOpened.Set();
+            SafeSet(_sessionOpened);
         }
 
         /// <summary>Session end marker (type 0x00) on our claimed session.</summary>
         void ISessionConsumer.OnClose(byte session, int ackSeq)
         {
-            _downloadComplete.Set();
+            SafeSet(_downloadComplete);
         }
 
         /// <summary>
@@ -149,9 +163,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             // ── Phase 1: Claim session 0x0B and request FT device-init ─────
             // Claim 0x0B through the dispatcher so we get exclusive routing.
             // This evicts the tile-server parser from 0x0B during download.
-            _sessionOpened.Reset();
-            _downloadComplete.Reset();
-            _ackReceived.Reset();
+            SafeReset(_sessionOpened);
+            SafeReset(_downloadComplete);
+            SafeReset(_ackReceived);
             _dispatcher.Claim(0x0B, this);
             MozaLog.Debug("[Moza] DashboardDownloader: claimed session 0x0B, sending FT activate...");
             // Whole-body try/finally so EVERY exit path (including future ones)
@@ -162,10 +176,10 @@ namespace MozaPlugin.Telemetry.Dashboard
             {
             SendFileTransferActivate(0x0B);
 
-            if (!_sessionOpened.IsSet)
+            if (!SafeIsSet(_sessionOpened))
             {
                 MozaLog.Debug("[Moza] DashboardDownloader: waiting for FT session device-init...");
-                if (!_sessionOpened.Wait(15_000))
+                if (!SafeWait(_sessionOpened, 15_000))
                 {
                     MozaLog.Warn("[Moza] DashboardDownloader: no FT session opened by wheel");
                     return 0;
@@ -188,7 +202,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 MozaLog.Debug("[Moza] DashboardDownloader: REPLAY MODE — sending PitHouse frames");
                 var lines = System.IO.File.ReadAllLines(replayPath);
                 lock (_responseBuffer) { _responseBuffer.Clear(); }
-                _downloadComplete.Reset();
+                SafeReset(_downloadComplete);
                 _receiving = true;
                 // Device-init ack already sent by TelemetrySender. Don't double-ack.
                 foreach (var line in lines)
@@ -203,9 +217,9 @@ namespace MozaPlugin.Telemetry.Dashboard
                 // Wait for response
                 _lastChunkTicks = Environment.TickCount;
                 int deadline2 = Environment.TickCount + 60_000;
-                while (!_downloadComplete.IsSet && Environment.TickCount < deadline2)
+                while (!SafeIsSet(_downloadComplete) && Environment.TickCount < deadline2)
                 {
-                    _downloadComplete.Wait(1000);
+                    SafeWait(_downloadComplete, 1000);
                     int bufSize; lock (_responseBuffer) { bufSize = _responseBuffer.Count; }
                     int idle = Environment.TickCount - _lastChunkTicks;
                     if (bufSize > 0 && idle > 15_000) break;
@@ -216,13 +230,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 return 0;
             }
 
-            byte[] requestBody = BuildRequestBody(state, hashByName);
+            byte[] requestBody = BuildRequestBody(state, hashByName, out var dashboardOrder);
             MozaLog.Debug(
                 $"[Moza] DashboardDownloader: built {requestBody.Length} byte request " +
                 $"for {hashByName.Count} dashboards on session 0x{_session:X2}");
 
             lock (_responseBuffer) { _responseBuffer.Clear(); }
-            _downloadComplete.Reset();
+            SafeReset(_downloadComplete);
             _receiving = true;
 
             try
@@ -260,8 +274,8 @@ namespace MozaPlugin.Telemetry.Dashboard
 
                     if (sent >= frames.Count) break;
 
-                    _ackReceived.Reset();
-                    _ackReceived.Wait(500);
+                    SafeReset(_ackReceived);
+                    SafeWait(_ackReceived, 500);
                 }
 
                 int closeSeq = seq; // seq after last data frame
@@ -280,9 +294,9 @@ namespace MozaPlugin.Telemetry.Dashboard
                 const int PollMs = 1_000;
                 bool closeSent = false;
 
-                while (!_downloadComplete.IsSet && Environment.TickCount < deadline)
+                while (!SafeIsSet(_downloadComplete) && Environment.TickCount < deadline)
                 {
-                    _downloadComplete.Wait(PollMs);
+                    SafeWait(_downloadComplete, PollMs);
                     int bufSize;
                     lock (_responseBuffer) { bufSize = _responseBuffer.Count; }
 
@@ -305,7 +319,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 {
                     SendSessionClose(_session, (ushort)closeSeq);
                 }
-                if (!_downloadComplete.IsSet && Environment.TickCount >= deadline)
+                if (!SafeIsSet(_downloadComplete) && Environment.TickCount >= deadline)
                     MozaLog.Warn("[Moza] DashboardDownloader: response timeout");
             }
             finally
@@ -342,10 +356,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             MozaLog.Debug($"[Moza] DashboardDownloader: found {mzdashFiles.Count} mzdash files");
 
             int ingested = 0;
-            var nameOrder = new List<string>(hashByName.Keys);
-            for (int i = 0; i < mzdashFiles.Count && i < nameOrder.Count; i++)
+            for (int i = 0; i < mzdashFiles.Count && i < dashboardOrder.Count; i++)
             {
-                string name = nameOrder[i];
+                string name = dashboardOrder[i];
                 string hash = hashByName[name];
                 if (_cache.Ingest(hash, name, mzdashFiles[i]))
                     ingested++;
@@ -367,7 +380,8 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         private byte[] BuildRequestBody(
             WheelDashboardState state,
-            Dictionary<string, string> hashByName)
+            Dictionary<string, string> hashByName,
+            out List<string> dashboardOrder)
         {
             long timestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string localAppData = Environment.GetFolderPath(
@@ -376,8 +390,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             string localBase = $"{localAppData}/MOZA Pit House/_dashes/8ae5d086b2fcad7486dbe208";
             string imageBase = $"{localAppData}/MOZA Pit House/_dashes";
 
-            // Collect all files (dashboards + images)
-            var files = new List<(string remotePath, string localPath, string md5Hex)>();
+            // Collect all files (dashboards + images). dashName is the dashboard
+            // dir-name for dashboard entries, null for images.
+            var files = new List<(string remotePath, string localPath, string md5Hex, string? dashName)>();
             foreach (var kvp in hashByName)
             {
                 string name = kvp.Key;
@@ -385,7 +400,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 files.Add((
                     $"/home/moza/resource/dashes/{name}/{name}.mzdash",
                     $"{localBase}/{name}/{name}.mzdash",
-                    hash));
+                    hash,
+                    name));
             }
             if (state.ImagePath != null)
             {
@@ -402,13 +418,21 @@ namespace MozaPlugin.Telemetry.Dashboard
                         files.Add((
                             $"/home/moza/resource/images/MD5/{img.Md5}.png",
                             $"{imageBase}/images/MD5/{img.Md5}.png",
-                            img.Md5));
+                            img.Md5,
+                            null));
                     }
                 }
             }
 
             // Sort files alphabetically by remote path to match PitHouse order.
             files.Sort((a, b) => string.Compare(a.remotePath, b.remotePath, StringComparison.Ordinal));
+
+            // The wheel returns file contents in this same (sorted) request order.
+            // Capture the dashboard names in that order so the response ingest maps
+            // each extracted mzdash file back to the correct dashboard/hash.
+            dashboardOrder = new List<string>(files.Count);
+            foreach (var f in files)
+                if (f.dashName != null) dashboardOrder.Add(f.dashName);
 
             // Section 2: Remote paths (comma-separated UTF-16LE)
             var remoteSb = new StringBuilder();

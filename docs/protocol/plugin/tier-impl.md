@@ -4,10 +4,12 @@
 > (`package_level` semantics, flag-byte mapping, end-to-end channel
 > example). This page covers how the plugin builds and sends tier defs.
 
-Plugin supports both versions, selectable via `TelemetryProtocolVersion` setting (UI: Telemetry > Advanced > Protocol version):
+Encoding selection is driven by the wheel-era policy, not a user "Protocol version" setting. `EraPolicy` (`Telemetry/Era/EraPolicy.cs`) resolves a `TierDefEncoding` and a `TierDefSessionPolicy` from the per-wheel-page `MozaWheelEra` (Auto resolves via `EraPolicy.GuessFromWheelModel`):
 
-- **Version 2** (default): compact numeric tier definitions via `TierDefinitionBuilder.BuildTierDefinitionMessage()`. Flag byte assignment controlled by `FlagByteMode` (0=zero-based, 1=session-port, 2=two-batch).
-- **Version 0**: URL subscription via `TierDefinitionBuilder.BuildV0UrlSubscription()`. Double-sent (once at startup, once after preamble) to match PitHouse. Flag byte mode not applicable — always zero-based.
+- **V2Compact / V2Type02**: compact numeric tier definitions via `TierDefinitionBuilder.BuildTierDefinitionMessage()`. The tier-def session and flag byte come from `TierDefSessionPolicy` (FlagByte vs MgmtPort).
+- **V0Url**: URL subscription via `TierDefinitionBuilder.BuildV0UrlSubscription()`. Double-sent (once at startup, once after preamble) to match PitHouse.
+
+(The earlier `TelemetryProtocolVersion` and `FlagByteMode` settings were removed in favour of this era policy.)
 
 Dashboard upload controlled by `TelemetryUploadDashboard` (UI: Telemetry > Advanced > Upload dashboard, default: on). Uploads `.mzdash` file to wheel on **session 0x04** (2025-11 firmware file-transfer path, Path B below) using TLV-path + MD5 sub-msg 1/2 framing. Path A (session 0x01 FF-prefix) was the original pre-2025-11 implementation; replaced because 2025-11 firmware only actions mzdash writes via session 0x04. Mzdash content loaded from user-selected file or from embedded resource matching active profile name.
 

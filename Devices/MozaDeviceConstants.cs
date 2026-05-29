@@ -193,11 +193,16 @@ namespace MozaPlugin.Devices
             if (Matches(deviceTypeId, WheelOldProtoGuid))
                 return OldProtocolMarker;
 
-            // Dynamic registry lookup (covers backward-compat + UUID v5 + unknown models)
-            foreach (var kvp in GuidToPrefix)
+            // Dynamic registry lookup (covers backward-compat + UUID v5 + unknown
+            // models). Locked because ResolveWheelGuid can mutate GuidToPrefix
+            // from another thread; _registryLock is reentrant-safe here.
+            lock (_registryLock)
             {
-                if (Matches(deviceTypeId, kvp.Key))
-                    return kvp.Value;
+                foreach (var kvp in GuidToPrefix)
+                {
+                    if (Matches(deviceTypeId, kvp.Key))
+                        return kvp.Value;
+                }
             }
 
             return null;
