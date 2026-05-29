@@ -416,6 +416,11 @@ namespace MozaPlugin.Devices
                     rpmColors = ledColors;
                 }
 
+                // Per-frame brightness from SimHub's wheel LED-brightness slider.
+                // Scales the outgoing RGB rather than writing the wheel's stored
+                // firmware brightness — see ScaleColorsForBrightness for why.
+                rpmColors = ScaleColorsForBrightness(rpmColors, rpmBrightness);
+
                 // --- RPM LEDs ---
                 bool rpmChanged = !ColorsEqual(rpmColors, _lastLeds);
                 bool shouldSendRpm = rpmChanged || (!limitUpdates && forceRefresh);
@@ -522,6 +527,11 @@ namespace MozaPlugin.Devices
                         buttonColors = overridden;
                     }
 
+                    // Per-frame brightness (SimHub's buttons LED-brightness
+                    // slider). Applied after the default-during-telemetry
+                    // override so the static fallback colours dim too.
+                    buttonColors = ScaleColorsForBrightness(buttonColors, buttonsBrightness);
+
                     bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
                     bool shouldSendButtons = buttonsChanged || (!limitUpdates && forceRefresh);
 
@@ -578,6 +588,9 @@ namespace MozaPlugin.Devices
                     {
                         knobColors = encoderColors;
                     }
+
+                    // Per-frame brightness (SimHub's encoders/knob LED-brightness slider).
+                    knobColors = ScaleColorsForBrightness(knobColors, encodersBrightness);
 
                     int count = Math.Min(knobColors.Length, knobCount);
                     int knobBitmask = 0;
@@ -640,16 +653,25 @@ namespace MozaPlugin.Devices
                     }
                 }
 
-                // RPM / buttons / knob-ring brightness were previously slaved to SimHub's
-                // per-frame rpmBrightness / buttonsBrightness / encodersBrightness here.
-                // Removed: SimHub passes 0 during scene transitions / no-game states /
-                // plugin-disabled idles, which got written to the wheel's persistent
-                // brightness settings and left the LEDs dark until SimHub recovered (the
-                // user-visible "randomly went to 0" symptom). Matches the existing
-                // treatment of flag-LEDs (above) and the standalone dashboard
-                // (MozaDashLedDeviceManager) — brightness for these channels is now
-                // exclusively stored config, written via the plugin's UI sliders and
-                // re-applied on connect through ApplyWheelToHardware / WriteKnobRingColors.
+                // Two distinct "brightness" concepts apply to these channels:
+                //
+                //  1. The wheel's PERSISTENT firmware brightness setting
+                //     (wheel-rpm-brightness / wheel-buttons-brightness). This is
+                //     stored config — written via the plugin's UI sliders and
+                //     re-applied on connect through ApplyWheelToHardware /
+                //     WriteKnobRingColors. It is deliberately NOT driven per-frame:
+                //     SimHub passes 0 during scene transitions / no-game states /
+                //     plugin-disabled idles, and writing that into EEPROM left the
+                //     LEDs dark until SimHub recovered (the "randomly went to 0"
+                //     symptom that motivated removing the old per-frame setting write).
+                //
+                //  2. SimHub's per-frame LED-brightness sliders (rpmBrightness /
+                //     buttonsBrightness / encodersBrightness Display params). These
+                //     ARE honoured, but as RGB scaling on the outgoing colour frame
+                //     (applied at each channel's send site above via
+                //     ScaleColorsForBrightness) — the same approach the base-LED
+                //     pipeline uses. A transient 0 just sends a black frame; nothing
+                //     persists, so the stuck-dark bug can't recur.
 
                 // --- Keepalive: resend last state periodically for ES wheel compat ---
                 if (anySent)
@@ -805,6 +827,44 @@ namespace MozaPlugin.Devices
         /// When <paramref name="indexMap"/> is provided, each entry maps the source array
         /// position to the protocol LED index (for non-contiguous button layouts).
         /// </summary>
+        /// <summary>
+        /// Scale a per-frame colour array by SimHub's 0..1 LED-brightness factor
+        /// (the wheel's SimHub LED-brightness sliders feed this via the
+        /// rpmBrightness / buttonsBrightness / encodersBrightness Display params).
+        /// Returns the source array unchanged when brightness is full (1.0 — the
+        /// untouched-slider default and hot path, so no allocation), otherwise a
+        /// new scaled array (SimHub's source array is never mutated).
+        ///
+        /// This is the per-frame RGB-scaling approach the base-LED pipeline uses
+        /// (MozaBaseLedDeviceManager.ProcessStrip). It deliberately does NOT touch
+        /// the wheel's persistent firmware brightness setting (wheel-rpm-brightness):
+        /// SimHub passes 0 during scene transitions / no-game states, and writing
+        /// that into EEPROM left the LEDs stuck dark until SimHub recovered. A
+        /// transient 0 here just produces a black frame.
+        ///
+        /// Because the scaled result feeds both the change-detection compare
+        /// (ColorsEqual against the last scaled frame) and the bitmask, dragging
+        /// the slider re-sends correctly and an LED scaled to black drops out of
+        /// the bitmask — matching the base pipeline's behaviour exactly.
+        /// </summary>
+        private static Color[] ScaleColorsForBrightness(Color[] colors, double brightness)
+        {
+            if (brightness < 0) brightness = 0;
+            if (brightness > 1) brightness = 1;
+            if (brightness >= 1.0) return colors;
+
+            var result = new Color[colors.Length];
+            for (int i = 0; i < colors.Length; i++)
+            {
+                var c = colors[i];
+                byte r = (byte)Math.Round(c.R * brightness);
+                byte g = (byte)Math.Round(c.G * brightness);
+                byte b = (byte)Math.Round(c.B * brightness);
+                result[i] = Color.FromArgb(r, g, b);
+            }
+            return result;
+        }
+
         internal static void SendColorChunks(MozaPlugin plugin, Color[] colors, int count,
             string command, int[]? indexMap = null)
         {
