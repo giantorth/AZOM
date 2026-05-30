@@ -25,6 +25,12 @@ namespace MozaPlugin.UI
         // A wheel was detected (new or old protocol) and its corresponding
         // model-specific device extension is not active in SimHub.
         ProfileNotAddedWheel,
+        // Registry saw the MOZA port but Open can't find it (hot-unplug / pty
+        // teardown) — remediation is replug, distinct from PortLockedByOtherApp.
+        PortVanished,
+        // The recovery ladder exhausted its restart budget / hit a terminal park
+        // and stopped the telemetry pipeline. Surfaces the park reason + how to retry.
+        TelemetryParked,
     }
 
     /// <summary>

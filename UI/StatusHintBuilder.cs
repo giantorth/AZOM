@@ -56,6 +56,37 @@ namespace MozaPlugin.UI
                     $"Close MOZA PitHouse (or anything else talking to the wheelbase) and click Refresh."));
             }
 
+            // Rule 1b: PortVanished — registry saw the port but Open can't find it
+            // (hot-unplug / Wine pty teardown). Distinct remediation from
+            // access-denied: replug, not close-another-app.
+            if (elapsed >= PortLockedSettling
+                && connection != null
+                && !(data?.IsConnected ?? false)
+                && connection.ConsecutiveOpenFailures >= 2
+                && connection.LastFailure.Kind == ConnectionFailureKind.PortVanished)
+            {
+                var port = connection.LastFailure.PortName ?? "the MOZA COM port";
+                list.Add(new StatusHint(
+                    StatusHintKind.PortVanished,
+                    "MOZA port disappeared",
+                    $"The MOZA device on {port} stopped responding to open. Replug the wheelbase " +
+                    "(or its USB cable) and click Refresh."));
+            }
+
+            // Rule 1c: TelemetryParked — the recovery ladder exhausted its restart
+            // budget (or hit a terminal park) and stopped the telemetry pipeline.
+            // Surface WHY (the verbatim park reason) and how to retry.
+            var sender = plugin.TelemetrySender;
+            if (sender != null && sender.Phase == global::MozaPlugin.Telemetry.PipelinePhase.Parked)
+            {
+                string reason = sender.Recovery?.ParkReason;
+                list.Add(new StatusHint(
+                    StatusHintKind.TelemetryParked,
+                    "Telemetry stopped after repeated failures",
+                    (string.IsNullOrEmpty(reason) ? "" : reason + " ")
+                    + "Toggle dashboard telemetry off and on to retry."));
+            }
+
             // Rule 2: DeviceDefinitionDeployed (existing behaviour, kept verbatim)
             if (plugin.DeviceDefinitionDeployed)
             {

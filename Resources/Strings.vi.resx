@@ -484,4 +484,8 @@
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Chọn một tệp JSON cài đặt PitHouse từ bất kỳ vị trí nào.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Tệp không phải JSON hợp lệ: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Loại cài đặt không hỗ trợ "{0}". Chỉ hỗ trợ cài đặt Motor và Pedals.</value></data>
+  <data name="Status_Connected" xml:space="preserve"><value>Đã kết nối</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>Đang khôi phục…</value></data>
+  <data name="Status_Parked" xml:space="preserve"><value>Đã dừng</value></data>
+  <data name="Status_TelemetryParked" xml:space="preserve"><value>Đã dừng telemetry sau nhiều lỗi — bật lại để thử lại</value></data>
 </root>

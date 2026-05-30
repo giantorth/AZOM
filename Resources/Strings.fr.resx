@@ -484,4 +484,8 @@
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Choisissez un fichier JSON de préréglage PitHouse n'importe où sur votre système.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Le fichier n'est pas du JSON valide : {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Type de préréglage non pris en charge « {0} ». Seuls les préréglages Motor et Pédales sont pris en charge.</value></data>
+  <data name="Status_Connected" xml:space="preserve"><value>Connecté</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>Récupération…</value></data>
+  <data name="Status_Parked" xml:space="preserve"><value>En pause</value></data>
+  <data name="Status_TelemetryParked" xml:space="preserve"><value>Télémétrie arrêtée après des échecs répétés — réactivez pour réessayer</value></data>
 </root>

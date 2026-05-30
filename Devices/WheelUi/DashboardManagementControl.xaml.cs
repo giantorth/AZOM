@@ -374,10 +374,17 @@ namespace MozaPlugin.Devices.WheelUi
             bool inCooldown = active?.IsInSilenceCooldown ?? false;
             bool pendingApply = _plugin?.IsPendingDashboardApply ?? false;
             bool senderReady = active != null && active.IsActive && !inCooldown && !pendingApply;
+            // Surface the pipeline health model first so recovery/park states are
+            // truthful instead of mislabeling a parked pipeline as "Connecting…" forever.
+            var phase = active?.Phase ?? PipelinePhase.Idle;
             if (!enabled)
                 TelemetryStatusLabel.Text = "Disabled";
             else if (testMode)
                 TelemetryStatusLabel.Text = $"Test pattern — {framesSent} frames sent";
+            else if (phase == PipelinePhase.Parked)
+                TelemetryStatusLabel.Text = global::MozaPlugin.Resources.Strings.Status_TelemetryParked;
+            else if (phase == PipelinePhase.Recovery)
+                TelemetryStatusLabel.Text = global::MozaPlugin.Resources.Strings.Status_Recovering;
             else if (active != null && !active.IsActive)
                 TelemetryStatusLabel.Text = inCooldown
                     ? "Switching dashboard… (post-emit silence)"

@@ -293,6 +293,23 @@ namespace MozaPlugin.UI
             var sb = new StringBuilder();
             sb.AppendLine($"Enabled:            {plugin.TelemetryEnabledForDiagnostics}");
             sb.AppendLine($"FramesSent:         {plugin.FramesSentForDiagnostics}");
+            sb.AppendLine($"Phase:              {(ts?.Phase ?? global::MozaPlugin.Telemetry.PipelinePhase.Idle)}");
+            var rec = ts?.Recovery;
+            if (rec != null)
+            {
+                sb.AppendLine($"  IsParked:         {rec.IsParked}");
+                sb.AppendLine($"  RecoveryInFlight: {rec.IsRecoveryInFlight}");
+                if (rec.IsParked && !string.IsNullOrEmpty(rec.ParkReason))
+                    sb.AppendLine($"  ParkReason:       {rec.ParkReason}");
+            }
+            var conn = plugin.Connection;
+            if (conn != null)
+            {
+                var lf = conn.LastFailure;
+                sb.AppendLine($"LastFailure:        {lf.Kind}"
+                    + (lf.Kind == ConnectionFailureKind.None ? "" : $" — {lf.Message}"));
+                sb.AppendLine($"ConsecOpenFails:    {conn.ConsecutiveOpenFailures}");
+            }
             var budget = plugin.SerialBudgetForDiagnostics;
             var errs = plugin.SerialWireErrorsForDiagnostics;
             int budgetTargetBytes = WriteBudget.TargetBytesPerWindow;

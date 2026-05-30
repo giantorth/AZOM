@@ -489,4 +489,8 @@
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Selecciona un archivo JSON de preset de PitHouse desde cualquier ubicación.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>El archivo no es JSON válido: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Tipo de preset no compatible "{0}". Solo se admiten presets de Motor y Pedales.</value></data>
+  <data name="Status_Connected" xml:space="preserve"><value>Conectado</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>Recuperando…</value></data>
+  <data name="Status_Parked" xml:space="preserve"><value>Detenido</value></data>
+  <data name="Status_TelemetryParked" xml:space="preserve"><value>Telemetría detenida tras fallos repetidos: vuelve a activarla para reintentar</value></data>
 </root>

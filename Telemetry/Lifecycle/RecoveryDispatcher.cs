@@ -55,6 +55,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private long _lastEscalationUtcTicks;
         private readonly Queue<long> _recentRestartTicks = new Queue<long>();
         private bool _parked;
+        private string _parkReason;
 
         private readonly TelemetrySender _sender;
 
@@ -69,6 +70,14 @@ namespace MozaPlugin.Telemetry.Lifecycle
         public bool IsParked
         {
             get { lock (_lock) return _parked; }
+        }
+
+        /// <summary>Human-readable reason the pipeline parked (verbatim from the
+        /// escalation that tripped it), or null when not parked. Surfaced by the
+        /// status banner / diagnostics so the user sees WHY telemetry stopped.</summary>
+        public string ParkReason
+        {
+            get { lock (_lock) return _parkReason; }
         }
 
         /// <summary>True while a queued restart is still inside its debounce
@@ -133,6 +142,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                         $"({RestartCapPerWindow} restarts in {WindowMs / 1000}s) — " +
                         $"parking pipeline rather than looping: {reason}");
                     _parked = true;
+                    _parkReason = reason;
                     _lastEscalationUtcTicks = now;
                     queuePark = true;
                 }
@@ -190,6 +200,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                     return;
                 }
                 _parked = true;
+                _parkReason = reason;
                 _lastEscalationUtcTicks = DateTime.UtcNow.Ticks;
                 fire = true;
             }
@@ -221,6 +232,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 _lastEscalationUtcTicks = 0;
                 _recentRestartTicks.Clear();
                 _parked = false;
+                _parkReason = null;
             }
         }
     }

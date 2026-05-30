@@ -491,4 +491,8 @@
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Pick a PitHouse preset JSON file from anywhere on your system.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>File is not valid JSON: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Unsupported preset type "{0}". Only Motor and Pedals presets are supported.</value></data>
+  <data name="Status_Connected" xml:space="preserve"><value>Connected</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>Recovering…</value></data>
+  <data name="Status_Parked" xml:space="preserve"><value>Parked</value></data>
+  <data name="Status_TelemetryParked" xml:space="preserve"><value>Telemetry stopped after repeated failures — re-enable to retry</value></data>
 </root>

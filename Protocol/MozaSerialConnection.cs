@@ -321,6 +321,19 @@ namespace MozaPlugin.Protocol
             }
         }
 
+        // Record a POST-open runtime failure (port wedge / half-open tty / live IO
+        // error) into the failure tracker WITHOUT touching _consecutiveOpenFailures
+        // — that counter is open-retry-specific and drives the port-in-use banner.
+        // This is what makes Diagnostics show a real failure instead of
+        // "LastFailure: kind=None" while a connected-but-dead link is being reset.
+        private void RecordRuntimeFailure(ConnectionFailureKind kind, string message)
+        {
+            lock (_failureLock)
+            {
+                _lastFailure = new ConnectionFailureInfo(kind, _lastPortName, message, DateTime.UtcNow);
+            }
+        }
+
         // SerialPort.Open / CreateFile under Wine and native Windows both
         // produce ERROR_ACCESS_DENIED (HResult 0x80070005) when another
         // process holds the port (PitHouse is the canonical case). The
@@ -391,25 +404,6 @@ namespace MozaPlugin.Protocol
             if (_running || _port != null)
                 Disconnect();
 
-            // Under Wine, select the MOZA by USB identity via /dev/serial/by-id and
-            // open it DIRECTLY — never blind-probe COM ports. Opening an unrelated
-            // device's CDC-ACM interface (e.g. a phone/tablet on the bus) via Wine
-            // segfaults the SHARED wineserver and kills SimHub, which out-of-process
-            // probe isolation cannot prevent. This bypasses the registry/cached-COM/
-            // blind-probe paths below entirely on Linux. (mBooster stays registry-only.)
-            if (IsRunningUnderWine()
-                && _probeTarget != MozaProbeTarget.MBooster
-                && MozaByIdDiscovery.ByIdAvailable())
-            {
-                if (!IsSerialProbeReady(out int settleMs))
-                {
-                    MozaLog.Debug($"[Moza] by-id open deferred — base USB not settled ({settleMs}ms / {ProbeHidSettleMs}ms).");
-                    return false;
-                }
-                MozaLog.Debug($"[Moza] by-id: base USB settled ({settleMs}ms) — discovering + opening.");
-                return ConnectViaById();
-            }
-
             // Try the cached port first, gated on registry confirming it still
             // belongs to a MOZA device of the right family. _activePorts guards
             // against same-process sibling-connection double-open on Wine ptys.
@@ -459,108 +453,6 @@ namespace MozaPlugin.Protocol
             HubProbeSucceeded = viaHubProbe;
 
             return TryOpen(portName);
-        }
-
-        // Wine path: open the MOZA by /dev/serial/by-id identity and confirm it
-        // with the existing discovery probe BEFORE committing — so a non-MOZA
-        // device is NEVER opened (the wineserver-killing crash vector).
-        private bool ConnectViaById()
-        {
-            if (!MozaByIdDiscovery.TryListMozaDataPorts(out var candidates))
-                return false;
-
-            // Prefer the previously-connected by-id name (stable across re-enumeration).
-            if (_lastPortName != null && candidates.Count > 1)
-                candidates.Sort((a, b) =>
-                    (b.Name == _lastPortName ? 1 : 0) - (a.Name == _lastPortName ? 1 : 0));
-
-            MozaLog.Debug($"[Moza] by-id: {candidates.Count} MOZA data-port candidate(s) for {_probeTarget}");
-            foreach (var cand in candidates)
-            {
-                if (_shutdownRequested) return false;
-                if (_activePorts.ContainsKey(cand.Name)) continue; // sibling connection holds it
-
-                MozaLog.Debug($"[Moza] by-id: opening {cand.Name}");
-                WineByIdMozaPort port;
-                try
-                {
-                    port = new WineByIdMozaPort(cand.ByIdPath);
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    RecordOpenFailure(cand.Name, ConnectionFailureKind.AccessDenied, ex);
-                    MozaLog.Error($"[Moza] by-id open {cand.Name} denied: {ex.Message}");
-                    continue;
-                }
-                catch (IOException ex) when (LooksLikeAccessDenied(ex))
-                {
-                    RecordOpenFailure(cand.Name, ConnectionFailureKind.AccessDenied, ex);
-                    MozaLog.Error($"[Moza] by-id open {cand.Name} denied: {ex.Message}");
-                    continue;
-                }
-                catch (Exception ex)
-                {
-                    RecordOpenFailure(cand.Name, ConnectionFailureKind.OpenFailedOther, ex);
-                    MozaLog.Debug($"[Moza] by-id open {cand.Name} failed: {ex.GetType().Name}: {ex.Message}");
-                    continue;
-                }
-
-                MozaLog.Debug($"[Moza] by-id: {cand.Name} open OK — confirming identity");
-                if (TryConfirmAndCommit(port, cand.Name))
-                    return true;
-                try { port.Close(); port.Dispose(); } catch { }
-            }
-            return false;
-        }
-
-        // Confirm device identity/readiness on an already-open by-id handle, then
-        // hand off to FinishOpen. Mirrors FindMozaPort's per-target probe logic.
-        private bool TryConfirmAndCommit(WineByIdMozaPort port, string name)
-        {
-            Action<string> log = m => MozaLog.Debug($"[Moza] {m}");
-            bool viaHub = false;
-            bool ok;
-            MozaLog.Debug($"[Moza] by-id: probing {name} for {_probeTarget}");
-            switch (_probeTarget)
-            {
-                case MozaProbeTarget.HubOnly:
-                    ok = MozaPortProbe.Confirm(port, ProbeKind.Hub, log);
-                    viaHub = ok;
-                    break;
-                case MozaProbeTarget.Ab9:
-                    // AB9 dev id collides with the base main; a base ALSO answers the
-                    // AB9 probe, so a base-probe match means "wheelbase, not AB9".
-                    if (MozaPortProbe.Confirm(port, ProbeKind.Base, log))
-                    {
-                        MozaLog.Debug($"[Moza] by-id {name}: base territory — not AB9, skipping");
-                        return false;
-                    }
-                    ok = MozaPortProbe.Confirm(port, ProbeKind.Ab9, log);
-                    break;
-                default: // BaseAndHub
-                    ok = MozaPortProbe.Confirm(port, ProbeKind.Base, log);
-                    if (!ok) { ok = MozaPortProbe.Confirm(port, ProbeKind.Hub, log); viaHub = ok; }
-                    break;
-            }
-            if (!ok)
-            {
-                MozaLog.Debug($"[Moza] by-id {name}: no MOZA {_probeTarget} response — skipping");
-                return false;
-            }
-
-            DiscoveredPid = null; // by-id path carries no Windows PID
-            HubProbeSucceeded = viaHub;
-            MozaLog.Info($"[Moza] Found MOZA {(viaHub ? "hub" : _probeTarget.ToString())} via by-id: {name}");
-            try
-            {
-                return FinishOpen(port, name);
-            }
-            catch (Exception ex)
-            {
-                RecordOpenFailure(name, ConnectionFailureKind.OpenFailedOther, ex);
-                MozaLog.Error($"[Moza] by-id finish-open {name} failed: {ex.Message}");
-                return false;
-            }
         }
 
         private bool TryOpen(string portName)
@@ -746,6 +638,8 @@ namespace MozaPlugin.Protocol
             {
                 MozaLog.Warn(
                     $"[Moza] Port wedged after {count} consecutive I/O errors — closing for reconnect");
+                RecordRuntimeFailure(ConnectionFailureKind.IoFailureAfterOpen,
+                    $"{label}: {ex.Message} (after {count} consecutive I/O errors — port wedged)");
                 lock (_lock)
                 {
                     try { _port?.Close(); } catch { }

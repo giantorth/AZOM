@@ -306,7 +306,23 @@ namespace MozaPlugin
             if (ConnectionPill == null) return;
             ConnectionPill.IsConnected = _data.IsConnected;
             ConnectionPill.PortName = _plugin.Connection?.LastPortName ?? "—";
-            ConnectionPill.StatusText = _data.IsConnected ? "Connected" : "Disconnected";
+            if (!_data.IsConnected)
+            {
+                ConnectionPill.StatusText = global::MozaPlugin.Resources.Strings.Status_Disconnected;
+            }
+            else
+            {
+                // Widen the connected pill with telemetry phase so Recovery/Parked
+                // are visible at a glance without opening the Diagnostics tab.
+                var phase = _plugin.TelemetrySender?.Phase ?? global::MozaPlugin.Telemetry.PipelinePhase.Idle;
+                string connected = global::MozaPlugin.Resources.Strings.Status_Connected;
+                if (phase == global::MozaPlugin.Telemetry.PipelinePhase.Recovery)
+                    ConnectionPill.StatusText = connected + " · " + global::MozaPlugin.Resources.Strings.Status_Recovering;
+                else if (phase == global::MozaPlugin.Telemetry.PipelinePhase.Parked)
+                    ConnectionPill.StatusText = connected + " · " + global::MozaPlugin.Resources.Strings.Status_Parked;
+                else
+                    ConnectionPill.StatusText = connected;
+            }
         }
 
         private void OnBandwidthTick(object? sender, EventArgs e)

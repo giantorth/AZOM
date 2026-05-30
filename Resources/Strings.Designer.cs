@@ -78,6 +78,10 @@ namespace MozaPlugin.Resources
         public static string Brand_Moza => Get("Brand_Moza");
         public static string Brand_SimHubPlugin => Get("Brand_SimHubPlugin");
         public static string Status_Disconnected => Get("Status_Disconnected");
+        public static string Status_Connected => Get("Status_Connected");
+        public static string Status_Recovering => Get("Status_Recovering");
+        public static string Status_Parked => Get("Status_Parked");
+        public static string Status_TelemetryParked => Get("Status_TelemetryParked");
         public static string Button_Refresh => Get("Button_Refresh");
         public static string Label_PerformanceOutput => Get("Label_PerformanceOutput");
         public static string Option_Reserved => Get("Option_Reserved");

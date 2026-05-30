@@ -2080,6 +2080,14 @@ namespace MozaPlugin
             this.AttachDelegate("Moza.BaseState", () => _data?.BaseState ?? 0);
             this.AttachDelegate("Moza.FfbStrength", () => (_data?.FfbStrength ?? 0) / 10);
             this.AttachDelegate("Moza.MaxAngle", () => (_data?.MaxAngle ?? 0) * 2);
+            // Telemetry pipeline health, so users can show a degraded/parked state on
+            // an overlay. TelemetryState = the PipelinePhase name (Idle/SilenceWait/
+            // Starting/Active/HotSwitchBurst/Recovery/Parked). DashboardBound is a
+            // best-effort "telemetry actively flowing" flag (Phase==Active) — there is
+            // no true wheel-side commit signal yet (see P4), so it can read true while
+            // a wheel silently ignores the binding; documented limitation.
+            this.AttachDelegate("Moza.TelemetryState", () => (_telemetrySender?.Phase ?? PipelinePhase.Idle).ToString());
+            this.AttachDelegate("Moza.DashboardBound", () => (_telemetrySender?.Phase ?? PipelinePhase.Idle) == PipelinePhase.Active);
         }
 
         private void RegisterActions()
