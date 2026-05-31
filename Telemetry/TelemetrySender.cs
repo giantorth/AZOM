@@ -158,6 +158,18 @@ namespace MozaPlugin.Telemetry
 
         // Upload handshake state.
         internal int _mgmtAckSeq;
+
+        // Gap-aware catalog ack: highest CONTIGUOUS inbound seq per catalog
+        // session (mgmt/telem) during binding. A dropped catalog chunk under
+        // Wine leaves a seq gap (observed 07→0c on sess=0x01); acking the
+        // post-gap seq tells the wheel we received chunks we didn't, so it never
+        // resends and the catalog stays truncated → dash wedged. Instead we
+        // re-ack the last contiguous seq across a gap. Pre-Active only;
+        // steady-state telemetry keeps specific-seq acks. Reset per session open
+        // (ResetContigAck) and per StartInner.
+        private readonly object _contigAckLock = new object();
+        private readonly System.Collections.Generic.Dictionary<byte, int> _contigAckSeqBySession
+            = new System.Collections.Generic.Dictionary<byte, int>();
         private readonly ManualResetEventSlim _mgmtResponseEvent = new ManualResetEventSlim(false);
 
         // File-transfer session state. See docs/protocol/dashboard-upload/.
@@ -1478,22 +1490,73 @@ namespace MozaPlugin.Telemetry
             {
                 const int CatalogWaitMaxMs = 5000;
                 const int CatalogWaitSliceMs = 100;
+                // The cold-start catalog can arrive with dropped/truncated
+                // chunks under Wine: mid-burst session-data frames are lost
+                // (observed on sess=0x01, seq 07→0c — the URL records 08-0b
+                // never reach the read buffer), leaving a partial URL record +
+                // END. The read thread cumulative-acks that END as delivered,
+                // so the wheel never resends; the dash renders but shows no live
+                // data and NEVER self-recovers — only a telemetry off/on toggle
+                // (a full session re-cycle) fixes it. So when the wheel pushed an
+                // END marker but we assembled ZERO valid channel URLs, treat the
+                // catalog as garbage and RE-REQUEST: wipe the polluted buffer and
+                // close+reopen the catalog sessions so the wheel re-pushes the
+                // full catalog. Bounded; a wheel that pushed no END at all
+                // (screenless / no dash bound) has nothing to re-request and just
+                // proceeds.
+                const int MaxCatalogRequests = 3; // 1 initial + 2 re-requests
                 byte mgmt = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
                 byte flag = FlagByte;
-                int waited = 0;
-                while (waited < CatalogWaitMaxMs)
+                int totalWaited = 0;
+                bool haveCatalog = false;
+                for (int attempt = 1; attempt <= MaxCatalogRequests; attempt++)
                 {
-                    _catalogParser.TryParse();
-                    if (_catalogParser.HasRealCatalogOnSession(mgmt)
-                        || (flag != 0 && flag != mgmt && _catalogParser.HasRealCatalogOnSession(flag)))
+                    int waited = 0;
+                    while (waited < CatalogWaitMaxMs)
+                    {
+                        _catalogParser.TryParse();
+                        if (_catalogParser.HasRealCatalogOnSession(mgmt)
+                            || (flag != 0 && flag != mgmt && _catalogParser.HasRealCatalogOnSession(flag)))
+                        {
+                            haveCatalog = true;
+                            break;
+                        }
+                        if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
+                        try { System.Threading.Thread.Sleep(CatalogWaitSliceMs); } catch { }
+                        waited += CatalogWaitSliceMs;
+                    }
+                    totalWaited += waited;
+                    if (haveCatalog) break;
+
+                    // Timed out with no usable catalog. Distinguish "incomplete
+                    // burst" (END seen, no valid URLs — re-request) from "no
+                    // catalog at all" (no END ever — screenless / nothing to ask
+                    // for, proceed).
+                    bool sawEnd = _catalogParser.GetEndMarkerForSession(mgmt) != 0
+                        || (flag != 0 && _catalogParser.GetEndMarkerForSession(flag) != 0)
+                        || _catalogParser.LastWheelEndMarker != 0;
+                    if (!sawEnd || attempt == MaxCatalogRequests)
                         break;
+
+                    MozaLog.Warn(
+                        $"[Moza] Incomplete channel catalog (END seen, 0 valid channels — " +
+                        $"dropped/truncated catalog chunks) after {waited}ms; re-requesting via " +
+                        $"session re-cycle (attempt {attempt}/{MaxCatalogRequests - 1}).");
+                    _catalogParser.ClearBuffer();
+                    try { TryCloseSession(0x01, 300); } catch { }
+                    try { TryCloseSession(0x02, 300); } catch { }
+                    try { TryCloseSession(0x03, 300); } catch { }
+                    try { System.Threading.Thread.Sleep(250); } catch { }
                     if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                    try { System.Threading.Thread.Sleep(CatalogWaitSliceMs); } catch { }
-                    waited += CatalogWaitSliceMs;
+                    TryOpenSession(0x01, 500);
+                    if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
+                    TryOpenSession(0x02, 500);
+                    SendSessionOpen(0x03, 0x03);
                 }
                 MozaLog.Debug(
-                    $"[Moza] Pre-init catalog wait: {waited}ms — tier-def session resolved to " +
-                    $"0x{ResolveTierDefSession():X2}, FF session 0x{ResolveFfSession():X2}.");
+                    $"[Moza] Pre-init catalog wait: {totalWaited}ms — tier-def session resolved to " +
+                    $"0x{ResolveTierDefSession():X2}, FF session 0x{ResolveFfSession():X2}" +
+                    $"{(haveCatalog ? "" : " (no usable catalog — proceeding)")}.");
             }
             MaybeSwapProfileForCatalog();
 
@@ -1535,6 +1598,7 @@ namespace MozaPlugin.Telemetry
             _nextFlagBase = 0;
             _activeSubscription = null;
             _sessionAckSeq = 0;
+            lock (_contigAckLock) _contigAckSeqBySession.Clear();
             _dashboardDownloadTriggered = false;
             _preambleTickTarget = Math.Max(1, 1000 / _baseTickMs);
             // Default the cold-start preamble gate off; StartInner re-arms it
@@ -2070,6 +2134,42 @@ namespace MozaPlugin.Telemetry
         internal int IncrementCatalogCrcRejects() => Interlocked.Increment(ref _catalogCrcRejects);
         internal int IncrementTileServerCrcRejects() => Interlocked.Increment(ref _tileServerCrcRejects);
         internal void SendSessionAckInternal(byte session, ushort ackSeq) => SendSessionAck(session, ackSeq);
+
+        /// <summary>Gap-aware ack-seq for a catalog-bearing session during the
+        /// binding phase. Advances on contiguous seqs, acks retransmits of
+        /// already-seen seqs specifically, and on a gap (a dropped catalog
+        /// chunk) re-acks the last CONTIGUOUS seq instead of acking past the
+        /// hole — so we never tell the wheel we received chunks we didn't, and
+        /// it gets a chance to resend. Once Active (steady-state telemetry) it
+        /// acks the seq verbatim, preserving the existing specific-seq behaviour
+        /// (a dropped keepalive must not stall the ack). Reset per session open.</summary>
+        internal ushort GapAwareCatalogAckSeq(byte session, int seq)
+        {
+            if (_state == TelemetryState.Active)
+                return (ushort)seq;
+            lock (_contigAckLock)
+            {
+                int contig = _contigAckSeqBySession.TryGetValue(session, out var c) ? c : -1;
+                if (contig < 0 || seq == contig + 1)
+                {
+                    _contigAckSeqBySession[session] = seq;   // first frame, or in-order
+                    return (ushort)seq;
+                }
+                if (seq <= contig)
+                    return (ushort)seq;                      // retransmit of an acked seq
+                // seq > contig + 1: chunk(s) between contig and seq dropped on RX.
+                // Dup-ack the last contiguous seq; do NOT advance past the hole.
+                return (ushort)contig;
+            }
+        }
+
+        /// <summary>Drop the gap-aware contiguous-ack baseline for a session so a
+        /// fresh open (new seq generation) starts clean. Called from
+        /// SendSessionOpen and the StartInner reset.</summary>
+        internal void ResetContigAck(byte session)
+        {
+            lock (_contigAckLock) _contigAckSeqBySession.Remove(session);
+        }
         internal void MaybeSendConfigJsonReplyInternal(WheelDashboardState state, byte session) =>
             MaybeSendConfigJsonReply(state, session);
         internal void MaybeTriggerDashboardDownloadInternal(WheelDashboardState state) =>
@@ -4211,6 +4311,9 @@ namespace MozaPlugin.Telemetry
 
         private void SendSessionOpen(byte session, byte port)
         {
+            // Fresh seq generation incoming — clear the gap-aware contiguous
+            // ack baseline so the re-opened session re-bases cleanly.
+            ResetContigAck(session);
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x0A,

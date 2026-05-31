@@ -168,7 +168,8 @@ namespace MozaPlugin.Telemetry.Inbound
             {
                 if (seq > _sender._sessionAckSeq)
                     _sender._sessionAckSeq = seq;
-                _sender.SendSessionAckInternal(_sender.FlagByte, (ushort)seq);
+                _sender.SendSessionAckInternal(
+                    _sender.FlagByte, _sender.GapAwareCatalogAckSeq(_sender.FlagByte, seq));
 
                 // First inbound on sess=FlagByte = engagement gate.
                 _sender.Watchdog.NoteSession02FirstInbound();
@@ -194,7 +195,8 @@ namespace MozaPlugin.Telemetry.Inbound
             {
                 if (seq > _sender._mgmtAckSeq)
                     _sender._mgmtAckSeq = seq;
-                _sender.SendSessionAckInternal(_sender.MgmtPort, (ushort)seq);
+                _sender.SendSessionAckInternal(
+                    _sender.MgmtPort, _sender.GapAwareCatalogAckSeq(_sender.MgmtPort, seq));
                 _sender.MgmtResponseEvent.Set();
                 // Mgmt session engagement signal — data flow on sess=MgmtPort
                 // is the strongest possible proof the session is alive.
