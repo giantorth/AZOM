@@ -1,9 +1,12 @@
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Navigation;
 using MozaPlugin.Resources;
 using MozaPlugin.UI;
 using MozaPlugin.UI.UpdateCheck;
@@ -37,8 +40,13 @@ namespace MozaPlugin
         // Same idea for the in-flight install (download + extract + swap).
         // Cancelled on Unload — but note that if the cancel lands AFTER the
         // file swap, the install completed and the banner just won't update;
-        // RefreshUpdateBannerFromSettings re-detects the .old file next open.
+        // RefreshUpdateNotifications re-detects the .old file next open.
         private CancellationTokenSource? _updateInstallCts;
+
+        // True while a download+install is running. Gates the banner repaint
+        // paths (the 500ms tick and RefreshUpdateNotifications) so they don't
+        // clobber the live "Downloading…/Installing…" progress UI mid-flight.
+        private bool _installInProgress;
 
         private void InitUpdateBannerControls()
         {
@@ -55,7 +63,7 @@ namespace MozaPlugin
                     UpdateChannelCombo.SelectedIndex = (int)s.UpdateChannel;
                 }
 
-                RefreshUpdateBannerFromSettings();
+                RefreshUpdateNotifications();
                 RefreshLastCheckedText();
                 Unloaded += OnUnloadedCancelUpdateCheck;
             }
@@ -87,57 +95,294 @@ namespace MozaPlugin
             catch { return false; }
         }
 
-        // Reads the persisted "last seen" version + skip state and decides
-        // whether to show the banner. Safe to call from the UI thread; never
-        // touches the network.
-        private void RefreshUpdateBannerFromSettings()
+        // Computes whether an update notification should be shown right now and
+        // in which mode. Pure read of persisted state + the .old pending-file
+        // probe; never touches the network. `pendingRestart` means an install
+        // already completed this/last session and SimHub must restart to load
+        // it — in that mode we never offer another install (it would fail with
+        // OldPending) and instead surface the Restart button.
+        private void ComputeUpdateVisibility(
+            string current, string latest,
+            out bool visible, out bool pendingRestart, out bool hasAsset)
         {
-            if (UpdateBannerBorder == null) return;
+            visible = false;
+            pendingRestart = false;
+            hasAsset = false;
 
             var s = _plugin?.Settings;
-            if (s == null) { UpdateBannerBorder.Visibility = Visibility.Collapsed; return; }
+            if (s == null) return;
+            if (_updateBannerDismissedThisSession || !s.UpdateCheckEnabled) return;
+            if (string.IsNullOrEmpty(latest)) return;
+            if (!UpdateCheckService.IsUpdateAvailable(latest, current, s.UpdateChannel)) return;
+            if (!string.IsNullOrEmpty(s.LastSkippedVersion)
+                && string.Equals(s.LastSkippedVersion, latest, StringComparison.Ordinal)) return;
 
-            if (_updateBannerDismissedThisSession || !s.UpdateCheckEnabled)
-            {
-                UpdateBannerBorder.Visibility = Visibility.Collapsed;
-                return;
-            }
+            visible = true;
+            hasAsset = !string.IsNullOrEmpty(s.LastSeenAssetUrl);
+            pendingRestart = IsInstallPending();
+        }
 
-            string latest = s.LastSeenLatestVersion ?? "";
-            if (string.IsNullOrEmpty(latest))
-            {
-                UpdateBannerBorder.Visibility = Visibility.Collapsed;
-                return;
-            }
+        // Full repaint of every update surface: the cross-tab header banner,
+        // the About > Updates card banner, and the release-notes panel. Called
+        // on construction and after every user action / check / install. Safe
+        // on the UI thread; no-ops while an install is mid-flight so it doesn't
+        // wipe the live progress UI.
+        internal void RefreshUpdateNotifications()
+        {
+            if (_installInProgress) return;
 
             string current = DiagnosticsTextBuilder.GetPluginVersion();
-            if (!UpdateCheckService.IsUpdateAvailable(latest, current, s.UpdateChannel))
-            {
-                UpdateBannerBorder.Visibility = Visibility.Collapsed;
-                return;
-            }
+            string latest = _plugin?.Settings?.LastSeenLatestVersion ?? "";
+            ComputeUpdateVisibility(current, latest, out bool visible, out bool pendingRestart, out bool hasAsset);
 
-            if (!string.IsNullOrEmpty(s.LastSkippedVersion)
-                && string.Equals(s.LastSkippedVersion, latest, StringComparison.Ordinal))
-            {
-                UpdateBannerBorder.Visibility = Visibility.Collapsed;
-                return;
-            }
+            PaintAboutBanner(visible, pendingRestart, hasAsset, current, latest);
+            PaintHeaderBanner(visible, pendingRestart, hasAsset, current, latest);
+            RefreshReleaseNotes(visible, latest);
+        }
 
-            UpdateBannerText.Text = $"{Strings.Label_UpdateAvailable}: v{current} → v{latest}";
+        // Repaints ONLY the header banner. Driven by the 500ms RefreshDisplay
+        // tick so the cross-tab notification appears/updates live (e.g. when
+        // the background auto-check completes while the user is on another
+        // tab). The heavier About-card banner + notes stay on the
+        // construct/user-action cadence to keep transient error text readable.
+        internal void RefreshHeaderBanner()
+        {
+            if (_installInProgress) return;
+
+            string current = DiagnosticsTextBuilder.GetPluginVersion();
+            string latest = _plugin?.Settings?.LastSeenLatestVersion ?? "";
+            ComputeUpdateVisibility(current, latest, out bool visible, out bool pendingRestart, out bool hasAsset);
+            PaintHeaderBanner(visible, pendingRestart, hasAsset, current, latest);
+        }
+
+        private void PaintAboutBanner(
+            bool visible, bool pendingRestart, bool hasAsset, string current, string latest)
+        {
+            if (UpdateBannerBorder == null) return;
+            if (!visible) { UpdateBannerBorder.Visibility = Visibility.Collapsed; return; }
+
             UpdateBannerBorder.Visibility = Visibility.Visible;
-
-            if (IsInstallPending())
+            if (pendingRestart)
             {
-                // Previous install completed but SimHub hasn't been restarted
-                // yet — show the "restart required" state instead of inviting
-                // another install that would fail with OldPending.
                 SetBannerState_Installed(latest);
             }
             else
             {
-                SetBannerState_Available(hasAsset: !string.IsNullOrEmpty(s.LastSeenAssetUrl));
+                if (UpdateBannerText != null)
+                    UpdateBannerText.Text = $"{Strings.Label_UpdateAvailable}: v{current} → v{latest}";
+                SetBannerState_Available(hasAsset);
             }
+        }
+
+        private void PaintHeaderBanner(
+            bool visible, bool pendingRestart, bool hasAsset, string current, string latest)
+        {
+            if (HeaderUpdateBanner == null) return;
+            if (!visible) { HeaderUpdateBanner.Visibility = Visibility.Collapsed; return; }
+
+            HeaderUpdateBanner.Visibility = Visibility.Visible;
+            if (HeaderUpdateBannerProgressText != null)
+                HeaderUpdateBannerProgressText.Visibility = Visibility.Collapsed;
+
+            if (pendingRestart)
+            {
+                if (HeaderUpdateBannerText != null)
+                    HeaderUpdateBannerText.Text = string.Format(
+                        Strings.Status_InstalledRestartRequired, latest);
+                if (HeaderUpdateInstallButton != null)
+                    HeaderUpdateInstallButton.Visibility = Visibility.Collapsed;
+                if (HeaderUpdateRestartButton != null)
+                {
+                    HeaderUpdateRestartButton.Visibility = Visibility.Visible;
+                    HeaderUpdateRestartButton.IsEnabled = true;
+                }
+            }
+            else
+            {
+                if (HeaderUpdateBannerText != null)
+                    HeaderUpdateBannerText.Text = $"{Strings.Label_UpdateAvailable}: v{current} → v{latest}";
+                if (HeaderUpdateInstallButton != null)
+                {
+                    HeaderUpdateInstallButton.Visibility = hasAsset ? Visibility.Visible : Visibility.Collapsed;
+                    HeaderUpdateInstallButton.IsEnabled = true;
+                }
+                if (HeaderUpdateRestartButton != null)
+                    HeaderUpdateRestartButton.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // The markdown source currently rendered into the RichTextBox, so we
+        // only rebuild the FlowDocument when the notes actually change (avoids
+        // resetting scroll/selection on every unrelated banner repaint).
+        private string? _renderedReleaseNotes;
+
+        // Populates the About-card "What's new in vX" panel from the cached
+        // release body. Hidden when there's nothing to show or no active
+        // notification.
+        private void RefreshReleaseNotes(bool visible, string latest)
+        {
+            if (UpdateReleaseNotesPanel == null) return;
+
+            string notes = _plugin?.Settings?.LastSeenReleaseNotes ?? "";
+            if (!visible || string.IsNullOrWhiteSpace(notes))
+            {
+                UpdateReleaseNotesPanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (UpdateReleaseNotesHeader != null)
+                UpdateReleaseNotesHeader.Text = string.Format(Strings.Label_WhatsNew, latest);
+            if (UpdateReleaseNotesBox != null
+                && !string.Equals(_renderedReleaseNotes, notes, StringComparison.Ordinal))
+            {
+                UpdateReleaseNotesBox.Document = BuildReleaseNotesDocument(notes);
+                _renderedReleaseNotes = notes;
+            }
+            UpdateReleaseNotesPanel.Visibility = Visibility.Visible;
+        }
+
+        // ----- Lightweight markdown → FlowDocument renderer -----
+        //
+        // GitHub release bodies (especially the auto-generated "What's Changed"
+        // list) use a small, predictable subset of markdown: ATX headings,
+        // '-'/'*'/'+' bullets, '1.' ordered items, **bold**, `inline code`,
+        // [label](url) links, and bare URLs. We render exactly that subset —
+        // a full CommonMark engine would be overkill for a changelog blurb and
+        // would mean pulling in a dependency.
+
+        private static readonly Regex s_inlineRx = new Regex(
+            @"(?<code>`[^`]+`)" +
+            @"|(?<bold>\*\*[^*]+\*\*|__[^_]+__)" +
+            @"|(?<link>\[[^\]]+\]\([^)\s]+\))" +
+            @"|(?<url>https?://[^\s)]+)",
+            RegexOptions.Compiled);
+
+        private FlowDocument BuildReleaseNotesDocument(string md)
+        {
+            var doc = new FlowDocument
+            {
+                PagePadding = new Thickness(0),
+                TextAlignment = TextAlignment.Left,
+            };
+            if (UpdateReleaseNotesBox != null)
+            {
+                doc.FontFamily = UpdateReleaseNotesBox.FontFamily;
+                doc.FontSize = UpdateReleaseNotesBox.FontSize;
+            }
+            double baseSize = doc.FontSize > 0 ? doc.FontSize : 12.0;
+
+            if (string.IsNullOrEmpty(md)) return doc;
+
+            var lines = md.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+            foreach (var rawLine in lines)
+            {
+                string trimmed = rawLine.Trim();
+                if (trimmed.Length == 0) continue;
+                if (trimmed == "---" || trimmed == "***" || trimmed == "___") continue;
+
+                // Heading (#, ##, ###)
+                if (trimmed[0] == '#')
+                {
+                    int h = 0;
+                    while (h < trimmed.Length && trimmed[h] == '#') h++;
+                    string htext = trimmed.Substring(h).TrimStart();
+                    var hp = new Paragraph { Margin = new Thickness(0, 8, 0, 4), FontWeight = FontWeights.Bold };
+                    hp.FontSize = baseSize + (h <= 1 ? 3 : h == 2 ? 2 : 1);
+                    AppendInlines(hp, htext);
+                    doc.Blocks.Add(hp);
+                    continue;
+                }
+
+                // Unordered bullet
+                if (trimmed.StartsWith("- ") || trimmed.StartsWith("* ") || trimmed.StartsWith("+ "))
+                {
+                    var bp = new Paragraph { Margin = new Thickness(12, 1, 0, 1), TextIndent = -10 };
+                    bp.Inlines.Add(new Run("•  "));
+                    AppendInlines(bp, trimmed.Substring(2));
+                    doc.Blocks.Add(bp);
+                    continue;
+                }
+
+                // Ordered item (1. ...)
+                var om = Regex.Match(trimmed, @"^(\d+)\.\s+(.*)$");
+                if (om.Success)
+                {
+                    var op = new Paragraph { Margin = new Thickness(12, 1, 0, 1), TextIndent = -14 };
+                    op.Inlines.Add(new Run(om.Groups[1].Value + ".  "));
+                    AppendInlines(op, om.Groups[2].Value);
+                    doc.Blocks.Add(op);
+                    continue;
+                }
+
+                // Plain paragraph
+                var p = new Paragraph { Margin = new Thickness(0, 2, 0, 2) };
+                AppendInlines(p, trimmed);
+                doc.Blocks.Add(p);
+            }
+
+            return doc;
+        }
+
+        // Splits a single line into styled inlines (plain text + bold + code +
+        // links). Unmatched text is emitted verbatim.
+        private void AppendInlines(Paragraph p, string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            int pos = 0;
+            foreach (Match m in s_inlineRx.Matches(text))
+            {
+                if (m.Index > pos)
+                    p.Inlines.Add(new Run(text.Substring(pos, m.Index - pos)));
+
+                if (m.Groups["code"].Success)
+                {
+                    string code = m.Value.Substring(1, m.Value.Length - 2);
+                    p.Inlines.Add(new Run(code)
+                    {
+                        FontFamily = new System.Windows.Media.FontFamily("Consolas, Courier New, monospace"),
+                    });
+                }
+                else if (m.Groups["bold"].Success)
+                {
+                    p.Inlines.Add(new Bold(new Run(m.Value.Substring(2, m.Value.Length - 4))));
+                }
+                else if (m.Groups["link"].Success)
+                {
+                    var lm = Regex.Match(m.Value, @"^\[([^\]]+)\]\(([^)\s]+)\)$");
+                    AddHyperlink(p, lm.Groups[1].Value, lm.Groups[2].Value);
+                }
+                else if (m.Groups["url"].Success)
+                {
+                    AddHyperlink(p, m.Value, m.Value);
+                }
+
+                pos = m.Index + m.Length;
+            }
+            if (pos < text.Length)
+                p.Inlines.Add(new Run(text.Substring(pos)));
+        }
+
+        private void AddHyperlink(Paragraph p, string label, string url)
+        {
+            try
+            {
+                var link = new Hyperlink(new Run(label)) { NavigateUri = new Uri(url) };
+                link.RequestNavigate += ReleaseNotesLink_RequestNavigate;
+                if (TryFindResource("CyanBrush") is System.Windows.Media.Brush brush)
+                    link.Foreground = brush;
+                p.Inlines.Add(link);
+            }
+            catch
+            {
+                // Malformed URL — fall back to plain label text.
+                p.Inlines.Add(new Run(label));
+            }
+        }
+
+        private void ReleaseNotesLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            OpenExternalUrl(e.Uri?.ToString() ?? "");
+            e.Handled = true;
         }
 
         // ----- Banner state machine -----
@@ -152,6 +397,8 @@ namespace MozaPlugin
                 UpdateBannerInstallButton.Visibility = hasAsset ? Visibility.Visible : Visibility.Collapsed;
                 UpdateBannerInstallButton.IsEnabled = true;
             }
+            if (UpdateBannerRestartButton != null)
+                UpdateBannerRestartButton.Visibility = Visibility.Collapsed;
             if (UpdateBannerOpenButton != null) UpdateBannerOpenButton.Visibility = Visibility.Visible;
             if (UpdateBannerSkipButton != null)
             {
@@ -181,13 +428,24 @@ namespace MozaPlugin
             }
         }
 
-        // Install succeeded — DLL is swapped, restart required. Hide the
-        // Install + Skip buttons (re-installing would just fail); keep
-        // Open release notes + Dismiss for navigation.
+        // Install succeeded — DLL is swapped, restart required. Replace the
+        // "update available" headline with the restart prompt (so the stale
+        // "new update" status is cleared the moment the install lands), hide
+        // Install + Skip (re-installing would just fail), and surface the
+        // one-click Restart button. Open release notes + Dismiss stay for
+        // navigation.
         private void SetBannerState_Installed(string version)
         {
+            if (UpdateBannerText != null)
+                UpdateBannerText.Text = string.Format(
+                    Strings.Status_InstalledRestartRequired, version);
             if (UpdateBannerInstallButton != null) UpdateBannerInstallButton.Visibility = Visibility.Collapsed;
             if (UpdateBannerSkipButton != null) UpdateBannerSkipButton.Visibility = Visibility.Collapsed;
+            if (UpdateBannerRestartButton != null)
+            {
+                UpdateBannerRestartButton.Visibility = Visibility.Visible;
+                UpdateBannerRestartButton.IsEnabled = true;
+            }
             if (UpdateBannerOpenButton != null) UpdateBannerOpenButton.Visibility = Visibility.Visible;
             if (UpdateBannerDismissButton != null)
             {
@@ -195,10 +453,22 @@ namespace MozaPlugin
                 UpdateBannerDismissButton.IsEnabled = true;
             }
             if (UpdateBannerProgressText != null)
+                UpdateBannerProgressText.Visibility = Visibility.Collapsed;
+        }
+
+        // Header-banner equivalent of SetBannerState_Installing: disable the
+        // Install button and show an indeterminate progress line while the
+        // download/extract/swap runs.
+        private void SetHeaderState_Installing()
+        {
+            if (HeaderUpdateBanner == null) return;
+            HeaderUpdateBanner.Visibility = Visibility.Visible;
+            if (HeaderUpdateInstallButton != null) HeaderUpdateInstallButton.IsEnabled = false;
+            if (HeaderUpdateRestartButton != null) HeaderUpdateRestartButton.Visibility = Visibility.Collapsed;
+            if (HeaderUpdateBannerProgressText != null)
             {
-                UpdateBannerProgressText.Visibility = Visibility.Visible;
-                UpdateBannerProgressText.Text = string.Format(
-                    Strings.Status_InstalledRestartRequired, version);
+                HeaderUpdateBannerProgressText.Visibility = Visibility.Visible;
+                HeaderUpdateBannerProgressText.Text = Strings.Status_DownloadingStart;
             }
         }
 
@@ -272,16 +542,37 @@ namespace MozaPlugin
 
         // ----- Banner button handlers -----
 
-        private void UpdateBanner_OpenNotes_Click(object sender, RoutedEventArgs e)
+        private void UpdateBanner_OpenNotes_Click(object sender, RoutedEventArgs e) => OpenReleaseNotes();
+
+        // Prefer the in-app "What's new" panel so the user doesn't have to leave
+        // SimHub: switch to the About tab and scroll the Updates section into
+        // view. Only falls back to the GitHub release page when we have no
+        // embedded notes to show (e.g. a hand-cut release with an empty body).
+        private void OpenReleaseNotes()
         {
-            var s = _plugin?.Settings;
-            string url = s?.LastSeenReleaseUrl ?? "";
-            if (string.IsNullOrEmpty(url))
+            string notes = _plugin?.Settings?.LastSeenReleaseNotes ?? "";
+            if (string.IsNullOrWhiteSpace(notes))
             {
-                // Fall back to the repo Releases page if the html_url wasn't captured.
-                url = "https://github.com/giantorth/moza-simhub-plugin/releases";
+                string url = _plugin?.Settings?.LastSeenReleaseUrl ?? "";
+                if (string.IsNullOrEmpty(url))
+                    url = "https://github.com/giantorth/moza-simhub-plugin/releases";
+                OpenExternalUrl(url);
+                return;
             }
-            OpenExternalUrl(url);
+
+            try
+            {
+                if (MainTabs != null && AboutTab != null)
+                    MainTabs.SelectedItem = AboutTab;
+                // Defer the scroll until the About tab's content is realized.
+                Dispatcher.BeginInvoke(
+                    new Action(() => { try { UpdatesSection?.BringIntoView(); } catch { } }),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[UpdateBanner] navigate to notes failed: {ex.Message}");
+            }
         }
 
         private void UpdateBanner_Skip_Click(object sender, RoutedEventArgs e)
@@ -290,13 +581,13 @@ namespace MozaPlugin
             if (s == null) return;
             s.LastSkippedVersion = s.LastSeenLatestVersion ?? "";
             try { _plugin!.PersistSettings(); } catch { /* persistence is best-effort */ }
-            RefreshUpdateBannerFromSettings();
+            RefreshUpdateNotifications();
         }
 
         private void UpdateBanner_Dismiss_Click(object sender, RoutedEventArgs e)
         {
             _updateBannerDismissedThisSession = true;
-            RefreshUpdateBannerFromSettings();
+            RefreshUpdateNotifications();
         }
 
         // ----- Settings handlers -----
@@ -308,7 +599,7 @@ namespace MozaPlugin
             if (s == null) return;
             s.UpdateCheckEnabled = UpdateCheckEnabledToggle?.IsChecked == true;
             try { _plugin!.PersistSettings(); } catch { }
-            RefreshUpdateBannerFromSettings();
+            RefreshUpdateNotifications();
         }
 
         private void UpdateChannelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -328,15 +619,22 @@ namespace MozaPlugin
             s.LastSeenLatestVersion = "";
             s.LastSeenReleaseUrl = "";
             s.LastSeenAssetUrl = "";
+            s.LastSeenReleaseNotes = "";
             s.LastSkippedVersion = "";
             try { _plugin!.PersistSettings(); } catch { }
-            RefreshUpdateBannerFromSettings();
+            RefreshUpdateNotifications();
         }
 
         private async void UpdateCheckNow_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin?.Settings == null || UpdateCheckNowButton == null) return;
             var s = _plugin.Settings;
+
+            // An explicit "Check now" is a clear request to see the current
+            // status, so it overrides a prior Dismiss — otherwise the banner
+            // would stay hidden for the rest of the session even when the check
+            // finds an available update.
+            _updateBannerDismissedThisSession = false;
 
             // Cancel any in-flight manual check before kicking off a new one.
             try { _updateCheckCts?.Cancel(); } catch { }
@@ -379,13 +677,14 @@ namespace MozaPlugin
                     s.LastSeenLatestVersion = result.LatestVersion;
                     s.LastSeenReleaseUrl = result.ReleaseUrl;
                     s.LastSeenAssetUrl = result.AssetUrl;
+                    s.LastSeenReleaseNotes = result.ReleaseNotes;
                 }
                 // result.Success with empty LatestVersion = 404 on dev-latest
                 // (no dev release published yet). Leave cached values alone
                 // so a previous stable-channel result doesn't get erased.
 
                 try { _plugin.PersistSettings(); } catch { }
-                RefreshUpdateBannerFromSettings();
+                RefreshUpdateNotifications();
 
                 if (UpdateLastCheckedText != null)
                 {
@@ -426,18 +725,27 @@ namespace MozaPlugin
 
         // ----- Install flow -----
 
+        // Both the About-card and header Install buttons route here so the
+        // download/install logic lives in exactly one place.
         private async void UpdateBanner_Install_Click(object sender, RoutedEventArgs e)
+            => await RunInstallAsync();
+
+        private async void HeaderUpdateInstall_Click(object sender, RoutedEventArgs e)
+            => await RunInstallAsync();
+
+        private async Task RunInstallAsync()
         {
             var s = _plugin?.Settings;
             if (s == null) return;
             if (string.IsNullOrEmpty(s.LastSeenAssetUrl)) return;
+            if (_installInProgress) return;
 
             // Defensive: if a previous install is still pending the swap
             // would fail with OldPending. Surface the restart-required UI
             // instead of even attempting the network call.
             if (IsInstallPending())
             {
-                SetBannerState_Installed(s.LastSeenLatestVersion ?? "");
+                RefreshUpdateNotifications();
                 return;
             }
 
@@ -445,7 +753,9 @@ namespace MozaPlugin
             _updateInstallCts = new CancellationTokenSource();
             var ct = _updateInstallCts.Token;
 
+            _installInProgress = true;
             SetBannerState_Installing();
+            SetHeaderState_Installing();
 
             // Progress is delivered on the Task scheduler; Progress<T>
             // captures the originating SynchronizationContext (WPF dispatcher)
@@ -465,61 +775,102 @@ namespace MozaPlugin
             }
             catch (OperationCanceledException)
             {
+                _installInProgress = false;
                 SetBannerState_Failed(InstallErrorKind.Cancelled, "");
+                RefreshHeaderBanner();
                 return;
             }
             catch (Exception ex)
             {
+                _installInProgress = false;
                 MozaLog.Warn($"[UpdateInstall] threw: {ex.GetType().Name}: {ex.Message}");
                 SetBannerState_Failed(InstallErrorKind.Unknown, ex.Message);
+                RefreshHeaderBanner();
                 return;
             }
+
+            _installInProgress = false;
 
             if (result.Success)
             {
                 MozaLog.Info($"[UpdateInstall] installed v{s.LastSeenLatestVersion} — restart required");
-                SetBannerState_Installed(s.LastSeenLatestVersion ?? "");
+                // Repaint both surfaces into the pending-restart state: clears
+                // the "update available" wording and shows the Restart button.
+                RefreshUpdateNotifications();
             }
             else
             {
                 MozaLog.Warn($"[UpdateInstall] failed: {result.ErrorKind} {result.ErrorMessage}");
+                // About card keeps the detailed error; header resets to its
+                // available/pending state (it doesn't surface install errors).
                 SetBannerState_Failed(result.ErrorKind, result.ErrorMessage);
+                RefreshHeaderBanner();
             }
+        }
+
+        // ----- Restart flow (one-click, post-install) -----
+
+        private void UpdateBanner_Restart_Click(object sender, RoutedEventArgs e) => DoRestart();
+        private void HeaderUpdateRestart_Click(object sender, RoutedEventArgs e) => DoRestart();
+
+        // Asks SimHub to exit and relaunch so the freshly-installed DLL loads.
+        // Disables the Restart buttons first so a double-click can't fire two
+        // exit requests; re-enables them if the request couldn't be issued so
+        // the user can retry or restart manually.
+        private void DoRestart()
+        {
+            if (UpdateBannerRestartButton != null) UpdateBannerRestartButton.IsEnabled = false;
+            if (HeaderUpdateRestartButton != null) HeaderUpdateRestartButton.IsEnabled = false;
+
+            bool ok = _plugin?.RestartSimHub() ?? false;
+            if (!ok)
+            {
+                if (UpdateBannerRestartButton != null) UpdateBannerRestartButton.IsEnabled = true;
+                if (HeaderUpdateRestartButton != null) HeaderUpdateRestartButton.IsEnabled = true;
+            }
+        }
+
+        // ----- Header banner button handlers -----
+
+        private void HeaderUpdateNotes_Click(object sender, RoutedEventArgs e) => OpenReleaseNotes();
+
+        private void HeaderUpdateDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            // One dismiss flag hides both the header and the About-card banner
+            // for the rest of the session (cleared on plugin reload).
+            _updateBannerDismissedThisSession = true;
+            RefreshUpdateNotifications();
         }
 
         private void OnInstallProgress(InstallProgress p)
         {
-            if (UpdateBannerProgressText == null) return;
+            string? text = null;
             switch (p.Phase)
             {
                 case InstallPhase.Downloading:
-                    if (p.TotalBytes <= 0)
-                    {
-                        UpdateBannerProgressText.Text = string.Format(
-                            Strings.Status_DownloadingIndeterminate,
-                            FormatBytes(p.BytesDownloaded));
-                    }
-                    else
-                    {
-                        int pct = (int)Math.Round(p.Fraction * 100);
-                        UpdateBannerProgressText.Text = string.Format(
+                    text = p.TotalBytes <= 0
+                        ? string.Format(Strings.Status_DownloadingIndeterminate, FormatBytes(p.BytesDownloaded))
+                        : string.Format(
                             Strings.Status_Downloading,
-                            pct,
+                            (int)Math.Round(p.Fraction * 100),
                             FormatBytes(p.BytesDownloaded),
                             FormatBytes(p.TotalBytes));
-                    }
                     break;
                 case InstallPhase.Extracting:
-                    UpdateBannerProgressText.Text = Strings.Status_Extracting;
+                    text = Strings.Status_Extracting;
                     break;
                 case InstallPhase.Installing:
-                    UpdateBannerProgressText.Text = Strings.Status_Installing;
+                    text = Strings.Status_Installing;
                     break;
                 case InstallPhase.Done:
-                    // Final UI state is set by SetBannerState_Installed after
+                    // Final UI state is set by RefreshUpdateNotifications after
                     // the await completes — no-op here.
-                    break;
+                    return;
             }
+
+            if (text == null) return;
+            if (UpdateBannerProgressText != null) UpdateBannerProgressText.Text = text;
+            if (HeaderUpdateBannerProgressText != null) HeaderUpdateBannerProgressText.Text = text;
         }
     }
 }

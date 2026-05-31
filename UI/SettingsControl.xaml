@@ -302,8 +302,60 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- Update notification banner: shows on every tab when a newer release
+             is available (or an install is pending a restart). Dismissable for
+             the session; the full controls (channel, skip, check-now, release
+             notes) live in About > Updates. Driven by
+             SettingsControl.UpdateBanner.cs via RefreshUpdateNotifications(). -->
+        <Border x:Name="HeaderUpdateBanner" DockPanel.Dock="Top"
+                Visibility="Collapsed"
+                Margin="22,8,22,0"
+                BorderBrush="{StaticResource CyanBrush}"
+                BorderThickness="1"
+                Background="{StaticResource BgDeepBrush}"
+                CornerRadius="4"
+                Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="HeaderUpdateBannerText"
+                               FontFamily="{StaticResource FontUi}"
+                               FontSize="12.5" FontWeight="SemiBold"
+                               Foreground="{StaticResource CyanBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="HeaderUpdateBannerProgressText"
+                               Style="{StaticResource MutedHintText}"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button x:Name="HeaderUpdateInstallButton"
+                            Content="{x:Static res:Strings.Button_InstallUpdate}"
+                            Click="HeaderUpdateInstall_Click"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="HeaderUpdateRestartButton"
+                            Content="{x:Static res:Strings.Button_RestartSimHub}"
+                            Click="HeaderUpdateRestart_Click"
+                            Visibility="Collapsed"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="HeaderUpdateNotesButton"
+                            Content="{x:Static res:Strings.Button_OpenReleaseNotes}"
+                            Click="HeaderUpdateNotes_Click"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="HeaderUpdateDismissButton"
+                            Content="{x:Static res:Strings.Button_DismissUpdate}"
+                            Click="HeaderUpdateDismiss_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Tabs -->
-        <TabControl Style="{StaticResource MozaTabControl}">
+        <TabControl x:Name="MainTabs" Style="{StaticResource MozaTabControl}">
 
             <!-- ==================== BASE TAB ==================== -->
             <TabItem Header="{x:Static res:Strings.TabHeader_Base}">
@@ -2298,7 +2350,7 @@
                  MozaPlugin.UI.Import.* collides with the MozaPlugin class name. -->
             <TabItem x:Name="ImportTab" Header="{x:Static res:Strings.TabHeader_Import}"/>
 
-            <TabItem Header="{x:Static res:Strings.TabHeader_About}">
+            <TabItem x:Name="AboutTab" Header="{x:Static res:Strings.TabHeader_About}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
 
@@ -2364,7 +2416,8 @@
                              newer release is detected. The settings row below it
                              (enable toggle, channel, "check now") is always
                              visible so users can opt out / pick stable vs dev. -->
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Updates}"
+                        <ctrl:SectionCard x:Name="UpdatesSection"
+                                          Title="{x:Static res:Strings.Section_Updates}"
                                           Subtitle="{x:Static res:Strings.Subtitle_Updates}"
                                           Icon="{StaticResource IconRefresh}">
                             <StackPanel>
@@ -2392,6 +2445,11 @@
                                                     Content="{x:Static res:Strings.Button_InstallUpdate}"
                                                     Click="UpdateBanner_Install_Click"
                                                     Margin="0,0,8,0"/>
+                                            <Button x:Name="UpdateBannerRestartButton"
+                                                    Content="{x:Static res:Strings.Button_RestartSimHub}"
+                                                    Click="UpdateBanner_Restart_Click"
+                                                    Visibility="Collapsed"
+                                                    Margin="0,0,8,0"/>
                                             <Button x:Name="UpdateBannerOpenButton"
                                                     Content="{x:Static res:Strings.Button_OpenReleaseNotes}"
                                                     Click="UpdateBanner_OpenNotes_Click"
@@ -2406,6 +2464,34 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
+
+                                <!-- Release notes for the latest available version
+                                     (GitHub release body, rendered as selectable
+                                     plain text). Shown only when notes are cached
+                                     and an update is available / pending restart. -->
+                                <StackPanel x:Name="UpdateReleaseNotesPanel"
+                                            Visibility="Collapsed"
+                                            Margin="0,0,0,14">
+                                    <TextBlock x:Name="UpdateReleaseNotesHeader"
+                                               Style="{StaticResource SectionTitleText}"
+                                               Margin="0,0,0,6"/>
+                                    <Border BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="1"
+                                            Background="{StaticResource BgDeepBrush}"
+                                            CornerRadius="4" Padding="2">
+                                        <RichTextBox x:Name="UpdateReleaseNotesBox"
+                                                     IsReadOnly="True"
+                                                     IsDocumentEnabled="True"
+                                                     Background="Transparent"
+                                                     BorderThickness="0"
+                                                     Foreground="{StaticResource TextDimBrush}"
+                                                     FontFamily="{StaticResource FontUi}"
+                                                     FontSize="12"
+                                                     Padding="8"
+                                                     MaxHeight="220"
+                                                     VerticalScrollBarVisibility="Auto"/>
+                                    </Border>
+                                </StackPanel>
 
                                 <ctrl:OffOnToggle x:Name="UpdateCheckEnabledToggle"
                                           Content="{x:Static res:Strings.Label_CheckForUpdates}"

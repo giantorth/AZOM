@@ -255,6 +255,12 @@ namespace MozaPlugin
         // in which case the banner falls back to the release-notes link only.
         public string LastSeenAssetUrl { get; set; } = "";
 
+        // The GitHub release `body` (markdown changelog) from the last
+        // successful check, rendered as plain text in the About > Updates
+        // "What's new" panel so users see what they're updating to without
+        // leaving SimHub. Empty when LastSeenLatestVersion is empty.
+        public string LastSeenReleaseNotes { get; set; } = "";
+
         // ===== Third-party SDK emulation =====
         // Master toggle for the in-plugin CoAP/UDP server that mimics MOZA's
         // PitHouse "partner SDK" surface (iRacing in particular). When false

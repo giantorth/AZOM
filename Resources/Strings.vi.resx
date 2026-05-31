@@ -272,6 +272,8 @@
   <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Mở ghi chú phát hành</value></data>
   <data name="Button_SkipThisVersion" xml:space="preserve"><value>Bỏ qua phiên bản này</value></data>
   <data name="Button_DismissUpdate" xml:space="preserve"><value>Đóng</value></data>
+  <data name="Button_RestartSimHub" xml:space="preserve"><value>Khởi động lại SimHub</value></data>
+  <data name="Label_WhatsNew" xml:space="preserve"><value>Có gì mới trong v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Tự động kiểm tra cập nhật</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Kênh phát hành</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Ổn định</value></data>

@@ -272,6 +272,8 @@
   <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>打开发布说明</value></data>
   <data name="Button_SkipThisVersion" xml:space="preserve"><value>跳过此版本</value></data>
   <data name="Button_DismissUpdate" xml:space="preserve"><value>忽略</value></data>
+  <data name="Button_RestartSimHub" xml:space="preserve"><value>重启 SimHub</value></data>
+  <data name="Label_WhatsNew" xml:space="preserve"><value>v{0} 新增内容</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>自动检查更新</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>发布通道</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>稳定版</value></data>

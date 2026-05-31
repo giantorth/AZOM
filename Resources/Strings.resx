@@ -279,6 +279,8 @@
   <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Open release notes</value></data>
   <data name="Button_SkipThisVersion" xml:space="preserve"><value>Skip this version</value></data>
   <data name="Button_DismissUpdate" xml:space="preserve"><value>Dismiss</value></data>
+  <data name="Button_RestartSimHub" xml:space="preserve"><value>Restart SimHub</value></data>
+  <data name="Label_WhatsNew" xml:space="preserve"><value>What's new in v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Check for updates automatically</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Release channel</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stable</value></data>

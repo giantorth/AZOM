@@ -1879,6 +1879,42 @@ namespace MozaPlugin
             ScheduleSave();
         }
 
+        /// <summary>
+        /// Requests SimHub to exit and relaunch — used after an in-app plugin
+        /// update is installed so the freshly-swapped DLL gets loaded. Drives
+        /// the supported SimHub lifecycle hook
+        /// <c>PluginManager.RequestApplicationExit(restart: true)</c> (see
+        /// docs/simhub.md § Application Lifecycle). Best-effort: logs and
+        /// returns false if the call is unavailable or throws, leaving SimHub
+        /// running so the user can restart manually.
+        /// </summary>
+        public bool RestartSimHub()
+        {
+            // Flush any pending settings synchronously-ish before we ask SimHub
+            // to tear down — ScheduleSave is debounced, but SimHub's own
+            // shutdown also persists plugin settings, so this is belt-and-braces.
+            try { PersistSettings(); } catch { /* best-effort */ }
+
+            var pm = _pluginManager;
+            if (pm == null)
+            {
+                MozaLog.Warn("[UpdateInstall] restart requested but PluginManager is null");
+                return false;
+            }
+
+            try
+            {
+                MozaLog.Info("[UpdateInstall] requesting SimHub restart to load updated plugin");
+                pm.RequestApplicationExit(true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[UpdateInstall] RequestApplicationExit failed: {ex.GetType().Name}: {ex.Message}");
+                return false;
+            }
+        }
+
         // Kicks off the background GitHub Releases query on a thread-pool
         // thread, with a 24h throttle (LastUpdateCheckUtc) and a per-process
         // dedupe (s_updateCheckStarted). Returns immediately; the result is
@@ -1890,7 +1926,17 @@ namespace MozaPlugin
             {
                 if (_settings == null || !_settings.UpdateCheckEnabled) return;
                 if (s_updateCheckStarted) return;
-                if (DateTime.UtcNow - _settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
+                // The dev channel tracks the rolling 'dev-latest' tag, so a
+                // version cached in a prior session can't be trusted across a
+                // restart: its 7-char SHA differs from any freshly-installed
+                // build, which the dev comparator reads as "newer" and paints a
+                // phantom "update available" banner. Re-check dev on every
+                // launch (still once per process via s_updateCheckStarted) so
+                // the cache re-syncs to the live dev-latest. Stable versions are
+                // SHA-stable and directly comparable, so they keep the 24h
+                // throttle.
+                if (_settings.UpdateChannel != UpdateChannel.Dev
+                    && DateTime.UtcNow - _settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
                 {
                     MozaLog.Debug("[UpdateCheck] skipped — last check less than 24h ago");
                     return;
@@ -1912,6 +1958,7 @@ namespace MozaPlugin
                             _settings.LastSeenLatestVersion = result.LatestVersion;
                             _settings.LastSeenReleaseUrl = result.ReleaseUrl;
                             _settings.LastSeenAssetUrl = result.AssetUrl;
+                            _settings.LastSeenReleaseNotes = result.ReleaseNotes;
                             MozaLog.Debug(
                                 $"[UpdateCheck] {channel}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
                         }
@@ -1923,6 +1970,21 @@ namespace MozaPlugin
 
                         try { this.SaveCommonSettings("MozaPluginSettings", _settings); }
                         catch { /* persistence is best-effort */ }
+
+                        // Repaint the settings pane if it's open so a fresh
+                        // result lands immediately — without this the About-card
+                        // banner + release notes would only update on the next
+                        // tab reopen or manual "Check now" (the header banner
+                        // already self-refreshes on its 500ms tick).
+                        try
+                        {
+                            var ctrl = SettingsControl.Instance;
+                            ctrl?.Dispatcher?.BeginInvoke(new Action(() =>
+                            {
+                                try { ctrl.RefreshUpdateNotifications(); } catch { }
+                            }));
+                        }
+                        catch { /* UI refresh is best-effort */ }
                     }
                     catch (Exception ex)
                     {

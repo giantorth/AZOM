@@ -272,6 +272,8 @@
   <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Release-Notes öffnen</value></data>
   <data name="Button_SkipThisVersion" xml:space="preserve"><value>Diese Version überspringen</value></data>
   <data name="Button_DismissUpdate" xml:space="preserve"><value>Verwerfen</value></data>
+  <data name="Button_RestartSimHub" xml:space="preserve"><value>SimHub neu starten</value></data>
+  <data name="Label_WhatsNew" xml:space="preserve"><value>Neu in v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Automatisch nach Updates suchen</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Release-Kanal</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stabil</value></data>

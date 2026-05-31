@@ -76,6 +76,40 @@ SimHub.Logging.Current.Error("message");
 
 Writes to SimHub's log file.
 
+## Application Lifecycle (Restart / Exit)
+
+`PluginManager` exposes a supported hook for asking SimHub to exit — and optionally relaunch itself. This is the mechanism a plugin uses to restart SimHub after an in-app self-update so the freshly-swapped DLL gets loaded. Verified by decompiling `SimHub.Plugins.dll` (`SimHub.Plugins.PluginManager`):
+
+```csharp
+// public instance method — no reflection needed
+public void RequestApplicationExit(bool restart);
+
+// public getter (private setter); true once teardown has begun
+public bool IsApplicationExiting { get; }
+```
+
+`RequestApplicationExit` decompiled:
+
+```csharp
+public void RequestApplicationExit(bool restart)
+{
+    if (IsInitialized)   // private field; set true after plugins load
+    {
+        Logging.Current.Info("Application exit requested from " + new StackTrace());
+        this.ApplicationExitRequested?.Invoke(this, restart);   // internal event
+    }
+}
+```
+
+- `restart: true` → SimHub exits **and relaunches**.
+- `restart: false` → plain exit.
+
+The call raises the **internal** `ApplicationExitRequested` event carrying the `restart` flag; the SimHub WPF shell (`SimHubWPF.exe` — not in `SimHub.Plugins.dll`) subscribes and performs the actual teardown and (when `restart` is true) relaunch. The method is a no-op until `PluginManager.IsInitialized` is true, so call it after `Init` has run (e.g. from a UI action), not during early startup.
+
+SimHub also ships an "Automatic restart" user setting (the strings `HasAutomaticRestartEnabled` and "Automatic restart delay (seconds):" are present in the assembly), but its owning type and gating are not on `PluginManager` and were not reverse-engineered — `RequestApplicationExit(true)` is the load-bearing call and works regardless. (Note: `RequestReload` is a method on `DevicesPlugin`, not `PluginManager`; it reloads device/dashboard definitions without a full process restart.)
+
+The MOZA plugin calls `RequestApplicationExit(true)` from `MozaPlugin.RestartSimHub()`, wired to the "Restart SimHub" button the update banner shows after an in-app update is installed.
+
 ## Profile System (`SimHub.Plugins.ProfilesCommon`)
 
 SimHub has a built-in per-game profile system. Plugins provide a profile data class and a store; SimHub handles switching profiles when the active game changes.
