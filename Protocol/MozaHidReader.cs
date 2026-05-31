@@ -185,19 +185,33 @@ namespace MozaPlugin.Protocol
                     if (openCount > 0)
                         _data.IsHidConnected = true;
 
-                    // Wait until stop or all threads exit
-                    foreach (var t in threads)
-                    {
-                        while (!_stop && t.IsAlive)
-                            SleepInterruptible(250);
-                    }
+                    // Wait until we're stopping, or ANY device thread exits.
+                    // With multiple Moza HID devices (e.g. a wheelbase + Universal
+                    // Hub) one device's stream dropping MUST trigger a full
+                    // re-enumerate so that device gets reopened. Waiting for ALL
+                    // threads instead would park on the still-live sibling forever
+                    // and freeze the dead device's values permanently — the base's
+                    // HID thread (the only one carrying the steering X axis) dies,
+                    // the hub thread keeps the reader alive, and Moza.SteeringAngle
+                    // stays stuck at its last value while pedals/handbrake (hub)
+                    // keep updating. Single-device setups always recovered because
+                    // the lone thread dying ended the wait and re-enumerated.
+                    while (!_stop && threads.Count > 0 && threads.All(t => t.IsAlive))
+                        SleepInterruptible(250);
 
-                    // On stop: wait for ReadDevice threads to exit so they can dispose their streams.
-                    if (_stop)
+                    // A device dropped (or we're shutting down): force every
+                    // still-open stream closed so the surviving ReadDevice threads
+                    // unblock from their read wait and exit (same mechanism as
+                    // Dispose), then join them all so each disposes its own stream
+                    // before we re-enumerate from the top.
+                    HidStream[] snapshot;
+                    lock (_streamsLock) snapshot = _liveStreams.ToArray();
+                    foreach (var s in snapshot)
                     {
-                        foreach (var t in threads)
-                            try { t.Join(1000); } catch { }
+                        try { s.Close(); } catch { }
                     }
+                    foreach (var t in threads)
+                        try { t.Join(1000); } catch { }
                 }
                 catch (Exception ex)
                 {
