@@ -50,6 +50,11 @@ namespace MozaPlugin.Devices
         // pulses stopped).
         private const double IntensitySilentThreshold = 0.5;
 
+        // Used when the active profile carries no Ab9 block — keeps engine
+        // vibration following the profile (defaults to silent) rather than
+        // freezing on the previous profile's settings.
+        private static readonly Ab9Settings DefaultAb9 = new Ab9Settings();
+
         private readonly MozaAb9DeviceManager _ab9;
         private readonly DeviceDetectionState _detectionState;
         private readonly Func<Ab9Settings?> _ab9Lookup;
@@ -144,8 +149,11 @@ namespace MozaPlugin.Devices
             if (_isShuttingDown()) return;
             if (_ab9 == null || !_ab9.IsConnected || !_detectionState.Ab9Detected) return;
 
-            var ab9 = _ab9Lookup();
-            if (ab9 == null) return;
+            // A null lookup means the active profile has no Ab9 block; use
+            // factory defaults (intensity 0 → silent) so engine vibration
+            // follows per-game profile switches instead of freezing on the
+            // last profile's values.
+            var ab9 = _ab9Lookup() ?? DefaultAb9;
 
             int intensity = ab9.EngineVibrationIntensity;
             if (intensity < 0) intensity = 0;

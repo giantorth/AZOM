@@ -651,14 +651,16 @@ namespace MozaPlugin.Hardware
 
         /// <summary>
         /// Push AB9 active-shifter settings to the AB9 manager. No-op unless AB9
-        /// is detected and the profile carries an Ab9 block.
+        /// is detected/connected. A profile with no Ab9 block applies factory
+        /// defaults so the device follows the active per-game profile (reset
+        /// semantics) instead of retaining the previously-applied profile's
+        /// settings.
         /// </summary>
         public void ApplyAb9ToHardware(MozaProfile? profile)
         {
-            if (profile?.Ab9 == null) return;
             if (!_detectionState.Ab9Detected || _ab9Manager == null || !_ab9Manager.IsConnected) return;
 
-            var ab9 = profile.Ab9;
+            var ab9 = profile?.Ab9 ?? new Ab9Settings();
             _ab9Manager.SendMode(ab9.Mode);
             _ab9Manager.SendSlider(Ab9Slider.MechanicalResistance, ab9.MechanicalResistance);
             _ab9Manager.SendSlider(Ab9Slider.Spring,               ab9.Spring);

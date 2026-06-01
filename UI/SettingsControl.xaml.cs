@@ -2062,8 +2062,6 @@ namespace MozaPlugin
         // Tracks whether the slider/combo values have been seeded from the profile
         // — without this, the first refresh tick would race the user's drag and
         // immediately overwrite an in-flight slider value with the saved one.
-        private bool _ab9UiSeeded;
-
         private void RefreshAb9Tab()
         {
             if (_plugin?.Ab9Manager == null) { Ab9Tab.Visibility = Visibility.Collapsed; return; }
@@ -2073,7 +2071,7 @@ namespace MozaPlugin
 
             Ab9Tab.Visibility = (connected || detected)
                 ? Visibility.Visible : Visibility.Collapsed;
-            if (!connected && !detected) { _ab9UiSeeded = false; return; }
+            if (!connected && !detected) return;
 
             Ab9StatusDot.Fill = detected
                 ? Brushes.LimeGreen
@@ -2082,10 +2080,12 @@ namespace MozaPlugin
                 ? "AB9 connected"
                 : "Probing AB9…";
 
-            if (_ab9UiSeeded) return;
-
-            // Seed the controls from the profile (or defaults). Suppress events
-            // so this seed pass doesn't fire WriteSlider for every control.
+            // Re-seed the controls from the active profile every refresh tick so
+            // the tab follows per-game profile switches (matching the other
+            // tabs). Events are suppressed (RefreshDisplay holds the suppressor;
+            // the nested Begin below is depth-counted). A missing Ab9 block
+            // shows defaults. The slider handlers write profile.Ab9 synchronously
+            // so re-seeding can't fight a live drag.
             var ab9 = _plugin.Settings?.ProfileStore?.CurrentProfile?.Ab9 ?? new Ab9Settings();
             using (_suppressor.Begin())
             {
@@ -2109,7 +2109,6 @@ namespace MozaPlugin
                 Ab9GearShiftDebounceSlider.Value = ab9DbMs;
                 Ab9GearShiftDebounceValue.Text = $"{ab9DbMs} ms";
             }
-            _ab9UiSeeded = true;
         }
 
         private void SetAb9Slider(Slider slider, TextBox value, byte v)
