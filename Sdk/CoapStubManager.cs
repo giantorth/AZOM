@@ -247,8 +247,13 @@ namespace MozaPlugin.Sdk
                     NativeMethods.PROCESS_INFORMATION pi;
 
                     // lpCommandLine must be writable per CreateProcessW docs.
-                    // Quote the path because it contains spaces.
-                    string cmdLine = $"\"{exePath}\"";
+                    // Quote the path because it contains spaces. Pass our own
+                    // (SimHub's) PID so the stub can watch it and self-terminate
+                    // when SimHub exits — the Wine-proof primary teardown path;
+                    // the JobObject's KILL_ON_JOB_CLOSE is the backstop. The SDK
+                    // only checks process name + registry version, never the
+                    // command line, so the extra argument is invisible to it.
+                    string cmdLine = $"\"{exePath}\" --parent-pid {Process.GetCurrentProcess().Id}";
 
                     if (!NativeMethods.CreateProcess(
                             lpApplicationName: null,
@@ -680,6 +685,39 @@ namespace MozaPlugin.Sdk
         /// current registry contents are treated as untrusted in that
         /// case (they may be a stale stub path) and simply replaced.
         /// </summary>
+        /// <summary>
+        /// True if <paramref name="candidate"/> refers to our own extracted
+        /// stub — either the exact current <see cref="StubExePath"/> or any path
+        /// inside the <c>…\MozaPlugin\CoapStub\</c> directory we own (so an
+        /// older build's stub path under the same folder still matches).
+        /// Used by the snapshot guard so we never treat our stub as the user's
+        /// original PitHouse value. Tolerant of unnormalizable input.
+        /// </summary>
+        private static bool IsOwnStubPath(string candidate)
+        {
+            string Normalize(string p)
+            {
+                try { return Path.GetFullPath(p.Trim().Trim('"')); }
+                catch { return p.Trim().Trim('"'); }
+            }
+
+            var cand = Normalize(candidate);
+            if (cand.Length == 0) return false;
+
+            if (string.Equals(cand, Normalize(StubExePath), StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            try
+            {
+                var ourDir = Normalize(Path.GetDirectoryName(StubExePath)!);
+                // Append a separator so "…\CoapStub" doesn't match "…\CoapStubX".
+                if (!ourDir.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+                    ourDir += Path.DirectorySeparatorChar;
+                return cand.StartsWith(ourDir, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
         private static bool ApplyRegistryRedirect(string stubExePath)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -706,6 +744,23 @@ namespace MozaPlugin.Sdk
                 catch (Exception ex)
                 {
                     MozaLog.Warn($"[Moza] Reading HKCU\\{MozaRegSubKey}\\{MozaRegValueName} for backup failed: {ex.GetType().Name}: {ex.Message}; treating as absent.");
+                }
+
+                // Self-capture guard: never record OUR OWN stub path as the
+                // user's "original." This branch only runs when no backup file
+                // exists, which in normal operation means the registry holds the
+                // user's real value (we always restore + delete the backup
+                // together). But if the backup file is lost while the registry
+                // still points at the stub — a manual sweep of the CoapStub
+                // folder, an uninstaller, or a stale path from an older build —
+                // capturing it verbatim would make a later restore "recover" the
+                // user to the stub forever. Treat any value that is our current
+                // stub path or otherwise lives inside our CoapStub directory as
+                // "no original" (empty backup → restore by deleting the value).
+                if (!string.IsNullOrEmpty(original) && IsOwnStubPath(original!))
+                {
+                    MozaLog.Info($"[Moza] Existing HKCU\\{MozaRegSubKey}\\{MozaRegValueName} value '{original}' is our own stub path; backing up as 'no original' so restore deletes it.");
+                    original = null;
                 }
 
                 try
@@ -765,8 +820,14 @@ namespace MozaPlugin.Sdk
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Reading registry backup '{backupPath}' failed: {ex.GetType().Name}: {ex.Message}; leaving registry untouched.");
-                return;
+                // We can't read the user's original value, but we know a redirect
+                // is active (the backup file exists), so the registry currently
+                // points at our stub. Leaving it pinned there would outlive the
+                // feature; the safe default is to remove our redirect entirely —
+                // a real PitHouse rewrites this key on its next launch anyway.
+                // Treat the unreadable backup as "no original" and delete.
+                MozaLog.Warn($"[Moza] Reading registry backup '{backupPath}' failed: {ex.GetType().Name}: {ex.Message}; removing our redirect (delete value) as the safe default.");
+                original = string.Empty;
             }
 
             try

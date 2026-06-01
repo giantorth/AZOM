@@ -243,11 +243,12 @@
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Désactivé temporairement.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>SERVEUR COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// serveur CoAP intégré sur loopback</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle SDK CoAP intégré.</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Fournit la prise en charge officielle du SDK MOZA pour les jeux qui l'exigent, comme iRacing ou tout jeu utilisant le mode 360 Hz. Le plugin exécute pour cela un serveur de contrôle SDK CoAP intégré sur loopback.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Lorsqu'il est activé, le plugin exécute un petit processus de substitution qui apparaît dans la liste des processus sous le nom « MOZA Pit House.exe ». C'est normal : cela permet aux applications du SDK MOZA de trouver PitHouse par son nom. Il se ferme automatiquement lorsque vous le désactivez ou fermez SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Activer le serveur SDK CoAP</value></data>
   <data name="Section_UdpControl" xml:space="preserve"><value>CONTRÔLE UDP</value></data>
   <data name="Subtitle_UdpControl" xml:space="preserve"><value>// surface de contrôle CBOR-sur-UDP simple</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle UDP intégré pour les outils tiers de configuration de volant.</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Il s'agit d'un contrôle UDP hérité permettant de régler l'angle de braquage. Le seul usage connu est la version RSF de Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Activer le serveur de contrôle UDP</value></data>
   <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
   <data name="Label_UdpControlServer" xml:space="preserve"><value>Contrôle UDP</value></data>

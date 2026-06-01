@@ -246,11 +246,12 @@
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Temporaneamente disabilitato.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>SERVER COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// server CoAP integrato in loopback</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Se abilitato, il plugin avvia un server di controllo CoAP SDK integrato.</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Fornisce il supporto ufficiale dell'SDK MOZA per i giochi che lo richiedono, come iRacing o qualsiasi gioco che usa la modalità 360 Hz. Il plugin avvia a tal fine un server di controllo CoAP SDK integrato in loopback.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Quando è abilitato, il plugin esegue un piccolo processo sostitutivo che appare nell'elenco dei processi come «MOZA Pit House.exe». È normale: consente alle app dell'SDK MOZA di trovare PitHouse per nome. Si chiude automaticamente quando lo disabiliti o chiudi SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Abilita server CoAP SDK</value></data>
   <data name="Section_UdpControl" xml:space="preserve"><value>CONTROLLO UDP</value></data>
   <data name="Subtitle_UdpControl" xml:space="preserve"><value>// interfaccia di controllo CBOR-su-UDP</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Se abilitato, il plugin avvia un server di controllo UDP integrato per strumenti di configurazione volante di terze parti.</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Questo è un controllo UDP legacy per impostare l'angolo di sterzata. L'unico uso noto è la versione RSF di Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Abilita server di controllo UDP</value></data>
   <data name="Label_PortNumber" xml:space="preserve"><value>Porta</value></data>
   <data name="Section_Status" xml:space="preserve"><value>STATO</value></data>

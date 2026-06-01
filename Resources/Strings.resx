@@ -250,11 +250,12 @@
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Disabled temporarily.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP SERVER</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// embedded CoAP server on loopback</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>When enabled, the plugin runs an embedded CoAP SDK control server.</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Provides official MOZA SDK support for games that require it — such as iRacing, or any game that uses 360 Hz mode. The plugin runs an embedded CoAP SDK control server on loopback.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>While enabled, the plugin runs a small stand-in process that appears in your process list as "MOZA Pit House.exe". This is expected — it lets MOZA SDK apps find PitHouse by name. It exits automatically when you disable this or close SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Enable CoAP SDK server</value></data>
   <data name="Section_UdpControl" xml:space="preserve"><value>UDP CONTROL</value></data>
   <data name="Subtitle_UdpControl" xml:space="preserve"><value>// plain CBOR-over-UDP control surface</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>When enabled, the plugin runs an embedded UDP control server for third-party wheel-config tools.</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>This is a legacy UDP control for setting steering angle. The only known use is the RSF version of Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Enable UDP control server</value></data>
   <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
   <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>

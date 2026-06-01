@@ -2271,6 +2271,8 @@
                                                Foreground="{StaticResource TextDimBrush}"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,12,0,0"
+                                           Text="{x:Static res:Strings.Hint_CoapStubProcessName}"/>
                             </StackPanel>
                         </ctrl:SectionCard>
 

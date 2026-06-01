@@ -243,11 +243,12 @@
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Vorübergehend deaktiviert.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// eingebetteter CoAP-Server auf Loopback</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Wenn aktiviert, betreibt das Plugin einen eingebetteten CoAP-SDK-Steuerserver.</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Bietet offizielle MOZA-SDK-Unterstützung für Spiele, die sie erfordern – etwa iRacing oder jedes Spiel, das den 360-Hz-Modus nutzt. Das Plugin betreibt dazu einen eingebetteten CoAP-SDK-Steuerserver auf Loopback.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Wenn aktiviert, führt das Plugin einen kleinen Platzhalterprozess aus, der in der Prozessliste als „MOZA Pit House.exe“ erscheint. Das ist beabsichtigt – so finden MOZA-SDK-Apps PitHouse anhand des Namens. Er wird automatisch beendet, wenn Sie dies deaktivieren oder SimHub schließen.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP-SDK-Server aktivieren</value></data>
   <data name="Section_UdpControl" xml:space="preserve"><value>UDP-STEUERUNG</value></data>
   <data name="Subtitle_UdpControl" xml:space="preserve"><value>// einfache CBOR-über-UDP-Steueroberfläche</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Wenn aktiviert, betreibt das Plugin einen eingebetteten UDP-Steuerserver für Drittanbieter-Tools zur Lenkrad-Konfiguration.</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Dies ist eine veraltete UDP-Steuerung zum Einstellen des Lenkwinkels. Der einzige bekannte Anwendungsfall ist die RSF-Version von Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>UDP-Steuerserver aktivieren</value></data>
   <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
   <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>

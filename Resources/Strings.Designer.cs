@@ -309,6 +309,7 @@ namespace MozaPlugin.Resources
         public static string Section_CoapServer => Get("Section_CoapServer");
         public static string Subtitle_CoapServer => Get("Subtitle_CoapServer");
         public static string Hint_CoapServerEnabled => Get("Hint_CoapServerEnabled");
+        public static string Hint_CoapStubProcessName => Get("Hint_CoapStubProcessName");
         public static string SliderLabel_EnableCoapServer => Get("SliderLabel_EnableCoapServer");
         public static string Section_UdpControl => Get("Section_UdpControl");
         public static string Subtitle_UdpControl => Get("Subtitle_UdpControl");

@@ -243,11 +243,12 @@
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Временно отключено.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>СЕРВЕР COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// встроенный CoAP сервер на loopback</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Если включено, плагин запускает встроенный сервер управления CoAP SDK.</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Обеспечивает официальную поддержку MOZA SDK для игр, которым она нужна, например iRacing или любой игры, использующей режим 360 Гц. Для этого плагин запускает встроенный сервер управления CoAP SDK на loopback.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Когда включено, плагин запускает небольшой процесс-заместитель, который отображается в списке процессов как «MOZA Pit House.exe». Это нормально: так приложения MOZA SDK находят PitHouse по имени. Он завершается автоматически при отключении этой функции или закрытии SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Включить сервер CoAP SDK</value></data>
   <data name="Section_UdpControl" xml:space="preserve"><value>УПРАВЛЕНИЕ ПО UDP</value></data>
   <data name="Subtitle_UdpControl" xml:space="preserve"><value>// простой CBOR-по-UDP интерфейс управления</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Если включено, плагин запускает встроенный UDP сервер управления для сторонних инструментов настройки руля.</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Это устаревший интерфейс управления по UDP для задания угла поворота руля. Единственное известное применение — версия RSF игры Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Включить сервер управления по UDP</value></data>
   <data name="Label_PortNumber" xml:space="preserve"><value>Порт</value></data>
   <data name="Label_UdpControlServer" xml:space="preserve"><value>Управление по UDP</value></data>

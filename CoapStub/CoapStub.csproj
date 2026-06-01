@@ -12,7 +12,7 @@
     <UseWPF>false</UseWPF>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AssemblyTitle>MOZA Pit House</AssemblyTitle>
-    <Description>Process-name impersonation stub for the MOZA SDK emulation feature. Sits idle until killed by its Win32 JobObject when SimHub exits.</Description>
+    <Description>Process-name impersonation stub for the MOZA SDK emulation feature. Watches the SimHub process passed via --parent-pid and exits when it goes away (Win32 JobObject is the backstop).</Description>
     <Product>MOZA Pit House</Product>
     <Copyright>Copyright 2026</Copyright>
     <!-- Matches real PitHouse 1.3.8.34 so MOZA_SDK.dll's installMozaSDK

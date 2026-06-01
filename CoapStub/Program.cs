@@ -7,15 +7,29 @@ using System.Threading;
 namespace MozaPlugin.CoapStub
 {
     /// <summary>
-    /// Idle stub that runs as <c>MOZA Pit House.exe</c> so process-name probes
-    /// from the vendor CoAP SDK find the expected name. Phase 1 diagnostic
-    /// build: in addition to staying alive forever, captures every byte the
-    /// vendor SDK writes to our stdin and logs it to
+    /// Stub that runs as <c>MOZA Pit House.exe</c> so process-name probes from
+    /// the vendor CoAP SDK find the expected name. Its lifetime is bound to the
+    /// SimHub process that owns the SDK-emulation feature:
+    ///
+    /// <list type="bullet">
+    /// <item>The plugin's <c>CoapStubManager</c> spawns us with
+    /// <c>--parent-pid &lt;SimHub PID&gt;</c>. We watch that PID and exit the
+    /// moment it goes away. This is the primary shutdown path — it works even
+    /// under Wine/Proton, where the JobObject's <c>KILL_ON_JOB_CLOSE</c> (our
+    /// backstop) has historically been unreliable.</item>
+    /// <item>If launched WITHOUT <c>--parent-pid</c> (e.g. the vendor SDK
+    /// started us directly via the registry redirect), we look for a running
+    /// <c>SimHubWPF</c> process and watch that instead. If none is running we
+    /// exit immediately — a PitHouse stand-in is pointless with no SimHub.</item>
+    /// </list>
+    ///
+    /// In addition the stub captures every byte the vendor SDK writes to our
+    /// stdin and logs it to
     /// <c>%LOCALAPPDATA%\SimHub\MozaPlugin\CoapStub\stub-trace-&lt;pid&gt;-&lt;launchstamp&gt;.log</c>.
-    /// Output-only — the stub writes nothing to stdout/stderr yet (deliberately,
-    /// so we can observe the vendor's request without our reply mutating the
-    /// conversation). Heartbeat lines fire every 2s so we can see whether the
-    /// SDK kills the process and when.
+    /// Output-only — the stub writes nothing to stdout/stderr (deliberately, so
+    /// we can observe the vendor's request without our reply mutating the
+    /// conversation). Heartbeat lines fire every 2s and double as the
+    /// parent-liveness poll.
     /// </summary>
     internal static class Program
     {
@@ -29,6 +43,18 @@ namespace MozaPlugin.CoapStub
                 OpenTrace(args);
                 LogHeader(args);
 
+                // Resolve the process whose lifetime we mirror. Exits the
+                // process immediately (return) if no such SimHub is running —
+                // satisfies "exit immediately if launched and SimHub is not
+                // running."
+                Process? parent = ResolveParent(args);
+                if (parent == null)
+                {
+                    Trace("parent not running at startup — exiting");
+                    return 0;
+                }
+                Trace($"watching parent PID={parent.Id} (name={SafeProcessName(parent)})");
+
                 // Background: read stdin until EOF, log each chunk as hex + ASCII.
                 var stdinThread = new Thread(StdinReaderLoop) { IsBackground = true, Name = "stub-stdin-reader" };
                 stdinThread.Start();
@@ -38,12 +64,19 @@ namespace MozaPlugin.CoapStub
                 AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                 AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
-                // Main loop: heartbeat once every 2s. Stays alive indefinitely;
-                // the plugin's JobObject (or the SDK's TerminateProcess) ends us.
+                // Main loop: heartbeat once every 2s, which doubles as the
+                // parent-liveness poll. When the parent (SimHub) exits we exit
+                // too — the Wine-proof primary teardown path; the plugin's
+                // JobObject is the backstop.
                 var sw = Stopwatch.StartNew();
                 while (true)
                 {
                     Thread.Sleep(2000);
+                    if (HasExitedSafe(parent))
+                    {
+                        Trace($"parent exited — shutting down (uptime={sw.Elapsed:hh\\:mm\\:ss})");
+                        return 0;
+                    }
                     Trace($"heartbeat uptime={sw.Elapsed:hh\\:mm\\:ss}");
                 }
             }
@@ -53,6 +86,96 @@ namespace MozaPlugin.CoapStub
                 Trace(ex.StackTrace ?? "");
                 return 1;
             }
+        }
+
+        /// <summary>
+        /// Resolve the process whose lifetime this stub mirrors. Returns a live
+        /// <see cref="Process"/> handle, or null if no suitable SimHub is
+        /// running (caller exits immediately in that case).
+        ///
+        /// <para>Preference order: an explicit <c>--parent-pid &lt;N&gt;</c>
+        /// passed by <c>CoapStubManager</c> (authoritative — it's the exact
+        /// SimHub that owns us), then a by-name lookup of <c>SimHubWPF</c> for
+        /// the case where the vendor SDK launched us directly.</para>
+        /// </summary>
+        private static Process? ResolveParent(string[] args)
+        {
+            int pid = ParseParentPid(args);
+            if (pid > 0)
+            {
+                try
+                {
+                    var p = Process.GetProcessById(pid);
+                    // GetProcessById throws if the PID isn't running; a returned
+                    // handle that already reports HasExited is also "gone".
+                    if (!p.HasExited) return p;
+                    Trace($"--parent-pid {pid} already exited");
+                }
+                catch (ArgumentException)
+                {
+                    Trace($"--parent-pid {pid} not running");
+                }
+                catch (Exception ex)
+                {
+                    Trace($"--parent-pid {pid} lookup failed: {ex.GetType().Name}: {ex.Message}");
+                }
+                return null;
+            }
+
+            // No explicit parent — we were launched by something other than the
+            // plugin (most likely the vendor SDK via the registry redirect).
+            // Bind to a running SimHub if there is one; otherwise exit.
+            Trace("no --parent-pid; searching for a running SimHub process");
+            foreach (var name in new[] { "SimHubWPF", "SimHub" })
+            {
+                try
+                {
+                    foreach (var p in Process.GetProcessesByName(name))
+                    {
+                        try { if (!p.HasExited) return p; } catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Trace($"GetProcessesByName({name}) failed: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Extract the integer following <c>--parent-pid</c> in the argument
+        /// list. Returns 0 when absent or unparseable.
+        /// </summary>
+        private static int ParseParentPid(string[] args)
+        {
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (!string.Equals(args[i], "--parent-pid", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (i + 1 < args.Length && int.TryParse(args[i + 1], out int pid))
+                    return pid;
+                return 0;
+            }
+            return 0;
+        }
+
+        private static bool HasExitedSafe(Process p)
+        {
+            try { return p.HasExited; }
+            catch (Exception ex)
+            {
+                // If we can no longer query the handle, assume the process is
+                // gone — better to exit a still-orphaned stub than to leak one.
+                Trace($"parent HasExited query failed ({ex.GetType().Name}: {ex.Message}); treating as exited");
+                return true;
+            }
+        }
+
+        private static string SafeProcessName(Process p)
+        {
+            try { return p.ProcessName; }
+            catch { return "<unknown>"; }
         }
 
         private static void StdinReaderLoop()
@@ -118,7 +241,7 @@ namespace MozaPlugin.CoapStub
         {
             Trace($"=== CoapStub diagnostic build ===");
             Trace($"PID={Process.GetCurrentProcess().Id}");
-            Trace($"Parent={GetParentInfo()}");
+            Trace($"Parent={GetParentInfo(args)}");
             Trace($"Exe={Process.GetCurrentProcess().MainModule?.FileName ?? "<unknown>"}");
             Trace($"Args={string.Join(" | ", args)}");
             Trace($"CmdLine={Environment.CommandLine}");
@@ -128,14 +251,12 @@ namespace MozaPlugin.CoapStub
             Trace($"OSVersion={Environment.OSVersion}");
         }
 
-        private static string GetParentInfo()
+        private static string GetParentInfo(string[] args)
         {
-            try
-            {
-                // No portable .NET API; rely on WMI which isn't available net48 without ref.
-                return "(parent-pid lookup omitted in this build)";
-            }
-            catch { return "<error>"; }
+            int pid = ParseParentPid(args);
+            return pid > 0
+                ? $"--parent-pid={pid}"
+                : "(no --parent-pid; will bind to a running SimHub by name)";
         }
 
         private static void Trace(string line)

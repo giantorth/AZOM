@@ -124,17 +124,15 @@ namespace MozaPlugin
         private static string DescribeServerStatus(string? liveStatus, bool enabledIntent)
         {
             if (!string.IsNullOrEmpty(liveStatus)) return liveStatus!;
-            return enabledIntent
-                ? "Enabled — will start after plugin restart"
-                : "Disabled";
+            // The toggles are live, so an "enabled" intent with no live status
+            // yet is just the brief window before the background start finishes.
+            return enabledIntent ? "Starting…" : "Disabled";
         }
 
         private static string DescribeStubStatus(Sdk.CoapStubManager? stub, bool enabledIntent)
         {
             if (stub == null)
-                return enabledIntent
-                    ? "Enabled — will spawn after plugin restart"
-                    : "Disabled";
+                return enabledIntent ? "Starting…" : "Disabled";
             return stub.IsRunning
                 ? $"Running (PID {stub.ProcessId})"
                 : "Stopped";
@@ -158,10 +156,10 @@ namespace MozaPlugin
             if (server == null)
             {
                 if (_sdkRecentRequests.Count != 1
-                    || !string.Equals(_sdkRecentRequests[0], "Server not started — enable in toggle above and restart plugin", StringComparison.Ordinal))
+                    || !string.Equals(_sdkRecentRequests[0], "Server not started — enable with the toggle above", StringComparison.Ordinal))
                 {
                     _sdkRecentRequests.Clear();
-                    _sdkRecentRequests.Add("Server not started — enable in toggle above and restart plugin");
+                    _sdkRecentRequests.Add("Server not started — enable with the toggle above");
                 }
                 _sdkRecentDirty = false;
                 return;
@@ -273,10 +271,10 @@ namespace MozaPlugin
             if (server == null)
             {
                 if (_controlUdpRecentRequests.Count != 1
-                    || !string.Equals(_controlUdpRecentRequests[0], "Server not started — enable in toggle above and restart plugin", StringComparison.Ordinal))
+                    || !string.Equals(_controlUdpRecentRequests[0], "Server not started — enable with the toggle above", StringComparison.Ordinal))
                 {
                     _controlUdpRecentRequests.Clear();
-                    _controlUdpRecentRequests.Add("Server not started — enable in toggle above and restart plugin");
+                    _controlUdpRecentRequests.Add("Server not started — enable with the toggle above");
                 }
                 _controlUdpRecentDirty = false;
                 return;
@@ -356,16 +354,32 @@ namespace MozaPlugin
         private void SdkEmulationEnabledCheck_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            _plugin.Settings.SdkEmulationEnabled = SdkEmulationEnabledCheck.IsChecked == true;
+            bool on = SdkEmulationEnabledCheck.IsChecked == true;
+            _plugin.Settings.SdkEmulationEnabled = on;
             _plugin.SaveSettings();
+            // Apply the change live — no plugin restart needed. Off-loaded to the
+            // ThreadPool because the stub spawn/teardown (CreateProcess +
+            // JobObject under Wine) can take a moment and must not stall the WPF
+            // thread; the 500 ms RefreshSdkTabTick renders the resulting status.
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try { _plugin.SetSdkEmulationEnabled(on); }
+                catch { /* helper logs its own failures; status reflects them */ }
+            });
             RefreshSdkStatus();
         }
 
         private void UdpControlEnabledCheck_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            _plugin.Settings.UdpControlEnabled = UdpControlEnabledCheck.IsChecked == true;
+            bool on = UdpControlEnabledCheck.IsChecked == true;
+            _plugin.Settings.UdpControlEnabled = on;
             _plugin.SaveSettings();
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try { _plugin.SetUdpControlEnabled(on); }
+                catch { /* helper logs its own failures; status reflects them */ }
+            });
             RefreshSdkStatus();
         }
 

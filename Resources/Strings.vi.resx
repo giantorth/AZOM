@@ -243,11 +243,12 @@
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Tạm thời vô hiệu hóa.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>MÁY CHỦ COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// máy chủ CoAP nhúng trên loopback</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Khi bật, plugin sẽ chạy máy chủ điều khiển SDK CoAP nhúng.</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Cung cấp hỗ trợ SDK MOZA chính thức cho các game yêu cầu, chẳng hạn như iRacing hoặc bất kỳ game nào dùng chế độ 360 Hz. Để làm vậy, plugin chạy một máy chủ điều khiển SDK CoAP nhúng trên loopback.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Khi được bật, plugin chạy một tiến trình thay thế nhỏ xuất hiện trong danh sách tiến trình với tên "MOZA Pit House.exe". Đây là điều bình thường — nó giúp các ứng dụng MOZA SDK tìm thấy PitHouse theo tên. Nó tự thoát khi bạn tắt mục này hoặc đóng SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Bật máy chủ CoAP SDK</value></data>
   <data name="Section_UdpControl" xml:space="preserve"><value>ĐIỀU KHIỂN UDP</value></data>
   <data name="Subtitle_UdpControl" xml:space="preserve"><value>// giao diện điều khiển CBOR-trên-UDP đơn giản</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Khi bật, plugin sẽ chạy máy chủ điều khiển UDP nhúng cho các công cụ cấu hình vô lăng của bên thứ ba.</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Đây là điều khiển UDP cũ để đặt góc đánh lái. Trường hợp sử dụng duy nhất đã biết là phiên bản RSF của Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Bật máy chủ điều khiển UDP</value></data>
   <data name="Label_PortNumber" xml:space="preserve"><value>Cổng</value></data>
   <data name="Label_UdpControlServer" xml:space="preserve"><value>Điều khiển UDP</value></data>
