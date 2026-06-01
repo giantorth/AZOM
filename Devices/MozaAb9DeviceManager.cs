@@ -319,38 +319,47 @@ namespace MozaPlugin.Devices
 
         // ===== Host-rendered engine vibration (Group 0x20 / cmd 0x0A 0x05) =====
         //
-        // PitHouse streams this at ~91 Hz with a 24-bit BE period field that
-        // satisfies period = K / (engine_rpm × freq_hz), K ≈ 3.95e11. The
-        // slot ID toggles between an active value and 0x0000 (silent
-        // keepalive) when intensity drops to zero. See
-        // docs/protocol/devices/ab9-shifter.md for the full decode.
+        // PitHouse streams this with a 24-bit BE period field that satisfies
+        //   period = K / (engine_rpm × freq_hz),  K ≈ 1.197e12
+        // (calibrated 2026-05-31 against ground-truth RPM telemetry — see below).
+        //
+        // The 16-bit field at payload offset 2-3 (historically mislabelled the
+        // "slot ID" / DirectInput handle) is the ENGINE-VIBRATION INTENSITY,
+        // encoded LINEARLY:
+        //   field = round(intensity_percent × 65.5)   (100% → 0x1996 = 6550)
+        // Verified directly: with the PitHouse intensity slider stepped
+        // 100/60/40 %, the field held 0x1996 / 0x0F5A / 0x0A3C exactly while
+        // RPM swept idle→redline, and slider-drag intermediates (96/56/52/48/44 %)
+        // all landed on intensity×65.5. The earlier "DirectInput handle that
+        // toggles 0x1996↔0x0000" reading was an artefact of only ever observing
+        // 0 % and 100 %. Intensity 0 → field 0 (silent). See
+        // docs/protocol/devices/ab9-shifter.md and tools/ab9-rpm-correlate.
         //
         // Layout of the 24-byte wire frame:
-        //   7E 13 20 12 0A 05 [slot_hi slot_lo] [00 × 7]
+        //   7E 13 20 12 0A 05 [int_hi int_lo] [00 × 7]
         //                     [per_hi per_mid per_lo] 04 [00 × 4] [cksum]
-        // Length byte 0x13 = 19 = cmd-id(2) + slot(2) + 7-zero + period(3)
+        // Length byte 0x13 = 19 = cmd-id(2) + intensity(2) + 7-zero + period(3)
         //                       + tag(1) + 4-zero.
-        public const ushort SilentSlotId = 0x0000;
-        // Primary engine-vib slot. PitHouse's runtime DI handle for the dominant
-        // slot in the 2026-05-13 capture; the device firmware doesn't validate
-        // this against allocated effects (slot IDs are host-side DI handles),
-        // so any consistent value works. Keeping the captured value matches
-        // PitHouse byte-for-byte for any tool that diffs against the capture.
-        public const ushort DefaultEngineVibSlotId = 0x1996;
+
+        // Intensity field value at 100 % (= 0x1996). Linearly scaled by the
+        // user's engine-vibration intensity slider; 0 % → 0 (silent).
+        public const ushort EngineVibIntensityFullScale = 0x1996; // 6550
         public const uint MinPeriodTicks = 0x64;
         public const uint MaxPeriodTicks = 0xFFFFFF;
 
         /// <summary>
-        /// Push one frame of the engine-vibration stream. When <paramref name="active"/>
-        /// is false the silent-keepalive slot (0x0000) is used and the period
-        /// becomes a stable mid-range filler. The frame goes through the
-        /// latest-wins stream lane so worker stalls never pile stale frames
-        /// on the wire.
+        /// Push one frame of the engine-vibration stream. The 16-bit intensity
+        /// field carries <paramref name="intensity0to100"/> scaled linearly
+        /// (round(intensity/100 × 0x1996)); 0 means silent. The frame goes
+        /// through the latest-wins stream lane so worker stalls never pile stale
+        /// frames on the wire.
         /// </summary>
-        public bool SendEngineVibrationStream(bool active, uint periodTicks)
+        public bool SendEngineVibrationStream(int intensity0to100, uint periodTicks)
         {
             if (!_connection.IsConnected) return false;
-            ushort slot = active ? DefaultEngineVibSlotId : SilentSlotId;
+            if (intensity0to100 < 0) intensity0to100 = 0;
+            if (intensity0to100 > 100) intensity0to100 = 100;
+            ushort slot = (ushort)Math.Round(intensity0to100 / 100.0 * EngineVibIntensityFullScale);
             if (periodTicks < MinPeriodTicks) periodTicks = MinPeriodTicks;
             if (periodTicks > MaxPeriodTicks) periodTicks = MaxPeriodTicks;
 
@@ -389,7 +398,7 @@ namespace MozaPlugin.Devices
             const int silentFrameCount = 9;
             for (int i = 0; i < silentFrameCount; i++)
             {
-                SendEngineVibrationStream(active: false, periodTicks: 0x100000);
+                SendEngineVibrationStream(intensity0to100: 0, periodTicks: 0x100000);
             }
             // Engine-pulse OFF half (amp16 = 0) flushes any active pulse.
             SendEnginePulsePair(_lastEnginePulsePhase, intensity0to100: 0);
