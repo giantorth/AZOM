@@ -22,9 +22,9 @@
   <data name="Brand_SimHubPlugin" xml:space="preserve"><value>Πρόσθετο SimHub</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Αποσυνδεδεμένο</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>ΑΝΑΝΕΩΣΗ</value></data>
-  <data name="Label_PerformanceOutput" xml:space="preserve"><value>Απόδοση Εξόδου</value></data>
-  <data name="Option_Reserved" xml:space="preserve"><value>Δεσμευμένο</value></data>
-  <data name="Option_Full" xml:space="preserve"><value>Πλήρες</value></data>
+  <data name="Label_PerformanceOutput" xml:space="preserve"><value>Απόδοση Βάσης</value></data>
+  <data name="Option_Reserved" xml:space="preserve"><value>Περιορισμένη</value></data>
+  <data name="Option_Full" xml:space="preserve"><value>Πλήρης</value></data>
   <data name="Button_CalibrateCenter" xml:space="preserve"><value>ΒΑΘΜΟΝΟΜΗΣΗ ΚΕΝΤΡΟΥ</value></data>
   <data name="Brand_Mcu" xml:space="preserve"><value>MCU</value></data>
   <data name="Brand_Mosfet" xml:space="preserve"><value>MOSFET</value></data>
@@ -97,7 +97,7 @@
   <data name="Option_None" xml:space="preserve"><value>Κανένα</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Αριστερά</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Δεξιά</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Οι ρυθμίσεις LED και κουμπιών βρίσκονται στην καρτέλα MOZA Wheel υπό Συσκευές.</value></data>
+  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Οι ρυθμίσεις LED και κουμπιών βρίσκονται στην καρτέλα MOZA Wheel Συσκευές.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>ΘΕΣΗ</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// Live είσοδος χειρόφρενου</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Θέση</value></data>
@@ -124,7 +124,7 @@
   <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ ΓΚΑΖΙΟΥ</value></data>
   <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ ΦΡΕΝΟΥ</value></data>
   <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ ΣΥΜΠΛΕΚΤΗ</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// Αντιστοίχιση φυσικής θέσης σε είσοδο παιχνιδιού</value></data>
+  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// Αντιστοίχιση φυσικής θέσης σε παιχνίδι</value></data>
   <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// Διαμόρφωση απόκρισης φρένου</value></data>
   <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// Διαμόρφωση απόκρισης συμπλέκτη</value></data>
   <data name="Section_ThrottleCalibration" xml:space="preserve"><value>ΓΚΑΖΙ · ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
@@ -189,9 +189,9 @@
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Εφαρμογή ρυθμίσεων προφίλ κατά την εκκίνηση</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>ΕΞΟΔΟΣ LED ΤΙΜΟΝΙΟΥ</value></data>
   <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// Περιορισμός rpm + κουμπιών</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Σύσταση: αφήστε τις παρακάτω επιλογές LED ΑΝΕΝΕΡΓΕΣ εκτός αν αντιμετωπίζετε προβλήματα LED.</value></data>
+  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Σύσταση: αφήστε τις παρακάτω επιλογές LED ΑΝΕΝΕΡΓΕΣ εκτός αν αντιμετωπίζετε προβλήματα με τα LED.</value></data>
   <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Περιορισμός ενημερώσεων στο τιμόνι</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Αποστολή δεδομένων LED μόνο όταν αλλάζουν.</value></data>
+  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Αποστολή δεδομένων σε LED μόνο όταν αλλάζουν.</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Πάντα επαναποστολή bitmask</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Πάντα αποστολή LED bitmask με ενημερώσεις χρώματος, ακόμα και αν δεν άλλαξε. Προκαλεί επιπλέον κίνηση δεδομένων.</value></data>
   <data name="Section_UsbDetection" xml:space="preserve"><value>ΑΝΙΧΝΕΥΣΗ USB</value></data>
@@ -260,14 +260,14 @@
   <data name="Subtitle_About" xml:space="preserve"><value>// Πρόσθετο SimHub ανοιχτού κώδικα</value></data>
   <data name="Label_UnofficialMozaPlugin" xml:space="preserve"><value>Ανεπίσημο πρόσθετο MOZA SimHub</value></data>
   <data name="Label_VersionPlaceholder" xml:space="preserve"><value>Έκδοση —</value></data>
-  <data name="Hint_AboutDescription" xml:space="preserve"><value>Ένα ανεπίσημο πρόσθετο SimHub που επικοινωνεί απευθείας με υλικό MOZA Racing μέσω σειριακής — διαμόρφωση υλικού, pipeline εφφέ LED και streaming πίνακα. Δεν σχετίζεται με τη MOZA / Gudsen Technology.</value></data>
+  <data name="Hint_AboutDescription" xml:space="preserve"><value>Ένα ανεπίσημο πρόσθετο SimHub που επικοινωνεί απευθείας με υλικό MOZA Racing μέσω σειριακού πρωτοκόλλου, εφφέ LED και streaming οθόνης. Δεν σχετίζεται με τη MOZA / Gudsen Technology.</value></data>
   <data name="Hint_SponsorshipsAppreciated" xml:space="preserve"><value>Οι χορηγίες εκτιμώνται ιδιαίτερα — η προσθήκη υποστήριξης για υλικό που δεν κατέχω μπορεί να είναι δύσκολη!</value></data>
-  <data name="Hint_ThanksToTesters" xml:space="preserve"><value>Τεράστιες ευχαριστίες σε όλους τους πρώιμους alpha και beta testers που αφιέρωσαν τον χρόνο τους — και την υπομονή τους — ενώ μάθαινα να κάνω το πρωτόκολλο MOZA να λειτουργεί. Αυτό το plugin δεν θα υπήρχε χωρίς εσάς.</value></data>
+  <data name="Hint_ThanksToTesters" xml:space="preserve"><value>Τεράστιες ευχαριστίες σε όλους τους πρώιμους alpha και beta testers που αφιέρωσαν τον χρόνο τους — και την υπομονή τους — ενώ μάθαινα το πρωτόκολλο της MOZA. Αυτό το plugin δεν θα υπήρχε χωρίς εσάς.</value></data>
   <data name="Button_Github" xml:space="preserve"><value>GitHub</value></data>
   <data name="Button_JoinDiscord" xml:space="preserve"><value>Εγγραφή στο Discord</value></data>
   <data name="Button_SponsorDevelopment" xml:space="preserve"><value>Χορηγία Ανάπτυξης</value></data>
   <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
-  <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Εγγραφή στο Discord του έργου</value></data>
+  <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Εγγραφή στο Discord του προσθέτου</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
   <data name="Label_UpdateAvailable" xml:space="preserve"><value>Διαθέσιμη ενημέρωση</value></data>
   <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>Άνοιγμα σημειώσεων έκδοσης</value></data>
@@ -292,7 +292,7 @@
   <data name="Status_DownloadingIndeterminate" xml:space="preserve"><value>Λήψη… ({0})</value></data>
   <data name="Status_Extracting" xml:space="preserve"><value>Αποσυμπίεση…</value></data>
   <data name="Status_Installing" xml:space="preserve"><value>Εγκατάσταση…</value></data>
-  <data name="Status_InstalledRestartRequired" xml:space="preserve"><value>Εγκαταστάθηκε ενημέρωση — επανεκκινήστε το SimHub για φόρτωση v{0}</value></data>
+  <data name="Status_InstalledRestartRequired" xml:space="preserve"><value>Εγκαταστάθηκε ενημέρωση — Επανεκκινήστε το SimHub για φόρτωση v{0}</value></data>
   <data name="Status_InstallFailed" xml:space="preserve"><value>Αποτυχία εγκατάστασης: {0}</value></data>
   <data name="Status_InstallFailedBadPackage" xml:space="preserve"><value>Το πακέτο ενημέρωσης δεν είναι έγκυρο</value></data>
   <data name="Status_InstallFailedPendingRestart" xml:space="preserve"><value>Εκκρεμεί προηγούμενη εγκατάσταση — επανεκκινήστε πρώτα το SimHub</value></data>
@@ -315,7 +315,7 @@
   <data name="Button_ExportBundle" xml:space="preserve"><value>ΕΞΑΓΩΓΗ ΠΑΚΕΤΟΥ (ZIP)…</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΚΑΤΑΓΡΑΦΗΣ ΣΤΟ ΠΡΟΧΕΙΡΟ</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>ΠΛΗΡΗΣ ΔΙΑΓΝΩΣΤΙΚΗ ΑΝΑΦΟΡΑ</value></data>
-  <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// πληροφορίες εντοπισμού σφαλμάτων</value></data>
+  <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// Πληροφορίες εντοπισμού σφαλμάτων</value></data>
   <data name="Button_Expand" xml:space="preserve"><value>ΑΝΑΠΤΥΞΗ</value></data>
   <data name="Button_Collapse" xml:space="preserve"><value>ΣΥΜΠΤΥΞΗ</value></data>
   <data name="Button_CopyAll" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΟΛΩΝ ΣΤΟ ΠΡΟΧΕΙΡΟ</value></data>
@@ -386,8 +386,8 @@
   <data name="Label_PaddleCombined" xml:space="preserve"><value>ΣΥΝΔΥΑΣΜΕΝΟ</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>ΕΝΕΡΓΑ ΚΟΥΜΠΙΑ</value></data>
   <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
-  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// ανάθεση κατευθυντικού stick</value></data>
-  <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Δεν έχει αναφερθεί ακόμα διαμόρφωση joystick από το τιμόνι. Συνδέστε το τιμόνι και περιμένετε να ολοκληρωθεί η ανίχνευση ταυτότητας.</value></data>
+  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// Διαμόρφωση Joystick</value></data>
+  <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Δεν έχει αναφερθεί ακόμα διαμόρφωση Joystick από το τιμόνι. Συνδέστε το τιμόνι και περιμένετε να ολοκληρωθεί η ανίχνευση.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Ενεργοποίηση τηλεμετρίας οθόνης</value></data>
   <data name="Button_LoadMzdash" xml:space="preserve"><value>ΦΟΡΤΩΣΗ .MZDASH…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ΟΡΙΣΜΟΣ ΦΑΚΕΛΟΥ…</value></data>
@@ -395,7 +395,7 @@
   <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Φόρτωση τοπικού αρχείου .mzdash για αντιστοίχιση καναλιών tier-def</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Ορισμός φακέλου .mzdash ως βιβλιοθήκη οθονών</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Αυτόματη ανίχνευση φακέλου οθόνης για το συνδεδεμένο τιμόνι</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ ΑΠΟΣΤΟΛΗ ΔΟΚΙΜΑΣΤΙΚΟΥ PATTERN</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ ΑΠΟΣΤΟΛΗ ΔΟΚΙΜΑΣΤΙΚΟΥ ΜΟΤΙΒΟΥ</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>■ ΔΙΑΚΟΠΗ</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>ΑΝΤΙΣΤΟΙΧΙΣΕΙΣ ΚΑΝΑΛΙΩΝ</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Κάντε κλικ στο μολύβι σε μια γραμμή για επιλογή ιδιότητας SimHub</value></data>
@@ -438,7 +438,7 @@
   <data name="Section_RpmLedColorsStatic" xml:space="preserve"><value>ΧΡΩΜΑΤΑ LED RPM (ΣΤΑΤΙΚΑ)</value></data>
   <data name="Subtitle_RpmLedColorsStatic" xml:space="preserve"><value>// Εμφανίζεται όταν δεν υπάρχει τηλεμετρία  · Κάντε κλικ σε LED για αλλαγή χρώματος</value></data>
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
-  <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// κάντε κλικ σε σημαία για αλλαγή χρώματος</value></data>
+  <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// Κάντε κλικ σε σημαία για αλλαγή χρώματος</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>ΣΗΜΑΙΑ 1</value></data>
   <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES WHEEL · ΔΕΙΚΤΗΣ RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// Παλαιό πρωτόκολλο ES</value></data>
@@ -475,7 +475,7 @@
 <data name="Button_ImportProfile" xml:space="preserve"><value>ΕΙΣΑΓΩΓΗ ΠΡΟΦΙΛ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Εισαγωγή Preset PitHouse</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Αναζήτηση αρχείου…</value></data>
-  <data name="Import_Category_Motor" xml:space="preserve"><value>Βάση τιμονιού (Κινητήρας)</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>Βάση</value></data>
   <data name="Import_Category_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
   <data name="Import_NoFolderFound" xml:space="preserve"><value>Ο φάκελος Presets PitHouse δεν βρέθηκε. Ορίστε προσαρμοσμένη διαδρομή ή χρησιμοποιήστε Αναζήτηση.</value></data>
   <data name="Import_SetCustomFolder" xml:space="preserve"><value>Ορισμός φακέλου…</value></data>
