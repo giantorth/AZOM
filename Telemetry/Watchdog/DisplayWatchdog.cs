@@ -656,13 +656,19 @@ namespace MozaPlugin.Telemetry.Watchdog
         /// Host-initiated session-open for the configJson channel (port 9).
         /// Uses configJson-specific magic <c>7c 1e 6c 80</c> — upload-style
         /// <c>7c 23 46 80</c> does NOT trigger wheel device-init for 0x09.
+        /// Addressed to the sender's current target device so the trigger reaches
+        /// the actual display: the wheel screen (0x17), a base-bridged CM2 (0x14),
+        /// or a standalone-USB CM2 (0x12). The prime + configJson reply already
+        /// follow <see cref="TelemetrySender.TargetDeviceId"/>; hardcoding the
+        /// open-request to the wheel left CM2 targets without their device-init
+        /// trigger, so sess=0x09 never opened and the dashboard never engaged.
         /// </summary>
         public void SendConfigJsonOpenRequest(byte port, ushort seq)
         {
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _sender.TargetDeviceId,
                 0x7C, 0x1E, 0x6C, 0x80,
                 (byte)(seq & 0xFF), (byte)(seq >> 8),
                 port, 0x00,
