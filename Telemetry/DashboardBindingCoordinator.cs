@@ -744,10 +744,20 @@ namespace MozaPlugin.Telemetry
             if (!_detectionState.NewWheelDetected
                 && !_detectionState.OldWheelDetected
                 && !standaloneDashboard) return;
+
+            // FSR V1 (group-0x42 display push) bypasses the dashboard-capability and
+            // display-probe gates below: it has a screen but never answers the
+            // 0x43-wrapped display probe and does not speak the tier-def protocol, so
+            // ShouldDriveDashboard()/IsDisplayDetected would defer it forever. We
+            // still honour the connection / wheel-detected / FramesSent / dispatch
+            // guards. TelemetrySender.Fsr1Mode routes Start() to the 0x42 path.
+            bool fsr1 = _plugin.IsFsr1DisplayWheel;
+            t.Fsr1Mode = fsr1;
+
             // Capability gate: known displayless wheels never get the dashboard
             // pipeline; unknown models fall back to the runtime probe. CM2
             // standalone is always a dashboard — skip the wheel-display gate.
-            if (!standaloneDashboard && !_plugin.ShouldDriveDashboard())
+            if (!standaloneDashboard && !fsr1 && !_plugin.ShouldDriveDashboard())
             {
                 MozaLog.Info(
                     $"[Moza] Wheel '{_data?.WheelModelName}' has no display " +
@@ -769,7 +779,7 @@ namespace MozaPlugin.Telemetry
             // detected but the display isn't — so deferring here is safe
             // and self-recovering. Standalone CM2 dashboards skip this gate
             // (they ARE the dashboard target, no separate sub-device boot).
-            if (!standaloneDashboard && !_plugin.IsDisplayDetected)
+            if (!standaloneDashboard && !fsr1 && !_plugin.IsDisplayDetected)
             {
                 MozaLog.Debug(
                     $"[Moza] Display sub-device not yet detected " +

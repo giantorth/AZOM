@@ -75,6 +75,8 @@ namespace MozaPlugin.Devices.WheelUi
             {
                 try { _dashEventSubscribedPlugin.DashboardSelectionChanged -= OnPluginDashboardSelectionChanged; }
                 catch { }
+                try { _dashEventSubscribedPlugin.Fsr1ActiveIndexChanged -= OnFsr1ActiveIndexChanged; }
+                catch { }
                 _dashEventSubscribedPlugin = null;
             }
 
@@ -112,6 +114,19 @@ namespace MozaPlugin.Devices.WheelUi
             PopulateChannelMappingList();
         }
 
+        // FSR V1: the wheel reported a dashboard switch (parsed from its Param-6 log,
+        // or our own select was applied) — re-select the dropdown to match.
+        private void OnFsr1ActiveIndexChanged(object? sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => OnFsr1ActiveIndexChanged(sender, e)));
+                return;
+            }
+            if (_plugin == null || !_plugin.IsFsr1DisplayWheel) return;
+            PopulateDashboardCombo();
+        }
+
         private bool ResolvePlugin()
         {
             _plugin = MozaPlugin.Instance;
@@ -127,8 +142,11 @@ namespace MozaPlugin.Devices.WheelUi
                 {
                     try { _dashEventSubscribedPlugin.DashboardSelectionChanged -= OnPluginDashboardSelectionChanged; }
                     catch { }
+                    try { _dashEventSubscribedPlugin.Fsr1ActiveIndexChanged -= OnFsr1ActiveIndexChanged; }
+                    catch { }
                 }
                 _plugin.DashboardSelectionChanged += OnPluginDashboardSelectionChanged;
+                _plugin.Fsr1ActiveIndexChanged += OnFsr1ActiveIndexChanged;
                 _dashEventSubscribedPlugin = _plugin;
                 MozaLog.Debug(
                     $"[Moza] UI: subscribed to DashboardSelectionChanged (plugin hash={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_plugin)})");
@@ -204,6 +222,27 @@ namespace MozaPlugin.Devices.WheelUi
         private void PopulateDashboardCombo()
         {
             if (_plugin == null) return;
+
+            // FSR V1: the dropdown selects which built-in dashboard (group-0x42
+            // record type) the plugin streams — there is no wheel-reported
+            // configJsonList. List the catalog's live dashboards.
+            if (_plugin.IsFsr1DisplayWheel)
+            {
+                // 19 built-in dashboard positions (index 0..18). Selecting one sends
+                // the group-0x32/0x81 select command; the wheel can also switch itself
+                // (auto-followed via OnFsr1ActiveIndexChanged).
+                using (_suppressor.Begin())
+                {
+                    TelemetryProfileCombo.Items.Clear();
+                    int max = global::MozaPlugin.Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex;
+                    for (int i = 0; i <= max; i++)
+                        TelemetryProfileCombo.Items.Add($"Dashboard {i + 1}");
+                    int active = _plugin.GetActiveFsr1Index();
+                    TelemetryProfileCombo.SelectedIndex = (active >= 0 && active <= max) ? active : 0;
+                    _lastPopulatedWheelSlot = -1;
+                }
+                return;
+            }
 
             using (_suppressor.Begin())
             {
@@ -306,6 +345,9 @@ namespace MozaPlugin.Devices.WheelUi
         private long ComputeMappingDataSignature()
         {
             if (_plugin == null) return -2;
+            // FSR V1 rows come from the static catalog, not a tier profile —
+            // a fixed signature so the list populates once and doesn't churn.
+            if (_plugin.IsFsr1DisplayWheel) return -3;
             var profile = _plugin.TelemetrySender?.Profile;
             int catalogCount = _plugin.WheelChannelCatalogForDiagnostics?.Count ?? 0;
             if (profile == null) return ((long)catalogCount << 40);
@@ -491,6 +533,19 @@ namespace MozaPlugin.Devices.WheelUi
             if (selected == null) return;
 
             int idx = TelemetryProfileCombo.SelectedIndex;
+
+            // FSR V1: selecting a dashboard sends the group-0x32/0x81 select command
+            // (index = combo position). The wheel switches its displayed page.
+            if (_plugin.IsFsr1DisplayWheel)
+            {
+                if (idx >= 0 && idx <= global::MozaPlugin.Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex)
+                {
+                    _plugin.SetActiveFsr1Index(idx, sendToWheel: true);
+                    TelemetryMappingStatus.Text = $"Switched to Dashboard {idx + 1}";
+                }
+                return;
+            }
+
             var active = _plugin.TelemetrySender;
             var state = _plugin.WheelStateForDiagnostics;
 
@@ -770,6 +825,17 @@ namespace MozaPlugin.Devices.WheelUi
         private void TelemetryResetMappings_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
+
+            // FSR V1: clear each field override (reverts to catalog defaults).
+            if (_plugin.IsFsr1DisplayWheel)
+            {
+                foreach (var row in _channelRows)
+                    _plugin.SetFsr1FieldMapping(row.RecordKey, row.FieldId, "", 0, 0);
+                PopulateChannelMappingList();
+                TelemetryMappingStatus.Text = $"Reset to defaults at {DateTime.Now:HH:mm:ss}";
+                return;
+            }
+
             // Restore each channel to its Telemetry.json default before clearing
             // the override dict — otherwise the live profile keeps the user's
             // last typed value until the next telemetry restart.
@@ -847,8 +913,22 @@ namespace MozaPlugin.Devices.WheelUi
         private void OnMappingRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (_plugin == null) return;
-            if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)) return;
             if (sender is not ChannelMappingRow row) return;
+
+            // FSR V1 dashboard fields persist to the dedicated per-field store
+            // (property + input scale). React to the property OR either scale bound.
+            if (row.IsFsr1)
+            {
+                if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)
+                    && e.PropertyName != nameof(ChannelMappingRow.InMin)
+                    && e.PropertyName != nameof(ChannelMappingRow.InMax)) return;
+                if (string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
+                _plugin.SetFsr1FieldMapping(row.RecordKey, row.FieldId, row.SimHubProperty, row.InMin, row.InMax);
+                TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
+                return;
+            }
+
+            if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)) return;
             if (string.IsNullOrEmpty(row.Url)) return;
             _plugin.SetChannelMapping(row.Url, row.SimHubProperty);
             TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";

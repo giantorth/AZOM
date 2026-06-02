@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""fsr1-inventory — frame inventory for FSR1 USB captures (JSONL).
+
+Reads one or more JSONL files produced by tools/pcap_to_jsonl.py
+(records: {"t": epoch_sec, "dir": "h2b"|"b2h", "hex": "<frame hex>"}).
+
+For each capture it reports:
+  * total MOZA frames, capture duration, direction split (h2b / b2h)
+  * a table of frame counts by (dir, cmd, dev)
+  * the set of device addresses and group (cmd) IDs present
+
+MOZA frame layout: 7E <len> <cmd> <dev> <len bytes payload> <csum>.
+  byte[0] = 0x7E
+  byte[1] = len (payload length)
+  byte[2] = cmd (group id)
+  byte[3] = dev (device id)
+  byte[4 : 4+len] = payload
+  byte[4+len] = checksum
+total frame size = len + 5.
+
+Usage:
+    tools/fsr1-inventory <file.jsonl> [<file.jsonl> ...]
+    tools/fsr1-inventory            # defaults to /tmp/fsr1/*.jsonl
+"""
+from __future__ import annotations
+
+import glob
+import json
+import sys
+from collections import Counter
+
+
+def parse_frame(hexstr: str):
+    """Return (cmd, dev, plen, payload_hex) or None if malformed."""
+    try:
+        b = bytes.fromhex(hexstr)
+    except ValueError:
+        return None
+    if len(b) < 5 or b[0] != 0x7E:
+        return None
+    plen = b[1]
+    cmd = b[2]
+    dev = b[3]
+    payload = b[4 : 4 + plen]
+    return cmd, dev, plen, payload.hex()
+
+
+def load(path: str):
+    recs = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            recs.append(rec)
+    return recs
+
+
+def report(path: str):
+    recs = load(path)
+    print("=" * 78)
+    print(f"CAPTURE: {path}")
+    print("=" * 78)
+    if not recs:
+        print("  (no records)")
+        return
+
+    ts = [r["t"] for r in recs if "t" in r]
+    total = len(recs)
+    dur = (max(ts) - min(ts)) if ts else 0.0
+    dirsplit = Counter(r.get("dir", "?") for r in recs)
+
+    print(f"total frames : {total}")
+    print(f"duration     : {dur:.3f} s  ({min(ts):.3f} .. {max(ts):.3f})")
+    print(f"direction    : h2b={dirsplit.get('h2b', 0)}  b2h={dirsplit.get('b2h', 0)}")
+
+    by_key = Counter()
+    devs = set()
+    groups = set()
+    malformed = 0
+    for r in recs:
+        pf = parse_frame(r.get("hex", ""))
+        if pf is None:
+            malformed += 1
+            continue
+        cmd, dev, _plen, _payload = pf
+        by_key[(r.get("dir", "?"), cmd, dev)] += 1
+        devs.add(dev)
+        groups.add(cmd)
+
+    if malformed:
+        print(f"malformed    : {malformed}")
+
+    print()
+    print("frame counts by (dir, cmd, dev):")
+    print(f"  {'dir':<4} {'cmd':>5} {'dev':>5}   {'count':>8}")
+    print(f"  {'-'*4} {'-'*5} {'-'*5}   {'-'*8}")
+    for (d, cmd, dev), n in sorted(
+        by_key.items(), key=lambda kv: (-kv[1], kv[0][0], kv[0][1], kv[0][2])
+    ):
+        print(f"  {d:<4} 0x{cmd:02X}  0x{dev:02X}   {n:>8}")
+
+    print()
+    print("device addresses present (dev):")
+    print("  " + "  ".join(f"0x{d:02X}({d})" for d in sorted(devs)))
+    print("group ids present (cmd):")
+    print("  " + "  ".join(f"0x{g:02X}({g})" for g in sorted(groups)))
+    print()
+
+
+def main(argv):
+    files = argv[1:]
+    if not files:
+        files = sorted(glob.glob("/tmp/fsr1/*.jsonl"))
+    if not files:
+        print("no input files (and /tmp/fsr1/*.jsonl is empty)", file=sys.stderr)
+        return 1
+    for path in files:
+        report(path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

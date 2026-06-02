@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""FSR V1 (RS21-D03) ground-truth extraction for group-0x42 display-push prototype.
+
+Reads the JSONL produced by tools/pcap_to_jsonl.py and reports, for the FSR V1
+captures, the verbatim wire bytes we need to replicate in the plugin:
+
+  (a) startup declaration sweep  : first host->0x17 group-0x42 frame per type
+  (b) live records per type      : length / b1 / b2 histogram + sample frames
+  (c) 0x43 keepalive             : host->0x17 group-0x43 1-byte cmdid-00 poll + rate
+  (d) group 0x3F LED frames      : host->0x17 RPM/button-LED frames + rate
+  (e) group 0x40 config sweep    : host->0x17 group-0x40 frames + rate
+  + identity strings (0x07/0x08/0x0F/0x10 replies on 0x71) for detection.
+
+Usage:
+  python3 tools/fsr1-0x42-extract [/tmp/fsr1]
+
+Regenerate the JSONL first if /tmp is stale:
+  for f in usb-capture/fsr1/*.pcapng; do \
+    python3 tools/pcap_to_jsonl.py "$f" "/tmp/fsr1/$(basename "$f" .pcapng | tr ' ' _).jsonl"; done
+"""
+import json
+import sys
+import collections
+from pathlib import Path
+
+WHEEL = 0x17          # request device id
+WHEEL_RESP = 0x71     # nibble-swap response id
+
+
+def frames(path):
+    """Yield (t, dir, len, grp, dev, payload_bytes, raw_hex) for each MOZA frame."""
+    for line in path.open():
+        rec = json.loads(line)
+        h = bytes.fromhex(rec["hex"])
+        if len(h) < 5 or h[0] != 0x7E:
+            continue
+        ln, grp, dev = h[1], h[2], h[3]
+        payload = h[4:4 + ln]
+        yield rec["t"], rec["dir"], ln, grp, dev, payload, rec["hex"]
+
+
+def ascii_of(payload):
+    # identity replies: cmdid echo byte then 16 null-padded ASCII bytes
+    body = payload[1:] if payload else payload
+    return bytes(b for b in body if b != 0).decode("latin-1", "replace")
+
+
+def report(path):
+    print(f"\n{'='*78}\n== {path.name} ==\n{'='*78}")
+
+    # ---- identity (b2h replies on 0x71) ----------------------------------
+    ident = {}
+    for t, d, ln, grp, dev, pl, hx in frames(path):
+        if d == "b2h" and dev == WHEEL_RESP and grp in (0x87, 0x88, 0x8F, 0x90, 0x91) and pl:
+            ident.setdefault((grp, pl[0]), ascii_of(pl))
+    if ident:
+        print("\n-- identity (wheel 0x71) --")
+        names = {0x87: "model(0x07)", 0x88: "hw(0x08)", 0x8F: "sw(0x0F)",
+                 0x90: "serial-a(0x10)", 0x91: "serial-b(0x10)"}
+        for (grp, cid), s in sorted(ident.items()):
+            print(f"   {names.get(grp, hex(grp))}/{cid:02x}: {s!r}")
+
+    # ---- group 0x42 host->wheel ------------------------------------------
+    g42 = [(t, ln, pl, hx) for t, d, ln, grp, dev, pl, hx in frames(path)
+           if d == "h2b" and dev == WHEEL and grp == 0x42 and pl]
+    if g42:
+        t0 = g42[0][0]
+        dur = g42[-1][0] - g42[0][0]
+        print(f"\n-- group 0x42 host->0x17 -- {len(g42)} frames over {dur:.1f}s "
+              f"(~{len(g42)/dur:.1f} Hz)" if dur > 0 else f"\n-- group 0x42 -- {len(g42)} frames")
+
+        # (a) declaration sweep: first frame seen per type, in time order
+        print("\n   (a) first-seen per type (declaration sweep candidates):")
+        seen = {}
+        order = []
+        for t, ln, pl, hx in g42:
+            ty = pl[0]
+            if ty not in seen:
+                seen[ty] = (t - t0, ln, pl, hx)
+                order.append(ty)
+        for ty in order:
+            dt, ln, pl, hx = seen[ty]
+            b1 = pl[1] if len(pl) > 1 else None
+            b2 = pl[2] if len(pl) > 2 else None
+            allzero = all(b == 0 for b in pl[3:])
+            print(f"      type {ty:02x} t+{dt:6.2f}s len={ln:2d} b1={b1:02x} b2={b2:02x} "
+                  f"zeroData={allzero}  {hx}")
+
+        # (b) per-type live stats: len/b1/b2 histograms + a populated sample
+        print("\n   (b) per-type stats (len | b1 set | b2 set | n | distinct-payloads):")
+        bytype = collections.defaultdict(list)
+        for t, ln, pl, hx in g42:
+            bytype[pl[0]].append((ln, pl, hx))
+        for ty in sorted(bytype):
+            rows = bytype[ty]
+            lens = sorted({r[0] for r in rows})
+            b1s = sorted({r[1][1] for r in rows if len(r[1]) > 1})
+            b2s = sorted({r[1][2] for r in rows if len(r[1]) > 2})
+            distinct = len({r[1] for r in rows})
+            print(f"      type {ty:02x}: len={lens} b1={[f'{x:02x}' for x in b1s]} "
+                  f"b2={[f'{x:02x}' for x in b2s]} n={len(rows)} distinct={distinct}")
+            # show a populated (non-all-zero-data) sample if one exists
+            for ln, pl, hx in rows:
+                if any(b for b in pl[3:]):
+                    print(f"          live sample: {hx}")
+                    break
+
+    # ---- group 0x43 host->wheel (keepalive + any 7c/7d) ------------------
+    g43 = [(t, ln, pl, hx) for t, d, ln, grp, dev, pl, hx in frames(path)
+           if d == "h2b" and dev == WHEEL and grp == 0x43 and pl]
+    if g43:
+        dur = g43[-1][0] - g43[0][0]
+        cmd = collections.Counter()
+        for t, ln, pl, hx in g43:
+            cid = pl[0] if ln == 1 else (pl[0] << 8 | pl[1]) if ln >= 2 else None
+            cmd[(ln, cid)] += 1
+        print(f"\n-- group 0x43 host->0x17 -- {len(g43)} frames over {dur:.1f}s")
+        for (ln, cid), n in cmd.most_common():
+            cids = f"{cid:04x}" if (cid is not None and ln >= 2) else (f"{cid:02x}" if cid is not None else "?")
+            print(f"      len={ln} cmd={cids}: {n}")
+        # sample the 1-byte keepalive
+        for t, ln, pl, hx in g43:
+            if ln == 1:
+                print(f"      keepalive sample (len1): {hx}")
+                break
+
+    # ---- group 0x3F + 0x40 host->wheel -----------------------------------
+    for g, label in ((0x3F, "0x3F (LED/live)"), (0x40, "0x40 (config)")):
+        rows = [(t, ln, pl, hx) for t, d, ln, grp, dev, pl, hx in frames(path)
+                if d == "h2b" and dev == WHEEL and grp == g and pl]
+        if not rows:
+            continue
+        dur = rows[-1][0] - rows[0][0]
+        cmd = collections.Counter()
+        for t, ln, pl, hx in rows:
+            key = (pl[0],) if ln >= 1 else ()
+            if ln >= 2:
+                key = (pl[0], pl[1])
+            cmd[key] += 1
+        print(f"\n-- group {label} host->0x17 -- {len(rows)} frames over {dur:.1f}s "
+              f"(~{len(rows)/dur:.2f} Hz)" if dur > 0 else f"\n-- group {label} -- {len(rows)} frames")
+        for key, n in cmd.most_common(15):
+            ks = " ".join(f"{x:02x}" for x in key)
+            print(f"      cmd[{ks}]: {n}")
+        # show a couple of representative frames per top cmd
+        shown = set()
+        for t, ln, pl, hx in rows:
+            key = (pl[0], pl[1]) if ln >= 2 else (pl[0],)
+            if key not in shown:
+                shown.add(key)
+                print(f"      sample cmd[{' '.join(f'{x:02x}' for x in key)}]: {hx}")
+            if len(shown) >= 8:
+                break
+
+
+def main():
+    base = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/fsr1")
+    paths = sorted(base.glob("*.jsonl"))
+    if not paths:
+        print(f"no JSONL in {base} — regenerate from usb-capture/fsr1/ first", file=sys.stderr)
+        sys.exit(1)
+    for p in paths:
+        report(p)
+
+
+if __name__ == "__main__":
+    main()

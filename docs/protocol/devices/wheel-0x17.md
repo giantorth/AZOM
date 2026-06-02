@@ -126,6 +126,89 @@ Confirmed in USB capture: sent to device `0x17` at ~100×/sec with payload alway
 | send-telemetry | `FD DE` | 4 | int | Wheels with integrated display; always `00 00 00 00` in captures |
 | old-send-telemetry | `FD DE` | 4 | int | Old wheel firmware without integrated display |
 
+### Group `0x42` (66) — Live Display Data Push (firmware variant)
+
+**Observed only on the `FSR` / `RS21-D03` display wheel** (model-name `FSR`, hw-version `RS21-D03-HW FW-C`, sw-version `RS21-D03-MC FW`, hw-rev `U-V04`; box/marketing name "FSR1"). This is the **FSR V1** — a distinct, older wheel from the **FSR V2** (`W13`), which uses the standard tier-definition telemetry path; see [`../identity/known-wheel-models.md`](../identity/known-wheel-models.md). Captured in `usb-capture/fsr1/` — see [`../../../usb-capture/CAPTURES.md`](../../../usb-capture/CAPTURES.md).
+
+On this unit, group `0x42` **replaces** the usual display-telemetry path. The documented `0x41` `FD DE` enable, the `0x43`/`7D 23` bit-packed value stream, **and the entire session-`0x02` / tier-definition channel-catalog handshake are all absent**: the wheel never advertises a channel catalog (no v0 URL or v2 compact advertisement, no `7C 00` session opens, no wheel→host `0xC3` catalog frames; `0x43` carries only a 1-byte cmdid-`00` keepalive poll). Instead PitHouse pushes **pre-computed display field values** to the wheel (`0x17`) as fixed-layout records at ~28 Hz during gameplay. Because no catalog is negotiated, the layout is a firmware-baked fixed schema rather than a channel-index-driven packing.
+
+This is documented as **observed** on this firmware. The record framing and type schema are proven; per-field channel semantics are only partially decoded (see "candidate mapping" below).
+
+**Frame format** (host→wheel `0x17`):
+
+```
+7E <len> 42 17 [type] [b1] [b2] <fixed-layout data> <csum>
+```
+
+- `type` (first payload byte) selects a record with a **fixed length**. At startup PitHouse enumerates each record type once with an all-zero payload (declaration); at runtime only a subset carries live data. **14 types are observed across all captures** — `01 02 03 04 05 06 08 09 0b 0c 0d 0e 11 12`; `07 0a 0f 10` never appear (the enumeration is not a dense `0x01`–`0x12` sweep).
+- `b1` — per-type sub/validity byte: `0x00` on the zero/enumeration frame, a type-specific non-zero value when populated.
+- `b2` — stream/mode flag (type `0x02`: `00`/`20`; type `0x0E`: `00`/`80`/`c0`).
+
+**Record types** (len = total payload bytes incl. `type`/`b1`/`b2`; "live" = carries changing values in these captures):
+
+| type | len | state | b1 (populated) | b2 seen | notes |
+|------|-----|-------|----------------|---------|-------|
+| `01` | 25 | declared-only | — | 00 | zero enumeration frame |
+| `02` | 18 | **live (gameplay)** | 03 | 00, 20 | main per-frame record (layout below) |
+| `03` | 19 | declared-only | — | 00 | |
+| `04` | 23 | live | 06 | 00 | |
+| `05` | 25 | declared-only | — | 00 | |
+| `06` | 25 | live | 0c | 00 | richest dashboard — see decoded layout below |
+| `08` | 23 | declared-only | — | 00 | |
+| `09` | 24 | live | 01 | 00, 80 | |
+| `0b` | 15 | live | 00 | 00, 04 | |
+| `0c` | 18 | declared-only | — | 00 | |
+| `0d` | 25 | live | 00 | 00 | |
+| `0e` | 24 | live | 0d | 00, 80, c0 | `b2` mode flips `c0`→`80` mid-session |
+| `11` | 25 | declared-only | — | 00 | |
+| `12` | 25 | declared-only | — | 00 | |
+
+**Type `0x02` layout** (proven across 8720/8720 frames; offsets are payload-relative):
+
+```
+off:  0    1    2    3  4  5   6  7   8  9  10 11 12 13  14  15  16  17
+      02   b1   b2   00 00 00  W0 00  W1 00 W2 00 W3 00  S   F   00  G
+```
+
+- `[6] [8] [10] [12]` (`W0..W3`) — a **4-element array, equal in 100 % of frames** (e.g. all `0x1A`=26 when the engine is running, `0` idle). The companion high bytes `[7] [9] [11] [13]` are always `00`. Candidate: per-wheel channel (tyre temp/pressure).
+- `[14]` (`S`) — scalar `0..158`; rises with engine activity. Candidate: RPM / engine load.
+- `[15]` (`F`) — `0` while the RPM-LED bar (group `0x3F` `1A 00`) is dark, `75` (`0x4B`) the instant any RPM LED lights. Engine-running flag.
+- `[17]` (`G`) — small enum `0..5`; loosely rises with revs. Candidate: gear.
+
+**Candidate semantics are unproven.** They were derived only by time-aligning these fields against the group-`0x3F` RPM-LED bitmask *within the same capture* — no external ground-truth telemetry labels exist for these captures. The structure (record types, fixed lengths, the 4-element array, the `0x4B` engine flag) is proven; the exact channel identity of each numeric field is not. The other live types have **decoded field offsets/widths** (below) but still-undecoded channel semantics — "no capture = I don't know."
+
+**The active record type tracks the displayed dashboard.** The *populated* type is not global — it follows which built-in dashboard the wheel shows. `FSR1 with game` (single dashboard) emits type `02` for its entire run; `FS1 multiple changes` shifts `0e` → (`09`) → `06` as dashboards are cycled. So the field/channel set is **per-dashboard, not globally fixed** — at least two dashboards drove distinct record types (`0e` and `06`).
+
+Each dashboard's record type is a **wholly distinct fixed layout** — different length and a different per-type `b1` (`02`→`03`, `04`→`06`, `06`→`0c`, `09`→`01`, `0d`→`00`, `0e`→`0d`; constant within a type, likely a layout/field-count id) — with non-overlapping field offsets. Two anchors recur across the rich dashboards: the `0x4B` **engine-running flag** a few bytes before the end, and a small **gear enum (`0..5`) in the last data byte**. Switching dashboards changes *which* fields are sent **and how many** — they are different layouts, not the same fields rearranged.
+
+**Decoded field layouts.** Payload-relative offsets, from per-offset variance analysis over all `usb-capture/fsr1/` captures (`tools/fsr1-0x42-extract` + `tools/fsr1-field-decode`). Field **offsets and widths are proven**; **channel semantics remain unproven** (best-guess from RPM-LED correlation / field position). Bytes not listed are constant `00` padding. The plugin encodes this catalog in [`Telemetry/Fsr1DashboardCatalog.cs`](../../../Telemetry/Fsr1DashboardCatalog.cs) and exposes each field for user channel assignment.
+
+- **Type `02`** — len 18, b1 `03` (see byte map above): `[6][8][10][12]` u8 4-element wheel array (companion hi bytes `00`); `[14]` u8 scalar `0..158` (RPM/load); `[15]` engine flag (`0`/`0x4B`, also `0x7E` in some `b2=20` frames); `[16]` u8 secondary flag (`0`/`0x4B`); `[17]` u8 gear `0..5`.
+- **Type `06`** — len 25, b1 `0c` (richest): `[5]` u8 flag/high (`00`/`01`/`80`); `[6,7]` **u16-BE** primary ramp (`0..65535`); `[8]` u8; `[18]` u8 (`0..102`); `[19]` u8 (`0..92`); `[20]` u8 (`0..255`); `[21]` u8; `[22]`/`[23]` engine flag (`0x4B`); `[24]` u8 gear `0..5`.
+- **Type `0e`** — len 24, b1 `0d`: `[11]` u8 (`0..54`); `[12]` u8 (`0..32`); `[13]` u8 (`0..255`); `[14]` (`01`/`7E`); `[15]` (`0`/`1`); `[16]`/`[17]` engine flag (`0x4B`); `[23]` u8 gear `0..5`.
+- **Type `09`** — len 24, b1 `01` (sparse): `[6,7]` **u16-BE**; `[18]` u8 small enum (`0..3`); `[19]`=`01`, `[23]`=`02` constant.
+- **Type `0d`** — len 25, b1 `00`: two live 5-byte groups `[5..9]` and `[10..14]` (u8 each) + `[18]` u8 (`1..15`). Grouping undecoded.
+- **Type `04`** — len 23, b1 `06`: **static** in these captures (frozen `24`@6, `21`@15, `21`@18, `34`@19, `4B`@21) — not actively driven. **Type `0b`** (len 15, b1 `00`) likewise static (`20`@12).
+
+**Channel identification — status.** The fields are *not yet mapped to specific Telemetry.json channels*; only the type-`02` candidates above are guessed (from internal RPM-LED correlation). Findings from PitHouse (`MOZA Pit House/bin`):
+
+- The display channels are the standard `Telemetry.json` (`v1/gameData/…`) set, **but `0x42` uses a byte-aligned firmware encoding, not the tier-def bit-packing** — e.g. the type-`02` 4-wheel array is byte-sized, whereas `TyreTemp`/`TyrePressure` are `float` (32-bit) in Telemetry.json. So the channels match; the wire widths do not.
+- The FSR V1 LED/indicator preset (`default_preset_library.rcc` → `FSR-Official.json`, device `FSR`) is **LED/flag config only** and references a single telemetry channel, `CarSettings_CurrentDisplayedRPMPercent` (the RPM-bar driver on group `0x3F`). It does **not** define the `0x42` screen field layout — that mapping is firmware-baked.
+- Mapping the `0x42` fields therefore needs either binary RE of PitHouse's `0x42`-builder (exe references `Steering Wheel/FSR-Official.json`, `Protocol - FSR`; a Ghidra workflow already exists in `usb-capture/pithouse-re.md`) or a controlled capture with known telemetry. Until then, treat the type-`02` candidates as unconfirmed. Each switch coincides with a **full group `0x40` config re-sweep** (~30 config writes re-pushed, repeating ~every 2 s while the user is in the wheel/menu). **No dedicated dashboard-switch opcode was observed** (no `7C 25`, no `kind=4`, no `B8` event), and the wheel sends **nothing** about channels or dashboards on the serial bus: every wheel→host frame is either a solicited reply to a host config read/write (`0x80` ack, `0xC0`/`0xBF` group-0x40/0x3F replies, `0x8E` group-0x0E replies, `0xB2`/`0xB3` poll replies, identity replies) or an unsolicited **diagnostic log string** (group `0x0E` cmd `05xx` — `NRFloss`, `RotaryMode`, `Calib…`, `[INFO]…`). There is no catalog advertisement and no structured input-event frame (0 real `B8` frames — the 690 b2h frames containing a `0xB8` byte are all value bytes like `0bb8`=3000 in config readbacks), and nothing on the `0x42` group from the wheel (`0xC2` count = 0). The wheel *does*, however, announce its **current dashboard/page index** over serial as a `0x0E` diagnostic-log line (`Table 7 Param 6 Written: <N>`, `N`=`0..18`) on each switch — see "Dashboard switching" below. For value computation **the host owns the channel/value decision**; for dashboard *selection* either side can drive it — the **host** via a dedicated group-`0x32` cmd-`0x81` index write, the **wheel** via an HID button combo — see "Dashboard switching" below.
+
+**Dashboard switching — verified.** The wheel has **19 dashboard/page positions** (index `0..18`); the active index selects which `0x42` record type the screen renders. Either the host or the wheel can change the index, and the wheel always reports its current index on the serial bus.
+
+- **Host-initiated** (PitHouse UI; the plugin's dropdown). The host sends a dedicated **select command — group `0x32`, cmd `0x81`** — with the target index as a big-endian u32:
+  ```
+  7E 05 32 17 81 00 00 00 <index>          (index 0..18; e.g. 0x11=17)
+  reply: 7E 05 B2 71 81 00 00 00 <index>   (wheel echoes/acks)
+  ```
+  The wheel switches to that page and logs `Table 7, Param 6 Written: <index>`. **Verified 7/7** in `dashboard change through pithouse, connected to base` (no wheel HID activity in that capture; each `g32/81 <N>` write is followed ~20 ms later by the wheel adopting index `N`). PitHouse then re-pushes the `0x40` config sweep and streams the `0x42` record type that matches the new page. *(Earlier drafts of this page mislabeled group `0x32` as a read poll, and then guessed that emitting the `0x42` record type was the switch — both wrong. The `0x32/0x81` write is the selector; the `0x42` stream is just the per-page value data.)*
+- **Wheel-initiated** (button **combo**, no host command). A held modifier — **HID byte 21 bit `0x08`** — plus a direction tap — **HID byte 18 bit `0x01`/`0x04`** — on the 42-byte EP `0x83` input report. The wheel changes its own page in firmware (`0x01` = +1 wrap `18→0`, `0x04` = −1 wrap `0→18`) and reports the new index via the `0x0E` log below. The host sends **no** `g32/81` here — it follows by streaming the matching type. The structured `B8` wheel-input event used by standard display wheels (§ Group 0x43) is **absent** on this gen.
+- **Reading the active index (either path).** The wheel emits an *unsolicited* group-`0x0E` diagnostic log on every change: `[INFO]param_manage.c:340 Table 7, Param 6 Written: <N>`, `N` = absolute index `0..18`. (The `B2/81` ack carries the same value.) So a host can always recover the absolute active dashboard from the serial stream — no HID press-counting needed.
+
+`g32/81` is sent **only at switch time** — the single-dashboard gameplay run (`FSR1 with game`) contains zero `g32/81` frames; it just streams the active type. The 19 index positions map **many-to-one** onto the live record types (pages within a dashboard share a layout). Partial index→type map observed: `14`→`04`, `7`→`09`(+`0d`), `15`→`06`, `18`→`0c`, `17`→`11`(+`12`); a mid-session gameplay switch capture is needed to nail all 19. Open item: whether the `0x40` config re-sweep is strictly required on a host switch or merely habitual.
+
 ### Group `0x43` (67) — Live Telemetry Stream (write-only)
 
 Main game telemetry sent at ~17–20×/sec. See [`../telemetry/live-stream.md`](../telemetry/live-stream.md) for full packet analysis and bit-packing format.

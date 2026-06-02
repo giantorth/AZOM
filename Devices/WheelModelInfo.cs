@@ -113,6 +113,18 @@ namespace MozaPlugin.Devices
             ("W18",     "KS Pro",     new WheelModelInfo(18, 14, false, null, 5, new[] { 12, 12, 8, 12, 12 }, hasDisplay: true,  browSegmentSize: 3)),
             ("KS",      "KS",         new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
             ("W13",     "FSR V2",     new WheelModelInfo(16, 10, false, null, 0, hasDisplay: true,  browSegmentSize: 3)),  // firmware reports "W13" for FSR V2
+            // FSR V1 display wheel (box name "FSR1"): firmware reports model-name
+            // "FSR", hw "RS21-D03-HW FW-C", sw "RS21-D03-MC FW". A DISTINCT, older
+            // product from FSR V2 ("W13"). It does NOT speak the standard tier-def
+            // telemetry protocol — it renders its screen from an undocumented
+            // group-0x42 fixed-schema value push (see Telemetry/Fsr1DisplayEmitter
+            // and docs/protocol/devices/wheel-0x17.md § Group 0x42). HasDisplay=false
+            // deliberately keeps the standard dashboard pipeline, the 0x43-wrapped
+            // display probe, and the display-wedge reconnect watchdog all OFF (the
+            // wheel never answers that probe); the 0x42 sender is started instead via
+            // the explicit MozaPlugin.IsFsr1DisplayWheel bypass. The 10 RPM + 10
+            // button LEDs use the standard group-0x3F SimHub LED path unchanged.
+            ("FSR",     "FSR V1",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
             ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true)),
             ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
             // RS V2 referenced in Telemetry/EraPolicy.cs:187 but not yet measured.

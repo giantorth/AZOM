@@ -31,7 +31,9 @@ One-line definitions for jargon used throughout `docs/protocol/`. Hardware names
 | **CSP** | Moza CSP wheel — integrated display, **version 0 URL-subscription** tier defs (different from VGS/CS) |
 | **KS Pro** / **KSP** | Moza KS Pro wheel — newer firmware era (2026-04+), dynamic upload sessions |
 | **ES** | Moza ES wheel — has identity caveat (responses don't match standard pattern; see [`identity/known-wheel-models.md`](identity/known-wheel-models.md)) |
-| **RS21** | Internal product family name appearing in command DB (`rs21_parameter.db`) and identity strings (`RS21-W08-HW SM-C` etc.) |
+| **FSR V1** | First-gen Moza FSR display wheel (box name "FSR1"). Identity: model-name `FSR`, hw `RS21-D03-HW FW-C`. Uses the **group `0x42`** fixed-schema display push (no tier-def/catalog) — distinct from FSR V2. See [`devices/wheel-0x17.md`](devices/wheel-0x17.md) § Group 0x42 |
+| **FSR V2** | Newer Moza FSR display wheel — firmware reports model-name **`W13`**. Uses the standard tier-definition telemetry path (NOT group `0x42`). A different wheel from FSR V1 despite the shared "FSR" branding |
+| **RS21** | Internal product family name appearing in command DB (`rs21_parameter.db`) and identity strings (`RS21-W08-HW SM-C`, `RS21-D03` for FSR V1, etc.) |
 
 ## Other peripherals
 

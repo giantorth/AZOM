@@ -25,6 +25,41 @@ namespace MozaPlugin.Devices.WheelUi
         public int PackageLevel { get; set; }
         public string Compression { get; set; } = "";
 
+        // ── FSR V1 dashboard-field rows (group-0x42) ────────────────────
+        // Set by ChannelMappingRowFactory.BuildFromFsr1Catalog. When IsFsr1 is
+        // true the row maps a fixed dashboard FIELD (RecordKey + FieldId) rather
+        // than a tier-def channel URL, and carries a scale (InMin..InMax mapped to
+        // the field's full-scale capability shown by CapabilityText).
+        public bool IsFsr1 { get; set; }
+        public string RecordKey { get; set; } = "";
+        public string FieldId { get; set; } = "";
+        /// <summary>Human-readable field output capability, e.g. "0–255".</summary>
+        public string CapabilityText { get; set; } = "";
+
+        private double _inMin;
+        public double InMin
+        {
+            get => _inMin;
+            set
+            {
+                if (_inMin.Equals(value)) return;
+                _inMin = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InMin)));
+            }
+        }
+
+        private double _inMax = 1;
+        public double InMax
+        {
+            get => _inMax;
+            set
+            {
+                if (_inMax.Equals(value)) return;
+                _inMax = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InMax)));
+            }
+        }
+
         private string _simHubProperty = "";
         public string SimHubProperty
         {

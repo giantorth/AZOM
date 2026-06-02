@@ -35,12 +35,56 @@ namespace MozaPlugin.Devices.WheelUi
             // Snapshot the SimHub property list once so all rows share the same
             // backing list (avoids N copies of a 500-entry list).
             var props = plugin.GetAllSimHubPropertyNames();
+
+            // FSR V1 renders fixed-schema group-0x42 dashboards, not tier-def
+            // channels — map its built-in dashboard FIELDS from the catalog.
+            if (plugin.IsFsr1DisplayWheel)
+                return BuildFromFsr1Catalog(plugin, props);
+
             var profile = plugin.TelemetrySender?.Profile;
 
             if (profile == null || profile.Tiers.Count == 0)
                 return BuildFromCatalog(plugin, props);
 
             return BuildFromProfile(profile, props);
+        }
+
+        /// <summary>
+        /// Build rows for the FSR V1's built-in dashboards (group-0x42 record types),
+        /// grouped by dashboard. One row per user-mappable field; engine-flag anchor
+        /// fields are protocol-filled and omitted. Each row carries the field's
+        /// current mapping (user override or catalog default) + input scale range.
+        /// </summary>
+        private static BuildResult BuildFromFsr1Catalog(MozaPlugin plugin, IReadOnlyList<string> props)
+        {
+            var rows = new List<ChannelMappingRow>();
+            foreach (var dash in Telemetry.Fsr1DashboardCatalog.LiveDashboards)
+            {
+                foreach (var f in dash.Fields)
+                {
+                    if (!f.IsUserMappable) continue;
+                    var m = plugin.GetFsr1FieldMapping(dash.Key, f.FieldId);
+                    bool direct = f.Kind == Telemetry.Fsr1FieldKind.Direct;
+                    rows.Add(new ChannelMappingRow
+                    {
+                        AllProperties = props,
+                        IsFsr1 = true,
+                        RecordKey = dash.Key,
+                        FieldId = f.FieldId,
+                        Name = $"{dash.Label} · {f.Label}" + (f.Decoded ? "" : "  (raw)"),
+                        Url = dash.Key + "/" + f.FieldId,
+                        Compression = f.Encoding.ToString(),
+                        CapabilityText = direct ? "direct value" : $"0–{f.OutputMax}",
+                        InMin = m?.InMin ?? f.DefaultInMin,
+                        InMax = m?.InMax ?? f.DefaultInMax,
+                        SimHubProperty = m?.Property ?? f.DefaultProperty,
+                    });
+                }
+            }
+            string status = rows.Count == 0
+                ? "(FSR V1: no mappable dashboard fields)"
+                : $"(FSR V1: {rows.Count} dashboard fields across built-in dashboards)";
+            return new BuildResult(rows, status);
         }
 
         private static BuildResult BuildFromCatalog(MozaPlugin plugin, IReadOnlyList<string> props)

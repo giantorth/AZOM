@@ -813,7 +813,12 @@ skipReadByMode:
                 // show it; unknown models defer to the runtime IsDisplayDetected probe.
                 // A CM2 behind the base owns the dashboard UI on its own device
                 // page, so hide it here; displayed wheels keep it.
-                bool showTelemetry = newWheel && (_plugin?.ShouldDriveDashboard() ?? false)
+                // FSR V1 drives its screen via the group-0x42 push, not the tier-def
+                // pipeline, so ShouldDriveDashboard() is false for it — but it still has
+                // a Dashboard tab (the per-field channel mapper). Show it explicitly.
+                bool showTelemetry = newWheel
+                                     && ((_plugin?.ShouldDriveDashboard() ?? false)
+                                         || (_plugin?.IsFsr1DisplayWheel ?? false))
                                      && !(_plugin?.IsCm2BehindBaseCandidate ?? false);
                 bool showButtonsTab = newWheel && (modelInfoForTabs?.ButtonLedCount ?? 0) > 0;
                 bool showKnobsTab = newWheel && (modelInfoForTabs?.KnobCount ?? 0) > 0;

@@ -281,6 +281,37 @@
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
                                         </ListBox>
+
+                                        <!-- FSR V1 only: per-field input scaling. The
+                                             source value between Min and Max maps onto the
+                                             field's full-scale output (CapabilityText). -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                                    Visibility="{Binding IsFsr1,
+                                                                Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="Input min" VerticalAlignment="Center"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <TextBox Text="{Binding InMin, Mode=TwoWay,
+                                                           UpdateSourceTrigger=LostFocus}"
+                                                     Width="70" Margin="6,0,0,0" Padding="6,3"
+                                                     Foreground="{DynamicResource TextBrush}"
+                                                     Background="{DynamicResource BgDeepBrush}"
+                                                     BorderBrush="{DynamicResource BorderBrush}"
+                                                     BorderThickness="1"/>
+                                            <TextBlock Text="Input max" VerticalAlignment="Center"
+                                                       Margin="12,0,0,0"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <TextBox Text="{Binding InMax, Mode=TwoWay,
+                                                           UpdateSourceTrigger=LostFocus}"
+                                                     Width="70" Margin="6,0,0,0" Padding="6,3"
+                                                     Foreground="{DynamicResource TextBrush}"
+                                                     Background="{DynamicResource BgDeepBrush}"
+                                                     BorderBrush="{DynamicResource BorderBrush}"
+                                                     BorderThickness="1"/>
+                                            <TextBlock Text="{Binding CapabilityText, StringFormat='→ {0}'}"
+                                                       VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       FontFamily="{DynamicResource FontMono}"
+                                                       Foreground="{DynamicResource TextDimBrush}"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

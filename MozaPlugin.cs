@@ -550,6 +550,20 @@ namespace MozaPlugin
         /// currently-detected wheel. Trusts <see cref="Devices.WheelModelInfo.HasDisplay"/>
         /// when known; falls back to the probe result for unknown models.
         /// </summary>
+        /// <summary>
+        /// True when the detected wheel is the FSR V1 display wheel (box "FSR1";
+        /// firmware model-name "FSR", hw-version "RS21-D03-*"). This wheel does not
+        /// speak the standard tier-definition telemetry protocol — its screen is
+        /// driven by the group-0x42 fixed-schema value push instead. Keyed primarily
+        /// on the hw-version (most specific; distinguishes it from FSR V2 "W13"),
+        /// with the model-name as corroboration. Used to (a) bypass the standard
+        /// display-probe gates in StartTelemetryIfReady and (b) put TelemetrySender
+        /// into <see cref="Telemetry.TelemetrySender.Fsr1Mode"/>.
+        /// </summary>
+        internal bool IsFsr1DisplayWheel =>
+            (_data?.WheelHwVersion?.StartsWith("RS21-D03", StringComparison.OrdinalIgnoreCase) ?? false)
+            || string.Equals(_data?.WheelModelName, "FSR", StringComparison.OrdinalIgnoreCase);
+
         internal bool ShouldDriveDashboard()
         {
             // CM2 on the wheelbase bus drives a dashboard even on a screenless wheel.
@@ -3421,6 +3435,12 @@ namespace MozaPlugin
                     text = $"<{data.Length - 3} bytes>";
                 }
                 _firmwareDebugLog.Record(rawDeviceId, text);
+                // FSR V1 reports its current dashboard/page index via this log on
+                // every switch (incl. wheel-side HID combo): "Table 7, Param 6
+                // Written: <N>". Parse it so the plugin follows wheel-initiated
+                // switches. See docs/protocol/devices/wheel-0x17.md § Group 0x42.
+                if (rawDeviceId == 0x71 && IsFsr1DisplayWheel)
+                    TryFollowFsr1DashboardLog(text);
                 MozaLog.Debug(
                     $"[Moza] firmware-debug src={(rawDeviceId == 0x21 ? "main" : rawDeviceId == 0x71 ? "wheel" : rawDeviceId == 0xB1 ? "display" : $"0x{rawDeviceId:X2}")}: {text}");
                 return;
@@ -4096,6 +4116,150 @@ namespace MozaPlugin
                 profile.TelemetryChannelMappings[g.Value] = m;
             }
             return m;
+        }
+
+        // ── FSR V1 (group-0x42) dashboard field mappings ────────────────────
+        // Mirror the channel-mapping helpers above but for the FSR V1's fixed-schema
+        // dashboard fields (keyed by record-type + field id, value carries scaling).
+
+        /// <summary>Active profile × current wheel page FSR1 field mappings, or null.</summary>
+        internal System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, Fsr1FieldMapping>>? GetActiveFsr1Mappings()
+        {
+            var profile = _settings?.ProfileStore?.CurrentProfile;
+            if (profile?.Fsr1DashboardMappings == null) return null;
+            var g = GetCurrentWheelPageGuid();
+            if (!g.HasValue) return null;
+            return profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var m) ? m : null;
+        }
+
+        /// <summary>Resolve one FSR1 field's user mapping, or null to use the catalog default.</summary>
+        internal Fsr1FieldMapping? GetFsr1FieldMapping(string recordKey, string fieldId)
+        {
+            if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return null;
+            var m = GetActiveFsr1Mappings();
+            if (m == null) return null;
+            return m.TryGetValue(recordKey, out var inner)
+                && inner.TryGetValue(fieldId, out var fm) ? fm : null;
+        }
+
+        /// <summary>
+        /// Persist (or clear) an FSR1 dashboard field assignment. Empty
+        /// <paramref name="property"/> removes the override (field reverts to the
+        /// catalog default). Tidies empty dicts and saves settings.
+        /// </summary>
+        internal void SetFsr1FieldMapping(string recordKey, string fieldId, string property, double inMin, double inMax)
+        {
+            if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return;
+            var profile = _settings?.ProfileStore?.CurrentProfile;
+            if (profile == null) return;
+            if (profile.Fsr1DashboardMappings == null)
+                profile.Fsr1DashboardMappings = new System.Collections.Generic.Dictionary<Guid, System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, Fsr1FieldMapping>>>();
+            var g = GetCurrentWheelPageGuid();
+            if (!g.HasValue) return;
+
+            if (!profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var middle) || middle == null)
+            {
+                middle = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, Fsr1FieldMapping>>(StringComparer.OrdinalIgnoreCase);
+                profile.Fsr1DashboardMappings[g.Value] = middle;
+            }
+            if (!middle.TryGetValue(recordKey, out var inner) || inner == null)
+            {
+                inner = new System.Collections.Generic.Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
+                middle[recordKey] = inner;
+            }
+
+            string trimmed = (property ?? "").Trim();
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                inner.Remove(fieldId);
+                if (inner.Count == 0) middle.Remove(recordKey);
+                if (middle.Count == 0) profile.Fsr1DashboardMappings.Remove(g.Value);
+            }
+            else
+            {
+                inner[fieldId] = new Fsr1FieldMapping { Property = trimmed, InMin = inMin, InMax = inMax };
+            }
+
+            SaveSettings();
+        }
+
+        // ── FSR V1 active dashboard/page index (0..18) ──────────────────────
+        // The FSR V1 has 19 built-in dashboard positions. The plugin switches the
+        // wheel by sending the group-0x32 cmd-0x81 index write; the wheel can also
+        // switch itself (HID button combo) and reports the new index via its
+        // 0x0E "Table 7 Param 6 Written: N" log, which we parse to follow it.
+
+        /// <summary>Raised when the active FSR1 dashboard index changes (either the
+        /// user picked it or the wheel reported a self-switch). UI re-selects.</summary>
+        internal event EventHandler? Fsr1ActiveIndexChanged;
+
+        // Set when the USER selects a dashboard; drained by TelemetrySender which
+        // emits the group-0x32/0x81 select command on the next tick. -1 = nothing
+        // pending. Wheel-reported (self-switch) updates do NOT set this.
+        private int _fsr1PendingSelect = -1;
+
+        /// <summary>Current FSR1 active dashboard index (0..18), default 0.</summary>
+        internal int GetActiveFsr1Index()
+        {
+            var g = GetCurrentWheelPageGuid();
+            if (g.HasValue && _settings?.Fsr1ActiveDashboardByWheelGuid != null
+                && _settings.Fsr1ActiveDashboardByWheelGuid.TryGetValue(g.Value, out var i))
+                return i;
+            return 0;
+        }
+
+        /// <summary>
+        /// Set the active FSR1 dashboard index. <paramref name="sendToWheel"/> true
+        /// (user/dropdown) queues the group-0x32/0x81 select command for the sender to
+        /// emit; false (wheel self-switch, parsed from the Param 6 log) just records
+        /// it. Persists per-wheel and raises <see cref="Fsr1ActiveIndexChanged"/>.
+        /// </summary>
+        internal void SetActiveFsr1Index(int index, bool sendToWheel)
+        {
+            if (index < 0) index = 0;
+            if (index > Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex)
+                index = Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex;
+            var g = GetCurrentWheelPageGuid();
+            if (g.HasValue && _settings != null)
+            {
+                if (_settings.Fsr1ActiveDashboardByWheelGuid == null)
+                    _settings.Fsr1ActiveDashboardByWheelGuid = new System.Collections.Generic.Dictionary<Guid, int>();
+                bool changed = !_settings.Fsr1ActiveDashboardByWheelGuid.TryGetValue(g.Value, out var prev) || prev != index;
+                _settings.Fsr1ActiveDashboardByWheelGuid[g.Value] = index;
+                if (changed && !sendToWheel) SaveSettings(); // host path saves after queuing below
+            }
+            if (sendToWheel)
+            {
+                Interlocked.Exchange(ref _fsr1PendingSelect, index);
+                SaveSettings();
+            }
+            try { Fsr1ActiveIndexChanged?.Invoke(this, EventArgs.Empty); } catch { }
+        }
+
+        /// <summary>Sender drains the pending user-select index (or -1). One-shot.</summary>
+        internal int TakePendingFsr1Select() => Interlocked.Exchange(ref _fsr1PendingSelect, -1);
+
+        /// <summary>Record a wheel-reported active index parsed from the Param 6 log
+        /// (wheel self-switch); follows without re-commanding the wheel.</summary>
+        internal void NoteFsr1WheelIndex(int index)
+        {
+            if (index == GetActiveFsr1Index()) return;
+            SetActiveFsr1Index(index, sendToWheel: false);
+        }
+
+        // Match "Table 7, Param 6 Written: <N>" in an FSR1 firmware-debug log line
+        // and follow the reported dashboard index. Tolerant of surrounding text.
+        private static readonly System.Text.RegularExpressions.Regex _fsr1DashLogRe =
+            new System.Text.RegularExpressions.Regex(
+                @"Table\s*7,\s*Param\s*6\s*Written:\s*(\d+)",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private void TryFollowFsr1DashboardLog(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            var m = _fsr1DashLogRe.Match(text);
+            if (m.Success && int.TryParse(m.Groups[1].Value, out int idx))
+                NoteFsr1WheelIndex(idx);
         }
 
         /// <summary>

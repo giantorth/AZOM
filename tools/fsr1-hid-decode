@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""FSR V1 USB-HID input-report decoder.
+
+The FSR V1's dashboard-cycle (and other) buttons ride USB HID, NOT the bulk
+MOZA serial bus — so tools/pcap_to_jsonl.py (bulk only) shows nothing for
+wheel-side input. This reads the interrupt (HID) transfers straight from the
+pcapng via tshark and reports, per report-byte:
+  - distinct value count + values for the discrete bytes (buttons / mode),
+  - a transition timeline so momentary presses vs persistent state are obvious.
+
+Finding (see docs/protocol/devices/wheel-0x17.md § Group 0x42):
+  byte 18 bit 0x01 / 0x04 = dashboard cycle buttons (next / prev).
+
+Usage:
+  tools/fsr1-hid-decode "usb-capture/fsr1/Manual dashboard change - Pithouse closed.pcapng" [--timeline 18]
+"""
+import subprocess
+import sys
+
+
+def reports(pcap):
+    """Yield (time_epoch, bytes) for each interrupt HID input report."""
+    out = subprocess.run(
+        ["tshark", "-r", pcap, "-Y", "usb.transfer_type==0x01",
+         "-T", "fields", "-e", "frame.time_epoch", "-e", "usbhid.data"],
+        capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        p = line.split("\t")
+        if len(p) < 2 or not p[1]:
+            continue
+        try:
+            yield float(p[0]), bytes.fromhex(p[1])
+        except ValueError:
+            continue
+
+
+def main():
+    args = sys.argv[1:]
+    timeline_byte = None
+    if "--timeline" in args:
+        i = args.index("--timeline")
+        timeline_byte = int(args[i + 1])
+        del args[i:i + 2]
+    if not args:
+        print(__doc__)
+        sys.exit(1)
+    pcap = args[0]
+
+    rows = list(reports(pcap))
+    if not rows:
+        print("no HID reports found", file=sys.stderr)
+        sys.exit(1)
+    # most common report length (mixed lengths happen on some endpoints)
+    from collections import Counter
+    ln = Counter(len(b) for _, b in rows).most_common(1)[0][0]
+    rows = [(t, b) for t, b in rows if len(b) == ln]
+    print(f"{len(rows)} reports of {ln} bytes  ({pcap})")
+
+    print("\nDiscrete bytes (2..12 distinct — buttons / mode selectors):")
+    for i in range(ln):
+        d = sorted({b[i] for _, b in rows})
+        if 2 <= len(d) <= 12:
+            print(f"  byte[{i}]: {len(d)} distinct {[f'{v:02x}' for v in d]}")
+
+    if timeline_byte is not None:
+        print(f"\nTransition timeline for byte[{timeline_byte}]:")
+        t0 = rows[0][0]
+        prev = None
+        for t, b in rows:
+            v = b[timeline_byte]
+            if v != prev:
+                print(f"  {t - t0:7.2f}  {v:02x}")
+                prev = v
+
+
+if __name__ == "__main__":
+    main()

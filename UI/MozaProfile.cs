@@ -119,6 +119,23 @@ namespace MozaPlugin
     /// (matching the on-wire single-byte payload range). Stored per-profile so a
     /// user can save game-specific feel presets alongside wheelbase FFB tuning.
     /// </summary>
+    /// <summary>
+    /// One user assignment of a SimHub property to an FSR V1 dashboard field, with
+    /// the source input range mapped onto the field's full-scale output capability.
+    /// </summary>
+    public sealed class Fsr1FieldMapping
+    {
+        /// <summary>SimHub property path (empty = unmapped → field sends 0).</summary>
+        public string Property { get; set; } = "";
+        /// <summary>Source value mapped to the field's minimum (0).</summary>
+        public double InMin { get; set; } = 0;
+        /// <summary>Source value mapped to the field's full-scale output.</summary>
+        public double InMax { get; set; } = 1;
+
+        public Fsr1FieldMapping Clone() =>
+            new Fsr1FieldMapping { Property = Property, InMin = InMin, InMax = InMax };
+    }
+
     public sealed class Ab9Settings
     {
         public Ab9Mode Mode { get; set; } = Ab9Mode.SevenPlusR_L1;
@@ -341,6 +358,17 @@ namespace MozaPlugin
         public Dictionary<Guid, Dictionary<string, Dictionary<string, string>>> TelemetryChannelMappings { get; set; }
             = new Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>();
 
+        // ===== FSR V1 group-0x42 dashboard field mappings =====
+        // The FSR V1 display wheel renders fixed-schema records, not tier-def
+        // channels, so its per-field assignments need their own store (each value
+        // carries an input range for scaling — see Fsr1FieldMapping).
+        // Outer key  = wheel page DescriptorUniqueId GUID
+        // Middle key = record-type key (Fsr1DashboardCatalog.Key, e.g. "type-02")
+        // Inner key  = field id (Fsr1FieldDef.FieldId, e.g. "rpmBar")
+        // Absent entry = use the catalog default for that field.
+        public Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>> Fsr1DashboardMappings { get; set; }
+            = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
+
         // ===== Wheelbase ambient LED (per-profile) =====
         // Moved out of MozaPluginSettings 2026-05-14 so each game can pick its own
         // ambient palette. -1 sentinel = "leave the persisted base value alone".
@@ -472,6 +500,26 @@ namespace MozaPlugin
                         middle[dash.Key] = new Dictionary<string, string>(dash.Value, StringComparer.OrdinalIgnoreCase);
                     }
                     TelemetryChannelMappings[kvp.Key] = middle;
+                }
+            }
+
+            // FSR V1 dashboard field mappings (deep clone)
+            Fsr1DashboardMappings = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
+            if (p.Fsr1DashboardMappings != null)
+            {
+                foreach (var kvp in p.Fsr1DashboardMappings)
+                {
+                    if (kvp.Value == null) continue;
+                    var middle = new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var rec in kvp.Value)
+                    {
+                        if (rec.Value == null) continue;
+                        var inner = new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var fld in rec.Value)
+                            if (fld.Value != null) inner[fld.Key] = fld.Value.Clone();
+                        middle[rec.Key] = inner;
+                    }
+                    Fsr1DashboardMappings[kvp.Key] = middle;
                 }
             }
 

@@ -4,10 +4,12 @@
 > (`package_level` semantics, flag-byte mapping, end-to-end channel
 > example). This page covers how the plugin builds and sends tier defs.
 
-Encoding selection is driven by the wheel-era policy, not a user "Protocol version" setting. `EraPolicy` (`Telemetry/Era/EraPolicy.cs`) resolves a `TierDefEncoding` and a `TierDefSessionPolicy` from the per-wheel-page `MozaWheelEra` (Auto resolves via `EraPolicy.GuessFromWheelModel`):
+Encoding selection is driven by the wheel-era policy, not a user "Protocol version" setting. `EraPolicy` (`Telemetry/Era/EraPolicy.cs`) resolves a `TierDefEncoding` from the per-wheel-page `MozaWheelEra` (Auto resolves via `EraPolicy.GuessFromWheelModel`):
 
-- **V2Compact / V2Type02**: compact numeric tier definitions via `TierDefinitionBuilder.BuildTierDefinitionMessage()`. The tier-def session and flag byte come from `TierDefSessionPolicy` (FlagByte vs MgmtPort).
+- **V2Type02**: compact numeric tier definitions via `TierDefinitionBuilder.BuildTierDefinitionMessage()`.
 - **V0Url**: URL subscription via `TierDefinitionBuilder.BuildV0UrlSubscription()`. Double-sent (once at startup, once after preamble) to match PitHouse.
+
+The tier-def **session is resolved dynamically**, independent of era: `TelemetrySender.ResolveTierDefSession()` emits the tier-def on whichever session currently carries the wheel's real catalog + END marker (`ChannelCatalogParser.HasRealCatalogOnSession`) — management `0x01` or telemetry `0x02` — defaulting to `0x01` until a catalog appears. FF-init records, dashboard-switch (kind=4), and property pushes ride the **mirror** session (`ResolveFfSession()`, the opposite of the tier-def session). The flag byte for value frames is 0x00-based, not session-port-based.
 
 (The earlier `TelemetryProtocolVersion` and `FlagByteMode` settings were removed in favour of this era policy.)
 

@@ -1129,6 +1129,20 @@ namespace MozaPlugin.Telemetry
 
         private volatile int _framesSent;
         public int FramesSent => _framesSent;
+
+        /// <summary>
+        /// When true, <see cref="Start"/> drives the FSR V1 group-0x42 fixed-schema
+        /// display push instead of the standard session/tier-def pipeline (set by
+        /// the FSR1 bypass in <see cref="Dashboard.DashboardBindingCoordinator.StartTelemetryIfReady"/>).
+        /// See <see cref="Fsr1DisplayEmitter"/>.
+        /// </summary>
+        public volatile bool Fsr1Mode;
+
+        // FSR V1 0x42 push cadence. Capture shows ~28.5 Hz; 35 ms ≈ 28.6 Hz.
+        private const double Fsr1TickIntervalMs = 35.0;
+        // Low-rate cadence for the shared/secondary records (e.g. 0d) and any
+        // not-yet-mapped page primaries, streamed alongside the active primary.
+        private const double Fsr1SecondaryHz = 3.0;
         /// <summary>True between Start() and Stop(). Exposed for diagnostics panel.
         /// Preserves the prior `_enabled` boolean's external semantics — anything
         /// other than Idle counts as "running".</summary>
@@ -1381,6 +1395,15 @@ namespace MozaPlugin.Telemetry
 
         private void StartInner(CancellationToken cancel)
         {
+            // FSR V1 (group-0x42 display push): no session handshake, no preamble,
+            // no tier-def, no silence gate — the wheel renders straight from the
+            // 0x42 value stream. Branch out before any of the standard machinery.
+            if (Fsr1Mode)
+            {
+                StartFsr1();
+                return;
+            }
+
             // Capture pre-Stop state. We need TWO things from
             // _silenceGate.LastStopUtcTicks BEFORE the Stop() call below
             // resets it to the current time:
@@ -1650,6 +1673,145 @@ namespace MozaPlugin.Telemetry
             _sendTimer.Start();
             TransitionTo(TelemetryState.Preamble, "StartInner: timer started");
         }
+
+        /// <summary>
+        /// FSR V1 startup: tear down any prior state, send the group-0x42
+        /// declaration sweep once, then arm the tick timer straight into Active so
+        /// <see cref="TickFsr1"/> streams the live records. No sessions, no preamble,
+        /// no catalog — this wheel does not speak the tier-def protocol. See
+        /// <see cref="Fsr1DisplayEmitter"/> and docs/protocol/devices/wheel-0x17.md
+        /// § Group 0x42.
+        /// </summary>
+        private void StartFsr1()
+        {
+            // Clean teardown of any previous timer/state (idempotent). Stop()'s
+            // CloseHostSessions early-returns for this wheel (HasDisplay=false), so
+            // no spurious session-close frames are sent.
+            Stop();
+
+            MozaLog.Info("[Moza] FSR V1 detected — starting group-0x42 display push " +
+                         "(no tier-def pipeline)");
+
+            InitTickStateAndTransitionToStarting();
+
+            // One-shot declaration sweep: enumerate every observed record type once
+            // with an all-zero payload, exactly as PitHouse does at startup.
+            foreach (var frame in Fsr1DisplayEmitter.DeclarationSweep)
+                _connection.Send(frame);
+
+            _sendTimer = new Timer(Fsr1TickIntervalMs) { AutoReset = true };
+            _sendTimer.Elapsed += OnTimerElapsed;
+            _sendTimer.Start();
+            TransitionTo(TelemetryState.Active, "FSR1: 0x42 display push started");
+        }
+
+        /// <summary>
+        /// FSR V1 per-tick emission (~28 Hz): live-mapped type-02 main record,
+        /// best-effort coverage of the other observed live record types at
+        /// <see cref="Fsr1NonMainHz"/>, and the 0x43 keepalive at ~1 Hz. Each record
+        /// type uses its own latest-wins stream slot. Replaces the entire standard
+        /// steady-state tick when <see cref="Fsr1Mode"/> is set.
+        /// </summary>
+        private void TickFsr1()
+        {
+            int oneHzEvery = Math.Max(1, (int)Math.Round(1000.0 / Fsr1TickIntervalMs));
+
+            // Telemetry disabled by profile: keepalive only, so the wheel stays
+            // engaged but receives no display values.
+            if (!_profileTelemetryEnabled)
+            {
+                if (_tickCounter % oneHzEvery == 0)
+                    _connection.SendStream(StreamKind.Enable, Fsr1DisplayEmitter.Keepalive43);
+                _tickCounter++;
+                return;
+            }
+
+            var data = _latestGameData;
+            bool engineRunning = (data?.Rpms ?? 0.0) > 1.0;
+            var plugin = MozaPlugin.Instance;
+            var resolve = PropertyResolver;
+
+            // Host-initiated dashboard switch: when the user picks a dashboard, the
+            // plugin queues the target index; emit the verified group-0x32/0x81
+            // select command (the wheel switches its displayed page). Wheel-initiated
+            // switches don't queue anything here — they're parsed from the wheel's
+            // Param-6 log and only update our tracked index.
+            int pending = plugin?.TakePendingFsr1Select() ?? -1;
+            if (pending >= 0)
+                _connection.Send(Fsr1DisplayEmitter.BuildSelect(pending));
+
+            long ValueFor(Fsr1Dashboard dash, Fsr1FieldDef f)
+            {
+                if (f.Kind == Fsr1FieldKind.EngineFlag)
+                    return engineRunning ? Fsr1DisplayEmitter.EngineFlagValue : 0;
+
+                var m = plugin?.GetFsr1FieldMapping(dash.Key, f.FieldId);
+                string prop = m?.Property ?? f.DefaultProperty;
+                if (string.IsNullOrEmpty(prop)) return 0;
+
+                double raw = resolve != null ? resolve(prop) : 0.0;
+                long outMax = f.OutputMax;
+                if (f.Kind == Fsr1FieldKind.Direct)
+                    return ClampL((long)Math.Round(raw), 0, outMax);
+
+                double inMin = m != null ? m.InMin : f.DefaultInMin;
+                double inMax = m != null ? m.InMax : f.DefaultInMax;
+                double span = inMax - inMin;
+                double t = span > 0 ? (raw - inMin) / span : 0.0;
+                if (t < 0) t = 0; else if (t > 1) t = 1;
+                return ClampL((long)Math.Round(t * outMax), 0, outMax);
+            }
+
+            // Send ALL the channels, the way PitHouse does: the active page's
+            // PRIMARY record type at full rate, plus every other field-bearing record
+            // (the shared low-rate records like 0d, and any not-yet-mapped page
+            // primaries) at a lower rate. Nothing is dropped. The active page is
+            // tracked from our own selects + the wheel's Param-6 log; on a page change
+            // we re-send the primary's declaration (mirroring PitHouse). If the active
+            // page's primary isn't decoded yet, every record streams at full rate so
+            // the (unknown) primary still updates promptly.
+            int activeIdx = plugin?.GetActiveFsr1Index() ?? 0;
+            var primary = Fsr1DashboardCatalog.ByIndex(activeIdx);
+            byte primaryType = primary?.RecordType ?? 0xFF;
+            int secondaryEvery = Math.Max(1, (int)Math.Round(1000.0 / Fsr1TickIntervalMs / Fsr1SecondaryHz));
+
+            if (primary != null && activeIdx != _fsr1LastStreamedIndex)
+            {
+                _fsr1LastStreamedIndex = activeIdx;
+                _connection.Send(Fsr1DisplayEmitter.BuildDeclaration(primary));
+            }
+            else if (primary == null)
+            {
+                _fsr1LastStreamedIndex = -1; // re-declare when a known page is next selected
+            }
+
+            var live = Fsr1DashboardCatalog.LiveDashboards;
+            for (int slot = 0; slot < live.Length; slot++)
+            {
+                var dash = live[slot];
+                if (dash.Fields.Length == 0) continue;          // no decoded channels
+                bool isPrimary = primary != null && dash.RecordType == primaryType;
+                // Primary every tick; others at the low secondary rate. When the
+                // primary is unknown, treat every record as full-rate.
+                bool emit = isPrimary || primary == null || (_tickCounter % secondaryEvery == 0);
+                if (!emit) continue;
+                _connection.SendStream(
+                    (StreamKind)((int)StreamKind.TierDash0 + slot),
+                    Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f)));
+            }
+
+            // 0x43 keepalive ~1 Hz.
+            if (_tickCounter % oneHzEvery == 0)
+                _connection.SendStream(StreamKind.Enable, Fsr1DisplayEmitter.Keepalive43);
+
+            _framesSent++;
+            _tickCounter++;
+        }
+
+        // Last FSR1 page index whose record type we streamed, to re-declare on change.
+        private int _fsr1LastStreamedIndex = -1;
+
+        private static long ClampL(long v, long lo, long hi) => v < lo ? lo : (v > hi ? hi : v);
 
         /// <summary>
         /// Close sessions 0x01/0x02/0x03 (host-owned) on shutdown. Wheel-owned
@@ -3306,6 +3468,19 @@ namespace MozaPlugin.Telemetry
                 // so a connection that keeps dropping+reconnecting+restarting
                 // eventually parks instead of looping forever.
                 try { _recovery.Reset(clearFlapHistory: false); } catch { }
+
+                // FSR1: a USB re-enumerate that didn't trigger a full wheel
+                // redetect still loses the wheel's declared 0x42 record set —
+                // re-send the declaration sweep so live records are accepted again.
+                if (Fsr1Mode && _state != TelemetryState.Idle)
+                {
+                    try
+                    {
+                        foreach (var frame in Fsr1DisplayEmitter.DeclarationSweep)
+                            _connection.Send(frame);
+                    }
+                    catch { }
+                }
             }
 
             if (_state == TelemetryState.Idle || !currentlyConnected)
@@ -3313,6 +3488,15 @@ namespace MozaPlugin.Telemetry
 
             try
             {
+                // FSR V1: the group-0x42 display push replaces the entire standard
+                // steady-state tick (no catalog, tier-def, sessions, or 0x41/0x43
+                // value stream). Handle and return before any of that runs.
+                if (Fsr1Mode)
+                {
+                    TickFsr1();
+                    return;
+                }
+
                 // Preamble: ~1 second of heartbeats while the wheel acks our
                 // session opens and pushes its initial catalog + state. No
                 // telemetry, no value frames; once the tick countdown elapses

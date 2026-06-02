@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""FSR V1 group-0x42 record-layout field decoder.
+
+For each live record type, reports per-payload-offset variance so field
+boundaries, widths and which bytes are live vs constant padding become visible:
+
+  - n distinct values, min, max, a few sample values, "CONST" flag
+  - u16 BE/LE interpretation of adjacent varying pairs (range), to spot 16-bit fields
+  - per-capture populated-frame counts (high distinct => telemetry-driven => decodable)
+
+Run AFTER regenerating JSONL:
+  for f in usb-capture/fsr1/*.pcapng; do \
+    python3 tools/pcap_to_jsonl.py "$f" "/tmp/fsr1/$(basename "$f" .pcapng | tr ' ' _ | tr -d '.,').jsonl"; done
+  python3 tools/fsr1-field-decode [/tmp/fsr1] [--type 06]
+
+Decode method mirrors the type-02 decode (docs/protocol/devices/wheel-0x17.md
+§ Group 0x42): a byte that varies with engine activity is a live field; constant
+bytes are padding/anchors. Honour "no capture = I don't know": offsets that stay
+ambiguous remain raw slots in the catalog.
+"""
+import json
+import sys
+import collections
+from pathlib import Path
+
+WHEEL = 0x17
+HEADER = 3  # type, b1, b2 occupy payload offsets 0,1,2
+
+
+def g42_frames(path):
+    """Yield payload bytes of every host->0x17 group-0x42 frame."""
+    for line in path.open():
+        rec = json.loads(line)
+        if rec.get("dir") != "h2b":
+            continue
+        h = bytes.fromhex(rec["hex"])
+        if len(h) < 5 or h[0] != 0x7E or h[2] != 0x42 or h[3] != WHEEL:
+            continue
+        ln = h[1]
+        yield h[4:4 + ln]
+
+
+def is_populated(pl):
+    """Live (non-declaration) frame: b1 set OR any data byte nonzero."""
+    if len(pl) < HEADER:
+        return False
+    return pl[1] != 0 or any(pl[HEADER:])
+
+
+def analyze_type(payloads, ty):
+    """payloads: list of populated payload byte-strings for one type."""
+    if not payloads:
+        return
+    ln = len(payloads[0])
+    print(f"\n  -- type {ty:02x}  len={ln}  populated={len(payloads)} --")
+    # per-offset stats
+    cols = list(range(HEADER, ln))
+    stats = {}
+    for off in cols:
+        vals = [pl[off] for pl in payloads if len(pl) > off]
+        distinct = sorted(set(vals))
+        stats[off] = (len(distinct), min(vals), max(vals), distinct)
+    # single-byte report
+    for off in cols:
+        nd, lo, hi, distinct = stats[off]
+        tag = "CONST" if nd == 1 else ("live " if nd > 4 else "      ")
+        sample = " ".join(f"{v:02x}" for v in distinct[:8])
+        more = f" (+{nd-8})" if nd > 8 else ""
+        print(f"     off {off:2d} (payload[{off}]): {tag} n={nd:4d} "
+              f"min={lo:3d} max={hi:3d}  vals[{sample}{more}]")
+    # adjacent-pair u16 interpretation for runs of varying bytes
+    print("     u16 pairs (BE/LE range over populated frames):")
+    for off in cols[:-1]:
+        nd0 = stats[off][0]
+        nd1 = stats[off + 1][0]
+        if nd0 == 1 and nd1 == 1:
+            continue
+        be = [ (pl[off] << 8) | pl[off+1] for pl in payloads if len(pl) > off+1 ]
+        le = [ (pl[off+1] << 8) | pl[off] for pl in payloads if len(pl) > off+1 ]
+        print(f"       [{off},{off+1}] BE {min(be)}..{max(be)}  LE {min(le)}..{max(le)}")
+
+
+def report(path, only_type):
+    by_type = collections.defaultdict(list)
+    for pl in g42_frames(path):
+        if is_populated(pl):
+            by_type[pl[0]].append(pl)
+    if not by_type:
+        return
+    print(f"\n{'='*78}\n== {path.name} ==\n{'='*78}")
+    for ty in sorted(by_type):
+        if only_type is not None and ty != only_type:
+            continue
+        # only bother for types with real variation
+        analyze_type(by_type[ty], ty)
+
+
+def main():
+    args = [a for a in sys.argv[1:]]
+    only_type = None
+    if "--type" in args:
+        i = args.index("--type")
+        only_type = int(args[i + 1], 16)
+        del args[i:i + 2]
+    base = Path(args[0]) if args else Path("/tmp/fsr1")
+    for p in sorted(base.glob("*.jsonl")):
+        report(p, only_type)
+
+
+if __name__ == "__main__":
+    main()
