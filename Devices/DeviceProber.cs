@@ -43,16 +43,20 @@ namespace MozaPlugin.Devices
         internal static readonly string[] NewWheelCoreReadCommands = new[]
         {
             "wheel-telemetry-mode",
-            // Sleep-light reads — captured into MozaData and seeded into the
-            // per-wheel-page WheelSleepByPageGuid bundle via
-            // SeedSleepBundleFromResponse. Common to every new-protocol wheel.
-            // The matching idle-*-interval (speed) commands are write-only on
-            // the wire (RxGroup=0xFF) so they're not read here.
-            "wheel-idle-mode", "wheel-idle-timeout", "wheel-idle-speed",
-            "wheel-idle-color",
             // Input modes — paddles/clutch/stick exist on every new-protocol wheel.
             // Knob input modes (wheel-knob-mode, wheel-knob-signal-modeN) are
             // gated below on WheelModelInfo.KnobCount.
+            //
+            // Sleep-light reads (wheel-idle-mode/timeout/speed/color) are
+            // deliberately NOT here. This list is issued at first wheel-detect,
+            // before wheel-model-name resolves, so it cannot be gated on
+            // capability. The legacy bare-"CS" wheel (HasSleepLight=false) does
+            // not implement those parameters — reading them drives its firmware
+            // into a Table 8 read-fail storm that makes it intermittently stop
+            // answering presence polls (the plugin then resets it ~every 20 s in
+            // a loop). The idle reads are deferred to
+            // BuildNewWheelLedReadCommands, gated on WheelModelInfo.HasSleepLight,
+            // once the model is known.
             "wheel-paddles-mode", "wheel-clutch-point", "wheel-stick-mode",
         };
 
@@ -72,6 +76,25 @@ namespace MozaPlugin.Devices
         {
             info ??= WheelModelInfo.Default;
             var cmds = new List<string>();
+
+            // Sleep-light (idle breathing) settings — read only on wheels that
+            // implement the feature. Captured into MozaData and seeded into the
+            // per-wheel-page WheelSleepByPageGuid bundle via
+            // SeedSleepBundleFromResponse. Deferred here (rather than the
+            // model-blind NewWheelCoreReadCommands) so they can be gated on
+            // HasSleepLight: the legacy bare-"CS" wheel lacks these parameters,
+            // and reading them triggers a Table 8 read-fail storm in its
+            // firmware that makes it periodically stop answering presence polls.
+            // The matching idle-*-interval commands are write-only on the wire
+            // (RxGroup=0xFF) so they're not read here; idle-speed (0x22) is
+            // readable and is.
+            if (info.HasSleepLight)
+            {
+                cmds.Add("wheel-idle-mode");
+                cmds.Add("wheel-idle-timeout");
+                cmds.Add("wheel-idle-speed");
+                cmds.Add("wheel-idle-color");
+            }
 
             // Per-zone LED modes + brightness + idle effect, gated on whether
             // the wheel actually has that zone.
