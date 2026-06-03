@@ -44,13 +44,23 @@ namespace MozaPlugin.ControlMapper
             ushort pid = unchecked((ushort)productid);
             if (!MozaUsbIds.IsWheelbasePid(pid) && !MozaUsbIds.IsHubPid(pid))
                 return null;
-            return ComputeVariant();
+            return ComputeCurrentVariant();
         }
 
-        private static string? ComputeVariant()
+        /// <summary>
+        /// Canonical wheel-variant resolution from live plugin state, shared by
+        /// <see cref="GetVariant"/>, <see cref="Poll"/>, and
+        /// <see cref="ControlMapperBridge"/>'s auto-create / detach paths.
+        /// </summary>
+        internal static string? ComputeCurrentVariant()
         {
             var plugin = MozaPlugin.Instance;
             if (plugin == null) return null;
+            // ES/ESX (old-protocol) wheels are base-proxied at dev 0x13 and report
+            // the wheelbase's identity, not their own — no serial way to read the
+            // wheel's model. Treat any old-protocol wheel as the "ES" variant
+            // (a fixed identity key, not localized — same as the friendly names).
+            if (plugin.IsOldWheelDetected) return "ES";
             string model = plugin.Data?.WheelModelName ?? string.Empty;
             if (string.IsNullOrEmpty(model)) return null;
             string prefix = WheelModelInfo.ExtractPrefix(model);
@@ -66,7 +76,7 @@ namespace MozaPlugin.ControlMapper
         /// </summary>
         internal void Poll()
         {
-            string? current = ComputeVariant();
+            string? current = ComputeCurrentVariant();
             if (current == _lastVariant) return;
 
             string before = _lastVariant ?? "<none>";
