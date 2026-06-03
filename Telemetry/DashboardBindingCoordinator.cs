@@ -498,7 +498,15 @@ namespace MozaPlugin.Telemetry
                 // unless the catalog re-sync probe fired (forces Stop+Start to re-advertise).
                 bool wheelOnTargetSlot = sender.WheelReportedSlot == slot;
                 bool weEmittedThisSlot = sender.LastEmittedKind4Slot == slot;
-                if (wheelOnTargetSlot || weEmittedThisSlot)
+                // "Already bound" only holds once the host has emitted at least
+                // one kind=4 this session — the display latches our value frames
+                // (test or live) only after a host-initiated switch. At first
+                // launch the wheel sits on its last slot (wheelOnTargetSlot) but
+                // the host has never engaged it (LastEmittedKind4Slot < 0); the
+                // old skip there left the dash blank until the user manually
+                // switched to a different dashboard. Force the initial kind=4.
+                bool hostEverEngaged = sender.LastEmittedKind4Slot >= 0;
+                if ((wheelOnTargetSlot || weEmittedThisSlot) && hostEverEngaged)
                 {
                     string bindEvidence = wheelOnTargetSlot
                         ? "wheel-reported slot"
