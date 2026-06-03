@@ -5,8 +5,8 @@ using System.Text;
 namespace MozaPlugin.Telemetry.Frames
 {
     /// <summary>
-    /// Builds the host → wheel string-channel value push that travels on
-    /// session 0x01 as a <c>type=0x05</c> sub-msg. String-typed
+    /// Builds the host → wheel string-channel value push that travels as a
+    /// <c>type=0x05</c> sub-msg on the tier-def/catalog session. String-typed
     /// <c>Data/Telemetry.json</c> channels (TrackId, TrackName, CarModel,
     /// SessionTypeName, Flag_Name, … — 23 such channels) cannot be
     /// bit-packed into the value frame; they ride this separate transport.
@@ -29,8 +29,9 @@ namespace MozaPlugin.Telemetry.Frames
     /// (`imola` → `ks_laguna_seca`).
     ///
     /// Caller responsibilities: feed the returned net-data bytes through
-    /// <see cref="TierDefinitionBuilder.ChunkMessage"/> with session=0x01 to
-    /// add chunk header + CRC32 + wire framing.
+    /// <see cref="TierDefinitionBuilder.ChunkMessage"/> on the resolved
+    /// tier-def session (<c>ResolveTierDefSession()</c>) to add chunk header
+    /// + CRC32 + wire framing.
     /// </summary>
     public static class StringValueBuilder
     {

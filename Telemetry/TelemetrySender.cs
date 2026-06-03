@@ -3834,22 +3834,22 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>Out-of-band string-channel value push on sess=0x01
-        /// type=0x05. Strings (Telemetry.json compression=string — TrackId,
-        /// CarModel, SessionTypeName, etc.) cannot be bit-packed into the
-        /// value frame; they ride a separate sub-msg on the management
-        /// session. Cadence: emit immediately on value change with a
-        /// 15-second keepalive floor for unchanged channels — matches the
-        /// 14.76 s mean cadence observed in PitHouse capture
-        /// bridge-20260514-204307.jsonl. Format and discovery in
-        /// docs/protocol/sessions/session-0x01-channel-protocol.md.
+        /// <summary>Out-of-band string-channel value push, type=0x05. Strings
+        /// (Telemetry.json compression=string — TrackId, CarModel,
+        /// SessionTypeName, etc.) cannot be bit-packed into the value frame;
+        /// they ride a separate sub-msg on the tier-def/catalog session
+        /// (ResolveTierDefSession() — 0x01 or the FlagByte session, whichever
+        /// the wheel advertised its catalog on, matching PitHouse). Cadence:
+        /// emit immediately on value change with a 15-second keepalive floor
+        /// for unchanged channels — matches the 14.76 s mean cadence observed
+        /// in PitHouse capture bridge-20260514-204307.jsonl. Format and
+        /// discovery in docs/protocol/sessions/session-0x01-channel-protocol.md.
         ///
-        /// _session01SeqLock is acquired around each emit. Today the only
-        /// other writer of _session01OutboundSeq is SendTierDefinition() also
-        /// on the tick handler (single-entry via _tickInProgress), so a race
-        /// is not reachable — but locking here matches SendTierDefinition's
-        /// pattern and is future-proof against off-tick sess=0x01 writers
-        /// being added later.</summary>
+        /// The resolved session's seq lock is acquired around each emit, the
+        /// same lock SendTierDefinition and the value-frame/FF paths take on
+        /// that session, so string chunks reserve a contiguous seq range and
+        /// cannot interleave into another chunk train. Emission is on the tick
+        /// handler (single-entry via _tickInProgress).</summary>
         private void TickEmitStringValues()
         {
             if (!TestMode && (!_gameRunning || !_profileTelemetryEnabled)) return;
@@ -3936,20 +3936,38 @@ namespace MozaPlugin.Telemetry
         private void EmitOneStringValue(byte channelIdx, string value)
         {
             byte[] msg = Frames.StringValueBuilder.Build(channelIdx, value);
-            lock (_session01SeqLock)
+
+            // Strings ride the SAME session as the tier-def/catalog, NOT a
+            // hardcoded 0x01. PitHouse puts type-0x05 string pushes on the
+            // tier-def session (W13/FSR2: catalog+tier-def+strings on 0x02,
+            // FF-records on 0x01). When the wheel advertises its catalog on the
+            // FlagByte session, ResolveTierDefSession() returns it and the
+            // tier-def follows — strings must follow too, or the wheel never
+            // binds them (same failure SendTierDefinition documents: emit on
+            // the wrong session → wheel acks then closes it). On wheels whose
+            // catalog is on 0x01 (e.g. CS Pro) this resolves to 0x01 and
+            // behaviour is unchanged. Mirrors SendTierDefinition's session/seq
+            // selection so chunks share the per-session seq + lock.
+            byte session = ResolveTierDefSession();
+            bool onFlagByte = session == FlagByte && FlagByte != 0;
+            object seqLock = onFlagByte ? _session02SeqLock : _session01SeqLock;
+            lock (seqLock)
             {
+                int seq = onFlagByte
+                    ? Math.Max(2, _session02OutboundSeq)
+                    : Math.Max(2, _session01OutboundSeq);
                 var frames = Frames.TierDefinitionBuilder.ChunkMessage(
-                    msg, session: 0x01, seq: ref _session01OutboundSeq, deviceId: _targetDeviceId);
-                // SendAndTrackChunk instead of Send: strings ride sess=0x01 just
-                // like tier-def and FF-record property pushes (PropertyPushQueue
-                // already uses Track), so a lost string chunk gets retransmitted
-                // until acked instead of waiting for the 15 s keepalive to
-                // re-send a fresh value. Wheel acks sess=0x01 chunks at 10-90%
-                // across PH bridge captures, so most strings will be acked-and-
-                // dropped from the retransmit queue on the first send; the
+                    msg, session, ref seq, deviceId: _targetDeviceId);
+                // SendAndTrackChunk instead of Send: strings ride the tier-def
+                // session just like tier-def and FF-record property pushes, so a
+                // lost string chunk gets retransmitted until acked instead of
+                // waiting for the 15 s keepalive to re-send a fresh value. Most
+                // strings are acked-and-dropped on the first send; the
                 // protection only fires when one actually gets lost.
                 foreach (var f in frames)
                     SendAndTrackChunk(f);
+                if (onFlagByte) _session02OutboundSeq = seq;
+                else _session01OutboundSeq = seq;
             }
         }
 
