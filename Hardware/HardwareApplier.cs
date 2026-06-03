@@ -1130,10 +1130,14 @@ namespace MozaPlugin.Hardware
         public void ClearLedsOnHardware()
         {
             if (_plugin.Connection == null || !_plugin.Connection.IsConnected) return;
-            int rpmCount = _plugin.WheelModelInfo?.RpmLedCount ?? 0;
+            var modelInfo = _plugin.WheelModelInfo;
+            int rpmCount = modelInfo?.RpmLedCount ?? 0;
+            int rpmWindow = rpmCount > 0 ? (1 << rpmCount) - 1 : 0;
+            // 8-byte active+window form (active=0 = all off), matching the live path.
             _deviceManager.WriteArray("wheel-send-rpm-telemetry",
-                MozaLedDeviceManager.BuildRpmBitmaskBytes(0, rpmCount));
-            _deviceManager.WriteArray("wheel-send-buttons-telemetry", new byte[] { 0, 0 });
+                MozaLedDeviceManager.BuildWindowedBitmaskBytes(0, rpmWindow));
+            _deviceManager.WriteArray("wheel-send-buttons-telemetry",
+                MozaLedDeviceManager.BuildWindowedBitmaskBytes(0, modelInfo?.ButtonWindowMask ?? 0));
             _deviceManager.WriteSetting("wheel-old-send-telemetry", 0);
             _deviceManager.WriteSetting("dash-send-telemetry", 0);
         }

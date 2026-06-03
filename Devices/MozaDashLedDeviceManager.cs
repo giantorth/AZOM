@@ -288,9 +288,9 @@ namespace MozaPlugin.Devices
             if (alwaysResendBitmask || bitmask != _lastBitmask)
             {
                 _lastBitmask = bitmask;
-                // CM2 (dev 0x12) RPM LEDs: send the 4-byte active-mask form. This
-                // path is unrelated to the wheel's (dev 0x17) 8-byte active+window
-                // form and is left as-is — no CM2 PitHouse capture to verify against.
+                // CM2 (dev 0x12) RPM LEDs: 4-byte active-mask form (CM2 has 16 LEDs).
+                // This is a separate device from the wheel (dev 0x17) and is left
+                // unchanged by the wheel-LED 8-byte active+window work.
                 var bitmaskBytes = new byte[]
                 {
                     (byte)(bitmask & 0xFF),
