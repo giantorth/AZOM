@@ -299,6 +299,16 @@ namespace MozaPlugin.Telemetry
         internal const string CatalogProfileName = "WheelCatalog";
         private uint _catalogEndMarkerAtSynthesis;
         private int _catalogCountAtSynthesis;
+        // Concatenated catalog URLs at the last synthesis. The wheel streams
+        // its catalog via abbreviated/back-ref chunks the parser reconstructs
+        // and corrects IN PLACE, so the channel set can change while count and
+        // END marker stay constant. Without tracking content, an early synth
+        // built against an incomplete catalog (channels whose URLs hadn't yet
+        // resolved → empty SimHubProperty → live value 0) was never refreshed
+        // until a dashboard switch bumped the END marker — live game data
+        // stayed blank while test mode (which bypasses property resolution)
+        // worked. Re-synthesise when this signature changes too.
+        private string _catalogSignatureAtSynthesis = "";
 
         // CRC32 reject counters for catalog (sess=0x01/FlagByte) and tile-server
         // (sess=0x03/0x0b) chunks. Surfaced via diagnostics for link-quality.
@@ -3110,12 +3120,18 @@ namespace MozaPlugin.Telemetry
             if (_catalogParser.LastWheelEndMarker == 0)
                 return;
 
-            // Re-synthesis trigger: catalog count grew OR wheel committed a new
+            // Re-synthesis trigger: catalog count grew, wheel committed a new
             // tier-def generation (END marker bumped — happens on dashboard
-            // switch). Skip when neither moved.
+            // switch), OR the catalog body changed at constant count/END (the
+            // parser corrected back-ref/abbreviated URLs in place). Skip only
+            // when all three are unchanged. The signature catch is what lets a
+            // synth that bound against an incomplete catalog refresh once the
+            // URLs finish resolving, instead of waiting for a manual switch.
+            string catalogSignature = string.Join("\n", catalog);
             if (currentIsSynthesised
                 && _catalogCountAtSynthesis == catalog.Count
                 && _catalogEndMarkerAtSynthesis == _catalogParser.LastWheelEndMarker
+                && _catalogSignatureAtSynthesis == catalogSignature
                 && !force)
                 return;
 
@@ -3170,6 +3186,7 @@ namespace MozaPlugin.Telemetry
 
             _catalogEndMarkerAtSynthesis = _catalogParser.LastWheelEndMarker;
             _catalogCountAtSynthesis = catalog.Count;
+            _catalogSignatureAtSynthesis = catalogSignature;
 
             // Going through the Profile setter so multi-broadcast expansion
             // and _tiers allocation match the mzdash path exactly. The setter
