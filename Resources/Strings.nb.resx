@@ -247,7 +247,7 @@
   <data name="Button_Delete" xml:space="preserve"><value>SLETT</value></data>
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Midlertidig deaktivert.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// innebygd CoAP-server på loopback</value></data>
+  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// aktiver dette alternativet for å hindre at PitHouse starter automatisk</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Gir offisiell MOZA SDK-støtte for spill som krever det — som iRacing, eller spill som bruker 360 Hz-modus. Pluginen kjører en innebygd CoAP SDK-kontrollserver på loopback.</value></data>
   <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Når aktivert kjører pluginen en liten stand-in-prosess som vises i prosesslisten som «MOZA Pit House.exe». Dette er forventet — det lar MOZA SDK-apper finne PitHouse via navnet. Den avsluttes automatisk når du deaktiverer dette eller lukker SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Aktiver CoAP SDK-server</value></data>

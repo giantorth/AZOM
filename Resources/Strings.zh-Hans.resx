@@ -242,7 +242,7 @@
   <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>已暂时禁用。</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>CoAP 服务器</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// 监听回环的内嵌 CoAP 服务器</value></data>
+  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// 启用此选项可阻止 PitHouse 自动启动</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>为需要的游戏提供官方 MOZA SDK 支持,例如 iRacing 或任何使用 360 Hz 模式的游戏。为此,插件会在回环上运行一个内嵌的 CoAP SDK 控制服务器。</value></data>
   <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>启用期间,插件会运行一个小型替身进程,在进程列表中显示为“MOZA Pit House.exe”。这是正常现象——它让 MOZA SDK 应用能够按名称找到 PitHouse。当你停用此项或关闭 SimHub 时,它会自动退出。</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 CoAP SDK 服务器</value></data>

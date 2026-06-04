@@ -242,7 +242,7 @@
   <data name="Button_Delete" xml:space="preserve"><value>LÖSCHEN</value></data>
   <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Vorübergehend deaktiviert.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// eingebetteter CoAP-Server auf Loopback</value></data>
+  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// diese Option aktivieren, um den automatischen Start von PitHouse zu verhindern</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Bietet offizielle MOZA-SDK-Unterstützung für Spiele, die sie erfordern – etwa iRacing oder jedes Spiel, das den 360-Hz-Modus nutzt. Das Plugin betreibt dazu einen eingebetteten CoAP-SDK-Steuerserver auf Loopback.</value></data>
   <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Wenn aktiviert, führt das Plugin einen kleinen Platzhalterprozess aus, der in der Prozessliste als „MOZA Pit House.exe“ erscheint. Das ist beabsichtigt – so finden MOZA-SDK-Apps PitHouse anhand des Namens. Er wird automatisch beendet, wenn Sie dies deaktivieren oder SimHub schließen.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP-SDK-Server aktivieren</value></data>
