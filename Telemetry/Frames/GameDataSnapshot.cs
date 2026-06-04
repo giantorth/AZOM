@@ -44,6 +44,16 @@ namespace MozaPlugin.Telemetry.Frames
         // so the wheel can highlight "you" on the track map. 0 when unknown.
         public int PlayerIndex;
 
+        // Per-car position RELATIVE to the player (already rotated into the
+        // player's frame by SimHub), for the radar (patch/ri*) channels. Each
+        // entry feeds one uint32 ri slot, packed by TelemetryFrameBuilder as
+        // two int16 (X, Y) — the wire format reverse-engineered from the
+        // PitHouse FSR2 radar capture. Indexed by Opponents[] order; (0,0)
+        // when SimHub has no relative coordinate for that car (out of radar
+        // range), which matches PitHouse's empty-slot behaviour. Source:
+        // Opponent.RelativeCoordinatesToPlayer (PointF, metres).
+        public (float X, float Y)[]? CarRelative;
+
         /// <summary>Populate from a live StatusDataBase instance.</summary>
         public static GameDataSnapshot FromStatusData(StatusDataBase? data)
         {
@@ -85,6 +95,7 @@ namespace MozaPlugin.Telemetry.Frames
             if (opps != null && opps.Count > 0)
             {
                 var locs = new (float X, float Y)[opps.Count];
+                var rels = new (float X, float Y)[opps.Count];
                 for (int i = 0; i < opps.Count; i++)
                 {
                     var opp = opps[i];
@@ -92,10 +103,13 @@ namespace MozaPlugin.Telemetry.Frames
                     locs[i] = (c != null && c.Length >= 3)
                         ? ((float)c[0], (float)c[2])
                         : (0f, 0f);
+                    var rc = opp?.RelativeCoordinatesToPlayer;
+                    rels[i] = rc.HasValue ? (rc.Value.X, rc.Value.Y) : (0f, 0f);
                     if (opp != null && opp.IsPlayer)
                         snap.PlayerIndex = i;
                 }
                 snap.CarLocations = locs;
+                snap.CarRelative = rels;
             }
         }
 
