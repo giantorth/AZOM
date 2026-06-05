@@ -3456,10 +3456,24 @@ namespace MozaPlugin
             // dashboard session group (0x43 dev=0x17), and screenless wheels
             // (CS V2.1 / KS / GS V2P / TSW / RS V2 / "CS") may interpret those as
             // dashboard-pipeline traffic and stop servicing settings reads.
-            // For unknown wheels (HasDisplay==null) the re-probe still runs.
+            // For resolved-but-unknown wheels (Default model, HasDisplay==null)
+            // the re-probe still runs so the UI can light the dashboard section.
+            //
+            // WheelModelInfo MUST be resolved (non-null) before probing: a bare
+            // `WheelModelInfo?.HasDisplay != false` reads `null != false` == true
+            // when WheelModelInfo is null, so the probe fired during the
+            // unresolved window — which ResetWheelDetection re-opens every time it
+            // nulls WheelModelInfo. On a screenless CS V2 that intermittently
+            // misses the model-name poll, the model never re-resolves, the probe
+            // re-fires each PollStatus tick, and its 0x43 burst drives the wheel
+            // into the Table-8 read-fail storm that makes it miss the next poll —
+            // a self-sustaining detect→storm→teardown loop. Gate on a resolved
+            // model so the unresolved window can't poke a wheel we can't yet
+            // confirm has a display.
             if (DetectionState.NewWheelDetected
                 && !IsDisplayDetected
-                && WheelModelInfo?.HasDisplay != false)
+                && WheelModelInfo != null
+                && WheelModelInfo.HasDisplay != false)
                 _deviceManager.SendDisplayProbe();
 
             // Display-boot wedge watchdog. The W17 (CS Pro) takes ~20 s for its
@@ -3569,6 +3583,19 @@ namespace MozaPlugin
                     text = $"<{data.Length - 3} bytes>";
                 }
                 _firmwareDebugLog.Record(rawDeviceId, text);
+                // A wheel still streaming firmware-debug (rawDeviceId 0x71) is
+                // physically present and alive at the firmware level, even when
+                // its command-response path is momentarily too busy to answer
+                // reads. Without this, the PollStatus hot-swap watchdog judges
+                // liveness only from decodable read responses and never sees
+                // these frames — observed on a screenless CS V2 whose command
+                // path stalled for ~15 s under a param-table read storm: the
+                // watchdog logged "3 misses", tore wheel detection down, and
+                // re-detected every ~20 s, losing identity in a loop. A removed
+                // wheel goes silent here too, so this still distinguishes a busy
+                // wheel from a gone one.
+                if (rawDeviceId == 0x71)
+                    _deviceManager.MarkWheelResponse(MozaProtocol.SwapNibbles(rawDeviceId));
                 // FSR V1 reports its current dashboard/page index via this log on
                 // every switch (incl. wheel-side HID combo): "Table 7, Param 6
                 // Written: <N>". Parse it so the plugin follows wheel-initiated
