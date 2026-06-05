@@ -172,14 +172,16 @@ namespace MozaPlugin.Telemetry.Dashboard
 
             // Split each package_level's channels into sub-tiers whose value
             // frame stays within MaxTierDataBytes. A value frame is a single
-            // group-0x43 packet whose length is carried in a 1-BYTE field
-            // (N = 10 + dataLen); a tier larger than ~245 B overflows it, and
-            // the wheel misframes the stream and CRASHES the display. PitHouse
-            // never exceeds 55 B per value frame (measured across FSR2
-            // captures) and splits big channel sets across many sub-tier flags
-            // (e.g. 64-bit location_t track-map channels at 6/flag), so we cap
-            // at the same 55 B. Each sub-tier shares the package_level (same
-            // emit rate) and gets its own consecutive flag downstream.
+            // group-0x43 packet, so it must (a) keep its 1-byte length field
+            // (N = 10 + dataLen) from overflowing, and (b) fit the wheel's
+            // value-frame buffer — PitHouse never exceeds 55 B (measured
+            // across FSR2 captures) and splits big channel sets accordingly
+            // (e.g. 64-bit location_t track-map channels at 6/flag, 48 B), so
+            // we match it at 55 B. The sub-tiers all ride in ONE broadcast
+            // with ONE END marker (see TierDefinitionBuilder
+            // .DetectSubTiersPerBroadcast) — the layout PitHouse emits and the
+            // wheel binds. Each sub-tier shares the package_level (same emit
+            // rate) and gets its own consecutive flag downstream.
             const int MaxTierDataBytes = 55;
             var tiers = new List<DashboardProfile>();
             foreach (var level in sortedLevels)

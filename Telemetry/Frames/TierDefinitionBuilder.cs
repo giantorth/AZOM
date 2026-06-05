@@ -42,15 +42,20 @@ namespace MozaPlugin.Telemetry.Frames
 
         public static int DetectSubTiersPerBroadcast(MultiStreamProfile profile)
         {
-            int tierCount = profile.Tiers.Count;
-            if (tierCount <= 1) return tierCount;
-            int firstPkg = profile.Tiers[0].PackageLevel;
-            for (int j = 1; j < tierCount; j++)
-            {
-                if (profile.Tiers[j].PackageLevel == firstPkg)
-                    return j;
-            }
-            return tierCount;
+            // All profiles are now built as a SINGLE broadcast (the Profile
+            // setter hardcodes broadcasts=1; the old N-copy multi-broadcast
+            // expansion was removed). PitHouse confirms this shape for split
+            // dashboards: the FSR2 track-map tier-def emits all 14 sub-tiers
+            // (flags 0x04–0x11) back-to-back followed by ONE END marker
+            // (END=139), not one broadcast per sub-tier.
+            //
+            // The old pl-repeat heuristic returned a SMALL count whenever the
+            // lowest package_level split into multiple sub-tiers (its pl
+            // repeats at index 1), making the builder emit one broadcast — and
+            // one END marker — PER sub-tier. That malformed tier-def reshaped
+            // the channel layout and caused the wheel to drop the connection.
+            // One broadcast = tier count.
+            return profile.Tiers.Count;
         }
 
         /// <summary>
