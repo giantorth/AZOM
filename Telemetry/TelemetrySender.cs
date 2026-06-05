@@ -3799,9 +3799,20 @@ namespace MozaPlugin.Telemetry
         /// test/live within the loop).</summary>
         private void TickEmitValueFrames(TierState[] tiers)
         {
+            // Only build the per-car track-map/radar arrays when an active tier
+            // actually has a Location/Radar channel. With those channels disabled
+            // (the shipped default) this skips GameDataSnapshot's reflection chain
+            // and per-opponent allocation/loop — dead work that scaled with the
+            // game's car count (e.g. open-world traffic). Cheap to recompute: a
+            // few bool reads over the 1-4 tiers.
+            bool needCarPositions = false;
+            for (int t = 0; t < tiers.Length; t++)
+            {
+                if (tiers[t].Builder?.NeedsCarPositions == true) { needCarPositions = true; break; }
+            }
             GameDataSnapshot snapshot = TestMode
                 ? default
-                : GameDataSnapshot.FromStatusData(_latestGameData);
+                : GameDataSnapshot.FromStatusData(_latestGameData, needCarPositions);
 
             bool liveOk = _gameRunning && _profileTelemetryEnabled;
             bool useV0Values = _policy.Encoding == TierDefEncoding.V0Url;

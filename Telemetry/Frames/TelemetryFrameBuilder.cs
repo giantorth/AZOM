@@ -36,6 +36,13 @@ namespace MozaPlugin.Telemetry.Frames
         // NotLocation for every other channel.
         private readonly int[] _locIndex;
         private const int NotLocation = int.MinValue;
+
+        /// <summary>True when any channel in this builder's profile is a
+        /// LocationPair/RadarPair — i.e. it actually reads the snapshot's per-car
+        /// position arrays. Lets the caller skip GameDataSnapshot's reflection +
+        /// per-opponent allocation entirely when no channel consumes them
+        /// (the shipped default, with radar/track-map channels disabled).</summary>
+        public bool NeedsCarPositions { get; private set; }
         // Fixed-point scale for radar relative coordinates (metres → int16
         // counts). The ri wire format packs two int16; this constant maps
         // SimHub's RelativeCoordinatesToPlayer (metres) onto that range.
@@ -148,6 +155,7 @@ namespace MozaPlugin.Telemetry.Frames
                 {
                     _encKind[i] = EncKind.LocationPair;
                     _locIndex[i] = locIdx;
+                    NeedsCarPositions = true;
                 }
                 else if (riIdx != NotLocation && ch.Compression == "uint32_t")
                 {
@@ -156,6 +164,7 @@ namespace MozaPlugin.Telemetry.Frames
                     // PitHouse FSR2 radar capture.
                     _encKind[i] = EncKind.RadarPair;
                     _locIndex[i] = riIdx;
+                    NeedsCarPositions = true;
                 }
                 else
                 {
@@ -332,7 +341,7 @@ namespace MozaPlugin.Telemetry.Frames
 
         /// <summary>Build frame from live game data.</summary>
         public byte[] BuildFrame(StatusDataBase? gameData, byte flagByte) =>
-            BuildFrameFromSnapshot(GameDataSnapshot.FromStatusData(gameData), flagByte);
+            BuildFrameFromSnapshot(GameDataSnapshot.FromStatusData(gameData, NeedsCarPositions), flagByte);
 
         /// <summary>Build frame from a pre-populated snapshot (test patterns, etc.).</summary>
         public byte[] BuildFrameFromSnapshot(GameDataSnapshot snapshot, byte flagByte)

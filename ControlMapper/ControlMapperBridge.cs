@@ -56,6 +56,13 @@ namespace MozaPlugin.ControlMapper
         private PropertyInfo? _stateAvailableProp;
         private bool _diagResolveAttempted;
         private string? _lastDiagVariant;
+        // Throttle the reflection-heavy AutoCreate scan (GetValue(ControllerMappings)
+        // + per-entry foreach). It only needs to react to a wheel/variant change,
+        // so cap it to once per AutoCreateScanIntervalMs plus immediately on a
+        // variant change — was running on every DataUpdate tick.
+        private string? _lastAutoCreateVariant;
+        private int _lastAutoCreateScanMs;
+        private const int AutoCreateScanIntervalMs = 1000;
         // Cached so Unregister can detach the CollectionChanged handler: the
         // publisher (SimHub's ControllerMappings) outlives a plugin reload, and
         // RemoveEventHandler needs the exact Delegate instance AddEventHandler used.
@@ -356,10 +363,21 @@ namespace MozaPlugin.ControlMapper
             // Wheel variant resolved once per tick; shared by auto-create and
             // the diagnostic dump below (was computed independently in both).
             string? currentVariant = ComputeCurrentVariant();
-            try { AutoCreateVariantMappingIfNeeded(currentVariant); }
-            catch (Exception ex)
+            // Run the reflection-heavy scan only when the variant changed or the
+            // throttle window elapsed — not every DataUpdate tick. The 1 s ceiling
+            // keeps auto-create responsive (a freshly-added wheelbase mapping is
+            // picked up within a second) without per-frame reflection.
+            int nowMs = Environment.TickCount;
+            bool variantChanged = !string.Equals(currentVariant, _lastAutoCreateVariant, StringComparison.Ordinal);
+            if (variantChanged || (uint)(nowMs - _lastAutoCreateScanMs) >= AutoCreateScanIntervalMs)
             {
-                MozaLog.Debug($"[Moza] CM auto-create: {ex.Message}");
+                _lastAutoCreateVariant = currentVariant;
+                _lastAutoCreateScanMs = nowMs;
+                try { AutoCreateVariantMappingIfNeeded(currentVariant); }
+                catch (Exception ex)
+                {
+                    MozaLog.Debug($"[Moza] CM auto-create: {ex.Message}");
+                }
             }
 
             // Diagnostic: when the wheel-side variant changes, dump every

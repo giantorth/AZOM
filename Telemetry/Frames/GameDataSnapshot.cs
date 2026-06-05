@@ -54,8 +54,13 @@ namespace MozaPlugin.Telemetry.Frames
         // Opponent.RelativeCoordinatesToPlayer (PointF, metres).
         public (float X, float Y)[]? CarRelative;
 
-        /// <summary>Populate from a live StatusDataBase instance.</summary>
-        public static GameDataSnapshot FromStatusData(StatusDataBase? data)
+        /// <summary>Populate from a live StatusDataBase instance. When
+        /// <paramref name="includeCarPositions"/> is false the per-car track-map /
+        /// radar arrays are NOT built — skips the reflection chain and the
+        /// per-opponent allocation/loop in <see cref="PopulateCarLocations"/>.
+        /// Callers pass false when no active channel consumes those arrays
+        /// (radar/track-map channels disabled), which is the shipped default.</summary>
+        public static GameDataSnapshot FromStatusData(StatusDataBase? data, bool includeCarPositions = true)
         {
             if (data == null) return default;
             var snap = new GameDataSnapshot
@@ -78,7 +83,8 @@ namespace MozaPlugin.Telemetry.Frames
                 TyreWearRearRight      = data.TyreWearRearRight,
                 CurrentLap             = data.CurrentLap,
             };
-            PopulateCarLocations(data, ref snap);
+            if (includeCarPositions)
+                PopulateCarLocations(data, ref snap);
             return snap;
         }
 
