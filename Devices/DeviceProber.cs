@@ -273,8 +273,12 @@ namespace MozaPlugin.Devices
             }
         }
 
-        /// <summary>First-sight detection cascade for the handbrake sub-device.</summary>
-        public void MarkHandbrakeDetected()
+        /// <summary>First-sight detection cascade for the handbrake sub-device.
+        /// <paramref name="issueReads"/> false skips the settings-read cascade —
+        /// used by a standalone pipe that has confirmed presence (connect or PID)
+        /// but not yet that the device answers our binary protocol, so doomed
+        /// reads don't spam the pending tracker.</summary>
+        public void MarkHandbrakeDetected(bool issueReads = true)
         {
             if (_detectionState.HandbrakeDetected) return;
             // Record the owning pipe BEFORE flipping the flag so HardwareApplier
@@ -283,12 +287,14 @@ namespace MozaPlugin.Devices
             _detectionState.HandbrakeOwner = _deviceManager;
             _detectionState.HandbrakeDetected = true;
             _plugin.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-            _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
+            if (issueReads)
+                _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
             MozaLog.Info("[Moza] Handbrake detected");
         }
 
-        /// <summary>First-sight detection cascade for the pedals sub-device.</summary>
-        public void MarkPedalsDetected()
+        /// <summary>First-sight detection cascade for the pedals sub-device.
+        /// See <see cref="MarkHandbrakeDetected"/> for <paramref name="issueReads"/>.</summary>
+        public void MarkPedalsDetected(bool issueReads = true)
         {
             if (_detectionState.PedalsDetected) return;
             // Owner first, then flag (see MarkHandbrakeDetected). The owning
@@ -297,7 +303,8 @@ namespace MozaPlugin.Devices
             _detectionState.PedalsOwner = _deviceManager;
             _detectionState.PedalsDetected = true;
             _plugin.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-            _deviceManager.ReadSettings(PedalsSettingsReadCommands);
+            if (issueReads)
+                _deviceManager.ReadSettings(PedalsSettingsReadCommands);
             MozaLog.Info("[Moza] Pedals detected");
         }
 

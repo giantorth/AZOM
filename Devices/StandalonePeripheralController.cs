@@ -24,8 +24,11 @@ namespace MozaPlugin.Devices
         public string CommandPrefix { get; }
         /// <summary>Capture-label / log base (<c>"pedals"</c> / <c>"handbrake"</c>).</summary>
         public string CaptureLabelBase { get; }
-        /// <summary>Flips the shared detection flag + owner to this lane's prober.</summary>
-        public Action<DeviceProber> MarkDetected { get; }
+        /// <summary>Flips the shared detection flag + owner to this lane's prober.
+        /// The bool is <c>issueReads</c> — false shows the tab without firing the
+        /// (possibly doomed) settings-read cascade; true once the device has
+        /// answered our binary protocol.</summary>
+        public Action<DeviceProber, bool> MarkDetected { get; }
         /// <summary>Reads this peripheral's shared detection flag (gates presence-probe polling).</summary>
         public Func<DeviceDetectionState, bool> IsDetected { get; }
 
@@ -36,7 +39,7 @@ namespace MozaPlugin.Devices
             byte deviceId,
             string commandPrefix,
             string captureLabelBase,
-            Action<DeviceProber> markDetected,
+            Action<DeviceProber, bool> markDetected,
             Func<DeviceDetectionState, bool> isDetected)
         {
             Category = category;
@@ -62,7 +65,7 @@ namespace MozaPlugin.Devices
                 MozaProtocol.DevicePedals,
                 "pedals-",
                 "pedals",
-                prober => prober.MarkPedalsDetected(),
+                (prober, issueReads) => prober.MarkPedalsDetected(issueReads),
                 s => s.PedalsDetected);
 
         public static readonly StandalonePeripheralDescriptor Handbrake =
@@ -73,7 +76,7 @@ namespace MozaPlugin.Devices
                 MozaProtocol.DeviceHandbrake,
                 "handbrake-",
                 "handbrake",
-                prober => prober.MarkHandbrakeDetected(),
+                (prober, issueReads) => prober.MarkHandbrakeDetected(issueReads),
                 s => s.HandbrakeDetected);
 
         /// <summary>Descriptor for a discovered port's category, or null if unsupported.</summary>
@@ -123,6 +126,11 @@ namespace MozaPlugin.Devices
         private readonly DeviceProber _prober;
 
         private volatile bool _disposed;
+        // True once the device has answered our binary protocol on THIS dedicated
+        // pipe (a {0x80,*} presence ACK). Distinct from the shared tab flag: the
+        // tab shows on connect, but the self/root (0x00) presence probe keeps
+        // firing until this latches — only then are settings reads safe to issue.
+        private volatile bool _binaryConfirmed;
 
         public string Identity { get; }
         public string PortName { get; private set; }
@@ -176,27 +184,31 @@ namespace MozaPlugin.Devices
             if (ok)
             {
                 MozaLog.Info($"[Moza] Connected to standalone {_desc.CaptureLabelBase} ({_connection.DiscoveredPid} on {_connection.LastPortName})");
-                // Kick detection: the empty presence probe ACK routes through
-                // OnConnectionMessage → MarkDetected → settings read.
+                // Registry PID classification + an open dedicated port IS proof of
+                // presence on this topology, so show the tab immediately — don't
+                // gate it on a binary ACK this device may never send. issueReads:
+                // false until the self-probe confirms the device speaks binary.
+                _desc.MarkDetected(_prober, false);
+                // Still probe (self/root 0x00) so a device that DOES answer can
+                // upgrade us to settings reads; Poll gates on _binaryConfirmed.
                 Poll();
             }
             return ok;
         }
 
         /// <summary>
-        /// While not yet detected, (re)send the empty presence probe — mirrors
-        /// <c>PollHubPeripherals</c>. The registry calls this each Refresh for
-        /// connected-but-undetected controllers so a device that wasn't ready
-        /// at connect still latches on a later tick. No-op once detected.
+        /// While the binary channel is unconfirmed, (re)send the self/root
+        /// presence probe. On a dedicated pipe the peripheral IS the root device,
+        /// so it answers device 0x00 — NOT the 0x19/0x1B sub-device address used
+        /// when a base/hub relays the probe (docs/protocol/devices/usb-ids.md).
+        /// The registry calls this each Refresh so a device that wasn't ready at
+        /// connect still latches later. Gated on _binaryConfirmed (not the shared
+        /// tab flag) so probing continues after the tab is shown on connect.
         /// </summary>
         public void Poll()
         {
-            if (_disposed || !_connection.IsConnected) return;
-            // Stop once this peripheral is detected anywhere (mirrors
-            // PollHubPeripherals' shared-flag gate) — no point probing a device
-            // that already answered on some pipe.
-            if (_desc.IsDetected(_detectionState)) return;
-            _deviceManager.SendPresenceProbe(_desc.DeviceId);
+            if (_disposed || !_connection.IsConnected || _binaryConfirmed) return;
+            _deviceManager.SendPresenceProbe(0x00);
         }
 
         private void OnConnectionDisconnected()
@@ -204,6 +216,7 @@ namespace MozaPlugin.Devices
             // Re-route ownership if this pipe owned the peripheral, so it
             // re-enumerates on whichever pipe answers next (mirrors
             // OnHubDisconnected). Reset the flag too so the UI tab hides.
+            _binaryConfirmed = false;
             ClearOwnershipIfHeld();
             try { _pending.Clear(); } catch { }
         }
@@ -216,12 +229,16 @@ namespace MozaPlugin.Devices
             // Firmware debug noise.
             if (data[0] == MozaProtocol.FirmwareDebugGroup) return;
 
-            // Empty presence-probe ACK: 7e 00 80 swap(dev) chk → data = {0x80, dev}.
+            // Presence-probe ACK: 7e 00 80 swap(dev) chk → data = {0x80, dev}.
+            // This pipe is dedicated and the PID already told us the category, so
+            // ANY 0x80 ACK means the peripheral answered (it replies as the root
+            // device 0x00 to our self-probe, not the 0x19/0x1B sub-device id). The
+            // device just proved it speaks binary, so confirm the channel and
+            // issue the settings reads.
             if (data.Length == 2 && data[0] == 0x80)
             {
-                byte deviceId = MozaProtocol.SwapNibbles(data[1]);
-                if (deviceId == _desc.DeviceId)
-                    _desc.MarkDetected(_prober);
+                _binaryConfirmed = true;
+                _desc.MarkDetected(_prober, true);
                 return;
             }
 
