@@ -3142,7 +3142,8 @@ namespace MozaPlugin.Telemetry
             MultiStreamProfile synthesised;
             try
             {
-                synthesised = store.BuildProfileFromCatalog(catalog, CatalogProfileName);
+                bool includeRadar = MozaPlugin.Instance?.Settings?.EnableRadarTrackMapChannels ?? false;
+                synthesised = store.BuildProfileFromCatalog(catalog, CatalogProfileName, includeRadar);
             }
             catch (Exception ex)
             {
@@ -3184,6 +3185,17 @@ namespace MozaPlugin.Telemetry
                 $"+ {synthesised.StringChannels.Count} strings (catalog={catalog.Count}, " +
                 $"endMarker={_catalogParser.LastWheelEndMarker}, userMappings={mappedCount})");
 
+            // Did the catalog actually advance to a new generation? Capture
+            // BEFORE updating the tracking fields. NOTE: the dedup near the top
+            // of this method is bypassed when force=true (the hot-switch burst
+            // re-emits with force), so reaching here does NOT imply a real
+            // change — we must compare explicitly or the re-arm below loops
+            // forever on every forced burst frame.
+            bool generationChanged =
+                _catalogEndMarkerAtSynthesis != _catalogParser.LastWheelEndMarker
+                || _catalogCountAtSynthesis != catalog.Count
+                || _catalogSignatureAtSynthesis != catalogSignature;
+
             _catalogEndMarkerAtSynthesis = _catalogParser.LastWheelEndMarker;
             _catalogCountAtSynthesis = catalog.Count;
             _catalogSignatureAtSynthesis = catalogSignature;
@@ -3193,6 +3205,22 @@ namespace MozaPlugin.Telemetry
             // preserves Name, so subsequent calls can detect the synthesised
             // profile by Profile.Name == CatalogProfileName.
             Profile = synthesised;
+
+            // Re-arm the hot-switch burst ONLY when the catalog genuinely
+            // advanced to a new generation. On a dashboard switch the wheel
+            // builds its catalog up across several generations (e.g. END
+            // 6→80→97 over ~3 s), but the switch's emission burst is a fixed
+            // 3–8 frames ~1 s apart — so the burst can finish on a PARTIAL
+            // generation (5 ch) before the final one (the 21-ch radar set)
+            // commits, and the complete tier-def never reaches the wheel until
+            // the user switches again. Re-arming on each real advance fixes
+            // that, and converges because a stable catalog stops advancing.
+            // Gating on generationChanged is essential: the forced burst
+            // re-emissions hit this path with the SAME generation, and an
+            // unconditional re-arm there self-perpetuates the burst forever
+            // (flagBase marches without end — observed 2026-06-04).
+            if (generationChanged)
+                _hotSwitch.ArmBurst(countsAsSwitch: false);
 
             // Notify the UI that the channel set has changed. The
             // DashboardSelectionChanged event is normally raised at the

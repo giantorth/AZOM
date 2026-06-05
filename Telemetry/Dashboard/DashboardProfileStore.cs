@@ -88,9 +88,36 @@ namespace MozaPlugin.Telemetry.Dashboard
             return ch;
         }
 
+        // Radar (patch/ri*, OpponentCount, PlayerIndex) and track-map
+        // (patch/Location*) channels. Matched precisely so other working
+        // patch/ channels (TrackPositionPercent, TrackName) are left alone;
+        // Heading is not patch/ and is untouched.
+        internal static bool IsRadarTrackMapChannel(string url)
+        {
+            if (string.IsNullOrEmpty(url) || url.IndexOf("/patch/", StringComparison.Ordinal) < 0)
+                return false;
+            string suffix = url.Substring(url.LastIndexOf('/') + 1);
+            if (suffix == "OpponentCount" || suffix == "PlayerIndex" || suffix == "Location")
+                return true;
+            if (suffix.StartsWith("Location_", StringComparison.Ordinal))
+                return AllDigits(suffix, "Location_".Length);
+            if (suffix.StartsWith("ri", StringComparison.Ordinal) && suffix.Length > 2)
+                return AllDigits(suffix, 2);
+            return false;
+        }
+
+        private static bool AllDigits(string s, int start)
+        {
+            if (start >= s.Length) return false;
+            for (int i = start; i < s.Length; i++)
+                if (s[i] < '0' || s[i] > '9') return false;
+            return true;
+        }
+
         public MultiStreamProfile BuildProfileFromCatalog(
             IReadOnlyList<string> catalog,
-            string profileName = "WheelCatalog")
+            string profileName = "WheelCatalog",
+            bool includeRadarTrackMap = true)
         {
             var telemetryMap = GetTelemetryMap();
             // Build a ChannelDefinition per catalog URL, looking up each
@@ -102,6 +129,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             foreach (var url in catalog)
             {
                 if (string.IsNullOrEmpty(url)) continue;
+                if (!includeRadarTrackMap && IsRadarTrackMapChannel(url)) continue;
                 string suffix = url.Substring(url.LastIndexOf('/') + 1);
                 ChannelDefinition ch;
                 int packageLevel;
