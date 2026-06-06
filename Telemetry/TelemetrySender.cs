@@ -1970,7 +1970,7 @@ namespace MozaPlugin.Telemetry
         /// or still inside the post-emit cooldown window — in which case
         /// the wheel state has not changed and no follow-up restart is
         /// required.</returns>
-        public bool SendDashboardSwitch(uint slotIndex)
+        public bool SendDashboardSwitch(uint slotIndex, bool anchorSlotRoundTrip = true)
         {
             if (!_connection.IsConnected) return false;
             // Block kind=4 emission during the post-emit silence window or
@@ -2007,8 +2007,15 @@ namespace MozaPlugin.Telemetry
             // racing to the same slot is the common case).
             _slotTracker.NoteHostEmittedKind4((int)slotIndex);
             // Anchor the display watchdog's slot round-trip window for every
-            // kind=4 source (resync probe, SwitchToProfile, convergence nudge).
-            _watchdog.NoteHostEmittedKind4((int)slotIndex);
+            // kind=4 source (resync probe, SwitchToProfile, convergence nudge)
+            // — EXCEPT a convergence nudge to a slot the wheel already reports
+            // it's on (anchorSlotRoundTrip=false). Re-stamping the window and
+            // clearing the not-engaged debounce on an already-bound slot is
+            // pointless churn, and it slows the watchdog's reaction if the
+            // wheel later drifts off-slot. The slot-tracker note above still
+            // fires so redundant-emit detection stays accurate.
+            if (anchorSlotRoundTrip)
+                _watchdog.NoteHostEmittedKind4((int)slotIndex);
             MozaLog.Debug(
                 $"[Moza] Sent dashboard-switch FF-record: slot={slotIndex} " +
                 $"on FF session 0x{ResolveFfSession():X2} (mirror of tier-def session)");
@@ -4269,11 +4276,15 @@ namespace MozaPlugin.Telemetry
                         $"{Lifecycle.PostSwitchCatalogConvergence.StableSampleThreshold}");
                     try
                     {
-                        // Bypass wheel-on-target shortcut by calling
-                        // SendDashboardSwitch directly. SendDashboardSwitch
-                        // gates on state/cooldown only; it has no slot-equality
-                        // check.
-                        SendDashboardSwitch((uint)targetSlot);
+                        // Bypass the wheel-on-target shortcut for the kind=4
+                        // EMISSION (the nudge's job is to make the wheel
+                        // re-advertise its catalog regardless of slot), but do
+                        // NOT re-anchor the watchdog's slot round-trip window
+                        // when the wheel already reports it's on this slot —
+                        // re-arming a window that has already round-tripped
+                        // just keeps a no-op timer alive.
+                        SendDashboardSwitch((uint)targetSlot,
+                            anchorSlotRoundTrip: _slotTracker.WheelReportedSlot != targetSlot);
                     }
                     catch (Exception ex)
                     {

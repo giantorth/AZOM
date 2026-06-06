@@ -96,21 +96,31 @@ namespace MozaPlugin.Telemetry.Display
         /// </summary>
         public void TryAbsorbType04Slot(byte[] chunkPayload)
         {
-            // type-04 slot record format on sess=0x02 b2h:
+            // type-04 slot record (exactly 13 bytes) on b2h — sess=0x02 for
+            // CS-family wheels, sess=0x01 for W13/FSR2:
             //   payload[0]    = 0x04 (record type)
-            //   payload[1..5] = slot (uint32 LE)
-            //   payload[5..9] = 0 (padding — MUST be zero, discriminator vs.
-            //                     other 0x04-prefixed sess=0x02 records)
-            //   payload[9..13]= CRC32 (wire-level CRC already validated)
-            if (chunkPayload == null || chunkPayload.Length < 9) return;
+            //   payload[1..5] = reserved — MUST be zero (this is the field that
+            //                   discriminates the slot record from the longer
+            //                   0x04 catalog-URL records, whose [1] is a
+            //                   non-zero URL length)
+            //   payload[5..9] = slot (uint32 LE)
+            //   payload[9..13]= CRC32 over payload[0..9]
+            // The slot is at [5..9], NOT [1..5]: verified against captured
+            // records that cycle slots 0..5 with the incrementing value at
+            // [5..9] and a matching CRC32 over the 9-byte body (the earlier
+            // layout read the always-zero reserved field as the slot and
+            // pad-checked the real slot, so every non-zero slot was dropped
+            // and WheelReportedSlot could only ever converge to 0).
+            if (chunkPayload == null || chunkPayload.Length != 13) return;
             if (chunkPayload[0] != 0x04) return;
-            // Padding must be zero — strongest filter against mis-matching non-slot records.
-            if (chunkPayload[5] != 0 || chunkPayload[6] != 0
-                || chunkPayload[7] != 0 || chunkPayload[8] != 0) return;
-            int slot = chunkPayload[1]
-                     | (chunkPayload[2] << 8)
-                     | (chunkPayload[3] << 16)
-                     | (chunkPayload[4] << 24);
+            // Reserved must be zero — rejects the longer catalog-URL 0x04
+            // records (non-zero URL length at [1]) and any other 0x04 record.
+            if (chunkPayload[1] != 0 || chunkPayload[2] != 0
+                || chunkPayload[3] != 0 || chunkPayload[4] != 0) return;
+            int slot = chunkPayload[5]
+                     | (chunkPayload[6] << 8)
+                     | (chunkPayload[7] << 16)
+                     | (chunkPayload[8] << 24);
             // Real slot indices are u8 in practice; reject implausibly large values.
             if (slot < 0 || slot > 255) return;
             if (slot == _wheelReportedSlot) return;
