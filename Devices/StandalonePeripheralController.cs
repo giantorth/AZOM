@@ -165,7 +165,11 @@ namespace MozaPlugin.Devices
                 disableProbeFallback: () => true);
             _connection.CaptureLabel = _desc.CaptureLabelBase + "-" + ShortId(identity);
             _connection.LastPortName = portName;
-            _deviceManager = new MozaDeviceManager(_connection, _pending);
+            // On its OWN CDC pipe the peripheral is the root ("main", 0x12) device
+            // — its frames identify as 0x12 (debug src=main), NOT the bus sub-device
+            // id (pedals 0x19 / handbrake 0x1B) used when relayed by a base/hub.
+            // Override so every read/write on this pipe targets 0x12.
+            _deviceManager = new MozaDeviceManager(_connection, _pending, MozaProtocol.DeviceMain);
             // drivesTelemetry:false — this prober only enumerates the peripheral
             // and must never touch the primary TelemetrySender.
             _prober = new DeviceProber(_plugin, _connection, _deviceManager, _data, _detectionState, drivesTelemetry: false);
@@ -197,10 +201,11 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// While the binary channel is unconfirmed, (re)send the self/root
-        /// presence probe. On a dedicated pipe the peripheral IS the root device,
-        /// so it answers device 0x00 — NOT the 0x19/0x1B sub-device address used
-        /// when a base/hub relays the probe (docs/protocol/devices/usb-ids.md).
+        /// While the binary channel is unconfirmed, (re)send the presence probe
+        /// to the root device. On a dedicated pipe the peripheral IS the root
+        /// ("main", 0x12) device — NOT the 0x19/0x1B sub-device address used when
+        /// a base/hub relays the probe (docs/protocol/devices/usb-ids.md). Its
+        /// own debug frames confirm this (src=main → swap(0x21)=0x12).
         /// The registry calls this each Refresh so a device that wasn't ready at
         /// connect still latches later. Gated on _binaryConfirmed (not the shared
         /// tab flag) so probing continues after the tab is shown on connect.
@@ -208,7 +213,7 @@ namespace MozaPlugin.Devices
         public void Poll()
         {
             if (_disposed || !_connection.IsConnected || _binaryConfirmed) return;
-            _deviceManager.SendPresenceProbe(0x00);
+            _deviceManager.SendPresenceProbe(MozaProtocol.DeviceMain);
         }
 
         private void OnConnectionDisconnected()
@@ -232,8 +237,8 @@ namespace MozaPlugin.Devices
             // Presence-probe ACK: 7e 00 80 swap(dev) chk → data = {0x80, dev}.
             // This pipe is dedicated and the PID already told us the category, so
             // ANY 0x80 ACK means the peripheral answered (it replies as the root
-            // device 0x00 to our self-probe, not the 0x19/0x1B sub-device id). The
-            // device just proved it speaks binary, so confirm the channel and
+            // device 0x12, i.e. {0x80, 0x21}, not the 0x19/0x1B sub-device id).
+            // The device just proved it speaks binary, so confirm the channel and
             // issue the settings reads.
             if (data.Length == 2 && data[0] == 0x80)
             {
@@ -242,9 +247,11 @@ namespace MozaPlugin.Devices
                 return;
             }
 
-            // Pedals/handbrake dev ids (0x19 / 0x1B) don't collide with the base
-            // main (0x12), so the default parser bus hint is correct here.
-            var result = MozaResponseParser.Parse(data);
+            // The device answers as 0x12 (main) on this pipe, which the parser
+            // would otherwise resolve to main-*/base-ambient-* commands. Pass the
+            // command family as busHint so responses bind to THIS lane's commands
+            // (mirrors the AB9 connection, which passes "ab9" for the same reason).
+            var result = MozaResponseParser.Parse(data, _desc.CaptureLabelBase);
             if (!result.HasValue) return;
             var r = result.Value;
             if (r.Name == null) return;

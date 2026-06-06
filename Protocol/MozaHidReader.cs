@@ -455,16 +455,15 @@ namespace MozaPlugin.Protocol
                                         if (kind == MozaHidClass.Pedals)
                                         {
                                             // Standalone pedal HID exposes only Rx/Ry/Rz; these
-                                            // are throttle/brake/clutch (NOT paddles). PROVISIONAL
-                                            // order mirrors the base's throttle<brake<clutch usage
-                                            // ordering — confirm against the per-axis debug log.
+                                            // are throttle/brake/clutch (NOT paddles), confirmed
+                                            // on CRP2 hardware (axis order matches the base's
+                                            // throttle<brake<clutch usage ordering).
                                             switch (usage)
                                             {
                                                 case UsageRx: _data.ThrottlePosition = pct; break;
                                                 case UsageRy: _data.BrakePosition    = pct; break;
                                                 case UsageRz: _data.ClutchPosition   = pct; break;
                                             }
-                                            MozaLog.Debug($"[Moza] standalone-pedal HID axis usage=0x{usage:X8} raw={value.GetLogicalValue()} pct={pct}");
                                             continue;
                                         }
 

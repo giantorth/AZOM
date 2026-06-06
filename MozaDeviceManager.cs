@@ -25,6 +25,15 @@ namespace MozaPlugin
         private readonly PendingResponseTracker? _pendingResponses;
         private PendingResponseTracker? Tracker => _pendingResponses ?? MozaPlugin.Instance?.PendingResponses;
 
+        // When set, every command on this pipe targets this device id regardless
+        // of the command's DeviceType. Used by a dedicated standalone-peripheral
+        // pipe: a pedal set / handbrake plugged STRAIGHT into the PC is the root
+        // ("main", 0x12) device on its OWN CDC connection, NOT the bus sub-device
+        // id (pedals 0x19 / handbrake 0x1B) it would carry through a base/hub.
+        // Mirrors the AB9, which is likewise a single internal device at 0x12 on
+        // its own pipe. Null → normal per-DeviceType addressing.
+        private readonly byte? _deviceIdOverride;
+
         /// <summary>
         /// The retransmit tracker this manager's reads are recorded against.
         /// The message handler calls <c>NoteResponse</c> on it when a response
@@ -87,10 +96,12 @@ namespace MozaPlugin
         }
 
         public MozaDeviceManager(MozaSerialConnection connection,
-                                 PendingResponseTracker? pendingResponses = null)
+                                 PendingResponseTracker? pendingResponses = null,
+                                 byte? deviceIdOverride = null)
         {
             _connection = connection;
             _pendingResponses = pendingResponses;
+            _deviceIdOverride = deviceIdOverride;
         }
 
         // Valid wheel device IDs to try (23, 21, 19)
@@ -392,6 +403,8 @@ namespace MozaPlugin
 
         private byte GetDeviceId(string deviceType)
         {
+            // Dedicated standalone pipe: all commands address the root device.
+            if (_deviceIdOverride.HasValue) return _deviceIdOverride.Value;
             switch (deviceType)
             {
                 case "base":     return MozaProtocol.DeviceBase;
