@@ -827,6 +827,8 @@ namespace MozaPlugin
         {
             if (_suppressEvents) return;
             _data.WheelKnobSignalModes[index] = value;
+            _plugin.UpdateActiveWheelOverlay(o =>
+                o.WheelKnobSignalModes = (int[])_data.WheelKnobSignalModes.Clone());
             _plugin.WriteIfWheelDetected($"wheel-knob-signal-mode{index}", value);
             _plugin.SaveSettings();
         }

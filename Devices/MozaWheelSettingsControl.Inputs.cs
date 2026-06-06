@@ -166,6 +166,8 @@ namespace MozaPlugin.Devices
             if (_suppressEvents || _plugin == null || _data == null) return;
             if (value < 0) return; // ComboBox SelectionChanged can fire during refresh
             _data.WheelKnobSignalModes[index] = value;
+            _plugin.UpdateActiveWheelOverlay(o =>
+                o.WheelKnobSignalModes = (int[])_data.WheelKnobSignalModes.Clone());
             _plugin.WriteIfWheelDetected($"wheel-knob-signal-mode{index}", value);
             _plugin.SaveSettings();
         }

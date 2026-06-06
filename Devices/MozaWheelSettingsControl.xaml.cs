@@ -344,6 +344,8 @@ skipReadByMode:
             int i = (int)cb.Tag;
             if (i < 0 || i >= _data.WheelButtonDefaultDuringTelemetry.Length) return;
             _data.WheelButtonDefaultDuringTelemetry[i] = cb.IsChecked == true;
+            _plugin.UpdateActiveWheelOverlay(o =>
+                o.WheelButtonDefaultDuringTelemetry = (bool[])_data.WheelButtonDefaultDuringTelemetry.Clone());
             _plugin.SaveSettings();
         }
 

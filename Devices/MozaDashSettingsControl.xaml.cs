@@ -317,6 +317,7 @@ namespace MozaPlugin.Devices
             if (display < 0 || display > 2) return;
             int stored = IndicatorMode.ToDashStored((IndicatorDisplayMode)display);
             _data!.DashRpmIndicatorMode = stored;
+            _plugin.UpdateActiveProfile(p => p.DashRpmIndicatorMode = stored);
             _plugin.WriteIfDashDetected("dash-rpm-indicator-mode", stored);
             _plugin.SaveSettings();
         }
@@ -326,6 +327,7 @@ namespace MozaPlugin.Devices
             if (_suppressEvents || _plugin == null) return;
             int val = DashRpmDisplayCombo.SelectedIndex;
             _data!.DashRpmDisplayMode = val;
+            _plugin.UpdateActiveProfile(p => p.DashRpmDisplayMode = val);
             _plugin.WriteIfDashDetected("dash-rpm-display-mode", val);
             _plugin.SaveSettings();
         }
@@ -337,6 +339,7 @@ namespace MozaPlugin.Devices
             if (display < 0 || display > 2) return;
             int stored = IndicatorMode.ToDashStored((IndicatorDisplayMode)display);
             _data!.DashFlagsIndicatorMode = stored;
+            _plugin.UpdateActiveProfile(p => p.DashFlagsIndicatorMode = stored);
             _plugin.WriteIfDashDetected("dash-flags-indicator-mode", stored);
             _plugin.SaveSettings();
         }

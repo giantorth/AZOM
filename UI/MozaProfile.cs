@@ -55,6 +55,9 @@ namespace MozaPlugin
         public int WheelClutchPoint { get; set; } = -1;
         public int WheelKnobMode { get; set; } = -1;
         public int WheelStickMode { get; set; } = -1;
+        // Per-knob signal modes (wheels reporting WheelKnobSignalModeSupported);
+        // up to 5 knobs, -1 per slot = no override. Overlay-only like WheelKnobMode.
+        public int[]? WheelKnobSignalModes { get; set; }
 
         // Colors (packed)
         public int[]? WheelRpmColors { get; set; }
@@ -93,6 +96,7 @@ namespace MozaPlugin
                 WheelClutchPoint = WheelClutchPoint,
                 WheelKnobMode = WheelKnobMode,
                 WheelStickMode = WheelStickMode,
+                WheelKnobSignalModes = WheelKnobSignalModes != null ? (int[])WheelKnobSignalModes.Clone() : null,
                 WheelRpmColors = WheelRpmColors != null ? (int[])WheelRpmColors.Clone() : null,
                 WheelRpmBlinkColors = WheelRpmBlinkColors != null ? (int[])WheelRpmBlinkColors.Clone() : null,
                 WheelButtonColors = WheelButtonColors != null ? (int[])WheelButtonColors.Clone() : null,
@@ -242,6 +246,10 @@ namespace MozaPlugin
         // GearshiftDebounceMs) — this one controls the wheelbase's own rumble.
         public int GearshiftVibration { get; set; } = -1;
 
+        // Performance output (cmd 0x1E base): 0 = Reserved, 1 = Full. Per-profile
+        // so each game keeps its own bandwidth-mode preference.
+        public int TempStrategy { get; set; } = -1;
+
         // ===== Wheel LED settings =====
         public int WheelTelemetryMode { get; set; } = -1;
         public int WheelKnobLedMode { get; set; } = -1;
@@ -267,6 +275,10 @@ namespace MozaPlugin
         public int DashFlagsBrightness { get; set; } = -1;
         public int DashDisplayBrightness { get; set; } = -1;
         public int DashDisplayStandbyMin { get; set; } = -1;
+        // Indicator/display modes (raw device-stored values, sentinel = leave alone).
+        public int DashRpmIndicatorMode { get; set; } = -1;
+        public int DashRpmDisplayMode { get; set; } = -1;
+        public int DashFlagsIndicatorMode { get; set; } = -1;
 
         // ===== FFB Equalizer (6 bands) =====
         public int Equalizer1 { get; set; } = -1000;
@@ -293,9 +305,15 @@ namespace MozaPlugin
 
         // ===== Pedal settings =====
         public int PedalsThrottleDir { get; set; } = -1;
+        public int PedalsThrottleMin { get; set; } = -1;   // range start, 0-100
+        public int PedalsThrottleMax { get; set; } = -1;   // range end, 0-100
         public int PedalsBrakeDir { get; set; } = -1;
+        public int PedalsBrakeMin { get; set; } = -1;
+        public int PedalsBrakeMax { get; set; } = -1;
         public int PedalsBrakeAngleRatio { get; set; } = -1; // 0=angle sensor, 100=load cell
         public int PedalsClutchDir { get; set; } = -1;
+        public int PedalsClutchMin { get; set; } = -1;
+        public int PedalsClutchMax { get; set; } = -1;
         public int[]? PedalsThrottleCurve { get; set; }          // [5] values 0-100
         public int[]? PedalsBrakeCurve { get; set; }             // [5] values 0-100
         public int[]? PedalsClutchCurve { get; set; }            // [5] values 0-100
@@ -405,6 +423,7 @@ namespace MozaPlugin
             GameInertia = p.GameInertia; GameSpring = p.GameSpring;
             WorkMode = p.WorkMode;
             GearshiftVibration = p.GearshiftVibration;
+            TempStrategy = p.TempStrategy;
 
             // Wheel LED
             WheelTelemetryMode = p.WheelTelemetryMode;
@@ -424,6 +443,8 @@ namespace MozaPlugin
             // Dashboard
             DashRpmBrightness = p.DashRpmBrightness; DashFlagsBrightness = p.DashFlagsBrightness;
             DashDisplayBrightness = p.DashDisplayBrightness; DashDisplayStandbyMin = p.DashDisplayStandbyMin;
+            DashRpmIndicatorMode = p.DashRpmIndicatorMode; DashRpmDisplayMode = p.DashRpmDisplayMode;
+            DashFlagsIndicatorMode = p.DashFlagsIndicatorMode;
 
             // FFB Equalizer
             Equalizer1 = p.Equalizer1; Equalizer2 = p.Equalizer2; Equalizer3 = p.Equalizer3;
@@ -441,6 +462,9 @@ namespace MozaPlugin
 
             // Pedals
             PedalsThrottleDir = p.PedalsThrottleDir; PedalsBrakeDir = p.PedalsBrakeDir; PedalsClutchDir = p.PedalsClutchDir;
+            PedalsThrottleMin = p.PedalsThrottleMin; PedalsThrottleMax = p.PedalsThrottleMax;
+            PedalsBrakeMin = p.PedalsBrakeMin; PedalsBrakeMax = p.PedalsBrakeMax;
+            PedalsClutchMin = p.PedalsClutchMin; PedalsClutchMax = p.PedalsClutchMax;
             PedalsBrakeAngleRatio = p.PedalsBrakeAngleRatio;
             PedalsThrottleCurve = CloneArray(p.PedalsThrottleCurve);
             PedalsBrakeCurve = CloneArray(p.PedalsBrakeCurve);
@@ -568,6 +592,7 @@ namespace MozaPlugin
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;
             WorkMode = data.WorkMode;
             GearshiftVibration = data.GearshiftVibration;
+            TempStrategy = data.TempStrategy;
 
             // FFB Equalizer
             Equalizer1 = data.Equalizer1; Equalizer2 = data.Equalizer2; Equalizer3 = data.Equalizer3;
@@ -585,6 +610,9 @@ namespace MozaPlugin
 
             // Pedals
             PedalsThrottleDir = data.PedalsThrottleDir; PedalsBrakeDir = data.PedalsBrakeDir; PedalsClutchDir = data.PedalsClutchDir;
+            PedalsThrottleMin = data.PedalsThrottleMin; PedalsThrottleMax = data.PedalsThrottleMax;
+            PedalsBrakeMin = data.PedalsBrakeMin; PedalsBrakeMax = data.PedalsBrakeMax;
+            PedalsClutchMin = data.PedalsClutchMin; PedalsClutchMax = data.PedalsClutchMax;
             PedalsBrakeAngleRatio = data.PedalsBrakeAngleRatio;
             PedalsThrottleCurve = (int[])data.PedalsThrottleCurve.Clone();
             PedalsBrakeCurve = (int[])data.PedalsBrakeCurve.Clone();

@@ -119,6 +119,12 @@ namespace MozaPlugin.Hardware
             if (clutchPoint >= 0) _data.WheelClutchPoint     = clutchPoint;
             if (knobMode  >= 0) _data.WheelKnobMode          = knobMode;
             if (stickMode >= 0) _data.WheelStickMode         = stickMode;
+            // Per-knob signal modes — overlay-only (no profile baseline), mirrored
+            // for UI display like the other input modes. Not re-pushed to hardware
+            // here; the wheel firmware persists them (newer FW drops readback).
+            if (ov?.WheelKnobSignalModes != null)
+                for (int i = 0; i < Math.Min(_data.WheelKnobSignalModes.Length, ov.WheelKnobSignalModes.Length); i++)
+                    if (ov.WheelKnobSignalModes[i] >= 0) _data.WheelKnobSignalModes[i] = ov.WheelKnobSignalModes[i];
 
             int[]? rpmColors          = EffArr(ov?.WheelRpmColors, profile.WheelRpmColors);
             int[]? rpmBlinkColors     = EffArr(ov?.WheelRpmBlinkColors, profile.WheelRpmBlinkColors);
@@ -278,6 +284,9 @@ namespace MozaPlugin.Hardware
             if (profile.DashFlagsBrightness   >= 0) _data.DashFlagsBrightness   = profile.DashFlagsBrightness;
             if (profile.DashDisplayBrightness >= 0) _data.DashDisplayBrightness = profile.DashDisplayBrightness;
             if (profile.DashDisplayStandbyMin >= 0) _data.DashDisplayStandbyMin = profile.DashDisplayStandbyMin;
+            if (profile.DashRpmIndicatorMode   >= 0) _data.DashRpmIndicatorMode   = profile.DashRpmIndicatorMode;
+            if (profile.DashRpmDisplayMode     >= 0) _data.DashRpmDisplayMode     = profile.DashRpmDisplayMode;
+            if (profile.DashFlagsIndicatorMode >= 0) _data.DashFlagsIndicatorMode = profile.DashFlagsIndicatorMode;
             MozaProfile.UnpackColorsInto(profile.DashRpmColors, _data.DashRpmColors);
             MozaProfile.UnpackColorsInto(profile.DashRpmBlinkColors, _data.DashRpmBlinkColors);
             MozaProfile.UnpackColorsInto(profile.DashFlagColors, _data.DashFlagColors);
@@ -309,9 +318,15 @@ namespace MozaPlugin.Hardware
             }
             else
             {
-                // Legacy SHDP dashboard: dash-flags-indicator-mode forced to 1
-                // (firmware default 0 silently drops flag colour writes).
-                _deviceManager.WriteSetting("dash-flags-indicator-mode", 1);
+                if (profile.DashRpmIndicatorMode >= 0)
+                    _deviceManager.WriteSetting("dash-rpm-indicator-mode", profile.DashRpmIndicatorMode);
+                if (profile.DashRpmDisplayMode >= 0)
+                    _deviceManager.WriteSetting("dash-rpm-display-mode", profile.DashRpmDisplayMode);
+                // Legacy SHDP dashboard: dash-flags-indicator-mode defaults to 1
+                // when the profile has no stored value (firmware default 0 silently
+                // drops flag colour writes); a saved profile value wins.
+                _deviceManager.WriteSetting("dash-flags-indicator-mode",
+                    profile.DashFlagsIndicatorMode >= 0 ? profile.DashFlagsIndicatorMode : 1);
 
                 WriteColorArray(profile.DashRpmColors, "dash-rpm-color", 10);
                 WriteColorArray(profile.DashRpmBlinkColors, "dash-rpm-blink-color", 10);
@@ -460,8 +475,14 @@ namespace MozaPlugin.Hardware
             if (profile == null) return;
 
             if (profile.PedalsThrottleDir      >= 0) _data.PedalsThrottleDir      = profile.PedalsThrottleDir;
+            if (profile.PedalsThrottleMin      >= 0) _data.PedalsThrottleMin      = profile.PedalsThrottleMin;
+            if (profile.PedalsThrottleMax      >= 0) _data.PedalsThrottleMax      = profile.PedalsThrottleMax;
             if (profile.PedalsBrakeDir         >= 0) _data.PedalsBrakeDir         = profile.PedalsBrakeDir;
+            if (profile.PedalsBrakeMin         >= 0) _data.PedalsBrakeMin         = profile.PedalsBrakeMin;
+            if (profile.PedalsBrakeMax         >= 0) _data.PedalsBrakeMax         = profile.PedalsBrakeMax;
             if (profile.PedalsClutchDir        >= 0) _data.PedalsClutchDir        = profile.PedalsClutchDir;
+            if (profile.PedalsClutchMin        >= 0) _data.PedalsClutchMin        = profile.PedalsClutchMin;
+            if (profile.PedalsClutchMax        >= 0) _data.PedalsClutchMax        = profile.PedalsClutchMax;
             if (profile.PedalsBrakeAngleRatio  >= 0) _data.PedalsBrakeAngleRatio  = profile.PedalsBrakeAngleRatio;
             if (profile.PedalsThrottleCurve != null)
                 for (int i = 0; i < Math.Min(5, profile.PedalsThrottleCurve.Length); i++)
@@ -476,8 +497,14 @@ namespace MozaPlugin.Hardware
             if (!_detectionState.PedalsDetected) return;
             var dm = PedalsManager;
             if (profile.PedalsThrottleDir      >= 0) dm.WriteSetting("pedals-throttle-dir", profile.PedalsThrottleDir);
+            if (profile.PedalsThrottleMin      >= 0) dm.WriteSetting("pedals-throttle-min", profile.PedalsThrottleMin);
+            if (profile.PedalsThrottleMax      >= 0) dm.WriteSetting("pedals-throttle-max", profile.PedalsThrottleMax);
             if (profile.PedalsBrakeDir         >= 0) dm.WriteSetting("pedals-brake-dir", profile.PedalsBrakeDir);
+            if (profile.PedalsBrakeMin         >= 0) dm.WriteSetting("pedals-brake-min", profile.PedalsBrakeMin);
+            if (profile.PedalsBrakeMax         >= 0) dm.WriteSetting("pedals-brake-max", profile.PedalsBrakeMax);
             if (profile.PedalsClutchDir        >= 0) dm.WriteSetting("pedals-clutch-dir", profile.PedalsClutchDir);
+            if (profile.PedalsClutchMin        >= 0) dm.WriteSetting("pedals-clutch-min", profile.PedalsClutchMin);
+            if (profile.PedalsClutchMax        >= 0) dm.WriteSetting("pedals-clutch-max", profile.PedalsClutchMax);
             if (profile.PedalsBrakeAngleRatio  >= 0) dm.WriteFloat("pedals-brake-angle-ratio", profile.PedalsBrakeAngleRatio);
             if (profile.PedalsThrottleCurve != null)
                 for (int i = 0; i < Math.Min(5, profile.PedalsThrottleCurve.Length); i++)
@@ -586,6 +613,9 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.GearshiftVibration, v => profile.GearshiftVibration = v,
                   () => _data.GearshiftVibration,   v => _data.GearshiftVibration   = v,
                   "base-gearshift-vibration");
+            Apply(() => profile.TempStrategy,       v => profile.TempStrategy       = v,
+                  () => _data.TempStrategy,         v => _data.TempStrategy         = v,
+                  "base-temp-strategy");
 
             // Local helper — does seed + mirror + write in one pass. Closes
             // over `profile` and `_data` via the enclosing scope so callers
