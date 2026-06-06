@@ -31,6 +31,9 @@ namespace MozaPlugin.Devices.WheelUi
         // than a tier-def channel URL, and carries a scale (InMin..InMax mapped to
         // the field's full-scale capability shown by CapabilityText).
         public bool IsFsr1 { get; set; }
+        /// <summary>True for a CM1 base-bridged dash field (group-0x35). Flat — uses
+        /// FieldId only (no RecordKey); the row maps the field to a SimHub property.</summary>
+        public bool IsCm1 { get; set; }
         public string RecordKey { get; set; } = "";
         public string FieldId { get; set; } = "";
         /// <summary>Human-readable field output capability, e.g. "0–255".</summary>

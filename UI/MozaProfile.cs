@@ -387,6 +387,15 @@ namespace MozaPlugin
         public Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>> Fsr1DashboardMappings { get; set; }
             = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
 
+        // CM1 base-bridged dash (group-0x35) field mappings. Flat — the CM1 streams one
+        // keyed field set regardless of selected dashboard, so there is no per-dashboard
+        // record-key level:
+        //   Outer key = dash device GUID (MozaDeviceConstants.DashGuid)
+        //   Inner key = field id (Cm1FieldDef.FieldId, e.g. "f54d")
+        // Reuses Fsr1FieldMapping (only Property is used; InMin/InMax unused for CM1).
+        public Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>> Cm1FieldMappings { get; set; }
+            = new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>();
+
         // ===== Wheelbase ambient LED (per-profile) =====
         // Moved out of MozaPluginSettings 2026-05-14 so each game can pick its own
         // ambient palette. -1 sentinel = "leave the persisted base value alone".
@@ -544,6 +553,20 @@ namespace MozaPlugin
                         middle[rec.Key] = inner;
                     }
                     Fsr1DashboardMappings[kvp.Key] = middle;
+                }
+            }
+
+            // CM1 dash field mappings (deep clone)
+            Cm1FieldMappings = new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>();
+            if (p.Cm1FieldMappings != null)
+            {
+                foreach (var kvp in p.Cm1FieldMappings)
+                {
+                    if (kvp.Value == null) continue;
+                    var inner = new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var fld in kvp.Value)
+                        if (fld.Value != null) inner[fld.Key] = fld.Value.Clone();
+                    Cm1FieldMappings[kvp.Key] = inner;
                 }
             }
 

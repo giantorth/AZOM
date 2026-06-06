@@ -254,12 +254,28 @@ namespace MozaPlugin
             if (!want)
             {
                 if (_cm2Sender != null) { try { _cm2Sender.Stop(); } catch { } }
+                if (_cm1Driver != null && _cm1Driver.IsRunning) { try { _cm1Driver.Stop(); } catch { } }
                 // Wheel sender no longer shares the bus with a CM2 sender.
                 if (_telemetrySender != null)
                 {
                     _telemetrySender.SharesConnection = false;
                     _telemetrySender.StrictInboundFilter = false;
                 }
+                return;
+            }
+
+            // Known CM1 base-bridged dash (group-0x35, no tier-def catalog): drive it with
+            // the dedicated Cm1DisplayDriver, never the tier-def sender. (CM1 only applies
+            // to a bus-bridged dash; a USB dash on PID 0x0025 is always a real CM2.)
+            if (busCm2 && DashIsCm1)
+            {
+                if (_cm2Sender != null) { try { _cm2Sender.Stop(); } catch { } }
+                if (_telemetrySender != null)
+                {
+                    _telemetrySender.SharesConnection = false;
+                    _telemetrySender.StrictInboundFilter = false;
+                }
+                StartCm1DriverIfNeeded();
                 return;
             }
 
@@ -289,6 +305,11 @@ namespace MozaPlugin
             // independent of the wheel, so the CM2's catalog-synth applies its own.
             _cm2Sender.MappingPageGuid = Cm2PageGuid;
             _cm2Sender.MappingDashKeys = new[] { Cm2DashKey };
+            // A bus-bridged dash of unknown type might be a CM1 (group-0x35) that never
+            // advertises a tier-def catalog. Suppress the no-catalog engagement watchdog
+            // so it doesn't loop restarts while TickCm1Discriminator decides. A USB dash
+            // (0x0025) is always a real CM2 → never suppress.
+            _cm2Sender.SuppressDisplayWatchdog = busCm2 && !DashIsCm1;
 
             // A tier-def WHEEL sender sharing the same bus must also filter strictly.
             bool wheelTierDefOnBus = busCm2 && !IsFsr1DisplayWheel
@@ -304,6 +325,8 @@ namespace MozaPlugin
                 // Fresh start: allow the saved-dashboard re-assert to fire once the
                 // CM2 advertises its dashboard list (PollStatus → TickCm2DashboardReassert).
                 _cm2ReassertAttempted = false;
+                // Stamp the start so TickCm1Discriminator can time the catalog-wait.
+                _cm2StartUtc = DateTime.UtcNow;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try { _cm2Sender.Start(); }
@@ -345,6 +368,72 @@ namespace MozaPlugin
 
             MozaLog.Info($"[Moza] Re-asserting saved CM2 dashboard '{saved}' (slot {slot}) after pipeline start");
             OnCm2DashboardSwitched((uint)slot);
+        }
+
+        // CM1 discriminator: when did the tier-def _cm2Sender start streaming? Used to
+        // time the catalog-wait before declaring a bridged dash a CM1.
+        private DateTime _cm2StartUtc = DateTime.MinValue;
+        // Past the watchdog's 20s engagement grace + 3s confirm; a real tier-def CM2
+        // advertises its catalog well within this, a CM1 never does.
+        private static readonly TimeSpan Cm1DecideAfter = TimeSpan.FromSeconds(25);
+
+        /// <summary>Start (or stop) the CM1 group-0x35 driver for a confirmed CM1 dash.
+        /// Mirrors <see cref="StartFsr1DriverIfNeeded"/>.</summary>
+        internal void StartCm1DriverIfNeeded()
+        {
+            if (_cm1Driver == null) return;
+            bool busDash = DetectionState.DashDetected && !DashboardUsbConnected
+                           && _connection?.IsConnected == true;
+            if (ActiveTelemetryEnabled && DashIsCm1 && busDash)
+            {
+                if (!_cm1Driver.IsRunning) _cm1Driver.Start();
+            }
+            else if (_cm1Driver.IsRunning)
+            {
+                _cm1Driver.Stop();
+            }
+        }
+
+        /// <summary>
+        /// PollStatus hook: decide whether a bus-bridged dash is a CM1 (group-0x35, never
+        /// advertises a tier-def catalog) rather than a tier-def CM2. Once the tier-def
+        /// _cm2Sender has run past the engagement grace with no catalog, latch DashIsCm1,
+        /// tear down the (watchdog-suppressed) _cm2Sender, and hand off to the CM1 driver.
+        /// If a catalog DOES arrive, it's a real CM2 → drop the suppress flag.
+        /// </summary>
+        internal void TickCm1Discriminator()
+        {
+            if (DashIsCm1) { StartCm1DriverIfNeeded(); return; }
+
+            var cm2 = _cm2Sender;
+            if (cm2 == null || !cm2.Enabled) return;
+
+            // CM1 only applies to a bus-bridged dash; a USB dash (0x0025) is a real CM2.
+            bool busCm2 = DetectionState.DashDetected && !DashboardUsbConnected
+                          && _connection?.IsConnected == true;
+            if (!busCm2) return;
+
+            if (cm2.CatalogCount > 0)
+            {
+                // Real tier-def CM2 — stop suppressing its engagement watchdog.
+                if (cm2.SuppressDisplayWatchdog) cm2.SuppressDisplayWatchdog = false;
+                return;
+            }
+
+            if (cm2.FramesSent == 0 || _cm2StartUtc == DateTime.MinValue) return;
+            if (DateTime.UtcNow - _cm2StartUtc < Cm1DecideAfter) return;
+
+            MozaLog.Info("[Moza] Bridged dash advertised no tier-def catalog within "
+                + $"{Cm1DecideAfter.TotalSeconds:F0}s — treating as CM1 (group-0x35); handing off to CM1 driver");
+            DashIsCm1 = true;
+            SaveSettings();
+            try { cm2.Stop(); } catch { }
+            if (_telemetrySender != null)
+            {
+                _telemetrySender.SharesConnection = false;
+                _telemetrySender.StrictInboundFilter = false;
+            }
+            StartCm1DriverIfNeeded();
         }
 
         /// <summary>
@@ -421,6 +510,10 @@ namespace MozaPlugin
         // the shared wheelbase connection (lane base 18) or dev 0x12 on the CM2's own
         // USB connection (lane base 0). Null until such a dual-screen setup is seen.
         private TelemetrySender? _cm2Sender;
+
+        // Standalone CM1 base-bridged dash driver (group-0x35 → dev 0x14). Used instead
+        // of the tier-def _cm2Sender when a bridged dash is a CM1 (no tier-def catalog).
+        private Telemetry.Cm1DisplayDriver? _cm1Driver;
         // True if Init reused the persistent connection/sender from a
         // prior plugin instance. End() respects this flag and skips
         // disposing them so the next Init can pick up where we left off.
@@ -1244,6 +1337,9 @@ namespace MozaPlugin
                 // FSR V1 display driver — own timer/lane on the wheelbase connection,
                 // started lazily once an FSR1 wheel is detected (StartFsr1DriverIfNeeded).
                 _fsr1Driver = new Telemetry.Fsr1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);
+                // CM1 base-bridged dash driver — own timer/lane on the wheelbase connection,
+                // started lazily once a bridged dash is confirmed CM1 (TickCm1Discriminator).
+                _cm1Driver = new Telemetry.Cm1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);
                 // Propagate the hot-renegotiation feature flag from settings.
                 // Reading from settings here (rather than via a callback) is
                 // fine because the flag is JSON-ignored and only set
@@ -1424,6 +1520,7 @@ namespace MozaPlugin
                 try { _telemetrySender?.Dispose(); } catch { }
                 try { _fsr1Driver?.Dispose(); } catch { }
                 try { _cm2Sender?.Dispose(); } catch { }
+                try { _cm1Driver?.Dispose(); } catch { }
             }
             // File sink always closes on teardown — new file per Init by design.
             // In-memory ring stays enabled across plugin reload when always-capture is on,
@@ -1573,6 +1670,8 @@ namespace MozaPlugin
             _fsr1Driver?.SetGameRunning(data.GameRunning);
             _cm2Sender?.UpdateGameData(data.NewData);
             _cm2Sender?.SetGameRunning(data.GameRunning);
+            _cm1Driver?.UpdateGameData(data.NewData);
+            _cm1Driver?.SetGameRunning(data.GameRunning);
             CheckGearshiftEvent(data);
             CheckAb9GearshiftEvent(data);
 
@@ -1819,6 +1918,8 @@ namespace MozaPlugin
             _fsr1Driver = null;
             try { _cm2Sender?.Dispose(); } catch { }
             _cm2Sender = null;
+            try { _cm1Driver?.Dispose(); } catch { }
+            _cm1Driver = null;
 
             // When keepWireAlive=true we just drop the instance ref; the
             // persistent static keeps the child process alive for the next
@@ -1918,6 +2019,7 @@ namespace MozaPlugin
             {
                 _telemetrySender?.Dispose();
                 _fsr1Driver?.Dispose();
+                _cm1Driver?.Dispose();
                 _connection?.Dispose();
                 // Clear static refs so the next Init takes the cold-start path.
                 if (_connection == s_persistentConnection)
@@ -3599,6 +3701,7 @@ namespace MozaPlugin
 
             _dashboardBindingCoordinator?.TickPendingDashboardRetry();
             TickCm2DashboardReassert();
+            TickCm1Discriminator();
 
             // Hot-swap detection: track whether the locked wheel is still responding
             // and periodically verify the model name hasn't changed.
@@ -3797,6 +3900,10 @@ namespace MozaPlugin
                 // switches. See docs/protocol/devices/wheel-0x17.md § Group 0x42.
                 if (rawDeviceId == 0x71 && IsFsr1DisplayWheel)
                     TryFollowFsr1DashboardLog(text);
+                // A CM1 base-bridged dash reports its current page via the byte-identical
+                // "Table 7, Param 6 Written: N" log on dev 0x41 (0x14 swapped). Follow it.
+                if (rawDeviceId == 0x41 && DashIsCm1)
+                    TryFollowCm1DashboardLog(text);
                 // The main bridge logs steering-wheel (rim) attach/detach edges
                 // here as "steer_connected <N>" / "Gpw Wheel Disconnected". A rim
                 // pull is NOT a USB/serial disconnect, so the poll-miss hot-swap
@@ -4457,6 +4564,13 @@ namespace MozaPlugin
         internal static readonly Guid Cm2PageGuid = Guid.Parse(Devices.MozaDeviceConstants.DashGuid);
         internal const string Cm2DashKey = "cm2";
 
+        // CM1 base-bridged dash gets its OWN page GUID so its field mappings,
+        // active-dashboard selection and the CM1/CM2 discriminator never share a
+        // key with the CM2 / legacy dash (which use Cm2PageGuid). A user can run
+        // a CM1 and a CM2 simultaneously; keeping the identities disjoint is what
+        // lets both persist independently.
+        internal static readonly Guid Cm1PageGuid = Guid.Parse(Devices.MozaDeviceConstants.DashCm1Guid);
+
         internal Dictionary<string, Dictionary<string, string>>? GetActiveChannelMappings(Guid? pageGuid = null)
         {
             var profile = _settings?.ProfileStore?.CurrentProfile;
@@ -4629,6 +4743,137 @@ namespace MozaPlugin
             var m = _fsr1DashLogRe.Match(text);
             if (m.Success && int.TryParse(m.Groups[1].Value, out int idx))
                 NoteFsr1WheelIndex(idx);
+        }
+
+        // CM1 page-report log is byte-identical to the FSR1's (same firmware family),
+        // just on dev 0x41. Reuse the regex; follow the dash's self-switch.
+        private void TryFollowCm1DashboardLog(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            var m = _fsr1DashLogRe.Match(text);
+            if (m.Success && int.TryParse(m.Groups[1].Value, out int idx))
+                NoteCm1WheelIndex(idx);
+        }
+
+        // ===== CM1 base-bridged dash (group-0x35) =====
+        // The CM1 is driven by the standalone Cm1DisplayDriver, not a tier-def sender.
+        // Its field set is flat (Cm1DashboardCatalog), keyed under its OWN dash GUID
+        // (Cm1PageGuid), independent of any wheel. The dashboard-switch command and the
+        // Param-6 page-report log are byte-identical to the FSR1's, just on dev 0x14/0x41.
+
+        private Dictionary<string, Fsr1FieldMapping>? GetActiveCm1Mappings()
+        {
+            var profile = _settings?.ProfileStore?.CurrentProfile;
+            if (profile?.Cm1FieldMappings == null) return null;
+            return profile.Cm1FieldMappings.TryGetValue(Cm1PageGuid, out var m) ? m : null;
+        }
+
+        /// <summary>Resolve one CM1 field's user mapping, or null to use the catalog default.</summary>
+        internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId)
+        {
+            if (string.IsNullOrEmpty(fieldId)) return null;
+            var m = GetActiveCm1Mappings();
+            return m != null && m.TryGetValue(fieldId, out var fm) ? fm : null;
+        }
+
+        /// <summary>Persist (or clear) a CM1 field assignment. Empty property removes the
+        /// override (field reverts to its catalog default/constant). Saves settings.</summary>
+        internal void SetCm1FieldMapping(string fieldId, string property)
+        {
+            if (string.IsNullOrEmpty(fieldId)) return;
+            var profile = _settings?.ProfileStore?.CurrentProfile;
+            if (profile == null) return;
+            if (profile.Cm1FieldMappings == null)
+                profile.Cm1FieldMappings = new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>();
+            if (!profile.Cm1FieldMappings.TryGetValue(Cm1PageGuid, out var inner) || inner == null)
+            {
+                inner = new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
+                profile.Cm1FieldMappings[Cm1PageGuid] = inner;
+            }
+            string trimmed = (property ?? "").Trim();
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                inner.Remove(fieldId);
+                if (inner.Count == 0) profile.Cm1FieldMappings.Remove(Cm1PageGuid);
+            }
+            else
+            {
+                inner[fieldId] = new Fsr1FieldMapping { Property = trimmed };
+            }
+            SaveSettings();
+        }
+
+        /// <summary>Clear ALL CM1 field mappings (reset-to-defaults).</summary>
+        internal void ClearCm1Mappings()
+        {
+            var profile = _settings?.ProfileStore?.CurrentProfile;
+            if (profile?.Cm1FieldMappings == null) return;
+            if (profile.Cm1FieldMappings.Remove(Cm1PageGuid)) SaveSettings();
+        }
+
+        /// <summary>Raised when the active CM1 dashboard index changes (user pick or the
+        /// dash reported a self-switch via its Param-6 log). UI re-selects.</summary>
+        internal event EventHandler? Cm1ActiveIndexChanged;
+
+        private int _cm1PendingSelect = -1;
+
+        /// <summary>Current CM1 active dashboard page (1-based), default 1.</summary>
+        internal int GetActiveCm1Index()
+        {
+            if (_settings?.Cm1ActiveDashboardByGuid != null
+                && _settings.Cm1ActiveDashboardByGuid.TryGetValue(Cm1PageGuid, out var i))
+                return i;
+            return Telemetry.Cm1DisplayEmitter.MinDashboardIndex;
+        }
+
+        /// <summary>Set the CM1 active dashboard page. <paramref name="sendToWheel"/> true
+        /// queues the group-0x32/0x81 select for the driver to emit; false (dash self-switch
+        /// from the Param-6 log) just records it. Persists per dash GUID.</summary>
+        internal void SetActiveCm1Index(int index, bool sendToWheel)
+        {
+            if (index < Telemetry.Cm1DisplayEmitter.MinDashboardIndex)
+                index = Telemetry.Cm1DisplayEmitter.MinDashboardIndex;
+            if (index > Telemetry.Cm1DisplayEmitter.MaxDashboardIndex)
+                index = Telemetry.Cm1DisplayEmitter.MaxDashboardIndex;
+            if (_settings != null)
+            {
+                if (_settings.Cm1ActiveDashboardByGuid == null)
+                    _settings.Cm1ActiveDashboardByGuid = new Dictionary<Guid, int>();
+                bool changed = !_settings.Cm1ActiveDashboardByGuid.TryGetValue(Cm1PageGuid, out var prev) || prev != index;
+                _settings.Cm1ActiveDashboardByGuid[Cm1PageGuid] = index;
+                if (changed && !sendToWheel) SaveSettings();
+            }
+            if (sendToWheel)
+            {
+                Interlocked.Exchange(ref _cm1PendingSelect, index);
+                SaveSettings();
+            }
+            try { Cm1ActiveIndexChanged?.Invoke(this, EventArgs.Empty); } catch { }
+        }
+
+        /// <summary>Driver drains the pending user-select index (or -1). One-shot.</summary>
+        internal int TakePendingCm1Select() => Interlocked.Exchange(ref _cm1PendingSelect, -1);
+
+        /// <summary>Record a dash-reported page index (self-switch via Param-6 log).</summary>
+        internal void NoteCm1WheelIndex(int index)
+        {
+            if (index == GetActiveCm1Index()) return;
+            SetActiveCm1Index(index, sendToWheel: false);
+        }
+
+        /// <summary>True once this dash is confirmed a CM1 (group-0x35). Persisted per
+        /// dash GUID so later boots skip the tier-def probe.</summary>
+        internal bool DashIsCm1
+        {
+            get => _settings?.DashIsCm1ByGuid != null
+                   && _settings.DashIsCm1ByGuid.TryGetValue(Cm1PageGuid, out var v) && v;
+            set
+            {
+                if (_settings == null) return;
+                if (_settings.DashIsCm1ByGuid == null)
+                    _settings.DashIsCm1ByGuid = new Dictionary<Guid, bool>();
+                _settings.DashIsCm1ByGuid[Cm1PageGuid] = value;
+            }
         }
 
         // Match "steer_connected <N>" in a main-bridge firmware-debug line. The

@@ -271,6 +271,12 @@ namespace MozaPlugin.Devices
                 try { _plugin.ApplyTelemetrySettings(); _plugin.StartTelemetryIfReady(); }
                 catch (Exception ex) { MozaLog.Debug($"[Moza] CM2-on-base telemetry start skipped: {ex.Message}"); }
             }
+
+            // Dual-screen: a wheel that has its OWN screen (FSR1 / tier-def display wheel)
+            // plus a bus-bridged dash → ensure the concurrent dash pipeline spins up so the
+            // CM1 discriminator (or the tier-def CM2 sender) starts. Idempotent / gated.
+            try { _plugin.EnsureCm2Pipeline(); }
+            catch (Exception ex) { MozaLog.Debug($"[Moza] EnsureCm2Pipeline on dash-detect skipped: {ex.Message}"); }
         }
 
         /// <summary>First-sight detection cascade for the handbrake sub-device.

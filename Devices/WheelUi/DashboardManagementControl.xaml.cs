@@ -127,6 +127,19 @@ namespace MozaPlugin.Devices.WheelUi
             PopulateDashboardCombo();
         }
 
+        // CM1 base-bridged dash reported a page switch (Param-6 log) or our select was
+        // applied — re-select the dropdown on the CM2/CM1 page to match.
+        private void OnCm1ActiveIndexChanged(object? sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => OnCm1ActiveIndexChanged(sender, e)));
+                return;
+            }
+            if (!IsCm1) return;
+            PopulateDashboardCombo();
+        }
+
         private bool ResolvePlugin()
         {
             _plugin = MozaPlugin.Instance;
@@ -144,9 +157,12 @@ namespace MozaPlugin.Devices.WheelUi
                     catch { }
                     try { _dashEventSubscribedPlugin.Fsr1ActiveIndexChanged -= OnFsr1ActiveIndexChanged; }
                     catch { }
+                    try { _dashEventSubscribedPlugin.Cm1ActiveIndexChanged -= OnCm1ActiveIndexChanged; }
+                    catch { }
                 }
                 _plugin.DashboardSelectionChanged += OnPluginDashboardSelectionChanged;
                 _plugin.Fsr1ActiveIndexChanged += OnFsr1ActiveIndexChanged;
+                _plugin.Cm1ActiveIndexChanged += OnCm1ActiveIndexChanged;
                 _dashEventSubscribedPlugin = _plugin;
                 MozaLog.Debug(
                     $"[Moza] UI: subscribed to DashboardSelectionChanged (plugin hash={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_plugin)})");
@@ -164,6 +180,10 @@ namespace MozaPlugin.Devices.WheelUi
         private global::MozaPlugin.Telemetry.TelemetrySender? ActiveSender =>
             _plugin == null ? null : (IsCm2Target ? _plugin.Cm2Sender : _plugin.TelemetrySender);
 
+        /// <summary>True when this (CM2) page's dash is a confirmed CM1 (group-0x35) —
+        /// it's driven by the Cm1DisplayDriver with a flat field set, not tier-def.</summary>
+        private bool IsCm1 => IsCm2Target && (_plugin?.DashIsCm1 ?? false);
+
         private void RefreshDashboardManagement()
         {
             if (!ResolvePlugin()) return;
@@ -173,6 +193,15 @@ namespace MozaPlugin.Devices.WheelUi
             if (IsCm2Target)
             {
                 InitTelemetryUI();
+                // CM1: static page list (group-0x35) + flat field rows — no tier-def
+                // slot / ConfigJsonList to track.
+                if (IsCm1)
+                {
+                    PopulateDashboardCombo();
+                    long sigc = ComputeMappingDataSignature();
+                    if (sigc != _lastMappingDataSignature) PopulateChannelMappingList();
+                    return;
+                }
                 int cm2Slot = ActiveSender?.WheelReportedSlot ?? -1;
                 bool cm2StateReady = (ActiveSender?.WheelState?.ConfigJsonList?.Count ?? 0) > 0;
                 if (cm2Slot != _lastPopulatedWheelSlot || (cm2StateReady && !_dashComboFromWheelState))
@@ -247,6 +276,25 @@ namespace MozaPlugin.Devices.WheelUi
         private void PopulateDashboardCombo()
         {
             if (_plugin == null) return;
+
+            // CM1 base-bridged dash: built-in pages selected via the 0x32/0x81 switch
+            // (1-based 1..N); no tier-def ConfigJsonList. Mirrors the FSR1 branch.
+            if (IsCm1)
+            {
+                using (_suppressor.Begin())
+                {
+                    TelemetryProfileCombo.Items.Clear();
+                    int min = global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MinDashboardIndex;
+                    int max = global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MaxDashboardIndex;
+                    for (int i = min; i <= max; i++)
+                        TelemetryProfileCombo.Items.Add($"Dashboard {i}");
+                    int active = _plugin.GetActiveCm1Index();
+                    int idx = active - min;
+                    TelemetryProfileCombo.SelectedIndex = (idx >= 0 && idx < TelemetryProfileCombo.Items.Count) ? idx : 0;
+                    _lastPopulatedWheelSlot = -1;
+                }
+                return;
+            }
 
             // FSR V1: the dropdown selects which built-in dashboard (group-0x42
             // record type) the plugin streams — there is no wheel-reported
@@ -373,6 +421,8 @@ namespace MozaPlugin.Devices.WheelUi
         private long ComputeMappingDataSignature()
         {
             if (_plugin == null) return -2;
+            // CM1 rows come from the static flat catalog — fixed signature (populate once).
+            if (IsCm1) return -4;
             // FSR V1 rows come from the static catalog, not a tier profile —
             // a fixed signature so the list populates once and doesn't churn.
             if (!IsCm2Target && _plugin.IsFsr1DisplayWheel) return -3;
@@ -564,9 +614,25 @@ namespace MozaPlugin.Devices.WheelUi
 
             int idx = TelemetryProfileCombo.SelectedIndex;
 
+            // CM1 base-bridged dash: selecting a page sends the group-0x32/0x81 select to
+            // dev 0x14 (1-based page = combo index + min). Checked before the FSR1 branch
+            // because the wheel may itself be an FSR1 (this is the dash page).
+            if (IsCm1)
+            {
+                int min = global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MinDashboardIndex;
+                int page = idx + min;
+                if (idx >= 0 && page <= global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MaxDashboardIndex)
+                {
+                    _plugin.SetActiveCm1Index(page, sendToWheel: true);
+                    PopulateChannelMappingList();
+                    TelemetryMappingStatus.Text = $"CM1 → Dashboard {page}";
+                }
+                return;
+            }
+
             // FSR V1: selecting a dashboard sends the group-0x32/0x81 select command
             // (index = combo position). The wheel switches its displayed page.
-            if (_plugin.IsFsr1DisplayWheel)
+            if (!IsCm2Target && _plugin.IsFsr1DisplayWheel)
             {
                 if (idx >= 0 && idx <= global::MozaPlugin.Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex)
                 {
@@ -735,6 +801,15 @@ namespace MozaPlugin.Devices.WheelUi
         {
             if (_plugin == null) return;
 
+            // CM1 base-bridged dash: clear all flat field mappings.
+            if (IsCm1)
+            {
+                _plugin.ClearCm1Mappings();
+                PopulateChannelMappingList();
+                TelemetryMappingStatus.Text = $"Reset to defaults at {DateTime.Now:HH:mm:ss}";
+                return;
+            }
+
             // FSR V1: clear each field override (reverts to catalog defaults).
             if (!IsCm2Target && _plugin.IsFsr1DisplayWheel)
             {
@@ -841,6 +916,16 @@ namespace MozaPlugin.Devices.WheelUi
                 return;
             }
 
+            // CM1 base-bridged dash: flat field store keyed by field id.
+            if (row.IsCm1)
+            {
+                if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)) return;
+                if (string.IsNullOrEmpty(row.FieldId)) return;
+                _plugin.SetCm1FieldMapping(row.FieldId, row.SimHubProperty);
+                TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
+                return;
+            }
+
             if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)) return;
             if (string.IsNullOrEmpty(row.Url)) return;
             if (IsCm2Target)
@@ -869,9 +954,11 @@ namespace MozaPlugin.Devices.WheelUi
                 return;
             }
 
-            var result = IsCm2Target
-                ? ChannelMappingRowFactory.BuildForCm2(_plugin, _plugin.Cm2Sender)
-                : ChannelMappingRowFactory.Build(_plugin);
+            var result = IsCm1
+                ? ChannelMappingRowFactory.BuildForCm1(_plugin)
+                : IsCm2Target
+                    ? ChannelMappingRowFactory.BuildForCm2(_plugin, _plugin.Cm2Sender)
+                    : ChannelMappingRowFactory.Build(_plugin);
             if (result.Rows == null)
             {
                 // No profile + no catalog yet — show loading state, leave the

@@ -88,6 +88,35 @@ namespace MozaPlugin.Devices.WheelUi
         }
 
         /// <summary>
+        /// Build rows for a CM1 base-bridged dash (group-0x35) — the flat
+        /// <see cref="Telemetry.Cm1DashboardCatalog"/> field set. Each row maps a 16-bit
+        /// field key to a SimHub property; values are streamed as big-endian float32.
+        /// Default mappings are blank (best-effort labels only) so users assign channels.
+        /// </summary>
+        public static BuildResult BuildForCm1(MozaPlugin plugin)
+        {
+            if (plugin == null) return new BuildResult(null, "");
+            var props = plugin.GetAllSimHubPropertyNames();
+            var rows = new List<ChannelMappingRow>();
+            foreach (var f in Telemetry.Cm1DashboardCatalog.Fields)
+            {
+                var m = plugin.GetCm1FieldMapping(f.FieldId);
+                rows.Add(new ChannelMappingRow
+                {
+                    AllProperties = props,
+                    IsCm1 = true,
+                    FieldId = f.FieldId,
+                    Name = f.Label + (f.Decoded ? "" : "  (raw)"),
+                    Url = "cm1/" + f.FieldId,
+                    Compression = "float32",
+                    CapabilityText = "float",
+                    SimHubProperty = m?.Property ?? f.DefaultProperty,
+                });
+            }
+            return new BuildResult(rows, $"(CM1: {rows.Count} dash fields — assign SimHub channels)");
+        }
+
+        /// <summary>
         /// Build rows for the CM2 dash pipeline from the CM2 sender's own
         /// catalog-synthesised profile (tier-def channels — never FSR1). Independent
         /// of the wheel's profile/catalog.

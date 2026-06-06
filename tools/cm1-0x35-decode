@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""CM1 base-bridged dash (group-0x35) field decoder.
+
+The CM1 dash (dev 0x14, responses 0x41) is driven by a keyed value stream:
+
+    7E <6N> 35 14  [<field_key:2 bytes BE><value: big-endian float32>] * N  <csum>
+    (group 0x36 = a lower-rate secondary stream, same record format)
+
+Every record is 6 bytes: a 16-bit field key (high byte clusters 0xDA/0xF5/0xD9 — it is
+PART OF THE KEY, not a type tag) followed by a **big-endian float32** value. The full flat
+field set streams round-robin, 10 records/frame. There is NO catalog naming the fields.
+
+Encoding was proven from FSR1_CM1.pcapng's driving window (t>=~260s): under big-endian
+float32 the values resolve to clean physical quantities (tyre pressures ~25, temps ~50/~120,
+per-wheel groups of 4); little-endian int/float yield garbage. See
+docs/protocol/devices/ (CM1 group-0x35) once written.
+
+Usage:
+    tools/cm1-0x35-decode <capture.jsonl> [drive_start_s]
+    tools/cm1-0x35-decode /tmp/fsr1_cm1.jsonl 260
+
+Honour "no capture = I don't know": fields whose meaning isn't clear from range/shape stay
+raw/unmapped in the emitted Cm1FieldDef seed (DefaultProperty="", Decoded=false).
+"""
+import json
+import struct
+import sys
+from collections import defaultdict
+
+DASH = 0x14
+MAGIC = 0x0D
+
+
+def wcsum(frame_wo_csum):
+    s = MAGIC + sum(frame_wo_csum)
+    for i in range(2, len(frame_wo_csum)):
+        if frame_wo_csum[i] == 0x7E:
+            s += 0x7E
+    return s & 0xFF
+
+
+def load(path):
+    out, t0 = [], None
+    with open(path) as fh:
+        for line in fh:
+            o = json.loads(line)
+            raw = bytes.fromhex(o["hex"])
+            if len(raw) < 5 or raw[0] != 0x7E:
+                continue
+            if t0 is None:
+                t0 = o["t"]
+            out.append((o["t"] - t0, o["dir"], raw))
+    return out
+
+
+def bef(raw):
+    return struct.unpack(">f", raw)[0]
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+    frames = load(sys.argv[1])
+    drive = float(sys.argv[2]) if len(sys.argv) > 2 else 260.0
+
+    ser = defaultdict(list)        # (hi,lo) -> [(t, raw4)]
+    ok = bad = 0
+    for t, dr, r in frames:
+        if dr != "h2b" or r[3] != DASH or r[2] not in (0x35, 0x36):
+            continue
+        if wcsum(r[:-1]) != r[-1]:
+            bad += 1
+            continue
+        ok += 1
+        body = r[4:-1]
+        if len(body) % 6:
+            continue
+        for i in range(0, len(body), 6):
+            ser[(body[i], body[i + 1])].append((t, bytes(body[i + 2:i + 6])))
+
+    print(f"frames ok={ok} bad-csum={bad}  distinct field keys={len(ser)}  drive>={drive:.0f}s")
+    print(f"\n{'key':6} {'n':>6} {'distinct':>8}  {'BE-float min..max':>24}  guess")
+
+    seed = []
+    rows = []
+    for key, s in ser.items():
+        d = [(t, raw) for t, raw in s if t >= drive]
+        if len(d) < 20:
+            continue
+        fs = [bef(raw) for _, raw in d]
+        fin = [x for x in fs if x == x and abs(x) < 1e9]
+        if not fin:
+            continue
+        lo, hi = min(fin), max(fin)
+        nd = len(set(raw for _, raw in d))
+        rows.append((key, len(d), nd, lo, hi))
+
+    # crude grouping/labels by value range (best-effort; refine on hardware)
+    def guess(lo, hi, nd):
+        if nd <= 2:
+            return "flag/const"
+        if 0 <= lo and hi <= 1.001 and nd > 20:
+            return "0..1 (pedal/norm)"
+        if 18 <= lo and hi <= 35:
+            return "tyre pressure? (~psi)"
+        if 40 <= lo and hi <= 75:
+            return "tyre temp? (degC)"
+        if 100 <= lo and hi <= 200:
+            return "temp? (degC)"
+        if 200 <= hi <= 20000:
+            return "speed/brake-temp/rpm?"
+        return ""
+
+    for key, n, nd, lo, hi in sorted(rows, key=lambda x: (x[3], x[0])):
+        g = guess(lo, hi, nd)
+        print(f"{key[0]:02x}{key[1]:02x}  {n:6d} {nd:8d}  [{lo:10.2f}..{hi:10.2f}]  {g}")
+        seed.append((key, lo, hi, g))
+
+    # paste-ready Cm1FieldDef seed (keys + suggested labels; DefaultProperty left blank)
+    print("\n// --- Cm1FieldDef seed (paste into Cm1DashboardCatalog; map DefaultProperty by hand) ---")
+    for (key, lo, hi, g) in seed:
+        kid = f"0x{key[0]:02x}{key[1]:02x}"
+        lbl = (g or "raw").replace('"', "'")
+        print(f'new Cm1FieldDef {{ Key = {{ 0x{key[0]:02x}, 0x{key[1]:02x} }}, '
+              f'Label = "{kid} ({lbl})", DefaultProperty = "", Decoded = false }},')
+
+
+if __name__ == "__main__":
+    main()

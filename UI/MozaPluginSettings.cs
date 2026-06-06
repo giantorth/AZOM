@@ -488,6 +488,24 @@ namespace MozaPlugin
             = new Dictionary<Guid, int>();
 
         /// <summary>
+        /// Latched per dash GUID: true once a base-bridged dash is confirmed to be a CM1
+        /// (group-0x35, no tier-def catalog) rather than a tier-def CM2. Lets subsequent
+        /// boots route straight to the CM1 driver instead of re-running the tier-def probe.
+        /// See <see cref="MozaPlugin.TickCm1Discriminator"/>.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+            DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
+        public Dictionary<Guid, bool> DashIsCm1ByGuid { get; set; }
+            = new Dictionary<Guid, bool>();
+
+        /// <summary>CM1 selected dashboard page index (1-based), per dash GUID. Set via the
+        /// 0x32/0x81 select command and reported back by the dash's Param-6 log. Absent = 1.</summary>
+        [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
+            DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
+        public Dictionary<Guid, int> Cm1ActiveDashboardByGuid { get; set; }
+            = new Dictionary<Guid, int>();
+
+        /// <summary>
         /// One-shot migration: copy entries from the legacy single-level
         /// <see cref="TelemetryChannelMappings"/> into <see cref="TelemetryChannelMappingsByWheel"/>
         /// under the empty-wheel slot ("") so users upgrading from 2026-05-08 or earlier

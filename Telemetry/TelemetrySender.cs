@@ -1188,6 +1188,15 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         public volatile bool SharesConnection;
 
+        /// <summary>
+        /// When true, the no-catalog engagement watchdog is suppressed for this sender.
+        /// Set while a base-bridged dash's type is undetermined: a CM1 (group-0x35) dash
+        /// never advertises a tier-def catalog, so the watchdog would otherwise loop
+        /// restarts. <see cref="MozaPlugin.TickCm1Discriminator"/> clears it (or hands off
+        /// to the CM1 driver) once the type is known.
+        /// </summary>
+        public volatile bool SuppressDisplayWatchdog;
+
         // FSR V1 (group-0x42) display push is handled by the standalone
         // Telemetry/Fsr1DisplayDriver — this sender is pure tier-def.
 
@@ -3508,7 +3517,13 @@ namespace MozaPlugin.Telemetry
                 TickEmitLedStatePolls();
                 TickEmitRetransmits();
                 _tierDefEmitter.TickEmitTierDefBlindRetransmits();
-                _watchdog.TickDisplayWatchdog();
+                // A base-bridged dash whose type is still unknown (could be a CM1
+                // group-0x35 device that never advertises a tier-def catalog) must NOT
+                // trip the no-catalog engagement watchdog — it would burn restarts and
+                // spam tier-def opens while the CM1 discriminator decides. See
+                // MozaPlugin.TickCm1Discriminator.
+                if (!SuppressDisplayWatchdog)
+                    _watchdog.TickDisplayWatchdog();
                 TickGrowSubscriptionIfCatalogStable();
                 TickPostSwitchCatalogConvergence();
 
