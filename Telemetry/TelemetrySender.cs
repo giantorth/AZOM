@@ -1737,9 +1737,37 @@ namespace MozaPlugin.Telemetry
             try { System.Threading.Thread.Sleep(100); } catch { }
         }
 
+        // Top frames of the call chain into Stop(), for diagnosing which path
+        // (watchdog / detection / switch) triggered a cooldown. Best-effort.
+        private static string DescribeStopCaller()
+        {
+            try
+            {
+                var st = new System.Diagnostics.StackTrace(2, false); // skip this + Stop
+                var frames = st.GetFrames();
+                if (frames == null) return "unknown";
+                var sb = new System.Text.StringBuilder();
+                int shown = 0;
+                foreach (var f in frames)
+                {
+                    var m = f.GetMethod();
+                    if (m == null) continue;
+                    if (shown > 0) sb.Append(" ← ");
+                    sb.Append(m.DeclaringType?.Name).Append('.').Append(m.Name);
+                    if (++shown >= 4) break;
+                }
+                return sb.Length > 0 ? sb.ToString() : "unknown";
+            }
+            catch { return "unknown"; }
+        }
+
         public void Stop()
         {
-            TransitionTo(TelemetryState.Idle, "Stop()");
+            // Capture the call chain that led here — Stop()→Idle is the cooldown
+            // path; several watchdogs and the device-detection/reconnect logic can
+            // all reach it, and the bare "Stop()" reason didn't say which. The
+            // top frames name the culprit in the diagnostics bundle.
+            TransitionTo(TelemetryState.Idle, "Stop() ← " + DescribeStopCaller());
             _connection.MessageReceived -= _inboundDispatcher.OnMessageDuringPreamble;
             if (_sendTimer != null)
             {
