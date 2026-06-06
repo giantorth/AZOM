@@ -327,6 +327,10 @@ namespace MozaPlugin
                 _cm2ReassertAttempted = false;
                 // Stamp the start so TickCm1Discriminator can time the catalog-wait.
                 _cm2StartUtc = DateTime.UtcNow;
+                // Fresh discrimination cycle — clear the param-read flag so a stale
+                // CM1 answer can't fast-latch a newly-attached CM2.
+                _dashParamReadAnswered = false;
+                _lastCm1ProbeUtc = DateTime.MinValue;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try { _cm2Sender.Start(); }
@@ -376,6 +380,15 @@ namespace MozaPlugin
         // Past the watchdog's 20s engagement grace + 3s confirm; a real tier-def CM2
         // advertises its catalog well within this, a CM1 never does.
         private static readonly TimeSpan Cm1DecideAfter = TimeSpan.FromSeconds(25);
+        // Set when the dash answers the group-0x0E param-read probe with a 0x8E
+        // reply (OnMessageReceived) — a positive CM1 signal a tier-def CM2 doesn't
+        // produce. Lets TickCm1Discriminator latch CM1 on the fast path.
+        private volatile bool _dashParamReadAnswered;
+        private DateTime _lastCm1ProbeUtc = DateTime.MinValue;
+        // Fast-path latch: param-read answered + no catalog after this short
+        // settle → CM1, without waiting out Cm1DecideAfter. Kept long enough that
+        // a slow tier-def CM2's catalog still arrives first and wins.
+        private static readonly TimeSpan Cm1FastDecideAfter = TimeSpan.FromSeconds(5);
 
         /// <summary>Start (or stop) the CM1 group-0x35 driver for a confirmed CM1 dash.
         /// Mirrors <see cref="StartFsr1DriverIfNeeded"/>.</summary>
@@ -421,17 +434,46 @@ namespace MozaPlugin
             }
 
             if (cm2.FramesSent == 0 || _cm2StartUtc == DateTime.MinValue) return;
-            if (DateTime.UtcNow - _cm2StartUtc < Cm1DecideAfter) return;
 
-            MozaLog.Info("[Moza] Bridged dash advertised no tier-def catalog within "
-                + $"{Cm1DecideAfter.TotalSeconds:F0}s — treating as CM1 (group-0x35); handing off to CM1 driver");
+            var elapsed = DateTime.UtcNow - _cm2StartUtc;
+
+            // Fast positive CM1 signal: the dash answers the group-0x0E param-read
+            // probe with a 0x8E reply (_dashParamReadAnswered); a tier-def CM2
+            // doesn't. Re-probe ~1 Hz until it answers or a catalog arrives. Once
+            // answered, latch CM1 after a short settle (Cm1FastDecideAfter) so a
+            // slow CM2 — whose catalog arrives well inside that window — still
+            // wins via the CatalogCount check above. Falls back to the long
+            // no-catalog timeout when the dash never answers the probe.
+            if (!_dashParamReadAnswered)
+            {
+                if ((DateTime.UtcNow - _lastCm1ProbeUtc).TotalMilliseconds >= 1000)
+                {
+                    _lastCm1ProbeUtc = DateTime.UtcNow;
+                    try { _deviceManager.SendCm1ParamProbe(); } catch { }
+                }
+            }
+            else if (elapsed >= Cm1FastDecideAfter)
+            {
+                LatchDashAsCm1($"answered param-read (0x8E) with no tier-def catalog in "
+                    + $"{Cm1FastDecideAfter.TotalSeconds:F0}s");
+                return;
+            }
+
+            if (elapsed < Cm1DecideAfter) return;
+            LatchDashAsCm1($"no tier-def catalog within {Cm1DecideAfter.TotalSeconds:F0}s (timeout fallback)");
+        }
+
+        /// <summary>Latch the bus-bridged dash as a CM1: persist the flag, deploy
+        /// the CM1 device definition (its own GUID/tab) and drop the speculative
+        /// CM2 copy MarkDashDetected wrote before we could tell them apart (guarded
+        /// against a real USB CM2), tear down the tier-def sender, and start the
+        /// CM1 driver.</summary>
+        private void LatchDashAsCm1(string reason)
+        {
+            MozaLog.Info($"[Moza] Bridged dash → CM1 (group-0x35): {reason}; handing off to CM1 driver");
             DashIsCm1 = true;
             SaveSettings();
 
-            // This bus-bridged dash is a CM1, not a CM2 — deploy the CM1 device
-            // definition (its own GUID/tab) and drop the speculative CM2 copy that
-            // MarkDashDetected wrote before we could tell them apart. The removal
-            // is guarded against a real USB CM2, so it doesn't break dual setups.
             try
             {
                 string? pid = _connection?.DiscoveredPid;
@@ -441,7 +483,7 @@ namespace MozaPlugin
             }
             catch (Exception ex) { MozaLog.Debug($"[Moza] CM1 device-definition deploy skipped: {ex.Message}"); }
 
-            try { cm2.Stop(); } catch { }
+            try { _cm2Sender?.Stop(); } catch { }
             if (_telemetrySender != null)
             {
                 _telemetrySender.SharesConnection = false;
@@ -2977,6 +3019,18 @@ namespace MozaPlugin
         /// <summary>The secondary CM2-dash tier-def sender (dual-screen), or null.</summary>
         internal TelemetrySender? Cm2Sender => _cm2Sender;
 
+        /// <summary>The sender that actually drives the CM2 dashboard. When the
+        /// wheel has its own screen (FSR1 / tier-def display) the dedicated
+        /// <see cref="Cm2Sender"/> lane drives the CM2 alongside the wheel; when
+        /// the wheel is SCREENLESS the CM2 is the only display, so the MAIN sender
+        /// is retargeted to it and <see cref="Cm2Sender"/> is never created
+        /// (EnsureCm2Pipeline gates on wheelHasOwnScreen). The CM2 dash UI must
+        /// read THIS sender's WheelState/ConfigJsonList — keying off Cm2Sender
+        /// alone left a screenless-wheel + base-CM2 setup with no dashboard
+        /// dropdown (dedicated sender null).</summary>
+        internal TelemetrySender? ActiveCm2Sender =>
+            (IsFsr1DisplayWheel || (WheelModelInfo?.HasDisplay == true)) ? _cm2Sender : _telemetrySender;
+
         /// <summary>The CM2's selected dashboard name (independent of the wheel's).</summary>
         internal string ActiveCm2DashboardName
         {
@@ -2987,7 +3041,7 @@ namespace MozaPlugin
         /// <summary>Switch the CM2 dash to a dashboard slot (FF kind=4 on the CM2
         /// sender), independent of the wheel.</summary>
         internal void OnCm2DashboardSwitched(uint slot) =>
-            _dashboardBindingCoordinator.OnDashboardSwitched(slot, _cm2Sender);
+            _dashboardBindingCoordinator.OnDashboardSwitched(slot, ActiveCm2Sender);
 
         // Surface configJson wheel state for the Diagnostics tab.
         internal WheelDashboardState? WheelStateForDiagnostics =>
@@ -3988,6 +4042,17 @@ namespace MozaPlugin
             {
                 byte deviceId = MozaProtocol.SwapNibbles(data[1]);
                 OnPresenceProbeAck(deviceId);
+                return;
+            }
+
+            // CM1 param-read reply: the discriminator probe (SendCm1ParamProbe,
+            // group 0x0E → dev 0x14) was answered with a group-0x8E frame from the
+            // dash (dev 0x41). A tier-def CM2 doesn't answer it, so this is a
+            // positive CM1 signal for TickCm1Discriminator's fast path. Not a
+            // command-DB entry — flag and short-circuit.
+            if (data.Length >= 2 && data[0] == 0x8E && data[1] == 0x41)
+            {
+                _dashParamReadAnswered = true;
                 return;
             }
 

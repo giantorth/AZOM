@@ -178,7 +178,7 @@ namespace MozaPlugin.Devices.WheelUi
 
         /// <summary>The telemetry sender this control configures (wheel or CM2).</summary>
         private global::MozaPlugin.Telemetry.TelemetrySender? ActiveSender =>
-            _plugin == null ? null : (IsCm2Target ? _plugin.Cm2Sender : _plugin.TelemetrySender);
+            _plugin == null ? null : (IsCm2Target ? _plugin.ActiveCm2Sender : _plugin.TelemetrySender);
 
         /// <summary>True when this (CM2) page's dash is a confirmed CM1 (group-0x35) —
         /// it's driven by the Cm1DisplayDriver with a flat field set, not tier-def.</summary>
@@ -646,7 +646,7 @@ namespace MozaPlugin.Devices.WheelUi
             // persist the CM2's selection, and emit FF kind=4 on the CM2 sender.
             if (IsCm2Target)
             {
-                var cm2State = _plugin.Cm2Sender?.WheelState;
+                var cm2State = _plugin.ActiveCm2Sender?.WheelState;
                 if (cm2State != null && idx >= 0 && idx < cm2State.ConfigJsonList.Count)
                 {
                     _plugin.ActiveCm2DashboardName = selected;
@@ -823,7 +823,7 @@ namespace MozaPlugin.Devices.WheelUi
             // Restore each channel to its catalog default before clearing the
             // override dict — otherwise the live profile keeps the user's last typed
             // value until the next telemetry restart. CM2 targets its own sender/keys.
-            var resetSender = IsCm2Target ? _plugin.Cm2Sender : null;
+            var resetSender = IsCm2Target ? _plugin.ActiveCm2Sender : null;
             foreach (var row in _channelRows)
                 _plugin.UpdateActiveChannelMapping(row.Url, "", resetSender);
             if (IsCm2Target)
@@ -930,7 +930,7 @@ namespace MozaPlugin.Devices.WheelUi
             if (string.IsNullOrEmpty(row.Url)) return;
             if (IsCm2Target)
                 _plugin.SetChannelMapping(row.Url, row.SimHubProperty,
-                    MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.Cm2Sender);
+                    MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
             else
                 _plugin.SetChannelMapping(row.Url, row.SimHubProperty);
             TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
@@ -957,7 +957,7 @@ namespace MozaPlugin.Devices.WheelUi
             var result = IsCm1
                 ? ChannelMappingRowFactory.BuildForCm1(_plugin)
                 : IsCm2Target
-                    ? ChannelMappingRowFactory.BuildForCm2(_plugin, _plugin.Cm2Sender)
+                    ? ChannelMappingRowFactory.BuildForCm2(_plugin, _plugin.ActiveCm2Sender)
                     : ChannelMappingRowFactory.Build(_plugin);
             if (result.Rows == null)
             {

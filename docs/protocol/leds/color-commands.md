@@ -21,10 +21,27 @@ for the per-command rows.
 7E [N] 3F 17 1A 00 [active_mask LE] [window_mask LE] [checksum]
 ```
 
-Three observed widths:
-- `[bitmask:u16] [u16 zeros]` — 2-byte form (older / small bars)
-- `[bitmask:u32]` — 4-byte form (≥17-LED bars)
-- `[active_mask:u32] [window_mask:u32]` — **8-byte form** observed live on R5 base + W17 wheel (2026-04-29 capture). `window_mask` defines which LEDs are addressable (e.g. `0x00001ff8` = 13-LED RPM strip, `0x0000ffff` = 16-LED extended) and `active_mask` is the subset currently lit. Different dashboards swap `window_mask` on the fly: `f81f00 00` → 13-LED RPM bar; `ffff0000` → 16-LED redline / wide-zone mode.
+**8-byte form is canonical** — `[active_mask:u32 LE] [window_mask:u32 LE]`.
+PitHouse emits this form on **every** wheel captured, and the plugin now does
+too (`BuildWindowedBitmaskBytes`). `window_mask` defines which LEDs the firmware
+treats as addressable and `active_mask` is the subset currently lit; both must be
+present. Verified windows:
+
+| Wheel (base) | `window_mask` | Capture |
+|--------------|---------------|---------|
+| CS V2.1 (R9) | `0x000003ff` (10 LEDs, bit 0 = first) | `idk.pcapng`, `MOZA CS V2.pcapng` |
+| CS Pro / W17 (R5) | `0x00001ff8` (13-LED bar) … `0x0000ffff` (16-LED) | 2026-04-29 capture, `automobilista2-*` |
+
+Different dashboards swap `window_mask` on the fly (`f81f0000` → 13-LED RPM bar;
+`ffff0000` → 16-LED redline / wide-zone). The plugin's SimHub LED path always
+renders a full bar, so it sends `window_mask = (1 << RpmLedCount) - 1` (full set,
+bit `i` = LED `i`): `0x03ff` for CS V2.1, `0xffff` for CS Pro.
+
+Two legacy widths appear in older captures and are **no longer emitted by the
+plugin** (a bare `[bitmask:u16]` with no window left CS V2.1's first LED stuck
+lit): the 2-byte form (`[bitmask:u16]`, older / small bars) and the 4-byte form
+(`[bitmask:u32]`, ≥17-LED bars). The 8-byte `u32` active mask covers every bit
+both of those did.
 
 Mask progression with rising RPM (8-byte form, `window_mask = 0x00001ff8`):
 ```
@@ -100,13 +117,25 @@ would be zero. Release the bitmask to zero only on explicit teardown
 **Button active-LED bitmask** (`wheel-send-buttons-telemetry`):
 
 ```
-7E 03 3F 17 1A 01 [bitmask LE: 2 bytes] [checksum]
+7E 0A 3F 17 1A 01 [active_mask:u32 LE] [window_mask:u32 LE] [checksum]
 ```
+
+Same 8-byte `active+window` form as RPM. The button `window_mask` is **per-wheel**:
+PitHouse drives wheels whose button layout is non-contiguous with `window` = the
+full set of mapped protocol indices, and contiguous-button wheels with `window = 0`:
+
+| Wheel | Button layout | `window_mask` | Capture |
+|-------|---------------|---------------|---------|
+| CS V2.1 | non-contiguous (indices 0,1,3,6,8,9) | `0x0000034b` — **buttons stay dark when 0** | `idk.pcapng` |
+| CS Pro (W17) | contiguous (0..7) | `0x00000000` | `automobilista2-nebula-pithouse.pcapng` |
+
+The plugin derives this from `WheelModelInfo.ButtonWindowMask` (OR of the
+`ButtonLedMap` bits when the map is non-null, else `0`).
 
 | Byte | Value | Meaning |
 |------|-------|---------|
 | 0 | `0x7E` | Frame start |
-| 1 | `[N]` | Payload length (0x14 = 20 for color chunk; 4 for 16-LED bitmask, 6 for 17+) |
+| 1 | `[N]` | Payload length (0x14 = 20 for color chunk; 0x0A = 10 for the 8-byte active+window bitmask) |
 | 2 | `0x3F` | Wheel-config write group |
 | 3 | `0x17` | Device wheel |
 | 4 | `0x19` (color) / `0x1A` (bitmask) | Cmd ID byte 1 |
@@ -141,17 +170,22 @@ causing button 0 to flicker on every frame. See
 
 ### Bitmask format
 
-Selects which LEDs are currently lit. Builder logic in
-[`Devices/MozaLedDeviceManager.cs:450`](../../../Devices/MozaLedDeviceManager.cs)
-(`BuildRpmBitmaskBytes`):
+Selects which LEDs are currently lit. The plugin emits the **8-byte
+`active+window` form** for every group (RPM, button, knob) via
+[`Devices/MozaLedDeviceManager.cs`](../../../Devices/MozaLedDeviceManager.cs)
+(`BuildWindowedBitmaskBytes`):
 
-| LED count | Bitmask size | Wire bytes |
-|-----------|--------------|------------|
-| ≤16 | 2 bytes (LE u16) | `[lo, hi]` |
-| 17+ (CS Pro, KS Pro) | 4 bytes (LE u32) | `[b0, b1, b2, b3]` |
+```
+[active_mask:u32 LE] [window_mask:u32 LE]
+```
 
-Bit `i` lit ↔ LED `i` has non-black color in the chunk write. Plugin sends
-the bitmask only when it changes (or every frame when
+- `window_mask` = the wheel's full addressable LED set for that group
+  (RPM: `(1 << RpmLedCount) - 1`; button: `WheelModelInfo.ButtonWindowMask`;
+  knob: `(1 << KnobCount) - 1`). Held constant frame-to-frame.
+- `active_mask` = the lit subset. Bit `i` lit ↔ LED `i` has non-black color
+  in the chunk write.
+
+Plugin sends the bitmask only when it changes (or every frame when
 `AlwaysResendBitmask` is set), regardless of color-chunk cadence.
 
 ### Example (CS V2.1 — 10 RPM LEDs, alternating red/blue)
@@ -169,10 +203,10 @@ chunk 1 (LEDs 5..9):
   [chk]
 ```
 
-Bitmask (all 10 lit):
+Bitmask (all 10 lit), 8-byte active+window form:
 
 ```
-7E 04 3F 17 1A 00 FF 03 [chk]      # 0x03FF = 10 bits set
+7E 0A 3F 17 1A 00 FF 03 00 00 FF 03 00 00 [chk]   # active=0x03FF lit, window=0x03FF
 ```
 
 ### Wheel echo

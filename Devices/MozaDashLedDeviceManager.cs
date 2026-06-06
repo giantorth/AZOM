@@ -162,18 +162,23 @@ namespace MozaPlugin.Devices
 
                 if (useCm2Path)
                 {
-                    // CM2 standalone path: use the wheel RPM-bar live commands
-                    // retargeted to dev=0x12. Working hypothesis from CM2.md
-                    // lab — wheel commands drive CM2's 16 physical LEDs when
-                    // re-addressed, since CM2 is functionally a meter with the
-                    // same logical RPM-bar behavior.
-                    // TODO(cm2): confirm with a wire-trace from a real CM2 unit
-                    // that wheel-telemetry-rpm-colors + wheel-send-rpm-telemetry
-                    // at dev=0x12 actually drive the physical LEDs. If they
-                    // don't, fall back to firmware-driven LEDs (cm2-normal-mode=1
-                    // + cm2-rpm-* thresholds applied via HardwareApplier).
-                    SendCm2LiveLedFrame(plugin, ledColors, buttonColors,
-                                        bitmask, alwaysResendBitmask, rpmCount, flagCount);
+                    // CM2: LEDs are FIRMWARE-DRIVEN. A real-CM2 wire-trace
+                    // (prueba1.pcapng) shows PitHouse never sends the wheel
+                    // RPM-bar per-LED commands (group 0x3F) to dev=0x12 — the CM2
+                    // ignores them. It drives its LEDs from the stored group-0x32
+                    // config (colours + RPM thresholds + cm2-rpm-group-mode=1,
+                    // sent by HardwareApplier on apply) fed by the tier-def
+                    // telemetry session (Rpm value frames). So the per-frame LED
+                    // push here is a NO-OP for the CM2 — the disproven
+                    // SendCm2LiveLedFrame path is retired.
+                    //
+                    // The capture ALSO carries a group-0x24 → dev 0x12 keyed
+                    // value stream (`<id> <BE float32>`) that likely feeds the
+                    // CM2 screen widgets; its key→channel map is NOT derivable
+                    // from that capture (it was a static 20/40/60/80/100 test
+                    // pattern), so wiring it blind is deferred until an in-game
+                    // CM2 capture pins the keys. See
+                    // docs/protocol/devices/main-hub-0x12.md.
                 }
                 else
                 {

@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""cm1-0e-register-decode — decode the CM1 dash's group-0x0e/0x8e param-manager
+register-read exchange from a raw USBPcap capture (or a moza-wire JSONL).
+
+The CM1 base-bridged dash (dev 0x14) answers a register-read interface that
+PitHouse sweeps at connect:
+
+    host -> 7E 03 0E 14  00 <reg_hi> <reg_lo>          (read register, 16-bit addr)
+    dash -> 7E 07 8E 41  <reg:3 echoed> <value: BE u32> (addr + 32-bit value)
+
+Checksum is the standard wire checksum (MozaProtocol.CalculateWireChecksum):
+    csum = (0x0D + sum(frame_bytes) + 0x7E once more per 0x7E at index>=2) & 0xFF
+over frame = [7E][len][grp][dev][payload]  (csum byte excluded).
+
+Only checksum-valid 0x0e/0x8e frames are kept, so the dense group-0x35 float
+stream and the co-bus FSR1 wheel traffic don't produce false matches.
+
+Usage:
+    tools/cm1-0e-register-decode <capture.pcapng | trace.jsonl> [--max-mb N]
+
+Output: one row per register, addr (hex+dec) -> value (hex + signed/unsigned dec),
+plus a note flagging the 0xFFFF8000 (int32 -32768) "unset" sentinel.
+"""
+from __future__ import annotations
+import argparse, json, struct, sys
+from collections import OrderedDict
+
+
+def wire_csum(frame: bytes) -> int:
+    s = 0x0D
+    for b in frame:
+        s += b
+    for i in range(2, len(frame)):
+        if frame[i] == 0x7E:
+            s += 0x7E
+    return s & 0xFF
+
+
+def scan_raw(path: str, max_bytes: int):
+    """Yield ('P'|'R', payload_bytes) for every checksum-valid 0x0e/0x8e frame,
+    streaming the raw file so a multi-hundred-MB pcapng stays bounded in RAM."""
+    CHUNK = 8 << 20
+    OVER = 256
+    total = 0
+    buf = b""
+    with open(path, "rb") as f:
+        while max_bytes <= 0 or total < max_bytes:
+            d = f.read(CHUNK)
+            if not d:
+                break
+            total += len(d)
+            b = buf + d
+            i, n = 0, len(b)
+            while i < n - 4:
+                if b[i] != 0x7E:
+                    i += 1
+                    continue
+                ln, grp, dev = b[i + 1], b[i + 2], b[i + 3]
+                is_probe = grp == 0x0E and dev == 0x14
+                is_resp = grp == 0x8E and dev == 0x41
+                end = i + 4 + ln  # csum index
+                if (is_probe or is_resp) and end < n:
+                    frame = bytes(b[i:end])
+                    if len(frame) >= 4 and wire_csum(frame) == b[end]:
+                        yield ("P" if is_probe else "R"), bytes(b[i + 4:end])
+                        i = end + 1
+                        continue
+                i += 1
+            buf = b[-OVER:]
+
+
+def scan_jsonl(path: str):
+    for line in open(path):
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        b = bytes.fromhex(r.get("hex", ""))
+        if len(b) < 5 or b[0] != 0x7E:
+            continue
+        grp, dev = b[2], b[3]
+        is_probe = grp == 0x0E and dev == 0x14
+        is_resp = grp == 0x8E and dev == 0x41
+        if not (is_probe or is_resp):
+            continue
+        ln = b[1]
+        end = 4 + ln
+        if end >= len(b):
+            continue
+        frame = b[:end]
+        if wire_csum(frame) == b[end]:
+            yield ("P" if is_probe else "R"), b[4:end]
+
+
+SENTINEL = 0xFFFF8000  # int32 -32768; observed for unpopulated params
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("capture")
+    ap.add_argument("--max-mb", type=int, default=200,
+                    help="cap raw scan at N MB (0 = whole file); ignored for .jsonl")
+    args = ap.parse_args()
+
+    gen = (scan_jsonl(args.capture) if args.capture.endswith(".jsonl")
+           else scan_raw(args.capture, args.max_mb * (1 << 20)))
+
+    regs = OrderedDict()  # reg(int) -> value(int)
+    last_probe = None
+    npairs = 0
+    for kind, pl in gen:
+        if kind == "P":
+            if len(pl) >= 3:
+                last_probe = (pl[1] << 8) | pl[2]
+        else:
+            if len(pl) >= 7 and last_probe is not None:
+                reg = (pl[1] << 8) | pl[2]
+                val = struct.unpack(">I", pl[3:7])[0]
+                if reg == last_probe and reg not in regs:
+                    regs[reg] = val
+                    npairs += 1
+            last_probe = None
+
+    print(f"# CM1 group-0x0e/0x8e register sweep — {npairs} registers")
+    print(f"# source: {args.capture}")
+    print(f"{'reg(hex)':>9}  {'reg(dec)':>8}  {'val(hex)':>10}  {'u32':>11}  {'i32':>11}  note")
+    for reg in sorted(regs):
+        v = regs[reg]
+        i32 = v - (1 << 32) if v >= (1 << 31) else v
+        note = "unset(-32768 sentinel)" if v == SENTINEL else ""
+        print(f"   0x{reg:04x}  {reg:8d}  0x{v:08x}  {v:11d}  {i32:11d}  {note}")
+
+
+if __name__ == "__main__":
+    main()

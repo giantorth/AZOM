@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""fsr2-valueframe-decode — decode bit-packed 7D:23 value-frame contents for
+named channels, to see what values the host actually transmits over time.
+
+Bit packing is LSB-first (mirrors Telemetry/Frames/TelemetryBitWriter.WriteBits);
+channels within a tier are packed in tier-def record order. Reuses the catalog +
+tier-def decoders from tools/fsr2-tierdef-audit.
+
+Usage:
+    tools/fsr2-valueframe-decode <capture.jsonl> <ChannelName> [<ChannelName> ...]
+"""
+from __future__ import annotations
+import struct, sys
+from collections import defaultdict, OrderedDict
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+
+A = SourceFileLoader("audit", str(Path(__file__).with_name("fsr2-tierdef-audit"))).load_module()
+
+
+def ordered_tierdef(buf):
+    """Return {flag: [(idx,comp,bw), ...]} preserving record order, from the
+    LAST emission (current dashboard). Also returns the emission's flag base."""
+    emissions = []
+    cur = []
+    i, n = 0, len(buf)
+    while i + 5 <= n:
+        tag = buf[i]; size = struct.unpack_from("<I", buf, i + 1)[0]
+        if i + 5 + size > n: break
+        data = buf[i + 5:i + 5 + size]
+        if tag == 0x01 and size >= 1:
+            flag = data[0]; recs = []
+            body = data[1:]
+            for j in range(0, len(body) - 15, 16):
+                idx, comp, bw, _ = struct.unpack_from("<IIII", body, j)
+                if 0 < idx < 2000 and 0 < bw <= 64:
+                    recs.append((idx, comp, bw))
+            cur.append((flag, recs))
+        elif tag == 0x06:
+            if cur: emissions.append(cur); cur = []
+        i += 5 + size
+    if cur: emissions.append(cur)
+    if not emissions: return {}
+    last = emissions[-1]
+    return {flag: recs for flag, recs in last}
+
+
+class BitReader:
+    def __init__(self, data): self.d = data; self.pos = 0
+    def read(self, n):
+        val = got = 0
+        while got < n:
+            bo, bit = self.pos // 8, self.pos % 8
+            if bo >= len(self.d): return val  # ran out
+            take = min(n - got, 8 - bit)
+            val |= ((self.d[bo] >> bit) & ((1 << take) - 1)) << got
+            got += take; self.pos += take
+        return val
+
+
+def decode_value(raw, comp, bw):
+    if comp == 0x07:  # float
+        return struct.unpack("<f", struct.pack("<I", raw & 0xFFFFFFFF))[0]
+    if comp in (0x11, 0x12, 0x13) and bw == 14:  # temp14 ×10+5000
+        return (raw - 5000) / 10.0
+    if comp == 0x16 and bw == 12:  # tyre pressure ×10
+        return raw / 10.0
+    if comp == 0x0E:  # percent_1 ×10
+        return raw / 10.0
+    if comp == 0x17:  # float_001 ×1000
+        return raw / 1000.0
+    if comp == 0x0F:  # speed ×10
+        return raw / 10.0
+    if comp == 0x15:  # ×100
+        return raw / 100.0
+    if comp in (0x0D, 0x13) and bw == 5:  # gear/level
+        return raw - 32 if raw > 15 else raw
+    return raw  # ints, bools, etc.
+
+
+def main():
+    path = sys.argv[1]
+    names = sys.argv[2:]
+    h2b, b2h = A.reassemble(path)
+    cat = A.decode_catalog(b2h.get(0x02, b""))
+    url2idx = {u: i for i, u in cat.items()}
+    tiers = ordered_tierdef(h2b.get(0x02, b""))
+    # map each wanted name -> (idx, flag, position-in-tier)
+    want = {}
+    for nm in names:
+        url = "v1/gameData/" + nm
+        idx = url2idx.get(url)
+        if idx is None:
+            print(f"  {nm}: not in catalog"); continue
+        loc = None
+        for flag, recs in tiers.items():
+            for pos, (ix, comp, bw) in enumerate(recs):
+                if ix == idx:
+                    loc = (flag, comp, bw); break
+            if loc: break
+        want[nm] = (idx, loc)
+
+    # value frames: payload[6]=flag, channel data = payload[8:]
+    series = defaultdict(list)
+    recs_by_flag = tiers
+    for r in A.load(path):
+        b = bytes.fromhex(r["hex"])
+        if len(b) < 13 or b[0] != 0x7E or b[2] != 0x43 or b[4] != 0x7D or b[5] != 0x23:
+            continue
+        pl = b[4:4 + b[1]]
+        if len(pl) < 9: continue
+        flag = pl[6]; data = pl[8:]
+        if flag not in recs_by_flag: continue
+        # unpack all channels in this tier in order, capture wanted ones
+        br = BitReader(data)
+        for (ix, comp, bw) in recs_by_flag[flag]:
+            raw = br.read(bw)
+            for nm, (widx, loc) in want.items():
+                if loc and ix == widx and loc[0] == flag:
+                    series[nm].append(decode_value(raw, comp, bw))
+
+    print(f"\ncapture: {path}")
+    for nm in names:
+        idx, loc = want.get(nm, (None, None))
+        if not loc:
+            print(f"  {nm:24s} idx={idx} — not in any emitted tier"); continue
+        s = series[nm]
+        if not s:
+            print(f"  {nm:24s} idx={idx} tier=0x{loc[0]:02X} comp=0x{loc[1]:X}/{loc[2]} — NO frames"); continue
+        distinct = sorted(set(round(x, 3) for x in s))
+        nz = [x for x in s if abs(x) > 1e-9]
+        sample = [round(x, 3) for x in s[:6]]
+        print(f"  {nm:24s} idx={idx} tier=0x{loc[0]:02X} comp=0x{loc[1]:X}/{loc[2]}  "
+              f"n={len(s)} nonzero={len(nz)} distinct={len(distinct)}  "
+              f"range=[{min(s):.3f}..{max(s):.3f}]  sample={sample}")
+
+
+if __name__ == "__main__":
+    main()

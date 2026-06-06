@@ -198,6 +198,22 @@ namespace MozaPlugin
         }
 
         /// <summary>
+        /// CM1-vs-CM2 discriminator probe: a group-0x0E param-manager register
+        /// read to the dash (dev 0x14), <c>7E 03 0E 14 00 00 01 chk</c>. A CM1
+        /// answers with a group-0x8E reply (<c>7E 07 8E 41 …</c>); a tier-def CM2
+        /// does not. Cheap (8-byte frame); used by
+        /// <see cref="MozaPlugin.TickCm1Discriminator"/> as a fast positive CM1
+        /// signal so we don't wait out the full no-catalog timeout. See
+        /// docs/protocol/devices/dash-0x14.md § "Param-manager register reads".
+        /// </summary>
+        public void SendCm1ParamProbe()
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(MozaProtocol.FirmwareDebugGroup, MozaProtocol.DeviceDash,
+                new byte[] { 0x00, 0x00, 0x01 });
+        }
+
+        /// <summary>
         /// Send detection probes for all candidate wheel IDs simultaneously.
         /// Much faster than cycling through IDs one at a time (~2s vs ~12s worst case).
         /// </summary>

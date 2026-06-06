@@ -72,10 +72,46 @@ With the car parked (start of the capture) almost everything sits at 0, which is
 |-------|-------|-----------|
 | Presence probe | `7E 00 00 14` | group `0x80` (`7E 00 80 41 …`) |
 | Session ping (~1 Hz) | `7E 01 43 14 00` | group `0xC3` (`7E 00 C3 41 …`) |
+| Param read (init sweep) | `7E 03 0E 14 00 <reg_hi> <reg_lo>` | group `0x8E` (`7E 07 8E 41 <reg:3 echoed> <BE u32>`) |
 
 There is **no tier-def catalog** — the dash never advertises channels on group `0x43`
 (only the 1-byte ping). This absence is how the plugin distinguishes a CM1 from a real
 tier-def CM2 (see below).
+
+**Param-manager register reads — group `0x0E` / `0x8E`**
+
+At connect PitHouse sweeps a register-read interface on the dash (the dash's own
+firmware-debug lines reference `param_manage.c`). Each read echoes the 16-bit
+register address and returns a 32-bit big-endian value:
+
+```
+host →  7E 03 0E 14  00 <reg_hi> <reg_lo>              (read register, 16-bit addr)
+dash →  7E 07 8E 41  <reg_hi'> <reg_lo'> 00 <BE u32>   (addr echoed + value)
+```
+
+Checksum is the standard wire checksum. Decode with `tools/cm1-0e-register-decode`
+(checksum-validated, so the dense group-`0x35` stream and the co-bus FSR1 wheel don't
+produce false matches).
+
+The captured sweep (`FSR1_CM1.pcapng`, PitHouse → FSR1 wheel + CM1 dash) reads **49
+registers** across four banks. `0xFFFF8000` (int32 −32768) is an "unset/NA" sentinel.
+
+| Bank | Registers | Non-sentinel values (reg → dec) |
+|------|-----------|---------------------------------|
+| `0x0001–0x0014` | 20 | 1→27, 2→22, 3→26, 4→35, 5→24, 7→12, 9→23, 10→32, 13→825 (rest sentinel) |
+| `0x012C–0x0140` | 21 | 300→875, 301→51, 302→9318, 303→0, 304→0, 305→223, 307→70, 309→164, 310→91, 313→843 (rest sentinel) |
+| `0x0190–0x0191` | 2 | 400→839, 401→878 |
+| `0x0BB8–0x0BBD` | 6 | 3000→100, 3001→0, 3002→0, 3003→0, 3004→1, 3005→62 |
+
+**Interpretation is unconfirmed.** The values are plain numeric params, not an ASCII
+identity/model string, so this is *not* a "CM1 vs CM2" name probe by itself. The
+round-address high banks (`0x0190+`, `0x0BB8+` = decimal 400 / 3000) are plausibly
+**firmware version / build / device-info** registers (e.g. `0x0BBC`=1, `0x0BBD`=62 could
+be a major/build pair), but nothing here is anchored to a known FW version, and there is
+no CM2 dump of the same registers to diff against. To turn any of these into a fast,
+positive CM1↔CM2 discriminator (replacing the ~25 s catalog-absence timeout), capture a
+**CM2** answering the same `0x0E` reads and diff the two snapshots — a register whose
+value differs by device type is the discriminator.
 
 **Dashboard switching**
 
