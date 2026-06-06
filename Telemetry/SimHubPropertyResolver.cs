@@ -59,6 +59,8 @@ namespace MozaPlugin.Telemetry
             if (string.IsNullOrEmpty(path)) return null;
             if (path.StartsWith("@internal/", StringComparison.Ordinal))
             {
+                var str = ResolveInternalStringChannel(path);
+                if (str != null) return str;
                 return ResolveInternalChannel(path)
                     .ToString("R", System.Globalization.CultureInfo.InvariantCulture);
             }
@@ -125,9 +127,31 @@ namespace MozaPlugin.Telemetry
         {
             if (string.IsNullOrEmpty(path)) return null;
             if (path!.StartsWith("@internal/", StringComparison.Ordinal))
-                return ResolveInternalChannel(path);
+                return ResolveInternalStringChannel(path) ?? (object)ResolveInternalChannel(path);
             try { return _pluginManager?.GetPropertyValue(path); }
             catch { return null; }
+        }
+
+        /// <summary>
+        /// Plugin-computed channels whose value is a string rather than a
+        /// number (the numeric counterpart is <see cref="ResolveInternalChannel"/>).
+        /// Returns null for paths that are not string-valued so callers fall
+        /// through to the numeric resolver.
+        /// </summary>
+        private string? ResolveInternalStringChannel(string path)
+        {
+            switch (path)
+            {
+                case "@internal/GameName":
+                {
+                    string? game = null;
+                    try { game = _pluginManager?.GameName; }
+                    catch { /* older SimHub / not yet running a game */ }
+                    return Dashboard.GameNameMap.Resolve(game);
+                }
+                default:
+                    return null;
+            }
         }
 
         public double ResolveInternalChannel(string path)

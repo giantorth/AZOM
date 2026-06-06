@@ -2652,7 +2652,7 @@
       "default_value": "",
       "compression": "string",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.DisplayTrackName"
+      "simhub_property": "DataCorePlugin.GameData.TrackName"
     },
     {
       "name": "Fuel",
@@ -3202,7 +3202,7 @@
       "default_value": "",
       "compression": "string",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.GameName"
+      "simhub_property": "@internal/GameName"
     },
     {
       "name": "Ontrack",

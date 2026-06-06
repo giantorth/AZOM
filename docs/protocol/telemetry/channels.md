@@ -99,3 +99,36 @@ Bits packed **LSB-first within each byte** (bit 0 = LSB of byte 0, bit 8 = LSB o
 | `v1/gameData/` | 275 | Standard game telemetry |
 | `v1/gameData/patch/` | 133 | Extended: 64 track map coords, 64 race info slots, display names |
 | `v1/preset/` | 2 | `CurrentTorque`, `SteeringWheelAngle` (both `float_6000_1`, 16 bits) — wheelbase state, NOT game telemetry |
+
+### `patch/*` channel value sources
+
+The MOZA-specific `patch/*` channels feed wheel-dashboard widgets (track name, game
+name, car count, radar). Their `simhub_property` mappings in `Telemetry.json` need
+care — several shipped pointing at SimHub properties that **do not exist**, which the
+resolver returns as empty (string) or 0 (numeric), so the widget renders blank with no
+error. Verified against the FSR2 "1 LD - Marco" dashboard, which reads exactly these:
+
+| Channel | Widget reads | Correct SimHub source |
+|---------|--------------|-----------------------|
+| `patch/DisplayTrackName` | track name (`value!=null ? value : "Track Name"`) | `DataCorePlugin.GameData.TrackName` — there is **no** `GameData.DisplayTrackName` property |
+| `patch/TrackName` | (internal, `is_visible:false`) | `DataCorePlugin.GameData.TrackName` |
+| `patch/GameName` | layout switch (`== "ACC"`, `== "AC"`, …) | computed `@internal/GameName` (see below) — there is **no** `GameData.GameName` property |
+| `patch/OpponentCount` | car count (`value + 1`) | `DataCorePlugin.GameData.OpponentsCount` |
+| `v1/gameData/CurrentCarCount` | car-count color threshold only | `DataCorePlugin.GameData.OpponentsCount` |
+
+**`@internal/GameName` (computed string).** The wheel dashboards branch on MOZA's
+short game strings (`AC`, `ACC`, `Automobilista 2`, `rFactor 2`), not SimHub's game
+code (`AssettoCorsa`, `AssettoCorsaCompetizione`, `Automobilista2`, `rFactor2`).
+`patch/GameName` is mapped to the sentinel `@internal/GameName`, resolved by
+`SimHubPropertyResolver.ResolveInternalStringChannel` → `Dashboard.GameNameMap`, which
+translates the four games confirmed against real dashboards and passes any other
+`PluginManager.GameName` value through unchanged (no fabricated short-codes). This is
+the **string** counterpart to the numeric `@internal/*` channels in
+`ResolveInternalChannel` (e.g. `@internal/SteeringWheelAngle`, `@internal/TimeStamp`);
+`ResolveAsString` tries the string resolver first, then falls back to the numeric one.
+
+**`OpponentCount` / `PlayerIndex` are not radar-gated.** `DashboardProfileStore.IsRadarTrackMapChannel`
+gates only the *bulky* track-map / radar geometry (`patch/Location`, `patch/Location_N`,
+`patch/riN`) behind the `EnableRadarTrackMapChannels` setting (default off). `OpponentCount`
+and `PlayerIndex` are 1-byte scalar session fields ordinary dashboards read for
+car-count / grid-position display, so they emit regardless of the radar setting.

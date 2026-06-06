@@ -44,7 +44,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 // Session / player.
                 ["v1/gameData/SessionTypeName"]            = "DataCorePlugin.GameData.SessionTypeName",
                 ["v1/gameData/PlayerName"]                 = "DataCorePlugin.GameData.PlayerName",
-                ["v1/gameData/patch/GameName"]             = "DataCorePlugin.GameData.GameName",
+                // Computed: SimHub game code → MOZA short name (see GameNameMap).
+                ["v1/gameData/patch/GameName"]             = "@internal/GameName",
                 ["v1/gameData/Flag_Name"]                  = "DataCorePlugin.GameData.Flag_Name",
                 ["v1/gameData/ReplayMode"]                 = "DataCorePlugin.GameData.ReplayMode",
                 ["v1/gameData/PacketTime"]                 = "DataCorePlugin.GameData.PacketTime",

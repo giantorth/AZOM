@@ -88,16 +88,21 @@ namespace MozaPlugin.Telemetry.Dashboard
             return ch;
         }
 
-        // Radar (patch/ri*, OpponentCount, PlayerIndex) and track-map
-        // (patch/Location*) channels. Matched precisely so other working
-        // patch/ channels (TrackPositionPercent, TrackName) are left alone;
-        // Heading is not patch/ and is untouched.
+        // Bulky track-map / radar position channels gated behind the radar
+        // setting: the per-opponent location array (patch/Location,
+        // patch/Location_N) and radar index channels (patch/riN).
+        // OpponentCount / PlayerIndex are deliberately NOT gated — they are
+        // 1-byte scalar session fields ordinary dashboards read for
+        // car-count / grid-position display (the FSR2 "LD - Marco" dash
+        // shows patch/OpponentCount+1 as the entry count), so they must
+        // emit regardless of the radar setting. Other patch/ channels
+        // (TrackPositionPercent, TrackName) and non-patch Heading untouched.
         internal static bool IsRadarTrackMapChannel(string url)
         {
             if (string.IsNullOrEmpty(url) || url.IndexOf("/patch/", StringComparison.Ordinal) < 0)
                 return false;
             string suffix = url.Substring(url.LastIndexOf('/') + 1);
-            if (suffix == "OpponentCount" || suffix == "PlayerIndex" || suffix == "Location")
+            if (suffix == "Location")
                 return true;
             if (suffix.StartsWith("Location_", StringComparison.Ordinal))
                 return AllDigits(suffix, "Location_".Length);
