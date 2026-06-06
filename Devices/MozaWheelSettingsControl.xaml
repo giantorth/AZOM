@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctrl="clr-namespace:MozaControls"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
+             xmlns:ui="clr-namespace:MozaPlugin.UI"
              Padding="0"
              TextElement.Foreground="{DynamicResource TextBrush}"
              TextElement.FontFamily="{DynamicResource FontUi}"
@@ -35,7 +36,8 @@
                 <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
             </Style>
             <Style x:Key="SettingSlider" TargetType="Slider" BasedOn="{StaticResource MozaSlider}">
-                <Setter Property="Width" Value="300"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="MinWidth" Value="80"/>
                 <Setter Property="IsSnapToTickEnabled" Value="True"/>
             </Style>
             <Style x:Key="LedIndex" TargetType="TextBlock">
@@ -210,13 +212,18 @@
                                         <ListBoxItem Content="{x:Static res:Strings.Option_Split}"/>
                                     </ctrl:SegmentedControl>
                                 </StackPanel>
-                                <StackPanel x:Name="WiClutchPointPanel" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ClutchSplitPoint}" Style="{StaticResource SliderLabel}"/>
-                                    <Slider x:Name="WiClutchPointSlider" Style="{StaticResource SettingSlider}"
+                                <Grid x:Name="WiClutchPointPanel" Margin="0,4" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ClutchSplitPoint}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="WiClutchPointSlider" Style="{StaticResource SettingSlider}"
                                             Minimum="0" Maximum="100" TickFrequency="1"
                                             ValueChanged="WiClutchPointSlider_ValueChanged"/>
-                                    <TextBlock x:Name="WiClutchPointValue" Style="{StaticResource SliderValue}" Text="50%"/>
-                                </StackPanel>
+                                    <TextBox Grid.Column="2" x:Name="WiClutchPointValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=WiClutchPointSlider}" Text="50%"/>
+                                </Grid>
                             </StackPanel>
                         </ctrl:SectionCard>
 
@@ -254,7 +261,7 @@
             <!-- ==================== DASHBOARD TAB ==================== -->
             <!-- Hosts the shared DashboardManagementControl (set in code-behind). -->
             <TabItem x:Name="DashboardTab" Header="{x:Static res:Strings.TabHeader_Dashboard}" Visibility="Collapsed">
-                <ContentControl x:Name="DashMgmtHost"/>
+                <ContentControl x:Name="DashMgmtHost" HorizontalContentAlignment="Stretch"/>
             </TabItem>
 
             <!-- ==================== RPM TAB ==================== -->
@@ -286,11 +293,16 @@
                                         <ListBoxItem Content="{x:Static res:Strings.Option_RgbPulse}"/>
                                     </ctrl:SegmentedControl>
                                 </StackPanel>
-                                <StackPanel x:Name="WheelIdleSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_RpmIdleSpeed}" Style="{StaticResource SliderLabel}"/>
-                                    <Slider x:Name="WheelIdleSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelIdleSpeedSlider_ValueChanged"/>
-                                    <TextBlock x:Name="WheelIdleSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
-                                </StackPanel>
+                                <Grid x:Name="WheelIdleSpeedRow" Margin="0,4" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RpmIdleSpeed}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="WheelIdleSpeedSlider" MinWidth="80" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelIdleSpeedSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="WheelIdleSpeedValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=WheelIdleSpeedSlider}" Text="1000 ms"/>
+                                </Grid>
                             </StackPanel>
                         </ctrl:SectionCard>
 
@@ -396,11 +408,16 @@
                                     <ListBoxItem Content="{x:Static res:Strings.Option_RgbPulse}"/>
                                 </ctrl:SegmentedControl>
                             </StackPanel>
-                            <StackPanel x:Name="WheelButtonIdleSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
-                                <TextBlock Text="{x:Static res:Strings.SliderLabel_ButtonIdleSpeed}" Style="{StaticResource SliderLabel}"/>
-                                <Slider x:Name="WheelButtonIdleSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelButtonIdleSpeedSlider_ValueChanged"/>
-                                <TextBlock x:Name="WheelButtonIdleSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
-                            </StackPanel>
+                            <Grid x:Name="WheelButtonIdleSpeedRow" Margin="0,4" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ButtonIdleSpeed}" Style="{StaticResource SliderLabel}"/>
+                                <Slider Grid.Column="1" x:Name="WheelButtonIdleSpeedSlider" MinWidth="80" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelButtonIdleSpeedSlider_ValueChanged"/>
+                                <TextBox Grid.Column="2" x:Name="WheelButtonIdleSpeedValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=WheelButtonIdleSpeedSlider}" Text="1000 ms"/>
+                            </Grid>
                         </StackPanel>
                     </ctrl:SectionCard>
 
@@ -455,11 +472,16 @@
                                         <ListBoxItem Content="{x:Static res:Strings.Option_RgbPulse}"/>
                                     </ctrl:SegmentedControl>
                                 </StackPanel>
-                                <StackPanel x:Name="WheelKnobIdleSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_KnobIdleSpeed}" Style="{StaticResource SliderLabel}"/>
-                                    <Slider x:Name="WheelKnobIdleSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelKnobIdleSpeedSlider_ValueChanged"/>
-                                    <TextBlock x:Name="WheelKnobIdleSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
-                                </StackPanel>
+                                <Grid x:Name="WheelKnobIdleSpeedRow" Margin="0,4" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KnobIdleSpeed}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="WheelKnobIdleSpeedSlider" MinWidth="80" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelKnobIdleSpeedSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="WheelKnobIdleSpeedValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=WheelKnobIdleSpeedSlider}" Text="1000 ms"/>
+                                </Grid>
                             </StackPanel>
                         </ctrl:SectionCard>
 
@@ -615,11 +637,16 @@
                                     <ComboBoxItem Tag="300" Content="{x:Static res:Strings.Option_Time5Hour}"/>
                                 </ComboBox>
                             </StackPanel>
-                            <StackPanel x:Name="WheelSleepSpeedRow" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
-                                <TextBlock Text="{x:Static res:Strings.SliderLabel_Speed}" Style="{StaticResource SliderLabel}"/>
-                                <Slider x:Name="WheelSleepSpeedSlider" Width="160" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelSleepSpeedSlider_ValueChanged"/>
-                                <TextBlock x:Name="WheelSleepSpeedValue" Width="60" Margin="4,0,0,0" VerticalAlignment="Center" Text="1000 ms"/>
-                            </StackPanel>
+                            <Grid x:Name="WheelSleepSpeedRow" Margin="0,4" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Speed}" Style="{StaticResource SliderLabel}"/>
+                                <Slider Grid.Column="1" x:Name="WheelSleepSpeedSlider" MinWidth="80" Minimum="200" Maximum="5000" TickFrequency="100" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" ValueChanged="WheelSleepSpeedSlider_ValueChanged"/>
+                                <TextBox Grid.Column="2" x:Name="WheelSleepSpeedValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=WheelSleepSpeedSlider}" Text="1000 ms"/>
+                            </Grid>
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="{x:Static res:Strings.SliderLabel_Color}" Style="{StaticResource SliderLabel}"/>
                                 <Border x:Name="WheelSleepColorSwatch" Width="36" Height="36"

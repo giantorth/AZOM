@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctrl="clr-namespace:MozaControls"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
+             xmlns:ui="clr-namespace:MozaPlugin.UI"
              Padding="14"
              TextElement.Foreground="{DynamicResource TextBrush}"
              TextElement.FontFamily="{DynamicResource FontUi}"
@@ -30,7 +31,8 @@
                 <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
             </Style>
             <Style x:Key="SettingSlider" TargetType="Slider" BasedOn="{StaticResource MozaSlider}">
-                <Setter Property="Width" Value="300"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="MinWidth" Value="80"/>
                 <Setter Property="IsSnapToTickEnabled" Value="True"/>
             </Style>
             <Style x:Key="LedIndex" TargetType="TextBlock">
@@ -116,16 +118,26 @@
 
                 <ctrl:SectionCard Title="{x:Static res:Strings.Section_Brightness}" Icon="{StaticResource IconLed}">
                     <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="{x:Static res:Strings.SliderLabel_RpmBrightness}" Style="{StaticResource SliderLabel}"/>
-                            <Slider x:Name="DashRpmBrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="DashRpmBrightnessSlider_ValueChanged"/>
-                            <TextBlock x:Name="DashRpmBrightnessValue" Style="{StaticResource SliderValue}" Text="100"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="{x:Static res:Strings.SliderLabel_FlagsBrightness}" Style="{StaticResource SliderLabel}"/>
-                            <Slider x:Name="DashFlagsBrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="DashFlagsBrightnessSlider_ValueChanged"/>
-                            <TextBlock x:Name="DashFlagsBrightnessValue" Style="{StaticResource SliderValue}" Text="100"/>
-                        </StackPanel>
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RpmBrightness}" Style="{StaticResource SliderLabel}"/>
+                            <Slider Grid.Column="1" x:Name="DashRpmBrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="DashRpmBrightnessSlider_ValueChanged"/>
+                            <TextBox Grid.Column="2" x:Name="DashRpmBrightnessValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=DashRpmBrightnessSlider}" Text="100"/>
+                        </Grid>
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FlagsBrightness}" Style="{StaticResource SliderLabel}"/>
+                            <Slider Grid.Column="1" x:Name="DashFlagsBrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="DashFlagsBrightnessSlider_ValueChanged"/>
+                            <TextBox Grid.Column="2" x:Name="DashFlagsBrightnessValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=DashFlagsBrightnessSlider}" Text="100"/>
+                        </Grid>
                     </StackPanel>
                 </ctrl:SectionCard>
 
@@ -173,7 +185,7 @@
             </TabItem>
 
             <TabItem x:Name="DashMgmtTab" Header="{x:Static res:Strings.TabHeader_Dashboard}" Visibility="Collapsed">
-                <ContentControl x:Name="DashMgmtHostCm2"/>
+                <ContentControl x:Name="DashMgmtHostCm2" HorizontalContentAlignment="Stretch"/>
             </TabItem>
 
             </TabControl>

@@ -108,7 +108,7 @@
                  right edge of the card. -->
             <Style x:Key="SettingSlider" TargetType="Slider" BasedOn="{StaticResource MozaSlider}">
                 <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                <Setter Property="MinWidth" Value="160"/>
+                <Setter Property="MinWidth" Value="80"/>
                 <Setter Property="IsSnapToTickEnabled" Value="True"/>
             </Style>
             <!-- Accent-colored slider variants. Foreground cascades to the

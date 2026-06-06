@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctrl="clr-namespace:MozaControls"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
+             xmlns:ui="clr-namespace:MozaPlugin.UI"
              Padding="14"
              TextElement.Foreground="{DynamicResource TextBrush}"
              TextElement.FontFamily="{DynamicResource FontUi}"
@@ -30,7 +31,8 @@
                 <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
             </Style>
             <Style x:Key="SettingSlider" TargetType="Slider" BasedOn="{StaticResource MozaSlider}">
-                <Setter Property="Width" Value="300"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="MinWidth" Value="80"/>
                 <Setter Property="IsSnapToTickEnabled" Value="True"/>
             </Style>
 
@@ -104,11 +106,16 @@
                 </ctrl:SectionCard>
 
                 <ctrl:SectionCard Title="{x:Static res:Strings.Section_Brightness}" Icon="{StaticResource IconLed}">
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Text="{x:Static res:Strings.SliderLabel_Brightness}" Style="{StaticResource FieldLabel}"/>
-                        <Slider x:Name="BrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="255" TickFrequency="1" ValueChanged="BrightnessSlider_ValueChanged"/>
-                        <TextBlock x:Name="BrightnessValue" Style="{StaticResource SliderValue}" Text="100"/>
-                    </StackPanel>
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Brightness}" Style="{StaticResource FieldLabel}"/>
+                        <Slider Grid.Column="1" x:Name="BrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="255" TickFrequency="1" ValueChanged="BrightnessSlider_ValueChanged"/>
+                        <TextBox Grid.Column="2" x:Name="BrightnessValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=BrightnessSlider}" Text="100"/>
+                    </Grid>
                 </ctrl:SectionCard>
 
                 <ctrl:SectionCard Title="{x:Static res:Strings.Section_Sleep}" Icon="{StaticResource IconMisc}">
@@ -120,11 +127,16 @@
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Enabled}"/>
                             </ComboBox>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="{x:Static res:Strings.SliderLabel_SleepTimeout}" Style="{StaticResource FieldLabel}"/>
-                            <Slider x:Name="SleepTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="120" TickFrequency="1" ValueChanged="SleepTimeoutSlider_ValueChanged"/>
-                            <TextBlock x:Name="SleepTimeoutValue" Style="{StaticResource SliderValue}" Text="15"/>
-                        </StackPanel>
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SleepTimeout}" Style="{StaticResource FieldLabel}"/>
+                            <Slider Grid.Column="1" x:Name="SleepTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="120" TickFrequency="1" ValueChanged="SleepTimeoutSlider_ValueChanged"/>
+                            <TextBox Grid.Column="2" x:Name="SleepTimeoutValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=SleepTimeoutSlider}" Text="15"/>
+                        </Grid>
                     </StackPanel>
                 </ctrl:SectionCard>
 

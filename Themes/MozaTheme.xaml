@@ -908,4 +908,62 @@
         <Setter Property="Template" Value="{StaticResource MozaCurveEditorTemplate}"/>
     </Style>
 
+    <!-- ============================================================ -->
+    <!-- Editable slider value box                                     -->
+    <!-- ============================================================ -->
+    <!-- Read-only-looking value box that reveals editable chrome on
+         hover/focus. Wire it to a slider with the SliderValueBox.Slider
+         attached behavior (clr-namespace MozaPlugin.UI) — focus strips the
+         unit suffix, Enter/blur pushes the typed value back to the slider.
+         The main settings page keeps its own copy of this key with a GotFocus
+         EventSetter; this shared version relies on the attached behavior. -->
+    <Style x:Key="SliderValueEditBox" TargetType="TextBox">
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Width" Value="78"/>
+        <Setter Property="Height" Value="26"/>
+        <Setter Property="Padding" Value="6,2"/>
+        <Setter Property="Margin" Value="8,0,0,0"/>
+        <Setter Property="TextAlignment" Value="Right"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CaretBrush" Value="{StaticResource CyanBrush}"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource CyanBrush}"/>
+        <Setter Property="SelectionOpacity" Value="0.35"/>
+        <Setter Property="Cursor" Value="IBeam"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center"
+                                      Focusable="False"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Hidden"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCard2Brush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCardBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
