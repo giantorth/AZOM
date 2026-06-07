@@ -9,22 +9,18 @@ namespace MozaPlugin.Protocol
     public enum ProbeKind { Base, Hub, Ab9 }
 
     /// <summary>
-    /// Self-contained serial open+probe core, compiled into BOTH MozaPlugin.dll
-    /// AND the out-of-process <c>MozaProbeHelper.exe</c> (see ProbeHelper project
-    /// + MozaSerialConnection's isolated-probe launcher).
+    /// Self-contained serial open+probe core used by <see cref="MozaSerialConnection"/>.
     ///
-    /// <para>It MUST NOT reference any other MozaPlugin type — the helper
-    /// compiles this one file standalone — so the wire constants below are local
-    /// copies of the corresponding <c>MozaProtocol.*</c> values. They are stable
-    /// wire constants; keep them in sync (a unit-style assert in
-    /// MozaSerialConnection's static ctor could enforce it, but they have not
-    /// changed since the protocol was first decoded).</para>
+    /// <para>It keeps the wire constants below as local copies of the
+    /// corresponding <c>MozaProtocol.*</c> values so the file stays free of
+    /// other MozaPlugin dependencies. They are stable wire constants; keep them
+    /// in sync (they have not changed since the protocol was first decoded).</para>
     ///
     /// <para>The one operation that can SEGFAULT Wine — <c>SerialPort.Open</c> on
     /// a not-yet-ready CDC-ACM port (the freshly-powered-base crash) — lives in
-    /// <see cref="ProbeOnePort"/>. Callers contain that crash by running it on a
-    /// throwaway thread (in-process, native Windows) or in a child process
-    /// (ProbeHelper, under Wine) so a fault never takes down SimHub.</para>
+    /// <see cref="ProbeOnePort"/>. <see cref="MozaSerialConnection.ProbeWithTimeout"/>
+    /// runs it on a throwaway background thread and abandons that thread at the
+    /// deadline if <c>Open()</c> wedges, so a hung probe never blocks detection.</para>
     /// </summary>
     public static class SerialProbeCore
     {

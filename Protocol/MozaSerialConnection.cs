@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using HidSharp;
 using MozaPlugin.Diagnostics;
@@ -119,15 +118,6 @@ namespace MozaPlugin.Protocol
         private static readonly ConcurrentDictionary<string, byte> _probeInFlight =
             new ConcurrentDictionary<string, byte>();
 
-        // Timeout for an out-of-process (Wine) probe. Must cover child-process
-        // launch overhead under Wine (~1-2 s for a .NET exe) ON TOP of the
-        // probe's internal ~500 ms budget, hence much larger than the in-process
-        // timeout. A genuinely-hung helper is killed at this deadline.
-        private const int IsolatedProbeTimeoutMs = 4_000;
-        // Wine-detection latch (-1 unknown, 0 native Windows, 1 Wine). Routes
-        // the serial probe out-of-process under Wine (the Wine serial-open path
-        // can wedge on a not-ready CDC-ACM port); native Windows probes in-process.
-        private static int _isWine = -1;
         // Priority lane: unpaced FIFO for tiny, time-critical frames (fc:00 session
         // acks). Drained ahead of one-shot every WriteLoop iteration so an ack
         // can't get buried behind a 1000-chunk tier-def burst — the wheel times
@@ -1355,49 +1345,16 @@ namespace MozaPlugin.Protocol
             return (null, null, false);
         }
 
-        // ProbeKind, the probe frames, and the open+probe core moved to the
-        // shared SerialProbeCore (Protocol/SerialProbeCore.cs) so the exact same
-        // code is compiled into the out-of-process MozaProbeHelper.exe with zero
-        // wire-constant drift.
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = false)]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = false)]
-        private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
-
-        /// <summary>Are we running under Wine/Proton? Canonical check: the
-        /// <c>wine_get_version</c> export in ntdll. Latched. Used to route the
-        /// serial probe out-of-process (the Wine serial-open path can wedge a
-        /// not-ready CDC-ACM port); native Windows probes in-process.</summary>
-        private static bool IsRunningUnderWine()
-        {
-            int v = _isWine;
-            if (v >= 0) return v == 1;
-            bool wine = false;
-            try
-            {
-                IntPtr ntdll = GetModuleHandle("ntdll.dll");
-                if (ntdll != IntPtr.Zero)
-                    wine = GetProcAddress(ntdll, "wine_get_version") != IntPtr.Zero;
-            }
-            catch { wine = false; }
-            _isWine = wine ? 1 : 0;
-            try { MozaLog.Debug($"[Moza] Runtime: {(wine ? "Wine/Proton" : "native Windows")} (serial probe {(wine ? "out-of-process" : "in-process")})"); } catch { }
-            return wine;
-        }
+        // ProbeKind, the probe frames, and the open+probe core live in the
+        // shared SerialProbeCore (Protocol/SerialProbeCore.cs).
 
         private static (bool responded, bool reachable) ProbeWithTimeout(string portName, int timeoutMs, ProbeKind kind)
         {
-            // Under Wine, run the open+probe in a child process so a Wine
-            // serial-open SEGFAULT on a not-ready CDC-ACM port kills only the
-            // helper, never SimHub (the freshly-powered-base crash is
-            // uncatchable in-process). A hung helper is killed at the deadline —
-            // safe, because it's a separate process, unlike an in-proc Open
-            // thread we cannot cancel. Native Windows has no such crash, so it
-            // falls through to the in-process path below (no launch latency).
-            if (IsRunningUnderWine())
-                return SerialProbeHelperLauncher.ProbeViaHelper(portName, kind, IsolatedProbeTimeoutMs);
+            // The open+probe runs on a throwaway background thread so a hung
+            // SerialPort.Open() on a not-ready CDC-ACM port (Wine's freshly-
+            // powered-base wedge) doesn't block detection: the thread is
+            // abandoned at the deadline (see _probeInFlight docs) and self-cleans
+            // when the syscall finally returns.
 
             // A prior probe on this port hung in Open() and was abandoned (see
             // _probeInFlight docs). Its SerialPort still owns the OS handle, so
@@ -1424,9 +1381,7 @@ namespace MozaPlugin.Protocol
                     // on THIS thread (no cross-thread dispose — that segfaults
                     // Wine mid-Open). On the abandoned-timeout path the thread is
                     // simply left running; it self-cleans here when Open finally
-                    // returns. NOTE: this is the IN-PROCESS path used on native
-                    // Windows; under Wine ProbeWithTimeout routes to the
-                    // out-of-process helper instead (see the Wine branch above).
+                    // returns.
                     (responded, reachable) = SerialProbeCore.ProbeOnePort(
                         portName, kind, m => MozaLog.Debug($"[Moza] {m}"));
                 }

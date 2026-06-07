@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MozaPlugin", "MozaPlugin.cs
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoapStub", "CoapStub\CoapStub.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F23456789012}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbeHelper", "ProbeHelper\ProbeHelper.csproj", "{C3D4E5F6-A7B8-9012-CDEF-345678901234}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -23,9 +21,5 @@ Global
 		{B2C3D4E5-F6A7-8901-BCDE-F23456789012}.Debug|x86.Build.0 = Debug|x86
 		{B2C3D4E5-F6A7-8901-BCDE-F23456789012}.Release|x86.ActiveCfg = Release|x86
 		{B2C3D4E5-F6A7-8901-BCDE-F23456789012}.Release|x86.Build.0 = Release|x86
-		{C3D4E5F6-A7B8-9012-CDEF-345678901234}.Debug|x86.ActiveCfg = Debug|x86
-		{C3D4E5F6-A7B8-9012-CDEF-345678901234}.Debug|x86.Build.0 = Debug|x86
-		{C3D4E5F6-A7B8-9012-CDEF-345678901234}.Release|x86.ActiveCfg = Release|x86
-		{C3D4E5F6-A7B8-9012-CDEF-345678901234}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 EndGlobal

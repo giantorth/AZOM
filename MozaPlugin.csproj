@@ -27,7 +27,7 @@
          default `**\*.cs` Compile glob would sweep its sources in.
          Exclude the whole subtree; the stub exe still gets embedded
          via the explicit EmbeddedResource Include below. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);CoapStub\**;ProbeHelper\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);CoapStub\**</DefaultItemExcludes>
     <!-- Force Platform=x86 so csproj-only builds match the path the
          sln-driven Release|x86 build uses (bin\x86\Release\). -->
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x86</Platform>
@@ -139,14 +139,6 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <Private>false</Private>
     </ProjectReference>
-    <!-- Build the out-of-process serial-probe helper before this project so its
-         exe can be embedded below (see ProbeHelper project + the isolated-probe
-         launcher in MozaSerialConnection). ReferenceOutputAssembly=false: we
-         embed the exe, we don't link it. -->
-    <ProjectReference Include="ProbeHelper\ProbeHelper.csproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <Private>false</Private>
-    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -156,11 +148,6 @@
     <EmbeddedResource Include="CoapStub\bin\x86\$(Configuration)\MOZA Pit House.exe"
                       LogicalName="MozaPlugin.Sdk.CoapStub.exe"
                       Visible="false" />
-    <!-- Embed the out-of-process probe helper so the launcher can extract it
-         at runtime (single-DLL deployment, same pattern as the CoAP stub). -->
-    <EmbeddedResource Include="ProbeHelper\bin\x86\$(Configuration)\MozaProbeHelper.exe"
-                      LogicalName="MozaPlugin.Protocol.MozaProbeHelper.exe"
-                      Visible="false" />
   </ItemGroup>
 
   <!-- Fail with a clear message if someone builds this csproj directly
@@ -169,11 +156,6 @@
   <Target Name="VerifyCoapStubBuilt" BeforeTargets="GenerateResourceMain">
     <Error Condition="!Exists('CoapStub\bin\x86\$(Configuration)\MOZA Pit House.exe')"
            Text="CoapStub output not found at 'CoapStub\bin\x86\$(Configuration)\MOZA Pit House.exe'. Build the sln (or `dotnet build CoapStub/CoapStub.csproj -c $(Configuration)` first)." />
-  </Target>
-
-  <Target Name="VerifyProbeHelperBuilt" BeforeTargets="GenerateResourceMain">
-    <Error Condition="!Exists('ProbeHelper\bin\x86\$(Configuration)\MozaProbeHelper.exe')"
-           Text="ProbeHelper output not found at 'ProbeHelper\bin\x86\$(Configuration)\MozaProbeHelper.exe'. Build the sln (or `dotnet build ProbeHelper/ProbeHelper.csproj -c $(Configuration)` first)." />
   </Target>
 
   <ItemGroup>
