@@ -30,7 +30,7 @@ namespace MozaPlugin.Devices
         // at its 7,700-rpm redline, slider 100) — a fixed K cannot satisfy both,
         // FreqTickHz × maxRpm does (K = FreqTickHz × maxRpm). See
         // docs/protocol/devices/ab9-shifter.md and tools/ab9-rpm-correlate.
-        private const double FreqTickHz = 6.366e7;
+        private const double FreqTickHz = 6.18e7; //New value from kilarn123, old: 6.366e7;
         // Redline fallback when the game doesn't report MaxRpm (matches the
         // HardwareApplier 8000-rpm convention) so the slider still maps to a
         // sensible redline frequency.
