@@ -384,13 +384,15 @@ namespace MozaPlugin.Hardware
             if (profile.DashRpmBrightness >= 0)
                 _deviceManager.WriteSetting("cm2-indicator-brightness", profile.DashRpmBrightness);
 
-            // 16 stored per-LED colors. The legacy SHDP profile only has 10
-            // RPM + 6 flag colors; map them across the 16 physical CM2
-            // positions: RPM colors 1-10 → cm2-stored-color1..10; flag colors
-            // 1-6 → cm2-stored-color11..16. This makes the existing dash UI
-            // continue to drive useful colors until a CM2-specific 16-color
-            // settings field replaces it. CM2.md confirms 1B 00 FF <i> + RGB
-            // visibly updates the matching LED at dev=0x12.
+            // STANDBY per-LED colors only (idle appearance, shown when no game
+            // is running). rs21_parameter.db: SetIndicatorGroupStandbyModeColor
+            // (0x1B 00 FF <i>) + RGB. RPM colors 1-10 → cm2-stored-color1..10,
+            // flag colors 1-6 → cm2-stored-color11..16.
+            //
+            // The LIVE/active colors (0x0B) are NOT written here — they are
+            // pushed per-frame through the SimHub LED pipeline
+            // (MozaDashLedDeviceManager.SendCm2LiveColors), exactly like the
+            // wheel's RPM LEDs. Config sets up the device + idle look only.
             if (profile.DashRpmColors != null)
             {
                 int rpmCount = System.Math.Min(profile.DashRpmColors.Length, 10);

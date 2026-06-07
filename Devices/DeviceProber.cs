@@ -624,6 +624,16 @@ namespace MozaPlugin.Devices
                                 _plugin.DeviceDefinitionDeployed = true;
                             try { _plugin.ApplyTelemetrySettings(); }
                             catch (Exception ex) { MozaLog.Debug($"[Moza] CM2-on-base ApplyTelemetrySettings skipped: {ex.Message}"); }
+                            // Push the CM2 meter LED config (modes/thresholds/colors,
+                            // group 0x32) now that the base-bridged CM2 is CONFIRMED.
+                            // The earlier MarkDashDetected apply races ahead of this —
+                            // it runs before the profile is loaded and before
+                            // IsCm2BehindBaseCandidate is true, so ApplyCm2DashboardConfig
+                            // never fires there. Without this re-apply the meter is never
+                            // put into telemetry LED mode and its RPM/flag LEDs stay dark
+                            // (KS+CM2 bundle 2026-06-06: zero group-0x32 frames on the wire).
+                            try { _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+                            catch (Exception ex) { MozaLog.Debug($"[Moza] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
                         }
                         // Re-arm the wedge-recovery one-shot now that we know
                         // a display is responsive — a future wheel hot-swap

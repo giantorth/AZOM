@@ -162,23 +162,17 @@ namespace MozaPlugin.Devices
 
                 if (useCm2Path)
                 {
-                    // CM2: LEDs are FIRMWARE-DRIVEN. A real-CM2 wire-trace
-                    // (prueba1.pcapng) shows PitHouse never sends the wheel
-                    // RPM-bar per-LED commands (group 0x3F) to dev=0x12 — the CM2
-                    // ignores them. It drives its LEDs from the stored group-0x32
-                    // config (colours + RPM thresholds + cm2-rpm-group-mode=1,
-                    // sent by HardwareApplier on apply) fed by the tier-def
-                    // telemetry session (Rpm value frames). So the per-frame LED
-                    // push here is a NO-OP for the CM2 — the disproven
-                    // SendCm2LiveLedFrame path is retired.
-                    //
-                    // The capture ALSO carries a group-0x24 → dev 0x12 keyed
-                    // value stream (`<id> <BE float32>`) that likely feeds the
-                    // CM2 screen widgets; its key→channel map is NOT derivable
-                    // from that capture (it was a static 20/40/60/80/100 test
-                    // pattern), so wiring it blind is deferred until an in-game
-                    // CM2 capture pins the keys. See
-                    // docs/protocol/devices/main-hub-0x12.md.
+                    // CM2 LEDs are driven per-frame from SimHub's LED pipeline,
+                    // exactly like the wheel — the live colours flow through this
+                    // Display() callback, NOT from the one-time HardwareApplier
+                    // config. Push each changed LED via the canonical per-LED
+                    // colour commands (group 0x32 sub 0x0B, from rs21_parameter.db
+                    // MeterSetCfg_SetIndicatorGroupColor / SetFlagGroupColor):
+                    //   RPM  LED i → cm2-indicator-color{i+1}  ([0x0B,0x00,i] + RGB)
+                    //   flag LED i → cm2-flag-color{i+1}        ([0x0B,0x02,i] + RGB)
+                    // Off = black. SimHub already encodes on/off as colour in the
+                    // ledColors/buttonColors arrays, so no separate bitmask is sent.
+                    SendCm2LiveColors(plugin, ledColors, buttonColors, rpmCount, flagCount);
                 }
                 else
                 {
@@ -203,111 +197,45 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Per-frame live LED emission for standalone CM2 via the wheel
-        /// RPM-bar command family retargeted to dev=0x12 (CM2 bridge/main).
-        ///
-        /// Emits:
-        ///  • <c>wheel-telemetry-rpm-colors</c> chunks when at least one of
-        ///    the 16 logical color slots changed since the last frame
-        ///    (per-LED [idx, R, G, B] in 5-LED 20-byte chunks);
-        ///  • <c>wheel-send-rpm-telemetry</c> 4-byte bitmask per frame
-        ///    whenever the bitmask differs from the last sent value (or
-        ///    on every frame if <c>AlwaysResendBitmask</c> is set).
-        ///
-        /// Color slot mapping: RPM colors 1–10 → LED positions 1–10; flag
-        /// colors 1–6 → LED positions 11–16. Matches the CM2 physical
-        /// layout (logical 1–3 left, 4–13 top, 14–16 right) in the same
-        /// order used by the cm2-stored-color writes in HardwareApplier.
+        /// Per-frame live CM2 LED emission — the wheel-equivalent flow for the
+        /// dash. Drives each of the 16 LEDs (10 RPM + 6 flag) from SimHub's
+        /// computed colours using the canonical per-LED colour commands
+        /// (group 0x32 sub 0x0B, rs21_parameter.db
+        /// MeterSetCfg_SetIndicatorGroupColor / SetFlagGroupColor):
+        ///   RPM  LED i → cm2-indicator-color{i+1}  ([0x0B,0x00,i] + RGB)
+        ///   flag LED i → cm2-flag-color{i+1}        ([0x0B,0x02,i] + RGB)
+        /// Only changed slots are sent (each command is a single-LED write).
+        /// Off is encoded as black, so no separate on/off bitmask is needed.
         /// </summary>
-        private void SendCm2LiveLedFrame(MozaPlugin plugin,
+        private void SendCm2LiveColors(MozaPlugin plugin,
             Color[] ledColors, Color[] buttonColors,
-            int bitmask, bool alwaysResendBitmask,
             int rpmCount, int flagCount)
         {
-            // Build the 16-slot color array from the SimHub RPM + button arrays.
-            var current = new Color[Cm2LedCount];
             for (int i = 0; i < Cm2LedCount; i++)
             {
-                if (i < rpmCount)
-                    current[i] = ledColors[i];
+                // Slots 0-9 = RPM (ledColors), 10-15 = flag (buttonColors).
+                Color c;
+                if (i < MozaDeviceConstants.RpmLedCount)
+                    c = i < rpmCount ? ledColors[i] : Color.FromArgb(0, 0, 0);
                 else
                 {
-                    int flagIdx = i - rpmCount;
-                    if (flagIdx < flagCount)
-                        current[i] = buttonColors[flagIdx];
-                    else
-                        current[i] = Color.FromArgb(0, 0, 0);
-                }
-            }
-
-            // Resend colors only when at least one slot changed (or first frame).
-            bool colorsChanged = !_cm2ColorsInitialised;
-            if (!colorsChanged)
-            {
-                for (int i = 0; i < Cm2LedCount; i++)
-                {
-                    if (current[i].R != _lastCm2Colors[i].R
-                        || current[i].G != _lastCm2Colors[i].G
-                        || current[i].B != _lastCm2Colors[i].B)
-                    {
-                        colorsChanged = true;
-                        break;
-                    }
-                }
-            }
-
-            if (colorsChanged)
-            {
-                // 4 bytes per LED, padded to 20-byte chunks. 16 LEDs → 64 bytes
-                // → 4 chunks of 20 (last chunk has 4 padding entries marked
-                // 0xFF index to avoid being interpreted as "LED 0 off").
-                int dataLen = Cm2LedCount * 4;
-                int bufferLen = ((dataLen + 19) / 20) * 20;
-                var colorData = new byte[bufferLen];
-                for (int i = 0; i < Cm2LedCount; i++)
-                {
-                    int o = i * 4;
-                    colorData[o] = (byte)i;
-                    colorData[o + 1] = current[i].R;
-                    colorData[o + 2] = current[i].G;
-                    colorData[o + 3] = current[i].B;
-                }
-                for (int pos = dataLen; pos < bufferLen; pos += 4)
-                    colorData[pos] = 0xFF;
-
-                var chunk = new byte[20];
-                for (int pos = 0; pos < bufferLen; pos += 20)
-                {
-                    Array.Copy(colorData, pos, chunk, 0, 20);
-                    plugin.DeviceManager.WriteArrayForDevice(
-                        "wheel-telemetry-rpm-colors",
-                        MozaProtocol.DeviceMain,
-                        chunk);
+                    int flagIdx = i - MozaDeviceConstants.RpmLedCount;
+                    c = flagIdx < flagCount ? buttonColors[flagIdx] : Color.FromArgb(0, 0, 0);
                 }
 
-                for (int i = 0; i < Cm2LedCount; i++)
-                    _lastCm2Colors[i] = current[i];
-                _cm2ColorsInitialised = true;
-            }
+                if (_cm2ColorsInitialised
+                    && _lastCm2Colors[i].R == c.R
+                    && _lastCm2Colors[i].G == c.G
+                    && _lastCm2Colors[i].B == c.B)
+                    continue;
 
-            if (alwaysResendBitmask || bitmask != _lastBitmask)
-            {
-                _lastBitmask = bitmask;
-                // CM2 (dev 0x12) RPM LEDs: 4-byte active-mask form (CM2 has 16 LEDs).
-                // This is a separate device from the wheel (dev 0x17) and is left
-                // unchanged by the wheel-LED 8-byte active+window work.
-                var bitmaskBytes = new byte[]
-                {
-                    (byte)(bitmask & 0xFF),
-                    (byte)((bitmask >> 8) & 0xFF),
-                    (byte)((bitmask >> 16) & 0xFF),
-                    (byte)((bitmask >> 24) & 0xFF),
-                };
-                plugin.DeviceManager.WriteArrayForDevice(
-                    "wheel-send-rpm-telemetry",
-                    MozaProtocol.DeviceMain,
-                    bitmaskBytes);
+                string cmd = i < MozaDeviceConstants.RpmLedCount
+                    ? $"cm2-indicator-color{i + 1}"
+                    : $"cm2-flag-color{i - MozaDeviceConstants.RpmLedCount + 1}";
+                plugin.DeviceManager.WriteColor(cmd, c.R, c.G, c.B);
+                _lastCm2Colors[i] = c;
             }
+            _cm2ColorsInitialised = true;
         }
     }
 }

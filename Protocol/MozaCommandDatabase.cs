@@ -377,10 +377,24 @@ namespace MozaPlugin.Protocol
             // Per-rung absolute RPM thresholds (10 rungs, u32 each).
             for (byte i = 0; i < 10; i++)
                 AddCommand($"cm2-rpm-absolute-threshold{i + 1}", "cm2-main", 0xFF, 0x32, new byte[] { 0x0E, i }, 4, "int");
-            // Per-LED stored color (16 LEDs on CM2 — all 16 are RPM positions per
-            // user-confirmed hardware layout). cmd `1B 00 FF <i>` + RGB.
+            // Per-LED STANDBY color (16 LEDs) — shown when the meter is idle.
+            // rs21_parameter.db: MeterSetCfg_SetIndicatorGroupStandbyModeColor
+            // = [50,27,0,255,i] (0x1B 00 FF <i>) + 3-byte RGB.
             for (byte i = 0; i < 16; i++)
                 AddCommand($"cm2-stored-color{i + 1}", "cm2-main", 0xFF, 0x32, new byte[] { 0x1B, 0x00, 0xFF, i }, 3, "array");
+
+            // Per-LED LIVE/ACTIVE color — what each LED shows while lit during
+            // telemetry (distinct from the standby colors above). rs21_parameter.db:
+            //   MeterSetCfg_SetIndicatorGroupColor1..10 = [50,11,0,i] (0x0B 00 <i>)
+            //     → 10 RPM/shift-light positions, 3-byte RGB.
+            //   MeterSetCfg_SetFlagGroupColor1..6       = [50,11,2,i] (0x0B 02 <i>)
+            //     → 6 flag-light positions, 3-byte RGB.
+            // Without these the firmware drives the RPM ramp in its own default
+            // colours; the profile's colours only reached the standby slots.
+            for (byte i = 0; i < 10; i++)
+                AddCommand($"cm2-indicator-color{i + 1}", "cm2-main", 0xFF, 0x32, new byte[] { 0x0B, 0x00, i }, 3, "array");
+            for (byte i = 0; i < 6; i++)
+                AddCommand($"cm2-flag-color{i + 1}", "cm2-main", 0xFF, 0x32, new byte[] { 0x0B, 0x02, i }, 3, "array");
 
             // ===== HANDBRAKE (device: handbrake, read group 91, write group 92) =====
             AddCommand("handbrake-direction",        "handbrake", 91, 92, new byte[] { 1 },  2, "int");
