@@ -525,7 +525,7 @@ namespace MozaPlugin.Devices.WheelUi
 
             // The standalone FSR1/CM1 drivers render the pattern without a tier-def
             // sender, so the button is live whenever any display pipeline is running.
-            TelemetryTestBtn.IsEnabled = senderReady || _plugin.IsAnyDashboardDisplayRunning;
+            TelemetryTestBtn.IsEnabled = senderReady || (_plugin?.IsAnyDashboardDisplayRunning ?? false);
             TelemetryTestBtn.Content = testMode
                 ? global::MozaPlugin.Resources.Strings.Button_StopTest
                 : global::MozaPlugin.Resources.Strings.Button_SendTestPattern;
@@ -747,18 +747,17 @@ namespace MozaPlugin.Devices.WheelUi
             // is the 0x42 driver — starting the idle wheel sender kicks a phantom
             // cold-start) or for a wheel whose screen isn't the tier-def sender.
             var active = _plugin.TelemetrySender;
-            bool tierDefWheelScreen = active != null && _plugin.WheelUsesTierDefDisplaySender;
-            if (turningOn)
+            if (active != null && _plugin.WheelUsesTierDefDisplaySender && !_plugin.ActiveTelemetryEnabled)
             {
-                if (tierDefWheelScreen && !_plugin.ActiveTelemetryEnabled && !active.IsActive)
+                if (turningOn && !active.IsActive)
                 {
                     _plugin.ApplyTelemetrySettings();
                     System.Threading.ThreadPool.QueueUserWorkItem(_ => active.Start());
                 }
-            }
-            else if (tierDefWheelScreen && !_plugin.ActiveTelemetryEnabled && active.IsActive)
-            {
-                active.Stop();
+                else if (!turningOn && active.IsActive)
+                {
+                    active.Stop();
+                }
             }
 
             RefreshTelemetryStatus();

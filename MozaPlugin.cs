@@ -329,6 +329,9 @@ namespace MozaPlugin
                 _cm2ReassertAttempted = false;
                 // Stamp the start so TickCm1Discriminator can time the catalog-wait.
                 _cm2StartUtc = DateTime.UtcNow;
+                // Re-stamped when the sender reaches Active (the discriminator times
+                // its CM1 decision from there, not from start — cold-start is long).
+                _cm2ActiveUtc = DateTime.MinValue;
                 // Fresh discrimination cycle — clear the param-read flag so a stale
                 // CM1 answer can't fast-latch a newly-attached CM2.
                 _dashParamReadAnswered = false;
@@ -379,6 +382,10 @@ namespace MozaPlugin
         // CM1 discriminator: when did the tier-def _cm2Sender start streaming? Used to
         // time the catalog-wait before declaring a bridged dash a CM1.
         private DateTime _cm2StartUtc = DateTime.MinValue;
+        // When the _cm2Sender first reached Active (cold-start done). The CM1 decision
+        // is timed from here: a CM1 advertises no catalog AND emits no value frames,
+        // so timing from FramesSent>0 (which never happens) wedged the discriminator.
+        private DateTime _cm2ActiveUtc = DateTime.MinValue;
         // Past the watchdog's 20s engagement grace + 3s confirm; a real tier-def CM2
         // advertises its catalog well within this, a CM1 never does.
         private static readonly TimeSpan Cm1DecideAfter = TimeSpan.FromSeconds(25);
@@ -435,9 +442,14 @@ namespace MozaPlugin
                 return;
             }
 
-            if (cm2.FramesSent == 0 || _cm2StartUtc == DateTime.MinValue) return;
+            // Wait for the sender to finish cold-start (reach Active) before deciding,
+            // then time from there. A CM1 advertises no catalog and emits no value
+            // frames, so the old `FramesSent == 0` gate never released and the
+            // discriminator stayed wedged here forever — the CM1 never engaged.
+            if (!cm2.IsActive) return;
+            if (_cm2ActiveUtc == DateTime.MinValue) _cm2ActiveUtc = DateTime.UtcNow;
 
-            var elapsed = DateTime.UtcNow - _cm2StartUtc;
+            var elapsed = DateTime.UtcNow - _cm2ActiveUtc;
 
             // Fast positive CM1 signal: the dash answers the group-0x0E param-read
             // probe with a 0x8E reply (_dashParamReadAnswered); a tier-def CM2
