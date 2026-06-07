@@ -62,7 +62,8 @@ namespace MozaPlugin.Telemetry
         public string Label = "";      // UI group header
         public byte PayloadLen;        // wire len byte (type+b1+b2+data)
         public byte LiveB1;            // b1 when populated
-        public byte LiveB2;            // b2 when populated
+        public byte LiveB2;            // b2 structural base (always-set bits)
+        public byte LiveB2EngineOffBit; // OR'd into b2 while the engine is stopped
         public bool IsLive;            // false = declared-only (never streams live)
         public Fsr1FieldDef[] Fields = System.Array.Empty<Fsr1FieldDef>();
     }
@@ -124,7 +125,8 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x02, Key = "type-02", Label = "Dashboard 02 — RPM / Gear", IsLive = true,
-                PayloadLen = 18, LiveB1 = 0x03, LiveB2 = 0x00,
+                // PitHouse: b2=0x00 engine-on, 0x20 engine-off (verified across captures).
+                PayloadLen = 18, LiveB1 = 0x03, LiveB2 = 0x00, LiveB2EngineOffBit = 0x20,
                 Fields = new[]
                 {
                     Wheel("wheelFL", "Wheel 1 (cand. tyre FL)", 6, PropTempFL),
@@ -158,7 +160,9 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — multi-field", IsLive = true,
-                PayloadLen = 24, LiveB1 = 0x0d, LiveB2 = 0x00,
+                // PitHouse always sets bit 0x80 on this type (0x40 sub-state toggle
+                // observed but not yet characterised — left out).
+                PayloadLen = 24, LiveB1 = 0x0d, LiveB2 = 0x80,
                 Fields = new[]
                 {
                     Raw(11), Raw(12), Raw(13), Raw(14), Raw(15),
@@ -169,12 +173,16 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x09, Key = "type-09", Label = "Dashboard 09 — sparse", IsLive = true,
-                PayloadLen = 24, LiveB1 = 0x01, LiveB2 = 0x00,
+                // PitHouse always sets bit 0x80 on this type (only engine-off captured).
+                PayloadLen = 24, LiveB1 = 0x01, LiveB2 = 0x80,
                 Fields = new[] { Raw(6, Fsr1Encoding.U16_BE), Raw(18) },
             },
             new()
             {
-                RecordType = 0x0d, Key = "type-0d", Label = "Dashboard 0D — multi-field", IsLive = true,
+                // No live 0d frame (b1!=0) was ever observed in any capture — only
+                // all-zero declarations. Declared-only until a real live frame is
+                // captured; streaming b1=0x00 just spams useless declarations.
+                RecordType = 0x0d, Key = "type-0d", Label = "Dashboard 0D — multi-field", IsLive = false,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new[]
                 {

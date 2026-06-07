@@ -112,8 +112,10 @@ namespace MozaPlugin.Telemetry
             if (_tickCounter % oneHzEvery == 0)
                 _connection.SendStream((StreamKind)PingSlot, Cm1DisplayEmitter.SessionPing);
 
-            // Telemetry disabled by the user: ping only, no value stream.
-            if (!(plugin?.ActiveTelemetryEnabled ?? false)) { _tickCounter++; return; }
+            // Telemetry disabled by the user: ping only, no value stream. The test
+            // pattern overrides this so the dash can be verified with no game running.
+            bool testMode = plugin?.DashboardTestPatternActive ?? false;
+            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode) { _tickCounter++; return; }
 
             // Host-initiated dashboard switch (group-0x32/0x81 → dev 0x14).
             int pending = plugin?.TakePendingCm1Select() ?? -1;
@@ -121,10 +123,19 @@ namespace MozaPlugin.Telemetry
                 _connection.Send(Cm1DisplayEmitter.BuildSelect(pending));
 
             var resolve = _resolve;
+            long testNowMs = testMode ? DashboardTestPattern.NowMs() : 0;
             float ValueFor(Cm1FieldDef f)
             {
                 var m = plugin?.GetCm1FieldMapping(f.FieldId);
                 string prop = m?.Property ?? f.DefaultProperty;
+                // Test pattern: sweep each field over an inferred natural range
+                // (the CM1 catalog carries no per-field range). Constants stay put.
+                if (testMode)
+                {
+                    if (f.Constant.HasValue) return (float)f.Constant.Value;
+                    double max = DashboardTestPattern.NaturalMax(f.FieldId, prop);
+                    return (float)(DashboardTestPattern.Sweep(f.FieldId, max, testNowMs) * f.Scale);
+                }
                 if (string.IsNullOrEmpty(prop))
                     return f.Constant.HasValue ? (float)f.Constant.Value : 0f;
                 double raw = resolve != null ? resolve(prop) : 0.0;

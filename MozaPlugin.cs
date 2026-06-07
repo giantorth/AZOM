@@ -3037,6 +3037,40 @@ namespace MozaPlugin
         /// <summary>The secondary CM2-dash tier-def sender (dual-screen), or null.</summary>
         internal TelemetrySender? Cm2Sender => _cm2Sender;
 
+        // "Send Test Pattern" toggle, shared across every display pipeline. The
+        // tier-def senders consume it via their own TestMode; the standalone FSR1
+        // (0x42) / CM1 (0x35) drivers read this flag in their tick and synthesise a
+        // sweep (see Telemetry/DashboardTestPattern). Volatile: written from the UI
+        // thread, read from the driver/sender timer threads.
+        private volatile bool _dashboardTestPattern;
+
+        /// <summary>True while the dashboard test pattern is active (any display type).</summary>
+        internal bool DashboardTestPatternActive => _dashboardTestPattern;
+
+        /// <summary>Toggle the test pattern across every display pipeline: the
+        /// tier-def senders (wheel + CM2) via their <see cref="TelemetrySender.TestMode"/>,
+        /// and the standalone FSR1/CM1 drivers via <see cref="DashboardTestPatternActive"/>.</summary>
+        internal void SetDashboardTestPattern(bool on)
+        {
+            _dashboardTestPattern = on;
+            if (_telemetrySender != null) _telemetrySender.TestMode = on;
+            if (_cm2Sender != null) _cm2Sender.TestMode = on;
+        }
+
+        /// <summary>True when some display pipeline is live and can render a test
+        /// pattern: a tier-def sender is Active, or a standalone FSR1/CM1 driver runs.</summary>
+        internal bool IsAnyDashboardDisplayRunning =>
+            (_telemetrySender?.IsActive ?? false)
+            || (_cm2Sender?.IsActive ?? false)
+            || (_fsr1Driver?.IsRunning ?? false)
+            || (_cm1Driver?.IsRunning ?? false);
+
+        /// <summary>True when the wheel's OWN screen is driven by the tier-def
+        /// <see cref="_telemetrySender"/> (a display wheel like W17/W18) rather than
+        /// the standalone FSR1 0x42 driver — so the test button may safely start it.</summary>
+        internal bool WheelUsesTierDefDisplaySender =>
+            !IsFsr1DisplayWheel && (WheelModelInfo?.HasDisplay == true);
+
         /// <summary>The sender that actually drives the CM2 dashboard. When the
         /// wheel has its own screen (FSR1 / tier-def display) the dedicated
         /// <see cref="Cm2Sender"/> lane drives the CM2 alongside the wheel; when

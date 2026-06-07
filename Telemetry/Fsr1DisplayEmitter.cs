@@ -88,11 +88,15 @@ namespace MozaPlugin.Telemetry
         /// returns each field's final wire integer (already resolved + scaled to the
         /// field's range); it is invoked once per field. Anchor (EngineFlag) fields
         /// are included in the catalog and handled by the caller's valueFor.
+        /// <paramref name="engineRunning"/> drives the per-type b2 engine-off bit
+        /// (<see cref="Fsr1Dashboard.LiveB2EngineOffBit"/>).
         /// </summary>
-        internal static byte[] BuildRecord(Fsr1Dashboard dash, Func<Fsr1FieldDef, long> valueFor)
+        internal static byte[] BuildRecord(
+            Fsr1Dashboard dash, Func<Fsr1FieldDef, long> valueFor, bool engineRunning)
         {
             if (dash == null) throw new ArgumentNullException(nameof(dash));
-            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
+            byte b2 = (byte)(dash.LiveB2 | (engineRunning ? 0 : dash.LiveB2EngineOffBit));
+            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, b2);
             foreach (var f in dash.Fields)
                 WriteField(frame, f, valueFor(f));
             Finish(frame);

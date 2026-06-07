@@ -22,9 +22,10 @@ namespace MozaPlugin.Telemetry
     internal sealed class Fsr1DisplayDriver : IDisposable
     {
         private const double TickIntervalMs = 35.0;   // ~28.6 Hz, matches capture
-        private const double SecondaryHz = 3.0;       // low-rate non-primary records
         // FSR1 occupies the wheel lane: TierDash0..6 (records) + Enable (keepalive).
         private const int LaneSlotCount = 9;          // slots 0..8
+        // _lastStreamedIndex sentinel meaning "currently in full-set fallback mode".
+        private const int FloodSentinel = -2;
 
         private readonly MozaSerialConnection _connection;
         private readonly Func<string, double> _resolve;
@@ -112,9 +113,11 @@ namespace MozaPlugin.Telemetry
 
             var plugin = MozaPlugin.Instance;
             int oneHzEvery = Math.Max(1, (int)Math.Round(1000.0 / TickIntervalMs));
+            bool testMode = plugin?.DashboardTestPatternActive ?? false;
 
             // Telemetry disabled by the user: keepalive only (keeps the wheel engaged).
-            if (!(plugin?.ActiveTelemetryEnabled ?? false))
+            // The test pattern overrides this so the screen can be verified with no game.
+            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode)
             {
                 if (_tickCounter % oneHzEvery == 0)
                     _connection.SendStream(StreamKind.Enable, Fsr1DisplayEmitter.Keepalive43);
@@ -123,8 +126,9 @@ namespace MozaPlugin.Telemetry
             }
 
             var data = _latestGameData;
-            bool engineRunning = (data?.Rpms ?? 0.0) > 1.0;
+            bool engineRunning = testMode || (data?.Rpms ?? 0.0) > 1.0;
             var resolve = _resolve;
+            long testNowMs = testMode ? DashboardTestPattern.NowMs() : 0;
 
             // Host-initiated dashboard switch: emit the group-0x32/0x81 select command.
             int pending = plugin?.TakePendingFsr1Select() ?? -1;
@@ -135,6 +139,12 @@ namespace MozaPlugin.Telemetry
             {
                 if (f.Kind == Fsr1FieldKind.EngineFlag)
                     return engineRunning ? Fsr1DisplayEmitter.EngineFlagValue : 0;
+
+                // Test pattern: sweep each field across its own output range.
+                if (testMode)
+                    return Clamp((long)Math.Round(
+                        DashboardTestPattern.Sweep(f.FieldId, f.OutputMax, testNowMs)),
+                        0, f.OutputMax);
 
                 var m = plugin?.GetFsr1FieldMapping(dash.Key, f.FieldId);
                 string prop = m?.Property ?? f.DefaultProperty;
@@ -153,34 +163,49 @@ namespace MozaPlugin.Telemetry
                 return Clamp((long)Math.Round(t * outMax), 0, outMax);
             }
 
-            // Active page's primary record at full rate + the other field-bearing
-            // records at the low secondary rate (all the channels; see wheel-0x17.md).
+            // PitHouse streams exactly ONE record type — the one for the wheel's
+            // currently-displayed page — not all of them. Match that: when the active
+            // index (tracked from the Param-6 0x0E log / g32-81 ack) maps to a known
+            // record type, stream only that type at full rate. Fall back to the whole
+            // live set ONLY while the index is genuinely unknown/unmapped, so the
+            // screen is never dead on a page we haven't decoded. See wheel-0x17.md.
             int activeIdx = plugin?.GetActiveFsr1Index() ?? 0;
             var primary = Fsr1DashboardCatalog.ByIndex(activeIdx);
-            byte primaryType = primary?.RecordType ?? 0xFF;
-            int secondaryEvery = Math.Max(1, (int)Math.Round(1000.0 / TickIntervalMs / SecondaryHz));
-
-            if (primary != null && activeIdx != _lastStreamedIndex)
-            {
-                _lastStreamedIndex = activeIdx;
-                _connection.Send(Fsr1DisplayEmitter.BuildDeclaration(primary));
-            }
-            else if (primary == null)
-            {
-                _lastStreamedIndex = -1;
-            }
-
             var live = Fsr1DashboardCatalog.LiveDashboards;
-            for (int slot = 0; slot < live.Length; slot++)
+
+            if (primary != null)
             {
-                var dash = live[slot];
-                if (dash.Fields.Length == 0) continue;
-                bool isPrimary = primary != null && dash.RecordType == primaryType;
-                bool emit = isPrimary || primary == null || (_tickCounter % secondaryEvery == 0);
-                if (!emit) continue;
+                if (_lastStreamedIndex != activeIdx)
+                {
+                    _lastStreamedIndex = activeIdx;
+                    // Drop any leftover records from the previous page / fallback so
+                    // only the active type keeps retransmitting, then re-declare it
+                    // (PitHouse re-declares on every switch before streaming).
+                    _connection.ClearStreamSlots(0, live.Length);
+                    _connection.Send(Fsr1DisplayEmitter.BuildDeclaration(primary));
+                }
                 _connection.SendStream(
-                    (StreamKind)((int)StreamKind.TierDash0 + slot),
-                    Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f)));
+                    StreamKind.TierDash0,
+                    Fsr1DisplayEmitter.BuildRecord(primary, f => ValueFor(primary, f), engineRunning));
+            }
+            else
+            {
+                if (_lastStreamedIndex != FloodSentinel)
+                {
+                    _lastStreamedIndex = FloodSentinel;
+                    MozaLog.Debug(
+                        $"[Moza] FSR1 active index {activeIdx} not in the decoded " +
+                        "index→type map — streaming the full live set as a fallback " +
+                        "until the wheel reports a known page.");
+                }
+                for (int slot = 0; slot < live.Length; slot++)
+                {
+                    var dash = live[slot];
+                    if (dash.Fields.Length == 0) continue;
+                    _connection.SendStream(
+                        (StreamKind)((int)StreamKind.TierDash0 + slot),
+                        Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f), engineRunning));
+                }
             }
 
             if (_tickCounter % oneHzEvery == 0)

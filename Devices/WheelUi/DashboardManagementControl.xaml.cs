@@ -479,7 +479,7 @@ namespace MozaPlugin.Devices.WheelUi
 
             bool enabled = _plugin.ActiveTelemetryEnabled;
             var active = _plugin.TelemetrySender;
-            bool testMode = active?.TestMode ?? false;
+            bool testMode = _plugin.DashboardTestPatternActive;
 
             // Sync checkbox to overlay each tick so game/profile switches reflect immediately.
             if (TelemetryEnabledCheck.IsChecked != enabled)
@@ -523,7 +523,9 @@ namespace MozaPlugin.Devices.WheelUi
             else
                 DashboardTelemetryCard.Subtitle = "Connected";
 
-            TelemetryTestBtn.IsEnabled = senderReady;
+            // The standalone FSR1/CM1 drivers render the pattern without a tier-def
+            // sender, so the button is live whenever any display pipeline is running.
+            TelemetryTestBtn.IsEnabled = senderReady || _plugin.IsAnyDashboardDisplayRunning;
             TelemetryTestBtn.Content = testMode
                 ? global::MozaPlugin.Resources.Strings.Button_StopTest
                 : global::MozaPlugin.Resources.Strings.Button_SendTestPattern;
@@ -733,20 +735,28 @@ namespace MozaPlugin.Devices.WheelUi
         private void TelemetryTestToggle_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            var active = _plugin.TelemetrySender;
-            if (active == null) return;
 
-            bool turningOn = !active.TestMode;
-            active.TestMode = turningOn;
+            bool turningOn = !_plugin.DashboardTestPatternActive;
+            // Drives every display pipeline: tier-def senders via TestMode, the
+            // standalone FSR1/CM1 drivers via the shared flag (they pick it up on
+            // their next tick — no start needed while they're already running).
+            _plugin.SetDashboardTestPattern(turningOn);
+
+            // A tier-def DISPLAY wheel (W17/W18) renders only while its sender is
+            // Active; bring it up on demand. Never start it for an FSR1 (its screen
+            // is the 0x42 driver — starting the idle wheel sender kicks a phantom
+            // cold-start) or for a wheel whose screen isn't the tier-def sender.
+            var active = _plugin.TelemetrySender;
+            bool tierDefWheelScreen = active != null && _plugin.WheelUsesTierDefDisplaySender;
             if (turningOn)
             {
-                if (!_plugin.ActiveTelemetryEnabled)
+                if (tierDefWheelScreen && !_plugin.ActiveTelemetryEnabled && !active.IsActive)
                 {
                     _plugin.ApplyTelemetrySettings();
                     System.Threading.ThreadPool.QueueUserWorkItem(_ => active.Start());
                 }
             }
-            else if (!_plugin.ActiveTelemetryEnabled)
+            else if (tierDefWheelScreen && !_plugin.ActiveTelemetryEnabled && active.IsActive)
             {
                 active.Stop();
             }
