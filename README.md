@@ -11,6 +11,7 @@
 > MOZA is a registered trademark of Gudsen Technology Co., Ltd. This project is not affiliated with, endorsed by, or sponsored by MOZA or Gudsen Technology. All trademarks are the property of their respective owners.
 
 ![Wheel Startup](docs/examples/IMG_7111.gif)
+_A CS Pro with a custom Sparco rim running ATSR_
 
 A SimHub plugin that provides complete replacement software for your MOZA hardware.
 
