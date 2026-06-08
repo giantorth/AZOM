@@ -1532,7 +1532,22 @@ namespace MozaPlugin.Telemetry
                         $"[Moza] Start: enforcing {waitMs}ms silence " +
                         $"(elapsed since last Stop: {elapsedMs}ms; min: {Lifecycle.SilenceGate.StopReopenSilenceMs}ms) " +
                         "so wheel session state can settle before reopen");
-                    try { System.Threading.Thread.Sleep(waitMs); } catch { }
+                    // Slice the sleep so a supersession (a new Start() cancelling
+                    // our token) releases the start semaphore within one slice
+                    // instead of pinning it for the full ~11 s — otherwise the
+                    // superseding Start hits "could not acquire start lock after
+                    // 10s" and telemetry stays wedged. Gate on the token only:
+                    // StartInner's own Stop() above already left _state == Idle
+                    // by design, so a state check here would bail immediately.
+                    const int SilenceSliceMs = 100;
+                    int slept = 0;
+                    while (slept < waitMs)
+                    {
+                        if (cancel.IsCancellationRequested) return;
+                        int slice = System.Math.Min(SilenceSliceMs, waitMs - slept);
+                        try { System.Threading.Thread.Sleep(slice); } catch { }
+                        slept += slice;
+                    }
                 }
             }
             else
@@ -1562,7 +1577,7 @@ namespace MozaPlugin.Telemetry
             // session state from a prior SimHub process. Game-switch reloads
             // skip the wide close to preserve the configJson handshake on
             // the persistent wire.
-            ProbeAndOpenSessions(isFirstStartInProcess);
+            ProbeAndOpenSessions(isFirstStartInProcess, cancel);
             // Supersession gate: a new Start() arriving mid-probe cancels
             // our token. An external Stop() during the same window pushes
             // state to Idle — both signal "abandon this StartInner".
@@ -1634,7 +1649,8 @@ namespace MozaPlugin.Telemetry
                             haveCatalog = true;
                             break;
                         }
-                        if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
+                        if (cancel.IsCancellationRequested
+                            || _state == TelemetryState.Idle || !_connection.IsConnected) return;
                         try { System.Threading.Thread.Sleep(CatalogWaitSliceMs); } catch { }
                         waited += CatalogWaitSliceMs;
                     }
@@ -1660,7 +1676,8 @@ namespace MozaPlugin.Telemetry
                     try { TryCloseSession(0x02, 300); } catch { }
                     try { TryCloseSession(0x03, 300); } catch { }
                     try { System.Threading.Thread.Sleep(250); } catch { }
-                    if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
+                    if (cancel.IsCancellationRequested
+                        || _state == TelemetryState.Idle || !_connection.IsConnected) return;
                     TryOpenSession(0x01, 500);
                     if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
                     TryOpenSession(0x02, 500);
@@ -2586,7 +2603,7 @@ namespace MozaPlugin.Telemetry
         /// request — the cold-start path always runs through that burst
         /// anyway, so there's no handshake to disturb.
         /// </summary>
-        private void ProbeAndOpenSessions(bool isColdStart)
+        private void ProbeAndOpenSessions(bool isColdStart, CancellationToken cancel)
         {
             if (!_connection.IsConnected)
                 return;
@@ -2623,7 +2640,8 @@ namespace MozaPlugin.Telemetry
                 $"(0x01..0x{lastClosePort:X2}{(isColdStart ? " — wide" : "")})...");
             for (byte port = 1; port <= lastClosePort; port++)
             {
-                if (!_connection.IsConnected) return;
+                if (cancel.IsCancellationRequested
+                    || _state == TelemetryState.Idle || !_connection.IsConnected) return;
                 bool acked = TryCloseSession(port, CloseAckTimeoutMs);
                 MozaLog.Debug(
                     $"[Moza] SessionClose 0x{port:X2} {(acked ? "acked" : "no ack within " + CloseAckTimeoutMs + "ms")}");
@@ -2647,16 +2665,41 @@ namespace MozaPlugin.Telemetry
             if (mgmtPort == 0 && telemetryPort == 0 && _connection.IsConnected)
             {
                 const int ExtendedAckWaitMs = 20_000;
+                const int ExtendedAckSliceMs = 100;
                 MozaLog.Info(
                     $"[Moza] Both sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens silent within " +
                     $"{OpenAckTimeoutMs}ms — waiting up to {ExtendedAckWaitMs}ms for slow-bring-up " +
                     "wheel (CS-Pro on Universal Hub takes ~14 s)");
-                bool gotLateAck;
+                bool gotLateAck = false;
                 _wheelReadyObserved = false;
                 try { _ackReceived.Reset(); }
                 catch (ObjectDisposedException) { return; }
-                try { gotLateAck = _ackReceived.Wait(ExtendedAckWaitMs); }
-                catch (ObjectDisposedException) { return; }
+                // Slice the wait so a SUPERSESSION (a new Start() cancelling our
+                // token) or an external Stop()/disconnect releases the start
+                // semaphore within one slice instead of pinning it for the full
+                // 20 s. A single blocking Wait here observed neither `cancel` nor
+                // `_state`, so a Stop→Start inside the window (e.g. the user
+                // toggling telemetry-enable mid-bring-up) parked this StartInner
+                // the whole 20 s holding the semaphore; the re-Start then hit
+                // "could not acquire start lock after 10s" and telemetry never
+                // came up — KS+CM2 cold start, diagnostics bundle 2026-06-08.
+                int extWaited = 0;
+                while (extWaited < ExtendedAckWaitMs)
+                {
+                    if (cancel.IsCancellationRequested
+                        || _state == TelemetryState.Idle || !_connection.IsConnected) return;
+                    try
+                    {
+                        if (_ackReceived.Wait(ExtendedAckSliceMs, cancel))
+                        {
+                            gotLateAck = true;
+                            break;
+                        }
+                    }
+                    catch (OperationCanceledException) { return; }
+                    catch (ObjectDisposedException) { return; }
+                    extWaited += ExtendedAckSliceMs;
+                }
                 if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
                 // Belt-and-suspenders: even if the Wait timed out, the
                 // dispatcher may have flipped _wheelReadyObserved in the
