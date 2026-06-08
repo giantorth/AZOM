@@ -180,7 +180,7 @@ namespace MozaPlugin.Telemetry
 
             // Point the sender at the connection that owns the screen: the
             // dedicated dashboard connection for a standalone-USB CM2, else the
-            // wheelbase connection (wheel-hosted 0x17 / base-bridged CM2 0x14).
+            // wheelbase connection (wheel-hosted 0x17 / base-bridged CM2 0x12).
             // Rebinding requires Idle; if the sender is mid-session, defer to the
             // next apply (a connection swap mid-stream isn't safe anyway).
             var desired = _plugin.DashboardUsbConnected
@@ -642,8 +642,9 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Handler for <see cref="TelemetrySender.WheelInitiatedSwitch"/>: stages the
-        /// matching profile on the sender. Does NOT persist — wheel-side nav is transient.
+        /// Handler for <see cref="TelemetrySender.WheelInitiatedSwitch"/>: clears the
+        /// staged profile so the catalog-only synth rebuilds for the new dash. Does
+        /// NOT persist — wheel-side nav is transient.
         /// </summary>
         public void OnWheelInitiatedSwitch(int slot)
         {
@@ -671,40 +672,32 @@ namespace MozaPlugin.Telemetry
                     return;
                 }
 
-                // Resolve to a MultiStreamProfile and stage it on the sender.
-                // NO writes to persisted settings — the saved profile preference
-                // (TelemetryDashboardKey) is the user's intent; wheel-side
-                // navigation must not clobber it.
-                var resolved = _plugin.ResolveDashboardProfileByName(newName);
-                if (resolved == null)
-                {
-                    // Catalog-only mode (no mzdash folder configured): the
-                    // profile can't be resolved by name, but the wheel will
-                    // re-emit its catalog for the new dash and TelemetrySender's
-                    // tick-path MaybeSwapProfileForCatalog will rebuild the
-                    // synthesised profile from the fresh URLs. Clear the
-                    // current synthesised profile so the tick path notices it
-                    // needs to rebuild AND so the UI grid empties immediately
-                    // (signature-based refresh keys on the profile ref) until
-                    // the rebuild completes. Then raise the selection-changed
-                    // event so the UI dropdown reflects the wheel's choice.
-                    if (sender.Profile != null
-                        && sender.Profile.Name == TelemetrySender.CatalogProfileName)
-                    {
-                        sender.Profile = null;
-                    }
-                    MozaLog.Info(
-                        $"[Moza] WheelInitiatedSwitch slot={slot} ('{newName}'): " +
-                        $"no mzdash resolved — relying on catalog-only synthesis from " +
-                        $"post-switch wheel catalog");
-                    _plugin.RaiseDashboardSelectionChangedInternal();
-                    return;
-                }
+                // Wheel-side navigation is transient and ALWAYS catalog-only:
+                // rebuild the subscription from the wheel's live catalog for the
+                // new dash, exactly like a host switch (ApplyTelemetrySettings
+                // forces profile=null — the mzdash never drives channels). This
+                // used to resolve a builtin/cache profile and stage it, which
+                // (a) sent that profile's channel set instead of the wheel's —
+                // an 8-channel builtin "Core" while the wheel's Core catalog has
+                // 72 — and (b) stuck, because the synth tick-path refuses to
+                // replace a non-synth profile (MaybeSwapProfileForCatalog
+                // returns early): after a Core→Marco wheel switch the host kept
+                // emitting Core's 8 channels while the wheel displayed Marco.
+                //
+                // Clear ANY non-synth profile (not only the CatalogProfileName
+                // synth) so the tick path rebuilds for the new dash AND a
+                // previously-stuck staged profile recovers on the next switch.
+                // Safe because the catalog-only path never leaves a user mzdash
+                // in sender.Profile (ApplyTelemetrySettings forces it null), so
+                // the only non-null value here is the synth or a stale staged
+                // one. NO writes to persisted settings — the saved profile
+                // preference is the user's intent; wheel nav must not clobber it.
+                if (sender.Profile != null)
+                    sender.Profile = null;
 
                 MozaLog.Info(
                     $"[Moza] WheelInitiatedSwitch slot={slot} ('{newName}'): " +
-                    $"staging resolved profile on sender (saved profile preference unchanged)");
-                sender.Profile = resolved;
+                    $"catalog-only — rebuilding synthesised profile from post-switch wheel catalog");
 
                 // UI dropdown reads sender.WheelReportedSlot directly when building
                 // the selection (not ActiveTelemetryProfileName), so the dropdown

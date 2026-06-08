@@ -283,7 +283,11 @@ namespace MozaPlugin
 
             var conn = usbCm2 ? DashboardConnection : _connection;
             if (conn == null) return;
-            byte dev = usbCm2 ? MozaProtocol.DeviceMain : MozaProtocol.DeviceDash; // 0x12 / 0x14
+            // CM2 is driven at the bridge/main 0x12 in BOTH topologies — on its own
+            // USB cable and bridged through the wheelbase bus (prueba1.pcapng: bus CM2
+            // LED config + telemetry both ride dev 0x12). A bus CM2 keeps lane-base 18
+            // so it coexists with the wheel's own screen pipeline.
+            byte dev = MozaProtocol.DeviceMain; // 0x12
             int slotBase = busCm2 ? 18 : 0;
             bool shareBus = busCm2;
 
@@ -810,19 +814,24 @@ namespace MozaPlugin
             // Standalone-USB CM2 on its own connection drives the dashboard
             // target even when a wheel is also present on the base.
             if (DashboardUsbConnected) return true;
-            // CM2 bridged through the base bus (screenless wheel) → dev 0x14.
+            // CM2 bridged through the base bus (screenless wheel) → dev 0x12.
             if (IsCm2BehindBaseCandidate) return true;
             return false;
         }
 
         /// <summary>
-        /// Target dev_id for screen telemetry / session-control frames. A
-        /// standalone-USB CM2 bridges as 0x12; a CM2 behind the wheelbase is the
-        /// meter at 0x14 (0x12 there is the base main, which rejects the session
-        /// layer), so target 0x14 in that topology.
+        /// Target dev_id for screen telemetry / session-control frames: always the
+        /// CM2 bridge/main at 0x12, whether the CM2 is on its own USB cable or
+        /// bridged through the wheelbase. PitHouse drives the bus-attached CM2's LED
+        /// config (group 0x32) AND the telemetry/value stream (group 0x43) entirely
+        /// at 0x12, fire-and-forget — the firmware lights its RPM/flag LEDs from the
+        /// RPM channel in that 0x12 stream. dev 0x14 only carries blind management
+        /// (presence ping group 0x33, brightness/page-switch group 0x32) and never
+        /// answers. Targeting 0x14 left the CM2's colour/threshold setup at 0x12 but
+        /// starved it of the RPM stream, so the LEDs stayed dark (KS+CM2-on-base;
+        /// prueba1.pcapng 2026-06-06).
         /// </summary>
-        internal byte PreferredStandaloneDashboardTargetDeviceId =>
-            IsCm2BehindBaseCandidate ? MozaProtocol.DeviceDash : MozaProtocol.DeviceMain;
+        internal byte PreferredStandaloneDashboardTargetDeviceId => MozaProtocol.DeviceMain;
 
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
