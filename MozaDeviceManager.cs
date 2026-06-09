@@ -90,6 +90,18 @@ namespace MozaPlugin
             }
         }
 
+        /// <summary>Unconditional "the wheel is present" mark, independent of the
+        /// locked wheel id. For evidence that identifies the wheel by itself —
+        /// e.g. an unsolicited firmware-debug log on the wheel's log channel
+        /// (dev 0x71) — where routing through <see cref="MarkWheelResponse"/>'s
+        /// id match would wrongly drop it for a wheel locked on 21/19 instead of
+        /// 23. Keeps the hot-swap poll-miss watchdog from re-detecting a wheel
+        /// that is demonstrably alive but has stopped answering a specific poll.</summary>
+        public void MarkWheelAlive()
+        {
+            _wheelRespondedSinceLastPoll = true;
+        }
+
         public void ResetWheelResponseFlag()
         {
             _wheelRespondedSinceLastPoll = false;

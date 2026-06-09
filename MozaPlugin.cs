@@ -4385,6 +4385,20 @@ namespace MozaPlugin
                     text = $"<{data.Length - 3} bytes>";
                 }
                 _firmwareDebugLog.Record(rawDeviceId, text);
+                // The wheel streams these 0x0E logs (dev 0x71) continuously whenever it
+                // is physically connected — they only stop on a real rim/link drop. So
+                // they are positive "wheel is alive" evidence: count them against the
+                // hot-swap miss counter. Marked unconditionally (not via the id-matched
+                // MarkWheelResponse) because the 0x71 log channel identifies the wheel
+                // by itself, regardless of whether it's locked on 23/21/19. Without
+                // this, a wheel that keeps logging but stops answering the periodic
+                // wheel-model-name poll (the FSR1 firmware does exactly this after
+                // initial detection) trips the poll-miss watchdog and gets re-detected
+                // on a ~20 s loop — a phantom "disconnection". A genuine disconnect
+                // still fires the watchdog (the logs stop too). Verified against
+                // "Disconnection issue.pcapng".
+                if (rawDeviceId == 0x71)
+                    _deviceManager.MarkWheelAlive();
                 // FSR V1 reports its current dashboard/page index via this log on
                 // every switch (incl. wheel-side HID combo): "Table 7, Param 6
                 // Written: <N>". Parse it so the plugin follows wheel-initiated
