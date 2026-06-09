@@ -210,6 +210,40 @@ namespace MozaPlugin
         }
 
         /// <summary>
+        /// Group-0x43 1-byte keepalive to the locked wheel
+        /// (<c>7e 01 43 &lt;wheelDeviceId&gt; 00 chk</c>), the ~1 Hz keepalive
+        /// PitHouse streams to hold a wheel's session subsystem up at idle.
+        /// PitHouse sends this exact frame to a SCREENLESS wheel (verified on the
+        /// R5 capture: 136× to 0x17, wheel stays healthy), so it is NOT gated on
+        /// display capability — the documented screenless hazard is the 11-frame
+        /// display PROBE (<see cref="SendDisplayProbe()"/>), not this single-byte
+        /// keepalive. The FSR1 path streams its own via
+        /// <see cref="Telemetry.Fsr1DisplayDriver"/>; callers exclude FSR1 to
+        /// avoid a double-send.
+        /// </summary>
+        public void SendWheelKeepalive()
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(MozaProtocol.TelemetrySendGroup, _wheelDeviceId, new byte[] { 0x00 });
+        }
+
+        /// <summary>
+        /// Group-0x0e param-manager poll to the locked wheel
+        /// (<c>7e 03 0e &lt;wheelDeviceId&gt; 00 00 01 chk</c>) — the same read
+        /// shape <see cref="SendCm1ParamProbe"/> aims at the dash. PitHouse polls
+        /// this on the wheel ~1.7 Hz (210× in the screenless-R5 capture); the
+        /// plugin previously never touched the wheel's param subsystem. Part of
+        /// the PitHouse idle footprint that keeps the wheel's Table-8 param state
+        /// validated, so identity resolves instead of storming read/write failures.
+        /// </summary>
+        public void SendWheelParamPoll()
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(MozaProtocol.FirmwareDebugGroup, _wheelDeviceId,
+                new byte[] { 0x00, 0x00, 0x01 });
+        }
+
+        /// <summary>
         /// CM1-vs-CM2 discriminator probe: a group-0x0E param-manager register
         /// read to the dash (dev 0x14), <c>7E 03 0E 14 00 00 01 chk</c>. A CM1
         /// answers with a group-0x8E reply (<c>7E 07 8E 41 …</c>); a tier-def CM2

@@ -4092,6 +4092,15 @@ namespace MozaPlugin
 
         private const int WheelMissThreshold = 3;
 
+        // wheel-model-name recheck cadence once identity is resolved; per-tick
+        // liveness then comes from the 0x00 presence ACK. Kept strictly below
+        // WheelMissThreshold so that even if a wheel model never ACKs 0x00 and
+        // emits no 0x0E logs, the model-name response still resets the miss
+        // counter before a false re-detect. Unresolved wheels read every tick
+        // (fast identity). See the hot-swap block in PollStatus.
+        private const int WheelModelRecheckInterval = WheelMissThreshold - 1;
+        private int _wheelModelRecheckTick;
+
         // Fires from MozaSerialConnection.HandleIoFailure on the read or
         // write thread once the port has been force-closed. Pause telemetry
         // and reset wheel detection right now rather than waiting for the
@@ -4208,7 +4217,43 @@ namespace MozaPlugin
                     }
                 }
                 _deviceManager.ResetWheelResponseFlag();
-                _deviceManager.ReadSetting("wheel-model-name");
+
+                // Active wheel maintenance, replicating PitHouse's idle footprint
+                // to 0x17. On the screenless-R5 capture PitHouse holds the wheel up
+                // with three streams the plugin previously omitted entirely:
+                // group-0x00 presence poll (302×), group-0x0e param poll (210×),
+                // and the 1-byte group-0x43 keepalive (136×). Without them the
+                // wheel's param subsystem wedges (Table-8 read/write storm), its
+                // tables never validate, identity never resolves, and the plugin
+                // falls into the re-detect "dogging" loop. Liveness is driven by
+                // the 0x00 presence ACK (OnPresenceProbeAck → MarkWheelAlive;
+                // verified: the screenless wheel ACKs it 300/302) plus the wheel's
+                // continuous 0x0e logs, not by re-reading wheel-model-name.
+                _deviceManager.SendPresenceProbe(MozaProtocol.DeviceWheel);
+                _deviceManager.SendWheelParamPoll();
+
+                // 1-byte 0x43 keepalive — sent to new-protocol wheels regardless of
+                // display capability. PitHouse sends this exact frame to the
+                // screenless R5 (and to 0x14/0x15) and the wheel stays healthy; the
+                // documented screenless hazard is the 11-frame display PROBE
+                // (SendDisplayProbe), NOT this keepalive. FSR1 streams its own via
+                // Fsr1DisplayDriver, so exclude it to avoid a double-send. Old ES
+                // wheels (id 0x13) are excluded — PitHouse never keepalives them.
+                if (DetectionState.NewWheelDetected && !IsFsr1DisplayWheel)
+                    _deviceManager.SendWheelKeepalive();
+
+                // wheel-model-name recheck: triggers initial identity resolution
+                // and hot-swap model-change detection. Every tick while unresolved
+                // (fast identity, as before); once resolved the presence ACK is the
+                // heartbeat so we recheck only every WheelModelRecheckInterval ticks
+                // (kept below WheelMissThreshold so the response still resets the
+                // miss counter even if 0x00/0x0e fall silent).
+                if (WheelModelInfo == null
+                    || ++_wheelModelRecheckTick >= WheelModelRecheckInterval)
+                {
+                    _wheelModelRecheckTick = 0;
+                    _deviceManager.ReadSetting("wheel-model-name");
+                }
 
                 // Probe other wheel IDs for hot-swap detection.
                 // Handles ES → new-protocol case where the base keeps responding
@@ -4599,16 +4644,22 @@ namespace MozaPlugin
 
         /// <summary>
         /// Dispatch an empty presence-probe ACK to the first-sight detection
-        /// helper for the matching sub-device. Only handles devices probed
-        /// via <see cref="MozaDeviceManager.SendPresenceProbe"/> from
-        /// PollStatus — currently dash / handbrake / pedals. Other device IDs
-        /// (e.g. wheel-on-base ACKs, AB9, Booster) reach this path harmlessly
-        /// and are ignored.
+        /// helper for the matching sub-device. Handles devices probed via
+        /// <see cref="MozaDeviceManager.SendPresenceProbe"/> from PollStatus —
+        /// dash / handbrake / pedals (first-sight detection) and the locked
+        /// wheel (liveness heartbeat → <see cref="MozaDeviceManager.MarkWheelAlive"/>).
+        /// Other device IDs (e.g. AB9, Booster) reach this path harmlessly and
+        /// are ignored.
         /// </summary>
         private void OnPresenceProbeAck(byte deviceId)
         {
             switch (deviceId)
             {
+                case MozaProtocol.DeviceWheel:
+                    // Presence ACK from the locked wheel — the active liveness
+                    // heartbeat that replaced the per-tick model-name read.
+                    _deviceManager.MarkWheelAlive();
+                    break;
                 case MozaProtocol.DeviceDash:
                     _deviceProber.MarkDashDetected();
                     break;
