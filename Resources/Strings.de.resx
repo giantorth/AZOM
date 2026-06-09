@@ -41,7 +41,7 @@
   <data name="Section_WheelbaseEffects" xml:space="preserve"><value>BASIS-EFFEKTE</value></data>
   <data name="Section_GameEffects" xml:space="preserve"><value>SPIEL-EFFEKTE</value></data>
   <data name="SliderLabel_WheelDamper" xml:space="preserve"><value>Lenkrad-Dämpfung</value></data>
-  <data name="SliderLabel_WheelFriction" xml:space="preserve"><value>Reibung/value></data>
+  <data name="SliderLabel_WheelFriction" xml:space="preserve"><value>Reibung</value></data>
   <data name="SliderLabel_NaturalInertia" xml:space="preserve"><value>Natürliche Trägheit</value></data>
   <data name="SliderLabel_WheelSpring" xml:space="preserve"><value>Rückstellkraft</value></data>
   <data name="SliderLabel_GameDamper" xml:space="preserve"><value>Spiel-Dämpfung</value></data>
