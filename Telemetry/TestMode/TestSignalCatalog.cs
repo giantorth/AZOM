@@ -112,7 +112,7 @@ namespace MozaPlugin.Telemetry.TestMode
             {
                 if (_fallbackCount == 0) return;
                 var names = string.Join(", ", _fallbackWarned);
-                MozaLog.Debug($"[Moza] TestSignalCatalog: {_fallbackCount} channels use compression-default sweep (no override or parseable JSON range): {names}");
+                MozaLog.Debug($"[AZOM] TestSignalCatalog: {_fallbackCount} channels use compression-default sweep (no override or parseable JSON range): {names}");
                 _fallbackWarned.Clear();
                 _fallbackCount = 0;
             }

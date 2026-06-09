@@ -64,20 +64,20 @@ namespace MozaPlugin.Devices
                         {
                             prop.GetSetMethod(nonPublic: true)!.Invoke(lmd.ledModuleSettings, new object[] { _ledDriver });
                             _driverInjected = true;
-                            MozaLog.Debug("[Moza] Injected virtual LED driver for dashboard");
+                            MozaLog.Debug("[AZOM] Injected virtual LED driver for dashboard");
                         }
                         else
                         {
-                            MozaLog.Warn("[Moza] Could not find DeviceDriver setter on LedModuleSettings (dash)");
+                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (dash)");
                         }
                         return;
                     }
                 }
-                MozaLog.Debug("[Moza] No LedModuleDevice found on dash device instance");
+                MozaLog.Debug("[AZOM] No LedModuleDevice found on dash device instance");
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Error injecting dash LED driver: {ex.Message}");
+                MozaLog.Error($"[AZOM] Error injecting dash LED driver: {ex.Message}");
             }
         }
 
@@ -91,7 +91,7 @@ namespace MozaPlugin.Devices
             if (plugin != null)
             {
                 plugin.DashDeviceExtensionActive = false;
-                MozaLog.Debug("[Moza] Dash device extension ended");
+                MozaLog.Debug("[AZOM] Dash device extension ended");
             }
         }
 

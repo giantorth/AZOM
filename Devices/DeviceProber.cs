@@ -263,21 +263,21 @@ namespace MozaPlugin.Devices
             if (!cm2BehindBase)
                 _deviceManager.ReadSettings(DashSettingsReadCommands);
             MozaLog.Info(cm2BehindBase
-                ? "[Moza] Dashboard detected (CM2 on wheelbase bus — deployed CM2 profile, probing display identity at 0x12)"
-                : "[Moza] Dashboard detected");
+                ? "[AZOM] Dashboard detected (CM2 on wheelbase bus — deployed CM2 profile, probing display identity at 0x12)"
+                : "[AZOM] Dashboard detected");
 
             // CM2-on-base: retarget screen telemetry to 0x12 and start it.
             if (cm2BehindBase)
             {
                 try { _plugin.ApplyTelemetrySettings(); _plugin.StartTelemetryIfReady(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza] CM2-on-base telemetry start skipped: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base telemetry start skipped: {ex.Message}"); }
             }
 
             // Dual-screen: a wheel that has its OWN screen (FSR1 / tier-def display wheel)
             // plus a bus-bridged dash → ensure the concurrent dash pipeline spins up so the
             // CM1 discriminator (or the tier-def CM2 sender) starts. Idempotent / gated.
             try { _plugin.EnsureCm2Pipeline(); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] EnsureCm2Pipeline on dash-detect skipped: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] EnsureCm2Pipeline on dash-detect skipped: {ex.Message}"); }
         }
 
         /// <summary>First-sight detection cascade for the handbrake sub-device.
@@ -296,7 +296,7 @@ namespace MozaPlugin.Devices
             _plugin.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
                 _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
-            MozaLog.Info("[Moza] Handbrake detected");
+            MozaLog.Info("[AZOM] Handbrake detected");
         }
 
         /// <summary>First-sight detection cascade for the pedals sub-device.
@@ -312,7 +312,7 @@ namespace MozaPlugin.Devices
             _plugin.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
                 _deviceManager.ReadSettings(PedalsSettingsReadCommands);
-            MozaLog.Info("[Moza] Pedals detected");
+            MozaLog.Info("[AZOM] Pedals detected");
         }
 
         /// <summary>
@@ -328,14 +328,14 @@ namespace MozaPlugin.Devices
             if (commandName == "wheel-mcu-uid" && _data.WheelMcuUid.Length > 0)
             {
                 MozaLog.Debug(
-                    $"[Moza] Wheel MCU UID ({_data.WheelMcuUid.Length}B): " +
+                    $"[AZOM] Wheel MCU UID ({_data.WheelMcuUid.Length}B): " +
                     MozaLog.RedactBytesHex(_data.WheelMcuUid));
                 return;
             }
             if (commandName == "display-mcu-uid" && _data.DisplayMcuUid.Length > 0)
             {
                 MozaLog.Debug(
-                    $"[Moza] Display MCU UID ({_data.DisplayMcuUid.Length}B): " +
+                    $"[AZOM] Display MCU UID ({_data.DisplayMcuUid.Length}B): " +
                     MozaLog.RedactBytesHex(_data.DisplayMcuUid));
                 return;
             }
@@ -363,7 +363,7 @@ namespace MozaPlugin.Devices
                 // migration. HardwareApplier routes base FFB/ambient writes here.
                 _detectionState.BaseOwner = _deviceManager;
                 _detectionState.BaseDetected = true;
-                MozaLog.Info("[Moza] Base detected");
+                MozaLog.Info("[AZOM] Base detected");
                 // Writes queue first, reads after — device processes FIFO so
                 // read responses reflect the values we just wrote.
                 var profile = _plugin.Settings.ProfileStore.CurrentProfile;
@@ -421,7 +421,7 @@ namespace MozaPlugin.Devices
                         _plugin.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         MozaLog.Info(
-                            $"[Moza] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}')");
+                            $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}')");
                     }
                     break;
 
@@ -458,7 +458,7 @@ namespace MozaPlugin.Devices
                         // wheel-model-name handler below, once WheelModelInfo
                         // is resolved.
                         _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
-                        MozaLog.Info($"[Moza] New-protocol wheel detected on ID {deviceId}");
+                        MozaLog.Info($"[AZOM] New-protocol wheel detected on ID {deviceId}");
                         // Telemetry start is deferred until wheel-model-name responds;
                         // ShouldDriveDashboard() needs WheelModelInfo to decide.
                     }
@@ -496,7 +496,7 @@ namespace MozaPlugin.Devices
                             _plugin.WheelModelInfo = WheelModelInfo.FromModelName(currentModel);
                             var info = _plugin.WheelModelInfo;
                             MozaLog.Debug(
-                                $"[Moza] Wheel model: {currentModel} " +
+                                $"[AZOM] Wheel model: {currentModel} " +
                                 $"(rpm={info!.RpmLedCount}, buttons={info.ButtonLedCount}, flags={info.HasFlagLeds}, knobs={info.KnobCount})");
                             // Display sub-device probe — deferred from the
                             // initial wheel-detection site so we can skip it
@@ -539,14 +539,14 @@ namespace MozaPlugin.Devices
                             var ovFolder = _plugin.ActiveTelemetryMzdashFolder;
                             if (!string.IsNullOrEmpty(ovFolder) && System.IO.Directory.Exists(ovFolder))
                             {
-                                MozaLog.Debug($"[Moza] Loading per-wheel mzdash folder from overlay: {ovFolder}");
+                                MozaLog.Debug($"[AZOM] Loading per-wheel mzdash folder from overlay: {ovFolder}");
                                 _plugin.DashCache?.LoadFromFolder(ovFolder);
                             }
 
                             try { _plugin.ApplyTelemetrySettings(); }
                             catch (Exception ex)
                             {
-                                MozaLog.Warn($"[Moza] ApplyTelemetrySettings after wheel-model-name failed: {ex.Message}");
+                                MozaLog.Warn($"[AZOM] ApplyTelemetrySettings after wheel-model-name failed: {ex.Message}");
                             }
 
                             // Wheel hot-swap path: the saved profile's dashboard
@@ -570,66 +570,66 @@ namespace MozaPlugin.Devices
                     }
                     else
                     {
-                        MozaLog.Debug($"[Moza] Wheel model (ES/base): {_data.WheelModelName}");
+                        MozaLog.Debug($"[AZOM] Wheel model (ES/base): {_data.WheelModelName}");
                     }
                     break;
 
                 case "wheel-sw-version":
-                    MozaLog.Debug($"[Moza] Wheel FW: {_data.WheelSwVersion}");
+                    MozaLog.Debug($"[AZOM] Wheel FW: {_data.WheelSwVersion}");
                     break;
 
                 case "wheel-serial-b":
                     if (!string.IsNullOrEmpty(_data.WheelSerialNumber))
-                        MozaLog.Debug($"[Moza] Wheel serial: {MozaLog.RedactId(_data.WheelSerialNumber)}");
+                        MozaLog.Debug($"[AZOM] Wheel serial: {MozaLog.RedactId(_data.WheelSerialNumber)}");
                     break;
 
                 case "wheel-hw-sub":
                     if (!string.IsNullOrEmpty(_data.WheelHwSubVersion))
-                        MozaLog.Debug($"[Moza] Wheel HW sub: {_data.WheelHwSubVersion}");
+                        MozaLog.Debug($"[AZOM] Wheel HW sub: {_data.WheelHwSubVersion}");
                     break;
 
                 case "wheel-mcu-uid":
                     if (_data.WheelMcuUid.Length > 0)
                         MozaLog.Debug(
-                            $"[Moza] Wheel MCU UID ({_data.WheelMcuUid.Length}B): " +
+                            $"[AZOM] Wheel MCU UID ({_data.WheelMcuUid.Length}B): " +
                             MozaLog.RedactBytesHex(_data.WheelMcuUid));
                     break;
 
                 case "wheel-device-type":
                     if (_data.WheelDeviceType.Length > 0)
-                        MozaLog.Debug($"[Moza] Wheel device type: {BitConverter.ToString(_data.WheelDeviceType)}");
+                        MozaLog.Debug($"[AZOM] Wheel device type: {BitConverter.ToString(_data.WheelDeviceType)}");
                     break;
 
                 case "wheel-capabilities":
                     if (_data.WheelCapabilities.Length > 0)
-                        MozaLog.Debug($"[Moza] Wheel capabilities: {BitConverter.ToString(_data.WheelCapabilities)}");
+                        MozaLog.Debug($"[AZOM] Wheel capabilities: {BitConverter.ToString(_data.WheelCapabilities)}");
                     break;
 
                 case "wheel-presence":
-                    MozaLog.Debug($"[Moza] Wheel presence/ready: sub_device_count={_data.WheelSubDeviceCount}");
+                    MozaLog.Debug($"[AZOM] Wheel presence/ready: sub_device_count={_data.WheelSubDeviceCount}");
                     break;
 
                 case "wheel-device-presence":
-                    MozaLog.Debug($"[Moza] Wheel device presence byte: 0x{_data.WheelDevicePresence:X2}");
+                    MozaLog.Debug($"[AZOM] Wheel device presence byte: 0x{_data.WheelDevicePresence:X2}");
                     break;
 
                 case "wheel-identity-11":
                     if (_data.WheelIdentity11.Length > 0)
-                        MozaLog.Debug($"[Moza] Wheel identity-11: {BitConverter.ToString(_data.WheelIdentity11)}");
+                        MozaLog.Debug($"[AZOM] Wheel identity-11: {BitConverter.ToString(_data.WheelIdentity11)}");
                     break;
 
                 case "display-model-name":
                     if (!string.IsNullOrEmpty(_data.DisplayModelName))
                     {
-                        MozaLog.Debug($"[Moza] Display model: {_data.DisplayModelName}");
+                        MozaLog.Debug($"[AZOM] Display model: {_data.DisplayModelName}");
                         // CM2-on-base confirmed by display identity — re-assert 0x12 routing.
                         if (_plugin.IsCm2BehindBaseCandidate)
                         {
-                            MozaLog.Info($"[Moza] CM2-on-base display confirmed: {_data.DisplayModelName} — routing screen telemetry to 0x12");
+                            MozaLog.Info($"[AZOM] CM2-on-base display confirmed: {_data.DisplayModelName} — routing screen telemetry to 0x12");
                             if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid, forceCm2: true))
                                 _plugin.DeviceDefinitionDeployed = true;
                             try { _plugin.ApplyTelemetrySettings(); }
-                            catch (Exception ex) { MozaLog.Debug($"[Moza] CM2-on-base ApplyTelemetrySettings skipped: {ex.Message}"); }
+                            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base ApplyTelemetrySettings skipped: {ex.Message}"); }
                             // Push the CM2 meter LED config (modes/thresholds/colors,
                             // group 0x32) now that the base-bridged CM2 is CONFIRMED.
                             // The earlier MarkDashDetected apply races ahead of this —
@@ -639,7 +639,7 @@ namespace MozaPlugin.Devices
                             // put into telemetry LED mode and its RPM/flag LEDs stay dark
                             // (KS+CM2 bundle 2026-06-06: zero group-0x32 frames on the wire).
                             try { _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
-                            catch (Exception ex) { MozaLog.Debug($"[Moza] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
+                            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
                         }
                         // Re-arm the wedge-recovery one-shot now that we know
                         // a display is responsive — a future wheel hot-swap
@@ -654,33 +654,33 @@ namespace MozaPlugin.Devices
                     break;
                 case "display-hw-version":
                     if (!string.IsNullOrEmpty(_data.DisplayHwVersion))
-                        MozaLog.Debug($"[Moza] Display HW: {_data.DisplayHwVersion}");
+                        MozaLog.Debug($"[AZOM] Display HW: {_data.DisplayHwVersion}");
                     break;
                 case "display-sw-version":
                     if (!string.IsNullOrEmpty(_data.DisplaySwVersion))
-                        MozaLog.Debug($"[Moza] Display FW: {_data.DisplaySwVersion}");
+                        MozaLog.Debug($"[AZOM] Display FW: {_data.DisplaySwVersion}");
                     break;
                 case "display-serial":
                     if (!string.IsNullOrEmpty(_data.DisplaySerialNumber))
-                        MozaLog.Debug($"[Moza] Display serial: {MozaLog.RedactId(_data.DisplaySerialNumber)}");
+                        MozaLog.Debug($"[AZOM] Display serial: {MozaLog.RedactId(_data.DisplaySerialNumber)}");
                     break;
                 case "display-presence":
-                    MozaLog.Debug($"[Moza] Display presence/ready: sub_device_count={_data.DisplaySubDeviceCount}");
+                    MozaLog.Debug($"[AZOM] Display presence/ready: sub_device_count={_data.DisplaySubDeviceCount}");
                     break;
                 case "display-device-presence":
-                    MozaLog.Debug($"[Moza] Display device presence byte: 0x{_data.DisplayDevicePresence:X2}");
+                    MozaLog.Debug($"[AZOM] Display device presence byte: 0x{_data.DisplayDevicePresence:X2}");
                     break;
                 case "display-device-type":
                     if (_data.DisplayDeviceType.Length > 0)
-                        MozaLog.Debug($"[Moza] Display device type: {BitConverter.ToString(_data.DisplayDeviceType)}");
+                        MozaLog.Debug($"[AZOM] Display device type: {BitConverter.ToString(_data.DisplayDeviceType)}");
                     break;
                 case "display-capabilities":
                     if (_data.DisplayCapabilities.Length > 0)
-                        MozaLog.Debug($"[Moza] Display capabilities: {BitConverter.ToString(_data.DisplayCapabilities)}");
+                        MozaLog.Debug($"[AZOM] Display capabilities: {BitConverter.ToString(_data.DisplayCapabilities)}");
                     break;
                 case "display-identity-11":
                     if (_data.DisplayIdentity11.Length > 0)
-                        MozaLog.Debug($"[Moza] Display identity-11: {BitConverter.ToString(_data.DisplayIdentity11)}");
+                        MozaLog.Debug($"[AZOM] Display identity-11: {BitConverter.ToString(_data.DisplayIdentity11)}");
                     break;
                 case "display-mcu-uid":
                     // Already logged before the value<0 guard at the top.
@@ -706,7 +706,7 @@ namespace MozaPlugin.Devices
                         _deviceManager.ReadSettingsPaced(OldWheelSettingsReadCommands);
                         if (DeviceDefinitionDeployer.DeployOldProtoWheel(_connection.DiscoveredPid))
                             _plugin.DeviceDefinitionDeployed = true;
-                        MozaLog.Info($"[Moza] Old-protocol wheel detected on ID {deviceId}");
+                        MozaLog.Info($"[AZOM] Old-protocol wheel detected on ID {deviceId}");
                         _plugin.StartTelemetryIfReady();
                     }
                     else if (deviceId != _deviceManager.WheelDeviceId)
@@ -735,7 +735,7 @@ namespace MozaPlugin.Devices
                         // wheels. With registry-based discovery we don't probe at
                         // port-discovery time; first 0xE4 hub reply is the trigger.
                         try { _connection.MarkHubDetected(); } catch { }
-                        MozaLog.Info("[Moza] Universal Hub detected");
+                        MozaLog.Info("[AZOM] Universal Hub detected");
                     }
                     break;
             }

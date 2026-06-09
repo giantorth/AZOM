@@ -142,7 +142,7 @@ namespace MozaPlugin.Telemetry
             _telemetry.SendPhaseMarker(PhaseEnterPreSwitchTest);
             _telemetry.TestMode = true;
             MozaLog.Debug(
-                $"[Moza] AUTO-TEST: TestMode-only enabled dash=\"{currentName}\" " +
+                $"[AZOM] AUTO-TEST: TestMode-only enabled dash=\"{currentName}\" " +
                 $"subGen={gen} — staying in TestMode, no switching");
             _state = State.Done;
         }
@@ -155,7 +155,7 @@ namespace MozaPlugin.Telemetry
             string startName = _startSlot >= 0 && _dashList != null && _startSlot < _dashList.Count
                 ? _dashList[_startSlot] : "?";
             MozaLog.Debug(
-                $"[Moza] AUTO-TEST: pre-switch test done dash=\"{startName}\" " +
+                $"[AZOM] AUTO-TEST: pre-switch test done dash=\"{startName}\" " +
                 $"frames={frames} {(frames > 0 ? "PASS" : "FAIL")}");
 
             // Keep TestMode on through the string burst so the burst's string
@@ -173,7 +173,7 @@ namespace MozaPlugin.Telemetry
 
             int strCount = _telemetry.Profile?.StringChannels.Count ?? 0;
             MozaLog.Debug(
-                $"[Moza] AUTO-TEST: string burst done channels={strCount}");
+                $"[AZOM] AUTO-TEST: string burst done channels={strCount}");
 
             _telemetry.TestMode = false;
             _elapsedMs = 0;
@@ -225,7 +225,7 @@ namespace MozaPlugin.Telemetry
             if (_elapsedMs >= RenegotiateTimeoutMs)
             {
                 MozaLog.Warn(
-                    $"[Moza] AUTO-TEST: renegotiate TIMEOUT after {RenegotiateTimeoutMs}ms — " +
+                    $"[AZOM] AUTO-TEST: renegotiate TIMEOUT after {RenegotiateTimeoutMs}ms — " +
                     $"target slot={_targetSlot} subGen still {_prevSubscriptionGen}");
                 Finish(persistTarget: false);
             }
@@ -239,7 +239,7 @@ namespace MozaPlugin.Telemetry
             string targetName = _dashList?[_targetSlot] ?? "?";
             bool ok = frames > 0;
             MozaLog.Debug(
-                $"[Moza] AUTO-TEST: post-switch test done dash=\"{targetName}\" " +
+                $"[AZOM] AUTO-TEST: post-switch test done dash=\"{targetName}\" " +
                 $"frames={frames} {(ok ? "PASS" : "FAIL")}");
 
             Finish(persistTarget: true);
@@ -251,14 +251,14 @@ namespace MozaPlugin.Telemetry
             _telemetry.SendPhaseMarker(PhaseEnterDone);
             // AutoTestLastSlot persistence intentionally removed — deterministic
             // target slot makes alternation irrelevant for wire-diff captures.
-            MozaLog.Debug("[Moza] AUTO-TEST: state=DONE");
+            MozaLog.Debug("[AZOM] AUTO-TEST: state=DONE");
             _state = State.Done;
         }
 
         private void Transition(State next, string detail)
         {
             _state = next;
-            MozaLog.Debug($"[Moza] AUTO-TEST: state={next} {detail}");
+            MozaLog.Debug($"[AZOM] AUTO-TEST: state={next} {detail}");
         }
     }
 }

@@ -61,7 +61,7 @@ namespace MozaPlugin.Telemetry
             _timer = new System.Timers.Timer(TickIntervalMs) { AutoReset = true };
             _timer.Elapsed += OnTick;
             _timer.Start();
-            MozaLog.Info("[Moza] FSR V1 display driver started (group-0x42 → 0x17)");
+            MozaLog.Info("[AZOM] FSR V1 display driver started (group-0x42 → 0x17)");
         }
 
         public void Stop()
@@ -95,7 +95,7 @@ namespace MozaPlugin.Telemetry
         {
             if (Interlocked.CompareExchange(ref _tickInProgress, 1, 0) != 0) return;
             try { Tick(); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] FSR1 driver tick error: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] FSR1 driver tick error: {ex.Message}"); }
             finally { Interlocked.Exchange(ref _tickInProgress, 0); }
         }
 
@@ -200,7 +200,7 @@ namespace MozaPlugin.Telemetry
                 {
                     _lastStreamedIndex = FloodSentinel;
                     MozaLog.Debug(
-                        $"[Moza] FSR1 active index {activeIdx} not in the decoded " +
+                        $"[AZOM] FSR1 active index {activeIdx} not in the decoded " +
                         "index→type map — streaming the full live set as a fallback " +
                         "until the wheel reports a known page.");
                 }

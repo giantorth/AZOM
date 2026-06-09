@@ -187,7 +187,7 @@ namespace MozaPlugin.Devices
             bool ok = _connection.Connect();
             if (ok)
             {
-                MozaLog.Info($"[Moza] Connected to standalone {_desc.CaptureLabelBase} ({_connection.DiscoveredPid} on {_connection.LastPortName})");
+                MozaLog.Info($"[AZOM] Connected to standalone {_desc.CaptureLabelBase} ({_connection.DiscoveredPid} on {_connection.LastPortName})");
                 // Registry PID classification + an open dedicated port IS proof of
                 // presence on this topology, so show the tab immediately — don't
                 // gate it on a binary ACK this device may never send. issueReads:

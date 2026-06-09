@@ -106,7 +106,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 {
                     if (!_overflowLogged)
                     {
-                        MozaLog.Warn($"[Moza] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_buffer.Count}+{net.Length}); dropping buffer");
+                        MozaLog.Warn($"[AZOM] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_buffer.Count}+{net.Length}); dropping buffer");
                         _overflowLogged = true;
                     }
                     _buffer.Clear();
@@ -192,7 +192,7 @@ namespace MozaPlugin.Telemetry.Sessions
                     if (seq < _lastSeq)
                     {
                         MozaLog.Debug(
-                            $"[Moza] Reassembler seq restart{tagSuffix}: " +
+                            $"[AZOM] Reassembler seq restart{tagSuffix}: " +
                             $"got seq={seq}, last was {_lastSeq}; clearing {_buffer.Count}B buffer (assuming new burst)");
                         _buffer.Clear();
                         _overflowLogged = false;
@@ -213,7 +213,7 @@ namespace MozaPlugin.Telemetry.Sessions
                         _lastForwardGapUtcTicks = System.DateTime.UtcNow.Ticks;
                         int missing = seq - _lastSeq - 1;
                         MozaLog.Warn(
-                            $"[Moza] Reassembler forward gap{tagSuffix}: " +
+                            $"[AZOM] Reassembler forward gap{tagSuffix}: " +
                             $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
                             $"preserving {_buffer.Count}B buffer, dropping out-of-order chunk — " +
                             $"caller must ack HighWaterSeq={_lastSeq} so wheel retransmits");
@@ -224,7 +224,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 {
                     if (!_overflowLogged)
                     {
-                        MozaLog.Warn($"[Moza] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_buffer.Count}+{net.Length}); dropping buffer");
+                        MozaLog.Warn($"[AZOM] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_buffer.Count}+{net.Length}); dropping buffer");
                         _overflowLogged = true;
                     }
                     _buffer.Clear();

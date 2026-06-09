@@ -42,7 +42,7 @@ namespace MozaPlugin.UI
             string serialCaptureText,
             IReadOnlyList<SerialTrafficCapture.Entry>? captureSnapshot)
         {
-            // [Moza] log lines come from MozaLog's in-process ring buffer — every
+            // [AZOM] log lines come from MozaLog's in-process ring buffer — every
             // plugin call site goes through that wrapper, so the snapshot is
             // current without depending on SimHub's rolling-file flush cadence.
             string logText = MozaLog.Snapshot();
@@ -50,7 +50,7 @@ namespace MozaPlugin.UI
 
             // Header — quick idea of what's in the bundle and when it was made.
             var manifest = new StringBuilder();
-            manifest.AppendLine("MOZA Control diagnostics bundle");
+            manifest.AppendLine("AZOM diagnostics bundle");
             manifest.AppendLine($"Created (local):     {DateTime.Now:yyyy-MM-dd HH:mm:ss zzz}");
             manifest.AppendLine($"Plugin version:      {DiagnosticsTextBuilder.GetPluginVersion()}");
             manifest.AppendLine($"OS:                  {Environment.OSVersion}");
@@ -59,7 +59,7 @@ namespace MozaPlugin.UI
             manifest.AppendLine("Files:");
             manifest.AppendLine("  serial-capture.txt   – TX/RX frames captured between Start/Stop (timestamps in local time)");
             manifest.AppendLine("  diagnostics.txt      – snapshot of the Diagnostics tab text");
-            manifest.AppendLine($"  moza-log.txt         – [Moza] log lines from MozaLog ring buffer ({logEntryCount} entries)");
+            manifest.AppendLine($"  moza-log.txt         – [AZOM] log lines from MozaLog ring buffer ({logEntryCount} entries)");
             manifest.AppendLine();
             manifest.AppendLine("Capture summary:");
             if (captureSnapshot != null)

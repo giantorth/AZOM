@@ -5,7 +5,9 @@
 [![Stars](https://img.shields.io/github/stars/giantorth/moza-simhub-plugin?label=Star&logo=github&color=yellow)](https://github.com/giantorth/moza-simhub-plugin/stargazers)
 [![Sponsor](https://img.shields.io/github/sponsors/giantorth?label=Sponsor&logo=github&color=ea4aaa)](https://github.com/sponsors/giantorth)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/giantorth)
-# Unofficial MOZA SimHub Plugin
+# AZOM
+
+**The MOZA Bridge for SimHub** — an unofficial, open-source SimHub plugin for MOZA sim racing hardware.
 
 > [!NOTE]
 > MOZA is a registered trademark of Gudsen Technology Co., Ltd. This project is not affiliated with, endorsed by, or sponsored by MOZA or Gudsen Technology. All trademarks are the property of their respective owners.
@@ -51,7 +53,7 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 > Simhub defaults to `C:\Program Files (x86)\SimHub\`
 
-Restart SimHub — the plugin appears under Settings > Plugins as "MOZA Control".
+Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
 **Development builds.** The latest in-progress build from the `dev` branch is published as a pre-release: [MozaPlugin_dev.zip](https://github.com/giantorth/moza-simhub-plugin/releases/download/dev-latest/MozaPlugin_dev.zip). Expect bugs or broken features — use the stable release above if you need something reliable.
 
@@ -141,7 +143,7 @@ All translations are embedded directly into `MozaPlugin.dll` — no per-culture 
 
 ### Hardware Configuration
 
-The plugin panel (Settings > Plugins > MOZA Control) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, SDK, About). The About tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
+The plugin panel (Settings > Plugins > AZOM) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, SDK, About). The About tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
 
 The Universal Hub gets its own tab listing each connected port and the device attached to it, polled every 2 seconds.
 
@@ -190,23 +192,23 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Moza.BaseConnected` | bool | Wheelbase connection status |
-| `Moza.McuTemp` | double | MCU temperature (°C or °F, per the temperature-unit setting) |
-| `Moza.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
-| `Moza.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
-| `Moza.BaseState` | int | Wheelbase state |
-| `Moza.FfbStrength` | int | FFB strength (%) |
-| `Moza.MaxAngle` | int | Max steering angle (degrees) |
-| `Moza.HidConnected` | bool | Whether a device HID surface is being read (live input is available) |
-| `Moza.SteeringAngle` | double | Live steering angle in degrees (0 = center, ± = each lock direction); 0 until max-angle is known |
-| `Moza.SteeringPosition` | double | Live steering as 0–100 (0 = full lock, 50 = center, 100 = full lock); -1 when unknown |
-| `Moza.Throttle` | int | Throttle pedal position (0–100) |
-| `Moza.Brake` | int | Brake pedal position (0–100) |
-| `Moza.Clutch` | int | Clutch pedal position (0–100) |
-| `Moza.Handbrake` | int | Handbrake position (0–100) |
-| `Moza.LeftPaddle` | int | Left analog paddle position (0–100) |
-| `Moza.RightPaddle` | int | Right analog paddle position (0–100) |
-| `Moza.CombinedPaddle` | int | Combined analog paddle axis position (0–100) |
+| `AZOM.BaseConnected` | bool | Wheelbase connection status |
+| `AZOM.McuTemp` | double | MCU temperature (°C or °F, per the temperature-unit setting) |
+| `AZOM.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
+| `AZOM.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
+| `AZOM.BaseState` | int | Wheelbase state |
+| `AZOM.FfbStrength` | int | FFB strength (%) |
+| `AZOM.MaxAngle` | int | Max steering angle (degrees) |
+| `AZOM.HidConnected` | bool | Whether a device HID surface is being read (live input is available) |
+| `AZOM.SteeringAngle` | double | Live steering angle in degrees (0 = center, ± = each lock direction); 0 until max-angle is known |
+| `AZOM.SteeringPosition` | double | Live steering as 0–100 (0 = full lock, 50 = center, 100 = full lock); -1 when unknown |
+| `AZOM.Throttle` | int | Throttle pedal position (0–100) |
+| `AZOM.Brake` | int | Brake pedal position (0–100) |
+| `AZOM.Clutch` | int | Clutch pedal position (0–100) |
+| `AZOM.Handbrake` | int | Handbrake position (0–100) |
+| `AZOM.LeftPaddle` | int | Left analog paddle position (0–100) |
+| `AZOM.RightPaddle` | int | Right analog paddle position (0–100) |
+| `AZOM.CombinedPaddle` | int | Combined analog paddle axis position (0–100) |
 
 These input properties are populated directly from the device HID surface, so they update live even when no game is running.
 
@@ -218,27 +220,27 @@ Each *step* setting has four actions: `…Up` / `…Down` apply a fine step, and
 
 | Action | Range | Fine | Coarse | Effect |
 |--------|-------|------|--------|--------|
-| `Moza.FfbStrengthUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheelbase FFB strength |
-| `Moza.TorqueUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 50–100% | ±5 | ±10 | Wheelbase torque limit |
-| `Moza.RotationUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 90–2700° | ±90° | ±180° | Steering rotation (max angle) |
-| `Moza.Ab9EngineIntensityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100 | ±5 | ±10 | AB9 engine-vibration intensity |
-| `Moza.Ab9EngineFrequencyUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–200 Hz | ±10 | ±20 | AB9 engine-vibration frequency |
-| `Moza.Ab9GearShiftIntensityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100 | ±5 | ±10 | AB9 gear-shift vibration intensity |
-| `Moza.DisplayBrightnessUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheel screen display brightness |
+| `AZOM.FfbStrengthUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheelbase FFB strength |
+| `AZOM.TorqueUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 50–100% | ±5 | ±10 | Wheelbase torque limit |
+| `AZOM.RotationUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 90–2700° | ±90° | ±180° | Steering rotation (max angle) |
+| `AZOM.Ab9EngineIntensityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100 | ±5 | ±10 | AB9 engine-vibration intensity |
+| `AZOM.Ab9EngineFrequencyUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–200 Hz | ±10 | ±20 | AB9 engine-vibration frequency |
+| `AZOM.Ab9GearShiftIntensityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100 | ±5 | ±10 | AB9 gear-shift vibration intensity |
+| `AZOM.DisplayBrightnessUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheel screen display brightness |
 
 | Action | Effect |
 |--------|--------|
-| `Moza.DisplayBrightness0` … `Moza.DisplayBrightness100` | Set wheel screen display brightness to a fixed level (0–100% in steps of 10) |
-| `Moza.WorkModeOff` | Turn off the wheelbase work mode (puts the base into standby) |
-| `Moza.WorkModeOn` | Turn on the wheelbase work mode (normal active state) |
-| `Moza.DashboardNext` | Switch the wheel's displayed dashboard to the next enabled slot (wraps around) |
-| `Moza.DashboardPrev` | Switch the wheel's displayed dashboard to the previous enabled slot (wraps around) |
-| `Moza.DashboardTelemetryToggle` | Toggle dashboard telemetry on/off for the active wheel page |
-| `Moza.DashboardTelemetryOn` | Enable dashboard telemetry for the active wheel page |
-| `Moza.DashboardTelemetryOff` | Disable dashboard telemetry for the active wheel page |
-| `Moza.DisplayToggle` | Toggle the wheel screen on/off (remembers the on-brightness so toggling back on restores it) |
-| `Moza.TestModeToggle` | Toggle telemetry test mode (synthetic signal sweep) for the active wheel page |
-| `Moza.ClearLeds` | Blank all wheel and dash LEDs |
+| `AZOM.DisplayBrightness0` … `AZOM.DisplayBrightness100` | Set wheel screen display brightness to a fixed level (0–100% in steps of 10) |
+| `AZOM.WorkModeOff` | Turn off the wheelbase work mode (puts the base into standby) |
+| `AZOM.WorkModeOn` | Turn on the wheelbase work mode (normal active state) |
+| `AZOM.DashboardNext` | Switch the wheel's displayed dashboard to the next enabled slot (wraps around) |
+| `AZOM.DashboardPrev` | Switch the wheel's displayed dashboard to the previous enabled slot (wraps around) |
+| `AZOM.DashboardTelemetryToggle` | Toggle dashboard telemetry on/off for the active wheel page |
+| `AZOM.DashboardTelemetryOn` | Enable dashboard telemetry for the active wheel page |
+| `AZOM.DashboardTelemetryOff` | Disable dashboard telemetry for the active wheel page |
+| `AZOM.DisplayToggle` | Toggle the wheel screen on/off (remembers the on-brightness so toggling back on restores it) |
+| `AZOM.TestModeToggle` | Toggle telemetry test mode (synthetic signal sweep) for the active wheel page |
+| `AZOM.ClearLeds` | Blank all wheel and dash LEDs |
 
 ## Building from Source
 

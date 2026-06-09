@@ -205,12 +205,12 @@ namespace MozaPlugin.Protocol
             if (newlyLong != null)
             {
                 global::MozaPlugin.MozaLog.Warn(
-                    $"[Moza] PendingResponseTracker: {newlyLong.Count} entry(s) still unanswered after {LongPendingWarnMs / 1000} s: {string.Join(", ", newlyLong)}");
+                    $"[AZOM] PendingResponseTracker: {newlyLong.Count} entry(s) still unanswered after {LongPendingWarnMs / 1000} s: {string.Join(", ", newlyLong)}");
             }
             if (newlySunset != null)
             {
                 global::MozaPlugin.MozaLog.Info(
-                    $"[Moza] PendingResponseTracker sunset {newlySunset.Count} name(s) (no response after {SunsetAfterMs / 1000} s; future Track() calls for these will no-op until disconnect): {string.Join(", ", newlySunset)}");
+                    $"[AZOM] PendingResponseTracker sunset {newlySunset.Count} name(s) (no response after {SunsetAfterMs / 1000} s; future Track() calls for these will no-op until disconnect): {string.Join(", ", newlySunset)}");
             }
         }
 

@@ -82,7 +82,7 @@ namespace MozaPlugin.Sdk.Resources.Motor
             // instance field IS the per-session flag.
             if (Interlocked.CompareExchange(ref _gapWarned, 1, 0) == 0)
             {
-                MozaLog.Warn($"[Moza.Sdk] Motor gap: {_diagnosticName} missing {what}");
+                MozaLog.Warn($"[AZOM.Sdk] Motor gap: {_diagnosticName} missing {what}");
             }
         }
     }

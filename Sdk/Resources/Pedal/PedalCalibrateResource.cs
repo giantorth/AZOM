@@ -35,9 +35,9 @@ namespace MozaPlugin.Sdk.Resources.Pedal
             // Best-effort payload log: captures show a 4-byte LE int (value 1)
             // but the trigger semantics are "the POST itself happened".
             if (req.HasPayload && PayloadCodec.TryDecodeScalarFromLittleEndian(req.Payload, out int v))
-                MozaLog.Debug($"[Moza.Sdk] {_diagnosticName} POST id={req.DeviceId} value={v}");
+                MozaLog.Debug($"[AZOM.Sdk] {_diagnosticName} POST id={req.DeviceId} value={v}");
             else
-                MozaLog.Debug($"[Moza.Sdk] {_diagnosticName} POST id={req.DeviceId} (no/short payload)");
+                MozaLog.Debug($"[AZOM.Sdk] {_diagnosticName} POST id={req.DeviceId} (no/short payload)");
 
             try
             {
@@ -45,7 +45,7 @@ namespace MozaPlugin.Sdk.Resources.Pedal
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] {_diagnosticName} write failed: {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] {_diagnosticName} write failed: {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
             return CoapResourceResponse.Valid();

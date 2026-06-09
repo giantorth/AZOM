@@ -624,7 +624,7 @@ namespace MozaPlugin.Hardware
             // volatile IsBaseConnected (which is false on the hot-reload that
             // ate the writes before the 2026-05-27 gate fix).
             MozaLog.Debug(
-                $"[Moza] ApplyBaseToHardware '{profile.Name}': " +
+                $"[AZOM] ApplyBaseToHardware '{profile.Name}': " +
                 $"Limit={profile.Limit} ({(profile.Limit >= 0 ? (profile.Limit * 2) + "°" : "skip")}), " +
                 $"FfbStrength={profile.FfbStrength}, Torque={profile.Torque}, Speed={profile.Speed}, " +
                 $"BaseDetected={_detectionState.BaseDetected}, " +
@@ -803,7 +803,7 @@ namespace MozaPlugin.Hardware
             // sentinels so they're skipped — device keeps its own values.
             if (profile.Limit == 0 && profile.FfbStrength == 0 && profile.Torque == 0 && profile.Speed == 0)
             {
-                MozaLog.Warn("[Moza] Profile has zeroed base settings — resetting to sentinels");
+                MozaLog.Warn("[AZOM] Profile has zeroed base settings — resetting to sentinels");
                 profile.Limit = -1; profile.FfbStrength = -1; profile.Torque = -1; profile.Speed = -1;
                 profile.Damper = -1; profile.Friction = -1; profile.Inertia = -1; profile.Spring = -1;
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
@@ -831,7 +831,7 @@ namespace MozaPlugin.Hardware
         /// </summary>
         public void ApplyWheelExtensionSettings(MozaWheelExtensionSettings extSettings, string? pageModelPrefix = null)
         {
-            MozaLog.Debug($"[Moza] Applying wheel device extension settings (prefix={pageModelPrefix ?? "(null)"})");
+            MozaLog.Debug($"[AZOM] Applying wheel device extension settings (prefix={pageModelPrefix ?? "(null)"})");
 
             var settings = _plugin.Settings;
             var profile = settings?.ProfileStore?.CurrentProfile;
@@ -871,7 +871,7 @@ namespace MozaPlugin.Hardware
 
         public void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings)
         {
-            MozaLog.Debug("[Moza] Applying dash device extension settings");
+            MozaLog.Debug("[AZOM] Applying dash device extension settings");
 
             var settings = _plugin.Settings;
             extSettings.ApplyTo(settings!, _data, settings?.ProfileStore?.CurrentProfile);
@@ -881,7 +881,7 @@ namespace MozaPlugin.Hardware
 
         public void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings)
         {
-            MozaLog.Debug("[Moza] Applying base ambient device extension settings");
+            MozaLog.Debug("[AZOM] Applying base ambient device extension settings");
 
             var settings = _plugin.Settings;
             extSettings.ApplyTo(settings!, _data, settings?.ProfileStore?.CurrentProfile);
@@ -990,7 +990,7 @@ namespace MozaPlugin.Hardware
             if (groupMode == 1)
             {
                 MozaLog.Debug(
-                    $"[Moza] LED write '{command}' suppressed: group {kind} in SimHub mode " +
+                    $"[AZOM] LED write '{command}' suppressed: group {kind} in SimHub mode " +
                     "(live pipeline owns the frame buffer; _data and overlay updated regardless)");
                 return;
             }

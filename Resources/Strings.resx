@@ -24,9 +24,6 @@
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
-  <data name="Brand_Unofficial" xml:space="preserve"><value>UNOFFICIAL</value></data>
-  <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>
-  <data name="Brand_SimHubPlugin" xml:space="preserve"><value>SimHub Plugin</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Disconnected</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>REFRESH</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Performance Output</value></data>
@@ -265,7 +262,7 @@
   <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// last 20 requests per server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>ABOUT</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Open-source SimHub plugin</value></data>
-  <data name="Label_UnofficialMozaPlugin" xml:space="preserve"><value>Unofficial MOZA SimHub Plugin</value></data>
+  <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
   <data name="Label_VersionPlaceholder" xml:space="preserve"><value>version —</value></data>
   <data name="Hint_AboutDescription" xml:space="preserve"><value>An unofficial SimHub plugin that talks directly to MOZA Racing hardware over serial — hardware configuration, LED effects pipeline, and dashboard streaming. Not affiliated with MOZA / Gudsen Technology.</value></data>
   <data name="Hint_SponsorshipsAppreciated" xml:space="preserve"><value>Sponsorships are greatly appreciated, adding support for hardware I do not own can be difficult!</value></data>

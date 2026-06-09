@@ -74,7 +74,7 @@ namespace MozaPlugin.Sdk.Resources.Handbrake
         {
             if (Interlocked.CompareExchange(ref _gapWarned, 1, 0) == 0)
             {
-                MozaLog.Warn($"[Moza.Sdk] Handbrake gap: {_diagnosticName} missing {what}");
+                MozaLog.Warn($"[AZOM.Sdk] Handbrake gap: {_diagnosticName} missing {what}");
             }
         }
     }

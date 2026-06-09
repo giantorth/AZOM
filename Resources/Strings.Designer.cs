@@ -76,9 +76,6 @@ namespace MozaPlugin.Resources
         public static string TabHeader_Sdk => Get("TabHeader_Sdk");
         public static string TabHeader_Import => Get("TabHeader_Import");
         public static string TabHeader_About => Get("TabHeader_About");
-        public static string Brand_Unofficial => Get("Brand_Unofficial");
-        public static string Brand_Moza => Get("Brand_Moza");
-        public static string Brand_SimHubPlugin => Get("Brand_SimHubPlugin");
         public static string Status_Disconnected => Get("Status_Disconnected");
         public static string Status_Connected => Get("Status_Connected");
         public static string Status_Recovering => Get("Status_Recovering");
@@ -325,7 +322,7 @@ namespace MozaPlugin.Resources
         public static string Subtitle_RecentRequests => Get("Subtitle_RecentRequests");
         public static string Section_About => Get("Section_About");
         public static string Subtitle_About => Get("Subtitle_About");
-        public static string Label_UnofficialMozaPlugin => Get("Label_UnofficialMozaPlugin");
+        public static string Label_AzomTitle => Get("Label_AzomTitle");
         public static string Label_VersionPlaceholder => Get("Label_VersionPlaceholder");
         public static string Hint_AboutDescription => Get("Hint_AboutDescription");
         public static string Hint_SponsorshipsAppreciated => Get("Hint_SponsorshipsAppreciated");

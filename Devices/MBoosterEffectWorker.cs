@@ -156,7 +156,7 @@ namespace MozaPlugin.Devices
             while (!_stop)
             {
                 try { Tick(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] worker tick: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] worker tick: {ex.Message}"); }
 
                 long now = Stopwatch.GetTimestamp();
                 long delta = next - now;

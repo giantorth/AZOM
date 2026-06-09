@@ -230,7 +230,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Upload: failed to decode mzdash as UTF-8 for PNG scan: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Upload: failed to decode mzdash as UTF-8 for PNG scan: {ex.Message}");
                 yield break;
             }
 
@@ -253,7 +253,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     else
                     {
                         MozaLog.Warn(
-                            $"[Moza] Upload: PNG asset MD5/{hex}.png referenced by mzdash but not " +
+                            $"[AZOM] Upload: PNG asset MD5/{hex}.png referenced by mzdash but not " +
                             $"found at {candidate} — widget bound to it will render blank.");
                         continue;
                     }
@@ -266,7 +266,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Upload: failed to read {candidate}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Upload: failed to read {candidate}: {ex.Message}");
                     continue;
                 }
 

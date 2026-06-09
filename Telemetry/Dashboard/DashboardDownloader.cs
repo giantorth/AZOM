@@ -142,7 +142,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             if (!Enabled)
             {
-                MozaLog.Debug("[Moza] DashboardDownloader: skipped (download not enabled)");
+                MozaLog.Debug("[AZOM] DashboardDownloader: skipped (download not enabled)");
                 return 0;
             }
             if (state.EnabledDashboards == null || state.EnabledDashboards.Count == 0)
@@ -167,7 +167,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             SafeReset(_downloadComplete);
             SafeReset(_ackReceived);
             _dispatcher.Claim(0x0B, this);
-            MozaLog.Debug("[Moza] DashboardDownloader: claimed session 0x0B, sending FT activate...");
+            MozaLog.Debug("[AZOM] DashboardDownloader: claimed session 0x0B, sending FT activate...");
             // Whole-body try/finally so EVERY exit path (including future ones)
             // releases the dispatcher claim. ReleaseAll(this) covers both the
             // initial 0x0B claim and any session the wheel migrated us to via
@@ -178,14 +178,14 @@ namespace MozaPlugin.Telemetry.Dashboard
 
             if (!SafeIsSet(_sessionOpened))
             {
-                MozaLog.Debug("[Moza] DashboardDownloader: waiting for FT session device-init...");
+                MozaLog.Debug("[AZOM] DashboardDownloader: waiting for FT session device-init...");
                 if (!SafeWait(_sessionOpened, 15_000))
                 {
-                    MozaLog.Warn("[Moza] DashboardDownloader: no FT session opened by wheel");
+                    MozaLog.Warn("[AZOM] DashboardDownloader: no FT session opened by wheel");
                     return 0;
                 }
             }
-            MozaLog.Debug($"[Moza] DashboardDownloader: using session 0x{_session:X2}");
+            MozaLog.Debug($"[AZOM] DashboardDownloader: using session 0x{_session:X2}");
 
             // ── Phase 3: Build and send download request ──────────────────
             _retransmitter.Clear();
@@ -199,7 +199,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 "pithouse_replay.txt");
             if (System.IO.File.Exists(replayPath))
             {
-                MozaLog.Debug("[Moza] DashboardDownloader: REPLAY MODE — sending PitHouse frames");
+                MozaLog.Debug("[AZOM] DashboardDownloader: REPLAY MODE — sending PitHouse frames");
                 var lines = System.IO.File.ReadAllLines(replayPath);
                 lock (_responseBuffer) { _responseBuffer.Clear(); }
                 SafeReset(_downloadComplete);
@@ -213,7 +213,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         raw[i] = Convert.ToByte(line.Substring(i * 2, 2), 16);
                     _connection.Send(raw);
                 }
-                MozaLog.Debug($"[Moza] DashboardDownloader: sent {lines.Length} replay frames");
+                MozaLog.Debug($"[AZOM] DashboardDownloader: sent {lines.Length} replay frames");
                 // Wait for response
                 _lastChunkTicks = Environment.TickCount;
                 int deadline2 = Environment.TickCount + 60_000;
@@ -226,13 +226,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 byte[] rd; lock (_responseBuffer) { rd = _responseBuffer.ToArray(); _responseBuffer.Clear(); }
                 _receiving = false;
-                MozaLog.Debug($"[Moza] DashboardDownloader: replay response = {rd.Length} bytes");
+                MozaLog.Debug($"[AZOM] DashboardDownloader: replay response = {rd.Length} bytes");
                 return 0;
             }
 
             byte[] requestBody = BuildRequestBody(state, hashByName, out var dashboardOrder);
             MozaLog.Debug(
-                $"[Moza] DashboardDownloader: built {requestBody.Length} byte request " +
+                $"[AZOM] DashboardDownloader: built {requestBody.Length} byte request " +
                 $"for {hashByName.Count} dashboards on session 0x{_session:X2}");
 
             lock (_responseBuffer) { _responseBuffer.Clear(); }
@@ -252,7 +252,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     requestBody, _session, ref seq);
 
                 MozaLog.Debug(
-                    $"[Moza] DashboardDownloader: sending {frames.Count} chunks " +
+                    $"[AZOM] DashboardDownloader: sending {frames.Count} chunks " +
                     $"(seq {_deviceInitSeq + 3}..{seq - 1}), windowed");
 
                 int baseSeq = _deviceInitSeq + 3;
@@ -280,7 +280,7 @@ namespace MozaPlugin.Telemetry.Dashboard
 
                 int closeSeq = seq; // seq after last data frame
                 MozaLog.Debug(
-                    $"[Moza] DashboardDownloader: all {frames.Count} request chunks sent, " +
+                    $"[AZOM] DashboardDownloader: all {frames.Count} request chunks sent, " +
                     $"waiting for response (timeout={timeoutMs}ms)");
 
                 // ── Wait for response ──────────────────────────────────────
@@ -306,7 +306,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     if (bufSize > 0 && idle > InactivityMs)
                     {
                         MozaLog.Debug(
-                            $"[Moza] DashboardDownloader: {bufSize} bytes, idle {idle}ms — closing");
+                            $"[AZOM] DashboardDownloader: {bufSize} bytes, idle {idle}ms — closing");
                         if (!closeSent)
                         {
                             SendSessionClose(_session, (ushort)closeSeq);
@@ -320,7 +320,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     SendSessionClose(_session, (ushort)closeSeq);
                 }
                 if (!SafeIsSet(_downloadComplete) && Environment.TickCount >= deadline)
-                    MozaLog.Warn("[Moza] DashboardDownloader: response timeout");
+                    MozaLog.Warn("[AZOM] DashboardDownloader: response timeout");
             }
             finally
             {
@@ -337,23 +337,23 @@ namespace MozaPlugin.Telemetry.Dashboard
 
             if (responseData.Length == 0)
             {
-                MozaLog.Warn("[Moza] DashboardDownloader: empty response");
+                MozaLog.Warn("[AZOM] DashboardDownloader: empty response");
                 return 0;
             }
 
-            MozaLog.Debug($"[Moza] DashboardDownloader: received {responseData.Length} bytes");
+            MozaLog.Debug($"[AZOM] DashboardDownloader: received {responseData.Length} bytes");
 
             byte[]? decompressed = DecompressResponse(responseData);
             if (decompressed == null || decompressed.Length == 0)
             {
-                MozaLog.Warn("[Moza] DashboardDownloader: decompression failed");
+                MozaLog.Warn("[AZOM] DashboardDownloader: decompression failed");
                 return 0;
             }
 
-            MozaLog.Debug($"[Moza] DashboardDownloader: decompressed {decompressed.Length} bytes");
+            MozaLog.Debug($"[AZOM] DashboardDownloader: decompressed {decompressed.Length} bytes");
 
             var mzdashFiles = SplitMzdashFiles(decompressed);
-            MozaLog.Debug($"[Moza] DashboardDownloader: found {mzdashFiles.Count} mzdash files");
+            MozaLog.Debug($"[AZOM] DashboardDownloader: found {mzdashFiles.Count} mzdash files");
 
             int ingested = 0;
             for (int i = 0; i < mzdashFiles.Count && i < dashboardOrder.Count; i++)
@@ -365,7 +365,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
 
             MozaLog.Debug(
-                $"[Moza] DashboardDownloader: ingested {ingested}/{mzdashFiles.Count} dashboards");
+                $"[AZOM] DashboardDownloader: ingested {ingested}/{mzdashFiles.Count} dashboards");
             return ingested;
             }
             finally

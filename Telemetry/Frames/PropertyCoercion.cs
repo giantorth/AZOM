@@ -84,7 +84,7 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 try
                 {
-                    MozaLog.Warn($"[Moza] Property '{path}' {detail}; channel will send 0 until mapping is fixed.");
+                    MozaLog.Warn($"[AZOM] Property '{path}' {detail}; channel will send 0 until mapping is fixed.");
                 }
                 catch { /* logging may not be initialised in tests */ }
             }

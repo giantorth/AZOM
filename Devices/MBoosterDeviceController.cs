@@ -128,7 +128,7 @@ namespace MozaPlugin.Devices
             // mapping into MBoosterDeviceSettings happens in the plugin-level
             // detection handler so the registry doesn't have to know about the
             // settings shape.
-            MozaLog.Debug($"[Moza/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
+            MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
         }
 
         /// <summary>Short identity slug for capture labels / log lines — last 8 chars of instance id.</summary>
@@ -155,7 +155,7 @@ namespace MozaPlugin.Devices
             bool ok = _connection.Connect();
             if (ok)
             {
-                MozaLog.Info($"[Moza/mBooster] Connected ({ShortIdentity(Identity)} on {_connection.LastPortName})");
+                MozaLog.Info($"[AZOM/mBooster] Connected ({ShortIdentity(Identity)} on {_connection.LastPortName})");
                 _worker.Start();
             }
             return ok;
@@ -176,9 +176,9 @@ namespace MozaPlugin.Devices
         {
             if (_detected) return;
             _detected = true;
-            MozaLog.Debug($"[Moza/mBooster] Detected {ShortIdentity(Identity)}");
+            MozaLog.Debug($"[AZOM/mBooster] Detected {ShortIdentity(Identity)}");
             try { DetectedRisingEdge?.Invoke(); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] DetectedRisingEdge handler: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DetectedRisingEdge handler: {ex.Message}"); }
         }
 
         // ===== Frame submission =====================================
@@ -329,7 +329,7 @@ namespace MozaPlugin.Devices
                 // (protocol note § 3 "Disable").
                 SendAllDisableFrames();
             }
-            catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Disable on dispose: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Disable on dispose: {ex.Message}"); }
             try { _worker.Stop(); } catch { }
             try { _connection.MessageReceived -= OnConnectionMessage; } catch { }
             try { _connection.Disconnected -= OnConnectionDisconnected; } catch { }

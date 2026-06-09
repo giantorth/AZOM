@@ -26,7 +26,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 if (_owners.TryGetValue(session, out var prev) && prev != owner)
                 {
                     MozaLog.Debug(
-                        $"[Moza] SessionDispatcher: session 0x{session:X2} " +
+                        $"[AZOM] SessionDispatcher: session 0x{session:X2} " +
                         $"transferred {prev.GetType().Name} → {owner.GetType().Name}");
                 }
                 _owners[session] = owner;
@@ -74,7 +74,7 @@ namespace MozaPlugin.Telemetry.Sessions
             catch (Exception ex)
             {
                 MozaLog.Warn(
-                    $"[Moza] SessionDispatcher: session 0x{session:X2} {kind} consumer threw: " +
+                    $"[AZOM] SessionDispatcher: session 0x{session:X2} {kind} consumer threw: " +
                     $"{ex.GetType().Name}: {ex.Message}");
             }
         }

@@ -91,7 +91,7 @@ namespace MozaPlugin.Sdk.Resources.Wheel
             // instance field IS the per-session flag.
             if (Interlocked.CompareExchange(ref _gapWarned, 1, 0) == 0)
             {
-                MozaLog.Warn($"[Moza.Sdk] Wheel gap: {_diagnosticName} missing {what}");
+                MozaLog.Warn($"[AZOM.Sdk] Wheel gap: {_diagnosticName} missing {what}");
             }
         }
     }

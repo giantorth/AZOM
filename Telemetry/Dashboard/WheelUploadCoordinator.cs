@@ -188,7 +188,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             catch (Exception ex)
             {
                 MozaLog.Warn(
-                    $"[Moza] UploadCompleted subscriber threw: " +
+                    $"[AZOM] UploadCompleted subscriber threw: " +
                     $"{ex.GetType().Name}: {ex.Message}");
             }
         }
@@ -331,13 +331,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 {
                     string json = System.Text.Encoding.UTF8.GetString(dirBlob);
                     MozaLog.Debug(
-                        $"[Moza] Session 0x{session:X2} dir listing: {dirBlob.Length} bytes, " +
+                        $"[AZOM] Session 0x{session:X2} dir listing: {dirBlob.Length} bytes, " +
                         $"children≈{CountOccurrences(json, "\"name\"")}");
                 }
                 catch (Exception ex)
                 {
                     MozaLog.Debug(
-                        $"[Moza] Session 0x{session:X2} dir listing decode: {ex.Message}");
+                        $"[AZOM] Session 0x{session:X2} dir listing decode: {ex.Message}");
                 }
             }
             return true;
@@ -403,7 +403,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 LastTotalSize = ts;
                 LastStatusByte = status;
                 MozaLog.Debug(
-                    $"[Moza] Upload ack type=0x{type:X2} bw={bw} total={ts} status=0x{status:X2}");
+                    $"[AZOM] Upload ack type=0x{type:X2} bw={bw} total={ts} status=0x{status:X2}");
             }
 
             if (type == 0x01)
@@ -538,7 +538,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (!_sessionOpened.Wait(FtBurstWaitMs))
                 {
                     MozaLog.Warn(
-                        $"[Moza] No file-transfer session device-opened within " +
+                        $"[AZOM] No file-transfer session device-opened within " +
                         $"{FtBurstWaitMs}ms — skipping dashboard upload. " +
                         "Wheel may render previously-cached dashboard.");
                     outcome = UploadOutcome.NoFtSession;
@@ -551,7 +551,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             catch (Exception ex)
             {
                 outcome = UploadOutcome.ExceptionThrown;
-                MozaLog.Warn($"[Moza] Background dashboard upload failed: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Background dashboard upload failed: {ex.Message}");
             }
             finally
             {
@@ -596,7 +596,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (CanSkipUpload(content))
             {
                 MozaLog.Debug(
-                    $"[Moza] Dashboard \"{MzdashName}\" already loaded on wheel (hash match) — skipping upload");
+                    $"[AZOM] Dashboard \"{MzdashName}\" already loaded on wheel (hash match) — skipping upload");
                 return UploadOutcome.SkippedHashMatch;
             }
 
@@ -703,7 +703,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     policy.UploadWireFormat, MzdashSourceDirectory);
 
             MozaLog.Debug(
-                $"[Moza] Uploading dashboard \"{dashboardName}\" via session 0x{uploadSess:X2} " +
+                $"[AZOM] Uploading dashboard \"{dashboardName}\" via session 0x{uploadSess:X2} " +
                 $"(wire={policy.UploadWireFormat}): " +
                 $"raw={upload.UncompressedSize}B md5={upload.Md5Hex} " +
                 $"compressed={upload.TotalCompressedSize}B chunks={upload.SubMsg2Chunks.Count} " +
@@ -803,7 +803,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         ? FileTransferWireFormat.Legacy2025_11
                         : FileTransferWireFormat.New2026_04;
                     MozaLog.Warn(
-                        $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack timeout with " +
+                        $"[AZOM] Session 0x{uploadSess:X2} sub-msg 1 ack timeout with " +
                         $"wire={policy.UploadWireFormat} — retrying with wire={fallback}");
 
                     policy.UploadWireFormat = fallback;
@@ -839,21 +839,21 @@ namespace MozaPlugin.Telemetry.Dashboard
                     if (_subMsg1Response.IsSet)
                     {
                         MozaLog.Debug(
-                            $"[Moza] Wire format auto-detected: wheel accepts {policy.UploadWireFormat} " +
+                            $"[AZOM] Wire format auto-detected: wheel accepts {policy.UploadWireFormat} " +
                             "(cached for this session)");
                         retried = true;
                     }
                     else
                     {
                         MozaLog.Warn(
-                            $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack timeout on fallback " +
+                            $"[AZOM] Session 0x{uploadSess:X2} sub-msg 1 ack timeout on fallback " +
                             $"wire={policy.UploadWireFormat} — aborting upload, no content sent");
                     }
                 }
                 else
                 {
                     MozaLog.Warn(
-                        $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack timeout with " +
+                        $"[AZOM] Session 0x{uploadSess:X2} sub-msg 1 ack timeout with " +
                         $"wire={policy.UploadWireFormat} — fallback disabled, aborting upload");
                 }
 
@@ -870,7 +870,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             _ = fellBack;
 
             MozaLog.Debug(
-                $"[Moza] Session 0x{uploadSess:X2} sub-msg 1 ack received " +
+                $"[AZOM] Session 0x{uploadSess:X2} sub-msg 1 ack received " +
                 $"(bytes_written={LastBytesWritten} total={LastTotalSize} status=0x{LastStatusByte:X2}) — " +
                 $"sending {upload.SubMsg2Chunks.Count} type=0x03 sub-msg(s)");
 
@@ -908,7 +908,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (!gotAck)
                 {
                     MozaLog.Warn(
-                        $"[Moza] Session 0x{uploadSess:X2} sub-msg 2 chunk {chunkIdx + 1}/{upload.SubMsg2Chunks.Count} " +
+                        $"[AZOM] Session 0x{uploadSess:X2} sub-msg 2 chunk {chunkIdx + 1}/{upload.SubMsg2Chunks.Count} " +
                         $"{(isLast ? "complete" : "progress")} ack timeout " +
                         $"(last bw={LastBytesWritten} total={LastTotalSize}) — aborting upload");
                     _outboundSeq = seq2;
@@ -923,7 +923,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (!isLast && LastBytesWritten <= lastBwSeen)
                 {
                     MozaLog.Debug(
-                        $"[Moza] Session 0x{uploadSess:X2} progress ack arrived but " +
+                        $"[AZOM] Session 0x{uploadSess:X2} progress ack arrived but " +
                         $"bytes_written did not advance (was {lastBwSeen}, is {LastBytesWritten})");
                 }
                 lastBwSeen = LastBytesWritten;
@@ -931,16 +931,16 @@ namespace MozaPlugin.Telemetry.Dashboard
             _outboundSeq = seq2;
 
             MozaLog.Debug(
-                $"[Moza] Session 0x{uploadSess:X2} sub-msg 2 complete-ack received " +
+                $"[AZOM] Session 0x{uploadSess:X2} sub-msg 2 complete-ack received " +
                 $"(bytes_written={LastBytesWritten} total={LastTotalSize} status=0x{LastStatusByte:X2})");
 
             // End marker on the upload session.
             _sendSessionEnd(uploadSess, (ushort)_outboundSeq);
 
             if (_endReceived.Wait(1000))
-                MozaLog.Debug($"[Moza] Dashboard upload complete (session 0x{uploadSess:X2} closed by device)");
+                MozaLog.Debug($"[AZOM] Dashboard upload complete (session 0x{uploadSess:X2} closed by device)");
             else
-                MozaLog.Debug("[Moza] Dashboard upload finished; device did not echo end marker within 1s");
+                MozaLog.Debug("[AZOM] Dashboard upload finished; device did not echo end marker within 1s");
 
             // Wheel's 2025-11 firmware fires a post-upload state refresh on
             // the upload session (updated directory listing) and session 0x09
@@ -952,7 +952,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             int refreshChunks = _inboundMsgCount - preRefreshCount;
             if (refreshChunks > 0)
                 MozaLog.Debug(
-                    $"[Moza] Session 0x{uploadSess:X2} post-upload state refresh: {refreshChunks} chunks");
+                    $"[AZOM] Session 0x{uploadSess:X2} post-upload state refresh: {refreshChunks} chunks");
 
             return UploadOutcome.Succeeded;
         }

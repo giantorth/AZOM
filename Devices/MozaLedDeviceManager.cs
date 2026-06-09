@@ -391,7 +391,7 @@ namespace MozaPlugin.Devices
                     _ledsAwake = true;
                     plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", 0x3FF);
                     plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", 0);
-                    MozaLog.Debug("[Moza] ES wheel LED wake-up sent");
+                    MozaLog.Debug("[AZOM] ES wheel LED wake-up sent");
                 }
 
                 bool limitUpdates = plugin.Settings.LimitWheelUpdates;
@@ -915,7 +915,7 @@ namespace MozaPlugin.Devices
             if (key == _lastRawDiagKey) return;
             _lastRawDiagKey = key;
             // Very chatty when animation is running
-            MozaLog.Debug($"[Moza] IndividualLEDs diag {key}");
+            MozaLog.Debug($"[AZOM] IndividualLEDs diag {key}");
         }
 #endif
 

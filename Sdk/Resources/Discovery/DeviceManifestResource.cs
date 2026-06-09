@@ -49,7 +49,7 @@ namespace MozaPlugin.Sdk.Resources.Discovery
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] DeviceManifestResource GET failed for id '{req.DeviceId}': {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] DeviceManifestResource GET failed for id '{req.DeviceId}': {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
         }

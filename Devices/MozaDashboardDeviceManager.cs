@@ -47,7 +47,7 @@ namespace MozaPlugin.Devices
             if (_connection.IsConnected) return true;
             bool ok = _connection.Connect();
             if (ok)
-                MozaLog.Info($"[Moza] Connected to standalone dashboard ({_connection.DiscoveredPid})");
+                MozaLog.Info($"[AZOM] Connected to standalone dashboard ({_connection.DiscoveredPid})");
             return ok;
         }
 

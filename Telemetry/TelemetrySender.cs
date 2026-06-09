@@ -398,7 +398,7 @@ namespace MozaPlugin.Telemetry
                 // Rebuild per-tier frame builders with the new dev_id so value
                 // frames address the right device on the next tick.
                 RebuildFrameBuildersForTargetDevice();
-                MozaLog.Debug($"[Moza] Telemetry target device set to {TargetDescription}");
+                MozaLog.Debug($"[AZOM] Telemetry target device set to {TargetDescription}");
             }
         }
 
@@ -739,7 +739,7 @@ namespace MozaPlugin.Telemetry
                                      System.Diagnostics.Stopwatch.Frequency;
                         TestSignalGenerator.ResetEpoch(nowMs);
                     }
-                    MozaLog.Debug($"[Moza] TestMode changed to {value}");
+                    MozaLog.Debug($"[AZOM] TestMode changed to {value}");
                 }
             }
         }
@@ -781,7 +781,7 @@ namespace MozaPlugin.Telemetry
                     // froze, fixed it by toggling telemetry back on.
                     if (value)
                     {
-                        MozaLog.Info("[Moza] Wheel telemetry enabled — resuming value-frame emission");
+                        MozaLog.Info("[AZOM] Wheel telemetry enabled — resuming value-frame emission");
                         // Reset reminder window so the next disable-cycle's
                         // first reminder doesn't fire instantly.
                         _profileTelemetryDisabledLastReminderTickMs = 0;
@@ -789,7 +789,7 @@ namespace MozaPlugin.Telemetry
                     else
                     {
                         MozaLog.Info(
-                            "[Moza] Wheel telemetry DISABLED for the active SimHub overlay — " +
+                            "[AZOM] Wheel telemetry DISABLED for the active SimHub overlay — " +
                             "value frames will be suppressed until you toggle telemetry on for this overlay. " +
                             "Wheel-side keepalives continue but the dashboard will not update.");
                         // Stamp NOW so the periodic reminder doesn't fire
@@ -811,7 +811,7 @@ namespace MozaPlugin.Telemetry
             if (!_connection.IsConnected) return;
             byte[] frame = BuildPhaseMarkerFrame(phaseId);
             _connection.Send(frame);
-            MozaLog.Debug($"[Moza] phase-marker phaseId=0x{phaseId:X2} ({phaseId})");
+            MozaLog.Debug($"[AZOM] phase-marker phaseId=0x{phaseId:X2} ({phaseId})");
         }
 
         private static byte[] BuildPhaseMarkerFrame(byte phaseId)
@@ -1046,7 +1046,7 @@ namespace MozaPlugin.Telemetry
                             ? c.Url
                             : $"{c.Url}→{c.SimHubProperty}"));
                     MozaLog.Debug(
-                        $"[Moza] Profile '{value.Name}' has {value.StringChannels.Count} " +
+                        $"[AZOM] Profile '{value.Name}' has {value.StringChannels.Count} " +
                         $"string channels (sess=0x01 type=0x05): {urls}");
                 }
 
@@ -1068,7 +1068,7 @@ namespace MozaPlugin.Telemetry
 
                 _tiers = new TierState[value.Tiers.Count];
                 var tierDiag = new System.Text.StringBuilder();
-                tierDiag.Append($"[Moza] Profile setter: \"{value.Name}\" {value.Tiers.Count}t baseTickMs={_baseTickMs}");
+                tierDiag.Append($"[AZOM] Profile setter: \"{value.Name}\" {value.Tiers.Count}t baseTickMs={_baseTickMs}");
                 for (int i = 0; i < value.Tiers.Count; i++)
                 {
                     var tier = value.Tiers[i];
@@ -1258,7 +1258,7 @@ namespace MozaPlugin.Telemetry
             var prev = _state;
             if (prev == next) return;
             _state = next;
-            try { MozaLog.Debug($"[Moza] state {prev} → {next} ({reason})"); }
+            try { MozaLog.Debug($"[AZOM] state {prev} → {next} ({reason})"); }
             catch { /* logging may not be initialised in tests */ }
         }
         // Read-only accessors for DashboardSwitchAutoTest
@@ -1329,16 +1329,16 @@ namespace MozaPlugin.Telemetry
                 switch (outcome)
                 {
                     case WheelUploadCoordinator.UploadOutcome.Succeeded:
-                        MozaLog.Info($"[Moza] Dashboard upload \"{name}\": Succeeded");
+                        MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": Succeeded");
                         break;
                     case WheelUploadCoordinator.UploadOutcome.SkippedHashMatch:
-                        MozaLog.Info($"[Moza] Dashboard upload \"{name}\": SkippedHashMatch");
+                        MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": SkippedHashMatch");
                         break;
                     case WheelUploadCoordinator.UploadOutcome.Aborted:
-                        MozaLog.Debug($"[Moza] Dashboard upload \"{name}\": Aborted");
+                        MozaLog.Debug($"[AZOM] Dashboard upload \"{name}\": Aborted");
                         break;
                     default:
-                        MozaLog.Warn($"[Moza] Dashboard upload \"{name}\": {outcome}");
+                        MozaLog.Warn($"[AZOM] Dashboard upload \"{name}\": {outcome}");
                         break;
                 }
             };
@@ -1361,7 +1361,7 @@ namespace MozaPlugin.Telemetry
             _connection = connection;
             _rpc.Rebind(connection);
             _uploader.Rebind(connection);
-            MozaLog.Debug($"[Moza] TelemetrySender rebound to {connection.CaptureLabel} connection");
+            MozaLog.Debug($"[AZOM] TelemetrySender rebound to {connection.CaptureLabel} connection");
         }
 
         // Caller passes the MozaPlugin instance directly because Init may call
@@ -1420,7 +1420,7 @@ namespace MozaPlugin.Telemetry
         {
             if (Volatile.Read(ref _disposed) != 0)
             {
-                MozaLog.Warn("[Moza] Start() ignored — sender disposed");
+                MozaLog.Warn("[AZOM] Start() ignored — sender disposed");
                 return;
             }
             // Persistent-sender reuse: when MozaPlugin reuses this sender
@@ -1435,7 +1435,7 @@ namespace MozaPlugin.Telemetry
             if (_state == TelemetryState.Active && _connection.IsConnected)
             {
                 MozaLog.Debug(
-                    "[Moza] Start() skipped — sender already Active with live connection " +
+                    "[AZOM] Start() skipped — sender already Active with live connection " +
                     "(persistent-sender reuse path)");
                 return;
             }
@@ -1447,24 +1447,24 @@ namespace MozaPlugin.Telemetry
             lock (_startCtsLock) { prior = _startCts; }
             if (prior != null)
             {
-                MozaLog.Debug("[Moza] Start() cancelling prior in-progress start");
+                MozaLog.Debug("[AZOM] Start() cancelling prior in-progress start");
                 try { prior.Cancel(); } catch (ObjectDisposedException) { }
             }
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             if (!_startSemaphore.Wait(10000))
             {
-                MozaLog.Warn("[Moza] Start() could not acquire start lock after 10s");
+                MozaLog.Warn("[AZOM] Start() could not acquire start lock after 10s");
                 return;
             }
             if (prior != null)
-                MozaLog.Debug($"[Moza] Start() superseded in-progress start (waited {sw.ElapsedMilliseconds}ms)");
+                MozaLog.Debug($"[AZOM] Start() superseded in-progress start (waited {sw.ElapsedMilliseconds}ms)");
 
             // Re-check disposal after the (potentially long) wait — Dispose
             // may have arrived while we were queued.
             if (Volatile.Read(ref _disposed) != 0)
             {
-                MozaLog.Warn("[Moza] Start() ignored — sender disposed during wait");
+                MozaLog.Warn("[AZOM] Start() ignored — sender disposed during wait");
                 _startSemaphore.Release();
                 return;
             }
@@ -1478,7 +1478,7 @@ namespace MozaPlugin.Telemetry
             }
             catch (OperationCanceledException)
             {
-                MozaLog.Debug("[Moza] StartInner cancelled by supersession / disposal");
+                MozaLog.Debug("[AZOM] StartInner cancelled by supersession / disposal");
             }
             finally
             {
@@ -1529,7 +1529,7 @@ namespace MozaPlugin.Telemetry
                 if (waitMs > 0)
                 {
                     MozaLog.Debug(
-                        $"[Moza] Start: enforcing {waitMs}ms silence " +
+                        $"[AZOM] Start: enforcing {waitMs}ms silence " +
                         $"(elapsed since last Stop: {elapsedMs}ms; min: {Lifecycle.SilenceGate.StopReopenSilenceMs}ms) " +
                         "so wheel session state can settle before reopen");
                     // Slice the sleep so a supersession (a new Start() cancelling
@@ -1553,7 +1553,7 @@ namespace MozaPlugin.Telemetry
             else
             {
                 MozaLog.Debug(
-                    "[Moza] Start: first start in this SimHub process — " +
+                    "[AZOM] Start: first start in this SimHub process — " +
                     "skipping silence gate (no prior Stop to settle from)");
             }
 
@@ -1668,7 +1668,7 @@ namespace MozaPlugin.Telemetry
                         break;
 
                     MozaLog.Warn(
-                        $"[Moza] Incomplete channel catalog (END seen, 0 valid channels — " +
+                        $"[AZOM] Incomplete channel catalog (END seen, 0 valid channels — " +
                         $"dropped/truncated catalog chunks) after {waited}ms; re-requesting via " +
                         $"session re-cycle (attempt {attempt}/{MaxCatalogRequests - 1}).");
                     _catalogParser.ClearBuffer();
@@ -1684,7 +1684,7 @@ namespace MozaPlugin.Telemetry
                     SendSessionOpen(0x03, 0x03);
                 }
                 MozaLog.Debug(
-                    $"[Moza] Pre-init catalog wait: {totalWaited}ms — tier-def session resolved to " +
+                    $"[AZOM] Pre-init catalog wait: {totalWaited}ms — tier-def session resolved to " +
                     $"0x{ResolveTierDefSession():X2}, FF session 0x{ResolveFfSession():X2}" +
                     $"{(haveCatalog ? "" : " (no usable catalog — proceeding)")}.");
             }
@@ -2011,7 +2011,7 @@ namespace MozaPlugin.Telemetry
             if (percent == 0 && !allowZero)
             {
                 global::MozaPlugin.MozaLog.Debug(
-                    "[Moza] SendDashDisplayBrightness: skipping non-explicit 0 push " +
+                    "[AZOM] SendDashDisplayBrightness: skipping non-explicit 0 push " +
                     "(use allowZero=true for deliberate display-off)");
                 return;
             }
@@ -2051,7 +2051,7 @@ namespace MozaPlugin.Telemetry
             if (_state != TelemetryState.Active || IsInSilenceCooldown)
             {
                 MozaLog.Debug(
-                    $"[Moza] SendDashboardSwitch slot={slotIndex} suppressed: " +
+                    $"[AZOM] SendDashboardSwitch slot={slotIndex} suppressed: " +
                     $"state={_state} cooldown={IsInSilenceCooldown}. " +
                     "User must wait for restart cycle to complete.");
                 return false;
@@ -2085,7 +2085,7 @@ namespace MozaPlugin.Telemetry
             if (anchorSlotRoundTrip)
                 _watchdog.NoteHostEmittedKind4((int)slotIndex);
             MozaLog.Debug(
-                $"[Moza] Sent dashboard-switch FF-record: slot={slotIndex} " +
+                $"[AZOM] Sent dashboard-switch FF-record: slot={slotIndex} " +
                 $"on FF session 0x{ResolveFfSession():X2} (mirror of tier-def session)");
             return true;
         }
@@ -2401,7 +2401,7 @@ namespace MozaPlugin.Telemetry
             try { WheelInitiatedSwitch?.Invoke(slot); }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] WheelInitiatedSwitch handler threw: {ex.Message}");
+                MozaLog.Warn($"[AZOM] WheelInitiatedSwitch handler threw: {ex.Message}");
             }
         }
 
@@ -2457,7 +2457,7 @@ namespace MozaPlugin.Telemetry
 
             _initHandshakeSession = ResolveFfSession();
             MozaLog.Debug(
-                $"[Moza] Sent init handshake (kind=2 nonce + kind=7 slot=0) on FF session " +
+                $"[AZOM] Sent init handshake (kind=2 nonce + kind=7 slot=0) on FF session " +
                 $"0x{_initHandshakeSession:X2} (mirror of tier-def session).");
         }
 
@@ -2475,7 +2475,7 @@ namespace MozaPlugin.Telemetry
                 // _tierDefPreambleSent stays true.
                 _hotSwitch.ArmBurst();
                 MozaLog.Info(
-                    $"[Moza] SwitchToProfile slot={slotIndex}: HOT path — " +
+                    $"[AZOM] SwitchToProfile slot={slotIndex}: HOT path — " +
                     $"{Lifecycle.HotSwitchCoordinator.MinEmissions}-" +
                     $"{Lifecycle.HotSwitchCoordinator.MaxEmissions} tier-def emissions queued " +
                     $"~{Lifecycle.HotSwitchCoordinator.EmissionSpacingMs}ms apart (adaptive on bind state)");
@@ -2488,7 +2488,7 @@ namespace MozaPlugin.Telemetry
             else
             {
                 MozaLog.Info(
-                    $"[Moza] SwitchToProfile slot={slotIndex}: STOP+START path " +
+                    $"[AZOM] SwitchToProfile slot={slotIndex}: STOP+START path " +
                     $"(EnableHotRenegotiation=false)");
                 RestartForSwitch();
             }
@@ -2526,7 +2526,7 @@ namespace MozaPlugin.Telemetry
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Error($"[Moza] RestartForSwitch failed: {ex.Message}");
+                    MozaLog.Error($"[AZOM] RestartForSwitch failed: {ex.Message}");
                 }
             });
         }
@@ -2636,7 +2636,7 @@ namespace MozaPlugin.Telemetry
             // are accepted and we proceed regardless.
             byte lastClosePort = isColdStart ? (byte)0x0A : (byte)0x03;
             MozaLog.Debug(
-                $"[Moza] Closing any stale {(isColdStart ? "cold-start" : "host")} sessions " +
+                $"[AZOM] Closing any stale {(isColdStart ? "cold-start" : "host")} sessions " +
                 $"(0x01..0x{lastClosePort:X2}{(isColdStart ? " — wide" : "")})...");
             for (byte port = 1; port <= lastClosePort; port++)
             {
@@ -2644,7 +2644,7 @@ namespace MozaPlugin.Telemetry
                     || _state == TelemetryState.Idle || !_connection.IsConnected) return;
                 bool acked = TryCloseSession(port, CloseAckTimeoutMs);
                 MozaLog.Debug(
-                    $"[Moza] SessionClose 0x{port:X2} {(acked ? "acked" : "no ack within " + CloseAckTimeoutMs + "ms")}");
+                    $"[AZOM] SessionClose 0x{port:X2} {(acked ? "acked" : "no ack within " + CloseAckTimeoutMs + "ms")}");
             }
 
             byte mgmtPort = TryOpenSession(MgmtSession, OpenAckTimeoutMs);
@@ -2667,7 +2667,7 @@ namespace MozaPlugin.Telemetry
                 const int ExtendedAckWaitMs = 20_000;
                 const int ExtendedAckSliceMs = 100;
                 MozaLog.Info(
-                    $"[Moza] Both sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens silent within " +
+                    $"[AZOM] Both sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens silent within " +
                     $"{OpenAckTimeoutMs}ms — waiting up to {ExtendedAckWaitMs}ms for slow-bring-up " +
                     "wheel (CS-Pro on Universal Hub takes ~14 s)");
                 bool gotLateAck = false;
@@ -2720,7 +2720,7 @@ namespace MozaPlugin.Telemetry
                     // from the wheel-ready point.
                     const int WheelReadyRetryMs = 2_000;
                     MozaLog.Info(
-                        "[Moza] Wheel session-layer ready observed (sess=0x09 device-init) — " +
+                        "[AZOM] Wheel session-layer ready observed (sess=0x09 device-init) — " +
                         $"retrying sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens with " +
                         $"{WheelReadyRetryMs}ms budget");
                     if (_connection.IsConnected)
@@ -2732,7 +2732,7 @@ namespace MozaPlugin.Telemetry
                 else if (gotLateAck)
                 {
                     MozaLog.Info(
-                        $"[Moza] Late ack on sess=0x{ackedSession:X2} after extended wait " +
+                        $"[AZOM] Late ack on sess=0x{ackedSession:X2} after extended wait " +
                         "— wheel is alive, proceeding with cold-start");
                     if (ackedSession == MgmtSession) mgmtPort = MgmtSession;
                     else if (ackedSession == TelemSession) telemetryPort = TelemSession;
@@ -2748,7 +2748,7 @@ namespace MozaPlugin.Telemetry
                 else
                 {
                     MozaLog.Warn(
-                        $"[Moza] No ack within {ExtendedAckWaitMs}ms extended wait — " +
+                        $"[AZOM] No ack within {ExtendedAckWaitMs}ms extended wait — " +
                         "proceeding with defaults; session watchdog will retry post-Active. " +
                         "If this recurs after a SimHub restart, the cold-start wide close " +
                         "(0x01..0x0a above) should already have cleared any stale wheel " +
@@ -2771,13 +2771,13 @@ namespace MozaPlugin.Telemetry
             {
                 FlagByte = telemetryPort;
                 MozaLog.Debug(
-                    $"[Moza] Sessions opened: mgmt=0x{mgmtPort:X2} telem=0x{telemetryPort:X2}");
+                    $"[AZOM] Sessions opened: mgmt=0x{mgmtPort:X2} telem=0x{telemetryPort:X2}");
             }
             else if (mgmtPort != 0)
             {
                 FlagByte = mgmtPort;
                 MozaLog.Warn(
-                    $"[Moza] Telem session 0x{TelemSession:X2} did not ack, using mgmt 0x{mgmtPort:X2} for telemetry");
+                    $"[AZOM] Telem session 0x{TelemSession:X2} did not ack, using mgmt 0x{mgmtPort:X2} for telemetry");
             }
             else
             {
@@ -2785,7 +2785,7 @@ namespace MozaPlugin.Telemetry
                 // may silently accept data on 0x02 even without an explicit ack.
                 FlagByte = TelemSession;
                 MozaLog.Warn(
-                    "[Moza] No session acks received, proceeding with defaults mgmt=0x01 telem=0x02");
+                    "[AZOM] No session acks received, proceeding with defaults mgmt=0x01 telem=0x02");
                 _mgmtPort = MgmtSession;
             }
         }
@@ -2836,7 +2836,7 @@ namespace MozaPlugin.Telemetry
                     if (gotAckSeq != -1 && gotAckSeq != session)
                     {
                         MozaLog.Debug(
-                            $"[Moza] OpenSession 0x{session:X2}: ack_seq={gotAckSeq} " +
+                            $"[AZOM] OpenSession 0x{session:X2}: ack_seq={gotAckSeq} " +
                             $"(expected {session}); accepting (firmware may use own port counter)");
                     }
                     return session;
@@ -2844,7 +2844,7 @@ namespace MozaPlugin.Telemetry
 
                 // Stale ack (different session) — discard and keep waiting.
                 MozaLog.Debug(
-                    $"[Moza] OpenSession 0x{session:X2}: ignoring stale ack for 0x{_lastAckedSession:X2}");
+                    $"[AZOM] OpenSession 0x{session:X2}: ignoring stale ack for 0x{_lastAckedSession:X2}");
                 try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
                 _lastAckedSession = 0;
             }
@@ -2984,7 +2984,7 @@ namespace MozaPlugin.Telemetry
             if (_initHandshakeSession != 0 && _initHandshakeSession != ffNow)
             {
                 MozaLog.Debug(
-                    $"[Moza] FF session moved 0x{_initHandshakeSession:X2}→0x{ffNow:X2} after catalog " +
+                    $"[AZOM] FF session moved 0x{_initHandshakeSession:X2}→0x{ffNow:X2} after catalog " +
                     "arrived — re-sending init handshake on the corrected FF session so kind=4/tier-def commit.");
                 SendSessionInitHandshake();
             }
@@ -3022,7 +3022,7 @@ namespace MozaPlugin.Telemetry
             int chCount = 0;
             foreach (var t in _profile.Tiers) chCount += t.Channels.Count;
             MozaLog.Debug(
-                $"[Moza] Subscription applied: \"{_profile.Name}\" " +
+                $"[AZOM] Subscription applied: \"{_profile.Name}\" " +
                 $"{chCount}ch/{_profile.Tiers.Count}t " +
                 $"catalog={_catalogParser.Count}");
         }
@@ -3091,7 +3091,7 @@ namespace MozaPlugin.Telemetry
                 newPolicy.AutoFallbackUploadWireFormat = true;
 
             _policy = newPolicy;
-            MozaLog.Debug($"[Moza] Auto era resolved → {resolved} ({reason})");
+            MozaLog.Debug($"[AZOM] Auto era resolved → {resolved} ({reason})");
         }
 
         /// <summary>
@@ -3191,7 +3191,7 @@ namespace MozaPlugin.Telemetry
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Catalog-only profile synthesis failed: {ex.GetType().Name}: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Catalog-only profile synthesis failed: {ex.GetType().Name}: {ex.Message}");
                 return;
             }
 
@@ -3226,7 +3226,7 @@ namespace MozaPlugin.Telemetry
             int chCount = 0;
             foreach (var t in synthesised.Tiers) chCount += t.Channels.Count;
             MozaLog.Debug(
-                $"[Moza] Synthesised catalog-only profile: {chCount}ch in {synthesised.Tiers.Count}t " +
+                $"[AZOM] Synthesised catalog-only profile: {chCount}ch in {synthesised.Tiers.Count}t " +
                 $"+ {synthesised.StringChannels.Count} strings (catalog={catalog.Count}, " +
                 $"endMarker={_catalogParser.LastWheelEndMarker}, userMappings={mappedCount})");
 
@@ -3325,13 +3325,13 @@ namespace MozaPlugin.Telemetry
                 foreach (var frame in frames)
                     _connection.Send(frame);
                 MozaLog.Debug(
-                    $"[Moza] Sent empty tile-server state on session 0x03: " +
+                    $"[AZOM] Sent empty tile-server state on session 0x03: " +
                     $"{json.Length}B JSON → {payload.Length}B (12B env + zlib) → " +
                     $"{frames.Count} chunk(s)");
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] SendTileServerState failed: {ex.Message}");
+                MozaLog.Debug($"[AZOM] SendTileServerState failed: {ex.Message}");
             }
         }
 
@@ -3387,7 +3387,7 @@ namespace MozaPlugin.Telemetry
             }
             _session09ReplySent = true;
             MozaLog.Debug(
-                $"[Moza] Sent configJson() reply on session 0x{session:X2}: " +
+                $"[AZOM] Sent configJson() reply on session 0x{session:X2}: " +
                 $"{CanonicalDashboardList.Count} dashboards, {chunkCount} chunks");
         }
 
@@ -3416,11 +3416,11 @@ namespace MozaPlugin.Telemetry
                     int ingested = downloader.Execute(state, missing);
                     if (ingested > 0)
                         MozaLog.Debug(
-                            $"[Moza] Dashboard download complete: {ingested} dashboards cached");
+                            $"[AZOM] Dashboard download complete: {ingested} dashboards cached");
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Dashboard download failed: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Dashboard download failed: {ex.Message}");
                 }
             });
         }
@@ -3642,10 +3642,10 @@ namespace MozaPlugin.Telemetry
                 // throws in the same streak log only the message to keep
                 // the ring buffer / log file from drowning.
                 if (_consecutiveTickFailures == 1)
-                    MozaLog.Warn($"[Moza] Telemetry send error: {ex.GetType().Name}: {ex}");
+                    MozaLog.Warn($"[AZOM] Telemetry send error: {ex.GetType().Name}: {ex}");
                 else
                     MozaLog.Warn(
-                        $"[Moza] Telemetry send error #{_consecutiveTickFailures}: " +
+                        $"[AZOM] Telemetry send error #{_consecutiveTickFailures}: " +
                         $"{ex.GetType().Name}: {ex.Message}");
 
                 if (_consecutiveTickFailures >= TickFailureRestartThreshold)
@@ -3701,7 +3701,7 @@ namespace MozaPlugin.Telemetry
                     if (_tickCounter == _preambleTickTarget)
                     {
                         MozaLog.Debug(
-                            "[Moza] Preamble extended: waiting for catalog (count=0). " +
+                            "[AZOM] Preamble extended: waiting for catalog (count=0). " +
                             $"Cap {extendedCap} ticks ({extendedCap * _baseTickMs} ms).");
                     }
                     return;
@@ -3744,7 +3744,7 @@ namespace MozaPlugin.Telemetry
                         {
                             _coldStartGateLogged = true;
                             MozaLog.Info(
-                                $"[Moza] Cold-start preamble hold: waiting for a real catalog " +
+                                $"[AZOM] Cold-start preamble hold: waiting for a real catalog " +
                                 $"(valid URL + END u32) on sess 0x{gateMgmt:X2} or 0x{gateFlag:X2} " +
                                 $"before first tier-def. Cap {catalogCap} ticks " +
                                 $"({PreambleSess01CatalogWaitMaxMs} ms).");
@@ -3752,7 +3752,7 @@ namespace MozaPlugin.Telemetry
                         return;
                     }
                     MozaLog.Warn(
-                        $"[Moza] Cold-start catalog wait exceeded {PreambleSess01CatalogWaitMaxMs} ms " +
+                        $"[AZOM] Cold-start catalog wait exceeded {PreambleSess01CatalogWaitMaxMs} ms " +
                         "without a real catalog on either session — proceeding to Active anyway " +
                         "(screenless or slow wheel; watchdog will recover if binding fails).");
                     // One-shot: don't re-hold if preamble is somehow re-entered.
@@ -3873,7 +3873,7 @@ namespace MozaPlugin.Telemetry
                 {
                     _profileTelemetryDisabledLastReminderTickMs = nowTickMs;
                     MozaLog.Info(
-                        "[Moza] Wheel telemetry is disabled for the active SimHub overlay " +
+                        "[AZOM] Wheel telemetry is disabled for the active SimHub overlay " +
                         "(value-frame emission suppressed). Toggle telemetry on for this overlay " +
                         "to resume dashboard updates.");
                 }
@@ -3900,7 +3900,7 @@ namespace MozaPlugin.Telemetry
                     _tierDiagEmitted[i] = true;
                     var p = tier.Builder.Profile;
                     MozaLog.Debug(
-                        $"[Moza] TIER-EMIT t[{i}] flag=0x{flagByte:X2} " +
+                        $"[AZOM] TIER-EMIT t[{i}] flag=0x{flagByte:X2} " +
                         $"tickInterval={tier.TickInterval} " +
                         $"name={p?.Name ?? "?"} ch={p?.Channels?.Count ?? 0} " +
                         $"bits={p?.TotalBits ?? 0} bytes={p?.TotalBytes ?? 0} " +
@@ -4193,7 +4193,7 @@ namespace MozaPlugin.Telemetry
             if (slot < 0)
             {
                 MozaLog.Debug(
-                    $"[Moza] Catalog re-sync probe skipped: profile '{profileName}' " +
+                    $"[AZOM] Catalog re-sync probe skipped: profile '{profileName}' " +
                     "not found in wheel-reported configJsonList");
                 return;
             }
@@ -4212,7 +4212,7 @@ namespace MozaPlugin.Telemetry
             if (_slotTracker.WheelReportedSlot == slot)
             {
                 MozaLog.Debug(
-                    $"[Moza] Catalog re-sync probe skipped: wheel already on " +
+                    $"[AZOM] Catalog re-sync probe skipped: wheel already on " +
                     $"slot {slot} ('{profileName}') per wheel-reported state");
                 return;
             }
@@ -4237,12 +4237,12 @@ namespace MozaPlugin.Telemetry
                     if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
                     SendDashboardSwitch((uint)slotCapture);
                     MozaLog.Debug(
-                        $"[Moza] Catalog re-sync probe: re-emitted kind=4 " +
+                        $"[AZOM] Catalog re-sync probe: re-emitted kind=4 " +
                         $"slot={slotCapture} ('{nameCapture}')");
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Catalog re-sync probe failed: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Catalog re-sync probe failed: {ex.Message}");
                 }
             });
         }
@@ -4298,7 +4298,7 @@ namespace MozaPlugin.Telemetry
                 int prev = _catalogCountAtLastSubscription;
                 int emissionIdx = _hotSwitch.EmissionsSent + 1;
                 MozaLog.Debug(
-                    $"[Moza] Re-applying tier-def (hot-switch burst " +
+                    $"[AZOM] Re-applying tier-def (hot-switch burst " +
                     $"#{emissionIdx}, cap {Lifecycle.HotSwitchCoordinator.MinEmissions}-" +
                     $"{Lifecycle.HotSwitchCoordinator.MaxEmissions}): " +
                     $"catalog {prev}→{cur}, wheel END={_catalogParser.LastWheelEndMarker}, " +
@@ -4318,13 +4318,13 @@ namespace MozaPlugin.Telemetry
                     if (newRemaining == 0)
                     {
                         MozaLog.Debug(
-                            $"[Moza] Hot-switch burst complete after " +
+                            $"[AZOM] Hot-switch burst complete after " +
                             $"{_hotSwitch.EmissionsSent} emissions (boundComplete={boundComplete?.ToString() ?? "n/a"})");
                     }
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Tier-def re-apply (hot-switch) failed: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Tier-def re-apply (hot-switch) failed: {ex.Message}");
                 }
                 return;
             }
@@ -4338,7 +4338,7 @@ namespace MozaPlugin.Telemetry
             if (idle < CatalogGrowthQuietMs) return;
             int p = _catalogCountAtLastSubscription;
             MozaLog.Debug(
-                $"[Moza] Re-applying tier-def: catalog grew {p}→{cur} " +
+                $"[AZOM] Re-applying tier-def: catalog grew {p}→{cur} " +
                 $"(idle {idle}ms ≥ {CatalogGrowthQuietMs}ms, reusing flagBase)");
             try
             {
@@ -4347,7 +4347,7 @@ namespace MozaPlugin.Telemetry
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Tier-def re-apply (catalog growth) failed: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Tier-def re-apply (catalog growth) failed: {ex.Message}");
             }
         }
 
@@ -4384,7 +4384,7 @@ namespace MozaPlugin.Telemetry
             {
                 case Lifecycle.PostSwitchCatalogConvergence.TickDecision.EmitNudge:
                     MozaLog.Debug(
-                        $"[Moza] Post-switch convergence nudge #{_postSwitchConvergence.NudgesSent}: " +
+                        $"[AZOM] Post-switch convergence nudge #{_postSwitchConvergence.NudgesSent}: " +
                         $"slot={targetSlot} sig=0x{sig:X8} matchStreak={_postSwitchConvergence.MatchCount}/" +
                         $"{Lifecycle.PostSwitchCatalogConvergence.StableSampleThreshold}");
                     try
@@ -4401,24 +4401,24 @@ namespace MozaPlugin.Telemetry
                     }
                     catch (Exception ex)
                     {
-                        MozaLog.Warn($"[Moza] Post-switch convergence nudge failed: {ex.Message}");
+                        MozaLog.Warn($"[AZOM] Post-switch convergence nudge failed: {ex.Message}");
                     }
                     break;
                 case Lifecycle.PostSwitchCatalogConvergence.TickDecision.Converged:
                     MozaLog.Debug(
-                        $"[Moza] Post-switch catalog convergence reached: slot={targetSlot} " +
+                        $"[AZOM] Post-switch catalog convergence reached: slot={targetSlot} " +
                         $"after {nudgesSentBefore} nudge(s), final sig=0x{sig:X8} " +
                         $"(stable for {Lifecycle.PostSwitchCatalogConvergence.StableSampleThreshold} samples)");
                     break;
                 case Lifecycle.PostSwitchCatalogConvergence.TickDecision.DeadlineExpired:
                     MozaLog.Warn(
-                        $"[Moza] Post-switch catalog convergence deadline expired " +
+                        $"[AZOM] Post-switch catalog convergence deadline expired " +
                         $"after {Lifecycle.PostSwitchCatalogConvergence.DeadlineMs}ms / " +
                         $"{nudgesSentBefore} nudge(s) — disarming; reactive watchdogs take over.");
                     break;
                 case Lifecycle.PostSwitchCatalogConvergence.TickDecision.MaxNudgesReached:
                     MozaLog.Warn(
-                        $"[Moza] Post-switch catalog convergence nudge cap " +
+                        $"[AZOM] Post-switch catalog convergence nudge cap " +
                         $"({Lifecycle.PostSwitchCatalogConvergence.MaxNudges}) reached " +
                         $"with streak {matchCountBefore}/" +
                         $"{Lifecycle.PostSwitchCatalogConvergence.StableSampleThreshold} — " +
@@ -4467,7 +4467,7 @@ namespace MozaPlugin.Telemetry
         {
             _postSwitchConvergence.Arm(slot, DateTime.UtcNow.Ticks);
             MozaLog.Debug(
-                $"[Moza] Post-switch catalog convergence armed: slot={slot} " +
+                $"[AZOM] Post-switch catalog convergence armed: slot={slot} " +
                 $"(spacing {Lifecycle.PostSwitchCatalogConvergence.SampleIntervalMs}ms, " +
                 $"threshold {Lifecycle.PostSwitchCatalogConvergence.StableSampleThreshold} samples, " +
                 $"deadline {Lifecycle.PostSwitchCatalogConvergence.DeadlineMs}ms, " +

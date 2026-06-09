@@ -305,7 +305,7 @@ namespace MozaPlugin
             // paired with a stale id.)
             _wheelDeviceId = deviceId;
             _wheelDetected = true;
-            MozaLog.Info($"[Moza] Wheel locked on device ID {_wheelDeviceId}");
+            MozaLog.Info($"[AZOM] Wheel locked on device ID {_wheelDeviceId}");
         }
 
         // Default backoff for tracked reads. Exponential growth caps at the

@@ -210,7 +210,7 @@ namespace MozaPlugin.UI.Import
             int changedCount = 0;
             foreach (var d in plan.Diffs) if (d.Changed) changedCount++;
             MozaLog.Info(
-                $"[Moza/Import] BuildPlan '{preset.Name}' type={preset.DeviceType}: " +
+                $"[AZOM/Import] BuildPlan '{preset.Name}' type={preset.DeviceType}: " +
                 $"dp.Count={preset.DeviceParams.Count} " +
                 $"diffs={plan.Diffs.Count} changed={changedCount} " +
                 $"notImported={plan.NotImported.Count} " +
@@ -218,7 +218,7 @@ namespace MozaPlugin.UI.Import
             for (int i = 0; i < Math.Min(plan.Diffs.Count, 5); i++)
             {
                 var d = plan.Diffs[i];
-                MozaLog.Info($"[Moza/Import]   diff[{i}] {d.Label}: '{d.OldDisplay}' -> '{d.NewDisplay}' changed={d.Changed}");
+                MozaLog.Info($"[AZOM/Import]   diff[{i}] {d.Label}: '{d.OldDisplay}' -> '{d.NewDisplay}' changed={d.Changed}");
             }
 
             ShowConfirmPanel();

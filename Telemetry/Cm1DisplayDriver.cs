@@ -61,7 +61,7 @@ namespace MozaPlugin.Telemetry
             _timer = new System.Timers.Timer(TickIntervalMs) { AutoReset = true };
             _timer.Elapsed += OnTick;
             _timer.Start();
-            MozaLog.Info("[Moza] CM1 display driver started (group-0x35 → 0x14)");
+            MozaLog.Info("[AZOM] CM1 display driver started (group-0x35 → 0x14)");
         }
 
         public void Stop()
@@ -95,7 +95,7 @@ namespace MozaPlugin.Telemetry
         {
             if (Interlocked.CompareExchange(ref _tickInProgress, 1, 0) != 0) return;
             try { Tick(); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM1 driver tick error: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM1 driver tick error: {ex.Message}"); }
             finally { Interlocked.Exchange(ref _tickInProgress, 0); }
         }
 

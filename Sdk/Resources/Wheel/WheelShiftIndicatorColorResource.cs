@@ -85,7 +85,7 @@ namespace MozaPlugin.Sdk.Resources.Wheel
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] WheelShiftIndicatorColor GET failed: {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] WheelShiftIndicatorColor GET failed: {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
         }
@@ -113,7 +113,7 @@ namespace MozaPlugin.Sdk.Resources.Wheel
                     if (Interlocked.CompareExchange(ref _unparsedWarned, 1, 0) == 0)
                     {
                         MozaLog.Warn(
-                            $"[Moza.Sdk] WheelShiftIndicatorColor: unrecognised color text '{incoming[i]}' " +
+                            $"[AZOM.Sdk] WheelShiftIndicatorColor: unrecognised color text '{incoming[i]}' " +
                             "— falling through to black. Encoding map TBD vs real PitHouse capture.");
                     }
                     r = g = b = 0;

@@ -70,7 +70,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 try { Directory.CreateDirectory(_cacheDir); }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] DashboardCache: cannot create {_cacheDir}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] DashboardCache: cannot create {_cacheDir}: {ex.Message}");
                     return;
                 }
             }
@@ -102,16 +102,16 @@ namespace MozaPlugin.Telemetry.Dashboard
                             _byHash[hash] = profile;
                             _nameToHash[name] = hash;
                             _rawContent[hash] = System.Text.Encoding.UTF8.GetBytes(content);
-                            MozaLog.Debug($"[Moza] DashboardCache: loaded '{name}' from disk (hash={hash.Substring(0, 8)}...)");
+                            MozaLog.Debug($"[AZOM] DashboardCache: loaded '{name}' from disk (hash={hash.Substring(0, 8)}...)");
                         }
                     }
                     catch (Exception ex)
                     {
-                        MozaLog.Warn($"[Moza] DashboardCache: failed to load {file}: {ex.Message}");
+                        MozaLog.Warn($"[AZOM] DashboardCache: failed to load {file}: {ex.Message}");
                     }
                 }
 
-                MozaLog.Debug($"[Moza] DashboardCache: {_byHash.Count} profiles loaded from disk");
+                MozaLog.Debug($"[AZOM] DashboardCache: {_byHash.Count} profiles loaded from disk");
             }
         }
 
@@ -142,7 +142,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
 
             if (missing.Count > 0)
-                MozaLog.Debug($"[Moza] DashboardCache: {missing.Count} dashboards not cached, need download");
+                MozaLog.Debug($"[AZOM] DashboardCache: {missing.Count} dashboards not cached, need download");
 
             return missing;
         }
@@ -157,7 +157,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 var profile = _store.ParseMzdashContent(dashboardName, mzdashContent);
                 if (profile == null)
                 {
-                    MozaLog.Warn($"[Moza] DashboardCache: failed to parse mzdash for '{dashboardName}'");
+                    MozaLog.Warn($"[AZOM] DashboardCache: failed to parse mzdash for '{dashboardName}'");
                     return false;
                 }
 
@@ -179,15 +179,15 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] DashboardCache: disk write failed for '{dashboardName}': {ex.Message}");
+                    MozaLog.Warn($"[AZOM] DashboardCache: disk write failed for '{dashboardName}': {ex.Message}");
                 }
 
-                MozaLog.Debug($"[Moza] DashboardCache: ingested '{dashboardName}' (hash={hash.Substring(0, Math.Min(8, hash.Length))}...)");
+                MozaLog.Debug($"[AZOM] DashboardCache: ingested '{dashboardName}' (hash={hash.Substring(0, Math.Min(8, hash.Length))}...)");
                 return true;
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] DashboardCache: ingest failed for '{dashboardName}': {ex.Message}");
+                MozaLog.Warn($"[AZOM] DashboardCache: ingest failed for '{dashboardName}': {ex.Message}");
                 return false;
             }
         }
@@ -322,11 +322,11 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] DashboardCache: failed to load folder file {file}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] DashboardCache: failed to load folder file {file}: {ex.Message}");
                 }
             }
 
-            MozaLog.Debug($"[Moza] DashboardCache: {FolderProfileCount} profiles loaded from folder '{folderPath}'");
+            MozaLog.Debug($"[AZOM] DashboardCache: {FolderProfileCount} profiles loaded from folder '{folderPath}'");
         }
 
         /// <summary>

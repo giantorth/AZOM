@@ -165,7 +165,7 @@ namespace MozaPlugin.Devices
 
             if (cmds.Count == 0) return;
             MozaLog.Debug(
-                $"[Moza] Tab '{selected.Name}' activated: reading {cmds.Count} {groupLabel} LED color(s) on-demand");
+                $"[AZOM] Tab '{selected.Name}' activated: reading {cmds.Count} {groupLabel} LED color(s) on-demand");
             _device.ReadSettingsPaced(cmds.ToArray());
             return;
 
@@ -176,7 +176,7 @@ skipReadByMode:
             // and the read is safe regardless of whether LEDs are physically
             // rendering.
             MozaLog.Debug(
-                $"[Moza] Tab '{selected.Name}' activated: skipping {groupLabel} LED color read " +
+                $"[AZOM] Tab '{selected.Name}' activated: skipping {groupLabel} LED color read " +
                 $"(group mode={groupMode} = SimHub; reads only gate-block on mode=1)");
         }
 
@@ -213,7 +213,7 @@ skipReadByMode:
             // failure here must not take the whole device control down (the
             // legacy hidden swatch path above still updates _data).
             try { BuildKnobRingVizPanels(); }
-            catch (Exception ex) { MozaLog.Warn($"[Moza] BuildKnobRingVizPanels failed: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] BuildKnobRingVizPanels failed: {ex.Message}"); }
             _swatchesBuilt = true;
         }
 
@@ -1205,7 +1205,7 @@ skipReadByMode:
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
             int prev = sleep?.TimeoutMin ?? -2;
             if (sleep != null) sleep.TimeoutMin = minutes;
-            MozaLog.Info($"[Moza] SLEEP-USER: bundle.TimeoutMin {prev} -> {minutes} (from dropdown handler, sleep={(sleep==null?"null":"ok")})");
+            MozaLog.Info($"[AZOM] SLEEP-USER: bundle.TimeoutMin {prev} -> {minutes} (from dropdown handler, sleep={(sleep==null?"null":"ok")})");
             _plugin.WriteIfWheelDetected("wheel-idle-timeout", minutes);
             _plugin.SaveSettings();
         }

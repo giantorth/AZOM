@@ -41,7 +41,7 @@ namespace MozaPlugin.Sdk.Resources.Discovery
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] DeviceListResource GET failed: {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] DeviceListResource GET failed: {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
         }

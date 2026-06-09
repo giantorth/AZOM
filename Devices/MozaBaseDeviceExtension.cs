@@ -66,20 +66,20 @@ namespace MozaPlugin.Devices
                         {
                             prop.GetSetMethod(nonPublic: true)!.Invoke(lmd.ledModuleSettings, new object[] { _ledDriver });
                             _driverInjected = true;
-                            MozaLog.Debug("[Moza] Injected virtual LED driver for wheel base ambient strip");
+                            MozaLog.Debug("[AZOM] Injected virtual LED driver for wheel base ambient strip");
                         }
                         else
                         {
-                            MozaLog.Warn("[Moza] Could not find DeviceDriver setter on LedModuleSettings (base ambient)");
+                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (base ambient)");
                         }
                         return;
                     }
                 }
-                MozaLog.Debug("[Moza] No LedModuleDevice found on base ambient device instance");
+                MozaLog.Debug("[AZOM] No LedModuleDevice found on base ambient device instance");
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Error injecting base ambient LED driver: {ex.Message}");
+                MozaLog.Error($"[AZOM] Error injecting base ambient LED driver: {ex.Message}");
             }
         }
 
@@ -93,7 +93,7 @@ namespace MozaPlugin.Devices
             if (plugin != null)
             {
                 plugin.BaseAmbientDeviceExtensionActive = false;
-                MozaLog.Debug("[Moza] Base ambient device extension ended");
+                MozaLog.Debug("[AZOM] Base ambient device extension ended");
             }
         }
 

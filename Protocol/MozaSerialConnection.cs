@@ -420,13 +420,13 @@ namespace MozaPlugin.Protocol
                     if (TryOpen(_lastPortName))
                         return true;
                     MozaLog.Debug(
-                        $"[Moza] Cached port {_lastPortName} validated but failed to open — clearing");
+                        $"[AZOM] Cached port {_lastPortName} validated but failed to open — clearing");
                     _lastPortName = null;
                 }
                 else
                 {
                     MozaLog.Debug(
-                        $"[Moza] Cached port {_lastPortName} no longer matches a MOZA device in the registry — clearing");
+                        $"[AZOM] Cached port {_lastPortName} no longer matches a MOZA device in the registry — clearing");
                     _lastPortName = null;
                 }
             }
@@ -454,31 +454,31 @@ namespace MozaPlugin.Protocol
             catch (UnauthorizedAccessException ex)
             {
                 RecordOpenFailure(portName, ConnectionFailureKind.AccessDenied, ex);
-                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }
             catch (IOException ex) when (LooksLikeAccessDenied(ex))
             {
                 RecordOpenFailure(portName, ConnectionFailureKind.AccessDenied, ex);
-                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }
             catch (FileNotFoundException ex)
             {
                 RecordOpenFailure(portName, ConnectionFailureKind.PortVanished, ex);
-                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }
             catch (IOException ex) when (LooksLikePortVanished(ex))
             {
                 RecordOpenFailure(portName, ConnectionFailureKind.PortVanished, ex);
-                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }
             catch (Exception ex)
             {
                 RecordOpenFailure(portName, ConnectionFailureKind.OpenFailedOther, ex);
-                MozaLog.Error($"[Moza] Failed to connect to {portName}: {ex.Message}");
+                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }
         }
@@ -531,7 +531,7 @@ namespace MozaPlugin.Protocol
                 _lastSuccessfulOpenUtc = DateTime.UtcNow;
             }
             Interlocked.Exchange(ref _consecutiveOpenFailures, 0);
-            MozaLog.Info($"[Moza] Connected to {portName}");
+            MozaLog.Info($"[AZOM] Connected to {portName}");
             return true;
         }
 
@@ -549,7 +549,7 @@ namespace MozaPlugin.Protocol
             if (p != null)
             {
                 try { p.Close(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza] Port close: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Port close: {ex.Message}"); }
             }
 
             if (_lastPortName != null)
@@ -629,7 +629,7 @@ namespace MozaPlugin.Protocol
 
             if (Volatile.Read(ref _portFailureLogged) == 0)
             {
-                MozaLog.Error($"[Moza] {label} error: {ex.GetType().Name}: {ex.Message}");
+                MozaLog.Error($"[AZOM] {label} error: {ex.GetType().Name}: {ex.Message}");
             }
 
             // Single-winner gate: only one thread crosses threshold AND wins
@@ -639,7 +639,7 @@ namespace MozaPlugin.Protocol
                 Interlocked.CompareExchange(ref _portFailureLogged, 1, 0) == 0)
             {
                 MozaLog.Warn(
-                    $"[Moza] Port wedged after {count} consecutive I/O errors — closing for reconnect");
+                    $"[AZOM] Port wedged after {count} consecutive I/O errors — closing for reconnect");
                 RecordRuntimeFailure(ConnectionFailureKind.IoFailureAfterOpen,
                     $"{label}: {ex.Message} (after {count} consecutive I/O errors — port wedged)");
                 lock (_lock)
@@ -653,14 +653,14 @@ namespace MozaPlugin.Protocol
                     Interlocked.Exchange(ref _streamSlots[k], null);
                 try { Disconnected?.Invoke(); } catch (Exception dex)
                 {
-                    MozaLog.Debug($"[Moza] Disconnected handler: {dex.Message}");
+                    MozaLog.Debug($"[AZOM] Disconnected handler: {dex.Message}");
                 }
             }
         }
 
         private void ReadLoop()
         {
-            MozaLog.Debug("[Moza] Read thread started");
+            MozaLog.Debug("[AZOM] Read thread started");
             int messageCount = 0;
             // Bulk read buffer — drains all available bytes from the OS read
             // buffer in one SerialPort.Read() call, then parses frames from
@@ -848,7 +848,7 @@ namespace MozaPlugin.Protocol
                             int nn = Math.Min(8, Math.Max(0, decoded));
                             string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
                             MozaLog.Debug(
-                                $"[Moza] DROP frame-error: decoded={decoded}/{needed} len={payloadLength} first8={first8a}");
+                                $"[AZOM] DROP frame-error: decoded={decoded}/{needed} len={payloadLength} first8={first8a}");
                             // Skip past the bad start byte and try to resync.
                             cursor = frameStart + 1;
                             continue;
@@ -869,7 +869,7 @@ namespace MozaPlugin.Protocol
                             int nn = Math.Min(8, needed);
                             string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
                             MozaLog.Debug(
-                                $"[Moza] DROP checksum mismatch: expected=0x{expected:X2} actual=0x{actual:X2} " +
+                                $"[AZOM] DROP checksum mismatch: expected=0x{expected:X2} actual=0x{actual:X2} " +
                                 $"len={payloadLength} group=0x{raw[0]:X2} dev=0x{raw[1]:X2} first8={first8a}");
                             cursor = frameStart + 1;
                             continue;
@@ -883,7 +883,7 @@ namespace MozaPlugin.Protocol
                         if (messageCount <= 5)
                         {
                             MozaLog.Debug(
-                                $"[Moza] Received msg #{messageCount}: len={payloadLength} " +
+                                $"[AZOM] Received msg #{messageCount}: len={payloadLength} " +
                                 $"group=0x{data[0]:X2} dev=0x{data[1]:X2} ({data.Length} bytes)");
                         }
                         // Diagnostic: per-chunk log for SerialStream session-data
@@ -901,7 +901,7 @@ namespace MozaPlugin.Protocol
                                 ? BitConverter.ToString(data, 8, Math.Min(8, bodyLen))
                                 : "(empty)";
                             MozaLog.Debug(
-                                $"[Moza] WIRE sess=0x{sess:X2} type=0x{type:X2} seq={seqWire} " +
+                                $"[AZOM] WIRE sess=0x{sess:X2} type=0x{type:X2} seq={seqWire} " +
                                 $"totalLen={data.Length} payload={bodyLen}B first8={first8}");
                         }
                         SerialTrafficCapture.Instance.RecordRx(CaptureLabel, data);
@@ -932,7 +932,7 @@ namespace MozaPlugin.Protocol
 
         private void WriteLoop()
         {
-            MozaLog.Debug("[Moza] Write thread started");
+            MozaLog.Debug("[AZOM] Write thread started");
             int writeCount = 0;
             // Pooled stuffing buffer. Worst-case stuffed size is 2 * decoded size;
             // grows on demand if a larger frame arrives.
@@ -958,7 +958,7 @@ namespace MozaPlugin.Protocol
                 {
                     _flushRequested = false;
                     try { _port?.DiscardOutBuffer(); }
-                    catch (Exception ex) { MozaLog.Debug($"[Moza] DiscardOutBuffer: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM] DiscardOutBuffer: {ex.Message}"); }
                 }
 
                 // 0) Priority lane: drain all queued fc:00 acks first, unpaced.
@@ -1005,7 +1005,7 @@ namespace MozaPlugin.Protocol
                     {
                         writeCount++;
                         if (writeCount <= 5)
-                            MozaLog.Debug($"[Moza] Sent cmd #{writeCount}: {msg.Length} bytes, group=0x{(msg.Length > 2 ? msg[2] : 0):X2}");
+                            MozaLog.Debug($"[AZOM] Sent cmd #{writeCount}: {msg.Length} bytes, group=0x{(msg.Length > 2 ? msg[2] : 0):X2}");
                         lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
                         lastWasOneShot = true;
                     }
@@ -1038,7 +1038,7 @@ namespace MozaPlugin.Protocol
                     if (snap.PercentBudget >= 90)
                     {
                         MozaLog.Warn(
-                            $"[Moza] Write budget {snap.PercentBudget}% ({snap.BytesLastSec} B/s, peak {snap.PeakBurstBytes})");
+                            $"[AZOM] Write budget {snap.PercentBudget}% ({snap.BytesLastSec} B/s, peak {snap.PeakBurstBytes})");
                     }
                     lastBudgetWarnTs = warnNow;
                 }
@@ -1145,14 +1145,14 @@ namespace MozaPlugin.Protocol
                     }
                 }
                 MozaLog.Debug(
-                    $"[Moza] Found MOZA device on {chosen.PortName} PID={FormatPid(chosen.Pid)} (registry)");
+                    $"[AZOM] Found MOZA device on {chosen.PortName} PID={FormatPid(chosen.Pid)} (registry)");
                 return (chosen.PortName, FormatPid(chosen.Pid), false);
             }
 
             if (disableProbeFallback?.Invoke() == true)
             {
                 MozaLog.Debug(
-                    "[Moza] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
+                    "[AZOM] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
                 return (null, null, false);
             }
 
@@ -1183,15 +1183,15 @@ namespace MozaPlugin.Protocol
             if (probeEligible == 0 && allRegistryPorts.Count > 0)
             {
                 MozaLog.Debug(
-                    $"[Moza] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
+                    $"[AZOM] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
                 return (null, null, false);
             }
 
             if (allRegistryPorts.Count == 0)
-                MozaLog.Debug("[Moza] No MOZA device in registry, falling back to serial probe");
+                MozaLog.Debug("[AZOM] No MOZA device in registry, falling back to serial probe");
             else
                 MozaLog.Debug(
-                    $"[Moza] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
+                    $"[AZOM] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
 
             // 600ms budget per port — SerialPort.Open can hang indefinitely under Wine
             // if another process holds the tty. Background-thread the probe so one bad
@@ -1211,12 +1211,12 @@ namespace MozaPlugin.Protocol
                 if (pidFilter == null || pidFilter(pidStr))
                 {
                     MozaLog.Debug(
-                        $"[Moza] Port {port} already classified by registry as PID={pidStr} ({MozaUsbIds.Describe(info.Pid)}) — claiming without probe");
+                        $"[AZOM] Port {port} already classified by registry as PID={pidStr} ({MozaUsbIds.Describe(info.Pid)}) — claiming without probe");
                     decided = (port, pidStr, false);
                     return true;
                 }
                 MozaLog.Debug(
-                    $"[Moza] Port {port} classified by registry as PID={pidStr} ({MozaUsbIds.Describe(info.Pid)}) — not for this connection, skipping probe");
+                    $"[AZOM] Port {port} classified by registry as PID={pidStr} ({MozaUsbIds.Describe(info.Pid)}) — not for this connection, skipping probe");
                 // Sentinel: mismatching classification — caller treats as
                 // "skip and continue" by checking decided.Item1 == null
                 // && we returned true.
@@ -1230,7 +1230,7 @@ namespace MozaPlugin.Protocol
                 // writing a discovery probe at every COM port is high-risk.
                 // The multi-device registry path is registry-only by design —
                 // if the registry doesn't see the device we don't probe.
-                MozaLog.Debug("[Moza] mBooster probe fallback is disabled by design (registry-only discovery)");
+                MozaLog.Debug("[AZOM] mBooster probe fallback is disabled by design (registry-only discovery)");
                 return (null, null, false);
             }
 
@@ -1254,19 +1254,19 @@ namespace MozaPlugin.Protocol
                     if (!baseReach) { unreachable.Add(port); continue; }
                     if (baseResp)
                     {
-                        MozaLog.Debug($"[Moza] Probe {port} Ab9: base probe matched — wheelbase territory, skipping");
+                        MozaLog.Debug($"[AZOM] Probe {port} Ab9: base probe matched — wheelbase territory, skipping");
                         continue;
                     }
 
                     var (ab9Resp, _) = ProbeWithTimeout(port, 600, ProbeKind.Ab9);
                     if (ab9Resp)
                     {
-                        MozaLog.Info($"[Moza] Found Moza AB9 shifter on {port} (probe)");
+                        MozaLog.Info($"[AZOM] Found Moza AB9 shifter on {port} (probe)");
                         return (port, null, false);
                     }
                 }
 
-                MozaLog.Debug("[Moza] No AB9 device found on any COM port");
+                MozaLog.Debug("[AZOM] No AB9 device found on any COM port");
                 return (null, null, false);
             }
 
@@ -1289,12 +1289,12 @@ namespace MozaPlugin.Protocol
                     var (responded, _) = ProbeWithTimeout(port, 600, ProbeKind.Hub);
                     if (responded)
                     {
-                        MozaLog.Info($"[Moza] Found Moza hub on {port} (probe, dedicated hub connection)");
+                        MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe, dedicated hub connection)");
                         return (port, null, true);
                     }
                 }
 
-                MozaLog.Debug("[Moza] No Moza hub found on any COM port (dedicated hub connection)");
+                MozaLog.Debug("[AZOM] No Moza hub found on any COM port (dedicated hub connection)");
                 return (null, null, false);
             }
 
@@ -1315,7 +1315,7 @@ namespace MozaPlugin.Protocol
                 var (responded, reachable) = ProbeWithTimeout(port, 600, ProbeKind.Base);
                 if (responded)
                 {
-                    MozaLog.Info($"[Moza] Found Moza base on {port} (probe)");
+                    MozaLog.Info($"[AZOM] Found Moza base on {port} (probe)");
                     return (port, null, false);
                 }
                 if (!reachable) unreachable.Add(port);
@@ -1334,14 +1334,14 @@ namespace MozaPlugin.Protocol
                 var (responded, _) = ProbeWithTimeout(port, 600, ProbeKind.Hub);
                 if (responded)
                 {
-                    MozaLog.Info($"[Moza] Found Moza hub on {port} (probe)");
+                    MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe)");
                     return (port, null, true);
                 }
             }
 
             // Drop to Debug — reconnect timer fires every 5s, so Info-level
             // would flood the log when no device is plugged in.
-            MozaLog.Debug("[Moza] No MOZA device found on any COM port");
+            MozaLog.Debug("[AZOM] No MOZA device found on any COM port");
             return (null, null, false);
         }
 
@@ -1364,7 +1364,7 @@ namespace MozaPlugin.Protocol
             if (_probeInFlight.ContainsKey(portName))
             {
                 MozaLog.Debug(
-                    $"[Moza] Probe {portName}: skipped — a prior probe is still " +
+                    $"[AZOM] Probe {portName}: skipped — a prior probe is still " +
                     "blocked in Open() (port not ready); will retry once it clears.");
                 return (false, false);
             }
@@ -1383,7 +1383,7 @@ namespace MozaPlugin.Protocol
                     // simply left running; it self-cleans here when Open finally
                     // returns.
                     (responded, reachable) = SerialProbeCore.ProbeOnePort(
-                        portName, kind, m => MozaLog.Debug($"[Moza] {m}"));
+                        portName, kind, m => MozaLog.Debug($"[AZOM] {m}"));
                 }
                 catch { responded = false; reachable = false; }
                 finally
@@ -1417,7 +1417,7 @@ namespace MozaPlugin.Protocol
                 // returns; until then this port is skipped above. The thread is
                 // IsBackground, so it never blocks process exit.
                 MozaLog.Debug(
-                    $"[Moza] Probe {portName}: timed out after {timeoutMs}ms — abandoning " +
+                    $"[AZOM] Probe {portName}: timed out after {timeoutMs}ms — abandoning " +
                     "blocked probe thread (not force-closing cross-thread; port marked in-flight).");
                 return (false, false);
             }

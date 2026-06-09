@@ -72,7 +72,7 @@ namespace MozaPlugin.Sdk.Resources.Display
         {
             if (Interlocked.CompareExchange(ref _gapWarned, 1, 0) == 0)
             {
-                MozaLog.Warn($"[Moza.Sdk] Display gap: {_diagnosticName} missing {what}");
+                MozaLog.Warn($"[AZOM.Sdk] Display gap: {_diagnosticName} missing {what}");
             }
         }
     }

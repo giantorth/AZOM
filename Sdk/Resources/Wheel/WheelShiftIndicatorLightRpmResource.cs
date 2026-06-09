@@ -46,7 +46,7 @@ namespace MozaPlugin.Sdk.Resources.Wheel
             if (System.Threading.Interlocked.CompareExchange(ref _getWarned, 1, 0) == 0)
             {
                 MozaLog.Warn(
-                    "[Moza.Sdk] WheelShiftIndicatorLightRpm GET: MozaData has no cached " +
+                    "[AZOM.Sdk] WheelShiftIndicatorLightRpm GET: MozaData has no cached " +
                     "per-LED thresholds (wheel-rpm-value{N} read responses not parsed).");
             }
             return CoapResourceResponse.NotFound("ShiftIndicatorLightRpm: no MozaData source");

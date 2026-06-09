@@ -135,7 +135,7 @@ namespace MozaPlugin.Telemetry.Sessions
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] RPC reply parse failed: {ex.Message}");
+                MozaLog.Debug($"[AZOM] RPC reply parse failed: {ex.Message}");
             }
         }
 

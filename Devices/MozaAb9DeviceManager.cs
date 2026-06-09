@@ -125,7 +125,7 @@ namespace MozaPlugin.Devices
             if (_connection.IsConnected) return true;
             bool ok = _connection.Connect();
             if (ok)
-                MozaLog.Info("[Moza/AB9] Connected to AB9 shifter");
+                MozaLog.Info("[AZOM/AB9] Connected to AB9 shifter");
             return ok;
         }
 
@@ -146,7 +146,7 @@ namespace MozaPlugin.Devices
         {
             if (_detected) return;
             _detected = true;
-            MozaLog.Debug("[Moza/AB9] AB9 active shifter detected");
+            MozaLog.Debug("[AZOM/AB9] AB9 active shifter detected");
         }
 
         /// <summary>
@@ -301,7 +301,7 @@ namespace MozaPlugin.Devices
             foreach (var effectType in FfbAllocSequence)
                 SendFfbControl(new byte[] { 0x07, effectType });
             SendFfbControl(new byte[] { 0x13, 0x00, 0x00 });
-            MozaLog.Debug("[Moza/AB9] Sent FFB init handshake (0e02/0e01/07×6/13)");
+            MozaLog.Debug("[AZOM/AB9] Sent FFB init handshake (0e02/0e01/07×6/13)");
         }
 
         private void SendFfbControl(byte[] payload)

@@ -24,7 +24,7 @@ namespace MozaPlugin
                 try { diff.Apply(); }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza/Import] apply '{diff.Label}': {ex.Message}");
+                    MozaLog.Warn($"[AZOM/Import] apply '{diff.Label}': {ex.Message}");
                 }
             }
 
@@ -40,7 +40,7 @@ namespace MozaPlugin
                 try { _plugin.ApplyProfile(profile); }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza/Import] ApplyProfile: {ex.Message}");
+                    MozaLog.Warn($"[AZOM/Import] ApplyProfile: {ex.Message}");
                 }
             }
 
@@ -58,7 +58,7 @@ namespace MozaPlugin
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza/Import] ApplyMBoosterToHardware: {ex.Message}");
+                    MozaLog.Warn($"[AZOM/Import] ApplyMBoosterToHardware: {ex.Message}");
                 }
             }
 

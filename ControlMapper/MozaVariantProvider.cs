@@ -84,13 +84,13 @@ namespace MozaPlugin.ControlMapper
             _lastVariant = current;
 
             MozaLog.Debug(
-                $"[Moza] ControlMapper variant changed: '{before}' -> '{after}'");
+                $"[AZOM] ControlMapper variant changed: '{before}' -> '{after}'");
 
             try { VariantChanged?.Invoke(this, EventArgs.Empty); }
             catch (Exception ex)
             {
                 MozaLog.Warn(
-                    $"[Moza] ControlMapper VariantChanged subscriber threw: {ex.Message}");
+                    $"[AZOM] ControlMapper VariantChanged subscriber threw: {ex.Message}");
             }
         }
     }

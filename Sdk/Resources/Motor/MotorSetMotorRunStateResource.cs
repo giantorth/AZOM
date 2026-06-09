@@ -32,7 +32,7 @@ namespace MozaPlugin.Sdk.Resources.Motor
 
             _hardware.WriteIfBaseConnected("base-motor-run-state", value);
 
-            MozaLog.Debug($"[Moza.Sdk] SetMotorRunState POST id={req.DeviceId} value={value}");
+            MozaLog.Debug($"[AZOM.Sdk] SetMotorRunState POST id={req.DeviceId} value={value}");
             return CoapResourceResponse.Valid();
         }
 

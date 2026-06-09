@@ -296,7 +296,7 @@ namespace MozaPlugin.Devices
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Could not load wheel GUID registry: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Could not load wheel GUID registry: {ex.Message}");
             }
         }
 
@@ -328,7 +328,7 @@ namespace MozaPlugin.Devices
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Could not save wheel GUID registry: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Could not save wheel GUID registry: {ex.Message}");
             }
         }
     }

@@ -225,18 +225,11 @@
                     <StackPanel Orientation="Horizontal">
                         <Image Width="32" Height="32" Margin="0,0,10,0"
                                Source="{StaticResource MozaWheelBrandIcon}"/>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{x:Static res:Strings.Brand_Unofficial}"
-                                       FontSize="8" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AmberBrush}"
-                                       Background="#22FFB84D"
-                                       Padding="5,1"
-                                       HorizontalAlignment="Left"/>
-                            <TextBlock Text="{x:Static res:Strings.Brand_Moza}" FontWeight="Bold" FontSize="13"
-                                       Foreground="{StaticResource TextBrush}"/>
-                            <TextBlock Text="{x:Static res:Strings.Brand_SimHubPlugin}" FontSize="9"
-                                       Foreground="{StaticResource TextFaintBrush}"/>
-                        </StackPanel>
+                        <!-- AZOM wordmark — Space Grotesk Bold outlines (matches the website), vector for crisp Wine/Proton rendering -->
+                        <Path VerticalAlignment="Center" HorizontalAlignment="Left"
+                              Width="63" Height="16" Stretch="Uniform"
+                              Fill="{StaticResource TextBrush}"
+                              Data="F1 M0 714 L184 14 L414 14 L598 714 L462 714 L424 560 L174 560 L136 714 L0 714Z M205 438 L393 438 L308 97 L290 97 L205 438Z M722 714 L722 546 L1068 148 L1068 132 L732 132 L732 14 L1206 14 L1206 182 L860 580 L860 596 L1208 596 L1208 714 L722 714Z M1650 728 Q1518 728 1440 655.5 Q1362 583 1362 448 L1362 280 Q1362 145 1440 72.5 Q1518 0 1650 0 Q1782 0 1860 72.5 Q1938 145 1938 280 L1938 448 Q1938 583 1860 655.5 Q1782 728 1650 728Z M1650 610 Q1724 610 1765 567 Q1806 524 1806 452 L1806 276 Q1806 204 1765 161 Q1724 118 1650 118 Q1577 118 1535.5 161 Q1494 204 1494 276 L1494 452 Q1494 524 1535.5 567 Q1577 610 1650 610Z M2114 714 L2114 14 L2359 14 L2480 624 L2498 624 L2619 14 L2864 14 L2864 714 L2736 714 L2736 111 L2718 111 L2598 714 L2380 714 L2260 111 L2242 111 L2242 714 L2114 714Z"/>
                     </StackPanel>
                 </Border>
 
@@ -2398,7 +2391,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{x:Static res:Strings.Label_UnofficialMozaPlugin}"
+                                        <TextBlock Text="{x:Static res:Strings.Label_AzomTitle}"
                                                    FontFamily="{StaticResource FontUi}"
                                                    FontSize="22" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextBrush}"/>

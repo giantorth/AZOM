@@ -17,9 +17,6 @@
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Nhập</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Giới thiệu</value></data>
-  <data name="Brand_Unofficial" xml:space="preserve"><value>KHÔNG CHÍNH THỨC</value></data>
-  <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>
-  <data name="Brand_SimHubPlugin" xml:space="preserve"><value>SimHub Plugin</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Đã ngắt kết nối</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>LÀM MỚI</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Hiệu suất đầu ra</value></data>
@@ -258,7 +255,7 @@
   <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 20 yêu cầu gần nhất mỗi máy chủ · trực tiếp</value></data>
   <data name="Section_About" xml:space="preserve"><value>GIỚI THIỆU</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Plugin SimHub mã nguồn mở</value></data>
-  <data name="Label_UnofficialMozaPlugin" xml:space="preserve"><value>Plugin SimHub MOZA không chính thức</value></data>
+  <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
   <data name="Label_VersionPlaceholder" xml:space="preserve"><value>phiên bản —</value></data>
   <data name="Hint_AboutDescription" xml:space="preserve"><value>Plugin SimHub không chính thức giao tiếp trực tiếp với phần cứng MOZA Racing qua cổng serial — cấu hình phần cứng, pipeline hiệu ứng LED và truyền phát bảng điều khiển. Không liên kết với MOZA / Gudsen Technology.</value></data>
   <data name="Hint_SponsorshipsAppreciated" xml:space="preserve"><value>Rất cảm kích các khoản tài trợ — việc bổ sung hỗ trợ cho phần cứng mà tôi không sở hữu có thể rất khó!</value></data>

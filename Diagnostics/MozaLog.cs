@@ -7,7 +7,7 @@ namespace MozaPlugin
     /// <summary>
     /// Thin wrapper over <c>SimHub.Logging.Current</c> that mirrors every
     /// emitted line into an in-process ring buffer for the Diagnostics tab's
-    /// export bundle. The wrapper is the single source of truth for [Moza]
+    /// export bundle. The wrapper is the single source of truth for [AZOM]
     /// log lines, so the export never has to read SimHub's rolling files
     /// (which buffer to disk and use varying paths/extensions per build).
     /// All call sites in the plugin should use this class instead of
@@ -15,7 +15,7 @@ namespace MozaPlugin
     /// </summary>
     public static class MozaLog
     {
-        // Cap covers many sessions of dense [Moza] traffic. Older lines drop
+        // Cap covers many sessions of dense [AZOM] traffic. Older lines drop
         // silently; the export pulls a chronological snapshot on demand.
         private const int MaxLines = 5000;
 

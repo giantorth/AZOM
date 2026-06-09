@@ -109,12 +109,12 @@ namespace MozaPlugin.Devices
                     return false;
 
                 Directory.Delete(deviceDir, recursive: true);
-                MozaLog.Info($"[Moza] Removed speculative CM2 dash definition (this dash is a CM1; restart SimHub to drop the stale entry)");
+                MozaLog.Info($"[AZOM] Removed speculative CM2 dash definition (this dash is a CM1; restart SimHub to drop the stale entry)");
                 return true;
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Could not remove speculative CM2 dash definition: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Could not remove speculative CM2 dash definition: {ex.Message}");
                 return false;
             }
         }
@@ -165,7 +165,7 @@ namespace MozaPlugin.Devices
                     catch (Exception parseEx)
                     {
                         MozaLog.Warn(
-                            $"[Moza] Could not parse existing device.json for '{deviceName}', rewriting: {parseEx.Message}");
+                            $"[AZOM] Could not parse existing device.json for '{deviceName}', rewriting: {parseEx.Message}");
                         stale = true;
                     }
 
@@ -184,14 +184,14 @@ namespace MozaPlugin.Devices
 
                 string action = stale ? "Refreshed" : "Deployed";
                 MozaLog.Debug(
-                    $"[Moza] {action} device definition: {deviceName} " +
+                    $"[AZOM] {action} device definition: {deviceName} " +
                     $"(guid={guid}, telemetryLeds={expectedTelemetryCount}, rpm={rpmCount}, flags={hasFlagLeds}, " +
                     $"buttons={buttonCount}, knobs={knobCount}, brow={browSegmentSize}, pid={pid}, restart SimHub to pick up changes)");
                 return true;
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Error deploying device definition '{deviceName}': {ex.Message}");
+                MozaLog.Error($"[AZOM] Error deploying device definition '{deviceName}': {ex.Message}");
                 return false;
             }
         }
@@ -377,7 +377,7 @@ namespace MozaPlugin.Devices
                     catch (Exception parseEx)
                     {
                         MozaLog.Warn(
-                            $"[Moza] Could not parse existing device.json for '{deviceName}', rewriting: {parseEx.Message}");
+                            $"[AZOM] Could not parse existing device.json for '{deviceName}', rewriting: {parseEx.Message}");
                         stale = true;
                     }
 
@@ -390,7 +390,7 @@ namespace MozaPlugin.Devices
                 {
                     if (stream == null)
                     {
-                        MozaLog.Warn($"[Moza] Embedded resource not found: {resourceName}");
+                        MozaLog.Warn($"[AZOM] Embedded resource not found: {resourceName}");
                         return false;
                     }
 
@@ -406,24 +406,24 @@ namespace MozaPlugin.Devices
                     if (discoveredPid != null)
                     {
                         json = json.Replace("__DETECT_PID__", discoveredPid);
-                        MozaLog.Debug($"[Moza] Patched device PID to {discoveredPid} for {deviceName}");
+                        MozaLog.Debug($"[AZOM] Patched device PID to {discoveredPid} for {deviceName}");
                     }
                     else
                     {
                         json = json.Replace("__DETECT_PID__", FallbackPid);
-                        MozaLog.Debug($"[Moza] No PID discovered, using fallback {FallbackPid} for {deviceName}");
+                        MozaLog.Debug($"[AZOM] No PID discovered, using fallback {FallbackPid} for {deviceName}");
                     }
 
                     File.WriteAllText(deviceJsonPath, json);
                 }
 
                 string action = stale ? "Refreshed" : "Deployed";
-                MozaLog.Info($"[Moza] {action} device definition: {deviceName} (restart SimHub to add it)");
+                MozaLog.Info($"[AZOM] {action} device definition: {deviceName} (restart SimHub to add it)");
                 return true;
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Error deploying device definition '{deviceName}': {ex.Message}");
+                MozaLog.Error($"[AZOM] Error deploying device definition '{deviceName}': {ex.Message}");
                 return false;
             }
         }

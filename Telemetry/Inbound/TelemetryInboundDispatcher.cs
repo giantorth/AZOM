@@ -90,7 +90,7 @@ namespace MozaPlugin.Telemetry.Inbound
                 {
                     string name = System.Text.Encoding.ASCII.GetString(data, 4, nameLen);
                     _sender.SetDisplayDetected(name);
-                    MozaLog.Debug($"[Moza] Display sub-device detected: \"{name}\"");
+                    MozaLog.Debug($"[AZOM] Display sub-device detected: \"{name}\"");
                 }
             }
         }
@@ -234,7 +234,7 @@ namespace MozaPlugin.Telemetry.Inbound
                 try
                 {
                     MozaLog.Debug(
-                        $"[Moza] session 0x{session:X2} inbound chunk: seq={seq} payload={chunkPayload.Length}B " +
+                        $"[AZOM] session 0x{session:X2} inbound chunk: seq={seq} payload={chunkPayload.Length}B " +
                         $"first8={BitConverter.ToString(chunkPayload, 0, Math.Min(8, chunkPayload.Length))}");
                 }
                 catch { }
@@ -317,7 +317,7 @@ namespace MozaPlugin.Telemetry.Inbound
                         int n = _sender.IncrementTileServerCrcRejects();
                         if (n <= 5 || n % 50 == 0)
                             MozaLog.Debug(
-                                $"[Moza] Tile-server chunk CRC mismatch sess=0x{session:X2} " +
+                                $"[AZOM] Tile-server chunk CRC mismatch sess=0x{session:X2} " +
                                 $"seq={seq}: calc=0x{calcCrc:X8} wire=0x{wireCrc:X8} (rejects={n})");
                     }
                     else
@@ -341,7 +341,7 @@ namespace MozaPlugin.Telemetry.Inbound
                                 try
                                 {
                                     MozaLog.Debug(
-                                        $"[Moza] Tile-server state received on session 0x{session:X2}: " +
+                                        $"[AZOM] Tile-server state received on session 0x{session:X2}: " +
                                         $"root='{tile.Root}' version={tile.Version} games={tile.Games.Count} " +
                                         $"any_populated={tile.AnyPopulated}");
                                 }
@@ -376,7 +376,7 @@ namespace MozaPlugin.Telemetry.Inbound
                     if (n <= 5 || n % 50 == 0)
                     {
                         MozaLog.Debug(
-                            $"[Moza] Catalog chunk CRC mismatch sess=0x{session:X2} " +
+                            $"[AZOM] Catalog chunk CRC mismatch sess=0x{session:X2} " +
                             $"seq={seq}: calc=0x{calcCrc:X8} wire=0x{wireCrc:X8} " +
                             $"(total rejects: {n})");
                     }

@@ -307,7 +307,7 @@ namespace MozaPlugin.Telemetry.Frames
                     profile = BuildV0ProfileFromCatalog(profile, catalog);
                     int catalogCh = profile.Tiers[0].Channels.Count;
                     MozaLog.Debug(
-                        $"[Moza] V0 subscription expanded to wheel catalog: " +
+                        $"[AZOM] V0 subscription expanded to wheel catalog: " +
                         $"{catalogCh} channels");
                 }
             }
@@ -357,7 +357,7 @@ namespace MozaPlugin.Telemetry.Frames
                     int channelCount = 0;
                     foreach (var t in profile.Tiers) channelCount += t.Channels.Count;
                     MozaLog.Debug(
-                        $"[Moza] Sending v0 URL subscription: " +
+                        $"[AZOM] Sending v0 URL subscription: " +
                         $"{message.Length} bytes in {frames.Count} chunks " +
                         $"on session 0x{tierDefSession:X2} ({channelCount} channels)");
 
@@ -404,7 +404,7 @@ namespace MozaPlugin.Telemetry.Frames
                     if (cspIdx && (_sender.CatalogParser.Catalog == null || _sender.CatalogParser.Catalog.Count == 0))
                     {
                         MozaLog.Debug(
-                            "[Moza] No wheel catalog — using alphabetic indices for initial tier-def. " +
+                            "[AZOM] No wheel catalog — using alphabetic indices for initial tier-def. " +
                             "Wheel will push corrected catalog after receiving this.");
                         cspIdx = false;
                     }
@@ -483,7 +483,7 @@ namespace MozaPlugin.Telemetry.Frames
                     var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     MozaLog.Debug(
-                        $"[Moza] Sending v2 tier definition ({(cspIdx ? "type02" : "compact")}): " +
+                        $"[AZOM] Sending v2 tier definition ({(cspIdx ? "type02" : "compact")}): " +
                         $"flagBase=0x{flagBase:X2}{(doReuse ? " (reused)" : "")}, " +
                         $"end={endForThisEmission} (echoing wheel), " +
                         $"prev={(prevSub != null ? $"0x{prevSub.FlagBase:X2}/{prevSub.TierCount}t/{prevSub.SubTiersPerBroadcast}spb" : "none")}, " +
@@ -546,7 +546,7 @@ namespace MozaPlugin.Telemetry.Frames
                             if (cspIdx)
                             {
                                 MozaLog.Warn(
-                                    $"[Moza] Tier-def has {unbound}/{total} unbound channels " +
+                                    $"[AZOM] Tier-def has {unbound}/{total} unbound channels " +
                                     $"(chIndex=0; wheel catalog has {catalogSnapshot.Count} entries). " +
                                     $"First unbound: {firstUnboundUrl ?? "(null)"}. " +
                                     "Scheduling kind=4 re-emit to nudge wheel re-advertise.");
@@ -555,7 +555,7 @@ namespace MozaPlugin.Telemetry.Frames
                             else
                             {
                                 MozaLog.Debug(
-                                    $"[Moza] Tier-def has {unbound}/{total} URLs absent from " +
+                                    $"[AZOM] Tier-def has {unbound}/{total} URLs absent from " +
                                     $"wheel catalog ({catalogSnapshot.Count} entries; alphabetic " +
                                     $"indexing in use). First absent: {firstUnboundUrl ?? "(null)"}.");
                             }
@@ -631,7 +631,7 @@ namespace MozaPlugin.Telemetry.Frames
             if (_tierDefBlindSentRounds > 0 && AllBlindChunksAcked())
             {
                 MozaLog.Debug(
-                    $"[Moza] Blind retransmit early-exit after round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
+                    $"[AZOM] Blind retransmit early-exit after round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
                     "(all blind chunks acked by wheel)");
                 _tierDefBlindFrames = null;
                 return;
@@ -673,7 +673,7 @@ namespace MozaPlugin.Telemetry.Frames
                 sent++;
             }
             MozaLog.Debug(
-                $"[Moza] Blind retransmit round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
+                $"[AZOM] Blind retransmit round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
                 $"({sent}/{_tierDefBlindFrames.Length} chunks sent, {skipped} already acked, " +
                 $"next gate {gateMs}ms)");
             if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)

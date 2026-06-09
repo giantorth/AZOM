@@ -59,7 +59,7 @@ namespace MozaPlugin.Sdk.Resources.Shifter
         {
             if (Interlocked.CompareExchange(ref _hitLogged, 1, 0) == 0)
             {
-                MozaLog.Info($"[Moza.Sdk] Shifter gap exercised: {_diagnosticName} {verb} (further hits suppressed)");
+                MozaLog.Info($"[AZOM.Sdk] Shifter gap exercised: {_diagnosticName} {verb} (further hits suppressed)");
             }
         }
     }

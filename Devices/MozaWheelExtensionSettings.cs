@@ -157,7 +157,7 @@ namespace MozaPlugin.Devices
             // Affects every wheel device-extension instance (one per saved-on-
             // disk device GUID — the user can accumulate several): once the
             // first one runs the merge, the flag locks for all of them.
-            MozaLog.Info($"[Moza] APPLYTO: prefix='{pageModelPrefix ?? "(null)"}' Drained={(settings?.WheelExtensionDrained == true)} dtoSleepTimeoutMin={WheelSleepTimeoutMin}");
+            MozaLog.Info($"[AZOM] APPLYTO: prefix='{pageModelPrefix ?? "(null)"}' Drained={(settings?.WheelExtensionDrained == true)} dtoSleepTimeoutMin={WheelSleepTimeoutMin}");
             if (settings != null && settings.WheelExtensionDrained) return;
 
             // Write into the profile's overlay for this page GUID. No-op when the

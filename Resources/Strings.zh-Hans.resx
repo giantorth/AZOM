@@ -17,9 +17,6 @@
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>导入</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>关于</value></data>
-  <data name="Brand_Unofficial" xml:space="preserve"><value>非官方</value></data>
-  <data name="Brand_Moza" xml:space="preserve"><value>MOZA</value></data>
-  <data name="Brand_SimHubPlugin" xml:space="preserve"><value>SimHub 插件</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>未连接</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>刷新</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>性能输出</value></data>
@@ -258,7 +255,7 @@
   <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 每个服务器最近 20 条请求 · 实时</value></data>
   <data name="Section_About" xml:space="preserve"><value>关于</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// 开源 SimHub 插件</value></data>
-  <data name="Label_UnofficialMozaPlugin" xml:space="preserve"><value>非官方 MOZA SimHub 插件</value></data>
+  <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
   <data name="Label_VersionPlaceholder" xml:space="preserve"><value>版本 —</value></data>
   <data name="Hint_AboutDescription" xml:space="preserve"><value>一个非官方 SimHub 插件,通过串口直接与 MOZA Racing 硬件通讯 — 硬件配置、LED 效果管线与仪表盘流式传输。本项目与 MOZA / Gudsen Technology 无关。</value></data>
   <data name="Hint_SponsorshipsAppreciated" xml:space="preserve"><value>非常感谢任何形式的赞助,新增对我没有的硬件的支持会比较困难!</value></data>

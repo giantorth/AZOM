@@ -118,17 +118,17 @@ namespace MozaPlugin.Devices
             {
                 foreach (var c in added)
                 {
-                    MozaLog.Info($"[Moza] Discovered standalone {c.Category} on {c.PortName}");
+                    MozaLog.Info($"[AZOM] Discovered standalone {c.Category} on {c.PortName}");
                     try { c.TryConnect(); }
-                    catch (Exception ex) { MozaLog.Warn($"[Moza] Standalone {c.Category} connect failed: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone {c.Category} connect failed: {ex.Message}"); }
                 }
             }
             if (removed != null)
             {
                 foreach (var c in removed)
                 {
-                    MozaLog.Info($"[Moza] Removed standalone {c.Category} (port gone from registry)");
-                    try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone dispose: {ex.Message}"); }
+                    MozaLog.Info($"[AZOM] Removed standalone {c.Category} (port gone from registry)");
+                    try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dispose: {ex.Message}"); }
                 }
             }
 
@@ -144,7 +144,7 @@ namespace MozaPlugin.Devices
                     if (!c.IsConnected) c.TryConnect();
                     else c.Poll();
                 }
-                catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone refresh: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone refresh: {ex.Message}"); }
             }
         }
 
@@ -160,7 +160,7 @@ namespace MozaPlugin.Devices
             {
                 if (!c.IsConnected) continue;
                 try { c.PendingResponses.TickRetransmits(c.Connection.Send); }
-                catch (Exception ex) { MozaLog.Warn($"[Moza] Standalone {c.Category} retransmit tick failed: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone {c.Category} retransmit tick failed: {ex.Message}"); }
             }
         }
 
@@ -175,7 +175,7 @@ namespace MozaPlugin.Devices
             }
             foreach (var c in all)
             {
-                try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone dispose: {ex.Message}"); }
+                try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dispose: {ex.Message}"); }
             }
         }
     }

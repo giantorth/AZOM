@@ -139,12 +139,12 @@ namespace MozaPlugin.Diagnostics
             if (warn)
             {
                 global::MozaPlugin.MozaLog.Warn(
-                    $"[Moza] session 0x{session:X2} seq approaching u16 wrap: {seq} (queue={queueSize})");
+                    $"[AZOM] session 0x{session:X2} seq approaching u16 wrap: {seq} (queue={queueSize})");
             }
             if (evictWarn)
             {
                 global::MozaPlugin.MozaLog.Warn(
-                    $"[Moza] retransmit queue over cap {MaxQueueSize}, evicted oldest " +
+                    $"[AZOM] retransmit queue over cap {MaxQueueSize}, evicted oldest " +
                     $"sess=0x{evictedSession:X2} seq={evictedSeq} (queue={evictedQueueSize})");
             }
         }

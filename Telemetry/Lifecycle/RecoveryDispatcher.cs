@@ -114,13 +114,13 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 _recentRestartTicks.Clear();
                 _lastEscalationUtcTicks = 0;
             }
-            MozaLog.Warn("[Moza] Recovery park auto-retry — re-attempting telemetry start once after park.");
+            MozaLog.Warn("[AZOM] Recovery park auto-retry — re-attempting telemetry start once after park.");
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try { _sender.Start(); }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Park auto-retry Start() raised: {ex.GetType().Name}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Park auto-retry Start() raised: {ex.GetType().Name}: {ex.Message}");
                 }
             });
         }
@@ -187,7 +187,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 if (_parked)
                 {
                     MozaLog.Debug(
-                        $"[Moza] Recovery restart dropped — pipeline already parked: {reason}");
+                        $"[AZOM] Recovery restart dropped — pipeline already parked: {reason}");
                     return false;
                 }
 
@@ -195,7 +195,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 if (_lastEscalationUtcTicks != 0 && elapsedMs < DebounceMs)
                 {
                     MozaLog.Debug(
-                        $"[Moza] Recovery restart debounced " +
+                        $"[AZOM] Recovery restart debounced " +
                         $"({elapsedMs} ms < {DebounceMs} ms since last escalation): {reason}");
                     return false;
                 }
@@ -215,7 +215,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                         ? $"flapping: {FlapCapPerWindow} restarts in {FlapWindowMs / 1000}s across connect cycles"
                         : $"{RestartCapPerWindow} restarts in {WindowMs / 1000}s";
                     MozaLog.Warn(
-                        $"[Moza] Recovery restart cap hit ({capReason}) — " +
+                        $"[AZOM] Recovery restart cap hit ({capReason}) — " +
                         $"parking pipeline rather than looping: {reason}");
                     _parked = true;
                     _parkReason = reason;
@@ -226,7 +226,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 }
                 else
                 {
-                    MozaLog.Warn($"[Moza] Recovery restart initiated: {reason}");
+                    MozaLog.Warn($"[AZOM] Recovery restart initiated: {reason}");
                     _recentRestartTicks.Enqueue(now);
                     _flapRestartTicks.Enqueue(now);
                     _lastEscalationUtcTicks = now;
@@ -242,7 +242,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                     catch (Exception ex)
                     {
                         MozaLog.Warn(
-                            $"[Moza] Recovery park Stop() raised: {ex.GetType().Name}: {ex.Message}");
+                            $"[AZOM] Recovery park Stop() raised: {ex.GetType().Name}: {ex.Message}");
                     }
                     try { _sender.RaiseDashboardPipelineParked(); } catch { }
                 });
@@ -255,7 +255,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                     catch (Exception ex)
                     {
                         MozaLog.Warn(
-                            $"[Moza] Recovery RestartForSwitch raised: {ex.GetType().Name}: {ex.Message}");
+                            $"[AZOM] Recovery RestartForSwitch raised: {ex.GetType().Name}: {ex.Message}");
                     }
                 });
             }
@@ -275,7 +275,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             {
                 if (_parked)
                 {
-                    MozaLog.Debug($"[Moza] Recovery park dropped — already parked: {reason}");
+                    MozaLog.Debug($"[AZOM] Recovery park dropped — already parked: {reason}");
                     return;
                 }
                 _parked = true;
@@ -286,14 +286,14 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 fire = true;
             }
             if (!fire) return;
-            MozaLog.Warn($"[Moza] Recovery park initiated: {reason}");
+            MozaLog.Warn($"[AZOM] Recovery park initiated: {reason}");
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try { _sender.Stop(); }
                 catch (Exception ex)
                 {
                     MozaLog.Warn(
-                        $"[Moza] Recovery park Stop() raised: {ex.GetType().Name}: {ex.Message}");
+                        $"[AZOM] Recovery park Stop() raised: {ex.GetType().Name}: {ex.Message}");
                 }
                 try { _sender.RaiseDashboardPipelineParked(); } catch { }
             });

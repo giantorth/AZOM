@@ -233,11 +233,11 @@ namespace MozaPlugin.Telemetry
                     {
                         mzdashName = profile.Name;
                         mzdashContent = _plugin.DashCache.TryGetRawContent(telemName);
-                        MozaLog.Debug($"[Moza] ApplyTelemetrySettings: found '{telemName}' in cache as '{mzdashName}'");
+                        MozaLog.Debug($"[AZOM] ApplyTelemetrySettings: found '{telemName}' in cache as '{mzdashName}'");
                     }
                     else
                     {
-                        MozaLog.Debug($"[Moza] ApplyTelemetrySettings: '{telemName}' NOT found in cache (folder={_plugin.DashCache.FolderProfileCount} wheel={_plugin.DashCache.WheelCacheCount})");
+                        MozaLog.Debug($"[AZOM] ApplyTelemetrySettings: '{telemName}' NOT found in cache (folder={_plugin.DashCache.FolderProfileCount} wheel={_plugin.DashCache.WheelCacheCount})");
                     }
                 }
 
@@ -301,7 +301,7 @@ namespace MozaPlugin.Telemetry
                 && sender.Profile != null
                 && sender.Profile.Name == TelemetrySender.CatalogProfileName;
             MozaLog.Debug(
-                $"[Moza] ApplyTelemetrySettings: setting profile=" +
+                $"[AZOM] ApplyTelemetrySettings: setting profile=" +
                 $"{profile?.Name ?? "null"} tiers={tierCount} channels={chCount} " +
                 $"mzdash={mzdashName} settingName={telemName}" +
                 (keepExistingSynth ? " (keeping existing synth — catalog-only mode unchanged)" : ""));
@@ -375,7 +375,7 @@ namespace MozaPlugin.Telemetry
             // Bypass StartTelemetryIfReady's FramesSent>0 guard which rejects restarts
             // when the sender is running. StartInner's first action is Stop() — true cold-start.
             if (Interlocked.CompareExchange(ref _plugin._telemetryStartRequested, 1, 0) != 0) return;
-            MozaLog.Info("[Moza] Restarting telemetry sender (full cold-start)");
+            MozaLog.Info("[AZOM] Restarting telemetry sender (full cold-start)");
             // Same guard as StartTelemetryIfReady: an unobserved exception on a
             // ThreadPool thread can take down the SimHub host process.
             ThreadPool.QueueUserWorkItem(_ =>
@@ -384,7 +384,7 @@ namespace MozaPlugin.Telemetry
                 catch (ObjectDisposedException) { /* plugin disposed mid-start */ }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Telemetry restart failed: {ex.GetType().Name}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Telemetry restart failed: {ex.GetType().Name}: {ex.Message}");
                 }
             });
         }
@@ -405,7 +405,7 @@ namespace MozaPlugin.Telemetry
             if (lastApplied != null
                 && string.Equals(lastApplied, key, StringComparison.OrdinalIgnoreCase))
             {
-                MozaLog.Debug("[Moza] ApplyTelemetryDashboardFromProfile: already applied " +
+                MozaLog.Debug("[AZOM] ApplyTelemetryDashboardFromProfile: already applied " +
                               key + " in this plugin instance — no-op");
                 return true;
             }
@@ -419,14 +419,14 @@ namespace MozaPlugin.Telemetry
                 string reason = $"sender={(sender == null ? "null" : (sender.IsActive ? "Active" : "not-Active"))} " +
                                 $"cooldown={sender?.IsInSilenceCooldown}";
                 if (RecordDeferReason(reason))
-                    MozaLog.Debug($"[Moza] ApplyTelemetryDashboardFromProfile deferring (key={key}): {reason}");
+                    MozaLog.Debug($"[AZOM] ApplyTelemetryDashboardFromProfile deferring (key={key}): {reason}");
                 return false;
             }
             if (state == null || state.ConfigJsonList == null || state.ConfigJsonList.Count == 0)
             {
                 string reason = $"state={(state == null ? "null" : $"listCount={state.ConfigJsonList?.Count ?? -1}")}";
                 if (RecordDeferReason("wheel state not yet available — " + reason))
-                    MozaLog.Debug($"[Moza] ApplyTelemetryDashboardFromProfile deferring (key={key}): wheel state not yet available — {reason}");
+                    MozaLog.Debug($"[AZOM] ApplyTelemetryDashboardFromProfile deferring (key={key}): wheel state not yet available — {reason}");
                 return false;
             }
             ClearDeferReason();
@@ -453,7 +453,7 @@ namespace MozaPlugin.Telemetry
                 }
                 if (match == null)
                 {
-                    MozaLog.Info("[Moza] Profile dashboard key not found in current wheel catalog (id=" +
+                    MozaLog.Info("[AZOM] Profile dashboard key not found in current wheel catalog (id=" +
                                  id + "); leaving current selection");
                     return true;
                 }
@@ -480,13 +480,13 @@ namespace MozaPlugin.Telemetry
             }
             else
             {
-                MozaLog.Warn("[Moza] Unknown TelemetryDashboardKey prefix: " + key);
+                MozaLog.Warn("[AZOM] Unknown TelemetryDashboardKey prefix: " + key);
                 return true;
             }
 
             if (string.IsNullOrEmpty(targetName))
             {
-                MozaLog.Warn("[Moza] ApplyTelemetryDashboardFromProfile: empty target name for key " + key);
+                MozaLog.Warn("[AZOM] ApplyTelemetryDashboardFromProfile: empty target name for key " + key);
                 return true;
             }
 
@@ -525,7 +525,7 @@ namespace MozaPlugin.Telemetry
                         : "prior host kind=4";
                     if (sender.HasCatalogResyncProbeFired)
                     {
-                        MozaLog.Info($"[Moza] Profile dashboard '{targetName}' (slot {slot}) bound ({bindEvidence}) but probe fired this instance (source: {sourceTag}); re-triggering switch to refresh binding");
+                        MozaLog.Info($"[AZOM] Profile dashboard '{targetName}' (slot {slot}) bound ({bindEvidence}) but probe fired this instance (source: {sourceTag}); re-triggering switch to refresh binding");
                         _plugin.ActiveTelemetryProfileName = targetName;
                         _plugin.ActiveTelemetryMzdashPath = mzdashPath;
                         _plugin.PersistSettings();
@@ -534,7 +534,7 @@ namespace MozaPlugin.Telemetry
                         SetLastAppliedKey(key);
                         return true;
                     }
-                    MozaLog.Info($"[Moza] Profile dashboard '{targetName}' (slot {slot}) already bound ({bindEvidence}, no probe this instance, source: {sourceTag}); no wire action needed");
+                    MozaLog.Info($"[AZOM] Profile dashboard '{targetName}' (slot {slot}) already bound ({bindEvidence}, no probe this instance, source: {sourceTag}); no wire action needed");
                     _plugin.ActiveTelemetryProfileName = targetName;
                     _plugin.ActiveTelemetryMzdashPath = mzdashPath;
                     _plugin.PersistSettings();
@@ -543,7 +543,7 @@ namespace MozaPlugin.Telemetry
                     SetLastAppliedKey(key);
                     return true;
                 }
-                MozaLog.Info($"[Moza] Applying profile dashboard '{targetName}' via wheel slot {slot} (source: {sourceTag})");
+                MozaLog.Info($"[AZOM] Applying profile dashboard '{targetName}' via wheel slot {slot} (source: {sourceTag})");
                 _plugin.ActiveTelemetryProfileName = targetName;
                 _plugin.ActiveTelemetryMzdashPath = mzdashPath;
                 _plugin.PersistSettings();
@@ -560,7 +560,7 @@ namespace MozaPlugin.Telemetry
             //   - builtin: slotless OnDashboardSwitched restarts against the named builtin.
             if (key.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
             {
-                MozaLog.Info("[Moza] Profile dashboard '" + targetName +
+                MozaLog.Info("[AZOM] Profile dashboard '" + targetName +
                              "' missing from configJsonList; leaving current selection");
                 return true;
             }
@@ -569,11 +569,11 @@ namespace MozaPlugin.Telemetry
             {
                 if (string.IsNullOrEmpty(mzdashPath))
                 {
-                    MozaLog.Info("[Moza] Profile dashboard file not resolvable and not in wheel catalog (" +
+                    MozaLog.Info("[AZOM] Profile dashboard file not resolvable and not in wheel catalog (" +
                                  targetName + "); leaving current selection");
                     return true;
                 }
-                MozaLog.Info("[Moza] Applying profile dashboard (no wheel slot, local file): " + mzdashPath);
+                MozaLog.Info("[AZOM] Applying profile dashboard (no wheel slot, local file): " + mzdashPath);
                 _plugin.ActiveTelemetryMzdashPath = mzdashPath;
                 _plugin.ActiveTelemetryProfileName = "";
                 _plugin.PersistSettings();
@@ -584,7 +584,7 @@ namespace MozaPlugin.Telemetry
             }
 
             // builtin: fallback.
-            MozaLog.Info("[Moza] Applying profile dashboard (builtin, no wheel slot): " + targetName);
+            MozaLog.Info("[AZOM] Applying profile dashboard (builtin, no wheel slot): " + targetName);
             _plugin.ActiveTelemetryProfileName = targetName;
             _plugin.ActiveTelemetryMzdashPath = "";
             _plugin.PersistSettings();
@@ -605,7 +605,7 @@ namespace MozaPlugin.Telemetry
             if (sender == null || !sender.Enabled) return;
             bool isWheel = ReferenceEquals(sender, _plugin.TelemetrySender);
             MozaLog.Debug(
-                $"[Moza] OnDashboardSwitched(slot={slot}, target={(isWheel ? "wheel" : "cm2")}): scheduling switch + Stop+Start");
+                $"[AZOM] OnDashboardSwitched(slot={slot}, target={(isWheel ? "wheel" : "cm2")}): scheduling switch + Stop+Start");
             // Stage the target's settings first so the post-Start cold-start builds
             // tier-def from the right channels (wheel: ApplyTelemetrySettings; CM2:
             // EnsureCm2Pipeline re-applies its policy/resolver/mapping target).
@@ -633,7 +633,7 @@ namespace MozaPlugin.Telemetry
             var sender = _plugin.TelemetrySender;
             if (sender != null && sender.Enabled)
             {
-                MozaLog.Debug("[Moza] OnDashboardSwitched: scheduling Stop+Start pipeline cycle (no slot)");
+                MozaLog.Debug("[AZOM] OnDashboardSwitched: scheduling Stop+Start pipeline cycle (no slot)");
                 ApplyTelemetrySettings();
                 sender.RestartForSwitch();
             }
@@ -666,7 +666,7 @@ namespace MozaPlugin.Telemetry
                     || slot < 0 || slot >= state.ConfigJsonList.Count)
                 {
                     MozaLog.Warn(
-                        $"[Moza] WheelInitiatedSwitch slot={slot}: cannot resolve dashboard name " +
+                        $"[AZOM] WheelInitiatedSwitch slot={slot}: cannot resolve dashboard name " +
                         $"(state={(state == null ? "null" : "ok")}, " +
                         $"listCount={state?.ConfigJsonList?.Count ?? -1}). " +
                         $"Tier-def burst will use stale profile.");
@@ -676,7 +676,7 @@ namespace MozaPlugin.Telemetry
                 string newName = state.ConfigJsonList[slot];
                 if (string.IsNullOrEmpty(newName))
                 {
-                    MozaLog.Warn($"[Moza] WheelInitiatedSwitch slot={slot}: configJsonList entry is empty");
+                    MozaLog.Warn($"[AZOM] WheelInitiatedSwitch slot={slot}: configJsonList entry is empty");
                     return;
                 }
 
@@ -704,7 +704,7 @@ namespace MozaPlugin.Telemetry
                     sender.Profile = null;
 
                 MozaLog.Info(
-                    $"[Moza] WheelInitiatedSwitch slot={slot} ('{newName}'): " +
+                    $"[AZOM] WheelInitiatedSwitch slot={slot} ('{newName}'): " +
                     $"catalog-only — rebuilding synthesised profile from post-switch wheel catalog");
 
                 // UI dropdown reads sender.WheelReportedSlot directly when building
@@ -715,7 +715,7 @@ namespace MozaPlugin.Telemetry
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] OnWheelInitiatedSwitch handler error: {ex.Message}");
+                MozaLog.Warn($"[AZOM] OnWheelInitiatedSwitch handler error: {ex.Message}");
             }
         }
 
@@ -771,7 +771,7 @@ namespace MozaPlugin.Telemetry
             if (!standaloneDashboard && !_plugin.ShouldDriveDashboard())
             {
                 MozaLog.Info(
-                    $"[Moza] Wheel '{_data?.WheelModelName}' has no display " +
+                    $"[AZOM] Wheel '{_data?.WheelModelName}' has no display " +
                     $"(HasDisplay={_plugin.WheelModelInfo?.HasDisplay?.ToString() ?? "unknown"}, " +
                     $"probe={_plugin.IsDisplayDetected}) — skipping dashboard telemetry start");
                 return;
@@ -793,7 +793,7 @@ namespace MozaPlugin.Telemetry
             if (!standaloneDashboard && !_plugin.IsDisplayDetected)
             {
                 MozaLog.Debug(
-                    $"[Moza] Display sub-device not yet detected " +
+                    $"[AZOM] Display sub-device not yet detected " +
                     $"(HasDisplay={_plugin.WheelModelInfo?.HasDisplay?.ToString() ?? "unknown"}) — " +
                     "deferring telemetry start until display probe completes");
                 return;
@@ -819,7 +819,7 @@ namespace MozaPlugin.Telemetry
             // Prevent duplicate dispatch.
             if (Interlocked.CompareExchange(ref _plugin._telemetryStartRequested, 1, 0) != 0) return;
 
-            MozaLog.Info("[Moza] Wheel detected and telemetry enabled — starting telemetry sender");
+            MozaLog.Info("[AZOM] Wheel detected and telemetry enabled — starting telemetry sender");
             // Top-level catch: ThreadPool callback exceptions on .NET Framework 4.8
             // can take down the SimHub host process.
             ThreadPool.QueueUserWorkItem(_ =>
@@ -828,7 +828,7 @@ namespace MozaPlugin.Telemetry
                 catch (ObjectDisposedException) { /* plugin disposed mid-start */ }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Telemetry start failed: {ex.GetType().Name}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Telemetry start failed: {ex.GetType().Name}: {ex.Message}");
                 }
             });
         }
@@ -850,7 +850,7 @@ namespace MozaPlugin.Telemetry
             var now = DateTime.UtcNow;
             if (now > snap.DeadlineUtc)
             {
-                MozaLog.Warn("[Moza] Pending profile dashboard apply timed out after " +
+                MozaLog.Warn("[AZOM] Pending profile dashboard apply timed out after " +
                              $"{PendingProfileKeyTimeout.TotalMinutes:F0} min and {snap.RetryCount} retries " +
                              $"(key={snap.Key}); giving up — wheel did not advertise dashboards in time");
                 lock (_stateLock)
@@ -867,7 +867,7 @@ namespace MozaPlugin.Telemetry
                 !string.Equals(profile.TelemetryDashboardKey, snap.Key, StringComparison.OrdinalIgnoreCase))
             {
                 // Profile changed under us — drop the stale pending key.
-                MozaLog.Debug($"[Moza] Pending profile dashboard apply abandoned — profile/key mismatch " +
+                MozaLog.Debug($"[AZOM] Pending profile dashboard apply abandoned — profile/key mismatch " +
                               $"(pending={snap.Key}, current={(profile == null ? "null" : profile.TelemetryDashboardKey ?? "(empty)")})");
                 lock (_stateLock)
                 {
@@ -883,7 +883,7 @@ namespace MozaPlugin.Telemetry
             }
             catch (Exception ex)
             {
-                MozaLog.Warn("[Moza] Pending dashboard apply retry threw: " + ex.Message);
+                MozaLog.Warn("[AZOM] Pending dashboard apply retry threw: " + ex.Message);
                 lock (_stateLock)
                 {
                     if (ReferenceEquals(_pending, snap)) _pending = null;
@@ -909,7 +909,7 @@ namespace MozaPlugin.Telemetry
                 int newCount = snap.RetryCount + 1;
                 if (now - snap.LastRetryWarnUtc >= RetryWarnInterval)
                 {
-                    MozaLog.Warn($"[Moza] Profile dashboard apply still pending after {newCount} retries " +
+                    MozaLog.Warn($"[AZOM] Profile dashboard apply still pending after {newCount} retries " +
                                  $"(key={snap.Key}, reason={_lastApplyDeferReason ?? "?"})");
                     _pending = snap.With(retryCount: newCount, lastRetryWarnUtc: now);
                 }

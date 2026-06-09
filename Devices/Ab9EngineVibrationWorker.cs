@@ -138,7 +138,7 @@ namespace MozaPlugin.Devices
             while (!_stop)
             {
                 try { Tick(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza/AB9] engine-vib tick: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/AB9] engine-vib tick: {ex.Message}"); }
 
                 long now = Stopwatch.GetTimestamp();
                 long delta = next - now;
@@ -233,7 +233,7 @@ namespace MozaPlugin.Devices
             if (effectiveStreaming != _active)
             {
                 _active = effectiveStreaming;
-                MozaLog.Debug($"[Moza/AB9] engine-vib {(effectiveStreaming ? "active" : "silent")} "
+                MozaLog.Debug($"[AZOM/AB9] engine-vib {(effectiveStreaming ? "active" : "silent")} "
                               + $"(rpm={rpm:F0}/{maxRpm:F0} freq={freqHz:F1}Hz period={period} "
                               + $"int={intensity} eff={_smoothedIntensity:F0})");
             }

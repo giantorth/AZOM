@@ -102,7 +102,7 @@ namespace MozaPlugin.Protocol
                 {
                     var p = newUnknown[i];
                     MozaLog.Info(
-                        $"[Moza] Unknown Moza PID 0x{p.Pid.ToString("X4", CultureInfo.InvariantCulture)} on " +
+                        $"[AZOM] Unknown Moza PID 0x{p.Pid.ToString("X4", CultureInfo.InvariantCulture)} on " +
                         $"{p.PortName} — not in usb-ids inventory. Will be probed with every known protocol; " +
                         $"please report so docs/protocol/devices/usb-ids.md can be updated.");
                 }
@@ -112,9 +112,9 @@ namespace MozaPlugin.Protocol
             // line in their support-bundle log confirming detection worked.
             // Subsequent enumerations log at Debug to avoid flooding.
             if (ports.Count > 0 && Interlocked.Exchange(ref _hasLoggedFirstSuccess, 1) == 0)
-                MozaLog.Info($"[Moza] MOZA detection: source=registry, {summary}");
+                MozaLog.Info($"[AZOM] MOZA detection: source=registry, {summary}");
             else
-                MozaLog.Debug($"[Moza] MOZA detection: source=registry, {summary}");
+                MozaLog.Debug($"[AZOM] MOZA detection: source=registry, {summary}");
 
             return ports;
         }
@@ -178,7 +178,7 @@ namespace MozaPlugin.Protocol
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] SerialPort.GetPortNames failed: {ex.GetType().Name}: {ex.Message}");
+                MozaLog.Debug($"[AZOM] SerialPort.GetPortNames failed: {ex.GetType().Name}: {ex.Message}");
                 liveCom = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             }
 
@@ -188,7 +188,7 @@ namespace MozaPlugin.Protocol
                 using var enumKey = Registry.LocalMachine.OpenSubKey(EnumUsbPath, writable: false);
                 if (enumKey == null)
                 {
-                    MozaLog.Debug($"[Moza] Registry: {EnumUsbPath} not found");
+                    MozaLog.Debug($"[AZOM] Registry: {EnumUsbPath} not found");
                     return results;
                 }
 
@@ -230,15 +230,15 @@ namespace MozaPlugin.Protocol
             }
             catch (SecurityException ex)
             {
-                MozaLog.Debug($"[Moza] Registry access denied: {ex.Message}");
+                MozaLog.Debug($"[AZOM] Registry access denied: {ex.Message}");
             }
             catch (IOException ex)
             {
-                MozaLog.Debug($"[Moza] Registry IO failure: {ex.Message}");
+                MozaLog.Debug($"[AZOM] Registry IO failure: {ex.Message}");
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] Registry enumeration failed: {ex.GetType().Name}: {ex.Message}");
+                MozaLog.Debug($"[AZOM] Registry enumeration failed: {ex.GetType().Name}: {ex.Message}");
             }
 
             return results;

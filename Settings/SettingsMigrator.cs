@@ -53,7 +53,7 @@ namespace MozaPlugin.Settings
                 // SeedProfileBaselineFromFlatFields. Bump straight to v9.
                 _settings.SettingsSchemaVersion = 10;
                 ClearLegacyAfterMigration();
-                MozaLog.Debug("[Moza] Schema v9: no profiles present, marking migrated (default profile will be seeded by InitProfileSystem)");
+                MozaLog.Debug("[AZOM] Schema v9: no profiles present, marking migrated (default profile will be seeded by InitProfileSystem)");
                 return true;
             }
 
@@ -68,9 +68,9 @@ namespace MozaPlugin.Settings
                 _settings.SettingsSchemaVersion = 10;
                 ClearLegacyAfterMigration();
                 if (ranV4Plus)
-                    MozaLog.Info("[Moza] Schema v9 migration: moved mzdash folder + telemetry-enable + wheel-era + sleep-light + idle-effect/speed to per-wheel-page dicts; reseeded profile baselines from flat fields where sentinel.");
+                    MozaLog.Info("[AZOM] Schema v9 migration: moved mzdash folder + telemetry-enable + wheel-era + sleep-light + idle-effect/speed to per-wheel-page dicts; reseeded profile baselines from flat fields where sentinel.");
                 else
-                    MozaLog.Info("[Moza] Schema v9 repair: reseeded profile baselines from flat fields where sentinel.");
+                    MozaLog.Info("[AZOM] Schema v9 repair: reseeded profile baselines from flat fields where sentinel.");
                 return true;
             }
 
@@ -170,7 +170,7 @@ namespace MozaPlugin.Settings
                     }
                     else
                     {
-                        MozaLog.Warn($"[Moza] Schema v2: cannot resolve UID {uidHex} to a wheel model (PerWheelSlots has {_settings.PerWheelSlots?.Count ?? 0} entries) — leaving channel mappings under legacy key");
+                        MozaLog.Warn($"[AZOM] Schema v2: cannot resolve UID {uidHex} to a wheel model (PerWheelSlots has {_settings.PerWheelSlots?.Count ?? 0} entries) — leaving channel mappings under legacy key");
                         continue;
                     }
 
@@ -292,7 +292,7 @@ namespace MozaPlugin.Settings
 
             _settings.SettingsSchemaVersion = 10;
             MozaLog.Info(
-                $"[Moza] Schema v9 migration: PerWheelSlots={slotsCount}, " +
+                $"[AZOM] Schema v9 migration: PerWheelSlots={slotsCount}, " +
                 $"ChannelMappings={channelMappingsCount}, TelemetryByUid={uidSlotCount}, " +
                 $"MzdashFolderByUid={folderCount} → applied across {profiles.Count} profile(s); " +
                 $"flat-field seeding done");

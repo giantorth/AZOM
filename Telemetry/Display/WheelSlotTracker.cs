@@ -83,13 +83,13 @@ namespace MozaPlugin.Telemetry.Display
             if (listCount == 0 || slot >= listCount)
             {
                 MozaLog.Debug(
-                    $"[Moza] WheelSlotTracker: deferred slot={slot} still out of " +
+                    $"[AZOM] WheelSlotTracker: deferred slot={slot} still out of " +
                     $"configJsonList range (count={listCount}) after replay — dropping");
                 return;
             }
 
             MozaLog.Info(
-                $"[Moza] Wheel-initiated switch (deferred replay): slot={slot} " +
+                $"[AZOM] Wheel-initiated switch (deferred replay): slot={slot} " +
                 $"(lastEmitted={_lastEmittedKind4Slot}). Arming hot-reneg burst; " +
                 "raising WheelInitiatedSwitch event.");
             _lastEmittedKind4Slot = slot;
@@ -133,12 +133,12 @@ namespace MozaPlugin.Telemetry.Display
                 if (n > 0 && fieldA == (uint)n && fieldB == 0)
                 {
                     _detectedSlotFieldA = 1;
-                    MozaLog.Info($"[Moza] Slot field auto-detected: A (wheel echoed kind=4 slot {n} in field A)");
+                    MozaLog.Info($"[AZOM] Slot field auto-detected: A (wheel echoed kind=4 slot {n} in field A)");
                 }
                 else if (n > 0 && fieldB == (uint)n && fieldA == 0)
                 {
                     _detectedSlotFieldA = 0;
-                    MozaLog.Info($"[Moza] Slot field auto-detected: B (wheel echoed kind=4 slot {n} in field B)");
+                    MozaLog.Info($"[AZOM] Slot field auto-detected: B (wheel echoed kind=4 slot {n} in field B)");
                 }
             }
 
@@ -154,7 +154,7 @@ namespace MozaPlugin.Telemetry.Display
 
             int prevSlot = _wheelReportedSlot;
             _wheelReportedSlot = slot;
-            MozaLog.Debug($"[Moza] Wheel reported active dashboard slot={slot} (was {prevSlot})");
+            MozaLog.Debug($"[AZOM] Wheel reported active dashboard slot={slot} (was {prevSlot})");
 
             // Wheel-initiated switch detection. Wheel emits a b2h type-04
             // record after EVERY switch — echo of host kind=4 OR wheel's own
@@ -184,21 +184,21 @@ namespace MozaPlugin.Telemetry.Display
             {
                 _pendingSwitchSlot = slot;
                 MozaLog.Debug(
-                    $"[Moza] WheelSlotTracker: slot={slot} change observed before " +
+                    $"[AZOM] WheelSlotTracker: slot={slot} change observed before " +
                     "configJsonList arrived — buffering for replay when state lands");
                 return;
             }
             if (slot >= listCount)
             {
                 MozaLog.Debug(
-                    $"[Moza] WheelSlotTracker: slot={slot} out of " +
+                    $"[AZOM] WheelSlotTracker: slot={slot} out of " +
                     $"configJsonList range (count={listCount}) — not arming wheel-init burst");
                 _wheelReportedSlot = prevSlot;
                 return;
             }
 
             MozaLog.Info(
-                $"[Moza] Wheel-initiated switch detected: slot={slot} " +
+                $"[AZOM] Wheel-initiated switch detected: slot={slot} " +
                 $"(was {prevSlot}, lastEmitted={_lastEmittedKind4Slot}). " +
                 $"Arming hot-reneg burst; raising WheelInitiatedSwitch event.");
 

@@ -223,7 +223,7 @@ namespace MozaPlugin.Protocol
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Debug($"[Moza] HID error: {ex.Message}");
+                    MozaLog.Debug($"[AZOM] HID error: {ex.Message}");
                 }
 
                 _data.IsHidConnected = false;
@@ -446,7 +446,7 @@ namespace MozaPlugin.Protocol
                                             if (normalized01 < 0) normalized01 = 0;
                                             if (normalized01 > 1) normalized01 = 1;
                                             try { MBoosterAxisChanged?.Invoke(identity, normalized01); }
-                                            catch (Exception ex) { MozaLog.Debug($"[Moza] mBooster axis handler: {ex.Message}"); }
+                                            catch (Exception ex) { MozaLog.Debug($"[AZOM] mBooster axis handler: {ex.Message}"); }
                                             continue;
                                         }
 
@@ -488,7 +488,7 @@ namespace MozaPlugin.Protocol
                         long n = System.Threading.Interlocked.Increment(ref _hidParseErrorCount);
                         // Log first, then every 1000th error to avoid spam.
                         if (n == 1 || n % 1000 == 0)
-                            MozaLog.Debug($"[Moza] HID parse error #{n}: {ex.Message}");
+                            MozaLog.Debug($"[AZOM] HID parse error #{n}: {ex.Message}");
                     }
                 };
                 receiver.Stopped += (sender, e) =>
@@ -500,7 +500,7 @@ namespace MozaPlugin.Protocol
                 {
                     receiver.Start(stream);
                     MozaLog.Debug(
-                        $"[Moza] HID device opened: {device.GetFriendlyName()} " +
+                        $"[AZOM] HID device opened: {device.GetFriendlyName()} " +
                         $"(VID {device.VendorID:X4} PID {device.ProductID:X4}, " +
                         $"usages: {string.Join(", ", usages.Keys.Select(u => $"0x{u:X8}"))})");
 
@@ -520,7 +520,7 @@ namespace MozaPlugin.Protocol
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] HID device read error ({device.GetFriendlyName()}): {ex.Message}");
+                MozaLog.Debug($"[AZOM] HID device read error ({device.GetFriendlyName()}): {ex.Message}");
             }
         }
 

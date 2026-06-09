@@ -112,7 +112,7 @@ namespace MozaPlugin.Telemetry
                 if (!_allPropertiesNamesWarned)
                 {
                     _allPropertiesNamesWarned = true;
-                    MozaLog.Warn("[Moza] GetAllPropertiesNames failed; falling back to static list: " + ex.Message);
+                    MozaLog.Warn("[AZOM] GetAllPropertiesNames failed; falling back to static list: " + ex.Message);
                 }
             }
             return KnownSimHubProperties.Paths;

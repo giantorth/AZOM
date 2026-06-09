@@ -244,7 +244,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                 _closeStormFirstTickMs[session] = now;
                 _closeStormCount[session] = 1;
                 MozaLog.Debug(
-                    $"[Moza] sess=0x{session:X2} wheel-initiated CLOSE (first in window) — " +
+                    $"[AZOM] sess=0x{session:X2} wheel-initiated CLOSE (first in window) — " +
                     "either a normal end-of-stream or the start of a rejection storm.");
                 return;
             }
@@ -256,7 +256,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                 {
                     _closeStormLastWarnTickMs[session] = now;
                     MozaLog.Warn(
-                        $"[Moza] sess=0x{session:X2} CLOSE storm: " +
+                        $"[AZOM] sess=0x{session:X2} CLOSE storm: " +
                         $"{_closeStormCount[session]} wheel-initiated closes in " +
                         $"{sinceFirst} ms. Wheel is rejecting our session — display watchdog " +
                         "will escalate to a full restart if it persists.");
@@ -438,7 +438,7 @@ namespace MozaPlugin.Telemetry.Watchdog
 
             ushort recoverySeq = (ushort)(0x000B + _s09RetryRounds * 0x10);
             MozaLog.Warn(
-                $"[Moza] sess=0x09 not yet device-initiated; retry round " +
+                $"[AZOM] sess=0x09 not yet device-initiated; retry round " +
                 $"{_s09RetryRounds}/{S09RetryMaxRounds} (open-seq=0x{recoverySeq:X4})");
 
             try
@@ -448,7 +448,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] sess=0x09 retry emit failed: {ex.Message}");
+                MozaLog.Warn($"[AZOM] sess=0x09 retry emit failed: {ex.Message}");
             }
 
             if (_s09RetryRounds >= S09RetryMaxRounds)
@@ -509,7 +509,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             try
             {
                 MozaLog.Warn(
-                    $"[Moza] sess=0x{session:X2} configJson gap stale " +
+                    $"[AZOM] sess=0x{session:X2} configJson gap stale " +
                     $"({gapAgeMs}ms >= {ConfigJsonGapPassiveWaitMs}ms passive-wait) — " +
                     $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4}, " +
                     $"nudge {_configJsonGapTickEscalations + 1}/{ConfigJsonGapTickEscalationCap})");
@@ -521,7 +521,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] sess=0x{session:X2} configJson retransmit nudge failed: {ex.Message}");
+                MozaLog.Warn($"[AZOM] sess=0x{session:X2} configJson retransmit nudge failed: {ex.Message}");
             }
         }
 
@@ -540,7 +540,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (haveCachedState)
             {
                 MozaLog.Warn(
-                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     "buffer preserved, keeping cached state — no recovery action");
                 return;
             }
@@ -548,7 +548,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (_sender.HotSwitchBurstPending)
             {
                 MozaLog.Debug(
-                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     "deferring recovery — hot-switch burst in flight");
                 return;
             }
@@ -560,7 +560,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (_sender.ConfigJsonLastForwardGapUtcTicks != 0 && gapAgeTicks < passiveWaitTicks)
             {
                 MozaLog.Debug(
-                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     $"waiting up to {ConfigJsonGapPassiveWaitMs}ms for wheel auto-retransmit " +
                     $"(gap age={gapAgeTicks / TimeSpan.TicksPerMillisecond}ms)");
                 return;
@@ -572,7 +572,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                 && primeAgeTicks < passiveWaitTicks)
             {
                 MozaLog.Debug(
-                    $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     $"prior prime+open-request {primeAgeTicks / TimeSpan.TicksPerMillisecond}ms ago — deferring next");
                 return;
             }
@@ -584,7 +584,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                     int recoveryOpenSeq = unchecked((ushort)(seq + 0x100 * _configJsonGapCount));
                     int primeSeq = unchecked((ushort)(seq + 0x200 + _configJsonGapCount));
                     MozaLog.Warn(
-                        $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                         $"passive wait expired ({gapAgeTicks / TimeSpan.TicksPerMillisecond}ms) — " +
                         $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, prime seq=0x{primeSeq:X4})");
                     _sender.SendSessionPrime(session, (ushort)primeSeq);
@@ -593,7 +593,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] {tag} configJson recovery emit failed: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] {tag} configJson recovery emit failed: {ex.Message}");
                 }
                 return;
             }
@@ -602,7 +602,7 @@ namespace MozaPlugin.Telemetry.Watchdog
             // never materialises, the unified verdict (no configJson state past
             // grace) restarts.
             MozaLog.Warn(
-                $"[Moza] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                 "nudge budget spent — waiting for chunk/state (display watchdog will restart if it never arrives)");
         }
 

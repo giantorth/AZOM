@@ -83,7 +83,7 @@ namespace MozaPlugin.Sdk.Resources.Pedal
         {
             if (Interlocked.CompareExchange(ref _gapWarned, 1, 0) == 0)
             {
-                MozaLog.Warn($"[Moza.Sdk] Pedal gap: {_diagnosticName} missing {what}");
+                MozaLog.Warn($"[AZOM.Sdk] Pedal gap: {_diagnosticName} missing {what}");
             }
         }
     }

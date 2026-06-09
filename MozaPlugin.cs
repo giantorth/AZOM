@@ -27,7 +27,7 @@ namespace MozaPlugin
 {
     [PluginDescription("Configure MOZA Racing hardware and send SimHub game telemetry to wheel/dashboard RPM LEDs")]
     [PluginAuthor("giantorth")]
-    [PluginName("MOZA Control")]
+    [PluginName("AZOM")]
     public class MozaPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
     {
         internal static MozaPlugin? Instance { get; private set; }
@@ -209,14 +209,14 @@ namespace MozaPlugin
                 catch (Exception ex)
                 {
                     MozaLog.Warn(
-                        $"[Moza] RequestSavedDashboardReapply: apply threw — {ex.Message}");
+                        $"[AZOM] RequestSavedDashboardReapply: apply threw — {ex.Message}");
                     return;
                 }
                 if (!applied)
                 {
                     _dashboardBindingCoordinator.SetPendingDashboardKey(profile.TelemetryDashboardKey!);
                     MozaLog.Debug(
-                        $"[Moza] RequestSavedDashboardReapply: deferred " +
+                        $"[AZOM] RequestSavedDashboardReapply: deferred " +
                         $"(key={profile.TelemetryDashboardKey}) — PollStatus retry will fire " +
                         "once wheel state is ready");
                 }
@@ -227,7 +227,7 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] RequestSavedDashboardReapply: outer error — {ex.Message}");
+                MozaLog.Warn($"[AZOM] RequestSavedDashboardReapply: outer error — {ex.Message}");
             }
         }
         internal void RestartTelemetry() => _dashboardBindingCoordinator.RestartTelemetry();
@@ -369,7 +369,7 @@ namespace MozaPlugin
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try { _cm2Sender.Start(); }
-                    catch (Exception ex) { MozaLog.Warn($"[Moza] CM2 pipeline start failed: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] CM2 pipeline start failed: {ex.Message}"); }
                 });
             }
         }
@@ -405,7 +405,7 @@ namespace MozaPlugin
             _cm2ReassertAttempted = true; // claim before issuing — switch restarts the pipeline
             if (cm2.WheelReportedSlot == slot) return; // already there
 
-            MozaLog.Info($"[Moza] Re-asserting saved CM2 dashboard '{saved}' (slot {slot}) after pipeline start");
+            MozaLog.Info($"[AZOM] Re-asserting saved CM2 dashboard '{saved}' (slot {slot}) after pipeline start");
             OnCm2DashboardSwitched((uint)slot);
         }
 
@@ -514,7 +514,7 @@ namespace MozaPlugin
         /// CM1 driver.</summary>
         private void LatchDashAsCm1(string reason)
         {
-            MozaLog.Info($"[Moza] Bridged dash → CM1 (group-0x35): {reason}; handing off to CM1 driver");
+            MozaLog.Info($"[AZOM] Bridged dash → CM1 (group-0x35): {reason}; handing off to CM1 driver");
             DashIsCm1 = true;
             SaveSettings();
 
@@ -525,7 +525,7 @@ namespace MozaPlugin
                     DeviceDefinitionDeployed = true;
                 Devices.DeviceDefinitionDeployer.RemoveSpeculativeCm2Dashboard();
             }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM1 device-definition deploy skipped: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM1 device-definition deploy skipped: {ex.Message}"); }
 
             try { _cm2Sender?.Stop(); } catch { }
             if (_telemetrySender != null)
@@ -547,11 +547,11 @@ namespace MozaPlugin
         {
             int subs = DashboardSelectionChanged?.GetInvocationList().Length ?? 0;
             MozaLog.Debug(
-                $"[Moza] Raising DashboardSelectionChanged (subscribers={subs}, " +
+                $"[AZOM] Raising DashboardSelectionChanged (subscribers={subs}, " +
                 $"profileName='{_settings?.TelemetryProfileName}', " +
                 $"mzdash='{_settings?.TelemetryMzdashPath}')");
             try { DashboardSelectionChanged?.Invoke(this, EventArgs.Empty); }
-            catch (Exception ex) { MozaLog.Warn("[Moza] DashboardSelectionChanged subscriber threw: " + ex.Message); }
+            catch (Exception ex) { MozaLog.Warn("[AZOM] DashboardSelectionChanged subscriber threw: " + ex.Message); }
         }
 
         // ===== HardwareApplier shims (external API surface) =====
@@ -669,7 +669,7 @@ namespace MozaPlugin
         
         public PluginManager PluginManager { set => _pluginManager = value; }
         public ImageSource? PictureIcon => NavIcon.Value;
-        public string LeftMenuTitle => "MOZA";
+        public string LeftMenuTitle => "AZOM";
 
         // Wheel-with-screen nav icon. Cyan tint for SimHub's dark nav.
         private static readonly Lazy<ImageSource> NavIcon = new Lazy<ImageSource>(BuildNavIcon);
@@ -996,7 +996,7 @@ namespace MozaPlugin
             // references with fresh instances.
             if (_connection != null || _telemetrySender != null || _hidReader != null)
             {
-                MozaLog.Warn("[Moza] Init() called with prior state still live — tearing down before re-init");
+                MozaLog.Warn("[AZOM] Init() called with prior state still live — tearing down before re-init");
                 try { CleanupPartialInit(); } catch { }
             }
 
@@ -1050,7 +1050,7 @@ namespace MozaPlugin
                 // per-wheel schema (empty key) so existing users keep their data.
                 if (_settings.MigrateLegacyChannelMappingsIfNeeded())
                 {
-                    MozaLog.Info("[Moza] Migrated legacy TelemetryChannelMappings to per-wheel schema (under empty-wheel slot \"\")");
+                    MozaLog.Info("[AZOM] Migrated legacy TelemetryChannelMappings to per-wheel schema (under empty-wheel slot \"\")");
                     this.SaveCommonSettings("MozaPluginSettings", _settings);
                 }
 
@@ -1067,7 +1067,7 @@ namespace MozaPlugin
                 MozaProfile.UnpackColorsInto(_settings.WheelRpmBlinkColors, _data.WheelRpmBlinkColors);
                 MozaProfile.UnpackColorsInto(_settings.DashRpmBlinkColors, _data.DashRpmBlinkColors);
 
-                MozaLog.Info("[Moza] Initializing plugin");
+                MozaLog.Info("[AZOM] Initializing plugin");
 
                 // Bridge-format JSONL wire trace at SimHub/Logs/moza-wire-*.jsonl.
                 // Opt-in via _settings.EnableWireTraceFileSink. Fresh file per launch.
@@ -1080,11 +1080,11 @@ namespace MozaPlugin
                         string logsDir = System.IO.Path.Combine(baseDir, "Logs");
                         string sinkPath = System.IO.Path.Combine(logsDir, $"moza-wire-{ts}.jsonl");
                         global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StartFileSink(sinkPath);
-                        MozaLog.Debug($"[Moza] Wire trace sink → {sinkPath}");
+                        MozaLog.Debug($"[AZOM] Wire trace sink → {sinkPath}");
                     }
                     catch (Exception ex)
                     {
-                        MozaLog.Warn($"[Moza] Wire trace sink open failed: {ex.GetType().Name}: {ex.Message}");
+                        MozaLog.Warn($"[AZOM] Wire trace sink open failed: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
@@ -1097,8 +1097,8 @@ namespace MozaPlugin
                     bool wasRunning = cap.Enabled;
                     cap.EnsureRunning();
                     MozaLog.Debug(wasRunning
-                        ? $"[Moza] Serial traffic capture preserved across reload — AlwaysCaptureOnStartup is on ({cap.Count} entries)"
-                        : "[Moza] Serial traffic capture auto-started — AlwaysCaptureOnStartup is on");
+                        ? $"[AZOM] Serial traffic capture preserved across reload — AlwaysCaptureOnStartup is on ({cap.Count} entries)"
+                        : "[AZOM] Serial traffic capture auto-started — AlwaysCaptureOnStartup is on");
                 }
 
                 // Fire-and-forget update check against the GitHub Releases API.
@@ -1113,7 +1113,7 @@ namespace MozaPlugin
                 // Read SimHub's global temperature unit preference (set at first launch)
                 var tempUnit = pluginManager.GetPropertyValue("DataCorePlugin.GameData.TemperatureUnit");
                 _data.UseFahrenheit = string.Equals(tempUnit as string, "Fahrenheit", StringComparison.OrdinalIgnoreCase);
-                MozaLog.Debug($"[Moza] Temperature unit: {(_data.UseFahrenheit ? "Fahrenheit" : "Celsius")}");
+                MozaLog.Debug($"[AZOM] Temperature unit: {(_data.UseFahrenheit ? "Fahrenheit" : "Celsius")}");
 
                 // Profile system init is deferred until after the collaborators
                 // (HardwareApplier, DeviceProber, PropertyResolver) are constructed,
@@ -1187,12 +1187,12 @@ namespace MozaPlugin
                             // Also restore _data.WheelModelName.
                             _data.WheelModelName = savedModel;
                             MozaLog.Debug(
-                                $"[Moza] Restored WheelModelInfo from persistent state: {savedModel} " +
+                                $"[AZOM] Restored WheelModelInfo from persistent state: {savedModel} " +
                                 $"(rpm={WheelModelInfo?.RpmLedCount}, buttons={WheelModelInfo?.ButtonLedCount}, " +
                                 $"knobs={WheelModelInfo?.KnobCount}, flags={WheelModelInfo?.HasFlagLeds})");
                         }
                     }
-                    MozaLog.Info("[Moza] Reusing persistent serial connection from prior plugin instance");
+                    MozaLog.Info("[AZOM] Reusing persistent serial connection from prior plugin instance");
                 }
                 else
                 {
@@ -1279,7 +1279,7 @@ namespace MozaPlugin
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.
                 try { _mboosterRegistry.Refresh(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Initial refresh: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Initial refresh: {ex.Message}"); }
 
                 // Standalone-peripheral registry — one dedicated connection per
                 // pedal set / handbrake plugged directly into the PC. Refresh()
@@ -1309,22 +1309,22 @@ namespace MozaPlugin
                     if (_connection.IsConnected)
                     {
                         try { PendingResponses.TickRetransmits(_connection.Send); }
-                        catch (Exception ex) { MozaLog.Warn($"[Moza] PendingResponseTracker tick failed: {ex.Message}"); }
+                        catch (Exception ex) { MozaLog.Warn($"[AZOM] PendingResponseTracker tick failed: {ex.Message}"); }
                     }
                     if (_hubManager != null && _hubManager.IsConnected)
                     {
                         try { _hubManager.PendingResponses?.TickRetransmits(_hubManager.Connection.Send); }
-                        catch (Exception ex) { MozaLog.Warn($"[Moza] Hub PendingResponseTracker tick failed: {ex.Message}"); }
+                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Hub PendingResponseTracker tick failed: {ex.Message}"); }
                     }
                     if (_baseManager != null && _baseManager.IsConnected)
                     {
                         try { _baseManager.PendingResponses?.TickRetransmits(_baseManager.Connection.Send); }
-                        catch (Exception ex) { MozaLog.Warn($"[Moza] Base-aux PendingResponseTracker tick failed: {ex.Message}"); }
+                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Base-aux PendingResponseTracker tick failed: {ex.Message}"); }
                     }
                     // Each standalone-peripheral pipe retransmits its own tracked
                     // reads on its own Send (same per-pipe isolation as the hub).
                     try { _peripheralRegistry?.TickRetransmits(); }
-                    catch (Exception ex) { MozaLog.Warn($"[Moza] Standalone peripheral retransmit tick failed: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone peripheral retransmit tick failed: {ex.Message}"); }
                 };
                 _retryTimer.AutoReset = true;
                 _retryTimer.Start();
@@ -1387,14 +1387,14 @@ namespace MozaPlugin
 
                     // Slice I: reconnect-timer mBooster Refresh re-enabled.
                     try { _mboosterRegistry?.Refresh(); }
-                    catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Refresh: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Refresh: {ex.Message}"); }
 
                     // Standalone pedals/handbrake on their own ports (registry-
                     // only, same Wine guard as the other dedicated lanes).
                     if (registryHasMoza)
                     {
                         try { _peripheralRegistry?.Refresh(); }
-                        catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone peripheral refresh: {ex.Message}"); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral refresh: {ex.Message}"); }
                     }
                 };
                 _reconnectTimer.AutoReset = true;
@@ -1408,7 +1408,7 @@ namespace MozaPlugin
                     _hidReader.MBoosterAxisChanged += (identity, pos01) =>
                     {
                         try { _mboosterRegistry.OnHidAxisUpdate(identity, pos01); }
-                        catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] HID dispatch: {ex.Message}"); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] HID dispatch: {ex.Message}"); }
                     };
                 }
                 _hidReader.Start();
@@ -1419,7 +1419,7 @@ namespace MozaPlugin
                 // peripheral walk — surfaces a pedal set / handbrake attached
                 // before SimHub launched without waiting for the 5 s reconnect tick.
                 try { _peripheralRegistry.Refresh(); }
-                catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone peripheral initial refresh: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral initial refresh: {ex.Message}"); }
                 // Hub-pipe peripheral prober: same _data + DetectionState, but
                 // bound to the hub connection + hub device manager so its reads
                 // and Mark*Detected ownership go out on the hub pipe.
@@ -1452,7 +1452,7 @@ namespace MozaPlugin
                     catch (Exception ex)
                     {
                         MozaLog.Warn(
-                            $"[Moza] ControlMapper bridge construction failed — {ex.GetBaseException().Message}");
+                            $"[AZOM] ControlMapper bridge construction failed — {ex.GetBaseException().Message}");
                         _controlMapperBridge = null;
                     }
                 }
@@ -1473,7 +1473,7 @@ namespace MozaPlugin
                 {
                     _telemetrySender = s_persistentTelemetrySender;
                     MozaLog.Info(
-                        "[Moza] Reusing persistent telemetry sender from prior plugin instance " +
+                        "[AZOM] Reusing persistent telemetry sender from prior plugin instance " +
                         $"(state={_telemetrySender.State}, sessions kept alive)");
                 }
                 else
@@ -1500,7 +1500,7 @@ namespace MozaPlugin
                 // null-forgiving operator silences CS8602 without a runtime check.
                 _telemetrySender.EnableHotRenegotiation = _settings!.EnableHotRenegotiation;
                 MozaLog.Info(
-                    $"[Moza] Hot re-negotiation feature flag: " +
+                    $"[AZOM] Hot re-negotiation feature flag: " +
                     $"settings={_settings.EnableHotRenegotiation} " +
                     $"sender={_telemetrySender.EnableHotRenegotiation}");
                 // Reset the start-request gate when the dashboard pipeline parks
@@ -1569,7 +1569,7 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Init failed: {ex}");
+                MozaLog.Error($"[AZOM] Init failed: {ex}");
                 CleanupPartialInit();
                 throw;
             }
@@ -1835,7 +1835,7 @@ namespace MozaPlugin
             if (_telemetrySender == null && sender != null && !_warnedStaleDataFeed)
             {
                 _warnedStaleDataFeed = true;
-                MozaLog.Warn("[Moza] DataUpdate fired with _telemetrySender=null — routing game " +
+                MozaLog.Warn("[AZOM] DataUpdate fired with _telemetrySender=null — routing game " +
                              "data to the persistent sender (stale post-reload instance).");
             }
             sender?.UpdateGameData(data.NewData);
@@ -1878,7 +1878,7 @@ namespace MozaPlugin
                         _controlMapperRetryTicks = 0;
                     else if (_controlMapperRetryTicks == 0 && !_controlMapperBridge.IsGivenUp)
                         MozaLog.Warn(
-                            "[Moza] ControlMapper bridge: ControlMapperPlugin never became available — " +
+                            "[AZOM] ControlMapper bridge: ControlMapperPlugin never became available — " +
                             "giving up retry. Variant integration disabled this session.");
                 }
             }
@@ -1958,7 +1958,7 @@ namespace MozaPlugin
             if (IsShuttingDown || controller == null) return;
             try
             {
-                MozaLog.Info($"[Moza/mBooster] Applying settings for {MBoosterDeviceController.ShortIdentity(controller.Identity)} (experimental calibration surface)");
+                MozaLog.Info($"[AZOM/mBooster] Applying settings for {MBoosterDeviceController.ShortIdentity(controller.Identity)} (experimental calibration surface)");
                 var s = GetOrCreateMBoosterSettings(controller.Identity);
                 ApplyMBoosterToHardware(controller, s);
                 // Always issue a calibration read burst on detect so the panel
@@ -1967,7 +1967,7 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza/mBooster] OnDetected for {controller.Identity}: {ex.Message}");
+                MozaLog.Warn($"[AZOM/mBooster] OnDetected for {controller.Identity}: {ex.Message}");
             }
         }
 
@@ -2024,7 +2024,7 @@ namespace MozaPlugin
         public void End(PluginManager pluginManager)
         {
             IsShuttingDown = true;
-            MozaLog.Info("[Moza] Shutting down plugin");
+            MozaLog.Info("[AZOM] Shutting down plugin");
 
             // 1. Stop timers first so no new callbacks fire against disposed state.
             _saveDebounceTimer?.Stop();
@@ -2207,7 +2207,7 @@ namespace MozaPlugin
             else
             {
                 MozaLog.Info(
-                    "[Moza] End: keeping persistent wire (connection + telemetry sender) alive " +
+                    "[AZOM] End: keeping persistent wire (connection + telemetry sender) alive " +
                     "across plugin reload — wheel sessions remain open, no settle wait on next Init");
             }
             try
@@ -2265,7 +2265,7 @@ namespace MozaPlugin
             try { AppDomain.CurrentDomain.ProcessExit += OnAppDomainProcessExit; }
             catch (Exception ex)
             {
-                try { MozaLog.Warn($"[Moza] ProcessExit handler registration failed: {ex.Message}"); } catch { }
+                try { MozaLog.Warn($"[AZOM] ProcessExit handler registration failed: {ex.Message}"); } catch { }
             }
         }
 
@@ -2293,7 +2293,7 @@ namespace MozaPlugin
                     try { ts.Stop(); }
                     catch (Exception ex)
                     {
-                        try { MozaLog.Warn($"[Moza] ProcessExit Stop(): {ex.GetType().Name}: {ex.Message}"); } catch { }
+                        try { MozaLog.Warn($"[AZOM] ProcessExit Stop(): {ex.GetType().Name}: {ex.Message}"); } catch { }
                     }
                 }
             }
@@ -2606,16 +2606,16 @@ namespace MozaPlugin
             try
             {
                 var g = GetCurrentWheelPageGuid();
-                if (!g.HasValue) { MozaLog.Debug($"[Moza] SLEEP-TRACE [{trigger}]: page guid unresolvable"); return; }
+                if (!g.HasValue) { MozaLog.Debug($"[AZOM] SLEEP-TRACE [{trigger}]: page guid unresolvable"); return; }
                 var dict = _settings?.WheelSleepByPageGuid;
                 if (dict == null || !dict.TryGetValue(g.Value, out var b) || b == null)
                 {
-                    MozaLog.Debug($"[Moza] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} bundle=null");
+                    MozaLog.Debug($"[AZOM] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} bundle=null");
                     return;
                 }
-                MozaLog.Info($"[Moza] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} Mode={b.Mode} TimeoutMin={b.TimeoutMin} SpeedMs={b.SpeedMs}");
+                MozaLog.Info($"[AZOM] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} Mode={b.Mode} TimeoutMin={b.TimeoutMin} SpeedMs={b.SpeedMs}");
             }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] SLEEP-TRACE failed: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] SLEEP-TRACE failed: {ex.Message}"); }
         }
 
         private readonly object _saveDebounceLock = new object();
@@ -2668,7 +2668,7 @@ namespace MozaPlugin
                 // Re-arm base→hub migration: a user toggling Connection wants a
                 // clean re-evaluation of where the wheel actually is.
                 ResetHubWheelMigrationState();
-                MozaLog.Info("[Moza] Connection enabled");
+                MozaLog.Info("[AZOM] Connection enabled");
             }
             else
             {
@@ -2711,7 +2711,7 @@ namespace MozaPlugin
                 Interlocked.Exchange(ref _telemetryStartRequested, 0);
                 DetectionState.WheelPollMisses = 0;
                 DetectionState.LastKnownWheelModel = "";
-                MozaLog.Info("[Moza] Connection disabled");
+                MozaLog.Info("[AZOM] Connection disabled");
             }
         }
 
@@ -2725,7 +2725,7 @@ namespace MozaPlugin
             var c = LanguageResolver.Resolve(_settings?.PreferredLanguage);
             if (!Thread.CurrentThread.CurrentUICulture.Equals(c))
             {
-                MozaLog.Info($"[Moza] GetWPFSettingsControl: switching UI thread culture from " +
+                MozaLog.Info($"[AZOM] GetWPFSettingsControl: switching UI thread culture from " +
                              $"'{Thread.CurrentThread.CurrentUICulture.Name}' to '{c.Name}' " +
                              $"(PreferredLanguage='{_settings?.PreferredLanguage ?? "<auto>"}')");
                 Thread.CurrentThread.CurrentUICulture = c;
@@ -2739,34 +2739,34 @@ namespace MozaPlugin
             // plugin reload windows where _data is unset, or after End() left fields
             // intact but mid-teardown. A throw inside a property getter destabilises
             // SimHub's property polling, so each getter returns a sentinel default.
-            this.AttachDelegate("Moza.BaseConnected", () => _data?.IsBaseConnected ?? false);
+            this.AttachDelegate("AZOM.BaseConnected", () => _data?.IsBaseConnected ?? false);
             // _propertyResolver is constructed later in Init than RegisterProperties
             // runs, so guard it too — SimHub may read these before it exists.
-            this.AttachDelegate("Moza.McuTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.McuTemp));
-            this.AttachDelegate("Moza.MosfetTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MosfetTemp));
-            this.AttachDelegate("Moza.MotorTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MotorTemp));
-            this.AttachDelegate("Moza.BaseState", () => _data?.BaseState ?? 0);
-            this.AttachDelegate("Moza.FfbStrength", () => (_data?.FfbStrength ?? 0) / 10);
-            this.AttachDelegate("Moza.MaxAngle", () => (_data?.MaxAngle ?? 0) * 2);
+            this.AttachDelegate("AZOM.McuTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.McuTemp));
+            this.AttachDelegate("AZOM.MosfetTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MosfetTemp));
+            this.AttachDelegate("AZOM.MotorTemp", () => (_data == null || _propertyResolver == null) ? 0.0 : _propertyResolver.ConvertTemp(_data.MotorTemp));
+            this.AttachDelegate("AZOM.BaseState", () => _data?.BaseState ?? 0);
+            this.AttachDelegate("AZOM.FfbStrength", () => (_data?.FfbStrength ?? 0) / 10);
+            this.AttachDelegate("AZOM.MaxAngle", () => (_data?.MaxAngle ?? 0) * 2);
             // Telemetry pipeline health, so users can show a degraded/parked state on
             // an overlay. TelemetryState = the PipelinePhase name (Idle/SilenceWait/
             // Starting/Active/HotSwitchBurst/Recovery/Parked). DashboardBound is a
             // best-effort "telemetry actively flowing" flag (Phase==Active) — there is
             // no true wheel-side commit signal yet (see P4), so it can read true while
             // a wheel silently ignores the binding; documented limitation.
-            this.AttachDelegate("Moza.TelemetryState", () => (_telemetrySender?.Phase ?? PipelinePhase.Idle).ToString());
-            this.AttachDelegate("Moza.DashboardBound", () => (_telemetrySender?.Phase ?? PipelinePhase.Idle) == PipelinePhase.Active);
+            this.AttachDelegate("AZOM.TelemetryState", () => (_telemetrySender?.Phase ?? PipelinePhase.Idle).ToString());
+            this.AttachDelegate("AZOM.DashboardBound", () => (_telemetrySender?.Phase ?? PipelinePhase.Idle) == PipelinePhase.Active);
 
             // Live physical-input positions read directly from the device HID
             // surface (independent of any game telemetry — these update even with
             // no sim running, see issue #59). _hidReader is constructed later in
             // Init than RegisterProperties, so guard it on every getter.
-            this.AttachDelegate("Moza.HidConnected", () => _data?.IsHidConnected ?? false);
+            this.AttachDelegate("AZOM.HidConnected", () => _data?.IsHidConnected ?? false);
             // Signed steering angle in degrees: 0 = center, + / - = each lock
             // direction. Scaled by the base's reported max-angle (MaxAngle*2 =
             // full physical range), matching Moza.MaxAngle. Returns 0 until the
             // max-angle and HID range are both known.
-            this.AttachDelegate("Moza.SteeringAngle", () =>
+            this.AttachDelegate("AZOM.SteeringAngle", () =>
             {
                 var hid = _hidReader;
                 int maxAngleDeg = (_data?.MaxAngle ?? 0) * 2;
@@ -2776,23 +2776,23 @@ namespace MozaPlugin
             // Steering as a 0-100 position (0 = full lock one way, 50 = center,
             // 100 = full lock the other). Independent of max-angle. Returns -1
             // when no HID device is connected or the range is unknown.
-            this.AttachDelegate("Moza.SteeringPosition", () => _hidReader?.GetSteeringPositionPercent() ?? -1.0);
+            this.AttachDelegate("AZOM.SteeringPosition", () => _hidReader?.GetSteeringPositionPercent() ?? -1.0);
             // Pedal / paddle axes as 0-100 positions.
-            this.AttachDelegate("Moza.Throttle", () => _data?.ThrottlePosition ?? 0);
-            this.AttachDelegate("Moza.Brake", () => _data?.BrakePosition ?? 0);
-            this.AttachDelegate("Moza.Clutch", () => _data?.ClutchPosition ?? 0);
-            this.AttachDelegate("Moza.Handbrake", () => _data?.HandbrakePosition ?? 0);
-            this.AttachDelegate("Moza.LeftPaddle", () => _data?.LeftPaddlePosition ?? 0);
-            this.AttachDelegate("Moza.RightPaddle", () => _data?.RightPaddlePosition ?? 0);
-            this.AttachDelegate("Moza.CombinedPaddle", () => _data?.CombinedPaddlePosition ?? 0);
+            this.AttachDelegate("AZOM.Throttle", () => _data?.ThrottlePosition ?? 0);
+            this.AttachDelegate("AZOM.Brake", () => _data?.BrakePosition ?? 0);
+            this.AttachDelegate("AZOM.Clutch", () => _data?.ClutchPosition ?? 0);
+            this.AttachDelegate("AZOM.Handbrake", () => _data?.HandbrakePosition ?? 0);
+            this.AttachDelegate("AZOM.LeftPaddle", () => _data?.LeftPaddlePosition ?? 0);
+            this.AttachDelegate("AZOM.RightPaddle", () => _data?.RightPaddlePosition ?? 0);
+            this.AttachDelegate("AZOM.CombinedPaddle", () => _data?.CombinedPaddlePosition ?? 0);
         }
 
         private void RegisterActions()
         {
-            this.AddAction("Moza.ClearLeds", (a, b) =>
+            this.AddAction("AZOM.ClearLeds", (a, b) =>
             {
                 ClearLedsOnHardware();
-                MozaLog.Debug("[Moza] LEDs cleared via action");
+                MozaLog.Debug("[AZOM] LEDs cleared via action");
             });
 
             // Step actions mirror the SettingsControl sliders so SimHub button
@@ -2803,30 +2803,30 @@ namespace MozaPlugin
             // new value on its refresh tick.
 
             // Base feel.
-            AddStepActions("Moza.FfbStrength", 5, 10, StepFfbStrength);   // 0..100 %
-            AddStepActions("Moza.Torque",      5, 10, StepTorque);        // 50..100 %
-            AddStepActions("Moza.Rotation",   90, 180, StepRotation);     // 90..2700 deg
+            AddStepActions("AZOM.FfbStrength", 5, 10, StepFfbStrength);   // 0..100 %
+            AddStepActions("AZOM.Torque",      5, 10, StepTorque);        // 50..100 %
+            AddStepActions("AZOM.Rotation",   90, 180, StepRotation);     // 90..2700 deg
 
             // AB9 shifter vibration.
-            AddStepActions("Moza.Ab9EngineIntensity",    5, 10, StepAb9EngineIntensity);    // 0..100
-            AddStepActions("Moza.Ab9EngineFrequency",   10, 20, StepAb9EngineFrequency);    // 0..200 Hz
-            AddStepActions("Moza.Ab9GearShiftIntensity", 5, 10, StepAb9GearShiftIntensity); // 0..100
+            AddStepActions("AZOM.Ab9EngineIntensity",    5, 10, StepAb9EngineIntensity);    // 0..100
+            AddStepActions("AZOM.Ab9EngineFrequency",   10, 20, StepAb9EngineFrequency);    // 0..200 Hz
+            AddStepActions("AZOM.Ab9GearShiftIntensity", 5, 10, StepAb9GearShiftIntensity); // 0..100
 
             // Cycle the wheel's displayed dashboard (wraparound).
-            this.AddAction("Moza.DashboardNext", (a, b) => CycleDashboard(+1));
-            this.AddAction("Moza.DashboardPrev", (a, b) => CycleDashboard(-1));
+            this.AddAction("AZOM.DashboardNext", (a, b) => CycleDashboard(+1));
+            this.AddAction("AZOM.DashboardPrev", (a, b) => CycleDashboard(-1));
 
             // Dashboard telemetry on/off for the active wheel page.
-            this.AddAction("Moza.DashboardTelemetryToggle", (a, b) => ToggleDashboardTelemetry());
-            this.AddAction("Moza.DashboardTelemetryOn", (a, b) =>
+            this.AddAction("AZOM.DashboardTelemetryToggle", (a, b) => ToggleDashboardTelemetry());
+            this.AddAction("AZOM.DashboardTelemetryOn", (a, b) =>
             {
                 SetTelemetryEnabled(true);
-                MozaLog.Debug("[Moza] Dashboard telemetry on via action");
+                MozaLog.Debug("[AZOM] Dashboard telemetry on via action");
             });
-            this.AddAction("Moza.DashboardTelemetryOff", (a, b) =>
+            this.AddAction("AZOM.DashboardTelemetryOff", (a, b) =>
             {
                 SetTelemetryEnabled(false);
-                MozaLog.Debug("[Moza] Dashboard telemetry off via action");
+                MozaLog.Debug("[AZOM] Dashboard telemetry off via action");
             });
 
             // Wheel screen display brightness, 0..100 % (cf.
@@ -2834,17 +2834,17 @@ namespace MozaPlugin
             // nudge ±5, the Coarse variants ±10; the stepper seeds from the
             // wheel's real brightness with the slider's fallback chain so the
             // first press never starts from the -1 sentinel.
-            AddStepActions("Moza.DisplayBrightness", 5, 10, StepDisplayBrightness);
+            AddStepActions("AZOM.DisplayBrightness", 5, 10, StepDisplayBrightness);
 
             // Jump straight to a fixed display brightness in 10-% steps
             // (Moza.DisplayBrightness0 .. Moza.DisplayBrightness100).
             for (int pct = 0; pct <= 100; pct += 10)
             {
                 int target = pct; // capture per iteration
-                this.AddAction($"Moza.DisplayBrightness{pct}", (a, b) =>
+                this.AddAction($"AZOM.DisplayBrightness{pct}", (a, b) =>
                 {
                     SetDisplayBrightness(target);
-                    MozaLog.Debug($"[Moza] Display brightness → {target}% via action");
+                    MozaLog.Debug($"[AZOM] Display brightness → {target}% via action");
                 });
             }
 
@@ -2852,30 +2852,30 @@ namespace MozaPlugin
             // main-set-work-mode; value 1 is the state the UI surfaces as
             // "Standby Mode" on (cf. SettingsControl.StandbyCheck_Click), which
             // is what "work mode off" means for the base.
-            this.AddAction("Moza.WorkModeOff", (a, b) =>
+            this.AddAction("AZOM.WorkModeOff", (a, b) =>
             {
                 if (_data != null) _data.WorkMode = 1;
                 WriteIfBaseConnected("main-set-work-mode", 1);
                 SaveSettings();
-                MozaLog.Debug("[Moza] Work mode off (standby) via action");
+                MozaLog.Debug("[AZOM] Work mode off (standby) via action");
             });
             // Turn work mode back on: value 0 is "Standby Mode" off — the base's
             // normal active state.
-            this.AddAction("Moza.WorkModeOn", (a, b) =>
+            this.AddAction("AZOM.WorkModeOn", (a, b) =>
             {
                 if (_data != null) _data.WorkMode = 0;
                 WriteIfBaseConnected("main-set-work-mode", 0);
                 SaveSettings();
-                MozaLog.Debug("[Moza] Work mode on via action");
+                MozaLog.Debug("[AZOM] Work mode on via action");
             });
 
             // Toggle the wheel screen on/off, remembering the on-brightness so a
             // later toggle-on restores it instead of a fixed default.
-            this.AddAction("Moza.DisplayToggle", (a, b) => ToggleDisplay());
+            this.AddAction("AZOM.DisplayToggle", (a, b) => ToggleDisplay());
 
             // Toggle telemetry test mode (synthetic signal sweep) for the active
             // wheel page, mirroring the Test Start/Stop buttons in the UI.
-            this.AddAction("Moza.TestModeToggle", (a, b) => ToggleTestMode());
+            this.AddAction("AZOM.TestModeToggle", (a, b) => ToggleTestMode());
         }
 
         // Remembered display brightness from the last DisplayToggle-off, so the
@@ -2895,13 +2895,13 @@ namespace MozaPlugin
             {
                 _displayBrightnessBeforeBlank = current;
                 SetDisplayBrightness(0);
-                MozaLog.Debug($"[Moza] Display off (was {current}%) via action");
+                MozaLog.Debug($"[AZOM] Display off (was {current}%) via action");
             }
             else
             {
                 int restore = _displayBrightnessBeforeBlank > 0 ? _displayBrightnessBeforeBlank : 100;
                 SetDisplayBrightness(restore);
-                MozaLog.Debug($"[Moza] Display on → {restore}% via action");
+                MozaLog.Debug($"[AZOM] Display on → {restore}% via action");
             }
         }
 
@@ -2916,7 +2916,7 @@ namespace MozaPlugin
             var active = TelemetrySender;
             if (active == null)
             {
-                MozaLog.Debug("[Moza] Test mode toggle ignored: no telemetry sender");
+                MozaLog.Debug("[AZOM] Test mode toggle ignored: no telemetry sender");
                 return;
             }
             bool turningOn = !active.TestMode;
@@ -2933,7 +2933,7 @@ namespace MozaPlugin
                     active.Stop();
                 }
             }
-            MozaLog.Debug($"[Moza] Test mode → {(turningOn ? "on" : "off")} via action");
+            MozaLog.Debug($"[AZOM] Test mode → {(turningOn ? "on" : "off")} via action");
         }
 
         // ===== Display brightness step/set helpers =====
@@ -2971,7 +2971,7 @@ namespace MozaPlugin
         {
             int val = ClampStep(CurrentDisplayBrightness(), delta, 0, 100);
             SetDisplayBrightness(val);
-            MozaLog.Debug($"[Moza] Display brightness → {val}% via action");
+            MozaLog.Debug($"[AZOM] Display brightness → {val}% via action");
         }
 
         /// <summary>
@@ -3000,7 +3000,7 @@ namespace MozaPlugin
             _data.FfbStrength = raw;
             WriteIfBaseConnected("base-ffb-strength", raw);
             SaveSettings();
-            MozaLog.Debug($"[Moza] FFB strength → {pct}% via action");
+            MozaLog.Debug($"[AZOM] FFB strength → {pct}% via action");
         }
 
         // Torque limit: percent, 50..100 (cf. TorqueSlider_ValueChanged).
@@ -3011,7 +3011,7 @@ namespace MozaPlugin
             _data.Torque = v;
             WriteIfBaseConnected("base-torque", v);
             SaveSettings();
-            MozaLog.Debug($"[Moza] Torque → {v}% via action");
+            MozaLog.Debug($"[AZOM] Torque → {v}% via action");
         }
 
         // Steering rotation: display degrees, stored raw = degrees / 2; both
@@ -3026,7 +3026,7 @@ namespace MozaPlugin
             WriteIfBaseConnected("base-limit", raw);
             WriteIfBaseConnected("base-max-angle", raw);
             SaveSettings();
-            MozaLog.Debug($"[Moza] Rotation → {deg}° via action");
+            MozaLog.Debug($"[AZOM] Rotation → {deg}° via action");
         }
 
         // AB9 engine vibration is host-rendered: the worker thread picks up the
@@ -3038,7 +3038,7 @@ namespace MozaPlugin
             if (ab9 == null) return;
             ab9.EngineVibrationIntensity = (byte)ClampStep(ab9.EngineVibrationIntensity, delta, 0, 100);
             SaveSettings();
-            MozaLog.Debug($"[Moza] AB9 engine vibration intensity → {ab9.EngineVibrationIntensity} via action");
+            MozaLog.Debug($"[AZOM] AB9 engine vibration intensity → {ab9.EngineVibrationIntensity} via action");
         }
 
         private void StepAb9EngineFrequency(int delta)
@@ -3047,7 +3047,7 @@ namespace MozaPlugin
             if (ab9 == null) return;
             ab9.EngineVibrationFrequency = (ushort)ClampStep(ab9.EngineVibrationFrequency, delta, 0, 200);
             SaveSettings();
-            MozaLog.Debug($"[Moza] AB9 engine vibration frequency → {ab9.EngineVibrationFrequency} Hz via action");
+            MozaLog.Debug($"[AZOM] AB9 engine vibration frequency → {ab9.EngineVibrationFrequency} Hz via action");
         }
 
         // AB9 gear-shift vibration: one config write per change so the firmware
@@ -3060,7 +3060,7 @@ namespace MozaPlugin
             ab9.GearShiftVibrationIntensity = (byte)v;
             _ab9Manager?.SendGearShiftVibrationIntensity(v);
             SaveSettings();
-            MozaLog.Debug($"[Moza] AB9 gear-shift vibration intensity → {v} via action");
+            MozaLog.Debug($"[AZOM] AB9 gear-shift vibration intensity → {v} via action");
         }
 
         // Returns the active profile's AB9 block, creating it if absent (matches
@@ -3079,7 +3079,7 @@ namespace MozaPlugin
         {
             bool turningOn = !ActiveTelemetryEnabled;
             SetTelemetryEnabled(turningOn);
-            MozaLog.Debug($"[Moza] Dashboard telemetry → {(turningOn ? "on" : "off")} via action");
+            MozaLog.Debug($"[AZOM] Dashboard telemetry → {(turningOn ? "on" : "off")} via action");
         }
 
         // Cycle the wheel's displayed dashboard to the next/previous enabled slot,
@@ -3094,13 +3094,13 @@ namespace MozaPlugin
             var list = WheelStateForDiagnostics?.ConfigJsonList;
             if (list == null || list.Count == 0)
             {
-                MozaLog.Debug("[Moza] Dashboard cycle ignored: no wheel dashboard list");
+                MozaLog.Debug("[AZOM] Dashboard cycle ignored: no wheel dashboard list");
                 return;
             }
             int n = list.Count;
             if (n == 1)
             {
-                MozaLog.Debug("[Moza] Dashboard cycle ignored: only one dashboard");
+                MozaLog.Debug("[AZOM] Dashboard cycle ignored: only one dashboard");
                 return;
             }
 
@@ -3134,7 +3134,7 @@ namespace MozaPlugin
             ActiveTelemetryMzdashPath = "";
             SaveSettings();
             OnDashboardSwitched((uint)target);
-            MozaLog.Debug($"[Moza] Dashboard cycle {(delta > 0 ? "next" : "prev")} → slot {target} \"{selected}\" via action");
+            MozaLog.Debug($"[AZOM] Dashboard cycle {(delta > 0 ? "next" : "prev")} → slot {target} \"{selected}\" via action");
         }
 
         /// <summary>
@@ -3467,7 +3467,7 @@ namespace MozaPlugin
                     // (possibly different) wheel — the diagnostics tab should
                     // only show what THIS connection has produced.
                     _firmwareDebugLog.Clear();
-                    MozaLog.Info("[Moza] Connected to MOZA device");
+                    MozaLog.Info("[AZOM] Connected to MOZA device");
                     MarkStandaloneDashboardDetectedFromUsb("serial connect");
                     // Base temps/state are dev-0x13 reads the base main controller
                     // answers — pointless (and retransmit-forever noise) on a
@@ -3507,7 +3507,7 @@ namespace MozaPlugin
                     // setting so we don't repeat the stale-port check on
                     // every reconnect tick.
                     MozaLog.Info(
-                        $"[Moza] Cleared stale saved port {_settings.LastWheelbasePort}");
+                        $"[AZOM] Cleared stale saved port {_settings.LastWheelbasePort}");
                     _settings.LastWheelbasePort = "";
                     ScheduleSave();
                 }
@@ -3545,14 +3545,14 @@ namespace MozaPlugin
             if (rising)
             {
                 MozaLog.Info(
-                    $"[Moza] Standalone dashboard detected from USB PID " +
+                    $"[AZOM] Standalone dashboard detected from USB PID " +
                     $"{dashPid} ({MozaUsbIds.Describe(dashPid)}; {reason})");
                 // Skip the legacy SHDP group-0x33 dash reads — a CM2 is driven by
                 // the 0x43 telemetry path, so those reads are pointless bleedthrough.
             }
 
             try { ApplyDashToHardware(_settings?.ProfileStore?.CurrentProfile); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] Standalone dashboard profile apply skipped: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dashboard profile apply skipped: {ex.Message}"); }
 
             try
             {
@@ -3561,7 +3561,7 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] Standalone dashboard telemetry start skipped: {ex.Message}");
+                MozaLog.Debug($"[AZOM] Standalone dashboard telemetry start skipped: {ex.Message}");
             }
 
             return true;
@@ -3594,7 +3594,7 @@ namespace MozaPlugin
                      && string.IsNullOrEmpty(_ab9Manager.Connection.LastPortName))
             {
                 MozaLog.Info(
-                    $"[Moza/AB9] Cleared stale saved port {_settings.LastAb9Port}");
+                    $"[AZOM/AB9] Cleared stale saved port {_settings.LastAb9Port}");
                 _settings.LastAb9Port = "";
                 ScheduleSave();
             }
@@ -3619,7 +3619,7 @@ namespace MozaPlugin
             else if (!string.IsNullOrEmpty(_settings.LastDashboardPort)
                      && string.IsNullOrEmpty(_dashboardManager.Connection.LastPortName))
             {
-                MozaLog.Info($"[Moza] Cleared stale saved dashboard port {_settings.LastDashboardPort}");
+                MozaLog.Info($"[AZOM] Cleared stale saved dashboard port {_settings.LastDashboardPort}");
                 _settings.LastDashboardPort = "";
                 ScheduleSave();
             }
@@ -3662,7 +3662,7 @@ namespace MozaPlugin
             else if (!string.IsNullOrEmpty(_settings.LastHubPort)
                      && string.IsNullOrEmpty(_hubManager.Connection.LastPortName))
             {
-                MozaLog.Info($"[Moza] Cleared stale saved hub port {_settings.LastHubPort}");
+                MozaLog.Info($"[AZOM] Cleared stale saved hub port {_settings.LastHubPort}");
                 _settings.LastHubPort = "";
                 ScheduleSave();
             }
@@ -3691,7 +3691,7 @@ namespace MozaPlugin
             else if (!string.IsNullOrEmpty(_settings.LastBaseAuxPort)
                      && string.IsNullOrEmpty(_baseManager.Connection.LastPortName))
             {
-                MozaLog.Info($"[Moza] Cleared stale saved base-aux port {_settings.LastBaseAuxPort}");
+                MozaLog.Info($"[AZOM] Cleared stale saved base-aux port {_settings.LastBaseAuxPort}");
                 _settings.LastBaseAuxPort = "";
                 ScheduleSave();
             }
@@ -3776,7 +3776,7 @@ namespace MozaPlugin
             string basePort = _connection.LastPortName ?? "";
 
             MozaLog.Info(
-                $"[Moza] Base on {basePort} (PID={_connection.DiscoveredPid}) has no wheel but " +
+                $"[AZOM] Base on {basePort} (PID={_connection.DiscoveredPid}) has no wheel but " +
                 $"a wheel answered on the hub at {hubPort} — migrating primary to the hub " +
                 "(base telemetry continues on the dedicated base-aux pipe)");
 
@@ -3881,7 +3881,7 @@ namespace MozaPlugin
             if (wheelbasePort == null) return;
 
             MozaLog.Info(
-                $"[Moza] Primary bound to non-wheelbase port {_connection.LastPortName} " +
+                $"[AZOM] Primary bound to non-wheelbase port {_connection.LastPortName} " +
                 $"(PID={_connection.DiscoveredPid}) but a wheelbase is available on {wheelbasePort} — " +
                 "migrating primary to the wheelbase");
 
@@ -4151,7 +4151,7 @@ namespace MozaPlugin
 
         internal void ResetWheelDetection(string reason)
         {
-            MozaLog.Debug($"[Moza] {reason}");
+            MozaLog.Debug($"[AZOM] {reason}");
             _telemetrySender?.Stop();
             // Preserve dash detection when this serial connection is a
             // standalone dashboard (CM2). Wheel hot-swap shouldn't blank a
@@ -4363,7 +4363,7 @@ namespace MozaPlugin
                     DisplayWedgeRecoveryFired = true;
                     var hasDisplayStr = WheelModelInfo?.HasDisplay?.ToString() ?? "unknown";
                     MozaLog.Warn(
-                        $"[Moza] Display sub-device wedge: wheel detected " +
+                        $"[AZOM] Display sub-device wedge: wheel detected " +
                         $"{elapsedMs}ms ago (HasDisplay={hasDisplayStr}) but " +
                         "display has not responded. Forcing serial disconnect — " +
                         "reconnect timer (5 s) will reopen the port and give the " +
@@ -4388,7 +4388,7 @@ namespace MozaPlugin
                 {
                     DetectionState.Group3ColorsRead = true;
                     _deviceManager.ReadSetting("wheel-knob-brightness");
-                    MozaLog.Debug($"[Moza] Read knob ring brightness (color reads deferred to Knobs-tab activation)");
+                    MozaLog.Debug($"[AZOM] Read knob ring brightness (color reads deferred to Knobs-tab activation)");
                 }
             }
 
@@ -4472,7 +4472,7 @@ namespace MozaPlugin
                 if (rawDeviceId == 0x21)
                     TryHandleWheelConnectionLog(text);
                 MozaLog.Debug(
-                    $"[Moza] firmware-debug src={(rawDeviceId == 0x21 ? "main" : rawDeviceId == 0x71 ? "wheel" : rawDeviceId == 0xB1 ? "display" : $"0x{rawDeviceId:X2}")}: {text}");
+                    $"[AZOM] firmware-debug src={(rawDeviceId == 0x21 ? "main" : rawDeviceId == 0x71 ? "wheel" : rawDeviceId == 0xB1 ? "display" : $"0x{rawDeviceId:X2}")}: {text}");
                 return;
             }
             // Other 0x0E variants we don't yet know how to decode — drop
@@ -4589,7 +4589,7 @@ namespace MozaPlugin
                         ? BitConverter.ToString(data, 2, showLen)
                         : "(empty)";
                     MozaLog.Debug(
-                        $"[Moza] Unmatched #{_unmatched}: rawGroup=0x{data[0]:X2} group=0x{grp:X2} " +
+                        $"[AZOM] Unmatched #{_unmatched}: rawGroup=0x{data[0]:X2} group=0x{grp:X2} " +
                         $"rawDev=0x{data[1]:X2} dev={dev} len={data.Length} " +
                         $"payload={payload}");
                 }
@@ -4624,7 +4624,7 @@ namespace MozaPlugin
                 if (!string.IsNullOrEmpty(baseName) && _data.BaseModelName != baseName)
                 {
                     _data.BaseModelName = baseName;
-                    MozaLog.Debug($"[Moza] Base identity: {baseName}");
+                    MozaLog.Debug($"[AZOM] Base identity: {baseName}");
                 }
                 return;
             }
@@ -4644,7 +4644,7 @@ namespace MozaPlugin
                 else if (r.Name.StartsWith("wheel-knob-",    StringComparison.Ordinal)) g = 3;
                 else if (r.Name.StartsWith("wheel-ambient-", StringComparison.Ordinal)) g = 4;
                 if (g >= 2 && g <= 4 && DetectionState.TrySetWheelLedGroupPresent(g))
-                    MozaLog.Debug($"[Moza] Wheel LED group {g} detected");
+                    MozaLog.Debug($"[AZOM] Wheel LED group {g} detected");
             }
 
             _deviceManager.MarkWheelResponse(r.DeviceId);
@@ -4714,11 +4714,11 @@ namespace MozaPlugin
                 // Push the FFB session-init handshake (alloc/init/commit) once on
                 // the rising edge. Manager guards against re-sending across reconnects.
                 try { _ab9Manager.SendFfbInitSequence(); }
-                catch (Exception ex) { MozaLog.Warn($"[Moza/AB9] FFB init failed: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Warn($"[AZOM/AB9] FFB init failed: {ex.Message}"); }
                 ApplyAb9ToHardware(_settings?.ProfileStore?.CurrentProfile);
             }
 
-            MozaLog.Debug($"[Moza/AB9] {r.Name} = {r.IntValue}");
+            MozaLog.Debug($"[AZOM/AB9] {r.Name} = {r.IntValue}");
         }
 
         /// <summary>
@@ -4994,13 +4994,13 @@ namespace MozaPlugin
                 case "wheel-idle-timeout":
                     if (bundle.TimeoutMin < 0 && r.IntValue > 0)
                     {
-                        MozaLog.Info($"[Moza] SLEEP-SEED: bundle.TimeoutMin {bundle.TimeoutMin} -> {r.IntValue} (from wheel response)");
+                        MozaLog.Info($"[AZOM] SLEEP-SEED: bundle.TimeoutMin {bundle.TimeoutMin} -> {r.IntValue} (from wheel response)");
                         bundle.TimeoutMin = r.IntValue;
                         changed = true;
                     }
                     else
                     {
-                        MozaLog.Debug($"[Moza] SLEEP-SEED skipped: bundle.TimeoutMin={bundle.TimeoutMin}, wheel reported {r.IntValue}");
+                        MozaLog.Debug($"[AZOM] SLEEP-SEED skipped: bundle.TimeoutMin={bundle.TimeoutMin}, wheel reported {r.IntValue}");
                     }
                     break;
                 case "wheel-idle-speed":
@@ -5525,11 +5525,11 @@ namespace MozaPlugin
             // Apply the initially selected profile
             if (store.CurrentProfile != null)
             {
-                MozaLog.Debug($"[Moza] Initial profile: {store.CurrentProfile.Name}");
+                MozaLog.Debug($"[AZOM] Initial profile: {store.CurrentProfile.Name}");
                 if (_settings.AutoApplyProfileOnLaunch)
                     ApplyProfile(store.CurrentProfile);
                 else
-                    MozaLog.Debug("[Moza] Skipping auto-apply (disabled in Options)");
+                    MozaLog.Debug("[AZOM] Skipping auto-apply (disabled in Options)");
             }
         }
 
@@ -5538,7 +5538,7 @@ namespace MozaPlugin
             var profile = _settings.ProfileStore.CurrentProfile;
             if (profile != null)
             {
-                MozaLog.Info($"[Moza] Profile changed: {profile.Name}");
+                MozaLog.Info($"[AZOM] Profile changed: {profile.Name}");
                 ApplyProfile(profile);
             }
         }
@@ -5550,7 +5550,7 @@ namespace MozaPlugin
         /// </summary>
                 internal void ApplyProfile(MozaProfile profile)
         {
-            MozaLog.Debug($"[Moza] Applying profile: {profile.Name}");
+            MozaLog.Debug($"[AZOM] Applying profile: {profile.Name}");
             _hardwareApplier.ApplyProfileHardware(profile);
 
             // Persist without re-capturing _data — profile already has the values
@@ -5566,13 +5566,13 @@ namespace MozaPlugin
                 try { applied = ApplyTelemetryDashboardFromProfile(profile); }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn("[Moza] ApplyTelemetryDashboardFromProfile threw: " + ex.Message);
+                    MozaLog.Warn("[AZOM] ApplyTelemetryDashboardFromProfile threw: " + ex.Message);
                     applied = true;
                 }
                 if (!applied)
                 {
                     _dashboardBindingCoordinator.SetPendingDashboardKey(profile.TelemetryDashboardKey!);
-                    MozaLog.Debug("[Moza] Profile dashboard apply deferred — wheel state not ready");
+                    MozaLog.Debug("[AZOM] Profile dashboard apply deferred — wheel state not ready");
                 }
                 else
                 {
@@ -5606,7 +5606,7 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Telemetry sync after profile apply failed: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Telemetry sync after profile apply failed: {ex.Message}");
             }
         }
 

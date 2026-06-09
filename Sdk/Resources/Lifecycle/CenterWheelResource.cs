@@ -36,9 +36,9 @@ namespace MozaPlugin.Sdk.Resources.Lifecycle
         public override CoapResourceResponse HandlePost(CoapResourceRequest req)
         {
             if (req.HasPayload && PayloadCodec.TryDecodeScalarFromLittleEndian(req.Payload, out int v))
-                MozaLog.Debug($"[Moza.Sdk] CenterWheel POST id={req.DeviceId} value={v}");
+                MozaLog.Debug($"[AZOM.Sdk] CenterWheel POST id={req.DeviceId} value={v}");
             else
-                MozaLog.Debug($"[Moza.Sdk] CenterWheel POST id={req.DeviceId} (no payload)");
+                MozaLog.Debug($"[AZOM.Sdk] CenterWheel POST id={req.DeviceId} (no payload)");
 
             try
             {
@@ -46,7 +46,7 @@ namespace MozaPlugin.Sdk.Resources.Lifecycle
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] CenterWheel write failed: {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] CenterWheel write failed: {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
             return CoapResourceResponse.Valid();

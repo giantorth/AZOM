@@ -71,7 +71,7 @@ namespace MozaPlugin.Sdk.Resources.Motor
             }
             catch (CborFormatException ex)
             {
-                MozaLog.Warn($"[Moza.Sdk] EqualizerAmp POST malformed CBOR: {ex.Message}");
+                MozaLog.Warn($"[AZOM.Sdk] EqualizerAmp POST malformed CBOR: {ex.Message}");
                 return CoapResourceResponse.BadRequest("malformed CBOR: " + ex.Message);
             }
 

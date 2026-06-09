@@ -159,22 +159,22 @@ namespace MozaPlugin.Devices
             {
                 foreach (var c in added)
                 {
-                    MozaLog.Info($"[Moza/mBooster] Discovered {MBoosterDeviceController.ShortIdentity(c.Identity)} on {c.PortName}");
+                    MozaLog.Info($"[AZOM/mBooster] Discovered {MBoosterDeviceController.ShortIdentity(c.Identity)} on {c.PortName}");
                     try
                     {
                         c.TryConnect();
-                        try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] DeviceAdded handler: {ex.Message}"); }
+                        try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceAdded handler: {ex.Message}"); }
                     }
-                    catch (Exception ex) { MozaLog.Warn($"[Moza/mBooster] Connect failed for {c.Identity}: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] Connect failed for {c.Identity}: {ex.Message}"); }
                 }
             }
             if (removed != null)
             {
                 foreach (var c in removed)
                 {
-                    MozaLog.Info($"[Moza/mBooster] Removed {MBoosterDeviceController.ShortIdentity(c.Identity)} (port gone from registry)");
-                    try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Dispose: {ex.Message}"); }
-                    try { DeviceRemoved?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] DeviceRemoved handler: {ex.Message}"); }
+                    MozaLog.Info($"[AZOM/mBooster] Removed {MBoosterDeviceController.ShortIdentity(c.Identity)} (port gone from registry)");
+                    try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Dispose: {ex.Message}"); }
+                    try { DeviceRemoved?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceRemoved handler: {ex.Message}"); }
                 }
             }
 
@@ -195,15 +195,15 @@ namespace MozaPlugin.Devices
                 foreach (var c in toReconnect)
                 {
                     try { c.TryConnect(); }
-                    catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Reconnect: {ex.Message}"); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Reconnect: {ex.Message}"); }
                 }
             }
         }
 
         private void OnControllerDetected(MBoosterDeviceController c)
         {
-            try { _onDeviceDetectedEdge?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] OnDetectedEdge: {ex.Message}"); }
-            try { DeviceDetected?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] DeviceDetected handler: {ex.Message}"); }
+            try { _onDeviceDetectedEdge?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnDetectedEdge: {ex.Message}"); }
+            try { DeviceDetected?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceDetected handler: {ex.Message}"); }
         }
 
         /// <summary>
@@ -309,7 +309,7 @@ namespace MozaPlugin.Devices
             if (isNew)
             {
                 MozaLog.Warn(
-                    $"[Moza/mBooster] Role collision: {MBoosterDeviceController.ShortIdentity(identity)} " +
+                    $"[AZOM/mBooster] Role collision: {MBoosterDeviceController.ShortIdentity(identity)} " +
                     $"is configured as '{role}' but another mBooster already claimed that role — its position will be ignored.");
             }
         }
@@ -336,7 +336,7 @@ namespace MozaPlugin.Devices
             }
             foreach (var c in all)
             {
-                try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[Moza/mBooster] Dispose {c.Identity}: {ex.Message}"); }
+                try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Dispose {c.Identity}: {ex.Message}"); }
             }
         }
     }

@@ -389,7 +389,7 @@ namespace MozaPlugin.Telemetry.Frames
                 // session(s) the wheel chose for the catalog without needing a
                 // wire trace. Cheap (one debug line per session per session-cycle).
                 MozaLog.Debug(
-                    $"[Moza] Catalog parser: first chunk on sess=0x{session:X2} seq={seq} len={length}");
+                    $"[AZOM] Catalog parser: first chunk on sess=0x{session:X2} seq={seq} len={length}");
             }
             return true;
         }
@@ -449,7 +449,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _lastAppendTickMs.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
-                        $"[Moza] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
+                        $"[AZOM] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
                         "proactive trim failed to bound this session (no committed END marker in buffer). " +
                         "Any in-flight catalog data is LOST; wheel must re-send to recover.");
                 }
@@ -715,7 +715,7 @@ namespace MozaPlugin.Telemetry.Frames
                     hex.Append(buffer[d].ToString("X2"));
                 }
                 MozaLog.Debug(
-                    $"[Moza] Catalog buffer dump sess=0x{session:X2} ({buffer.Length} bytes): {hex}");
+                    $"[AZOM] Catalog buffer dump sess=0x{session:X2} ({buffer.Length} bytes): {hex}");
 
                 // Scan-forward for `04`-tag URL records. Each record encodes its
                 // canonical wheel-firmware idx in the byte at offset i+5 (1-based).
@@ -853,7 +853,7 @@ namespace MozaPlugin.Telemetry.Frames
                     for (int k = 0; k < masked.Count; k++)
                         if (!string.IsNullOrEmpty(masked[k])) liveNonEmpty++;
                     MozaLog.Debug(
-                        $"[Moza] Live catalog committed: end={_committedEndMarker}→{markerValue} " +
+                        $"[AZOM] Live catalog committed: end={_committedEndMarker}→{markerValue} " +
                         $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}} " +
                         (useUnion
                             ? $"(same-burst UNION arm={currentArmCount}, total live={liveNonEmpty})"
@@ -1127,7 +1127,7 @@ namespace MozaPlugin.Telemetry.Frames
                 {
                     int newOnSess = s.distinctIdxAfter - s.distinctIdxBefore;
                     MozaLog.Debug(
-                        $"[Moza] Catalog parse sess=0x{s.session:X2}: " +
+                        $"[AZOM] Catalog parse sess=0x{s.session:X2}: " +
                         $"full={s.full} prefix={s.prefix} abbr={s.abbr} " +
                         $"backref={s.backref} backrefFail={s.backrefFail} " +
                         $"sizeReject={s.sizeReject} plausReject={s.plausReject} " +
@@ -1136,7 +1136,7 @@ namespace MozaPlugin.Telemetry.Frames
                 // Aggregate summary line, preserves the pre-split format for
                 // anyone grepping for "Catalog parse stats: full=...".
                 MozaLog.Debug(
-                    $"[Moza] Catalog parse stats: full={totalFull} prefix={totalPrefix} " +
+                    $"[AZOM] Catalog parse stats: full={totalFull} prefix={totalPrefix} " +
                     $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
                     $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +
                     $"distinct-idx={parsed.Count}");
@@ -1186,7 +1186,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _highestSeqAppended.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
                     MozaLog.Debug(
-                        $"[Moza] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
+                        $"[AZOM] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
                         $"({wiped}B, no valid records, last append {ageMs / 1000}s ago) — " +
                         "wheel sent non-catalog bytes that the parser has been re-rejecting.");
                 }
@@ -1222,7 +1222,7 @@ namespace MozaPlugin.Telemetry.Frames
                         if (wasDifferent) diff.Append($" [{kv.Key}]={kv.Value}");
                     }
                     MozaLog.Debug(
-                        $"[Moza] Wheel channel catalog updated (size {prior?.Count ?? 0}→{merged.Count}):{diff}");
+                        $"[AZOM] Wheel channel catalog updated (size {prior?.Count ?? 0}→{merged.Count}):{diff}");
                 }
             }
 

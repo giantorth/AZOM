@@ -368,7 +368,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Failed to load builtin profile {resourceName}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Failed to load builtin profile {resourceName}: {ex.Message}");
                 }
             }
 
@@ -392,7 +392,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Failed to parse .mzdash {path}: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Failed to parse .mzdash {path}: {ex.Message}");
                 return null;
             }
         }
@@ -432,7 +432,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Debug($"[Moza] mzdash widget-tree parse failed for '{name}': {ex.Message}");
+                    MozaLog.Debug($"[AZOM] mzdash widget-tree parse failed for '{name}': {ex.Message}");
                 }
             }
 
@@ -445,7 +445,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] mzdash page-count parse failed for '{name}': {ex.Message}");
+                MozaLog.Debug($"[AZOM] mzdash page-count parse failed for '{name}': {ex.Message}");
             }
 
             return profile;
@@ -821,7 +821,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 using var stream = assembly.GetManifestResourceStream("MozaPlugin.Data.Telemetry.json");
                 if (stream == null)
                 {
-                    MozaLog.Warn("[Moza] Telemetry.json embedded resource not found");
+                    MozaLog.Warn("[AZOM] Telemetry.json embedded resource not found");
                     return result;
                 }
 
@@ -878,13 +878,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 if (tyreDrift.Count > 0)
                     MozaLog.Warn(
-                        $"[Moza] Telemetry.json tyre codec drift — {tyreDrift.Count} channel(s) not using "
+                        $"[AZOM] Telemetry.json tyre codec drift — {tyreDrift.Count} channel(s) not using "
                         + "the firmware codec PitHouse emits; these widgets will not render: "
                         + string.Join(", ", tyreDrift));
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Failed to load Telemetry.json: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Failed to load Telemetry.json: {ex.Message}");
             }
 
             return result;

@@ -49,7 +49,7 @@ namespace MozaPlugin.Devices
             _expectedModelPrefix = MozaDeviceConstants.GetWheelModelPrefix(typeId);
 
             MozaLog.Debug(
-                $"[Moza] WheelDeviceExtension Init — DeviceTypeID={typeId}, modelPrefix={_expectedModelPrefix ?? "(null)"}");
+                $"[AZOM] WheelDeviceExtension Init — DeviceTypeID={typeId}, modelPrefix={_expectedModelPrefix ?? "(null)"}");
 
             // Injection is deferred to DataUpdate() — calling it here would run before
             // LedModuleDevice.SetSettings(), causing a KeyNotFoundException in that call.
@@ -109,20 +109,20 @@ namespace MozaPlugin.Devices
                             if (plugin != null)
                                 plugin.DeviceExtensionActive = true;
 
-                            MozaLog.Debug("[Moza] Injected virtual LED driver — effects UI should be available");
+                            MozaLog.Debug("[AZOM] Injected virtual LED driver — effects UI should be available");
                         }
                         else
                         {
-                            MozaLog.Warn("[Moza] Could not find DeviceDriver setter on LedModuleSettings");
+                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings");
                         }
                         return;
                     }
                 }
-                MozaLog.Debug("[Moza] No LedModuleDevice found on device instance");
+                MozaLog.Debug("[AZOM] No LedModuleDevice found on device instance");
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Error injecting LED driver: {ex.Message}");
+                MozaLog.Error($"[AZOM] Error injecting LED driver: {ex.Message}");
             }
         }
 
@@ -138,7 +138,7 @@ namespace MozaPlugin.Devices
                 plugin.DeviceExtensionActive = false;
                 if (_expectedModelPrefix != null)
                     plugin.UnregisterActiveModelPrefix(_expectedModelPrefix);
-                MozaLog.Debug("[Moza] Device extension ended");
+                MozaLog.Debug("[AZOM] Device extension ended");
             }
 
             // Drop the LED driver from the static instance registry so it isn't
@@ -225,7 +225,7 @@ namespace MozaPlugin.Devices
             _lastAppliedButtonsCount = modelInfo.ButtonLedCount;
             _lastAppliedEncodersCount = modelInfo.KnobCount;
             MozaLog.Debug(
-                $"[Moza] Set ButtonsCount={modelInfo.ButtonLedCount}, " +
+                $"[AZOM] Set ButtonsCount={modelInfo.ButtonLedCount}, " +
                 $"EncodersCount={modelInfo.KnobCount} for " +
                 $"{(string.IsNullOrEmpty(_expectedModelPrefix) ? "(generic)" : _expectedModelPrefix)}");
         }
@@ -292,7 +292,7 @@ namespace MozaPlugin.Devices
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[Moza] Could not set EncodersCount: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Could not set EncodersCount: {ex.Message}");
             }
         }
     }

@@ -26,16 +26,16 @@ This guide gets you from download to a connected wheel.
    [Releases page](https://github.com/giantorth/moza-simhub-plugin/releases/latest).
 2. Extract `MozaPlugin.dll` into your SimHub directory — on Windows this defaults to
    `C:\Program Files (x86)\SimHub\`.
-3. Restart SimHub. The plugin appears under **Settings › Plugins** as “MOZA Control”.
+3. Restart SimHub. The plugin appears under **Settings › Plugins** as “AZOM”.
 4. Plug in your hardware and restart once more. Devices are auto-detected and their
    definitions deployed — then add them under **Devices**.
 
 ## Verify the connection
 
-Open **Settings › Plugins › MOZA Control**. With a base connected you should see live
+Open **Settings › Plugins › AZOM**. With a base connected you should see live
 steering angle, temperatures, and FFB settings populate:
 
-![The MOZA Control plugin panel inside SimHub](/docs/Screenshot.png)
+![The AZOM plugin panel inside SimHub](/docs/Screenshot.png)
 
 If the panel stays empty, confirm Pithouse is fully closed and that no other app holds
 the serial port, then restart SimHub.

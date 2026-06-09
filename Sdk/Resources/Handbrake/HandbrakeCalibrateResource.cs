@@ -31,9 +31,9 @@ namespace MozaPlugin.Sdk.Resources.Handbrake
         public override CoapResourceResponse HandlePost(CoapResourceRequest req)
         {
             if (req.HasPayload && PayloadCodec.TryDecodeScalarFromLittleEndian(req.Payload, out int v))
-                MozaLog.Debug($"[Moza.Sdk] {_diagnosticName} POST id={req.DeviceId} value={v}");
+                MozaLog.Debug($"[AZOM.Sdk] {_diagnosticName} POST id={req.DeviceId} value={v}");
             else
-                MozaLog.Debug($"[Moza.Sdk] {_diagnosticName} POST id={req.DeviceId} (no/short payload)");
+                MozaLog.Debug($"[AZOM.Sdk] {_diagnosticName} POST id={req.DeviceId} (no/short payload)");
 
             try
             {
@@ -41,7 +41,7 @@ namespace MozaPlugin.Sdk.Resources.Handbrake
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] {_diagnosticName} write failed: {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] {_diagnosticName} write failed: {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
             return CoapResourceResponse.Valid();

@@ -224,7 +224,7 @@ namespace MozaPlugin.ControlMapper
                         _remapperWorker = rw;
                         _registered = true;
                         MozaLog.Info(
-                            "[Moza] ControlMapper bridge: MozaVariantProvider already present, reusing existing entry");
+                            "[AZOM] ControlMapper bridge: MozaVariantProvider already present, reusing existing entry");
                         return true;
                     }
                 }
@@ -239,7 +239,7 @@ namespace MozaPlugin.ControlMapper
                     catch (Exception ex)
                     {
                         MozaLog.Warn(
-                            "[Moza] ControlMapper bridge: UpdateVariantProviders threw — provider registered " +
+                            "[AZOM] ControlMapper bridge: UpdateVariantProviders threw — provider registered " +
                             "but VariantHelper may not have subscribed to VariantChanged: " +
                             ex.GetBaseException().Message);
                     }
@@ -247,13 +247,13 @@ namespace MozaPlugin.ControlMapper
                 else
                 {
                     MozaLog.Warn(
-                        "[Moza] ControlMapper bridge: RemapperWorker.UpdateVariantProviders not found — wheel " +
+                        "[AZOM] ControlMapper bridge: RemapperWorker.UpdateVariantProviders not found — wheel " +
                         "hot-swap won't refresh Control Mapper automatically (user can manually rescan).");
                 }
 
                 _registered = true;
                 MozaLog.Info(
-                    $"[Moza] ControlMapper bridge: registered MozaVariantProvider " +
+                    $"[AZOM] ControlMapper bridge: registered MozaVariantProvider " +
                     $"({providers.Count} providers total)");
 
                 // Diagnostic capture — settings reference for periodic mapping dumps.
@@ -270,7 +270,7 @@ namespace MozaPlugin.ControlMapper
                     // Controller (or anything else mutates the collection).
                     HookMappingsCollectionChanged();
                 }
-                catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: settings capture: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: settings capture: {ex.Message}"); }
 
                 // Force an immediate controller re-enumeration so our provider's
                 // variant is picked up on the first pass instead of waiting for
@@ -288,13 +288,13 @@ namespace MozaPlugin.ControlMapper
                     {
                         updateControllerListMethod.Invoke(rw, null);
                         MozaLog.Debug(
-                            "[Moza] ControlMapper bridge: forced UpdateControllerList " +
+                            "[AZOM] ControlMapper bridge: forced UpdateControllerList " +
                             "to re-key controllers with MOZA variant");
                     }
                     catch (Exception ex)
                     {
                         MozaLog.Debug(
-                            "[Moza] ControlMapper bridge: UpdateControllerList threw — " +
+                            "[AZOM] ControlMapper bridge: UpdateControllerList threw — " +
                             ex.GetBaseException().Message);
                     }
                 }
@@ -337,7 +337,7 @@ namespace MozaPlugin.ControlMapper
             try { _provider.Poll(); }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] ControlMapper bridge poll: {ex.Message}");
+                MozaLog.Debug($"[AZOM] ControlMapper bridge poll: {ex.Message}");
             }
 
             // Auto-create a new ControllerSourceMapping for the currently-
@@ -376,7 +376,7 @@ namespace MozaPlugin.ControlMapper
                 try { AutoCreateVariantMappingIfNeeded(currentVariant); }
                 catch (Exception ex)
                 {
-                    MozaLog.Debug($"[Moza] CM auto-create: {ex.Message}");
+                    MozaLog.Debug($"[AZOM] CM auto-create: {ex.Message}");
                 }
             }
 
@@ -394,7 +394,7 @@ namespace MozaPlugin.ControlMapper
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] CM diag: {ex.Message}");
+                MozaLog.Debug($"[AZOM] CM diag: {ex.Message}");
             }
         }
 
@@ -420,21 +420,21 @@ namespace MozaPlugin.ControlMapper
                 || _descControllerIDProp == null
                 || _stateAvailableProp == null)
             {
-                MozaLog.Debug("[Moza] CM diag: reflection unavailable, skipping dump");
+                MozaLog.Debug("[AZOM] CM diag: reflection unavailable, skipping dump");
                 return;
             }
             object? mappingsObj;
             try { mappingsObj = _settingsControllerMappingsProp.GetValue(_controlMapperSettings); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: get mappings: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: get mappings: {ex.Message}"); return; }
             if (mappingsObj is not IList mappings)
             {
-                MozaLog.Debug("[Moza] CM diag: mappings not an IList");
+                MozaLog.Debug("[AZOM] CM diag: mappings not an IList");
                 return;
             }
 
             int idx = 0;
             int mozaCount = 0;
-            MozaLog.Debug($"[Moza] CM diag (variant=\"{currentVariantLabel}\"): "
+            MozaLog.Debug($"[AZOM] CM diag (variant=\"{currentVariantLabel}\"): "
                 + $"ControllerMappings.Count={mappings.Count}");
             foreach (object? entry in mappings)
             {
@@ -466,10 +466,10 @@ namespace MozaPlugin.ControlMapper
                     catch { }
                 }
                 MozaLog.Debug(
-                    $"[Moza] CM diag   #{idx}: Variant=\"{variant}\" CtrlID={cidShort}.. "
+                    $"[AZOM] CM diag   #{idx}: Variant=\"{variant}\" CtrlID={cidShort}.. "
                     + $"Available={availStr} IsEnabled={enabledStr} DescObj={GetHash(desc):X}");
             }
-            MozaLog.Debug($"[Moza] CM diag: {mozaCount} MOZA mapping(s) total");
+            MozaLog.Debug($"[AZOM] CM diag: {mozaCount} MOZA mapping(s) total");
         }
 
         private void ResolveDiagnosticReflection()
@@ -502,7 +502,7 @@ namespace MozaPlugin.ControlMapper
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] CM diag: reflection resolve: {ex.Message}");
+                MozaLog.Debug($"[AZOM] CM diag: reflection resolve: {ex.Message}");
             }
         }
 
@@ -651,20 +651,20 @@ namespace MozaPlugin.ControlMapper
 
             object? newCsm;
             try { newCsm = Activator.CreateInstance(csmType); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM auto-create: csm ctor: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM auto-create: csm ctor: {ex.Message}"); return; }
             if (newCsm == null) return;
 
             object? newDesc;
             try { newDesc = Activator.CreateInstance(descType); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM auto-create: desc ctor: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM auto-create: desc ctor: {ex.Message}"); return; }
             if (newDesc == null) return;
 
             try { copyFrom.Invoke(newDesc, new[] { primaryDesc }); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM auto-create: desc CopyFrom: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM auto-create: desc CopyFrom: {ex.Message}"); return; }
             try { _descVariantProp.SetValue(newDesc, currentVariant); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM auto-create: set Variant: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM auto-create: set Variant: {ex.Message}"); return; }
             try { _csmDescriptionProp.SetValue(newCsm, newDesc); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM auto-create: set csm Description: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM auto-create: set csm Description: {ex.Message}"); return; }
 
             // Mark before Add so we don't re-attempt on the next tick if the
             // async dispatch is still pending.
@@ -690,13 +690,13 @@ namespace MozaPlugin.ControlMapper
                 {
                     capturedMappings.Add(capturedCsm);
                     MozaLog.Info(
-                        $"[Moza] CM auto-create: added new mapping for variant \"{capturedVariant}\" "
+                        $"[AZOM] CM auto-create: added new mapping for variant \"{capturedVariant}\" "
                         + $"(now {capturedMappings.Count} total mappings)");
                 }
                 catch (Exception ex)
                 {
                     MozaLog.Warn(
-                        $"[Moza] CM auto-create: Add threw on UI thread: {ex.GetBaseException().Message}");
+                        $"[AZOM] CM auto-create: Add threw on UI thread: {ex.GetBaseException().Message}");
                 }
             }
 
@@ -709,7 +709,7 @@ namespace MozaPlugin.ControlMapper
                 try { dispatcher.BeginInvoke(new Action(DoAdd)); }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] CM auto-create: dispatcher BeginInvoke threw: {ex.GetBaseException().Message}");
+                    MozaLog.Warn($"[AZOM] CM auto-create: dispatcher BeginInvoke threw: {ex.GetBaseException().Message}");
                 }
             }
         }
@@ -750,7 +750,7 @@ namespace MozaPlugin.ControlMapper
             }
             if (evt == null)
             {
-                MozaLog.Debug("[Moza] CM diag: CollectionChanged event not found on ControllerMappings");
+                MozaLog.Debug("[AZOM] CM diag: CollectionChanged event not found on ControllerMappings");
                 return;
             }
             try
@@ -764,11 +764,11 @@ namespace MozaPlugin.ControlMapper
                 _mappingsCollChangedEvent = evt;
                 _mappingsCollChangedHandler = handler;
                 _mappingsCollChangedTarget = mappingsObj;
-                MozaLog.Debug("[Moza] CM diag: subscribed to ControllerMappings.CollectionChanged");
+                MozaLog.Debug("[AZOM] CM diag: subscribed to ControllerMappings.CollectionChanged");
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] CM diag: subscribe failed: {ex.Message}");
+                MozaLog.Debug($"[AZOM] CM diag: subscribe failed: {ex.Message}");
             }
         }
 
@@ -782,7 +782,7 @@ namespace MozaPlugin.ControlMapper
                 || _mappingsCollChangedTarget == null)
                 return;
             try { _mappingsCollChangedEvent.RemoveEventHandler(_mappingsCollChangedTarget, _mappingsCollChangedHandler); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: unsubscribe failed: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: unsubscribe failed: {ex.Message}"); }
             finally
             {
                 _mappingsCollChangedEvent = null;
@@ -796,7 +796,7 @@ namespace MozaPlugin.ControlMapper
             try
             {
                 MozaLog.Debug(
-                    $"[Moza] CM diag: ControllerMappings changed (action={e.Action}, "
+                    $"[AZOM] CM diag: ControllerMappings changed (action={e.Action}, "
                     + $"newCount={(e.NewItems?.Count ?? 0)}, oldCount={(e.OldItems?.Count ?? 0)})");
                 string? currentVariant = ComputeCurrentVariant();
 
@@ -826,7 +826,7 @@ namespace MozaPlugin.ControlMapper
 
                 DumpMappingsState(currentVariant ?? "<none>");
             }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: collchanged handler: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: collchanged handler: {ex.Message}"); }
         }
 
         /// <summary>
@@ -848,13 +848,13 @@ namespace MozaPlugin.ControlMapper
             // Build an independent clone of the description.
             Type descType = desc.GetType();
             MethodInfo? copyFrom = descType.GetMethod("CopyFrom");
-            if (copyFrom == null) { MozaLog.Debug("[Moza] CM diag: CopyFrom not found on Description"); return; }
+            if (copyFrom == null) { MozaLog.Debug("[AZOM] CM diag: CopyFrom not found on Description"); return; }
             object? clone;
             try { clone = Activator.CreateInstance(descType); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: clone ctor: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: clone ctor: {ex.Message}"); return; }
             if (clone == null) return;
             try { copyFrom.Invoke(clone, new[] { desc }); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: clone CopyFrom: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: clone CopyFrom: {ex.Message}"); return; }
 
             // Stamp the clone's Variant with the current detected wheel
             // (what the user actually wanted to add). If no wheel is detected
@@ -866,14 +866,14 @@ namespace MozaPlugin.ControlMapper
             catch { originalVariant = null; }
             string targetVariant = currentVariant ?? originalVariant ?? string.Empty;
             try { _descVariantProp.SetValue(clone, targetVariant); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: clone set Variant: {ex.Message}"); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: clone set Variant: {ex.Message}"); }
 
             // Replace the CSM's Description with the independent clone.
             try { _csmDescriptionProp.SetValue(csm, clone); }
-            catch (Exception ex) { MozaLog.Debug($"[Moza] CM diag: set CSM Description: {ex.Message}"); return; }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: set CSM Description: {ex.Message}"); return; }
 
             MozaLog.Debug(
-                $"[Moza] CM diag: detached shared Description on new MOZA mapping "
+                $"[AZOM] CM diag: detached shared Description on new MOZA mapping "
                 + $"(oldDescObj={oldHash:X}, newDescObj={GetHash(clone):X}, "
                 + $"originalVariant=\"{originalVariant ?? "<null>"}\", "
                 + $"setVariant=\"{targetVariant}\")");
@@ -906,15 +906,15 @@ namespace MozaPlugin.ControlMapper
                         catch (Exception ex)
                         {
                             MozaLog.Debug(
-                                $"[Moza] ControlMapper bridge unregister UpdateVariantProviders: {ex.Message}");
+                                $"[AZOM] ControlMapper bridge unregister UpdateVariantProviders: {ex.Message}");
                         }
                     }
                 }
-                MozaLog.Info("[Moza] ControlMapper bridge: MozaVariantProvider removed");
+                MozaLog.Info("[AZOM] ControlMapper bridge: MozaVariantProvider removed");
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Moza] ControlMapper bridge unregister: {ex.Message}");
+                MozaLog.Debug($"[AZOM] ControlMapper bridge unregister: {ex.Message}");
             }
             finally
             {
@@ -930,7 +930,7 @@ namespace MozaPlugin.ControlMapper
             if (_giveUpLogged) return;
             _giveUpLogged = true;
             MozaLog.Warn(
-                $"[Moza] ControlMapper bridge: {reason} — Control Mapper variant integration disabled " +
+                $"[AZOM] ControlMapper bridge: {reason} — Control Mapper variant integration disabled " +
                 "for this session. The wheelbase will still appear in Control Mapper without a variant.");
         }
     }

@@ -90,7 +90,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 try
                 {
                     MozaLog.Debug(
-                        $"[Moza] configJson state received: TitleId={state.TitleId} " +
+                        $"[AZOM] configJson state received: TitleId={state.TitleId} " +
                         $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
                         $"configJsonList={state.ConfigJsonList.Count} " +
                         $"enabled={state.EnabledDashboards.Count} disabled={state.DisabledDashboards.Count} " +
@@ -111,7 +111,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         try
                         {
                             MozaLog.Debug(
-                                $"[Moza] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
+                                $"[AZOM] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
                                 "Firmware may be older than 2025-11 or schema has drifted.");
                         }
                         catch { /* logging optional in unit tests */ }
@@ -146,7 +146,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             try
             {
                 MozaLog.Debug(
-                    $"[Moza] configJson state received: TitleId={state.TitleId} " +
+                    $"[AZOM] configJson state received: TitleId={state.TitleId} " +
                     $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
                     $"configJsonList={state.ConfigJsonList.Count} " +
                     $"enabled={state.EnabledDashboards.Count} disabled={state.DisabledDashboards.Count} " +
@@ -163,7 +163,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     try
                     {
                         MozaLog.Debug(
-                            $"[Moza] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
+                            $"[AZOM] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
                             "Firmware may be older than 2025-11 or schema has drifted.");
                     }
                     catch { /* logging optional in unit tests */ }

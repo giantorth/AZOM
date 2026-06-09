@@ -477,7 +477,7 @@ namespace MozaPlugin
             // buffer still records it for the Diagnostics export bundle.
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
             MozaLog.Debug(
-                $"[Moza] Rotation slider → {deg}° (raw={raw}); " +
+                $"[AZOM] Rotation slider → {deg}° (raw={raw}); " +
                 $"active profile='{profile?.Name ?? "(none)"}', " +
                 $"profile.Limit={profile?.Limit.ToString() ?? "n/a"}, " +
                 $"baseConnected={_data.IsBaseConnected}");
@@ -1699,11 +1699,11 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Diagnostics export failed: {ex}");
+                MozaLog.Error($"[AZOM] Diagnostics export failed: {ex}");
                 System.Windows.MessageBox.Show(
                     System.Windows.Window.GetWindow(this),
                     $"Export failed: {ex.Message}",
-                    "MOZA Control",
+                    "AZOM",
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
             }

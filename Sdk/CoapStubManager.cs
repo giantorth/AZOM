@@ -145,7 +145,7 @@ namespace MozaPlugin.Sdk
             {
                 if (_disposed)
                 {
-                    MozaLog.Warn("[Moza] CoapStubManager.Start called after Dispose; ignored.");
+                    MozaLog.Warn("[AZOM] CoapStubManager.Start called after Dispose; ignored.");
                     return;
                 }
 
@@ -155,7 +155,7 @@ namespace MozaPlugin.Sdk
                     {
                         if (!_process.HasExited)
                         {
-                            MozaLog.Warn($"[Moza] CoAP stub already running (PID {_process.Id}); Start() ignored.");
+                            MozaLog.Warn($"[AZOM] CoAP stub already running (PID {_process.Id}); Start() ignored.");
                             return;
                         }
                     }
@@ -176,7 +176,7 @@ namespace MozaPlugin.Sdk
                         // so the UI doesn't show a misleading "Stopped".
                         _status = "Disabled (non-Windows host)";
                         _lastError = null;
-                        MozaLog.Info("[Moza] CoapStubManager.Start skipped: host is not Windows.");
+                        MozaLog.Info("[AZOM] CoapStubManager.Start skipped: host is not Windows.");
                         return;
                     }
 
@@ -312,7 +312,7 @@ namespace MozaPlugin.Sdk
                         _jobHandle = jobHandle;
                         _status = $"Running (PID {p.Id})";
                         _lastError = null;
-                        MozaLog.Info($"[Moza] CoAP stub started (PID {p.Id}, exe '{exePath}').");
+                        MozaLog.Info($"[AZOM] CoAP stub started (PID {p.Id}, exe '{exePath}').");
 
                         // Redirect HKCU\Software\MOZA\PitHouse\path to our
                         // stub so the SDK's env check reads the FileVersion
@@ -344,7 +344,7 @@ namespace MozaPlugin.Sdk
                 {
                     _lastError = ex.Message;
                     _status = "Failed to start";
-                    MozaLog.Error($"[Moza] CoAP stub start failed: {ex}");
+                    MozaLog.Error($"[AZOM] CoAP stub start failed: {ex}");
                     CleanupProcessLocked();
                 }
             }
@@ -371,7 +371,7 @@ namespace MozaPlugin.Sdk
 
                 _status = "Stopped";
                 if (pid.HasValue)
-                    MozaLog.Info($"[Moza] CoAP stub stopped (was PID {pid.Value}).");
+                    MozaLog.Info($"[AZOM] CoAP stub stopped (was PID {pid.Value}).");
             }
         }
 
@@ -408,7 +408,7 @@ namespace MozaPlugin.Sdk
                 try { Stop(); }
                 catch (Exception ex)
                 {
-                    try { MozaLog.Warn($"[Moza] CoAP stub Stop() raised: {ex.GetType().Name}: {ex.Message}"); } catch { }
+                    try { MozaLog.Warn($"[AZOM] CoAP stub Stop() raised: {ex.GetType().Name}: {ex.Message}"); } catch { }
                 }
             });
             bool completed;
@@ -419,7 +419,7 @@ namespace MozaPlugin.Sdk
                 try
                 {
                     MozaLog.Warn(
-                        $"[Moza] CoAP stub Stop() timed out after {timeoutMs} ms — abandoning. " +
+                        $"[AZOM] CoAP stub Stop() timed out after {timeoutMs} ms — abandoning. " +
                         "JobObject KILL_ON_JOB_CLOSE will reap the child on process exit; " +
                         "orphan sweep covers the case where Wine doesn't honor it.");
                 }
@@ -477,7 +477,7 @@ namespace MozaPlugin.Sdk
             try { candidates = Process.GetProcessesByName(exeName); }
             catch (Exception ex)
             {
-                try { MozaLog.Debug($"[Moza] Orphan-sweep enumerate failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
+                try { MozaLog.Debug($"[AZOM] Orphan-sweep enumerate failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
                 return;
             }
 
@@ -514,11 +514,11 @@ namespace MozaPlugin.Sdk
                         p.Kill();
                         try { p.WaitForExit(500); } catch { }
                         killed++;
-                        try { MozaLog.Info($"[Moza] Orphan-sweep killed prior-session stub PID {pid}"); } catch { }
+                        try { MozaLog.Info($"[AZOM] Orphan-sweep killed prior-session stub PID {pid}"); } catch { }
                     }
                     catch (Exception ex)
                     {
-                        try { MozaLog.Warn($"[Moza] Orphan-sweep kill PID {pid} failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
+                        try { MozaLog.Warn($"[AZOM] Orphan-sweep kill PID {pid} failed: {ex.GetType().Name}: {ex.Message}"); } catch { }
                     }
                 }
                 finally
@@ -529,11 +529,11 @@ namespace MozaPlugin.Sdk
 
             if (killed == 0)
             {
-                try { MozaLog.Debug($"[Moza] Orphan-sweep: no prior-session stub processes found ({candidates.Length} candidate(s) checked)"); } catch { }
+                try { MozaLog.Debug($"[AZOM] Orphan-sweep: no prior-session stub processes found ({candidates.Length} candidate(s) checked)"); } catch { }
             }
             else
             {
-                try { MozaLog.Info($"[Moza] Orphan-sweep reaped {killed} prior-session stub process(es) — stale wineserver state cleared."); } catch { }
+                try { MozaLog.Info($"[AZOM] Orphan-sweep reaped {killed} prior-session stub process(es) — stale wineserver state cleared."); } catch { }
             }
         }
 
@@ -553,7 +553,7 @@ namespace MozaPlugin.Sdk
                     _status = code == 0
                         ? "Stopped (exit 0)"
                         : $"Crashed (exit {code})";
-                    MozaLog.Warn($"[Moza] CoAP stub exited unexpectedly with code {code}.");
+                    MozaLog.Warn($"[AZOM] CoAP stub exited unexpectedly with code {code}.");
                 }
             }
         }
@@ -606,7 +606,7 @@ namespace MozaPlugin.Sdk
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Could not hash existing stub at '{StubExePath}': {ex.Message}; will overwrite.");
+                    MozaLog.Warn($"[AZOM] Could not hash existing stub at '{StubExePath}': {ex.Message}; will overwrite.");
                 }
             }
 
@@ -635,7 +635,7 @@ namespace MozaPlugin.Sdk
             if (_redirectApplied)
             {
                 try { RestoreRegistryRedirect(); }
-                catch (Exception ex) { MozaLog.Warn($"[Moza] Registry restore raised in cleanup: {ex.GetType().Name}: {ex.Message}"); }
+                catch (Exception ex) { MozaLog.Warn($"[AZOM] Registry restore raised in cleanup: {ex.GetType().Name}: {ex.Message}"); }
                 _redirectApplied = false;
             }
 
@@ -722,7 +722,7 @@ namespace MozaPlugin.Sdk
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                MozaLog.Info("[Moza] Registry redirect skipped: host is not Windows.");
+                MozaLog.Info("[AZOM] Registry redirect skipped: host is not Windows.");
                 return false;
             }
 
@@ -743,7 +743,7 @@ namespace MozaPlugin.Sdk
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[Moza] Reading HKCU\\{MozaRegSubKey}\\{MozaRegValueName} for backup failed: {ex.GetType().Name}: {ex.Message}; treating as absent.");
+                    MozaLog.Warn($"[AZOM] Reading HKCU\\{MozaRegSubKey}\\{MozaRegValueName} for backup failed: {ex.GetType().Name}: {ex.Message}; treating as absent.");
                 }
 
                 // Self-capture guard: never record OUR OWN stub path as the
@@ -759,7 +759,7 @@ namespace MozaPlugin.Sdk
                 // "no original" (empty backup → restore by deleting the value).
                 if (!string.IsNullOrEmpty(original) && IsOwnStubPath(original!))
                 {
-                    MozaLog.Info($"[Moza] Existing HKCU\\{MozaRegSubKey}\\{MozaRegValueName} value '{original}' is our own stub path; backing up as 'no original' so restore deletes it.");
+                    MozaLog.Info($"[AZOM] Existing HKCU\\{MozaRegSubKey}\\{MozaRegValueName} value '{original}' is our own stub path; backing up as 'no original' so restore deletes it.");
                     original = null;
                 }
 
@@ -773,13 +773,13 @@ namespace MozaPlugin.Sdk
                     // Without a durable backup we can't promise to restore
                     // on shutdown — refuse the redirect rather than leave
                     // the user's registry permanently pointed at the stub.
-                    MozaLog.Error($"[Moza] Could not persist registry backup to '{backupPath}': {ex.GetType().Name}: {ex.Message}; refusing to redirect.");
+                    MozaLog.Error($"[AZOM] Could not persist registry backup to '{backupPath}': {ex.GetType().Name}: {ex.Message}; refusing to redirect.");
                     return false;
                 }
             }
             else
             {
-                MozaLog.Info($"[Moza] Reusing existing registry backup '{backupPath}' (prior session did not clean up).");
+                MozaLog.Info($"[AZOM] Reusing existing registry backup '{backupPath}' (prior session did not clean up).");
             }
 
             try
@@ -787,12 +787,12 @@ namespace MozaPlugin.Sdk
                 using var key = Registry.CurrentUser.CreateSubKey(MozaRegSubKey, writable: true)
                     ?? throw new InvalidOperationException("CreateSubKey returned null");
                 key.SetValue(MozaRegValueName, stubExePath, RegistryValueKind.String);
-                MozaLog.Info($"[Moza] HKCU\\{MozaRegSubKey}\\{MozaRegValueName} redirected to stub '{stubExePath}'.");
+                MozaLog.Info($"[AZOM] HKCU\\{MozaRegSubKey}\\{MozaRegValueName} redirected to stub '{stubExePath}'.");
                 return true;
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Registry redirect write failed: {ex.GetType().Name}: {ex.Message}. Backup file kept; restore on Stop will undo any partial state.");
+                MozaLog.Error($"[AZOM] Registry redirect write failed: {ex.GetType().Name}: {ex.Message}. Backup file kept; restore on Stop will undo any partial state.");
                 return false;
             }
         }
@@ -826,7 +826,7 @@ namespace MozaPlugin.Sdk
                 // feature; the safe default is to remove our redirect entirely —
                 // a real PitHouse rewrites this key on its next launch anyway.
                 // Treat the unreadable backup as "no original" and delete.
-                MozaLog.Warn($"[Moza] Reading registry backup '{backupPath}' failed: {ex.GetType().Name}: {ex.Message}; removing our redirect (delete value) as the safe default.");
+                MozaLog.Warn($"[AZOM] Reading registry backup '{backupPath}' failed: {ex.GetType().Name}: {ex.Message}; removing our redirect (delete value) as the safe default.");
                 original = string.Empty;
             }
 
@@ -840,26 +840,26 @@ namespace MozaPlugin.Sdk
                         // throwOnMissingValue=false: someone else may have
                         // already deleted it between our write and now.
                         try { key.DeleteValue(MozaRegValueName, throwOnMissingValue: false); }
-                        catch (Exception ex) { MozaLog.Debug($"[Moza] DeleteValue ignored: {ex.Message}"); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM] DeleteValue ignored: {ex.Message}"); }
                     }
-                    MozaLog.Info($"[Moza] HKCU\\{MozaRegSubKey}\\{MozaRegValueName} restored (deleted — original had no value).");
+                    MozaLog.Info($"[AZOM] HKCU\\{MozaRegSubKey}\\{MozaRegValueName} restored (deleted — original had no value).");
                 }
                 else
                 {
                     using var key = Registry.CurrentUser.CreateSubKey(MozaRegSubKey, writable: true)
                         ?? throw new InvalidOperationException("CreateSubKey returned null");
                     key.SetValue(MozaRegValueName, original, RegistryValueKind.String);
-                    MozaLog.Info($"[Moza] HKCU\\{MozaRegSubKey}\\{MozaRegValueName} restored to original '{original}'.");
+                    MozaLog.Info($"[AZOM] HKCU\\{MozaRegSubKey}\\{MozaRegValueName} restored to original '{original}'.");
                 }
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza] Registry restore write failed: {ex.GetType().Name}: {ex.Message}. Backup file kept for next attempt.");
+                MozaLog.Error($"[AZOM] Registry restore write failed: {ex.GetType().Name}: {ex.Message}. Backup file kept for next attempt.");
                 return; // Don't delete backup — preserve for retry.
             }
 
             try { File.Delete(backupPath); }
-            catch (Exception ex) { MozaLog.Warn($"[Moza] Could not delete registry backup '{backupPath}' after restore: {ex.GetType().Name}: {ex.Message}."); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Could not delete registry backup '{backupPath}' after restore: {ex.GetType().Name}: {ex.Message}."); }
         }
 
         // ─────────────────────────────────────────────────────────────

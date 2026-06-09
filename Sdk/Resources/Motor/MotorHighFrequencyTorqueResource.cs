@@ -34,7 +34,7 @@ namespace MozaPlugin.Sdk.Resources.Motor
 
             int n = Interlocked.Increment(ref _counter);
             if ((n % LogEvery) == 1)
-                MozaLog.Debug($"[Moza.Sdk] HighFrequencyTorque POST id={req.DeviceId} value={value} (sample 1/{LogEvery})");
+                MozaLog.Debug($"[AZOM.Sdk] HighFrequencyTorque POST id={req.DeviceId} value={value} (sample 1/{LogEvery})");
 
             return CoapResourceResponse.Valid();
         }

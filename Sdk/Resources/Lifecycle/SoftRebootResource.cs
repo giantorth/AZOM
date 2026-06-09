@@ -42,9 +42,9 @@ namespace MozaPlugin.Sdk.Resources.Lifecycle
             // decoded value but don't reject malformed bodies — the client
             // sometimes sends an empty POST (capture showed both shapes).
             if (req.HasPayload && PayloadCodec.TryDecodeScalarFromLittleEndian(req.Payload, out int v))
-                MozaLog.Debug($"[Moza.Sdk] SoftReboot POST id={req.DeviceId} value={v}");
+                MozaLog.Debug($"[AZOM.Sdk] SoftReboot POST id={req.DeviceId} value={v}");
             else
-                MozaLog.Debug($"[Moza.Sdk] SoftReboot POST id={req.DeviceId} (no payload)");
+                MozaLog.Debug($"[AZOM.Sdk] SoftReboot POST id={req.DeviceId} (no payload)");
 
             try
             {
@@ -52,7 +52,7 @@ namespace MozaPlugin.Sdk.Resources.Lifecycle
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[Moza.Sdk] SoftReboot write failed: {ex.Message}");
+                MozaLog.Error($"[AZOM.Sdk] SoftReboot write failed: {ex.Message}");
                 return CoapResourceResponse.InternalError(ex.Message);
             }
             return CoapResourceResponse.Valid();

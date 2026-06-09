@@ -99,7 +99,7 @@ namespace MozaPlugin.Devices.WheelUi
 
             if (_plugin == null)
             {
-                MozaLog.Debug("[Moza] UI: DashboardSelectionChanged handler — _plugin null, skipping");
+                MozaLog.Debug("[AZOM] UI: DashboardSelectionChanged handler — _plugin null, skipping");
                 return;
             }
 
@@ -109,7 +109,7 @@ namespace MozaPlugin.Devices.WheelUi
             // so refreshing the channel-mapping grid here covers both UI- and
             // wheel-initiated switches.
             MozaLog.Debug(
-                $"[Moza] UI: DashboardSelectionChanged handler — selected='{_plugin.ActiveTelemetryProfileName}'");
+                $"[AZOM] UI: DashboardSelectionChanged handler — selected='{_plugin.ActiveTelemetryProfileName}'");
             PopulateDashboardCombo();
             PopulateChannelMappingList();
         }
@@ -168,7 +168,7 @@ namespace MozaPlugin.Devices.WheelUi
                 _plugin.Cm1ActiveIndexChanged += OnCm1ActiveIndexChanged;
                 _dashEventSubscribedPlugin = _plugin;
                 MozaLog.Debug(
-                    $"[Moza] UI: subscribed to DashboardSelectionChanged (plugin hash={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_plugin)})");
+                    $"[AZOM] UI: subscribed to DashboardSelectionChanged (plugin hash={System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_plugin)})");
             }
 
             return true;
@@ -576,7 +576,7 @@ namespace MozaPlugin.Devices.WheelUi
             if (val < 0)
             {
                 global::MozaPlugin.MozaLog.Debug(
-                    "[Moza] DisplayBrightnessDebounce_Tick: skipping wire push — _data is sentinel");
+                    "[AZOM] DisplayBrightnessDebounce_Tick: skipping wire push — _data is sentinel");
                 return;
             }
             if (val > 100) val = 100;
