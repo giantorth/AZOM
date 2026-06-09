@@ -125,6 +125,9 @@ namespace MozaPlugin.Devices.WheelUi
             }
             if (_plugin == null || !_plugin.IsFsr1DisplayWheel) return;
             PopulateDashboardCombo();
+            // The channel-mapping list follows the active dashboard (CM2-like) — the
+            // active page's record type(s) determine which fields are shown.
+            PopulateChannelMappingList();
         }
 
         // CM1 base-bridged dash reported a page switch (Param-6 log) or our select was
@@ -423,9 +426,11 @@ namespace MozaPlugin.Devices.WheelUi
             if (_plugin == null) return -2;
             // CM1 rows come from the static flat catalog — fixed signature (populate once).
             if (IsCm1) return -4;
-            // FSR V1 rows come from the static catalog, not a tier profile —
-            // a fixed signature so the list populates once and doesn't churn.
-            if (!IsCm2Target && _plugin.IsFsr1DisplayWheel) return -3;
+            // FSR V1 rows come from the static catalog but follow the ACTIVE dashboard,
+            // so the signature varies with the active index (re-populate on switch; the
+            // Fsr1ActiveIndexChanged event also drives this). Distinct from the other
+            // negative sentinels (-2/-4) and from positive profile signatures.
+            if (!IsCm2Target && _plugin.IsFsr1DisplayWheel) return -100L - _plugin.GetActiveFsr1Index();
             var profile = ActiveSender?.Profile;
             // CM2 has no wheel-catalog fallback — its list comes from its own profile.
             int catalogCount = IsCm2Target ? 0 : (_plugin.WheelChannelCatalogForDiagnostics?.Count ?? 0);

@@ -61,9 +61,8 @@ namespace MozaPlugin.Telemetry
         public string Key = "";        // settings key, e.g. "type-02"
         public string Label = "";      // UI group header
         public byte PayloadLen;        // wire len byte (type+b1+b2+data)
-        public byte LiveB1;            // b1 when populated
-        public byte LiveB2;            // b2 structural base (always-set bits)
-        public byte LiveB2EngineOffBit; // OR'd into b2 while the engine is stopped
+        public byte LiveB1;            // b1 anchor (per-dashboard config; option-A default)
+        public byte LiveB2;            // b2 anchor (per-dashboard config; option-A default)
         public bool IsLive;            // false = declared-only (never streams live)
         public Fsr1FieldDef[] Fields = System.Array.Empty<Fsr1FieldDef>();
     }
@@ -84,131 +83,266 @@ namespace MozaPlugin.Telemetry
     /// </summary>
     internal static class Fsr1DashboardCatalog
     {
-        // Common SimHub property paths used as default mappings.
-        private const string PropRpmPct = "DataCorePlugin.GameData.CarSettings_CurrentDisplayedRPMPercent"; // 0..100
-        private const string PropGear = "DataCorePlugin.GameData.Gear";          // string: R/N/1..n
-        private const string PropSpeed = "DataCorePlugin.GameData.SpeedKmh";
-        private const string PropTempFL = "DataCorePlugin.GameData.TyreTemperatureFrontLeft";
-        private const string PropTempFR = "DataCorePlugin.GameData.TyreTemperatureFrontRight";
-        private const string PropTempRL = "DataCorePlugin.GameData.TyreTemperatureRearLeft";
-        private const string PropTempRR = "DataCorePlugin.GameData.TyreTemperatureRearRight";
 
-        private static Fsr1FieldDef Wheel(string id, string label, int off, string prop) => new()
-        {
-            FieldId = id, Label = label, Offsets = new[] { off }, Encoding = Fsr1Encoding.U8,
-            Kind = Fsr1FieldKind.Scaled, DefaultProperty = prop, DefaultInMin = 0, DefaultInMax = 150,
-            Decoded = true,
-        };
-
-        private static Fsr1FieldDef Gear(int off) => new()
-        {
-            FieldId = "gear", Label = "Gear", Offsets = new[] { off }, Encoding = Fsr1Encoding.U8,
-            Kind = Fsr1FieldKind.Direct, DefaultProperty = PropGear, FullScale = 9, Decoded = true,
-        };
-
-        private static Fsr1FieldDef EngineFlag(int off) => new()
-        {
-            FieldId = "engineFlag", Label = "Engine-running flag (auto)", Offsets = new[] { off },
-            Encoding = Fsr1Encoding.U8, Kind = Fsr1FieldKind.EngineFlag, Decoded = true,
-        };
-
-        private static Fsr1FieldDef Raw(int off, Fsr1Encoding enc = Fsr1Encoding.U8) => new()
-        {
-            FieldId = "raw" + off, Label = $"Raw byte @{off}" + (enc == Fsr1Encoding.U8 ? "" : $" ({enc})"),
-            Offsets = enc == Fsr1Encoding.U16_BE ? new[] { off, off + 1 } : new[] { off },
-            Encoding = enc, Kind = Fsr1FieldKind.Direct, DefaultProperty = "", Decoded = false,
-        };
-
+        // ===== Auto-generated from usb-capture/fsr1 (tools/.. gencatalog) =====
         public static readonly Fsr1Dashboard[] Dashboards =
         {
-            // ── Live dashboards (decoded layouts) ────────────────────────────
             new()
             {
-                RecordType = 0x02, Key = "type-02", Label = "Dashboard 02 — RPM / Gear", IsLive = true,
-                // PitHouse: b2=0x00 engine-on, 0x20 engine-off (verified across captures).
-                PayloadLen = 18, LiveB1 = 0x03, LiveB2 = 0x00, LiveB2EngineOffBit = 0x20,
+                RecordType = 0x01, Key = "type-01", Label = "Dashboard 01 — dashboard", IsLive = true,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new[]
                 {
-                    Wheel("wheelFL", "Wheel 1 (cand. tyre FL)", 6, PropTempFL),
-                    Wheel("wheelFR", "Wheel 2 (cand. tyre FR)", 8, PropTempFR),
-                    Wheel("wheelRL", "Wheel 3 (cand. tyre RL)", 10, PropTempRL),
-                    Wheel("wheelRR", "Wheel 4 (cand. tyre RR)", 12, PropTempRR),
-                    new Fsr1FieldDef
-                    {
-                        FieldId = "rpmBar", Label = "RPM bar", Offsets = new[] { 14 },
-                        Encoding = Fsr1Encoding.U8, Kind = Fsr1FieldKind.Scaled,
-                        DefaultProperty = PropRpmPct, DefaultInMin = 0, DefaultInMax = 100,
-                        FullScale = 158, Decoded = true,
-                    },
-                    EngineFlag(15),
-                    Raw(16),
-                    Gear(17),
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
                 },
             },
             new()
             {
-                RecordType = 0x06, Key = "type-06", Label = "Dashboard 06 — multi-field", IsLive = true,
-                PayloadLen = 25, LiveB1 = 0x0c, LiveB2 = 0x00,
+                RecordType = 0x02, Key = "type-02", Label = "Dashboard 02 — RPM / gear", IsLive = true,
+                PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new[]
                 {
-                    Raw(5), Raw(6, Fsr1Encoding.U16_BE), Raw(8),
-                    Raw(18), Raw(19), Raw(20), Raw(21),
-                    EngineFlag(23),
-                    Gear(24),
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "b17", Label = "Slot @17 (8-bit)", Offsets = new[] { 17 }, Encoding = Fsr1Encoding.U8, Kind = Fsr1FieldKind.Direct, Decoded = false },
                 },
             },
             new()
             {
-                RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — multi-field", IsLive = true,
-                // PitHouse always sets bit 0x80 on this type (0x40 sub-state toggle
-                // observed but not yet characterised — left out).
-                PayloadLen = 24, LiveB1 = 0x0d, LiveB2 = 0x80,
+                RecordType = 0x03, Key = "type-03", Label = "Dashboard 03 — dashboard", IsLive = true,
+                PayloadLen = 19, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new[]
                 {
-                    Raw(11), Raw(12), Raw(13), Raw(14), Raw(15),
-                    EngineFlag(17),
-                    Gear(23),
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x04, Key = "type-04", Label = "Dashboard 04 — dashboard", IsLive = true,
+                PayloadLen = 23, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x05, Key = "type-05", Label = "Dashboard 05 — dashboard", IsLive = true,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x06, Key = "type-06", Label = "Dashboard 06 — multi-gauge", IsLive = true,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x08,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x08, Key = "type-08", Label = "Dashboard 08 — dashboard", IsLive = true,
+                PayloadLen = 23, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
                 },
             },
             new()
             {
                 RecordType = 0x09, Key = "type-09", Label = "Dashboard 09 — sparse", IsLive = true,
-                // PitHouse always sets bit 0x80 on this type (only engine-off captured).
-                PayloadLen = 24, LiveB1 = 0x01, LiveB2 = 0x80,
-                Fields = new[] { Raw(6, Fsr1Encoding.U16_BE), Raw(18) },
-            },
-            new()
-            {
-                // No live 0d frame (b1!=0) was ever observed in any capture — only
-                // all-zero declarations. Declared-only until a real live frame is
-                // captured; streaming b1=0x00 just spams useless declarations.
-                RecordType = 0x0d, Key = "type-0d", Label = "Dashboard 0D — multi-field", IsLive = false,
-                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
+                PayloadLen = 24, LiveB1 = 0x00, LiveB2 = 0x08,
                 Fields = new[]
                 {
-                    Raw(5), Raw(6), Raw(7), Raw(8), Raw(9),
-                    Raw(10), Raw(11), Raw(12), Raw(13), Raw(14), Raw(18),
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "b23", Label = "Slot @23 (8-bit)", Offsets = new[] { 23 }, Encoding = Fsr1Encoding.U8, Kind = Fsr1FieldKind.Direct, Decoded = false },
                 },
             },
             new()
             {
-                RecordType = 0x04, Key = "type-04", Label = "Dashboard 04 — static", IsLive = true,
-                PayloadLen = 23, LiveB1 = 0x06, LiveB2 = 0x00, Fields = System.Array.Empty<Fsr1FieldDef>(),
+                RecordType = 0x0b, Key = "type-0b", Label = "Dashboard 0B — dashboard", IsLive = true,
+                PayloadLen = 15, LiveB1 = 0x00, LiveB2 = 0x04,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
             },
             new()
             {
-                RecordType = 0x0b, Key = "type-0b", Label = "Dashboard 0B — static", IsLive = true,
-                PayloadLen = 15, LiveB1 = 0x00, LiveB2 = 0x00, Fields = System.Array.Empty<Fsr1FieldDef>(),
+                RecordType = 0x0c, Key = "type-0c", Label = "Dashboard 0C — dashboard", IsLive = true,
+                PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x02,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "b17", Label = "Slot @17 (8-bit)", Offsets = new[] { 17 }, Encoding = Fsr1Encoding.U8, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
             },
+            new()
+            {
+                RecordType = 0x0d, Key = "type-0d", Label = "Dashboard 0D — dashboard", IsLive = true,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — multi-field", IsLive = true,
+                PayloadLen = 24, LiveB1 = 0x0e, LiveB2 = 0x01,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "b23", Label = "Slot @23 (8-bit)", Offsets = new[] { 23 }, Encoding = Fsr1Encoding.U8, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x11, Key = "type-11", Label = "Dashboard 11 — GT Style A", IsLive = true,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+            new()
+            {
+                RecordType = 0x12, Key = "type-12", Label = "Dashboard 12 — GT Style B", IsLive = true,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new[]
+                {
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                },
+            },
+        };
 
-            // ── Declared-only record types (never stream live; in the sweep) ──
-            new() { RecordType = 0x01, Key = "type-01", Label = "Record 01", PayloadLen = 25 },
-            new() { RecordType = 0x03, Key = "type-03", Label = "Record 03", PayloadLen = 19 },
-            new() { RecordType = 0x05, Key = "type-05", Label = "Record 05", PayloadLen = 25 },
-            new() { RecordType = 0x08, Key = "type-08", Label = "Record 08", PayloadLen = 23 },
-            new() { RecordType = 0x0c, Key = "type-0c", Label = "Record 0C", PayloadLen = 18 },
-            new() { RecordType = 0x11, Key = "type-11", Label = "Record 11", PayloadLen = 25 },
-            new() { RecordType = 0x12, Key = "type-12", Label = "Record 12", PayloadLen = 25 },
+        private static readonly System.Collections.Generic.Dictionary<int, byte[]> IndexToRecordTypes = new()
+        {
+            { 1, new byte[] { 0x02 } },
+            { 2, new byte[] { 0x06 } },
+            { 3, new byte[] { 0x06 } },
+            { 4, new byte[] { 0x03 } },
+            { 5, new byte[] { 0x04 } },
+            { 6, new byte[] { 0x04 } },
+            { 7, new byte[] { 0x06 } },
+            { 8, new byte[] { 0x05 } },
+            { 9, new byte[] { 0x03 } },
+            { 10, new byte[] { 0x08 } },
+            { 11, new byte[] { 0x09 } },
+            { 12, new byte[] { 0x0e } },
+            { 13, new byte[] { 0x04 } },
+            { 14, new byte[] { 0x04 } },
+            { 15, new byte[] { 0x0c } },
+            { 17, new byte[] { 0x11, 0x12 } },
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
@@ -223,23 +357,20 @@ namespace MozaPlugin.Telemetry
             Dashboards.FirstOrDefault(d => d.RecordType == type);
 
         /// <summary>
-        /// Active page index (`Param 6` / `g32-81`) → the live record type the wheel
-        /// renders on that page. **Partial**, decoded from gameplay captures (live
-        /// `0x42` frames only — declarations were noise): only the indices actually
-        /// exercised in captures are known. Unmapped indices return null; the sender
-        /// then falls back to streaming the whole live set so data still shows. The
-        /// map may also be per-dashboard-configuration, not a firmware constant — to
-        /// be confirmed with more captures. See docs/protocol/devices/wheel-0x17.md
-        /// § Group 0x42.
+        /// Active page index (Param 6 / g32-81) -> the record type(s) the wheel renders
+        /// on that page (table above). Firmware-fixed: the index->type mapping is
+        /// consistent across all captures (only the channel feeding each field is
+        /// per-dashboard config). Most pages map to one type; the GT-style page streams
+        /// two (0x11 + 0x12). Unmapped indices return empty -> the driver falls back to
+        /// the full live set. See docs/protocol/devices/wheel-0x17.md.
         /// </summary>
-        private static readonly System.Collections.Generic.Dictionary<int, byte> IndexToRecordType = new()
+        public static Fsr1Dashboard[] ByIndex(int index)
         {
-            { 3, 0x06 }, { 5, 0x04 }, { 7, 0x06 }, { 11, 0x09 }, { 12, 0x0e },
-        };
-
-        /// <summary>The live dashboard for a page index, or null if that index's
-        /// record type isn't decoded yet.</summary>
-        public static Fsr1Dashboard? ByIndex(int index) =>
-            IndexToRecordType.TryGetValue(index, out var t) ? ByType(t) : null;
+            if (!IndexToRecordTypes.TryGetValue(index, out var types))
+                return System.Array.Empty<Fsr1Dashboard>();
+            var list = new List<Fsr1Dashboard>(types.Length);
+            foreach (var t in types) { var d = ByType(t); if (d != null) list.Add(d); }
+            return list.ToArray();
+        }
     }
 }

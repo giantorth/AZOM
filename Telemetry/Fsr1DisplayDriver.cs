@@ -170,23 +170,29 @@ namespace MozaPlugin.Telemetry
             // live set ONLY while the index is genuinely unknown/unmapped, so the
             // screen is never dead on a page we haven't decoded. See wheel-0x17.md.
             int activeIdx = plugin?.GetActiveFsr1Index() ?? 0;
-            var primary = Fsr1DashboardCatalog.ByIndex(activeIdx);
+            var active = Fsr1DashboardCatalog.ByIndex(activeIdx);
             var live = Fsr1DashboardCatalog.LiveDashboards;
 
-            if (primary != null)
+            if (active.Length > 0)
             {
                 if (_lastStreamedIndex != activeIdx)
                 {
                     _lastStreamedIndex = activeIdx;
                     // Drop any leftover records from the previous page / fallback so
-                    // only the active type keeps retransmitting, then re-declare it
-                    // (PitHouse re-declares on every switch before streaming).
+                    // only the active type(s) keep retransmitting, then re-declare each
+                    // (PitHouse re-declares on every switch before streaming). Most
+                    // pages map to one type; the GT-style page streams two (11+12).
                     _connection.ClearStreamSlots(0, live.Length);
-                    _connection.Send(Fsr1DisplayEmitter.BuildDeclaration(primary));
+                    foreach (var dash in active)
+                        _connection.Send(Fsr1DisplayEmitter.BuildDeclaration(dash));
                 }
-                _connection.SendStream(
-                    StreamKind.TierDash0,
-                    Fsr1DisplayEmitter.BuildRecord(primary, f => ValueFor(primary, f), engineRunning));
+                for (int slot = 0; slot < active.Length; slot++)
+                {
+                    var dash = active[slot];
+                    _connection.SendStream(
+                        (StreamKind)((int)StreamKind.TierDash0 + slot),
+                        Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f)));
+                }
             }
             else
             {
@@ -204,7 +210,7 @@ namespace MozaPlugin.Telemetry
                     if (dash.Fields.Length == 0) continue;
                     _connection.SendStream(
                         (StreamKind)((int)StreamKind.TierDash0 + slot),
-                        Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f), engineRunning));
+                        Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f)));
                 }
             }
 

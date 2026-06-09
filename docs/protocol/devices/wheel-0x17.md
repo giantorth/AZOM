@@ -130,7 +130,7 @@ Confirmed in USB capture: sent to device `0x17` at ~100×/sec with payload alway
 
 **Observed only on the `FSR` / `RS21-D03` display wheel** (model-name `FSR`, hw-version `RS21-D03-HW FW-C`, sw-version `RS21-D03-MC FW`, hw-rev `U-V04`; box/marketing name "FSR1"). This is the **FSR V1** — a distinct, older wheel from the **FSR V2** (`W13`), which uses the standard tier-definition telemetry path; see [`../identity/known-wheel-models.md`](../identity/known-wheel-models.md). Captured in `usb-capture/fsr1/` — see [`../../../usb-capture/CAPTURES.md`](../../../usb-capture/CAPTURES.md).
 
-On this unit, group `0x42` **replaces** the usual display-telemetry path. The documented `0x41` `FD DE` enable, the `0x43`/`7D 23` bit-packed value stream, **and the entire session-`0x02` / tier-definition channel-catalog handshake are all absent**: the wheel never advertises a channel catalog (no v0 URL or v2 compact advertisement, no `7C 00` session opens, no wheel→host `0xC3` catalog frames; `0x43` carries only a 1-byte cmdid-`00` keepalive poll). Instead PitHouse pushes **pre-computed display field values** to the wheel (`0x17`) as fixed-layout records at ~28 Hz during gameplay. Because no catalog is negotiated, the layout is a firmware-baked fixed schema rather than a channel-index-driven packing.
+On this unit, group `0x42` **replaces** the usual display-telemetry path. The documented `0x41` `FD DE` enable, the `0x43`/`7D 23` bit-packed value stream, **and the entire session-`0x02` / tier-definition channel-catalog handshake are all absent**: the wheel never advertises a channel catalog (no v0 URL or v2 compact advertisement, no `7C 00` session opens, no wheel→host `0xC3` catalog frames; `0x43` carries only a 1-byte cmdid-`00` keepalive poll). Instead PitHouse pushes **pre-computed display field values** to the wheel (`0x17`) as fixed-layout records at ~28 Hz during gameplay. The **byte schema is firmware-baked and fixed per record type** (fixed length, fixed field positions/widths), but **which telemetry channel feeds each field is host-chosen per loaded dashboard** — so the slots are fixed and the channel→slot mapping is configurable (see "The model" below).
 
 This is documented as **observed** on this firmware. The record framing and type schema are proven; per-field channel semantics are only partially decoded (see "candidate mapping" below).
 
@@ -140,57 +140,66 @@ This is documented as **observed** on this firmware. The record framing and type
 7E <len> 42 17 [type] [b1] [b2] <fixed-layout data> <csum>
 ```
 
-- `type` (first payload byte) selects a record with a **fixed length**. At startup PitHouse enumerates each record type once with an all-zero payload (declaration); at runtime only a subset carries live data. **14 types are observed across all captures** — `01 02 03 04 05 06 08 09 0b 0c 0d 0e 11 12`; `07 0a 0f 10` never appear (the enumeration is not a dense `0x01`–`0x12` sweep).
-- `b1` — per-type sub/validity byte: `0x00` on the zero/enumeration frame, a type-specific non-zero value when populated.
-- `b2` — stream/mode flag (type `0x02`: `00`/`20`; type `0x0E`: `00`/`80`/`c0`).
+- `type` (first payload byte) selects a record with a **fixed length**. At startup PitHouse enumerates each record type once with an all-zero payload (declaration); at runtime the type for the **currently-displayed** dashboard carries live data. **14 types are observed** — `01 02 03 04 05 06 08 09 0b 0c 0d 0e 11 12`; `07 0a 0f 10` never appear. The 2026-06-08 captures (`All dashboards`, `Dashboards on time trial`, `GT Style dashboards`) drove **all 14** live (earlier captures only exercised 5, hence the older "declared-only" labels).
+- `b1`, `b2` — **per-dashboard-configuration descriptors, NOT stable per record-type.** The same type carries different `b1`/`b2` across dashboard sets, so they cannot be hardcoded per type. Examples (type → old single-dash captures → new multi-dash captures): `06`→`0c/00`→`00/08`; `09`→`01/80`→`00/08`; `0e`→`0d/80`→`0e/01`; `02`→`03/00`→`00/00`. In the new set `b2` looks like a region/feature **bitmask** (`0e`→`01`, `0c`→`02`, `0b`→`04`, `06`/`09`→`08`, `11`→`06`); `b1` is usually `00`. Treat as opaque per-dashboard — derive from the loaded dashboard or leave `0`; do **not** assume a fixed value. (The plugin's previously-hardcoded `0x80` for `09`/`0e` only matched the old captures.)
 
-**Record types** (len = total payload bytes incl. `type`/`b1`/`b2`; "live" = carries changing values in these captures):
+**Record types** (len = total payload bytes incl. `type`/`b1`/`b2`; all 14 carry live values when their dashboard is the displayed page). Payload **data starts at offset 5** — offsets 3 and 4 are always `00` (reserved/padding) in every type:
 
-| type | len | state | b1 (populated) | b2 seen | notes |
-|------|-----|-------|----------------|---------|-------|
-| `01` | 25 | declared-only | — | 00 | zero enumeration frame |
-| `02` | 18 | **live (gameplay)** | 03 | 00, 20 | main per-frame record (layout below) |
-| `03` | 19 | declared-only | — | 00 | |
-| `04` | 23 | live | 06 | 00 | |
-| `05` | 25 | declared-only | — | 00 | |
-| `06` | 25 | live | 0c | 00 | richest dashboard — see decoded layout below |
-| `08` | 23 | declared-only | — | 00 | |
-| `09` | 24 | live | 01 | 00, 80 | |
-| `0b` | 15 | live | 00 | 00, 04 | |
-| `0c` | 18 | declared-only | — | 00 | |
-| `0d` | 25 | live | 00 | 00 | |
-| `0e` | 24 | live | 0d | 00, 80, c0 | `b2` mode flips `c0`→`80` mid-session |
-| `11` | 25 | declared-only | — | 00 | |
-| `12` | 25 | declared-only | — | 00 | |
+| type | len | data bytes (off 5..) | notes |
+|------|-----|----------------------|-------|
+| `01` | 25 | 5..24 (20) | |
+| `02` | 18 | 5..17 (13) | main racing record — 4×u16-BE gauges + tail (layout below) |
+| `03` | 19 | 5..18 (14) | |
+| `04` | 23 | 5..22 (18) | |
+| `05` | 25 | 5..24 (20) | |
+| `06` | 25 | 5..24 (20) | dense multi-gauge dashboard |
+| `08` | 23 | 5..22 (18) | |
+| `09` | 24 | 5..23 (19) | |
+| `0b` | 15 | 5..14 (10) | smallest record |
+| `0c` | 18 | 5..17 (13) | |
+| `0d` | 25 | 5..24 (20) | |
+| `0e` | 24 | 5..23 (19) | |
+| `11` | 25 | 5..24 (20) | **GT Style dashboard** (gt_style capture: 27 k frames) |
+| `12` | 25 | 5..24 (20) | **GT Style dashboard** (gt_style capture: 24 k frames) |
 
 **Type `0x02` layout** (proven across 8720/8720 frames; offsets are payload-relative):
 
 ```
-off:  0    1    2    3  4  5   6  7   8  9  10 11 12 13  14  15  16  17
-      02   b1   b2   00 00 00  W0 00  W1 00 W2 00 W3 00  S   F   00  G
+off:  0    1    2    3  4   5  6   7  8   9 10  11 12  13 14  15  16  17
+      02   b1   b2   00 00  [ G0 ] [ G1 ] [ G2 ] [ G3 ]  ?   ?   ?   ?
+                            u16BE  u16BE  u16BE  u16BE
 ```
 
-- `[6] [8] [10] [12]` (`W0..W3`) — a **4-element array, equal in 100 % of frames** (e.g. all `0x1A`=26 when the engine is running, `0` idle). The companion high bytes `[7] [9] [11] [13]` are always `00`. Candidate: per-wheel channel (tyre temp/pressure).
-- `[14]` (`S`) — scalar `0..158`; rises with engine activity. Candidate: RPM / engine load.
-- `[15]` (`F`) — `0` while the RPM-LED bar (group `0x3F` `1A 00`) is dark, `75` (`0x4B`) the instant any RPM LED lights. Engine-running flag.
-- `[17]` (`G`) — small enum `0..5`; loosely rises with revs. Candidate: gear.
+`G0..G3` = four **16-bit big-endian** gauges at `[5,6] [7,8] [9,10] [11,12]`. **Proven** by a carry test on `all_dashboards` (the aligned pairs show frame-to-frame median |Δ| of the BE value ≈ 2, while the straddle pairs between them jump by ≈ 512 = one hi-byte): the field boundaries fall on `5,7,9,11`. In the older captures all four were `00 XX` (values < 256, e.g. `00 5b`=91 = four stable tyre temps), which is why they previously read as four u8s at `6,8,10,12` — that was the **low byte only**. `[13]`/`[14]`/`[15]`/`[16]`/`[17]` are the tail (a small scalar, the `0x4B` engine flag, and a gear/index — exact split best-effort).
 
-**Candidate semantics are unproven.** They were derived only by time-aligning these fields against the group-`0x3F` RPM-LED bitmask *within the same capture* — no external ground-truth telemetry labels exist for these captures. The structure (record types, fixed lengths, the 4-element array, the `0x4B` engine flag) is proven; the exact channel identity of each numeric field is not. The other live types have **decoded field offsets/widths** (below) but still-undecoded channel semantics — "no capture = I don't know."
+### The model (corrected)
 
-**The active record type tracks the displayed dashboard.** The *populated* type is not global — it follows which built-in dashboard the wheel shows. `FSR1 with game` (single dashboard) emits type `02` for its entire run; `FS1 multiple changes` shifts `0e` → (`09`) → `06` as dashboards are cycled. So the field/channel set is **per-dashboard, not globally fixed** — at least two dashboards drove distinct record types (`0e` and `06`).
+- **Field POSITIONS and WIDTHS are fixed per record type** (a type always has the same byte length and the same field skeleton). The records are **arrays of u16-BE gauges** (most of the payload) followed by a few u8 fields (engine flag `0x4B`, gear/page index `0..9`, 0/100 percentages). Offsets 3–4 are always `00`.
+- **CHANNEL ASSIGNMENT is per-dashboard and host-driven** — *which* telemetry channel feeds each gauge slot is chosen by the loaded dashboard (configurable in PitHouse), not fixed by the firmware. That is why the same type shows wildly different value ranges across `All dashboards` / `time trial` / `GT Style` (different channels mapped to the same slots). This is exactly the shape the plugin wants: **fixed slots the user maps SimHub channels onto.**
+- Consequence: the plugin should expose every gauge slot of every type as a **u16-BE** mappable field (low-byte-only u8 mappings clip anything > 255), and **not** hardcode `b1`/`b2`.
 
-Each dashboard's record type is a **wholly distinct fixed layout** — different length and a different per-type `b1` (`02`→`03`, `04`→`06`, `06`→`0c`, `09`→`01`, `0d`→`00`, `0e`→`0d`; constant within a type, likely a layout/field-count id) — with non-overlapping field offsets. Two anchors recur across the rich dashboards: the `0x4B` **engine-running flag** a few bytes before the end, and a small **gear enum (`0..5`) in the last data byte**. Switching dashboards changes *which* fields are sent **and how many** — they are different layouts, not the same fields rearranged.
+**Per-type field skeletons** (offsets payload-relative; ranges are *observed across the three 2026-06-08 captures*, so they reflect whatever channels those dashboards happened to map — they bound the wire width, not the channel). `u16` = big-endian pair `[o,o+1]`. Generated via `tools/fsr1-field-decode` + carry-test pairing (`/tmp/fsr1new/*.py`). Gauge pairing in the dense middle of the larger records is **best-effort** — treat the whole `o5..` region as consecutive u16-BE slots when implementing.
 
-**Decoded field layouts.** Payload-relative offsets, from per-offset variance analysis over all `usb-capture/fsr1/` captures (`tools/fsr1-0x42-extract` + `tools/fsr1-field-decode`). Field **offsets and widths are proven**; **channel semantics remain unproven** (best-guess from RPM-LED correlation / field position). Bytes not listed are constant `00` padding. The plugin encodes this catalog in [`Telemetry/Fsr1DashboardCatalog.cs`](../../../Telemetry/Fsr1DashboardCatalog.cs) and exposes each field for user channel assignment.
+| type | u16-BE gauge slots (offsets) | u8 tail / flags | best-guess anchors |
+|------|------------------------------|-----------------|--------------------|
+| `02` | 5, 7, 9, 11, 13 | 14, 15, 16, 17 | 4 gauges (tyre temps when stable=91); tail has RPM-ish scalar, `0x4B` engine flag, gear |
+| `06` | 5, 7, 9, 11, 13, 18, 20 | 22, 23(`0x4B`), 24(gear `0..5`) | densest; `[19]`/`[21]` busy u8 |
+| `09` | 5, 7, 9, 11, 13, 15, 17, 19 | 21, 22, 23(gear `1..9`) | `[20]`/`[21]` 0..100 pct |
+| `0e` | 6, 9, 11, 13, 15, 18, 20 | 17, 22, 23(gear `1..9`) | gt_style: `[14,15]`≈RPM, `[18,19]` slow decreasing (fuel) |
+| `0c` | 5, 7, 9, 11, 13, 15 | 16, 17 | |
+| `11` | 5, 14, 18, 21 | 8..13, 19, 20, 23(pct), 24(pct) | gt_style GT dash: `[5,6]` slow 9→2, `[14,15]`≈RPM, `[18,19]` fuel↓, `[21]` lap↑ |
+| `12` | 5, 7, 10, 13, 15, 17, 21 | 9, 20, 23, 24 | gt_style GT dash (paired with 11) |
+| `01` | 5, 7, 9, 11, 20 | 15..19, 22, 23, 24 | |
+| `03` | 6, 8, 12, 14 | 7, 9..11, 16, 17, 18 | mostly slow/static gauges |
+| `04` | 5, 7, 9, 17 | 10..16, 18..22 | |
+| `05` | 5, 7, 9, 22 | 8, 10..21, 24 | |
+| `08` | 5, 8, 10, 12, 15 | 6, 7, 9, 14, 17..22 | |
+| `0d` | 5, 7, 16 | 6, 8..15, 18..24 | two 5-byte groups `[5..9]`/`[10..14]` |
+| `0b` | 5, 8, 12 | 7, 10, 14 | smallest; mostly static |
 
-- **Type `02`** — len 18, b1 `03` (see byte map above): `[6][8][10][12]` u8 4-element wheel array (companion hi bytes `00`); `[14]` u8 scalar `0..158` (RPM/load); `[15]` engine flag (`0`/`0x4B`, also `0x7E` in some `b2=20` frames); `[16]` u8 secondary flag (`0`/`0x4B`); `[17]` u8 gear `0..5`.
-- **Type `06`** — len 25, b1 `0c` (richest): `[5]` u8 flag/high (`00`/`01`/`80`); `[6,7]` **u16-BE** primary ramp (`0..65535`); `[8]` u8; `[18]` u8 (`0..102`); `[19]` u8 (`0..92`); `[20]` u8 (`0..255`); `[21]` u8; `[22]`/`[23]` engine flag (`0x4B`); `[24]` u8 gear `0..5`.
-- **Type `0e`** — len 24, b1 `0d`: `[11]` u8 (`0..54`); `[12]` u8 (`0..32`); `[13]` u8 (`0..255`); `[14]` (`01`/`7E`); `[15]` (`0`/`1`); `[16]`/`[17]` engine flag (`0x4B`); `[23]` u8 gear `0..5`.
-- **Type `09`** — len 24, b1 `01` (sparse): `[6,7]` **u16-BE**; `[18]` u8 small enum (`0..3`); `[19]`=`01`, `[23]`=`02` constant.
-- **Type `0d`** — len 25, b1 `00`: two live 5-byte groups `[5..9]` and `[10..14]` (u8 each) + `[18]` u8 (`1..15`). Grouping undecoded.
-- **Type `04`** — len 23, b1 `06`: **static** in these captures (frozen `24`@6, `21`@15, `21`@18, `34`@19, `4B`@21) — not actively driven. **Type `0b`** (len 15, b1 `00`) likewise static (`20`@12).
+**Confirmed anchors across types:** the `0x4B` **engine-running flag** (a low-distinct byte carrying `0x4B` while the RPM-LED bar is lit) and a small **gear / page index** (`0..9`) in/near the last data byte. **Channel identity beyond these is a guess** — derived from time-aligning fields against the group-`0x3F` RPM-LED signal and from monotonic behaviour over a session (steadily-decreasing 16-bit ⇒ fuel, steadily-increasing small int ⇒ lap, fast oscillating 16-bit ⇒ RPM). To pin a slot to a specific Telemetry.json channel, drive **one known channel at a time** (the plugin's Test Pattern / a controlled sweep) and read which offset moves.
 
-**Channel identification — status.** The fields are *not yet mapped to specific Telemetry.json channels*; only the type-`02` candidates above are guessed (from internal RPM-LED correlation). Findings from PitHouse (`MOZA Pit House/bin`):
+**Channel identification — status.** Field **positions and widths** are decoded for all 14 types (table above); **channel identity** is still only best-guess (engine flag, gear, and behavioural guesses for RPM/fuel/lap). Because the channel→slot mapping is host-chosen per dashboard, the robust plan is to expose the decoded slots as mappable u16-BE/u8 fields and let users assign Telemetry.json channels, rather than chase a single "correct" per-type mapping. Findings from PitHouse (`MOZA Pit House/bin`):
 
 - The display channels are the standard `Telemetry.json` (`v1/gameData/…`) set, **but `0x42` uses a byte-aligned firmware encoding, not the tier-def bit-packing** — e.g. the type-`02` 4-wheel array is byte-sized, whereas `TyreTemp`/`TyrePressure` are `float` (32-bit) in Telemetry.json. So the channels match; the wire widths do not.
 - The FSR V1 LED/indicator preset (`default_preset_library.rcc` → `FSR-Official.json`, device `FSR`) is **LED/flag config only** and references a single telemetry channel, `CarSettings_CurrentDisplayedRPMPercent` (the RPM-bar driver on group `0x3F`). It does **not** define the `0x42` screen field layout — that mapping is firmware-baked.

@@ -58,7 +58,15 @@ namespace MozaPlugin.Devices.WheelUi
         private static BuildResult BuildFromFsr1Catalog(MozaPlugin plugin, IReadOnlyList<string> props)
         {
             var rows = new List<ChannelMappingRow>();
-            foreach (var dash in Telemetry.Fsr1DashboardCatalog.LiveDashboards)
+            // Follow the ACTIVE dashboard (like a CM2/modern display): show only the
+            // record type(s) the wheel renders on the current page. Refreshed on
+            // Fsr1ActiveIndexChanged. Fall back to all live dashboards when the active
+            // page's type isn't in the decoded index→type map.
+            int activeIdx = plugin.GetActiveFsr1Index();
+            var active = Telemetry.Fsr1DashboardCatalog.ByIndex(activeIdx);
+            bool followingActive = active.Length > 0;
+            var dashes = followingActive ? active : Telemetry.Fsr1DashboardCatalog.LiveDashboards;
+            foreach (var dash in dashes)
             {
                 foreach (var f in dash.Fields)
                 {
@@ -81,9 +89,9 @@ namespace MozaPlugin.Devices.WheelUi
                     });
                 }
             }
-            string status = rows.Count == 0
-                ? "(FSR V1: no mappable dashboard fields)"
-                : $"(FSR V1: {rows.Count} dashboard fields across built-in dashboards)";
+            string status = followingActive
+                ? $"(FSR V1: dashboard {activeIdx + 1} — {rows.Count} mappable fields; switch dashboards to map another page)"
+                : $"(FSR V1: active page not decoded — showing all {rows.Count} fields across dashboards)";
             return new BuildResult(rows, status);
         }
 
