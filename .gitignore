@@ -2,6 +2,10 @@
 bin/
 obj/
 
+## Node / Eleventy site build
+node_modules/
+_site/
+
 ## Visual Studio / Rider
 .vs/
 *.user

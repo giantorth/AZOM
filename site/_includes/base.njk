@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<meta name="theme-color" content="#070809" />
+<title>{{ title }} — AZOM</title>
+<meta name="description" content="{{ description or 'Guides and manuals for AZOM, the open-source MOZA bridge for SimHub.' }}" />
+<meta property="og:title" content="{{ title }} — AZOM" />
+<meta property="og:description" content="{{ description or 'Guides and manuals for AZOM, the open-source MOZA bridge for SimHub.' }}" />
+<meta property="og:type" content="article" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<!-- ===== reusable wheel mark ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="azom-wheel" viewBox="-4 -4 248 248">
+    <mask id="awm" maskUnits="userSpaceOnUse" x="-4" y="-4" width="248" height="248">
+      <rect x="-4" y="-4" width="248" height="248" fill="black"/>
+      <path fill="white" d="M120 59.796 C138.96 59.796 162.619 61.39 176.88 63.24 C185.6 64.371 192.128 65.002 197.77 67.42 C202.233 69.332 205.348 71.131 208.68 75.08 C213.705 81.036 219.158 93.188 221.68 102.47 C224.041 111.16 224.598 120.366 224 128.94 C223.422 137.219 221.451 145.183 218.43 153.08 C215.197 161.531 209.84 173.848 204.73 177.92 C201.674 180.354 197.823 180.838 194.98 180.71 C192.71 180.608 190.703 179.682 188.95 178.38 C187.008 176.938 184.96 174.482 184.07 172.12 C183.182 169.761 182.957 167.317 183.61 164.22 C184.683 159.129 191.556 150.924 193.36 145.19 C194.708 140.903 196.706 135.328 194.98 133.35 C193.245 131.362 186.24 132.564 182.91 133.35 C180.326 133.96 178.176 134.53 176.41 136.6 C173.65 139.836 173.746 149.614 171.07 153.54 C169.14 156.372 167.635 158.023 163.88 159.35 C155.7 162.242 134.627 159.35 120 159.35 C105.373 159.35 84.3 162.242 76.12 159.35 C72.365 158.023 70.86 156.372 68.93 153.54 C66.254 149.614 66.35 139.836 63.59 136.6 C61.824 134.53 59.674 133.96 57.09 133.35 C53.76 132.564 46.755 131.362 45.02 133.35 C43.294 135.328 45.292 140.903 46.64 145.19 C48.444 150.924 55.317 159.129 56.39 164.22 C57.043 167.317 56.818 169.761 55.93 172.12 C55.04 174.482 52.992 176.938 51.05 178.38 C49.297 179.682 47.29 180.608 45.02 180.71 C42.177 180.838 38.326 180.354 35.27 177.92 C30.16 173.848 24.803 161.531 21.57 153.08 C18.549 145.183 16.578 137.219 16 128.94 C15.402 120.366 15.959 111.16 18.32 102.47 C20.842 93.188 26.295 81.036 31.32 75.08 C34.652 71.131 37.767 69.332 42.23 67.42 C47.872 65.002 54.4 64.371 63.12 63.24 C77.381 61.39 101.04 59.796 120 59.796 Z"/>
+      <g fill="black">
+        <path d="M181.52 90.63 C183.754 90.597 186.679 90.747 188.48 92.03 C190.368 93.376 191.199 96.014 192.43 98.76 C194.143 102.582 196.537 109.76 197.07 113.15 C197.35 114.932 197.609 116.149 197.07 117.33 C196.504 118.57 195.366 119.687 193.59 120.35 C190.16 121.631 179.84 121.631 176.41 120.35 C174.634 119.687 173.725 119.072 172.93 117.33 C171.2 113.539 171.607 99.554 172.93 95.51 C173.518 93.712 174.253 92.839 175.48 92.03 C176.951 91.06 179.432 90.661 181.52 90.63 Z"/>
+        <path d="M64.52 92.03 C65.747 92.839 66.482 93.712 67.07 95.51 C68.393 99.554 68.8 113.539 67.07 117.33 C66.275 119.072 65.366 119.687 63.59 120.35 C60.16 121.631 49.84 121.631 46.41 120.35 C44.634 119.687 43.496 118.57 42.93 117.33 C42.391 116.149 42.65 114.932 42.93 113.15 C43.463 109.76 45.857 102.582 47.57 98.76 C48.801 96.014 49.632 93.376 51.52 92.03 C53.321 90.747 56.246 90.597 58.48 90.63 C60.568 90.661 63.049 91.06 64.52 92.03 Z"/>
+        <rect x="74" y="72" width="92" height="49" rx="5"/>
+      </g>
+    </mask>
+    <rect x="-4" y="-4" width="248" height="248" fill="currentColor" mask="url(#awm)"/>
+  </symbol>
+</svg>
+
+<!-- ===== nav ===== -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="/">
+      <svg class="mark"><use href="#azom-wheel"/></svg>
+      <b>AZOM</b>
+    </a>
+    <nav class="nav-links">
+      <a class="lk" href="/#why">Why</a>
+      <a class="lk" href="/#features">Features</a>
+      <a class="lk" href="/#screens">Screens</a>
+      <a class="lk" href="/#install">Install</a>
+      <a class="lk{% if page.url and '/guides/' in page.url %} active{% endif %}" href="/guides/">Guides</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn sm spon-btn" href="/#sponsor"><span class="hrt">♥</span> Sponsor</a>
+      <a class="btn sm" href="https://github.com/giantorth/moza-simhub-plugin" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn sm primary" href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener">Download</a>
+    </div>
+  </div>
+</header>
+
+{{ content | safe }}
+
+<!-- ===== footer ===== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a class="brand" href="/">
+          <svg class="mark" style="width:36px;height:36px"><use href="#azom-wheel"/></svg>
+          <b style="font-size:19px">AZOM</b>
+        </a>
+        <p>An unofficial, open-source SimHub plugin for MOZA sim racing hardware.</p>
+      </div>
+      <div class="fcol">
+        <h5>Project</h5>
+        <a href="/guides/">Guides &amp; manuals</a>
+        <a href="https://github.com/giantorth/moza-simhub-plugin" target="_blank" rel="noopener">GitHub repository</a>
+        <a href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener">Latest release</a>
+        <a href="https://github.com/giantorth/moza-simhub-plugin/blob/main/docs/protocol/README.md" target="_blank" rel="noopener">Protocol reference</a>
+      </div>
+      <div class="fcol">
+        <h5>Community</h5>
+        <a href="https://discord.gg/J4enw43e62" target="_blank" rel="noopener">Discord server</a>
+        <a href="https://www.youtube.com/watch?v=KwLeVaii0TY" target="_blank" rel="noopener">Video guide</a>
+        <a href="https://github.com/sponsors/giantorth" target="_blank" rel="noopener">Sponsor</a>
+        <a href="https://ko-fi.com/giantorth" target="_blank" rel="noopener">Ko-fi</a>
+      </div>
+      <div class="fcol">
+        <h5>Built with</h5>
+        <a href="https://github.com/Lawstorant/boxflat" target="_blank" rel="noopener">Boxflat</a>
+        <a href="https://www.simhub.com/" target="_blank" rel="noopener">SimHub</a>
+        <a href="https://github.com/ATSR-Alex/ATSR-Hub-EVO/" target="_blank" rel="noopener">ATSR-EVO</a>
+      </div>
+    </div>
+    <div class="disclaimer">
+      <p>MOZA is a registered trademark of Gudsen Technology Co., Ltd. This project is not affiliated with, endorsed by, or sponsored by MOZA or Gudsen Technology. All trademarks are the property of their respective owners. Software provided “as is”, without warranty of any kind.</p>
+      <div class="meta">GPL-3.0 · <span id="yr"></span></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var nav = document.getElementById('nav');
+  var onScroll = function(){ nav.classList.toggle('scrolled', window.scrollY > 8); };
+  onScroll(); window.addEventListener('scroll', onScroll, {passive:true});
+  document.getElementById('yr').textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

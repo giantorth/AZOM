@@ -1,0 +1,13 @@
+{
+  "name": "azom-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AZOM landing page and guides — static site built with Eleventy.",
+  "scripts": {
+    "build": "eleventy",
+    "serve": "eleventy --serve"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "^3.0.0"
+  }
+}

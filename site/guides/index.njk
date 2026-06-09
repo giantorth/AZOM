@@ -1,0 +1,23 @@
+---
+layout: base.njk
+title: Guides
+description: Setup walkthroughs, hardware notes, and reference manuals for AZOM — the MOZA bridge for SimHub.
+permalink: /guides/
+---
+<div class="wrap">
+  <div class="doc-hero">
+    <p class="eyebrow">Documentation</p>
+    <h2 class="h2">Guides &amp; manuals</h2>
+    <p class="lede">Step-by-step setup, hardware-specific notes, and reference for getting AZOM running on your rig.</p>
+  </div>
+  <div class="guide-list">
+    {% for g in collections.guides %}
+    <a class="guide-card" href="{{ g.url }}">
+      <div class="idx">{% if loop.index < 10 %}0{% endif %}{{ loop.index }}</div>
+      <h3>{{ g.data.title }}</h3>
+      <p>{{ g.data.description }}</p>
+      <div class="go">Read →</div>
+    </a>
+    {% endfor %}
+  </div>
+</div>

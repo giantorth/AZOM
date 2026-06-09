@@ -1,0 +1,19 @@
+---
+layout: base.njk
+---
+<div class="wrap doc">
+  <aside class="doc-side">
+    <h5>Guides</h5>
+    <ul>
+      {% for g in collections.guides %}
+      <li><a class="{% if g.url == page.url %}active{% endif %}" href="{{ g.url }}">{{ g.data.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </aside>
+  <article class="prose">
+    <p class="eyebrow">Guide</p>
+    <h1>{{ title }}</h1>
+    {% if description %}<p class="lede" style="margin:14px 0 30px">{{ description }}</p>{% endif %}
+    {{ content | safe }}
+  </article>
+</div>
