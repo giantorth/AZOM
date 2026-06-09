@@ -1372,12 +1372,17 @@ namespace MozaPlugin
                     if (registryHasMoza && !_hubManager.IsConnected)
                         TryConnectHub();
 
-                    // Dedicated base-aux pipe — only when the primary has migrated
-                    // to the hub (broken base). Gated on PrimaryBoundToHub so it
-                    // never opens while the base IS the primary (the primary holds
-                    // the base port anyway). Reclaims the base port the primary
-                    // freed, keeping base temps/FFB/ambient alive.
-                    if (registryHasMoza && PrimaryBoundToHub && !_baseManager.IsConnected)
+                    // Dedicated base-aux pipe — ONLY after a DELIBERATE base→hub
+                    // migration (broken base), identified by the _wheellessBasePort
+                    // latch. Must NOT gate on PrimaryBoundToHub alone: the primary
+                    // can be TRANSIENTLY on the hub during wrong-latch-order cold
+                    // start (hub enumerated before the base). If base-aux grabbed
+                    // the base then, it would hold the port and permanently block
+                    // MigratePrimaryToWheelbaseIfNeeded from reclaiming it — leaving
+                    // the primary stuck on the hub (wheel still works via the hub,
+                    // but the port is mislabeled "Wheelbase"). The latch is set only
+                    // by a real migration, so a transient hub latch never trips it.
+                    if (registryHasMoza && _wheellessBasePort != null && !_baseManager.IsConnected)
                         TryConnectBase();
 
                     // Slice I: reconnect-timer mBooster Refresh re-enabled.
@@ -3782,8 +3787,13 @@ namespace MozaPlugin
             try { _hubManager?.PendingResponses?.Clear(); } catch { }
 
             // Latch the wheel-less base BEFORE rebinding so MigratePrimaryToWheelbase
-            // (which runs later this tick) skips it.
+            // (which runs later this tick) skips it, and so the reconnect tick's
+            // TryConnectBase gate (_wheellessBasePort != null) arms. Seed the
+            // base-aux pipe at the exact port we're leaving so it reclaims it
+            // deterministically.
             _wheellessBasePort = string.IsNullOrEmpty(basePort) ? null : basePort;
+            if (!string.IsNullOrEmpty(basePort))
+                _baseManager.Connection.LastPortName = basePort;
 
             // Point the primary directly at the hub port and rebind. The primary's
             // PID filter accepts the hub PID (same as the hub-only case), so the
