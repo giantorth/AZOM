@@ -45,7 +45,7 @@
   <data name="SliderLabel_NaturalInertia" xml:space="preserve"><value>Natürliche Trägheit</value></data>
   <data name="SliderLabel_WheelSpring" xml:space="preserve"><value>Rückstellkraft</value></data>
   <data name="SliderLabel_GameDamper" xml:space="preserve"><value>Spiel-Dämpfung</value></data>
-  <data name="SliderLabel_GameFriction" xml:space="preserve"><value>Spiel-Reibung/value></data>
+  <data name="SliderLabel_GameFriction" xml:space="preserve"><value>Spiel-Reibung</value></data>
   <data name="SliderLabel_GameInertia" xml:space="preserve"><value>Spiel-Trägheit</value></data>
   <data name="SliderLabel_GameSpring" xml:space="preserve"><value>Spiel-Rückstellkraft</value></data>
   <data name="Section_Protection" xml:space="preserve"><value>SCHUTZ</value></data>
