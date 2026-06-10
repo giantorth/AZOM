@@ -5,7 +5,7 @@ namespace MozaPlugin.Telemetry.Era
     /// axis (tier-def session, encoding, preamble policy, blind-retransmit,
     /// upload header, init handshake) via <see cref="EraPolicy"/>.
     ///
-    /// Three live eras supported. <see cref="Auto"/> probes the wheel and
+    /// Two live eras supported. <see cref="Auto"/> probes the wheel and
     /// picks one at session start (see <c>TelemetrySender.ResolveAutoPolicy</c>).
     /// </summary>
     /// <remarks>
@@ -15,15 +15,17 @@ namespace MozaPlugin.Telemetry.Era
     /// <list type="bullet">
     /// <item><see cref="Era2024"/> — V0 URL subscription. R9, older CSP.
     /// Tier-def TLV is a flat URL list; wheel resolves compression internally.</item>
-    /// <item><see cref="Era2025"/> — V2 compact tier-def, FlagByte session,
-    /// preamble on every send, no blind retx. VGS, GS V2P, F1. Matches the
-    /// 0.8.0 (commit 5692099) "Compact numeric (VGS-style)" path.</item>
-    /// <item><see cref="Era2026"/> — V2 compact + Type02 metadata. Tier-def
-    /// on management session 0x01, FF init kinds on 0x02, preamble gated,
-    /// blind retx on. Post-2026-04 CSP, R5+W17, KS Pro.</item>
+    /// <item><see cref="Era2026"/> — V2 compact + Type02 metadata. Tier-def and
+    /// FF init kinds ride the dynamically-resolved sessions, preamble gated,
+    /// blind retx on. Post-2026-04 CSP, R5+W17, KS Pro, and VGS-class wheels
+    /// (the compact builder is reused when no wheel catalog is advertised).</item>
     /// </list>
     ///
-    /// Values are contiguous (0..3) so UI index ↔ enum is a direct cast.
+    /// Value 2 is a retired hole (the defunct Era2025); it is never written
+    /// anymore, so a persisted 2 unambiguously means a legacy Era2025 pick and
+    /// is migrated to <see cref="Auto"/> on read. Because the values are NOT
+    /// contiguous, the settings UI maps combo index ↔ enum explicitly rather
+    /// than casting (see <c>SettingsControl.EraComboOrder</c>).
     /// </remarks>
     public enum MozaWheelEra
     {
@@ -33,10 +35,10 @@ namespace MozaPlugin.Telemetry.Era
         /// <summary>V0 URL subscription. R9, older CSP.</summary>
         Era2024 = 1,
 
-        /// <summary>V2 compact tier-def. VGS, GS V2P, F1.</summary>
-        Era2025 = 2,
+        // 2 = retired Era2025 (hole). Migrated to Auto on read.
 
-        /// <summary>V2 compact + Type02 metadata. Post-2026-04 CSP, R5+W17, KS Pro.</summary>
+        /// <summary>V2 compact + Type02 metadata. Post-2026-04 CSP, R5+W17,
+        /// KS Pro, and VGS-class wheels.</summary>
         Era2026 = 3,
     }
 }

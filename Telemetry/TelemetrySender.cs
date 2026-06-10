@@ -197,8 +197,9 @@ namespace MozaPlugin.Telemetry
         private readonly object _session02SeqLock = new object();
 
         // Same rationale as _session02SeqLock but for the mgmt session.
-        // SendTierDefinition can target either 0x01 or 0x02 depending on
-        // _policy.TierDefSession.
+        // SendTierDefinition targets the session ResolveTierDefSession()
+        // returns (0x01 unless the wheel's real catalog lands on the flag
+        // session).
         private readonly object _session01SeqLock = new object();
 
         // Per-chunk retransmit until fc:00 ack drains the queue.
@@ -2222,24 +2223,18 @@ namespace MozaPlugin.Telemetry
         internal byte ResolveTierDefSession()
         {
             byte mgmt = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
-            byte flag = FlagByte;
             if (_catalogParser.HasRealCatalogOnSession(mgmt)) return mgmt;
-            // Only FOLLOW the catalog onto the flag session for a wheel whose
-            // policy actually puts the tier-def there (Form B). A MgmtPort-policy
-            // wheel (Form A — CS-Pro) binds the subscription on mgmt (0x01); after
-            // a power cycle its first catalog can land on the flag session (0x02),
-            // but echoing the tier-def there left the wheel unbound — host kind=4
-            // ignored, test mode dead — until a watchdog recovery nudged the
-            // catalog back to 0x01 (verified 2026-06-07: tier-def 0x02 → no bind;
-            // 0x01 → binds). Keep the tier-def on mgmt regardless of which session
-            // the cold-start catalog arrived on; the parser still ingests it from
-            // whichever session carried it, and ResolveFfSession keeps FF on the
-            // opposite (flag) session per the Form-A pairing.
-            if (_policy.TierDefSession == TierDefSessionPolicy.FlagByte
-                && flag != 0 && flag != mgmt
-                && _catalogParser.HasRealCatalogOnSession(flag)) return flag;
-            return _policy.TierDefSession == TierDefSessionPolicy.FlagByte
-                ? (flag != 0 ? flag : (byte)0x02) : mgmt;
+            // Keep the tier-def on mgmt (0x01) regardless of which session the
+            // cold-start catalog arrived on. A wheel (Form A — CS-Pro) binds the
+            // subscription on mgmt; after a power cycle its first catalog can land
+            // on the flag session (0x02), but echoing the tier-def there left the
+            // wheel unbound — host kind=4 ignored, test mode dead — until a
+            // watchdog recovery nudged the catalog back to 0x01 (verified
+            // 2026-06-07: tier-def 0x02 → no bind; 0x01 → binds). The parser still
+            // ingests the catalog from whichever session carried it, and
+            // ResolveFfSession keeps FF on the opposite (flag) session per the
+            // Form-A pairing.
+            return mgmt;
         }
 
         /// <summary>The session FF-init / dashboard-switch (kind=4) / property
@@ -3040,8 +3035,8 @@ namespace MozaPlugin.Telemetry
         ///      is the strongest signal that the wheel speaks Type02).
         ///   2. <c>EraPolicy.GuessFromWheelModel(WheelModelName)</c> hits →
         ///      use that.
-        ///   3. Default to Era2025 (most-likely VGS-class wheel, matches 0.8.0
-        ///      working behavior for users with no catalog and no model match).
+        ///   3. Default to Era2026 (the live V2/Type02 path; its compact
+        ///      builder fallback covers catalog-less wheels too).
         /// </remarks>
         private void ResolveAutoPolicy()
         {
@@ -3076,7 +3071,7 @@ namespace MozaPlugin.Telemetry
                 }
                 else
                 {
-                    resolved = MozaWheelEra.Era2025;
+                    resolved = MozaWheelEra.Era2026;
                     reason = $"default (no catalog, model=\"{modelName}\" unmatched)";
                 }
             }

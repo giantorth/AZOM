@@ -12,7 +12,7 @@ Replicates Pithouse's observed preamble with direct session allocation.
 5. Queue the dashboard upload to the ThreadPool (`QueueBackgroundUploadIfReady`) — a **60s background FT-burst budget**, deliberately decoupled so it never stalls tier-def/timer (NOT a synchronous 2s foreground wait). The upload runs on **session 0x04** (or whichever FT session the wheel device-inits) per [`../dashboard-upload/path-b-session-04.md`](../dashboard-upload/path-b-session-04.md).
 6. Open session 0x03 (aux) and send an empty tile-server state blob via `SendTileServerState()`.
 7. Wait for the channel-catalog burst to go quiet (`WaitForChannelCatalogQuiet`), parse it, then `MaybeSwapProfileForCatalog`.
-8. Wait for a real catalog to arrive (so the session roles are known), then send the FF-init handshake on the **mirror** session (`ResolveFfSession()` — the opposite of the dynamically-resolved tier-def session, typically 0x02 when tier-def is on 0x01); probe the Display sub-device via 0x43.
+8. Wait for a real catalog to arrive (so the session roles are known), then send the FF-init handshake on the **mirror** session (`ResolveFfSession()` — the opposite of the tier-def session, i.e. `0x02` since the tier-def is on the management session `0x01`); probe the Display sub-device via 0x43.
 9. Arm the tick timer.
 
 The V2 preamble + tier definition are **not** sent in Phase 0 — tier-def first emits at the Preamble→Active transition (`ApplySubscription` in `TickPreamble`), once the tick timer is running. Flag bytes are 0x00-based, not session-port-based.

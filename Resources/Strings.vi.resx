@@ -202,7 +202,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Thời kỳ firmware vô lăng:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Tự động — Cố gắng phát hiện qua bắt tay với vô lăng</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Thời kỳ 2024 — (đăng ký URL)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>Thời kỳ 2025 — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Thời kỳ 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Tự động phát hiện thời kỳ firmware của vô lăng từ bắt tay và chọn giao thức tương ứng. Chỉ ghi đè khi telemetry không hoạt động.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>ĐẶT LẠI</value></data>

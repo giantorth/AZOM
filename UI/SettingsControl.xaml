@@ -2097,7 +2097,6 @@
                                               SelectionChanged="FirmwareEra_Changed">
                                         <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEraAuto}"/>
                                         <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2024}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2025}"/>
                                         <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2026}"/>
                                     </ComboBox>
                                 </StackPanel>

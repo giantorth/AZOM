@@ -1495,10 +1495,21 @@ namespace MozaPlugin
         // resolves after the wheel identifies. Safe to call repeatedly; uses
         // the suppressor to keep SelectionChanged handlers from firing on
         // programmatic writes.
+        // ComboBox item order ↔ MozaWheelEra. The enum is non-contiguous
+        // (value 2 is the retired Era2025 hole), so map by position rather than
+        // casting the index. Keep in lockstep with the FirmwareEraCombo items
+        // in SettingsControl.xaml.
+        private static readonly MozaWheelEra[] EraComboOrder =
+        {
+            MozaWheelEra.Auto,
+            MozaWheelEra.Era2024,
+            MozaWheelEra.Era2026,
+        };
+
         private void RefreshTelemetryTab()
         {
-            int desired = (int)_plugin.ActiveTelemetryWheelEra;
-            if (desired < 0 || desired > 3) desired = (int)MozaWheelEra.Auto;
+            int desired = System.Array.IndexOf(EraComboOrder, _plugin.ActiveTelemetryWheelEra);
+            if (desired < 0) desired = 0; // fall back to Auto
             if (FirmwareEraCombo.SelectedIndex != desired)
             {
                 using (_suppressor.Begin())
@@ -1527,12 +1538,12 @@ namespace MozaPlugin
         private void FirmwareEra_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
-            // MozaWheelEra values are contiguous 0..3 matching ComboBox indices —
-            // direct cast. -1 (no selection) clamps to Auto so the plugin stays
-            // in a valid state even if the combo is somehow deselected.
+            // Map combo index → enum via EraComboOrder (the enum is
+            // non-contiguous). -1 (no selection) falls back to Auto so the
+            // plugin stays in a valid state even if the combo is deselected.
             int idx = FirmwareEraCombo.SelectedIndex;
-            _plugin.ActiveTelemetryWheelEra = (idx >= 0 && idx <= 3)
-                ? (MozaWheelEra)idx
+            _plugin.ActiveTelemetryWheelEra = (idx >= 0 && idx < EraComboOrder.Length)
+                ? EraComboOrder[idx]
                 : MozaWheelEra.Auto;
             _plugin.SaveSettings();
             _plugin.RestartTelemetry();

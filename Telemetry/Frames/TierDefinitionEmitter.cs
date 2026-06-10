@@ -337,7 +337,7 @@ namespace MozaPlugin.Telemetry.Frames
 
             // Send wrapper: under blind-retransmit policy (Era2026), every
             // tier-def chunk is also tracked by the retransmitter for the
-            // tick-loop blind-retx replay. Era2024/2025 send raw.
+            // tick-loop blind-retx replay. Era2024 sends raw.
             void Send(byte[] frame)
             {
                 if (policy.BlindRetransmitTierDef)
@@ -376,13 +376,11 @@ namespace MozaPlugin.Telemetry.Frames
                     break;
                 }
 
-                case TierDefEncoding.V2Compact:
                 case TierDefEncoding.V2Type02:
                 {
                     // V2 preamble: tag 0x07 (version=2), tag 0x03 (value=0).
-                    // 2025-era needs it on every send; 2026-era accepts it once per connect.
-                    bool emitPreamble = policy.SendV2PreambleEverySend
-                                        || !_tierDefPreambleSent;
+                    // Gated to once per connect.
+                    bool emitPreamble = !_tierDefPreambleSent;
                     int preambleChunkCount = 0;
                     if (emitPreamble)
                     {
@@ -513,8 +511,9 @@ namespace MozaPlugin.Telemetry.Frames
                     // probe to nudge Type02 firmware to re-publish its catalog —
                     // verified to actually re-burst on Type02 captures.
                     //
-                    // V2Compact (VGS): wheel doesn't index by catalog position, so
-                    // an "unbound" URL is informational only — the tier-def still
+                    // Compact fallback (!cspIdx — no wheel catalog / VGS-class):
+                    // wheel doesn't index by catalog position, so an "unbound"
+                    // URL is informational only — the tier-def still
                     // emits the URL with an alphabetic chIdx and the wheel either
                     // accepts or ignores per its own dashboard JSON. We log the
                     // count for diagnostics and feed it to LastTierDefTotalCount /
@@ -579,8 +578,9 @@ namespace MozaPlugin.Telemetry.Frames
                 }
             }
 
-            // Persist the new seq counter on whichever session we used.
-            if (policy.TierDefSession == TierDefSessionPolicy.FlagByte)
+            // Persist the new seq counter on whichever session we actually
+            // emitted on (matches the seqLock pick above).
+            if (onFlagByte)
                 _sender.Session02OutboundSeq = seq;
             else
                 _sender.Session01OutboundSeq = seq;
@@ -617,7 +617,7 @@ namespace MozaPlugin.Telemetry.Frames
                 + System.Diagnostics.Stopwatch.Frequency * 5);
         }
 
-        /// <summary>Re-emit blind tier-def chunks (Era2024/25 doesn't ack sess=0x01).</summary>
+        /// <summary>Re-emit blind tier-def chunks (Era2024 doesn't ack sess=0x01).</summary>
         public void TickEmitTierDefBlindRetransmits()
         {
             if (_tierDefBlindFrames == null) return;

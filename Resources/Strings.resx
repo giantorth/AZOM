@@ -209,7 +209,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Wheel firmware era:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Attempt to detect from wheel handshake</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 era — (URL subscription)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>2025 era — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 era — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detects the wheel&apos;s firmware era from its handshake and picks the matching protocol. Override only if telemetry does not work.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>RESET</value></data>

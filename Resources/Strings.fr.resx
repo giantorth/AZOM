@@ -202,7 +202,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Ère du firmware du volant :</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Tenter la détection depuis la poignée de main du volant</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Ère 2024 — (abonnement par URL)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>Ère 2025 — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Ère 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto détecte l'ère du firmware du volant depuis sa poignée de main et choisit le protocole correspondant. Ne forcez l'option que si la télémétrie ne fonctionne pas.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>RÉINITIALISER</value></data>

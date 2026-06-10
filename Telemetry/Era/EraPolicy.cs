@@ -4,39 +4,12 @@ using MozaPlugin.Telemetry.Dashboard;
 namespace MozaPlugin.Telemetry.Era
 {
     /// <summary>
-    /// Which session number tier-def chunks ride on.
-    /// </summary>
-    public enum TierDefSessionPolicy
-    {
-        /// <summary>
-        /// Send tier-def on the probed telemetry FlagByte (typically 0x02).
-        /// 2025-era VGS firmware accepts tier-def here. Matches 0.8.0
-        /// behavior (commit 5692099).
-        /// </summary>
-        FlagByte,
-
-        /// <summary>
-        /// Send tier-def on the management port (typically 0x01). 2026-era
-        /// firmware (R5+W17, KS Pro, post-2026-04 CSP) puts tier-def TLV on
-        /// 0x01 and FF init records on 0x02. Verified by 2026-05-03 PitHouse
-        /// captures (see <c>docs/protocol/findings/2026-05-04-init-sequence.md</c>).
-        /// </summary>
-        MgmtPort,
-    }
-
-    /// <summary>
     /// Tier-definition body shape. Picks which builder produces the message.
     /// </summary>
     public enum TierDefEncoding
     {
         /// <summary>Flat URL subscription list (V0). Wheel resolves compression internally.</summary>
         V0Url,
-
-        /// <summary>
-        /// V2 compact: tier records with alphabetic channel indices. No wheel-catalog
-        /// lookup. Used by 2025-era VGS-class firmware.
-        /// </summary>
-        V2Compact,
 
         /// <summary>
         /// V2 compact + Type02 metadata layout: channel indices come from the
@@ -57,21 +30,14 @@ namespace MozaPlugin.Telemetry.Era
     public sealed class EraPolicy
     {
         /// <summary>The era this policy was built from. After auto-resolution,
-        /// reflects the resolved era (e.g. Era2025), not the user's pick.</summary>
+        /// reflects the resolved era (e.g. Era2026), not the user's pick.</summary>
         public MozaWheelEra Era;
 
         /// <summary>True when the user picked <see cref="MozaWheelEra.Auto"/>.
         /// Enables runtime auto-resolution and upload-wire-format fallback.</summary>
         public bool IsAuto;
 
-        public TierDefSessionPolicy TierDefSession;
         public TierDefEncoding Encoding;
-
-        /// <summary>When true, the V2 preamble (tag=0x07 size=4 ver=2; tag=0x03
-        /// size=4 val=0) is emitted on every <c>SendTierDefinition</c> call.
-        /// When false, it's gated by <c>_tierDefPreambleSent</c> (once per
-        /// connect). 2025-era VGS firmware needs every-send.</summary>
-        public bool SendV2PreambleEverySend;
 
         /// <summary>When true, tier-def chunks are tracked for blind
         /// retransmission (~10 rounds at 200ms). 2026-era only.</summary>
@@ -103,44 +69,11 @@ namespace MozaPlugin.Telemetry.Era
                     {
                         Era = MozaWheelEra.Era2024,
                         IsAuto = false,
-                        // Tier-def on management port (0x01) — same architecture
-                        // as Era2025/Era2026 so the wheel's tier-def parser sees
-                        // a clean TLV stream uncontaminated by FF/session-state
-                        // chunks on 0x02.
-                        TierDefSession = TierDefSessionPolicy.MgmtPort,
                         Encoding = TierDefEncoding.V0Url,
-                        SendV2PreambleEverySend = false, // n/a for V0
                         BlindRetransmitTierDef = false,
                         UploadWireFormat = FileTransferWireFormat.New2026_04,
                         AutoFallbackUploadWireFormat = false,
                         ProtocolVersion = 0,
-                    };
-
-                case MozaWheelEra.Era2025:
-                    return new EraPolicy
-                    {
-                        Era = MozaWheelEra.Era2025,
-                        IsAuto = false,
-                        // Tier-def rides on the management port (0x01), same as
-                        // Era2026. Real VGS firmware (and the wheel simulator
-                        // which emulates it) parses tier-def from a clean TLV
-                        // stream, so it must NOT share a session with FF init
-                        // records (which use 0x02). The 5692099 plugin sent
-                        // tier-def on FlagByte (often 0x02) which co-mingled
-                        // with FF records — VGS firmware tolerated this in
-                        // some configurations but the sim's parser gets
-                        // misaligned by the FF CRC envelopes. The actual
-                        // VGS-vs-Type02 differences are below this line:
-                        // preamble-each-send, no blind retransmit, 8B upload.
-                        TierDefSession = TierDefSessionPolicy.MgmtPort,
-                        Encoding = TierDefEncoding.V2Compact,
-                        SendV2PreambleEverySend = true,
-                        BlindRetransmitTierDef = false,
-                        // 8B header matches 0.8.0 working behavior for VGS users.
-                        // No fallback — users on Type02 firmware should pick Era2026.
-                        UploadWireFormat = FileTransferWireFormat.Legacy2025_11,
-                        AutoFallbackUploadWireFormat = false,
-                        ProtocolVersion = 2,
                     };
 
                 case MozaWheelEra.Era2026:
@@ -148,9 +81,7 @@ namespace MozaPlugin.Telemetry.Era
                     {
                         Era = MozaWheelEra.Era2026,
                         IsAuto = false,
-                        TierDefSession = TierDefSessionPolicy.MgmtPort,
                         Encoding = TierDefEncoding.V2Type02,
-                        SendV2PreambleEverySend = false, // gated by _tierDefPreambleSent
                         BlindRetransmitTierDef = true,
                         UploadWireFormat = FileTransferWireFormat.New2026_04_Type02,
                         AutoFallbackUploadWireFormat = false,
@@ -166,9 +97,7 @@ namespace MozaPlugin.Telemetry.Era
                     {
                         Era = MozaWheelEra.Era2026,
                         IsAuto = true,
-                        TierDefSession = TierDefSessionPolicy.MgmtPort,
                         Encoding = TierDefEncoding.V2Type02,
-                        SendV2PreambleEverySend = false,
                         BlindRetransmitTierDef = true,
                         UploadWireFormat = FileTransferWireFormat.New2026_04_Type02,
                         AutoFallbackUploadWireFormat = true,
@@ -180,7 +109,7 @@ namespace MozaPlugin.Telemetry.Era
         /// <summary>
         /// Heuristic era guess from a wheel-model identity string. Returns null
         /// when no entry matches — callers fall back to other signals
-        /// (typically default to Era2025 — most-likely-VGS-class).
+        /// (typically default to Era2026 — the live V2/Type02 path).
         /// </summary>
         /// <remarks>
         /// Matched substrings, case-insensitive. The wheel's identity string
@@ -205,11 +134,13 @@ namespace MozaPlugin.Telemetry.Era
             // Era2024 — V0 URL subscription. R9 wheel-base / older CSP firmware.
             if (m.Contains("R9"))   return MozaWheelEra.Era2024;
 
-            // Era2025 — VGS-class V2 compact tier-def. VGS, GS V2P, F1, FSR.
-            if (m.Contains("VGS"))  return MozaWheelEra.Era2025;
-            if (m.Contains("GS V2P") || m.Contains("GSV2P")) return MozaWheelEra.Era2025;
-            if (m.Contains("FSR"))  return MozaWheelEra.Era2025;
-            if (m.Contains("F1"))   return MozaWheelEra.Era2025;
+            // VGS-class wheels (VGS, GS V2P, F1, FSR) speak the V2 path; with no
+            // Type02 catalog they fall back to the compact tier-def builder, so
+            // Era2026 (dynamic session + compact fallback) covers them.
+            if (m.Contains("VGS"))  return MozaWheelEra.Era2026;
+            if (m.Contains("GS V2P") || m.Contains("GSV2P")) return MozaWheelEra.Era2026;
+            if (m.Contains("FSR"))  return MozaWheelEra.Era2026;
+            if (m.Contains("F1"))   return MozaWheelEra.Era2026;
 
             return null;
         }

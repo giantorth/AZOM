@@ -202,7 +202,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Έκδοση firmware τιμονιού:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Αυτόματα — Προσπάθεια ανίχνευσης από handshake τιμονιού</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Έκδοση 2024 — (URL subscription)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>Έκδοση 2025 — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Έκδοση 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Αυτόματη ανίχνευση της έκδοσης firmware του τιμονιού από το handshake και επιλογή αντίστοιχου πρωτοκόλλου. Αλλάξτε μόνο αν η τηλεμετρία δεν λειτουργεί.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>

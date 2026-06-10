@@ -359,9 +359,8 @@ namespace MozaPlugin.UI
                 sb.AppendLine($"DisplayEngaged:     {ts.Watchdog?.DisplayEngagementText() ?? "(n/a)"}");
                 var p = ts.Policy;
                 sb.AppendLine($"PolicyEra:          {p.Era}{(p.IsAuto ? " (auto)" : "")}");
-                sb.AppendLine($"TierDefSession:     {p.TierDefSession}");
+                sb.AppendLine($"ResolvedTierDefSes: 0x{ts.ResolveTierDefSession():X2}");
                 sb.AppendLine($"Encoding:           {p.Encoding}");
-                sb.AppendLine($"PreambleEverySend:  {p.SendV2PreambleEverySend}");
                 sb.AppendLine($"BlindRetransmit:    {p.BlindRetransmitTierDef}");
                 sb.AppendLine($"UploadWireFormat:   {p.UploadWireFormat}");
                 sb.AppendLine($"FlagByte:           0x{ts.FlagByte:X2}");

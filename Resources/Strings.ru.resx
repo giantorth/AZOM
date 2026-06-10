@@ -202,7 +202,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Эра прошивки руля:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Авто — определить из рукопожатия руля</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Эра 2024 — (подписка по URL)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>Эра 2025 — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Эра 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Авто определяет эру прошивки руля по его рукопожатию и выбирает соответствующий протокол. Переопределяйте, только если телеметрия не работает.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>СБРОС</value></data>

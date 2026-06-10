@@ -202,7 +202,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Lenkrad-Firmware-Ära:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Versuch zur Erkennung anhand des Lenkrad-Handshakes</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Ära 2024 — (URL-Abonnement)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>Ära 2025 — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Ära 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto ermittelt die Firmware-Ära aus dem Handshake des Lenkrads und wählt das passende Protokoll. Nur überschreiben, falls die Telemetrie nicht funktioniert.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>

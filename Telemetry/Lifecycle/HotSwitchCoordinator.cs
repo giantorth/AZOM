@@ -31,8 +31,9 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
         /// <summary>Legacy fixed burst length. Used when the caller passes
         /// <c>null</c> to <see cref="MarkEmission"/> — i.e., when bind
-        /// completeness isn't measurable for this era (V0Url, V2Compact).
-        /// Preserves the prior pre-adaptive behaviour for those wheels.</summary>
+        /// completeness isn't measurable (V0 URL, or the V2 compact fallback
+        /// with no wheel catalog). Preserves the prior pre-adaptive
+        /// behaviour for those wheels.</summary>
         public const int EmissionCount = 4;
 
         /// <summary>Min spacing between subsequent emissions in the burst.
@@ -201,9 +202,10 @@ namespace MozaPlugin.Telemetry.Lifecycle
         ///
         /// <para><paramref name="boundComplete"/> drives the adaptive cap:</para>
         /// <list type="bullet">
-        /// <item><c>null</c> — bind info isn't available for this era (V0Url,
-        /// V2Compact). Caps the burst at the legacy <see cref="EmissionCount"/>
-        /// (4) to preserve pre-adaptive behaviour for older wheels.</item>
+        /// <item><c>null</c> — bind info isn't available (V0 URL, or the V2
+        /// compact fallback when no wheel catalog is advertised). Caps the burst
+        /// at the legacy <see cref="EmissionCount"/> (4) to preserve pre-adaptive
+        /// behaviour for older wheels.</item>
         /// <item><c>true</c> — wheel-catalog covers every channel we emitted.
         /// Stops early after at least <see cref="MinEmissions"/> (3) have gone
         /// out — saves wire bandwidth on the common case where the first

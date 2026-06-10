@@ -202,7 +202,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>方向盘固件世代:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>自动 — 尝试从方向盘握手信息中识别</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 世代 — (URL 订阅)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>2025 世代 — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 世代 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>自动会从方向盘握手中识别固件世代并选择匹配的协议。仅在遥测无法工作时手动覆盖。</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>重置</value></data>

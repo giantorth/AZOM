@@ -207,7 +207,6 @@
   <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Ratt-firmware-versjon:</value></data>
   <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Forsøk å detektere fra ratt-handshake</value></data>
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024-versjon — (URL-abonnement)</value></data>
-  <data name="Option_FirmwareEra2025" xml:space="preserve"><value>2025-versjon — VGS</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026-versjon — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detekterer rattets firmware-versjon fra handshake og velger riktig protokoll. Overstyr kun hvis telemetrien ikke virker.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>TILBAKESTILL</value></data>

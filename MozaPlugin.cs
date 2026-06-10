@@ -5137,16 +5137,20 @@ namespace MozaPlugin
 
         /// <summary>
         /// Map a persisted era int onto the current <see cref="MozaWheelEra"/>
-        /// values. The defunct Era2025 (stored as 2) and the pre-renumber
-        /// Era2026 (stored as 3) both resolve to the live Era2026 (now 2): the
-        /// stored 2 already lands on Era2026 by the renumber, and a legacy 3 is
-        /// clamped down. 0=Auto / 1=Era2024 are unchanged.
+        /// values. The defunct Era2025 was stored as 2 (now a retired hole) and
+        /// is migrated to <see cref="MozaWheelEra.Auto"/> so the wheel is
+        /// re-probed rather than pinned to a hallucinated era. Existing
+        /// Era2024 (1) and Era2026 (3) picks are preserved; anything else
+        /// (including 0 and the retired 2) falls back to Auto.
         /// </summary>
         private static MozaWheelEra MigrateStoredEra(int stored)
         {
-            if (stored > (int)MozaWheelEra.Era2026)
-                return MozaWheelEra.Era2026;
-            return (MozaWheelEra)stored;
+            switch (stored)
+            {
+                case (int)MozaWheelEra.Era2024: return MozaWheelEra.Era2024;
+                case (int)MozaWheelEra.Era2026: return MozaWheelEra.Era2026;
+                default: return MozaWheelEra.Auto;
+            }
         }
 
         /// <summary>

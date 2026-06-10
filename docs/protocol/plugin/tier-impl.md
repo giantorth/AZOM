@@ -9,13 +9,12 @@ Encoding selection is driven by the wheel-era policy, not a user "Protocol versi
 - **V2Type02**: compact numeric tier definitions via `TierDefinitionBuilder.BuildTierDefinitionMessage()`.
 - **V0Url**: URL subscription via `TierDefinitionBuilder.BuildV0UrlSubscription()`. Double-sent (once at startup, once after preamble) to match PitHouse.
 
-The tier-def **session is resolved dynamically**, independent of era, by `TelemetrySender.ResolveTierDefSession()`:
+The tier-def is emitted on the **management** session `0x01`, independent of era, by `TelemetrySender.ResolveTierDefSession()`:
 
-- If the wheel's real catalog + END marker is on the **management** session `0x01` (`ChannelCatalogParser.HasRealCatalogOnSession`), the tier-def goes there.
-- Otherwise the catalog is **followed onto** the telemetry session `0x02` **only for a Form-B (`FlagByte`-policy) wheel**. A Form-A (`MgmtPort`-policy) wheel — e.g. CS-Pro — keeps the tier-def on `0x01` regardless of where the catalog landed. This matters on cold start: after a hardware power cycle the wheel's first catalog can transiently arrive on `0x02`, and the old "follow the catalog" rule put the tier-def there too, leaving the wheel **unbound** — host kind=4 ignored, test mode dead — until a `DisplayWatchdog` recovery (~24 s + Stop/Start) nudged the catalog back to `0x01`. The catalog is still *parsed* from whichever session carried it; only the tier-def echo is pinned to where a Form-A wheel actually binds the subscription (mgmt). Verified CS-Pro 2026-06-07: catalog-on-0x02 + tier-def-on-0x02 → no bind; tier-def-on-0x01 → binds.
-- Default: `0x01` until a catalog appears.
+- The wheel's channel catalog is **parsed from whichever session delivered it** (`ChannelCatalogParser.HasRealCatalogOnSession`). On cold start the wheel's first catalog can transiently arrive on the telemetry session `0x02`.
+- The tier-def echo, however, **always stays on `0x01`**, because that is where the wheel binds the subscription. Echoing it on `0x02` after a cold-start catalog landed there left the wheel **unbound** — host kind=4 ignored, test mode dead — until a `DisplayWatchdog` recovery (~24 s + Stop/Start) nudged the catalog back to `0x01`. Verified CS-Pro 2026-06-07: catalog-on-0x02 + tier-def-on-0x02 → no bind; tier-def-on-0x01 → binds.
 
-FF-init records, dashboard-switch (kind=4), and property pushes ride the **mirror** session (`ResolveFfSession()`, the *opposite* of the tier-def session — Form A: tier-def `0x01` / FF `0x02`; Form B: the mirror; PitHouse-derived). The flag byte for value frames is 0x00-based, not session-port-based.
+FF-init records, dashboard-switch (kind=4), and property pushes ride the **mirror** session `0x02` (`ResolveFfSession()`, the *opposite* of the tier-def session; PitHouse-derived). The flag byte for value frames is 0x00-based, not session-port-based.
 
 (The earlier `TelemetryProtocolVersion` and `FlagByteMode` settings were removed in favour of this era policy.)
 

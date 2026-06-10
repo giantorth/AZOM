@@ -266,7 +266,6 @@ namespace MozaPlugin.Resources
         public static string Label_WheelFirmwareEra => Get("Label_WheelFirmwareEra");
         public static string Option_FirmwareEraAuto => Get("Option_FirmwareEraAuto");
         public static string Option_FirmwareEra2024 => Get("Option_FirmwareEra2024");
-        public static string Option_FirmwareEra2025 => Get("Option_FirmwareEra2025");
         public static string Option_FirmwareEra2026 => Get("Option_FirmwareEra2026");
         public static string Hint_FirmwareEra => Get("Hint_FirmwareEra");
         public static string Section_Reset => Get("Section_Reset");
