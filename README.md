@@ -172,10 +172,7 @@ Full configuration support for the MOZA AB9 active shifter, surfaced under its o
 
 MOZA mBooster pedal haptics get their own **mBooster** tab when one or more units are connected. Each unit is assigned a role (Throttle, Brake, or Clutch), and the plugin renders pedal haptic effects host-side from live telemetry:
 
-- **ABS** — pulse when ABS activates.
-- **Lockup** — vibration as a tyre approaches lockup under braking.
-- **Threshold** — feedback near the brake-pressure threshold.
-- **Engine continuous** — RPM-driven continuous vibration.
+- **Engine Vibration** — RPM-driven continuous vibration.
 
 An experimental calibration section is also available per device.
 
