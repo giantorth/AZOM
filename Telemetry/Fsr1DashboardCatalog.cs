@@ -325,8 +325,16 @@ namespace MozaPlugin.Telemetry
             },
         };
 
+        // Index → record type(s), verified by correlating g32/81 selects + the wheel's
+        // Param-6 0x0E log with the streamed 0x42 record type across the usb-capture/fsr1
+        // dashboard-change captures (All dashboards / Moza FSR1 dashboard change / FS1
+        // multiple changes / GT Style / manual). Index 0 is the power-on default (784
+        // streamed type-01 frames before the first switch). Index 16 is never enumerated
+        // by PitHouse (its sweep goes …15, 17, 18) → left unmapped (falls back to the
+        // full live set). See docs/protocol/devices/wheel-0x17.md § Group 0x42.
         private static readonly System.Collections.Generic.Dictionary<int, byte[]> IndexToRecordTypes = new()
         {
+            { 0, new byte[] { 0x01 } },
             { 1, new byte[] { 0x02 } },
             { 2, new byte[] { 0x06 } },
             { 3, new byte[] { 0x06 } },
@@ -343,6 +351,7 @@ namespace MozaPlugin.Telemetry
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
             { 17, new byte[] { 0x11, 0x12 } },
+            { 18, new byte[] { 0x0c } },
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
