@@ -15,5 +15,14 @@ layout: base.njk
     <h1>{{ title }}</h1>
     {% if description %}<p class="lede" style="margin:14px 0 30px">{{ description }}</p>{% endif %}
     {{ content | safe }}
+
+    {%- set prev = collections.guides | getPreviousCollectionItem %}
+    {%- set next = collections.guides | getNextCollectionItem %}
+    {%- if prev or next %}
+    <nav class="guide-foot">
+      {%- if prev %}<a class="prev" href="{{ prev.url }}"><span class="dir">← Previous</span><span>{{ prev.data.title }}</span></a>{% endif %}
+      {%- if next %}<a class="next" href="{{ next.url }}"><span class="dir">Next →</span><span>{{ next.data.title }}</span></a>{% endif %}
+    </nav>
+    {%- endif %}
   </article>
 </div>
