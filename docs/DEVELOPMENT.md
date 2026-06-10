@@ -355,7 +355,7 @@ The FSR V1 (model-name `FSR`, hw `RS21-D03*`) uses a fundamentally different tra
 
 ### Internationalization (i18n)
 
-User-visible strings live in `Resources/Strings.resx` (English neutral/master) plus per-culture variants for de, el, es, fr, it, nb, ru, vi, and zh-Hans. XAML uses `{x:Static res:Strings.<Key>}`; C# uses `MozaPlugin.Resources.Strings.<Key>`. The strongly-typed accessor `Resources/Strings.Designer.cs` is hand-edited (one line per key), not generated.
+User-visible strings live in `Resources/Strings.resx` (English neutral/master) plus per-culture variants for de, el, es, fr, it, ko, nb, ru, vi, and zh-Hans. XAML uses `{x:Static res:Strings.<Key>}`; C# uses `MozaPlugin.Resources.Strings.<Key>`. The strongly-typed accessor `Resources/Strings.Designer.cs` is hand-edited (one line per key), not generated.
 
 **Single-DLL deployment.** Every locale is embedded directly inside `MozaPlugin.dll` — no satellite assemblies. The csproj sets `<WithCulture>false</WithCulture>` per non-neutral resx with explicit `ManifestResourceName` keys; `Strings.Designer.cs` builds a BCP-47-keyed `ResourceManager` dictionary and `Get(key)` walks `Thread.CurrentUICulture`'s parent chain (passing `InvariantCulture` to each `GetString` so no satellite lookup happens), falling back to English.
 
