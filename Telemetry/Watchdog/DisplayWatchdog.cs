@@ -141,6 +141,26 @@ namespace MozaPlugin.Telemetry.Watchdog
         private readonly int[] _closeStormRestartFirstTickMs = new int[CloseStormSessionMax];
         private readonly int[] _closeStormRestartCount = new int[CloseStormSessionMax];
 
+        // ── tier-def reject detector (single-close wedge, no storm) ───────
+        // Cold-start wedge (CS-Pro bundle 2026-06-10): the wheel routes its
+        // catalog + END marker to sess=0x02 and gives the tier-def session
+        // (0x01) only a value-less END stub, so every tier-def goes out with
+        // end=0; the wheel rejects the first one and CLOSEs the tier-def
+        // session ONCE — no storm follows, Context A stays green (catalog +
+        // configJson both present on 0x02), and the slot rule never restarts.
+        // The reject is one wheel-initiated CLOSE of the tier-def session
+        // within this window of an emission whose echoed END was 0 while the
+        // wheel's END demonstrably lives elsewhere (LastWheelEndMarker != 0).
+        // Recovery = the empirically-proven telemetry off/on cycle:
+        // RequestRestart → Stop() (close 0x01..0x03) → SilenceGate (~11 s
+        // host quiet) → fresh opens, after which the wheel re-advertises
+        // WITH a valid END on the tier-def session (verified 2026-06-10
+        // 12:13 log: first post-cycle tier-def echoed end=12 and bound).
+        // One-shot per Start cycle; RecoveryDispatcher's debounce + restart
+        // cap bound the retry loop if the wheel re-wedges.
+        private const int TierDefRejectWindowMs = 10_000;
+        private int _tierDefRejectRestartRequested;
+
         // ───── Notification API (called by sender / inbound dispatch) ─────
 
         /// <summary>Called when sess=MgmtPort receives an fc:00 ack or any 7c:00
@@ -213,6 +233,26 @@ namespace MozaPlugin.Telemetry.Watchdog
             // to refuse trusting inbound-bytes liveness for S01PostCloseSettleMs.
             if (session == _sender.MgmtPort)
                 Interlocked.Exchange(ref _session01LastCloseUtcTicks, DateTime.UtcNow.Ticks);
+
+            // Tier-def reject wedge — see the field block for the full story.
+            var emitter = _sender.TierDefEmitter;
+            long emitTicks = emitter.LastTierDefEmitUtcTicks;
+            if (_tierDefRejectRestartRequested == 0
+                && emitTicks != 0
+                && session == emitter.LastTierDefSession
+                && emitter.LastTierDefEndMarker == 0
+                && _sender.CatalogParser.LastWheelEndMarker != 0
+                && (DateTime.UtcNow.Ticks - emitTicks) / TimeSpan.TicksPerMillisecond
+                    <= TierDefRejectWindowMs)
+            {
+                _tierDefRejectRestartRequested = 1;
+                _sender.Recovery.RequestRestart(
+                    $"sess=0x{session:X2} tier-def REJECT: wheel closed the tier-def session " +
+                    $"after an emission with end=0 while its END marker " +
+                    $"({_sender.CatalogParser.LastWheelEndMarker}) lives on another session — " +
+                    "cycling the pipeline so the wheel re-advertises with a valid END " +
+                    "(catalog-on-wrong-session cold-start wedge).");
+            }
 
             // Restart-escalation accounting on its own 30 s window.
             int sinceRestartFirst = now - _closeStormRestartFirstTickMs[session];
@@ -297,6 +337,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                 _closeStormRestartFirstTickMs[s] = 0;
                 _closeStormRestartCount[s] = 0;
             }
+            _tierDefRejectRestartRequested = 0;
 
             // Clear the wheel-ready latch so a reconnect re-arms detection from
             // a clean slate (consumed by ProbeAndOpenSessions).

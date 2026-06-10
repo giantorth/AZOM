@@ -46,6 +46,20 @@ namespace MozaPlugin.Telemetry.Frames
         private volatile TelemetrySender.SubscriptionDiagnostics? _lastSubscriptionDiag;
         public TelemetrySender.SubscriptionDiagnostics? LastSubscription => _lastSubscriptionDiag;
 
+        // Last tier-def emission snapshot: which session it rode, the END u32
+        // echoed, and when. Consumed by DisplayWatchdog's tier-def-reject
+        // detector — the wheel CLOSE-ing the tier-def session right after an
+        // emission that couldn't echo a valid END is the cold-start wedge
+        // where the wheel routed its catalog+END to the other session
+        // (CS-Pro bundle 2026-06-10). 64-bit ticks go through Interlocked
+        // (x86 build); -1 endMarker = no emission yet.
+        private long _lastTierDefEmitUtcTicks;
+        private volatile byte _lastTierDefSession;
+        private volatile int _lastTierDefEndMarker = -1;
+        internal long LastTierDefEmitUtcTicks => Interlocked.Read(ref _lastTierDefEmitUtcTicks);
+        internal byte LastTierDefSession => _lastTierDefSession;
+        internal int LastTierDefEndMarker => _lastTierDefEndMarker;
+
         public TierDefinitionEmitter(TelemetrySender sender)
         {
             _sender = sender;
@@ -58,6 +72,9 @@ namespace MozaPlugin.Telemetry.Frames
             _tierDefBlindFrames = null;
             _tierDefBlindSentRounds = 0;
             _tierDefBlindLastTickCount = 0;
+            Interlocked.Exchange(ref _lastTierDefEmitUtcTicks, 0);
+            _lastTierDefSession = 0;
+            _lastTierDefEndMarker = -1;
             _lastTierDefUnboundCount = -1;
             _lastTierDefTotalCount = -1;
             _lastSubscriptionDiag = null;
@@ -479,6 +496,13 @@ namespace MozaPlugin.Telemetry.Frames
                         prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0),
                         prevSubPerBroadcast: doReuse ? 0 : (prevSub?.SubTiersPerBroadcast ?? 0));
                     var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
+
+                    // Stamp BEFORE the chunks hit the wire — the wheel's reject
+                    // CLOSE can arrive within ~500 ms and the detector must see
+                    // this emission's session/END.
+                    _lastTierDefSession = tierDefSession;
+                    _lastTierDefEndMarker = unchecked((int)endForThisEmission);
+                    Interlocked.Exchange(ref _lastTierDefEmitUtcTicks, DateTime.UtcNow.Ticks);
 
                     MozaLog.Debug(
                         $"[AZOM] Sending v2 tier definition ({(cspIdx ? "type02" : "compact")}): " +
