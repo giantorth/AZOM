@@ -164,6 +164,14 @@ namespace MozaPlugin
             // Toggle telemetry test mode (synthetic signal sweep) for the active
             // wheel page, mirroring the Test Start/Stop buttons in the UI.
             _plugin.AddAction("AZOM.TestModeToggle", (a, b) => ToggleTestMode());
+
+            // Re-center the wheelbase (same command as the UI's Calibrate Center
+            // button, cf. SettingsControl.BaseCalibrateButton_Click).
+            _plugin.AddAction("AZOM.CalibrateCenter", (a, b) =>
+            {
+                _plugin.WriteIfBaseConnected("base-calibration", 1);
+                MozaLog.Debug("[AZOM] Base center calibration via action");
+            });
         }
 
         // Remembered display brightness from the last DisplayToggle-off, so the

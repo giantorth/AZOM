@@ -246,6 +246,7 @@ Each *step* setting has four actions: `…Up` / `…Down` apply a fine step, and
 | `AZOM.DisplayToggle` | Toggle the wheel screen on/off (remembers the on-brightness so toggling back on restores it) |
 | `AZOM.TestModeToggle` | Toggle telemetry test mode (synthetic signal sweep) for the active wheel page |
 | `AZOM.ClearLeds` | Blank all wheel and dash LEDs |
+| `AZOM.CalibrateCenter` | Re-center the wheelbase (same as the Calibrate Center button — hold the wheel at physical center when triggering) |
 
 ## Building from Source
 
