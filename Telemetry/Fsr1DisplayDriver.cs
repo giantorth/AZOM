@@ -114,11 +114,11 @@ namespace MozaPlugin.Telemetry
             var plugin = MozaPlugin.Instance;
             int oneHzEvery = Math.Max(1, (int)Math.Round(1000.0 / TickIntervalMs));
             bool testMode = plugin?.DashboardTestPatternActive ?? false;
-            bool ruler = plugin?.Fsr1ByteRulerActive ?? false;
+            bool probe = plugin?.Fsr1ProbeActive ?? false;
 
             // Telemetry disabled by the user: keepalive only (keeps the wheel engaged).
-            // The test pattern / byte ruler override this so the screen renders with no game.
-            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode && !ruler)
+            // The test pattern / byte probe override this so the screen renders with no game.
+            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode && !probe)
             {
                 if (_tickCounter % oneHzEvery == 0)
                     _connection.SendStream(StreamKind.Enable, Fsr1DisplayEmitter.Keepalive43);
@@ -164,10 +164,21 @@ namespace MozaPlugin.Telemetry
                 return Clamp((long)Math.Round(t * outMax), 0, outMax);
             }
 
-            // Byte-ruler diagnostic overrides value computation: every data byte = its
-            // own offset, so each box on the wheel reveals which byte(s) feed it.
+            // Single-byte probe overrides value computation: stream an all-zero record
+            // with ONE data byte (the active target offset) ramping 0..255 as a triangle,
+            // and zero every other record on the page, so exactly one box animates. The
+            // user watches which box moves to map offset→field. ~1.6s up-and-down sweep.
+            (byte probeType, int probeOff) = probe ? (plugin?.Fsr1ProbeTarget() ?? ((byte)0, -1)) : ((byte)0, -1);
+            int probeVal = 0;
+            if (probe)
+            {
+                const long Period = 1600, Half = Period / 2;
+                long ph = DashboardTestPattern.NowMs() % Period;
+                probeVal = (int)(ph < Half ? ph * 255 / Half : 255 - (ph - Half) * 255 / Half);
+            }
+
             byte[] RecordFor(Fsr1Dashboard dash) =>
-                ruler ? Fsr1DisplayEmitter.BuildByteRulerRecord(dash)
+                probe ? Fsr1DisplayEmitter.BuildProbeRecord(dash, dash.RecordType == probeType ? probeOff : -1, probeVal)
                       : Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f));
 
             // PitHouse streams exactly ONE record type — the one for the wheel's

@@ -105,6 +105,7 @@ header.nav.scrolled{ border-bottom-color:var(--line); background:rgba(7,8,9,.86)
 .hero{ padding:74px 0 64px; overflow:hidden; }
 .hero-glow{ position:absolute; top:-220px; left:50%; transform:translateX(-50%); width:900px; height:620px;
   background:radial-gradient(circle, rgba(0,229,255,.12), transparent 62%); pointer-events:none; z-index:0; }
+.hero-watermark{ position:absolute; right:-160px; top:40px; width:560px; color:#fff; opacity:.035; z-index:0; pointer-events:none; }
 .hero-in{ position:relative; z-index:2; text-align:center; display:flex; flex-direction:column; align-items:center; }
 .hero .lockup{ display:flex; align-items:center; justify-content:center; gap:26px; }
 .hero .lockup .mark{ width:104px; height:104px; filter:drop-shadow(0 6px 26px rgba(0,0,0,.6)); }
@@ -137,6 +138,60 @@ header.nav.scrolled{ border-bottom-color:var(--line); background:rgba(7,8,9,.86)
 .pill{ display:inline-flex; align-items:center; gap:9px; font-family:var(--mono); font-size:12.5px; letter-spacing:.04em;
   color:var(--ink-2); padding:8px 14px; border:1px solid var(--line); border-radius:100px; background:rgba(255,255,255,.012); }
 .pill .k{ color:var(--accent); }
+
+/* ---------- hero · split layout (homepage A) ---------- */
+.splitA{ display:grid; grid-template-columns:1.04fr .96fr; gap:54px; align-items:center; position:relative; z-index:2; }
+.colL{ min-width:0; }
+.colR{ position:relative; }
+/* lockup + taglines all stack, left-aligned, taglines below the wordmark */
+.hero .lockup.left{ justify-content:flex-start; gap:22px; }
+.hero .lockup.left .mark{ width:88px; height:88px; }
+.hero .lockup.left h1{ font-size:clamp(58px,8.4vw,92px); }
+.hero .tagrule.left{ justify-content:flex-start; margin:22px 0 0; }
+.hero .sub2.left{ text-align:left; }
+.hero .pitch.left{ margin:24px 0 0; max-width:46ch; text-align:left; }
+.hero .ctas.left{ justify-content:flex-start; }
+.hero .metrics{ margin-top:28px; }
+
+/* GitHub icon button in the nav (replaces the labelled GitHub + Sponsor cluster) */
+.btn.icon{ padding:0; width:38px; height:38px; justify-content:center; }
+.btn.icon svg{ width:18px; height:18px; }
+
+/* custom metric chips — replaces the shields.io badge row (no tokens, never rate-limited) */
+.metrics{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.metric{ display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12px;
+  letter-spacing:.03em; color:var(--ink-2); padding:7px 13px; border:1px solid var(--line);
+  border-radius:8px; background:rgba(255,255,255,.015); }
+.metric b{ color:var(--ink); font-weight:600; }
+
+/* cropped screenshot inside the standard .shot frame */
+.shotcrop{ position:relative; overflow:hidden; height:480px; }
+.shotcrop img{ width:100%; display:block; }
+.shotcrop::after{ content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, transparent 56%, rgba(14,17,22,.65) 86%, var(--panel) 100%); }
+.floatshot{ box-shadow:0 40px 80px -34px rgba(0,0,0,.9), 0 0 0 1px var(--line); }
+
+/* split → stack on narrow viewports, re-centering the lockup */
+@media (max-width:980px){
+  .splitA{ grid-template-columns:1fr; gap:38px; }
+  .hero .lockup.left{ justify-content:center; }
+  .hero .tagrule.left{ justify-content:center; }
+  .hero .sub2.left{ text-align:center; }
+  .hero .pitch.left{ text-align:center; margin-left:auto; margin-right:auto; }
+  .hero .ctas.left{ justify-content:center; }
+  .hero .metrics{ justify-content:center; }
+  .shotcrop{ height:420px; }
+}
+
+/* merged hero + why: long left column, single sticky screenshot */
+.splitA.merged{ align-items:start; }
+.splitA.merged .why-merge{ margin-top:42px; padding-top:36px; border-top:1px solid var(--line); }
+.colR .shotwrap{ position:sticky; top:88px; }
+.colR .shotwrap .cap{ margin-top:13px; }
+@media (max-width:980px){
+  .colR .shotwrap{ position:static; }
+  .splitA.merged{ align-items:stretch; }
+}
 
 /* ---------- generic section frame ---------- */
 .band{ padding:96px 0; border-top:1px solid var(--line); }
@@ -198,6 +253,8 @@ header.nav.scrolled{ border-bottom-color:var(--line); background:rgba(7,8,9,.86)
 .steps .num::before{ content:counter(s,decimal-leading-zero); }
 .steps h4{ margin:0 0 5px; font-size:17px; font-weight:600; }
 .steps p{ margin:0; color:var(--sub); font-size:14.5px; }
+.steps p a{ color:var(--accent); border-bottom:1px solid rgba(0,229,255,.35); transition:border-color .15s; }
+.steps p a:hover{ border-color:var(--accent); }
 code.path{ font-family:var(--mono); font-size:13px; color:var(--accent); background:#101319; border:1px solid var(--line); border-radius:6px; padding:2px 7px; }
 
 .admon{ border:1px solid var(--line); border-left-width:3px; border-radius:10px; padding:18px 20px; background:var(--panel); margin-bottom:14px; }
@@ -340,6 +397,7 @@ footer{ border-top:1px solid var(--line); padding:70px 0 46px; background:var(--
   .atsr{ grid-template-columns:1fr; text-align:center; justify-items:center; }
   .sponsor-grid{ grid-template-columns:1fr; }
   .foot-top{ grid-template-columns:1fr 1fr; gap:32px; }
+  .hero-watermark{ display:none; }
   .doc{ grid-template-columns:1fr; gap:8px; }
   .doc-side{ position:static; margin-bottom:14px; padding-bottom:18px; border-bottom:1px solid var(--line); }
   .doc-side ul{ flex-direction:row; flex-wrap:wrap; gap:6px; }

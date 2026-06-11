@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/styles.css?v=20260610" />
 </head>
 <body>
 
@@ -49,79 +49,59 @@
       <a class="lk" href="/guides/">Guides</a>
     </nav>
     <div class="nav-cta">
-      <a class="btn sm spon-btn" href="#sponsor"><span class="hrt">♥</span> Sponsor</a>
-      <a class="btn sm" href="https://github.com/giantorth/moza-simhub-plugin" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn sm icon" href="https://github.com/giantorth/moza-simhub-plugin" target="_blank" rel="noopener" aria-label="GitHub repository"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
       <a class="btn sm primary" href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener">Download</a>
     </div>
   </div>
 </header>
 
-<!-- ===== hero ===== -->
+<!-- ===== hero + why (merged) ===== -->
 <section class="hero" id="top">
   <div class="grid-bg"></div>
   <div class="hero-glow"></div>
-  <div class="wrap hero-in">
-    <div class="lockup reveal">
-      <svg class="mark"><use href="#azom-wheel"/></svg>
-      <h1>AZOM</h1>
-    </div>
-    <div class="tagrule reveal"><span class="ln"></span><span>The MOZA Bridge for SimHub</span><span class="ln"></span></div>
-    <div class="sub2 reveal">Reverse-Engineered · Race-Ready</div>
-
-    <p class="pitch reveal">Complete replacement software for your <b>MOZA</b> sim racing hardware — LED effects, LCD dashboard telemetry, and full device configuration, driven entirely through <b>SimHub</b>.</p>
-
-    <div class="ctas reveal">
-      <a class="btn primary" href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener">Download latest release <span class="arw">↗</span></a>
-      <a class="btn" href="/guides/">Read the guides</a>
-      <a class="btn" href="https://github.com/giantorth/moza-simhub-plugin" target="_blank" rel="noopener">View source</a>
-      <a class="btn" href="https://discord.gg/J4enw43e62" target="_blank" rel="noopener">Join Discord</a>
-    </div>
-
-    <div class="badges reveal">
-      <a href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener"><img src="https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin?style=flat-square&labelColor=0e1116&color=00e5ff&label=release" alt="Latest release" loading="lazy" /></a>
-      <a href="https://github.com/giantorth/moza-simhub-plugin/releases" target="_blank" rel="noopener"><img src="https://img.shields.io/github/downloads/giantorth/moza-simhub-plugin/total?style=flat-square&labelColor=0e1116&color=eef1f6&label=downloads" alt="Total downloads" loading="lazy" /></a>
-      <a href="https://github.com/giantorth/moza-simhub-plugin/stargazers" target="_blank" rel="noopener"><img src="https://img.shields.io/github/stars/giantorth/moza-simhub-plugin?style=flat-square&labelColor=0e1116&color=eef1f6&label=stars" alt="GitHub stars" loading="lazy" /></a>
-      <a href="https://github.com/giantorth/moza-simhub-plugin/commits/main" target="_blank" rel="noopener"><img src="https://img.shields.io/github/last-commit/giantorth/moza-simhub-plugin?style=flat-square&labelColor=0e1116&color=eef1f6&label=last%20commit" alt="Last commit" loading="lazy" /></a>
-      <a href="https://github.com/giantorth/moza-simhub-plugin/blob/main/LICENSE" target="_blank" rel="noopener"><img src="https://img.shields.io/github/license/giantorth/moza-simhub-plugin?style=flat-square&labelColor=0e1116&color=eef1f6" alt="License" loading="lazy" /></a>
-    </div>
-
-    <div class="rpm reveal">
-      <div class="rpmbar rpmbar-static" aria-hidden="true">
-        <i class="g on"></i><i class="g on"></i><i class="g on"></i><i class="g on"></i><i class="a on"></i><i class="a on"></i><i class="a on"></i><i class="a on"></i><i class="r on"></i><i class="r on"></i><i class="r on"></i><i class="r"></i>
+  <svg class="hero-watermark"><use href="#azom-wheel"/></svg>
+  <div class="wrap">
+    <div class="splitA merged">
+      <div class="colL">
+        <div class="lockup left reveal">
+          <svg class="mark"><use href="#azom-wheel"/></svg>
+          <h1>AZOM</h1>
+        </div>
+        <div class="tagrule left reveal"><span>The MOZA Bridge for SimHub</span><span class="ln"></span></div>
+        <div class="sub2 left reveal">Reverse-Engineered · Race-Ready</div>
+        <p class="pitch left reveal">Complete replacement software for your <b>MOZA</b> sim racing hardware — LED effects, LCD dashboard telemetry, and full device configuration, driven entirely through <b>SimHub</b>.</p>
+        <div class="ctas left reveal">
+          <a class="btn primary" href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener">Download latest release <span class="arw">↗</span></a>
+          <a class="btn spon-btn" href="#sponsor"><span class="hrt">♥</span> Sponsor</a>
+          <a class="btn" href="https://discord.gg/J4enw43e62" target="_blank" rel="noopener">Join Discord</a>
+        </div>
+        <div class="metrics reveal">
+          <span class="metric"><b>GPL-3.0</b></span>
+          <span class="metric">Windows &amp; Linux</span>
+          <span class="metric">11 languages</span>
+          <span class="metric">SimHub 9.11.8+</span>
+        </div>
+        <div class="why-merge reveal" id="why">
+          <h2 class="h2">MOZA hardware, finally fluent in SimHub.</h2>
+          <p class="lede" style="margin-top:18px">MOZA makes excellent sim racing hardware — but Pithouse, their companion software, is Windows-only. Linux users had no official way to manage LED effects or stream telemetry to their wheel's dashboard.</p>
+          <ul class="why-points">
+            <li>SimHub runs on Linux via Proton/Wine — this plugin opens MOZA hardware to its entire ecosystem.</li>
+            <li>Map any of the thousands of SimHub data points to your wheel's LCD dashboard.</li>
+            <li>Drive your LEDs through SimHub's full effects pipeline — superb paired with ATSR-EVO.</li>
+            <li>Cross-platform hardware control with first-class, built-in telemetry.</li>
+          </ul>
+          <p class="credit">Built on the work of <a href="https://github.com/Lawstorant/boxflat" target="_blank" rel="noopener">Boxflat</a>, Linux software for MOZA control.</p>
+        </div>
       </div>
-      <div class="cap">Runs on Windows &amp; Linux · Requires SimHub 9.11.8+</div>
-    </div>
-
-    <div class="pills reveal">
-      <span class="pill"><span class="k">◢</span> GPL-3.0 licensed</span>
-      <span class="pill"><span class="k">◢</span> 11 languages</span>
-      <span class="pill"><span class="k">◢</span> Windows &amp; Linux</span>
-      <span class="pill"><span class="k">◢</span> Full SimHub support</span>
-    </div>
-  </div>
-</section>
-
-<!-- ===== why ===== -->
-<section class="band alt" id="why">
-  <div class="wrap why-grid">
-    <div class="reveal">
-      <p class="eyebrow">Why it exists</p>
-      <h2 class="h2">MOZA hardware, finally fluent in SimHub.</h2>
-      <p class="lede" style="margin-top:18px">MOZA makes excellent sim racing hardware — but Pithouse, their companion software, is Windows-only. Linux users had no official way to manage LED effects or stream telemetry to their wheel's dashboard.</p>
-      <ul class="why-points">
-        <li>SimHub runs on Linux via Proton/Wine — this plugin opens MOZA hardware to its entire ecosystem.</li>
-        <li>Map any of the thousands of SimHub data points to your wheel's LCD dashboard.</li>
-        <li>Drive your LEDs through SimHub's full effects pipeline — superb paired with ATSR-EVO.</li>
-        <li>Cross-platform hardware control with first-class, built-in telemetry.</li>
-      </ul>
-      <p class="credit">Built on the work of <a href="https://github.com/Lawstorant/boxflat" target="_blank" rel="noopener">Boxflat</a>, Linux software for MOZA control.</p>
-    </div>
-    <div class="reveal">
-      <div class="shot">
-        <div class="bar"><i></i><i></i><i></i><span class="ttl">SimHub › Plugins › AZOM</span></div>
-        <img src="docs/BasePage.png" alt="The AZOM plugin panel inside SimHub, showing steering angle, temperatures, FFB settings, equalizer and output curve" loading="lazy" />
+      <div class="colR reveal">
+        <div class="shotwrap">
+          <div class="shot floatshot">
+            <div class="bar"><i></i><i></i><i></i><span class="ttl">SimHub › Plugins › AZOM</span></div>
+            <img src="docs/BasePage.png" alt="The AZOM plugin panel inside SimHub, showing steering angle, temperatures, FFB settings, equalizer and output curve" loading="lazy" />
+          </div>
+          <p class="cap"><b>The plugin panel</b> — wheelbase, FFB, EQ and output curves, mirroring Pithouse.</p>
+        </div>
       </div>
-      <p class="cap"><b>The plugin panel</b> — wheelbase, FFB, EQ and output curves.</p>
     </div>
   </div>
 </section>
@@ -247,12 +227,13 @@
       <p class="eyebrow">Get started</p>
       <h2 class="h2">Installed in four steps.</h2>
       <ol class="steps">
-        <li><span class="num"></span><div><h4>Download the release</h4><p>Grab the latest <code class="path">MozaPlugin_&lt;version&gt;.zip</code> from the Releases page.</p></div></li>
+        <li><span class="num"></span><div><h4>Download the release</h4><p>Grab the latest <code class="path">MozaPlugin_&lt;version&gt;.zip</code> from the <a href="https://github.com/giantorth/moza-simhub-plugin/releases/latest" target="_blank" rel="noopener">Releases page</a>.</p></div></li>
         <li><span class="num"></span><div><h4>Drop in the DLL</h4><p>Extract <code class="path">MozaPlugin.dll</code> into your SimHub directory — defaults to <code class="path">C:\Program Files (x86)\SimHub\</code>.</p></div></li>
         <li><span class="num"></span><div><h4>Start SimHub</h4><p>The plugin appears under <b>Settings › Plugins</b> as “AZOM”.</p></div></li>
         <li><span class="num"></span><div><h4>Connect &amp; detect</h4><p>Plug in your hardware and restart SimHub. Your wheel can be found under Devices by searching for MOZA.</p></div></li>
       </ol>
       <p class="credit" style="margin-top:22px">Need the screen-by-screen version? Read <a href="/guides/install-the-plugin/">Install the Plugin</a> and <a href="/guides/add-your-device/">Add Your Device</a>, or browse <a href="/guides/">all guides</a>.</p>
+      <a class="btn" href="/guides/" style="margin-top:18px">Read the guides <span class="arw">↗</span></a>
     </div>
     <div class="reveal">
       <div class="admon warn">

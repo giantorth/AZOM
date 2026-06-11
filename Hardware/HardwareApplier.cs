@@ -264,22 +264,31 @@ namespace MozaPlugin.Hardware
                 bool hasBtn        = btnCount > 0;
                 bool hasKnob       = model.KnobCount > 0;
                 bool hasSleepLight = model.HasSleepLight;
+                // The per-zone idle-EFFECT (cmd 0x1d) and idle-INTERVAL (0x1e)
+                // writes are idle/standby LED animations, not the live RPM bar.
+                // The legacy bare-"CS" rim has RPM LEDs but does NOT implement
+                // these idle params — writing them (gated only on zone presence)
+                // is what storms its Table 8 param manager. Gate them on the same
+                // "supports idle LED features" capability as the sleep light:
+                // every known wheel with idle effects also has HasSleepLight=true;
+                // CS and unidentified wheels (HasSleepLight=false) are skipped.
+                bool hasIdleLed = hasSleepLight;
 
                 if (telemMode      >= 0            && WheelCfgChanged("wheel-telemetry-mode", telemMode))          _deviceManager.WriteSetting("wheel-telemetry-mode", telemMode);
-                if (idleEffect     >= 0 && hasRpm  && WheelCfgChanged("wheel-telemetry-idle-effect", idleEffect)) _deviceManager.WriteSetting("wheel-telemetry-idle-effect", idleEffect);
-                if (btnIdleEffect  >= 0 && hasBtn  && WheelCfgChanged("wheel-buttons-idle-effect", btnIdleEffect))_deviceManager.WriteSetting("wheel-buttons-idle-effect", btnIdleEffect);
-                if (knobIdleEffect >= 0 && hasKnob && WheelCfgChanged("wheel-knob-idle-effect", knobIdleEffect))  _deviceManager.WriteSetting("wheel-knob-idle-effect", knobIdleEffect);
+                if (idleEffect     >= 0 && hasRpm  && hasIdleLed && WheelCfgChanged("wheel-telemetry-idle-effect", idleEffect)) _deviceManager.WriteSetting("wheel-telemetry-idle-effect", idleEffect);
+                if (btnIdleEffect  >= 0 && hasBtn  && hasIdleLed && WheelCfgChanged("wheel-buttons-idle-effect", btnIdleEffect))_deviceManager.WriteSetting("wheel-buttons-idle-effect", btnIdleEffect);
+                if (knobIdleEffect >= 0 && hasKnob && hasIdleLed && WheelCfgChanged("wheel-knob-idle-effect", knobIdleEffect))  _deviceManager.WriteSetting("wheel-knob-idle-effect", knobIdleEffect);
                 if (knobLedMode    >= 0 && hasKnob && WheelCfgChanged("wheel-knob-led-mode", knobLedMode))        _deviceManager.WriteSetting("wheel-knob-led-mode", knobLedMode);
                 if (btnLedMode     >= 0 && hasBtn  && WheelCfgChanged("wheel-buttons-led-mode", btnLedMode))      _deviceManager.WriteSetting("wheel-buttons-led-mode", btnLedMode);
-                if (idleEffect >= 0 && idleSpeed >= 0 && hasRpm
+                if (idleEffect >= 0 && idleSpeed >= 0 && hasRpm && hasIdleLed
                         && WheelCfgChanged("wheel-telemetry-idle-interval", ((long)idleEffect << 32) | (uint)idleSpeed))
                     _deviceManager.WriteArray("wheel-telemetry-idle-interval",
                         BuildIdleIntervalPayload(idleEffect, idleSpeed));
-                if (btnIdleEffect >= 0 && btnIdleSpeed >= 0 && hasBtn
+                if (btnIdleEffect >= 0 && btnIdleSpeed >= 0 && hasBtn && hasIdleLed
                         && WheelCfgChanged("wheel-buttons-idle-interval", ((long)btnIdleEffect << 32) | (uint)btnIdleSpeed))
                     _deviceManager.WriteArray("wheel-buttons-idle-interval",
                         BuildIdleIntervalPayload(btnIdleEffect, btnIdleSpeed));
-                if (knobIdleEffect >= 0 && knobIdleSpeed >= 0 && hasKnob
+                if (knobIdleEffect >= 0 && knobIdleSpeed >= 0 && hasKnob && hasIdleLed
                         && WheelCfgChanged("wheel-knob-idle-interval", ((long)knobIdleEffect << 32) | (uint)knobIdleSpeed))
                     _deviceManager.WriteArray("wheel-knob-idle-interval",
                         BuildIdleIntervalPayload(knobIdleEffect, knobIdleSpeed));

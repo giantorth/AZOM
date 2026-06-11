@@ -165,6 +165,17 @@ namespace MozaPlugin
             // wheel page, mirroring the Test Start/Stop buttons in the UI.
             _plugin.AddAction("AZOM.TestModeToggle", (a, b) => ToggleTestMode());
 
+            // FSR V1 single-byte probe diagnostic: step the probed payload offset with
+            // wheel buttons so the boundaries can be walked hands-on while watching the
+            // screen (mirrors the ◀/▶ buttons on the Dashboard Telemetry card).
+            _plugin.AddAction("AZOM.Fsr1ProbeToggle", (a, b) =>
+            {
+                _plugin.SetFsr1Probe(!_plugin.Fsr1ProbeActive);
+                MozaLog.Debug($"[AZOM] FSR1 byte probe {(_plugin.Fsr1ProbeActive ? "on" : "off")} via action");
+            });
+            _plugin.AddAction("AZOM.Fsr1ProbeNext", (a, b) => StepFsr1Probe(+1));
+            _plugin.AddAction("AZOM.Fsr1ProbePrev", (a, b) => StepFsr1Probe(-1));
+
             // Re-center the wheelbase (same command as the UI's Calibrate Center
             // button, cf. SettingsControl.BaseCalibrateButton_Click).
             _plugin.AddAction("AZOM.CalibrateCenter", (a, b) =>
@@ -379,6 +390,16 @@ namespace MozaPlugin
             bool turningOn = !_plugin.ActiveTelemetryEnabled;
             _plugin.SetTelemetryEnabled(turningOn);
             MozaLog.Debug($"[AZOM] Dashboard telemetry → {(turningOn ? "on" : "off")} via action");
+        }
+
+        // Step the FSR V1 byte-probe offset, auto-starting the probe on first press so a
+        // single bound button both begins and walks the diagnostic. No-op on non-FSR1.
+        private void StepFsr1Probe(int delta)
+        {
+            if (!_plugin.IsFsr1DisplayWheel) return;
+            if (!_plugin.Fsr1ProbeActive) _plugin.SetFsr1Probe(true);
+            else _plugin.StepFsr1Probe(delta);
+            MozaLog.Debug($"[AZOM] FSR1 byte probe → {_plugin.Fsr1ProbeTargetLabel()} via action");
         }
 
         // Cycle the wheel's displayed dashboard to the next/previous enabled slot,

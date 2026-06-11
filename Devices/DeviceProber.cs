@@ -77,6 +77,19 @@ namespace MozaPlugin.Devices
             info ??= WheelModelInfo.Default;
             var cmds = new List<string>();
 
+            // Bare RPM-only rims (the legacy "CS": RPM LEDs, no buttons / knobs /
+            // flags / sleep light) have essentially no readable LED settings, and
+            // every group-param read we issue is for a new-protocol param this old
+            // firmware doesn't implement — which storms its Table 8 param manager
+            // ("Failed to Read Parameter" sweep → dead identity → re-detect loop).
+            // PitHouse never reads these from this wheel. We drive its RPM LEDs by
+            // writing colours directly; nothing needs reading back. Read nothing.
+            if (info.RpmLedCount > 0 && info.ButtonLedCount == 0 && info.KnobCount == 0
+                && !info.HasFlagLeds && !info.HasSleepLight)
+            {
+                return System.Array.Empty<string>();
+            }
+
             // Sleep-light (idle breathing) settings — read only on wheels that
             // implement the feature. Captured into MozaData and seeded into the
             // per-wheel-page WheelSleepByPageGuid bundle via
@@ -97,22 +110,30 @@ namespace MozaPlugin.Devices
             }
 
             // Per-zone LED modes + brightness + idle effect, gated on whether
-            // the wheel actually has that zone.
+            // the wheel actually has that zone. The idle-EFFECT reads (cmd 0x1d)
+            // are additionally gated on HasSleepLight: they are idle/standby
+            // animations the bare-"CS" rim lacks, and reading them — like writing
+            // them — storms its Table 8 param manager. (Same family as the
+            // sleep-light reads below; every wheel with idle effects has
+            // HasSleepLight=true.)
             if (info.RpmLedCount > 0)
             {
                 cmds.Add("wheel-rpm-brightness");
-                cmds.Add("wheel-telemetry-idle-effect");
+                if (info.HasSleepLight)
+                    cmds.Add("wheel-telemetry-idle-effect");
             }
             if (info.ButtonLedCount > 0)
             {
                 cmds.Add("wheel-buttons-led-mode");
                 cmds.Add("wheel-buttons-brightness");
-                cmds.Add("wheel-buttons-idle-effect");
+                if (info.HasSleepLight)
+                    cmds.Add("wheel-buttons-idle-effect");
             }
             if (info.KnobCount > 0)
             {
                 cmds.Add("wheel-knob-led-mode");
-                cmds.Add("wheel-knob-idle-effect");
+                if (info.HasSleepLight)
+                    cmds.Add("wheel-knob-idle-effect");
                 // Knob input config (encoder signal mode per knob).
                 cmds.Add("wheel-knob-mode");
                 for (int i = 0; i < info.KnobCount && i < 5; i++)

@@ -117,8 +117,13 @@
                     <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
                         <Button x:Name="TelemetryTestBtn" Content="{x:Static res:Strings.Button_SendTestPattern}"
                                 Margin="0,0,8,0" Click="TelemetryTestToggle_Click"/>
-                        <Button x:Name="Fsr1ByteRulerBtn" Content="Byte ruler" Visibility="Collapsed"
-                                Margin="0,0,8,0" Click="Fsr1ByteRulerToggle_Click"/>
+                        <Button x:Name="Fsr1ProbeBtn" Content="Probe bytes" Visibility="Collapsed"
+                                Margin="0,0,8,0" Click="Fsr1ProbeToggle_Click"/>
+                        <Button x:Name="Fsr1ProbePrevBtn" Content="◀" Visibility="Collapsed" Width="30"
+                                Margin="0,0,4,0" Click="Fsr1ProbePrev_Click"/>
+                        <Button x:Name="Fsr1ProbeNextBtn" Content="▶" Visibility="Collapsed" Width="30"
+                                Margin="0,0,8,0" Click="Fsr1ProbeNext_Click"/>
+                        <TextBlock x:Name="Fsr1ProbeLabel" Visibility="Collapsed" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
             </ctrl:SectionCard>

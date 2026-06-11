@@ -84,21 +84,21 @@ namespace MozaPlugin.Telemetry
             BuildZeroRecord(dash.RecordType, dash.PayloadLen);
 
         /// <summary>
-        /// Diagnostic "byte ruler" record: every data byte (payload offset 5..end) is
-        /// set to its own offset index, so each on-screen box renders the byte(s) it
-        /// reads. A box showing N reads payload byte N; a 16-bit box shows
-        /// <c>N&lt;&lt;8 | N+1</c>; a u24 time box shows <c>N N+1 N+2</c> (decoded as ms).
-        /// One screenshot therefore reveals every field's offset, width, and — for a
-        /// linearly-scaled box — its scale (displayed ÷ byte-index). b1/b2 anchors are
-        /// preserved so the wheel renders the dashboard's normal layout. Offsets 3–4
-        /// are left 0 (protocol-fixed padding, never a field).
+        /// Diagnostic single-byte probe record: all data bytes are 0 except payload
+        /// offset <paramref name="probeOffset"/>, set to <paramref name="value"/>
+        /// (pass <c>probeOffset &lt; 5</c> for an all-zero anchored record). Streaming
+        /// this while ramping <paramref name="value"/> and stepping the offset isolates
+        /// one byte at a time: exactly one on-screen box animates, so the offset where
+        /// the active box CHANGES is a field boundary and the run of consecutive offsets
+        /// driving the SAME box is the field width. b1/b2 anchors are preserved so the
+        /// wheel renders the dashboard's normal layout; offsets 3–4 stay 0 (padding).
         /// </summary>
-        internal static byte[] BuildByteRulerRecord(Fsr1Dashboard dash)
+        internal static byte[] BuildProbeRecord(Fsr1Dashboard dash, int probeOffset, int value)
         {
             if (dash == null) throw new ArgumentNullException(nameof(dash));
             var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
-            for (int i = 5; i < dash.PayloadLen; i++)
-                frame[4 + i] = (byte)(i & 0xFF);
+            if (probeOffset >= 5 && probeOffset < dash.PayloadLen)
+                frame[4 + probeOffset] = (byte)(value & 0xFF);
             Finish(frame);
             return frame;
         }

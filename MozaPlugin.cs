@@ -2411,24 +2411,94 @@ namespace MozaPlugin
             _dashboardTestPattern = on;
             if (_telemetrySender != null) _telemetrySender.TestMode = on;
             if (_cm2Sender != null) _cm2Sender.TestMode = on;
-            if (on) _fsr1ByteRuler = false; // mutually exclusive with the byte ruler
+            if (on) _fsr1ProbeStep = -1; // mutually exclusive with the byte probe
         }
 
-        // FSR V1 byte-ruler diagnostic. When set, the 0x42 driver fills every data byte
-        // with its own payload offset so each box on the wheel shows which byte feeds it.
-        // Volatile: UI thread writes, driver timer thread reads.
-        private volatile bool _fsr1ByteRuler;
+        // FSR V1 single-byte probe diagnostic. The driver streams an all-zero record with
+        // exactly ONE data byte ramping 0..255, isolating one payload offset at a time so
+        // the user can see which on-screen box animates (boundary = where the active box
+        // changes; width = the run of consecutive offsets driving the same box; scale =
+        // displayed value ÷ byte value). _fsr1ProbeStep is the global step index across the
+        // active page's record(s); -1 = probe off. Volatile: UI writes, driver reads.
+        private volatile int _fsr1ProbeStep = -1;
 
-        /// <summary>True while the FSR V1 byte-ruler diagnostic is active.</summary>
-        internal bool Fsr1ByteRulerActive => _fsr1ByteRuler;
+        /// <summary>True while the FSR V1 single-byte probe diagnostic is active.</summary>
+        internal bool Fsr1ProbeActive => _fsr1ProbeStep >= 0;
 
-        /// <summary>Toggle the FSR V1 byte-ruler diagnostic (see
-        /// <see cref="Telemetry.Fsr1DisplayEmitter.BuildByteRulerRecord"/>). FSR1-only;
-        /// mutually exclusive with the sweep test pattern.</summary>
-        internal void SetFsr1ByteRuler(bool on)
+        /// <summary>Current 0-based probe step across the active page's data bytes.</summary>
+        internal int Fsr1ProbeStepIndex => _fsr1ProbeStep;
+
+        /// <summary>The record(s) the probe walks — the active page's type(s), or the full
+        /// live set as a fallback when the active index is unmapped (mirrors the driver's
+        /// own active/fallback selection so the probe targets what is actually streaming).</summary>
+        internal Telemetry.Fsr1Dashboard[] Fsr1ProbeRecords()
         {
-            _fsr1ByteRuler = on;
+            var active = Telemetry.Fsr1DashboardCatalog.ByIndex(GetActiveFsr1Index());
+            return active.Length > 0 ? active : Telemetry.Fsr1DashboardCatalog.LiveDashboards;
+        }
+
+        /// <summary>Total probe steps = sum of data-byte counts (PayloadLen-5) across the
+        /// active page's record(s).</summary>
+        internal int Fsr1ProbeStepCount()
+        {
+            int n = 0;
+            foreach (var d in Fsr1ProbeRecords())
+                n += System.Math.Max(0, d.PayloadLen - 5);
+            return n;
+        }
+
+        /// <summary>Map the current step to a (record type, payload offset) target. Returns
+        /// <c>(0, -1)</c> when the probe is off or the step is out of range.</summary>
+        internal (byte type, int offset) Fsr1ProbeTarget()
+        {
+            int step = _fsr1ProbeStep;
+            if (step < 0) return (0, -1);
+            foreach (var d in Fsr1ProbeRecords())
+            {
+                int count = System.Math.Max(0, d.PayloadLen - 5);
+                if (step < count) return (d.RecordType, 5 + step);
+                step -= count;
+            }
+            return (0, -1);
+        }
+
+        /// <summary>Human-readable description of the byte the probe currently targets,
+        /// annotated with the catalog field that — per the CURRENT decode — owns it and
+        /// whether the byte is that field's first byte (an assumed field boundary). This
+        /// surfaces the hypothesized boundaries while stepping so the user can spot where
+        /// the on-screen box disagrees with the catalog's field layout.</summary>
+        internal string Fsr1ProbeTargetLabel()
+        {
+            var (type, off) = Fsr1ProbeTarget();
+            if (off < 0) return "—";
+            string where = $"record 0x{type:X2}, byte {off}  ({_fsr1ProbeStep + 1}/{Fsr1ProbeStepCount()})";
+            var dash = Fsr1DashboardCatalog.ByType(type);
+            var f = dash?.Fields.FirstOrDefault(x => System.Array.IndexOf(x.Offsets, off) >= 0);
+            if (f == null) return where + "  — unmapped byte";
+            bool boundary = f.Offsets.Length > 0 && f.Offsets[0] == off;
+            int width = f.Offsets.Length;
+            return $"{where}  — {f.FieldId} \"{f.Label}\" " +
+                   (boundary ? $"[◀ field start, {width}B]" : "[cont]");
+        }
+
+        /// <summary>Toggle the FSR V1 probe (starts at the first data byte, offset 5).
+        /// FSR1-only; mutually exclusive with the sweep test pattern.</summary>
+        internal void SetFsr1Probe(bool on)
+        {
+            _fsr1ProbeStep = on ? 0 : -1;
             if (on) SetDashboardTestPattern(false);
+        }
+
+        /// <summary>Step the probe offset by <paramref name="delta"/>, wrapping within the
+        /// active page's total data-byte count. No-op when the probe is off.</summary>
+        internal void StepFsr1Probe(int delta)
+        {
+            if (_fsr1ProbeStep < 0) return;
+            int total = Fsr1ProbeStepCount();
+            if (total <= 0) { _fsr1ProbeStep = 0; return; }
+            int s = (_fsr1ProbeStep + delta) % total;
+            if (s < 0) s += total;
+            _fsr1ProbeStep = s;
         }
 
         /// <summary>True when some display pipeline is live and can render a test

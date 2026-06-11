@@ -543,11 +543,18 @@ namespace MozaPlugin.Devices.WheelUi
                 : global::MozaPlugin.Resources.Strings.Button_SendTestPattern;
             TelemetryProfileCombo.IsEnabled = selectorReady;
 
-            // Byte-ruler diagnostic button: FSR1-only, live whenever its driver runs.
-            bool rulerOn = _plugin?.Fsr1ByteRulerActive ?? false;
-            Fsr1ByteRulerBtn.Visibility = fsr1 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            Fsr1ByteRulerBtn.IsEnabled = fsr1Running;
-            Fsr1ByteRulerBtn.Content = rulerOn ? "Stop ruler" : "Byte ruler";
+            // Single-byte probe diagnostic: FSR1-only, live whenever its driver runs.
+            bool probeOn = _plugin?.Fsr1ProbeActive ?? false;
+            var probeVis = fsr1 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Fsr1ProbeBtn.Visibility = probeVis;
+            Fsr1ProbeBtn.IsEnabled = fsr1Running;
+            Fsr1ProbeBtn.Content = probeOn ? "Stop probe" : "Probe bytes";
+            var stepVis = (fsr1 && probeOn) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Fsr1ProbePrevBtn.Visibility = stepVis;
+            Fsr1ProbeNextBtn.Visibility = stepVis;
+            Fsr1ProbeLabel.Visibility = stepVis;
+            if (probeOn)
+                Fsr1ProbeLabel.Text = _plugin?.Fsr1ProbeTargetLabel() ?? "—";
 
             // Refresh profile info — auto-renegotiate may have swapped
             // the profile on a background thread after a dashboard switch.
@@ -781,14 +788,27 @@ namespace MozaPlugin.Devices.WheelUi
             RefreshTelemetryStatus();
         }
 
-        // FSR V1 byte-ruler diagnostic: fills every 0x42 data byte with its own payload
-        // offset so each box on the wheel shows which byte(s) feed it (offset/width/scale
-        // in one screenshot). See Fsr1DisplayEmitter.BuildByteRulerRecord.
-        private void Fsr1ByteRulerToggle_Click(object sender, RoutedEventArgs e)
+        // FSR V1 single-byte probe diagnostic: streams an all-zero 0x42 record with one
+        // data byte ramping 0..255, so exactly one box on the wheel animates. Step the
+        // offset with ◀/▶ to map each box → payload byte(s). See Fsr1DisplayEmitter.BuildProbeRecord.
+        private void Fsr1ProbeToggle_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            bool on = !_plugin.Fsr1ByteRulerActive;
-            _plugin.SetFsr1ByteRuler(on);
+            _plugin.SetFsr1Probe(!_plugin.Fsr1ProbeActive);
+            RefreshTelemetryStatus();
+        }
+
+        private void Fsr1ProbePrev_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+            _plugin.StepFsr1Probe(-1);
+            RefreshTelemetryStatus();
+        }
+
+        private void Fsr1ProbeNext_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+            _plugin.StepFsr1Probe(+1);
             RefreshTelemetryStatus();
         }
 
