@@ -2074,13 +2074,34 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Profiles}" Icon="{StaticResource IconBolt}">
-                            <StackPanel Orientation="Horizontal" Margin="0,8">
-                                <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
-                                <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
-                                          Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
+                                              Title="{x:Static res:Strings.Section_Profiles}" Icon="{StaticResource IconBolt}">
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
+                                              Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+
+                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
+                                              Title="{x:Static res:Strings.Section_Language}" Icon="{StaticResource IconBolt}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_Language}" Style="{StaticResource SliderLabel}"/>
+                                        <ComboBox x:Name="LanguageCombo" Width="200" VerticalAlignment="Center"
+                                                  SelectionChanged="LanguageCombo_Changed"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{x:Static res:Strings.Hint_LanguageChangeRestart}"
+                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+                        </Grid>
 
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_WheelLedOutput}"
                                           Subtitle="{x:Static res:Strings.Subtitle_WheelLedOutput}"
@@ -2146,18 +2167,6 @@
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,4,0,0"
                                            Text="{x:Static res:Strings.Hint_FirmwareEra}"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Language}" Icon="{StaticResource IconBolt}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_Language}" Style="{StaticResource SliderLabel}"/>
-                                    <ComboBox x:Name="LanguageCombo" Width="200" VerticalAlignment="Center"
-                                              SelectionChanged="LanguageCombo_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_LanguageChangeRestart}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </ctrl:SectionCard>
 
