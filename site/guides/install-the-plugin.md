@@ -64,6 +64,3 @@ restart loads the new device definitions so your hardware is ready to add under 
 ![The AZOM panel showing a restart-required banner after device definitions were deployed](/docs/RestartPrompt.png)
 
 Restart SimHub one more time.
-
-> **Next:** your wheelbase is talking to AZOM, but SimHub still needs the device added
-> before LEDs and dashboards work. Continue to [Add Your Device](/guides/add-your-device/).

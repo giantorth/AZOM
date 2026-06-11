@@ -51,6 +51,3 @@ Effect** mirror the RPM controls, but the interesting part is per-knob colour.
 - **Colours** — click any ring LED, or the centre swatch, to recolour it from the palette.
   **Fill ring with selected** paints the whole ring at once, and **Copy this knob to all**
   replicates one knob's look across the others.
-
-> **Next:** send live race data to the wheel's screen in
-> [Dashboard &amp; Channels](/guides/dashboard-and-channels/).

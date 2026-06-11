@@ -33,6 +33,3 @@ device — ready for the LED effects pipeline, LCD dashboard telemetry and onboa
 > **Don't see it?** Make sure the restarts from the
 > [install guide](/guides/install-the-plugin/) actually happened — device definitions are
 > only deployed and loaded on the launches *after* the hardware is first detected.
-
-> **Next:** dial in your wheelbase feel on the [Base tab](/guides/configure-the-wheelbase/),
-> or jump straight to [Wheel LEDs &amp; Knobs](/guides/wheel-leds-and-knobs/).

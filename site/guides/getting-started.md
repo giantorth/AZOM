@@ -33,17 +33,6 @@ walkthrough if you want it.
 3. **Verify the connection.** Open the **AZOM** panel — with a base connected you'll see
    live steering angle, temperatures and FFB settings populate.
 
-## Where to next
-
-- **Dial in feel** — [Configure the Wheelbase](/guides/configure-the-wheelbase/) and
-  [Pedals &amp; Handbrake](/guides/pedals-and-handbrake/).
-- **Start from a preset** — [Import a Profile](/guides/import-a-profile/).
-- **Light it up** — [Wheel LEDs &amp; Knobs](/guides/wheel-leds-and-knobs/) and the
-  [LCD Dashboard](/guides/dashboard-and-channels/).
-- **Cockpit control** — [Controls &amp; Actions](/guides/controls-and-actions/), or
-  [Control Mapper](/guides/control-mapper/) if you swap wheels.
-- **iRacing &amp; 360 Hz** — [SDK &amp; iRacing](/guides/sdk-and-iracing/).
-
 For advanced LED work, the [ATSR-EVO](https://github.com/ATSR-Alex/ATSR-Hub-EVO/)
 integration unlocks sophisticated telemetry-driven effects.
 

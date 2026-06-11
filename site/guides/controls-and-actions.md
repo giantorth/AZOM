@@ -95,6 +95,3 @@ nothing.
 | `AZOM.WorkModeOff` | Put the base into standby |
 | `AZOM.ClearLeds` | Turn off every LED the plugin is driving |
 | `AZOM.CalibrateCenter` | Re-center the wheelbase — hold the wheel at physical center when triggering |
-
-> **Next:** swap wheels often? [Control Mapper](/guides/control-mapper/) keeps these
-> mappings working across every wheel.
