@@ -291,16 +291,21 @@ namespace MozaPlugin.Telemetry
             {
                 RecordType = 0x11, Key = "type-11", Label = "Dashboard 11 — GT Style A", IsLive = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
+                // Slot semantics for the GT-style page (index 17 = records 11+12) are
+                // community-contributed (driving known channels, reading which box moved).
+                // See docs/protocol/devices/wheel-0x17.md § GT-style field semantics. Default
+                // properties are the canonical simhub_property values from Data/Telemetry.json
+                // (MOZA's own channel catalog). All Direct → InMin/InMax unused; user-overridable.
                 Fields = new[]
                 {
                     new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Estimated lap time", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.EstimatedLapTime" },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Predicted lap time", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.EstimatedLapTime" },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Gear", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.Gear" },
                     new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Speed (km/h)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.SpeedKmh" },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Fuel — remaining laps", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.FuelLaps" },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "Gear", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.Gear" },
                     new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
                     new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
                 },
@@ -309,24 +314,34 @@ namespace MozaPlugin.Telemetry
             {
                 RecordType = 0x12, Key = "type-12", Label = "Dashboard 12 — GT Style B", IsLive = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
+                // GT-style page second record (paired with 11). Community-contributed
+                // slot semantics — see docs/protocol/devices/wheel-0x17.md § GT-style fields.
                 Fields = new[]
                 {
-                    new Fsr1FieldDef { FieldId = "g5", Label = "Gauge @5 (16-bit)", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g7", Label = "Gauge @7 (16-bit)", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g9", Label = "Gauge @9 (16-bit)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g11", Label = "Gauge @11 (16-bit)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g13", Label = "Gauge @13 (16-bit)", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g15", Label = "Gauge @15 (16-bit)", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g17", Label = "Gauge @17 (16-bit)", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g19", Label = "Gauge @19 (16-bit)", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
-                    new Fsr1FieldDef { FieldId = "g21", Label = "Gauge @21 (16-bit)", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
+                    new Fsr1FieldDef { FieldId = "g5", Label = "Tyre pressure FL", Offsets = new[] { 5, 6 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.TyrePressureFrontLeft" },
+                    new Fsr1FieldDef { FieldId = "g7", Label = "Tyre pressure RL", Offsets = new[] { 7, 8 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.TyrePressureRearLeft" },
+                    new Fsr1FieldDef { FieldId = "g9", Label = "Fuel used (L)", Offsets = new[] { 9, 10 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.FuelUsed" },
+                    new Fsr1FieldDef { FieldId = "g11", Label = "Fuel per lap (L)", Offsets = new[] { 11, 12 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.FuelConsumeLap" },
+                    new Fsr1FieldDef { FieldId = "g13", Label = "Fuel level", Offsets = new[] { 13, 14 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.Fuel" },
+                    new Fsr1FieldDef { FieldId = "g15", Label = "Current lap time", Offsets = new[] { 15, 16 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.CurrentLapTime" },
+                    new Fsr1FieldDef { FieldId = "g17", Label = "Lap time", Offsets = new[] { 17, 18 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.CurrentLapTime" },
+                    new Fsr1FieldDef { FieldId = "g19", Label = "TC level", Offsets = new[] { 19, 20 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true, DefaultProperty = "DataCorePlugin.GameData.TCLevel" },
+                    new Fsr1FieldDef { FieldId = "g21", Label = "Light stage", Offsets = new[] { 21, 22 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = true },
                     new Fsr1FieldDef { FieldId = "g23", Label = "Gauge @23 (16-bit)", Offsets = new[] { 23, 24 }, Encoding = Fsr1Encoding.U16_BE, Kind = Fsr1FieldKind.Direct, Decoded = false },
                 },
             },
         };
 
+        // Index → record type(s), verified by correlating g32/81 selects + the wheel's
+        // Param-6 0x0E log with the streamed 0x42 record type across the usb-capture/fsr1
+        // dashboard-change captures (All dashboards / Moza FSR1 dashboard change / FS1
+        // multiple changes / GT Style / manual). Index 0 is the power-on default (784
+        // streamed type-01 frames before the first switch). Index 16 is never enumerated
+        // by PitHouse (its sweep goes …15, 17, 18) → left unmapped (falls back to the
+        // full live set). See docs/protocol/devices/wheel-0x17.md § Group 0x42.
         private static readonly System.Collections.Generic.Dictionary<int, byte[]> IndexToRecordTypes = new()
         {
+            { 0, new byte[] { 0x01 } },
             { 1, new byte[] { 0x02 } },
             { 2, new byte[] { 0x06 } },
             { 3, new byte[] { 0x06 } },
@@ -343,6 +358,7 @@ namespace MozaPlugin.Telemetry
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
             { 17, new byte[] { 0x11, 0x12 } },
+            { 18, new byte[] { 0x0c } },
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>

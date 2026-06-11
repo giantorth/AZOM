@@ -493,4 +493,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>Σε αναμονή</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Η τηλεμετρία σταμάτησε μετά από επαναλαμβανόμενες αποτυχίες — επανενεργοποιήστε για επανάληψη</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>Το τιμόνι δεν έχει οθόνη — δεν απαιτείται τηλεμετρία</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Το τιμόνι ανέφερε σφάλματα υλικολογισμικού</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Το υλικολογισμικό του τιμονιού σας ανέφερε επανειλημμένα σφάλματα παραμέτρων. Ενεργοποιήστε την καταγραφή σειριακής για άμεση διάγνωση.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Ενεργοποίηση καταγραφής σειριακής</value></data>
 </root>

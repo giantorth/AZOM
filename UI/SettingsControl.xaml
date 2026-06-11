@@ -347,6 +347,50 @@
             </Grid>
         </Border>
 
+        <!-- Wheel firmware-error warning. Shown when the wheel firmware reports a
+             param-read/write storm (legacy "CS" rim that can't service the
+             plugin's reads). Driven by SettingsControl.UpdateBanner.cs via
+             RefreshFirmwareWarningBanner(). Asks the user to export a diagnostics
+             bundle so the fault can be investigated. -->
+        <Border x:Name="HeaderFirmwareWarningBanner" DockPanel.Dock="Top"
+                Visibility="Collapsed"
+                Margin="22,8,22,0"
+                BorderBrush="{StaticResource AmberBrush}"
+                BorderThickness="1"
+                Background="{StaticResource AmberSoftBrush}"
+                CornerRadius="4"
+                Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="HeaderFirmwareWarningTitle"
+                               Text="{x:Static res:Strings.Banner_WheelFirmwareErrors_Title}"
+                               FontFamily="{StaticResource FontUi}"
+                               FontSize="12.5" FontWeight="SemiBold"
+                               Foreground="{StaticResource AmberBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="HeaderFirmwareWarningBody"
+                               Text="{x:Static res:Strings.Banner_WheelFirmwareErrors_Body}"
+                               Style="{StaticResource MutedHintText}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button x:Name="HeaderFirmwareCaptureButton"
+                            Content="{x:Static res:Strings.Button_EnableSerialCapture}"
+                            Click="HeaderFirmwareCapture_Click"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="HeaderFirmwareDismissButton"
+                            Content="{x:Static res:Strings.Button_DismissUpdate}"
+                            Click="HeaderFirmwareDismiss_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- One-time nudge for users without SDK support enabled: enabling it
              lets the plugin stand in for MOZA Pit House so SDK apps don't
              launch it. Cross-tab like the update banner above; dismissal is

@@ -34,6 +34,3 @@ property — pick one, and click **Ok**. The **Current value** column updates li
 can confirm the binding is feeding real numbers.
 
 > **Tip:** Any of SimHub's properties works here, or from other plugins. The display isn't limited to the stock fields.
-
-> **Next:** put AZOM actions on your wheel buttons in
-> [Controls &amp; Actions](/guides/controls-and-actions/).

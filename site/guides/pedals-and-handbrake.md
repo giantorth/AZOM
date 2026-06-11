@@ -55,6 +55,3 @@ The **Handbrake** tab works the same way, with one extra choice.
 
 > **Calibrate after mounting.** Pull the handbrake fully once through the calibration
 > routine after you bolt it to the rig — mounting tension changes the resting point.
-
-> **Next:** save your tuned axes as part of a [profile](/guides/import-a-profile/) so they
-> follow each game automatically.

@@ -106,8 +106,12 @@ namespace MozaPlugin.Devices
             return offset;
         }
 
-        /// <summary>Default for unknown models — 10 RPM, 14 buttons, no flags, contiguous, no knobs, display unknown, no brow.</summary>
-        public static readonly WheelModelInfo Default = new(10, 14, false, null, 0, null, hasDisplay: null, browSegmentSize: 0);
+        /// <summary>Default for unknown models — 10 RPM, 14 buttons, no flags, contiguous, no knobs, display unknown, no brow.
+        /// hasSleepLight:false — never push sleep-light params (wheel-idle-mode/timeout/speed/color) to a wheel we
+        /// haven't positively identified. The legacy bare-"CS" rim doesn't implement them, and reading/writing them
+        /// drives its firmware into a Table 8 read-fail storm that kills identity readback. A wheel that does support
+        /// the feature gets it once it's added to <see cref="KnownModels"/> with hasSleepLight:true.</summary>
+        public static readonly WheelModelInfo Default = new(10, 14, false, null, 0, null, hasDisplay: null, browSegmentSize: 0, hasSleepLight: false);
 
         /// <summary>
         /// Known wheel models, ordered longest prefix first for correct disambiguation.

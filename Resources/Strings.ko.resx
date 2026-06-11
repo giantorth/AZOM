@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="TabHeader_Base" xml:space="preserve"><value>베이스</value></data>
+  <data name="TabHeader_Wheel" xml:space="preserve"><value>휠</value></data>
+  <data name="TabHeader_Handbrake" xml:space="preserve"><value>핸드브레이크</value></data>
+  <data name="TabHeader_Pedals" xml:space="preserve"><value>페달</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 시프터</value></data>
+  <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
+  <data name="TabHeader_Hub" xml:space="preserve"><value>허브</value></data>
+  <data name="TabHeader_Options" xml:space="preserve"><value>옵션</value></data>
+  <data name="TabHeader_Upload" xml:space="preserve"><value>업로드</value></data>
+  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>휠 파일</value></data>
+  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="TabHeader_Import" xml:space="preserve"><value>가져오기</value></data>
+  <data name="TabHeader_About" xml:space="preserve"><value>정보</value></data>
+  <data name="Status_Disconnected" xml:space="preserve"><value>연결 안 됨</value></data>
+  <data name="Button_Refresh" xml:space="preserve"><value>새로 고침</value></data>
+  <data name="Label_PerformanceOutput" xml:space="preserve"><value>성능 출력</value></data>
+  <data name="Option_Reserved" xml:space="preserve"><value>예약됨</value></data>
+  <data name="Option_Full" xml:space="preserve"><value>전체</value></data>
+  <data name="Button_CalibrateCenter" xml:space="preserve"><value>센터 보정</value></data>
+  <data name="Brand_Mcu" xml:space="preserve"><value>MCU</value></data>
+  <data name="Brand_Mosfet" xml:space="preserve"><value>MOSFET</value></data>
+  <data name="Brand_Motor" xml:space="preserve"><value>모터</value></data>
+  <data name="Section_CoreSettings" xml:space="preserve"><value>핵심 설정</value></data>
+  <data name="Section_GearshiftVibration" xml:space="preserve"><value>기어 변속 진동</value></data>
+  <data name="SliderLabel_WheelRotationAngle" xml:space="preserve"><value>휠 회전 각도</value></data>
+  <data name="SliderLabel_GameFfbStrength" xml:space="preserve"><value>게임 FFB 강도</value></data>
+  <data name="SliderLabel_BaseTorqueOutput" xml:space="preserve"><value>베이스 토크 출력</value></data>
+  <data name="SliderLabel_MaximumWheelSpeed" xml:space="preserve"><value>최대 휠 회전 속도</value></data>
+  <data name="SliderLabel_ShiftIntensity" xml:space="preserve"><value>변속 진동 강도</value></data>
+  <data name="SliderLabel_VibrateOnNeutral" xml:space="preserve"><value>중립에서 진동</value></data>
+  <data name="SliderLabel_ShiftDebounce" xml:space="preserve"><value>변속 디바운스</value></data>
+  <data name="Section_WheelbaseEffects" xml:space="preserve"><value>휠베이스 효과</value></data>
+  <data name="Section_GameEffects" xml:space="preserve"><value>게임 효과</value></data>
+  <data name="SliderLabel_WheelDamper" xml:space="preserve"><value>휠 댐퍼</value></data>
+  <data name="SliderLabel_WheelFriction" xml:space="preserve"><value>휠 마찰</value></data>
+  <data name="SliderLabel_NaturalInertia" xml:space="preserve"><value>자연 관성</value></data>
+  <data name="SliderLabel_WheelSpring" xml:space="preserve"><value>휠 스프링</value></data>
+  <data name="SliderLabel_GameDamper" xml:space="preserve"><value>게임 댐퍼</value></data>
+  <data name="SliderLabel_GameFriction" xml:space="preserve"><value>게임 마찰</value></data>
+  <data name="SliderLabel_GameInertia" xml:space="preserve"><value>게임 관성</value></data>
+  <data name="SliderLabel_GameSpring" xml:space="preserve"><value>게임 스프링</value></data>
+  <data name="Section_Protection" xml:space="preserve"><value>보호</value></data>
+  <data name="Section_SoftLimit" xml:space="preserve"><value>소프트 리밋</value></data>
+  <data name="SliderLabel_HandsOffProtection" xml:space="preserve"><value>핸즈오프 보호</value></data>
+  <data name="SliderLabel_SteeringWheelInertia" xml:space="preserve"><value>스티어링 휠 관성</value></data>
+  <data name="SliderLabel_Stiffness" xml:space="preserve"><value>강성</value></data>
+  <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>게임 FFB 유지</value></data>
+  <data name="Section_FfbEqualizer" xml:space="preserve"><value>FFB 이퀄라이저</value></data>
+  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 400% = 최대 부스트</value></data>
+  <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB 출력 커브</value></data>
+  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 5개의 노드를 드래그하여 응답 곡선 조정</value></data>
+  <data name="Button_Flat" xml:space="preserve"><value>플랫</value></data>
+  <data name="Button_Falloff" xml:space="preserve"><value>폴오프</value></data>
+  <data name="Button_Linear" xml:space="preserve"><value>리니어</value></data>
+  <data name="Button_SCurve" xml:space="preserve"><value>S 커브</value></data>
+  <data name="Button_Exponential" xml:space="preserve"><value>지수</value></data>
+  <data name="Button_Parabolic" xml:space="preserve"><value>포물선</value></data>
+  <data name="Section_Miscellaneous" xml:space="preserve"><value>기타</value></data>
+  <data name="Section_HighSpeedDamping" xml:space="preserve"><value>고속 댐핑</value></data>
+  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// 이 설정들이 무슨 역할을 하는지는 알 수 없습니다</value></data>
+  <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>포스 피드백 반전</value></data>
+  <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>대기 모드</value></data>
+  <data name="SliderLabel_BaseStatusLed" xml:space="preserve"><value>베이스 상태 LED</value></data>
+  <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>블루투스</value></data>
+  <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>댐핑 레벨</value></data>
+  <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>트리거 속도</value></data>
+  <data name="Section_Paddles" xml:space="preserve"><value>패들</value></data>
+  <data name="Label_LeftPaddle" xml:space="preserve"><value>왼쪽 패들</value></data>
+  <data name="Label_RightPaddle" xml:space="preserve"><value>오른쪽 패들</value></data>
+  <data name="Label_Combined" xml:space="preserve"><value>통합</value></data>
+  <data name="Section_Buttons" xml:space="preserve"><value>버튼</value></data>
+  <data name="Section_PaddleSettings" xml:space="preserve"><value>패들 설정</value></data>
+  <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>패들 모드</value></data>
+  <data name="Option_Buttons" xml:space="preserve"><value>버튼</value></data>
+  <data name="Option_Combined" xml:space="preserve"><value>통합</value></data>
+  <data name="Option_Split" xml:space="preserve"><value>분리</value></data>
+  <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>클러치 분리 지점</value></data>
+  <data name="Section_InputSettings" xml:space="preserve"><value>입력 설정</value></data>
+  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>로터리 인코더</value></data>
+  <data name="Option_Knob" xml:space="preserve"><value>노브</value></data>
+  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>로터리 1</value></data>
+  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>로터리 2</value></data>
+  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>로터리 3</value></data>
+  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>로터리 4</value></data>
+  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>로터리 5</value></data>
+  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>스틱을 D-패드로 사용</value></data>
+  <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>조이스틱 할당</value></data>
+  <data name="Option_None" xml:space="preserve"><value>없음</value></data>
+  <data name="Option_Left" xml:space="preserve"><value>왼쪽</value></data>
+  <data name="Option_Right" xml:space="preserve"><value>오른쪽</value></data>
+  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>LED 및 버튼 설정은 장치(Devices) 아래 MOZA Wheel 장치 탭에 있습니다.</value></data>
+  <data name="Section_Position" xml:space="preserve"><value>위치</value></data>
+  <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// 실시간 핸드브레이크 입력</value></data>
+  <data name="Label_Position" xml:space="preserve"><value>위치</value></data>
+  <data name="Section_Calibration" xml:space="preserve"><value>보정</value></data>
+  <data name="Subtitle_PullHandbrakeFully" xml:space="preserve"><value>// 핸드브레이크를 끝까지 한 번 당기세요</value></data>
+  <data name="Button_StartCalibration" xml:space="preserve"><value>보정 시작</value></data>
+  <data name="Button_Stop" xml:space="preserve"><value>정지</value></data>
+  <data name="Section_HandbrakeSettings" xml:space="preserve"><value>핸드브레이크 설정</value></data>
+  <data name="SliderLabel_Mode" xml:space="preserve"><value>모드</value></data>
+  <data name="Option_Axis" xml:space="preserve"><value>축</value></data>
+  <data name="Option_Button" xml:space="preserve"><value>버튼</value></data>
+  <data name="SliderLabel_ButtonThreshold" xml:space="preserve"><value>버튼 임계값</value></data>
+  <data name="SliderLabel_ReverseDirection" xml:space="preserve"><value>방향 반전</value></data>
+  <data name="SliderLabel_RangeStart" xml:space="preserve"><value>범위 시작</value></data>
+  <data name="SliderLabel_RangeEnd" xml:space="preserve"><value>범위 끝</value></data>
+  <data name="Section_OutputCurve" xml:space="preserve"><value>출력 커브</value></data>
+  <data name="Subtitle_MapPhysicalPullToGame" xml:space="preserve"><value>// 물리적 당김을 게임 입력으로 매핑</value></data>
+  <data name="Label_Throttle" xml:space="preserve"><value>스로틀</value></data>
+  <data name="Label_Brake" xml:space="preserve"><value>브레이크</value></data>
+  <data name="Label_Clutch" xml:space="preserve"><value>클러치</value></data>
+  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>스로틀 · 방향 및 범위</value></data>
+  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>브레이크 · 방향 및 범위</value></data>
+  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>클러치 · 방향 및 범위</value></data>
+  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>스로틀 출력 커브</value></data>
+  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>브레이크 출력 커브</value></data>
+  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>클러치 출력 커브</value></data>
+  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// 물리적 위치를 게임 입력으로 매핑</value></data>
+  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// 브레이크 응답 곡선 조정</value></data>
+  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// 클러치 응답 곡선 조정</value></data>
+  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>스로틀 · 보정</value></data>
+  <data name="Section_BrakeCalibration" xml:space="preserve"><value>브레이크 · 보정</value></data>
+  <data name="Section_ClutchCalibration" xml:space="preserve"><value>클러치 · 보정</value></data>
+  <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>센서 비율</value></data>
+  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = 각도 센서 · 100% = 로드셀</value></data>
+  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 액티브 시프터</value></data>
+  <data name="Status_SearchingForAb9" xml:space="preserve"><value>AB9 검색 중...</value></data>
+  <data name="Section_MechanicalLayout" xml:space="preserve"><value>기계식 레이아웃</value></data>
+  <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R 레이아웃 1</value></data>
+  <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R 레이아웃 1</value></data>
+  <data name="Option_Ab9Layout6R2" xml:space="preserve"><value>6+R 레이아웃 2</value></data>
+  <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R 레이아웃 1</value></data>
+  <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R 레이아웃 2</value></data>
+  <data name="Option_Sequential" xml:space="preserve"><value>시퀀셜</value></data>
+  <data name="Section_Feel" xml:space="preserve"><value>조작감</value></data>
+  <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// 축별 기계적 특성</value></data>
+  <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>기계적 저항</value></data>
+  <data name="SliderLabel_Spring" xml:space="preserve"><value>스프링</value></data>
+  <data name="SliderLabel_NaturalDamping" xml:space="preserve"><value>자연 댐핑</value></data>
+  <data name="SliderLabel_NaturalFriction" xml:space="preserve"><value>자연 마찰</value></data>
+  <data name="SliderLabel_MaxOutputTorqueLimit" xml:space="preserve"><value>최대 출력 토크 제한</value></data>
+  <data name="Section_EngineVibration" xml:space="preserve"><value>엔진 진동</value></data>
+  <data name="Subtitle_HostRenderedRumble" xml:space="preserve"><value>// RPM 기반 호스트 렌더링 진동</value></data>
+  <data name="SliderLabel_Intensity" xml:space="preserve"><value>강도</value></data>
+  <data name="SliderLabel_Frequency" xml:space="preserve"><value>주파수</value></data>
+  <data name="Section_GearShift" xml:space="preserve"><value>기어 변속</value></data>
+  <data name="SliderLabel_VibrationIntensity" xml:space="preserve"><value>진동 강도</value></data>
+  <data name="Section_MBoosterPedals" xml:space="preserve"><value>mBooster 페달</value></data>
+  <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value>// 호스트 렌더링 효과 · 장치별 역할 + 위치</value></data>
+  <data name="SliderLabel_Device" xml:space="preserve"><value>장치</value></data>
+  <data name="Status_NoMBooster" xml:space="preserve"><value>연결된 mBooster 없음</value></data>
+  <data name="Section_PedalRole" xml:space="preserve"><value>페달 역할</value></data>
+  <data name="SliderLabel_Role" xml:space="preserve"><value>역할</value></data>
+  <data name="Option_Disabled" xml:space="preserve"><value>사용 안 함</value></data>
+  <data name="Option_Throttle" xml:space="preserve"><value>스로틀</value></data>
+  <data name="Option_Brake" xml:space="preserve"><value>브레이크</value></data>
+  <data name="Option_Clutch" xml:space="preserve"><value>클러치</value></data>
+  <data name="Section_Effects" xml:space="preserve"><value>효과</value></data>
+  <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// 트리거: ABS는 게임 신호 · 락업은 브레이크&gt;0.8 · 임계값은 에지 · 엔진은 연속</value></data>
+  <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Label_Enable" xml:space="preserve"><value>사용</value></data>
+  <data name="Button_Test1s" xml:space="preserve"><value>1초 테스트</value></data>
+  <data name="Section_Lockup" xml:space="preserve"><value>락업</value></data>
+  <data name="Section_Threshold" xml:space="preserve"><value>임계값</value></data>
+  <data name="Section_EngineContinuous" xml:space="preserve"><value>엔진 (연속 — 10%로 자동 제한)</value></data>
+  <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 실험적 기능 — mBooster 펌웨어가 적용하지 않을 수 있음</value></data>
+  <data name="Label_ReversedDirection" xml:space="preserve"><value>방향 반전</value></data>
+  <data name="SliderLabel_MinRaw" xml:space="preserve"><value>최소 (원시값)</value></data>
+  <data name="SliderLabel_MaxRaw" xml:space="preserve"><value>최대 (원시값)</value></data>
+  <data name="Button_ReadFromDevice" xml:space="preserve"><value>장치에서 읽기</value></data>
+  <data name="Button_Apply" xml:space="preserve"><value>적용</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>유니버설 허브 · 페달</value></data>
+  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// 페달 포트 (2초마다 폴링)</value></data>
+  <data name="Label_PedalsPort" xml:space="preserve"><value>페달 포트</value></data>
+  <data name="Section_Accessories" xml:space="preserve"><value>액세서리</value></data>
+  <data name="Label_Port1" xml:space="preserve"><value>포트 1</value></data>
+  <data name="Label_Port2" xml:space="preserve"><value>포트 2</value></data>
+  <data name="Label_Port3" xml:space="preserve"><value>포트 3</value></data>
+  <data name="Section_Profiles" xml:space="preserve"><value>프로필</value></data>
+  <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>시작 시 프로필 설정 적용</value></data>
+  <data name="Section_WheelLedOutput" xml:space="preserve"><value>휠 LED 출력</value></data>
+  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// RPM + 버튼 전송 제한</value></data>
+  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>권장: LED 문제가 없는 한 아래 LED 옵션은 OFF로 두세요.</value></data>
+  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>휠 업데이트 제한</value></data>
+  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>LED 데이터가 실제로 변경될 때만 전송합니다.</value></data>
+  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>비트마스크 항상 재전송</value></data>
+  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>변경이 없어도 색상 업데이트와 함께 LED 비트마스크를 항상 전송합니다. 추가 트래픽이 발생합니다.</value></data>
+  <data name="Section_UsbDetection" xml:space="preserve"><value>USB 감지</value></data>
+  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>시리얼 프로브 폴백 비활성화 (고급)</value></data>
+  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>플러그인이 잘못된 장치와 통신하는 경우에만 필요합니다.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>AB9 액티브 시프터 감지 비활성화</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>AB9 재연결 프로브를 건너뜁니다.</value></data>
+  <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
+  <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>연결 시 대시보드 업로드</value></data>
+  <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>휠에서 대시보드 다운로드</value></data>
+  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>휠 펌웨어 세대:</value></data>
+  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>자동 — 휠 핸드셰이크에서 감지 시도</value></data>
+  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 세대 — (URL 구독)</value></data>
+  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 세대 — CSP/KSP</value></data>
+  <data name="Hint_FirmwareEra" xml:space="preserve"><value>자동은 핸드셰이크에서 휠의 펌웨어 세대를 감지해 맞는 프로토콜을 선택합니다. 텔레메트리가 동작하지 않을 때만 수동으로 변경하세요.</value></data>
+  <data name="Section_Reset" xml:space="preserve"><value>초기화</value></data>
+  <data name="Button_ClearAllSettings" xml:space="preserve"><value>모든 설정 및 프로필 지우기</value></data>
+  <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>모든 플러그인 설정과 프로필이 기본값으로 초기화됩니다.</value></data>
+  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  아직 동작하지 않음</value></data>
+  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>대시보드 업로드는 개발 중이며 현재는 휠로 파일을 전송하지 않습니다.</value></data>
+  <data name="Section_DashboardUpload" xml:space="preserve"><value>대시보드 업로드</value></data>
+  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// .mzdash 파일을 연결된 휠로 전송</value></data>
+  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>상태는 가장 최근의 휠 ack를 반영합니다.</value></data>
+  <data name="Label_Source" xml:space="preserve"><value>소스</value></data>
+  <data name="Option_LocalMzdashFile" xml:space="preserve"><value>로컬 .mzdash 파일</value></data>
+  <data name="Option_DashboardLibrary" xml:space="preserve"><value>대시보드 라이브러리</value></data>
+  <data name="Button_PickMzdash" xml:space="preserve"><value>.MZDASH 선택…</value></data>
+  <data name="Status_NoFileSelected" xml:space="preserve"><value>(선택된 파일 없음)</value></data>
+  <data name="Label_Dashboard" xml:space="preserve"><value>대시보드:</value></data>
+  <data name="Button_UploadNow" xml:space="preserve"><value>지금 업로드</value></data>
+  <data name="Status_Idle" xml:space="preserve"><value>대기</value></data>
+  <data name="Label_DashboardName" xml:space="preserve"><value>대시보드 이름:</value></data>
+  <data name="Label_RawSize" xml:space="preserve"><value>원본 크기:</value></data>
+  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
+  <data name="Label_InFlight" xml:space="preserve"><value>전송 중:</value></data>
+  <data name="Label_LastAckBytes" xml:space="preserve"><value>마지막 ack bytes_written / total:</value></data>
+  <data name="Label_LastAckStatus" xml:space="preserve"><value>마지막 ack 상태 바이트:</value></data>
+  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>참고: 업로드하려면 휠이 연결되어 있고 관리 세션이 협상되어 있어야 합니다.</value></data>
+  <data name="Section_WheelFiles" xml:space="preserve"><value>휠 파일</value></data>
+  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// 휠에 로드된 대시보드</value></data>
+  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>삭제는 일시적으로 비활성화되어 있습니다.</value></data>
+  <data name="DataGridHeader_State" xml:space="preserve"><value>상태</value></data>
+  <data name="DataGridHeader_Title" xml:space="preserve"><value>제목</value></data>
+  <data name="DataGridHeader_DirName" xml:space="preserve"><value>디렉터리 이름</value></data>
+  <data name="DataGridHeader_Hash" xml:space="preserve"><value>해시</value></data>
+  <data name="DataGridHeader_LastModified" xml:space="preserve"><value>마지막 수정</value></data>
+  <data name="Button_Delete" xml:space="preserve"><value>삭제</value></data>
+  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>일시적으로 비활성화됨.</value></data>
+  <data name="Section_CoapServer" xml:space="preserve"><value>CoAP 서버</value></data>
+  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// PitHouse 자동 실행을 막으려면 이 옵션을 켜세요</value></data>
+  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>iRacing이나 360 Hz 모드를 사용하는 게임처럼 공식 MOZA SDK 지원이 필요한 게임을 위한 기능입니다. 플러그인이 루프백에 내장 CoAP SDK 제어 서버를 실행합니다.</value></data>
+  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>사용 중에는 프로세스 목록에 "MOZA Pit House.exe"라는 이름의 작은 대리 프로세스가 표시됩니다. 이는 정상이며, MOZA SDK 앱이 이름으로 PitHouse를 찾을 수 있게 해 줍니다. 이 옵션을 끄거나 SimHub를 종료하면 자동으로 종료됩니다.</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP SDK 서버 사용</value></data>
+  <data name="Section_UdpControl" xml:space="preserve"><value>UDP 제어</value></data>
+  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// 순수 CBOR-over-UDP 제어 인터페이스</value></data>
+  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>조향각 설정용 레거시 UDP 제어입니다. 알려진 유일한 용도는 Richard Burns Rally의 RSF 버전입니다.</value></data>
+  <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>UDP 제어 서버 사용</value></data>
+  <data name="Label_PortNumber" xml:space="preserve"><value>포트</value></data>
+  <data name="Section_Status" xml:space="preserve"><value>상태</value></data>
+  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP 서버</value></data>
+  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP 제어</value></data>
+  <data name="Section_RecentRequests" xml:space="preserve"><value>최근 요청</value></data>
+  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 서버당 최근 20개 요청 · 실시간</value></data>
+  <data name="Section_About" xml:space="preserve"><value>정보</value></data>
+  <data name="Subtitle_About" xml:space="preserve"><value>// 오픈소스 SimHub 플러그인</value></data>
+  <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
+  <data name="Label_VersionPlaceholder" xml:space="preserve"><value>버전 —</value></data>
+  <data name="Hint_AboutDescription" xml:space="preserve"><value>MOZA Racing 하드웨어와 시리얼로 직접 통신하는 비공식 SimHub 플러그인입니다 — 하드웨어 설정, LED 효과 파이프라인, 대시보드 스트리밍을 제공합니다. MOZA / Gudsen Technology와 무관합니다.</value></data>
+  <data name="Hint_SponsorshipsAppreciated" xml:space="preserve"><value>후원해 주시면 큰 힘이 됩니다. 직접 보유하지 않은 하드웨어를 지원하는 일은 쉽지 않습니다!</value></data>
+  <data name="Hint_ThanksToTesters" xml:space="preserve"><value>MOZA 프로토콜을 동작시키는 방법을 알아내는 동안 시간과 — 정신력까지 — 바쳐 준 모든 초기 알파·베타 테스터에게 깊이 감사드립니다. 여러분이 없었다면 이 플러그인은 존재하지 않았을 것입니다.</value></data>
+  <data name="Button_Github" xml:space="preserve"><value>GitHub</value></data>
+  <data name="Button_JoinDiscord" xml:space="preserve"><value>Discord 참여</value></data>
+  <data name="Button_SponsorDevelopment" xml:space="preserve"><value>개발 후원</value></data>
+  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
+  <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>프로젝트 Discord에 참여하세요</value></data>
+  <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
+  <data name="Label_UpdateAvailable" xml:space="preserve"><value>업데이트 사용 가능</value></data>
+  <data name="Button_OpenReleaseNotes" xml:space="preserve"><value>릴리스 노트 열기</value></data>
+  <data name="Button_SkipThisVersion" xml:space="preserve"><value>이 버전 건너뛰기</value></data>
+  <data name="Button_DismissUpdate" xml:space="preserve"><value>닫기</value></data>
+  <data name="Banner_SdkSuggestionText" xml:space="preserve"><value>MOZA Pit House의 자동 실행을 막으려면 SDK 지원을 켜세요.</value></data>
+  <data name="Button_ConfigureSdk" xml:space="preserve"><value>SDK 설정</value></data>
+  <data name="Button_Dismiss" xml:space="preserve"><value>닫기</value></data>
+  <data name="Button_RestartSimHub" xml:space="preserve"><value>SimHub 재시작</value></data>
+  <data name="Label_WhatsNew" xml:space="preserve"><value>v{0}의 새로운 기능</value></data>
+  <data name="Label_CheckForUpdates" xml:space="preserve"><value>자동으로 업데이트 확인</value></data>
+  <data name="Label_ReleaseChannel" xml:space="preserve"><value>릴리스 채널</value></data>
+  <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>안정</value></data>
+  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>개발</value></data>
+  <data name="Button_CheckNow" xml:space="preserve"><value>지금 확인</value></data>
+  <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>확인한 적 없음</value></data>
+  <data name="Status_UpdateChecking" xml:space="preserve"><value>확인 중…</value></data>
+  <data name="Status_UpdateUpToDate" xml:space="preserve"><value>최신 상태</value></data>
+  <data name="Status_UpdateFailedNetwork" xml:space="preserve"><value>확인 실패 (네트워크)</value></data>
+  <data name="Status_UpdateFailedHttp" xml:space="preserve"><value>확인 실패 (서버)</value></data>
+  <data name="Status_UpdateFailedParse" xml:space="preserve"><value>확인 실패 (응답 형식)</value></data>
+  <data name="Button_InstallUpdate" xml:space="preserve"><value>업데이트 설치</value></data>
+  <data name="Status_DownloadingStart" xml:space="preserve"><value>다운로드 시작 중…</value></data>
+  <data name="Status_Downloading" xml:space="preserve"><value>다운로드 중 {0}% ({1} / {2})</value></data>
+  <data name="Status_DownloadingIndeterminate" xml:space="preserve"><value>다운로드 중… ({0})</value></data>
+  <data name="Status_Extracting" xml:space="preserve"><value>압축 해제 중…</value></data>
+  <data name="Status_Installing" xml:space="preserve"><value>설치 중…</value></data>
+  <data name="Status_InstalledRestartRequired" xml:space="preserve"><value>업데이트 설치됨 — v{0}을(를) 로드하려면 SimHub를 재시작하세요</value></data>
+  <data name="Status_InstallFailed" xml:space="preserve"><value>설치 실패: {0}</value></data>
+  <data name="Status_InstallFailedBadPackage" xml:space="preserve"><value>릴리스 패키지가 유효하지 않습니다</value></data>
+  <data name="Status_InstallFailedPendingRestart" xml:space="preserve"><value>이전 설치가 대기 중입니다 — 먼저 SimHub를 재시작하세요</value></data>
+  <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>플러그인 폴더에 쓸 수 없습니다</value></data>
+  <data name="Section_Updates" xml:space="preserve"><value>업데이트</value></data>
+  <data name="Subtitle_Updates" xml:space="preserve"><value>// 플러그인 내장 업데이트 알림</value></data>
+  <data name="Section_Bandwidth" xml:space="preserve"><value>대역폭</value></data>
+  <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// 시리얼 처리량 · 30초 윈도우</value></data>
+  <data name="Label_Inbound" xml:space="preserve"><value>수신</value></data>
+  <data name="Label_Outbound" xml:space="preserve"><value>송신</value></data>
+  <data name="Label_Capacity" xml:space="preserve"><value>용량</value></data>
+  <data name="Label_Peak" xml:space="preserve"><value>피크</value></data>
+  <data name="Label_Session" xml:space="preserve"><value>세션</value></data>
+  <data name="Section_SerialTrafficCapture" xml:space="preserve"><value>시리얼 트래픽 캡처</value></data>
+  <data name="Subtitle_SerialTrafficCapture" xml:space="preserve"><value>// 모든 TX/RX 프레임 기록</value></data>
+  <data name="Hint_CaptureDataInMemory" xml:space="preserve"><value>데이터는 메모리에만 저장되며 실행 간에 보존되지 않습니다. 진단 지원용 ZIP 번들을 내보내려면 정지를 클릭하세요.</value></data>
+  <data name="Button_StartCapture" xml:space="preserve"><value>캡처 시작</value></data>
+  <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>실행/게임 전환 시 항상 진단 캡처 시작</value></data>
+  <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>켜면 플러그인이 시작될 때마다 시리얼 트래픽 캡처가 자동으로 시작됩니다.</value></data>
+  <data name="Button_ExportBundle" xml:space="preserve"><value>번들 내보내기 (ZIP)…</value></data>
+  <data name="Button_CopyCapture" xml:space="preserve"><value>캡처를 클립보드에 복사</value></data>
+  <data name="Section_FullDiagReport" xml:space="preserve"><value>전체 진단 보고서</value></data>
+  <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// 디버깅 정보</value></data>
+  <data name="Button_Expand" xml:space="preserve"><value>펼치기</value></data>
+  <data name="Button_Collapse" xml:space="preserve"><value>접기</value></data>
+  <data name="Button_CopyAll" xml:space="preserve"><value>전체를 클립보드에 복사</value></data>
+  <data name="Hint_ClickExpandToRender" xml:space="preserve"><value>펼치기를 클릭하면 전체 다중 섹션 보고서가 표시됩니다.</value></data>
+  <data name="Hint_FullDiagRendered" xml:space="preserve"><value>// {0}줄 · 내보내기 번들과 동일한 내용</value></data>
+  <data name="Hint_FullDiagRenderFailed" xml:space="preserve"><value>// 렌더링 실패</value></data>
+  <data name="Hint_MBoosterIntro" xml:space="preserve"><value>연결된 각 mBooster가 아래에 표시됩니다. 장치별로 역할(스로틀/브레이크/클러치)을 선택해 페달 위치를 라우팅하세요. 보정 섹션은 실험적 기능입니다.</value></data>
+  <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>아직 테스트되지 않았습니다.</value></data>
+  <data name="Title_PickLedColor" xml:space="preserve"><value>LED 색상 선택</value></data>
+  <data name="Label_Palette" xml:space="preserve"><value>팔레트</value></data>
+  <data name="Label_Last" xml:space="preserve"><value>최근</value></data>
+  <data name="Label_FineTuneRgb" xml:space="preserve"><value>미세 조정 · RGB</value></data>
+  <data name="Button_Cancel" xml:space="preserve"><value>취소</value></data>
+  <data name="Button_Ok" xml:space="preserve"><value>확인</value></data>
+  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>MOZA 휠 베이스 · 앰비언트 LED</value></data>
+  <data name="Label_BaseModel" xml:space="preserve"><value>베이스 모델</value></data>
+  <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>베이스 앰비언트 LED가 감지되지 않았습니다. R9/R12 휠베이스에는 LED 스트립이 없으며, 이 패널은 R21/R25/R27급 베이스에서만 활성화됩니다.</value></data>
+  <data name="Section_Mode" xml:space="preserve"><value>모드</value></data>
+  <data name="SliderLabel_IndicatorState" xml:space="preserve"><value>인디케이터 상태</value></data>
+  <data name="Option_Off" xml:space="preserve"><value>끔</value></data>
+  <data name="Option_On" xml:space="preserve"><value>켬</value></data>
+  <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>대기 애니메이션</value></data>
+  <data name="Option_Constant" xml:space="preserve"><value>고정</value></data>
+  <data name="Option_Breath" xml:space="preserve"><value>호흡</value></data>
+  <data name="Option_Cycle" xml:space="preserve"><value>사이클</value></data>
+  <data name="Option_Rainbow" xml:space="preserve"><value>무지개</value></data>
+  <data name="Option_Flow" xml:space="preserve"><value>플로우</value></data>
+  <data name="Section_Brightness" xml:space="preserve"><value>밝기</value></data>
+  <data name="SliderLabel_Brightness" xml:space="preserve"><value>밝기</value></data>
+  <data name="Section_Sleep" xml:space="preserve"><value>절전</value></data>
+  <data name="SliderLabel_SleepMode" xml:space="preserve"><value>절전 모드</value></data>
+  <data name="Option_Enabled" xml:space="preserve"><value>사용</value></data>
+  <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>절전 시간</value></data>
+  <data name="Section_PowerOnOffColor" xml:space="preserve"><value>전원 켜기 / 끄기 색상</value></data>
+  <data name="SliderLabel_StartupColor" xml:space="preserve"><value>시작 색상</value></data>
+  <data name="SliderLabel_ShutdownColor" xml:space="preserve"><value>종료 색상</value></data>
+  <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA 대시보드</value></data>
+  <data name="Status_SearchingForDashboard" xml:space="preserve"><value>대시보드 검색 중...</value></data>
+  <data name="Section_IndicatorModes" xml:space="preserve"><value>인디케이터 모드</value></data>
+  <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>RPM 인디케이터 모드</value></data>
+  <data name="Option_SimHubMode" xml:space="preserve"><value>SimHub 모드</value></data>
+  <data name="Option_AlwaysOn" xml:space="preserve"><value>항상 켬</value></data>
+  <data name="SliderLabel_RpmDisplayMode" xml:space="preserve"><value>RPM 표시 모드</value></data>
+  <data name="Option_Mode1" xml:space="preserve"><value>모드 1</value></data>
+  <data name="Option_Mode2" xml:space="preserve"><value>모드 2</value></data>
+  <data name="SliderLabel_FlagsIndicatorMode" xml:space="preserve"><value>플래그 인디케이터 모드</value></data>
+  <data name="SliderLabel_RpmBrightness" xml:space="preserve"><value>RPM 밝기</value></data>
+  <data name="SliderLabel_FlagsBrightness" xml:space="preserve"><value>플래그 밝기</value></data>
+  <data name="Section_RpmLedColors" xml:space="preserve"><value>RPM LED 색상</value></data>
+  <data name="Section_RpmBlinkColors" xml:space="preserve"><value>RPM 점멸 색상</value></data>
+  <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// RPM이 레드라인에 도달하면 표시</value></data>
+  <data name="Section_FlagLedColors" xml:space="preserve"><value>플래그 LED 색상</value></data>
+  <data name="Label_SteeringAngle" xml:space="preserve"><value>조향각</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="TabHeader_Inputs" xml:space="preserve"><value>입력</value></data>
+  <data name="TabHeader_Dashboard" xml:space="preserve"><value>대시보드</value></data>
+  <data name="TabHeader_Leds" xml:space="preserve"><value>LED</value></data>
+  <data name="TabHeader_Rpm" xml:space="preserve"><value>RPM</value></data>
+  <data name="TabHeader_Buttons" xml:space="preserve"><value>버튼</value></data>
+  <data name="TabHeader_Knobs" xml:space="preserve"><value>노브</value></data>
+  <data name="TabHeader_Files" xml:space="preserve"><value>파일</value></data>
+  <data name="TabHeader_Sleep" xml:space="preserve"><value>절전</value></data>
+  <data name="Status_SearchingForWheel" xml:space="preserve"><value>휠 검색 중...</value></data>
+  <data name="Section_LivePaddles" xml:space="preserve"><value>실시간 패들</value></data>
+  <data name="Label_PaddleLeft" xml:space="preserve"><value>왼쪽</value></data>
+  <data name="Label_PaddleRight" xml:space="preserve"><value>오른쪽</value></data>
+  <data name="Label_PaddleCombined" xml:space="preserve"><value>통합</value></data>
+  <data name="Section_ActiveButtons" xml:space="preserve"><value>활성 버튼</value></data>
+  <data name="Section_Joystick" xml:space="preserve"><value>조이스틱</value></data>
+  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// 방향 스틱 할당</value></data>
+  <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>휠이 아직 조이스틱 구성을 보고하지 않았습니다. 휠을 연결하고 식별 프로브가 완료될 때까지 기다리세요.</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리 사용</value></data>
+  <data name="Button_LoadMzdash" xml:space="preserve"><value>.MZDASH 로드…</value></data>
+  <data name="Button_SetFolder" xml:space="preserve"><value>폴더 설정…</value></data>
+  <data name="Button_AutoDetect" xml:space="preserve"><value>자동 감지</value></data>
+  <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>티어 정의 채널 매칭용 로컬 .mzdash 파일을 로드합니다</value></data>
+  <data name="Tooltip_SetFolder" xml:space="preserve"><value>.mzdash 파일 폴더를 대시보드 라이브러리로 설정합니다</value></data>
+  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>연결된 휠의 대시보드 폴더를 자동으로 감지합니다</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ 테스트 패턴 전송</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>■ 정지</value></data>
+  <data name="Section_ChannelMappings" xml:space="preserve"><value>채널 매핑</value></data>
+  <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>행의 연필 아이콘을 클릭해 SimHub 속성을 선택하세요</value></data>
+  <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>채널 매핑 로드 중…</value></data>
+  <data name="DataGridHeader_Channel" xml:space="preserve"><value>채널</value></data>
+  <data name="DataGridHeader_SimHubProperty" xml:space="preserve"><value>SimHub 속성</value></data>
+  <data name="DataGridHeader_CurrentValue" xml:space="preserve"><value>현재 값</value></data>
+  <data name="Tooltip_EditMapping" xml:space="preserve"><value>SimHub 속성 바인딩 편집</value></data>
+  <data name="Button_ResetToDefaults" xml:space="preserve"><value>기본값으로 재설정</value></data>
+  <data name="Section_Display" xml:space="preserve"><value>디스플레이</value></data>
+  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>디스플레이 밝기</value></data>
+  <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>대기 시간</value></data>
+  <data name="Option_Time1Min" xml:space="preserve"><value>1분</value></data>
+  <data name="Option_Time2Min" xml:space="preserve"><value>2분</value></data>
+  <data name="Option_Time3Min" xml:space="preserve"><value>3분</value></data>
+  <data name="Option_Time4Min" xml:space="preserve"><value>4분</value></data>
+  <data name="Option_Time5Min" xml:space="preserve"><value>5분</value></data>
+  <data name="Option_Time10Min" xml:space="preserve"><value>10분</value></data>
+  <data name="Option_Time15Min" xml:space="preserve"><value>15분</value></data>
+  <data name="Option_Time20Min" xml:space="preserve"><value>20분</value></data>
+  <data name="Option_Time25Min" xml:space="preserve"><value>25분</value></data>
+  <data name="Option_Time30Min" xml:space="preserve"><value>30분</value></data>
+  <data name="Option_Time35Min" xml:space="preserve"><value>35분</value></data>
+  <data name="Option_Time40Min" xml:space="preserve"><value>40분</value></data>
+  <data name="Option_Time45Min" xml:space="preserve"><value>45분</value></data>
+  <data name="Option_Time1Hour" xml:space="preserve"><value>1시간</value></data>
+  <data name="Option_Time2Hour" xml:space="preserve"><value>2시간</value></data>
+  <data name="Option_Time3Hour" xml:space="preserve"><value>3시간</value></data>
+  <data name="Option_Time4Hour" xml:space="preserve"><value>4시간</value></data>
+  <data name="Option_Time5Hour" xml:space="preserve"><value>5시간</value></data>
+  <data name="Section_RpmLedMode" xml:space="preserve"><value>RPM LED 모드</value></data>
+  <data name="SliderLabel_RpmLedMode" xml:space="preserve"><value>RPM LED 모드</value></data>
+  <data name="Option_Static" xml:space="preserve"><value>고정</value></data>
+  <data name="SliderLabel_RpmIdleEffect" xml:space="preserve"><value>RPM 대기 효과</value></data>
+  <data name="Option_Breathing" xml:space="preserve"><value>호흡</value></data>
+  <data name="Option_ColorCycle" xml:space="preserve"><value>색상 사이클</value></data>
+  <data name="Option_SandFlow" xml:space="preserve"><value>샌드 플로우</value></data>
+  <data name="Option_RgbPulse" xml:space="preserve"><value>RGB 펄스</value></data>
+  <data name="SliderLabel_RpmIdleSpeed" xml:space="preserve"><value>RPM 대기 효과 속도</value></data>
+  <data name="Section_RpmLedColorsStatic" xml:space="preserve"><value>RPM LED 색상 (고정)</value></data>
+  <data name="Subtitle_RpmLedColorsStatic" xml:space="preserve"><value>// 텔레메트리가 전송되지 않을 때 표시 · LED를 클릭해 색상 변경</value></data>
+  <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
+  <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// 플래그를 클릭해 색상 변경</value></data>
+  <data name="Label_FlagPlaceholder" xml:space="preserve"><value>플래그 1</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES 휠 · RPM 인디케이터</value></data>
+  <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// 레거시 ES 프로토콜</value></data>
+  <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>인디케이터 모드</value></data>
+  <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>표시 모드</value></data>
+  <data name="Section_ButtonLedMode" xml:space="preserve"><value>버튼 LED 모드</value></data>
+  <data name="SliderLabel_ButtonLedMode" xml:space="preserve"><value>버튼 LED 모드</value></data>
+  <data name="SliderLabel_ButtonIdleEffect" xml:space="preserve"><value>버튼 대기 효과</value></data>
+  <data name="SliderLabel_ButtonIdleSpeed" xml:space="preserve"><value>버튼 대기 효과 속도</value></data>
+  <data name="Section_ButtonLedColors" xml:space="preserve"><value>버튼 LED 색상</value></data>
+  <data name="Subtitle_ButtonLedColors" xml:space="preserve"><value>// 버튼을 클릭해 색상 변경 · '텔레메트리 중 기본값'은 꺼진 버튼을 선택한 색상으로 대체</value></data>
+  <data name="Label_ButtonPlaceholder" xml:space="preserve"><value>버튼 01</value></data>
+  <data name="Section_KnobLedMode" xml:space="preserve"><value>노브 LED 모드</value></data>
+  <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>노브 LED 모드</value></data>
+  <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>노브 대기 효과</value></data>
+  <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>노브 대기 효과 속도</value></data>
+  <data name="Section_KnobSettings" xml:space="preserve"><value>노브 설정</value></data>
+  <data name="Label_SignalMode" xml:space="preserve"><value>신호 모드</value></data>
+  <data name="Subtitle_SignalMode" xml:space="preserve"><value>// 각 로터리의 입력 보고 방식</value></data>
+  <data name="SliderLabel_AllRotaries" xml:space="preserve"><value>모든 로터리</value></data>
+  <data name="Label_Colours" xml:space="preserve"><value>색상</value></data>
+  <data name="Subtitle_KnobColours" xml:space="preserve"><value>// 링 LED를 클릭하거나, 해당 노브의 활성 색상은 중앙 견본을 클릭하세요</value></data>
+  <data name="Label_KnobEditing" xml:space="preserve"><value>편집 중 · 노브 1 · 활성</value></data>
+  <data name="Button_FillRingWithSelected" xml:space="preserve"><value>선택한 색으로 링 채우기</value></data>
+  <data name="Button_CopyKnobToAll" xml:space="preserve"><value>이 노브를 전체에 복사</value></data>
+  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  대시보드 업로드는 아직 동작하지 않음</value></data>
+  <data name="Section_SleepLight" xml:space="preserve"><value>절전 라이트</value></data>
+  <data name="Subtitle_SleepLight" xml:space="preserve"><value>// 유휴 시간 초과 후 휠에 표시되는 내용</value></data>
+  <data name="SliderLabel_Speed" xml:space="preserve"><value>속도</value></data>
+  <data name="SliderLabel_Color" xml:space="preserve"><value>색상</value></data>
+  <data name="Section_Language" xml:space="preserve"><value>언어</value></data>
+  <data name="SliderLabel_Language" xml:space="preserve"><value>언어</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>새 언어를 적용하려면 이 설정 페이지를 닫았다가 다시 여세요. 자동은 SimHub의 언어 설정을, 그다음 OS 설정을 따릅니다.</value></data>
+  <data name="Button_ImportProfile" xml:space="preserve"><value>프로필 가져오기…</value></data>
+  <data name="Import_DialogTitle" xml:space="preserve"><value>PitHouse 프리셋 가져오기</value></data>
+  <data name="Import_Tab_Browse" xml:space="preserve"><value>파일 찾아보기…</value></data>
+  <data name="Import_Category_Motor" xml:space="preserve"><value>휠 베이스 (모터)</value></data>
+  <data name="Import_Category_Pedals" xml:space="preserve"><value>페달</value></data>
+  <data name="Import_NoFolderFound" xml:space="preserve"><value>PitHouse 프리셋 폴더를 찾을 수 없습니다. 사용자 지정 경로를 설정하거나 찾아보기를 사용하세요.</value></data>
+  <data name="Import_SetCustomFolder" xml:space="preserve"><value>폴더 설정…</value></data>
+  <data name="Import_ConfirmHeader" xml:space="preserve"><value>"{0}"을(를) 프로필 "{1}"에 적용합니다. 다음 설정이 변경됩니다:</value></data>
+  <data name="Import_NoChangesHeader" xml:space="preserve"><value>이 프리셋의 모든 값이 이미 활성 프로필과 일치합니다.</value></data>
+  <data name="Import_NotImportedHeader" xml:space="preserve"><value>가져오지 않음 (플러그인에 대응 항목 없음):</value></data>
+  <data name="Import_ApplyButton" xml:space="preserve"><value>적용</value></data>
+  <data name="Import_CancelButton" xml:space="preserve"><value>취소</value></data>
+  <data name="Import_NextButton" xml:space="preserve"><value>다음</value></data>
+  <data name="Import_BackButton" xml:space="preserve"><value>뒤로</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>시스템 어디에서든 PitHouse 프리셋 JSON 파일을 선택하세요.</value></data>
+  <data name="Import_Error_InvalidJson" xml:space="preserve"><value>파일이 유효한 JSON이 아닙니다: {0}</value></data>
+  <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>지원되지 않는 프리셋 유형 "{0}". 모터와 페달 프리셋만 지원됩니다.</value></data>
+  <data name="Status_Connected" xml:space="preserve"><value>연결됨</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>복구 중…</value></data>
+  <data name="Status_Parked" xml:space="preserve"><value>일시 중지됨</value></data>
+  <data name="Status_TelemetryParked" xml:space="preserve"><value>반복된 실패로 텔레메트리가 중지되었습니다 — 다시 켜서 재시도하세요</value></data>
+  <data name="Status_DegradedScreenless" xml:space="preserve"><value>휠에 디스플레이가 없습니다 — 텔레메트리가 필요하지 않습니다</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>휠이 펌웨어 오류를 보고했습니다</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>휠 펌웨어가 반복적인 파라미터 오류를 보고했습니다. 즉시 진단하려면 시리얼 캡처를 켜세요.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>시리얼 캡처 켜기</value></data>
+</root>

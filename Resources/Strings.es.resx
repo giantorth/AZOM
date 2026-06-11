@@ -499,4 +499,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>Detenido</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Telemetría detenida tras fallos repetidos: vuelve a activarla para reintentar</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>El volante no tiene pantalla: telemetría no necesaria</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>El volante informó errores de firmware</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>El firmware de su volante informó errores de parámetros repetidos. Active la captura serie para diagnosticar de inmediato.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Activar captura serie</value></data>
 </root>

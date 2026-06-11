@@ -105,7 +105,6 @@ header.nav.scrolled{ border-bottom-color:var(--line); background:rgba(7,8,9,.86)
 .hero{ padding:74px 0 64px; overflow:hidden; }
 .hero-glow{ position:absolute; top:-220px; left:50%; transform:translateX(-50%); width:900px; height:620px;
   background:radial-gradient(circle, rgba(0,229,255,.12), transparent 62%); pointer-events:none; z-index:0; }
-.hero-watermark{ position:absolute; right:-160px; top:40px; width:560px; color:#fff; opacity:.035; z-index:0; pointer-events:none; }
 .hero-in{ position:relative; z-index:2; text-align:center; display:flex; flex-direction:column; align-items:center; }
 .hero .lockup{ display:flex; align-items:center; justify-content:center; gap:26px; }
 .hero .lockup .mark{ width:104px; height:104px; filter:drop-shadow(0 6px 26px rgba(0,0,0,.6)); }
@@ -341,7 +340,6 @@ footer{ border-top:1px solid var(--line); padding:70px 0 46px; background:var(--
   .atsr{ grid-template-columns:1fr; text-align:center; justify-items:center; }
   .sponsor-grid{ grid-template-columns:1fr; }
   .foot-top{ grid-template-columns:1fr 1fr; gap:32px; }
-  .hero-watermark{ display:none; }
   .doc{ grid-template-columns:1fr; gap:8px; }
   .doc-side{ position:static; margin-bottom:14px; padding-bottom:18px; border-bottom:1px solid var(--line); }
   .doc-side ul{ flex-direction:row; flex-wrap:wrap; gap:6px; }

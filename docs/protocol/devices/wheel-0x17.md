@@ -216,7 +216,48 @@ off:  0    1    2    3  4   5  6   7  8   9 10  11 12  13 14  15  16  17
 - **Wheel-initiated** (button **combo**, no host command). A held modifier — **HID byte 21 bit `0x08`** — plus a direction tap — **HID byte 18 bit `0x01`/`0x04`** — on the 42-byte EP `0x83` input report. The wheel changes its own page in firmware (`0x01` = +1 wrap `18→0`, `0x04` = −1 wrap `0→18`) and reports the new index via the `0x0E` log below. The host sends **no** `g32/81` here — it follows by streaming the matching type. The structured `B8` wheel-input event used by standard display wheels (§ Group 0x43) is **absent** on this gen.
 - **Reading the active index (either path).** The wheel emits an *unsolicited* group-`0x0E` diagnostic log on every change: `[INFO]param_manage.c:340 Table 7, Param 6 Written: <N>`, `N` = absolute index `0..18`. (The `B2/81` ack carries the same value.) So a host can always recover the absolute active dashboard from the serial stream — no HID press-counting needed.
 
-`g32/81` is sent **only at switch time** — the single-dashboard gameplay run (`FSR1 with game`) contains zero `g32/81` frames; it just streams the active type. The 19 index positions map **many-to-one** onto the live record types (pages within a dashboard share a layout). Partial index→type map observed: `14`→`04`, `7`→`09`(+`0d`), `15`→`06`, `18`→`0c`, `17`→`11`(+`12`); a mid-session gameplay switch capture is needed to nail all 19. Open item: whether the `0x40` config re-sweep is strictly required on a host switch or merely habitual.
+`g32/81` is sent **only at switch time** — the single-dashboard gameplay run (`FSR1 with game`) contains zero `g32/81` frames; it just streams the active type. The 19 index positions map **many-to-one** onto the live record types (pages within a dashboard share a layout).
+
+**Full index→type map — verified.** Built by correlating every `g32/81` select + `Param 6` log with the `0x42` record type(s) streamed until the next switch, across `All dashboards`, `Moza FSR1 dashboard change`, `FS1 multiple changes`, `GT Style`, and the manual-change captures (`tools/` ad-hoc windowed correlation):
+
+| index | type | index | type | index | type |
+|-------|------|-------|------|-------|------|
+| 0 | `01` | 7 | `06` | 13 | `04` |
+| 1 | `02` | 8 | `05` | 14 | `04` |
+| 2 | `06` | 9 | `03` | 15 | `0c` |
+| 3 | `06` | 10 | `08` | 16 | *(unused)* |
+| 4 | `03` | 11 | `09` | 17 | `11` + `12` |
+| 5 | `04` | 12 | `0e` | 18 | `0c` |
+| 6 | `04` | | | | |
+
+- **Index 0** is the **power-on default**: the wheel streams type `01` before any switch (784 type-`01` frames precede the first `g32/81` in `All dashboards`). This is why a freshly-connected FSR1 sits on the type-`01` dashboard.
+- **Index 16** is **never enumerated by PitHouse** — its full sweep goes `…15, 17, 18`, skipping 16 — so there appear to be 18 selectable dashboards over indices `{0–15, 17, 18}`. Left unmapped (the plugin falls back to the full live set there).
+- **Index 17 is the only dual-type page.** The GT-style screen is fed by records `11` and `12` **interleaved frame-by-frame** — a clean 13 s dwell on index 17 streams `11 12 11 12 …` (521× `11` / 417× `12`). Both must be streamed to fill the screen.
+- Earlier drafts of this page guessed `7`→`09` and `15`→`06`; both were wrong (18 captures of streaming data give `7`→`06`, `15`→`0c`). Index `15` and `18` both render type `0c`.
+
+Open item: whether the `0x40` config re-sweep is strictly required on a host switch or merely habitual.
+
+**GT-style dashboard (index 17) field semantics — community-contributed.** A user hand-mapped the GT-style page by driving known SimHub channels and reading which on-screen box moved (the GT layout has labelled boxes: Speed, Gear, Fuel, Lap time, Tyre press, TC, Lights). Because the GT page streams two records, the screen's fields are split across both. Gauge offsets are the u16-BE pairs `[o, o+1]`; meanings below supersede the behavioural guesses in the per-type skeleton table for these two types. Slots not listed were left UNKNOWN by the contributor.
+
+| record | gauge | meaning |
+|--------|-------|---------|
+| `11` (GT Style A) | @7  | estimated lap time |
+| `11` | @9  | predicted lap time |
+| `11` | @11 | gear |
+| `11` | @15 | speed (km/h) |
+| `11` | @17 | fuel — remaining laps |
+| `11` | @19 | gear |
+| `12` (GT Style B) | @5  | tyre pressure front-left |
+| `12` | @7  | tyre pressure rear-left |
+| `12` | @9  | fuel used (litres) |
+| `12` | @11 | fuel per lap (litres) |
+| `12` | @13 | fuel level |
+| `12` | @15 | current lap time |
+| `12` | @17 | lap time |
+| `12` | @19 | TC level |
+| `12` | @21 | light stage |
+
+The contributor's exact channels were game/hub-specific (`ATSRHubMain.Telemetry.*`, `PersistantTrackerPlugin.*`, plus generic `DataCorePlugin.*`); the **meaning** of each slot is the durable finding, since channel→slot assignment is host-chosen and user-overridable. The catalog seeds each decoded slot's default with the canonical `simhub_property` from [`Data/Telemetry.json`](../../../Data/Telemetry.json) (MOZA's own channel catalog) — e.g. speed → `DataCorePlugin.GameData.SpeedKmh`, fuel remaining laps → `DataCorePlugin.GameData.FuelLaps`, fuel/lap → `DataCorePlugin.GameData.FuelConsumeLap`. The one exception is **light stage** (record `12` @21): Telemetry.json has only individual light bools (`HighBeamLight`, `RainLight`, …), no aggregate, so it ships with no default. The `0x42` path is byte-aligned `u16` (not tier-def bit-packing), so only the property *names* are taken from Telemetry.json, not its compression codes.
 
 ### Group `0x43` (67) — Live Telemetry Stream (write-only)
 
@@ -290,3 +331,57 @@ Additional newer wheel commands:
 | knob-active-color | `27 [knob] [role]` | 3 | array | Per-knob "Active position" LED RGB. `knob=0..4` (knob 1..5; CS Pro 0..3, KS Pro 0..4). Role-byte semantics verified live 2026-05-10 against PitHouse: `role=0` is the only writable form — sets the persisted Active LED colour and is what PitHouse's "Active" swatch fires; `role=1` is read-only and returns the live ring-LED colour at the knob's current rotation position. Plugin commands: `wheel-knob{1..5}-active-color` (write/read role 0) and `wheel-knob{1..5}-live-color` (read-only role 1). Earlier docs labelled role 0 as "background/idle" and role 1 as "primary/active" — that mapping was wrong; corrected here and in [`../telemetry/control-signals.md` § Per-knob Active LED colour](../telemetry/control-signals.md). |
 | multi-function-switch | `28 [0..2]` | 1 | int | Enable, count, left/right assignment |
 | rotary-signal-mode | `2A [N]` | 1 | int | Encoder N (0–4) signal mode |
+
+### Legacy "CS" wheel — Table 8 param-read storm (firmware fault we must not trigger)
+
+The original bare-`CS` wheel (firmware model name `CS`, reports on the bus as
+`wheel_wnfw`; RPM-only — 10 LEDs, **no** buttons / flags / knobs / sleep light /
+display) does **not** implement large parts of the parameter space newer rims do.
+When the plugin reads (or writes) a parameter this firmware lacks, its
+param-manager logs one failure per index it can't service and sweeps the whole
+table:
+
+```
+0e 71 05 [INFO]param_manage.c:424 Table 8: Failed to Read Parameter 0
+…
+0e 71 05 [INFO]param_manage.c:424 Table 8: Failed to Read Parameter 127
+```
+
+These arrive on the firmware-debug channel (wire group `0x0E`, subtype `0x05`,
+dev `0x71`). The sweep wedges the param subsystem: identity readback dies, the
+wheel stops answering presence polls, and the plugin drops into a ~20 s re-detect
+("dogging") loop. Users report this as the wheel "crashing".
+
+**Plugin-caused, not inherent firmware self-validation.** The same wheel
+(`wheel_wnfw`) on the same R5 base, driven by **MOZA Pit House**
+(`extreme_dogging.pcapng`), emits **zero** `Failed to Read/Write Parameter`
+lines — Pit House validates only param Tables 3/4/11/12 and never pokes Table 8.
+The plugin produced thousands on identical hardware
+(`moza-diagnostics-bundle-20260605-154600.zip`, 3 419 lines). The trigger is a
+plugin read/write the wheel can't service. (The benign `[ERRO]diag_svr_event.c
+error_code 40/41/42` lines seen once at startup appear under Pit House too and
+are **not** the fault signal.)
+
+**Gating rule (do not regress).**
+
+- Never push sleep-light params (`wheel-idle-mode`/`-timeout`/`-speed`/`-color`)
+  to a wheel not positively identified as supporting them. Gated on
+  `WheelModelInfo.HasSleepLight`; the `CS` entry **and** `WheelModelInfo.Default`
+  (unknown models) both set it `false`.
+- Never blind-probe extended LED groups (Single/Ambient/knob-brightness) on an
+  unidentified wheel — only read a group once a known `WheelModelInfo` says it
+  exists. A genuinely new wheel earns these reads by being added to
+  `KnownModels`, not by speculative probing.
+- The load-bearing idle keepalives in `PollStatus` — group `0x00` presence poll,
+  group `0x0E` param poll, 1-byte group `0x43` keepalive — are PitHouse-parity
+  and **must stay on**; they hold the wheel's param subsystem up. They are not
+  the storm trigger and must not be backed off.
+
+**Runtime self-protection.** `FirmwareDebugLog` counts `Failed to Read/Write
+Parameter` lines in a trailing 10 s window; ≥ 3 marks a storm (and logs a
+one-time SimHub warning so it's on record even if the user never opens the pane).
+While a storm is active the plugin skips the heavy LED-capability read batch on
+re-detect (so it stops feeding the dogging loop) and the AZOM pane raises a header
+banner whose "Enable Serial Capture" button jumps the user to the serial-capture
+section so they can grab the traffic for us. The keepalives above are
+intentionally exempt.

@@ -97,11 +97,11 @@ namespace MozaPlugin.Telemetry.Inbound
 
         private void HandleFc00Ack(byte[] data)
         {
-            _sender._lastAckedSession = data[4];
+            _sender.SessionLife._lastAckedSession = data[4];
             if (data.Length >= 7)
             {
                 int ackSeq = data[5] | (data[6] << 8);
-                _sender._lastAckedSeq = ackSeq;
+                _sender.SessionLife._lastAckedSeq = ackSeq;
                 _sender.Retransmitter.Ack(data[4], ackSeq);
                 // Route ack to session owner (downloader, uploader, etc.).
                 _sender.Dispatcher.DispatchAck(data[4], ackSeq);
@@ -110,7 +110,7 @@ namespace MozaPlugin.Telemetry.Inbound
             {
                 // 5-byte fc:00 (no seq). Signal "ack present but seq unknown" so
                 // TryOpenSession's seq verification falls through to session-match-only.
-                _sender._lastAckedSeq = -1;
+                _sender.SessionLife._lastAckedSeq = -1;
             }
             // Mgmt session engagement signal: a wheel fc:00 ack on sess=MgmtPort
             // proves the session is open even if the wheel never pushes data on

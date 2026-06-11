@@ -37,6 +37,3 @@ you need it.
 The **Status** block confirms the listeners are up — you'll see the CoAP and UDP listeners
 reporting that they're bound on `127.0.0.1`. If iRacing's force feedback isn't behaving,
 this is the first thing to check.
-
-> **Next:** keep AZOM current and learn the bug-reporting tools in
-> [Updates &amp; Diagnostics](/guides/updates-and-diagnostics/).

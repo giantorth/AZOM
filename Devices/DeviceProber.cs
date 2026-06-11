@@ -130,18 +130,17 @@ namespace MozaPlugin.Devices
                     cmds.Add($"wheel-flag-color{i}");
             }
 
-            // Extended LED group probes (Single/Rotary/Ambient). For known
-            // models the WheelModelInfo already tells us what's there; only
-            // probe when the model is unknown, or when the model claims knobs
-            // (so wheel-knob-brightness lights the Rotary-group presence flag
-            // used by knob-ring writes).
-            bool isUnknown = ReferenceEquals(info, WheelModelInfo.Default);
-            if (isUnknown)
-            {
-                cmds.Add("wheel-single-brightness");
-                cmds.Add("wheel-ambient-brightness");
-            }
-            if (info.KnobCount > 0 || isUnknown)
+            // Extended LED group probes (Single/Rotary/Ambient). Sent ONLY for
+            // models we've positively identified as having the group — never for
+            // an unknown model. Blind-probing Single/Ambient/knob-brightness on a
+            // wheel we can't identify is exactly the "send reads to a rim that
+            // doesn't implement the param" pattern that storms the legacy bare-"CS"
+            // firmware (Table 8 read-fail → dead identity). A genuinely-new wheel
+            // gets these once it's added to WheelModelInfo.KnownModels; until then
+            // we stay quiet rather than risk wedging it. wheel-knob-brightness is
+            // still read on known knob wheels (lights the Rotary-group presence
+            // flag used by knob-ring writes).
+            if (info.KnobCount > 0)
             {
                 cmds.Add("wheel-knob-brightness");
             }
@@ -514,7 +513,17 @@ namespace MozaPlugin.Devices
                             // LED-group-filtered reads. Skipping reads for LEDs
                             // the wheel doesn't have keeps PendingResponseTracker
                             // from churning on inevitable timeouts.
-                            _deviceManager.ReadSettingsPaced(BuildNewWheelLedReadCommands(info));
+                            //
+                            // Self-protection backoff: if the wheel is already mid
+                            // param-read storm, don't pile the LED capability batch
+                            // on top — that's the fuel that keeps the re-detect
+                            // "dogging" loop alive on a wheel whose firmware can't
+                            // service the reads. The load-bearing keepalives in
+                            // PollStatus still run; we just skip the heavy batch.
+                            if (_plugin.WheelParamStormActive)
+                                MozaLog.Info("[AZOM] Wheel param storm active — skipping LED capability reads to avoid amplifying the fault");
+                            else
+                                _deviceManager.ReadSettingsPaced(BuildNewWheelLedReadCommands(info));
                             if (DeviceDefinitionDeployer.DeployForModel(currentModel, _connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
 

@@ -84,6 +84,26 @@ namespace MozaPlugin.Telemetry
             BuildZeroRecord(dash.RecordType, dash.PayloadLen);
 
         /// <summary>
+        /// Diagnostic "byte ruler" record: every data byte (payload offset 5..end) is
+        /// set to its own offset index, so each on-screen box renders the byte(s) it
+        /// reads. A box showing N reads payload byte N; a 16-bit box shows
+        /// <c>N&lt;&lt;8 | N+1</c>; a u24 time box shows <c>N N+1 N+2</c> (decoded as ms).
+        /// One screenshot therefore reveals every field's offset, width, and — for a
+        /// linearly-scaled box — its scale (displayed ÷ byte-index). b1/b2 anchors are
+        /// preserved so the wheel renders the dashboard's normal layout. Offsets 3–4
+        /// are left 0 (protocol-fixed padding, never a field).
+        /// </summary>
+        internal static byte[] BuildByteRulerRecord(Fsr1Dashboard dash)
+        {
+            if (dash == null) throw new ArgumentNullException(nameof(dash));
+            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
+            for (int i = 5; i < dash.PayloadLen; i++)
+                frame[4 + i] = (byte)(i & 0xFF);
+            Finish(frame);
+            return frame;
+        }
+
+        /// <summary>
         /// Build a live record for <paramref name="dash"/>. <paramref name="valueFor"/>
         /// returns each field's final wire integer (already resolved + scaled to the
         /// field's range); it is invoked once per field. <c>b1</c>/<c>b2</c> are the

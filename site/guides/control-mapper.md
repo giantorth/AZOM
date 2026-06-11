@@ -34,6 +34,3 @@ source controllers are recognised — for example a *MOZA R5 Base - CS Pro* show
 With your wheels feeding one virtual controller, the AZOM mappings from
 [Controls &amp; Actions](/guides/controls-and-actions/) keep working whichever wheel is
 attached.
-
-> **Next:** enable the MOZA SDK for iRacing and 360 Hz mode in
-> [SDK &amp; iRacing](/guides/sdk-and-iracing/).

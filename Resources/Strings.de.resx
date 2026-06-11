@@ -494,4 +494,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>Angehalten</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Telemetrie nach wiederholten Fehlern gestoppt – zum erneuten Versuch wieder aktivieren</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>Lenkrad hat kein Display – Telemetrie nicht erforderlich</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Lenkrad meldet Firmware-Fehler</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Die Firmware Ihres Lenkrads hat wiederholt Parameterfehler gemeldet. Aktivieren Sie die serielle Aufzeichnung, um sofort zu diagnostizieren.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Serielle Aufzeichnung aktivieren</value></data>
 </root>

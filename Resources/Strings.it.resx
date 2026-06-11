@@ -497,4 +497,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>In pausa</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Telemetria interrotta dopo errori ripetuti — riattiva per riprovare</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>Il volante non ha display — telemetria non necessaria</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Il volante ha segnalato errori del firmware</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Il firmware del tuo volante ha segnalato ripetuti errori dei parametri. Abilita la cattura seriale per diagnosticare immediatamente.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Abilita cattura seriale</value></data>
 </root>

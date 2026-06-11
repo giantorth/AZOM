@@ -543,6 +543,12 @@ namespace MozaPlugin.Devices.WheelUi
                 : global::MozaPlugin.Resources.Strings.Button_SendTestPattern;
             TelemetryProfileCombo.IsEnabled = selectorReady;
 
+            // Byte-ruler diagnostic button: FSR1-only, live whenever its driver runs.
+            bool rulerOn = _plugin?.Fsr1ByteRulerActive ?? false;
+            Fsr1ByteRulerBtn.Visibility = fsr1 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Fsr1ByteRulerBtn.IsEnabled = fsr1Running;
+            Fsr1ByteRulerBtn.Content = rulerOn ? "Stop ruler" : "Byte ruler";
+
             // Refresh profile info — auto-renegotiate may have swapped
             // the profile on a background thread after a dashboard switch.
         }
@@ -772,6 +778,17 @@ namespace MozaPlugin.Devices.WheelUi
                 }
             }
 
+            RefreshTelemetryStatus();
+        }
+
+        // FSR V1 byte-ruler diagnostic: fills every 0x42 data byte with its own payload
+        // offset so each box on the wheel shows which byte(s) feed it (offset/width/scale
+        // in one screenshot). See Fsr1DisplayEmitter.BuildByteRulerRecord.
+        private void Fsr1ByteRulerToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+            bool on = !_plugin.Fsr1ByteRulerActive;
+            _plugin.SetFsr1ByteRuler(on);
             RefreshTelemetryStatus();
         }
 

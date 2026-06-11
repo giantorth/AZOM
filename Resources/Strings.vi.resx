@@ -494,4 +494,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>Đã dừng</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Đã dừng telemetry sau nhiều lỗi — bật lại để thử lại</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>Vô lăng không có màn hình — không cần telemetry</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Vô lăng báo lỗi firmware</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Firmware vô lăng của bạn liên tục báo lỗi tham số. Hãy bật ghi dữ liệu serial để chẩn đoán ngay.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Bật ghi dữ liệu serial</value></data>
 </root>

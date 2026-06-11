@@ -494,4 +494,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>En pause</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Télémétrie arrêtée après des échecs répétés — réactivez pour réessayer</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>Le volant n'a pas d'écran — télémétrie non nécessaire</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Le volant a signalé des erreurs de firmware</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Le firmware de votre volant a signalé des erreurs de paramètres répétées. Activez la capture série pour diagnostiquer immédiatement.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Activer la capture série</value></data>
 </root>

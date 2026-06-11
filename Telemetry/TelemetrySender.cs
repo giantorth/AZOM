@@ -115,27 +115,17 @@ namespace MozaPlugin.Telemetry
         // and StartTickTimer both depend on this being non-zero (1000 / _baseTickMs;
         // new Timer(_baseTickMs)).
         private int _baseTickMs = 33;
-        private byte _sequenceCounter;
         private int _displayConfigPage;
 
         // _tierDefPreambleSent moved to TierDefinitionEmitter.
         private int _preambleTickTarget;
         internal int _sessionAckSeq;
 
-        // Port probing state. _lastAckedSeq=-1 signals "ack present but seq unknown"
-        // (5-byte fc:00 form). See docs/protocol/sessions/chunk-format.md.
-        internal volatile byte _lastAckedSession;
-        internal volatile int _lastAckedSeq = -1;
-        private readonly ManualResetEventSlim _ackReceived = new ManualResetEventSlim(false);
-
-        // Wheel session-layer readiness latch. Set by TelemetryInboundDispatcher
-        // when the wheel pushes its first spontaneous sess=0x09 device-init
-        // (type=0x81) — the most reliable "I'm alive and ready for session-level
-        // traffic" signal the wheel emits during a slow hot-attach boot
-        // (~20s after wheel-telemetry-mode reads first succeed). Consumed by
-        // ProbeAndOpenSessions to retry sess=0x01/0x02 opens that timed out
-        // while the wheel was still booting.
-        internal volatile bool _wheelReadyObserved;
+        // Session open/close state machine + ack latch + contig-ack tracking —
+        // see Sessions/SessionLifecycle.cs. Constructed in the ctor before the
+        // uploader (whose delegates point at it).
+        private readonly Sessions.SessionLifecycle _sessionLife;
+        internal Sessions.SessionLifecycle SessionLife => _sessionLife;
 
         // Cold-start preamble gate. Set true in StartInner ONLY on a true
         // cold start (first start in this SimHub process); read by
@@ -159,17 +149,6 @@ namespace MozaPlugin.Telemetry
         // Upload handshake state.
         internal int _mgmtAckSeq;
 
-        // Gap-aware catalog ack: highest CONTIGUOUS inbound seq per catalog
-        // session (mgmt/telem) during binding. A dropped catalog chunk under
-        // Wine leaves a seq gap (observed 07→0c on sess=0x01); acking the
-        // post-gap seq tells the wheel we received chunks we didn't, so it never
-        // resends and the catalog stays truncated → dash wedged. Instead we
-        // re-ack the last contiguous seq across a gap. Pre-Active only;
-        // steady-state telemetry keeps specific-seq acks. Reset per session open
-        // (ResetContigAck) and per StartInner.
-        private readonly object _contigAckLock = new object();
-        private readonly System.Collections.Generic.Dictionary<byte, int> _contigAckSeqBySession
-            = new System.Collections.Generic.Dictionary<byte, int>();
         private readonly ManualResetEventSlim _mgmtResponseEvent = new ManualResetEventSlim(false);
 
         // File-transfer session state. See docs/protocol/dashboard-upload/.
@@ -183,7 +162,7 @@ namespace MozaPlugin.Telemetry
         /// seq to use when sending V0 per-channel value frames in active phase.
         /// V2 telemetry uses group=0x43 cmd=0x7d23 directly (no session seq).
         /// </summary>
-        private int _session02OutboundSeq;
+        internal int _session02OutboundSeq;
 
         // Guard for the read-chunk-send-write of _session02OutboundSeq +
         // _propertyPushLastSeqs. Without it, the timer thread (V0 value
@@ -194,7 +173,7 @@ namespace MozaPlugin.Telemetry
         // higher value with a lower one. The wheel keys retransmit
         // suppression per literal seq, so a regression makes it drop
         // chunks as duplicates and the upstream message stays stuck.
-        private readonly object _session02SeqLock = new object();
+        internal readonly object _session02SeqLock = new object();
 
         // Same rationale as _session02SeqLock but for the mgmt session.
         // SendTierDefinition targets the session ResolveTierDefSession()
@@ -394,8 +373,7 @@ namespace MozaPlugin.Telemetry
                 byte next = value == 0 ? MozaProtocol.DeviceWheel : value;
                 if (_targetDeviceId == next) return;
                 _targetDeviceId = next;
-                _cachedDisplayConfigFrames = null;
-                _cachedDisplayConfigPageCount = 0;
+                _frames.InvalidateDisplayConfig();
                 // Rebuild per-tier frame builders with the new dev_id so value
                 // frames address the right device on the next tick.
                 RebuildFrameBuildersForTargetDevice();
@@ -655,69 +633,14 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        // Pre-cached frames (built once, reused every tick)
-        private byte[] _cachedEnableFrame = null!;
-        private byte[] _cachedModeFrame = null!;
-        private byte[] _cachedSequenceFrame = null!;
-        private byte[][] _cachedHeartbeatFrames = null!;
-
-        // Group 0x43 N=1 device-ping frames sent ~1 Hz. Static — device IDs and
-        // checksums never vary, so the byte[]s outlive any sender instance.
-        private static readonly byte[] _dashKeepaliveFrameDash = BuildKeepaliveFrame(MozaProtocol.DeviceDash);
-        private static readonly byte[] _dashKeepaliveFrame15 = BuildKeepaliveFrame(0x15);
-        private static readonly byte[] _dashKeepaliveFrameWheel = BuildKeepaliveFrame(MozaProtocol.DeviceWheel);
-        // CM2 standalone dashboard pings its bridge/main at 0x12; the dash/15/wheel
-        // trio above never reaches CM2's expected target.
-        private static readonly byte[] _dashKeepaliveFrameMain = BuildKeepaliveFrame(MozaProtocol.DeviceMain);
-
-        // Peripheral output-poll frames — wire-parity polls (handbrake/pedals).
-        // Cadence: presence ~22 Hz, handbrake-output ~10 Hz, pedals ~7 Hz.
-        private static readonly byte[] _handbrakePresenceFrame = BuildShortFrame(0x5A, 0x1B, new byte[] { 0x00 });
-        private static readonly byte[] _handbrakeOutputFrame   = BuildShortFrame(0x5D, 0x1B, new byte[] { 0x01, 0x00, 0x00 });
-        private static readonly byte[] _pedalThrottleOutFrame  = BuildShortFrame(0x25, 0x19, new byte[] { 0x01, 0x00, 0x00 });
-        private static readonly byte[] _pedalBrakeOutFrame     = BuildShortFrame(0x25, 0x19, new byte[] { 0x02, 0x00, 0x00 });
-        private static readonly byte[] _pedalClutchOutFrame    = BuildShortFrame(0x25, 0x19, new byte[] { 0x03, 0x00, 0x00 });
-
-        // LED state read polls (`0x40/0x17 1F 03 [group] 00 00 00 00`).
-        // Group 1 (RPM bar) ~1 Hz; group 2 (Single) ~0.2 Hz.
-        //
-        // The 1F 03 [group] sub-cmd shape is not in the documented MozaCommandDatabase
-        // read set and Universal HUB firmware logs an `Unexpected cmd: 31` per poll
-        // (W17 CS-Pro observed ~8/min). The polls were deleted on 2026-05-27 for
-        // exactly that reason — but the deletion regressed RPM-LED telemetry-mode
-        // engagement on the GS V2 Pro (firmware variant reporting bare "GS"):
-        // wheel-telemetry-rpm-colors / wheel-send-rpm-telemetry frames no longer
-        // visibly light the RPM strip without these read polls in the keepalive
-        // mix. See `project_parity_polls_load_bearing` memory — the wheel uses
-        // the *requests* (not their responses) as the host-is-live heartbeat for
-        // per-group telemetry engagement; ~1 Hz is enough. Restored 2026-05-28.
-        // If the firmware-warning noise becomes a problem, replace with a
-        // documented read-set shape rather than removing entirely.
-        private static readonly byte[] _ledStatePollGroup1 = BuildShortFrame(0x40, 0x17, new byte[] { 0x1F, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00 });
-        private static readonly byte[] _ledStatePollGroup2 = BuildShortFrame(0x40, 0x17, new byte[] { 0x1F, 0x03, 0x02, 0x00, 0x00, 0x00, 0x00 });
-
-        private static byte[] BuildShortFrame(byte group, byte dev, byte[] payload)
-        {
-            var frame = new byte[payload.Length + 5];
-            frame[0] = MozaProtocol.MessageStart;
-            frame[1] = (byte)payload.Length;
-            frame[2] = group;
-            frame[3] = dev;
-            Array.Copy(payload, 0, frame, 4, payload.Length);
-            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
-            return frame;
-        }
-
-        // Lazy per-page cache for the 7C:27/7C:23 display-config frames sent
-        // ~1 Hz. Invalidated when the profile's page count changes; rebuilt on
-        // first SendDisplayConfig() after that.
-        private byte[][]? _cachedDisplayConfigFrames;
-        private int _cachedDisplayConfigPageCount;
+        // Cached + static frame construction — see Frames/TelemetryFrameCache.cs.
+        // Allocated in the constructor; BuildCachedFrames() runs per Start.
+        private readonly Frames.TelemetryFrameCache _frames;
 
         // Session ports determined during port probing.
         // MgmtPort = first acked port (session 0x01, used for dashboard upload).
         // FlagByte = second acked port (session 0x02, used for tier definitions and fc:00 acks).
-        private byte _mgmtPort;
+        internal byte _mgmtPort;
         public byte FlagByte { get; set; } = 0x02;
         public bool SendTelemetryMode { get; set; } = true;
         public bool SendSequenceCounter { get; set; } = true;
@@ -1293,6 +1216,7 @@ namespace MozaPlugin.Telemetry
         public TelemetrySender(MozaSerialConnection connection)
         {
             _connection = connection;
+            _frames = new Frames.TelemetryFrameCache(this);
             _silenceGate = new Lifecycle.SilenceGate(() => EnableHotRenegotiation);
             _recovery = new Lifecycle.RecoveryDispatcher(this);
             _watchdog = new DisplayWatchdog(this);
@@ -1306,6 +1230,7 @@ namespace MozaPlugin.Telemetry
             _propertyPushQueue = new PropertyPushQueue(this);
             _tierDefEmitter = new Frames.TierDefinitionEmitter(this);
             _inboundDispatcher = new Inbound.TelemetryInboundDispatcher(this);
+            _sessionLife = new Sessions.SessionLifecycle(this);
             _rpc = new RpcCallChannel(
                 connection,
                 shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected);
@@ -1314,10 +1239,10 @@ namespace MozaPlugin.Telemetry
                 shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected,
                 getPolicy: () => _policy,
                 getConfigJsonState: () => _configJson.LastState,
-                sendSessionAck: SendSessionAck,
-                sendSessionEnd: SendSessionEnd,
+                sendSessionAck: _sessionLife.SendSessionAck,
+                sendSessionEnd: _sessionLife.SendSessionEnd,
                 sendAndTrackChunk: SendAndTrackChunk,
-                sendSessionOpen: SendSessionOpen);
+                sendSessionOpen: _sessionLife.SendSessionOpen);
 
             // Single-line outcome log per upload attempt. Without this, a
             // silent failure (e.g. NoFtSession) only shows up as a Warn deep
@@ -1564,7 +1489,7 @@ namespace MozaPlugin.Telemetry
             // method above, which clears it. Warm/game-switch reloads leave it
             // false → no added preamble latency.
             _coldStartWheelGatePending = isFirstStartInProcess;
-            BuildCachedFrames();
+            _frames.BuildCachedFrames();
 
             // Subscribe early so we catch fc:00 acks during port probing AND preamble
             _connection.MessageReceived += _inboundDispatcher.OnMessageDuringPreamble;
@@ -1578,7 +1503,7 @@ namespace MozaPlugin.Telemetry
             // session state from a prior SimHub process. Game-switch reloads
             // skip the wide close to preserve the configJson handshake on
             // the persistent wire.
-            ProbeAndOpenSessions(isFirstStartInProcess, cancel);
+            _sessionLife.ProbeAndOpenSessions(isFirstStartInProcess, cancel);
             // Supersession gate: a new Start() arriving mid-probe cancels
             // our token. An external Stop() during the same window pushes
             // state to Idle — both signal "abandon this StartInner".
@@ -1596,7 +1521,7 @@ namespace MozaPlugin.Telemetry
             // Open session 0x03 (tile-server). Tile-server push deferred until
             // after tier-def — earlier push collided with the wheel's
             // sess=0x09 state burst under Wine SerialPort contention.
-            SendSessionOpen(0x03, 0x03);
+            _sessionLife.SendSessionOpen(0x03, 0x03);
 
             _tierDefEmitter.WaitForChannelCatalogQuiet(quietMs: 200, timeoutMs: 2000);
             _catalogParser.TryParse();
@@ -1673,16 +1598,16 @@ namespace MozaPlugin.Telemetry
                         $"dropped/truncated catalog chunks) after {waited}ms; re-requesting via " +
                         $"session re-cycle (attempt {attempt}/{MaxCatalogRequests - 1}).");
                     _catalogParser.ClearBuffer();
-                    try { TryCloseSession(0x01, 300); } catch { }
-                    try { TryCloseSession(0x02, 300); } catch { }
-                    try { TryCloseSession(0x03, 300); } catch { }
+                    try { _sessionLife.TryCloseSession(0x01, 300); } catch { }
+                    try { _sessionLife.TryCloseSession(0x02, 300); } catch { }
+                    try { _sessionLife.TryCloseSession(0x03, 300); } catch { }
                     try { System.Threading.Thread.Sleep(250); } catch { }
                     if (cancel.IsCancellationRequested
                         || _state == TelemetryState.Idle || !_connection.IsConnected) return;
-                    TryOpenSession(0x01, 500);
+                    _sessionLife.TryOpenSession(0x01, 500);
                     if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                    TryOpenSession(0x02, 500);
-                    SendSessionOpen(0x03, 0x03);
+                    _sessionLife.TryOpenSession(0x02, 500);
+                    _sessionLife.SendSessionOpen(0x03, 0x03);
                 }
                 MozaLog.Debug(
                     $"[AZOM] Pre-init catalog wait: {totalWaited}ms — tier-def session resolved to " +
@@ -1719,7 +1644,7 @@ namespace MozaPlugin.Telemetry
             TransitionTo(TelemetryState.Starting, "StartInner: begin");
             _tickCounter = 0;
             _framesSent = 0;
-            _sequenceCounter = 0;
+            _frames.ResetSequenceCounter();
             _slowCounter = 0;
             _displayConfigPage = 0;
             // ClearBuffer keeps the resolved _catalog so cross-switch backrefs
@@ -1729,7 +1654,7 @@ namespace MozaPlugin.Telemetry
             _nextFlagBase = 0;
             _activeSubscription = null;
             _sessionAckSeq = 0;
-            lock (_contigAckLock) _contigAckSeqBySession.Clear();
+            _sessionLife.ClearContigAck();
             _dashboardDownloadTriggered = false;
             _preambleTickTarget = Math.Max(1, 1000 / _baseTickMs);
             // Default the cold-start preamble gate off; StartInner re-arms it
@@ -1800,9 +1725,9 @@ namespace MozaPlugin.Telemetry
         {
             if (!_connection.IsConnected) return;
             if (MozaPlugin.Instance?.ShouldDriveDashboard() == false) return;
-            try { SendSessionClose(0x01); } catch { }
-            try { SendSessionClose(0x02); } catch { }
-            try { SendSessionClose(0x03); } catch { }
+            try { _sessionLife.SendSessionClose(0x01); } catch { }
+            try { _sessionLife.SendSessionClose(0x02); } catch { }
+            try { _sessionLife.SendSessionClose(0x03); } catch { }
             try { System.Threading.Thread.Sleep(100); } catch { }
         }
 
@@ -1867,7 +1792,7 @@ namespace MozaPlugin.Telemetry
             // (those callers may be on the SimHub UI thread).
             _rpc.DrainWaiters();
 
-            try { _ackReceived.Reset(); } catch (ObjectDisposedException) { }
+            _sessionLife.ResetAckEvent();
             try { _mgmtResponseEvent.Reset(); } catch (ObjectDisposedException) { }
             // Disarm convergence — a torn-down pipeline shouldn't keep
             // firing kind=4 nudges into a session being closed.
@@ -2154,6 +2079,9 @@ namespace MozaPlugin.Telemetry
         internal bool StateIsIdle => _state == TelemetryState.Idle;
         internal bool StateIsActive => _state == TelemetryState.Active;
         internal bool ConnectionIsConnected => _connection.IsConnected;
+        // Live connection reference for collaborators — never capture this:
+        // Rebind() replaces _connection (CM2 standalone repoint).
+        internal MozaSerialConnection ConnectionRef => _connection;
         internal Sessions.SessionInfo SessionsGetOrCreate(byte session) => _sessions.GetOrCreate(session);
         internal bool ConfigJsonHasLastState => _configJson.LastState != null;
         internal long ConfigJsonLastForwardGapUtcTicks => _configJson.LastForwardGapUtcTicks;
@@ -2285,26 +2213,12 @@ namespace MozaPlugin.Telemetry
         internal RpcCallChannel Rpc => _rpc;
         internal SessionDataReassembler Session0aInbox => _session0aInbox;
         internal TileServerStateParser TileServerParser => _tileServerParser;
-        internal ManualResetEventSlim AckReceived => _ackReceived;
+        internal ManualResetEventSlim AckReceived => _sessionLife.AckReceived;
         internal ManualResetEventSlim MgmtResponseEvent => _mgmtResponseEvent;
 
-        /// <summary>Latch set by <see cref="Inbound.TelemetryInboundDispatcher"/>
-        /// the first time the wheel pushes a spontaneous sess=0x09 device-init
-        /// (type=0x81). Consumed by <see cref="ProbeAndOpenSessions"/> to detect
-        /// the slow-bring-up hot-attach case where the wheel's session layer
-        /// comes online after the initial 500 ms open-ack budget but before the
-        /// 20 s extended-wait timeout. Also wakes <see cref="_ackReceived"/> so
-        /// the extended wait returns immediately.</summary>
-        internal void MarkWheelReadyObserved()
-        {
-            _wheelReadyObserved = true;
-            _ackReceived.Set();
-        }
-
-        /// <summary>Clear the wheel-ready latch — called at Start/Stop
-        /// boundaries via <see cref="Watchdog.DisplayWatchdog.Reset"/>
-        /// so a subsequent reconnect re-arms detection from a clean slate.</summary>
-        internal void ResetWheelReadyObserved() => _wheelReadyObserved = false;
+        // Wheel-ready latch + ack latch live in Sessions/SessionLifecycle.cs.
+        internal void MarkWheelReadyObserved() => _sessionLife.MarkWheelReadyObserved();
+        internal void ResetWheelReadyObserved() => _sessionLife.ResetWheelReadyObserved();
         internal long SubscriptionResponseDeadlineTicksField
         {
             get => _subscriptionResponseDeadlineTicks;
@@ -2314,43 +2228,8 @@ namespace MozaPlugin.Telemetry
         internal System.Collections.Generic.Dictionary<byte, int> TileServerHighestSeqMap => _tileServerHighestSeq;
         internal int IncrementCatalogCrcRejects() => Interlocked.Increment(ref _catalogCrcRejects);
         internal int IncrementTileServerCrcRejects() => Interlocked.Increment(ref _tileServerCrcRejects);
-        internal void SendSessionAckInternal(byte session, ushort ackSeq) => SendSessionAck(session, ackSeq);
-
-        /// <summary>Gap-aware ack-seq for a catalog-bearing session during the
-        /// binding phase. Advances on contiguous seqs, acks retransmits of
-        /// already-seen seqs specifically, and on a gap (a dropped catalog
-        /// chunk) re-acks the last CONTIGUOUS seq instead of acking past the
-        /// hole — so we never tell the wheel we received chunks we didn't, and
-        /// it gets a chance to resend. Once Active (steady-state telemetry) it
-        /// acks the seq verbatim, preserving the existing specific-seq behaviour
-        /// (a dropped keepalive must not stall the ack). Reset per session open.</summary>
-        internal ushort GapAwareCatalogAckSeq(byte session, int seq)
-        {
-            if (_state == TelemetryState.Active)
-                return (ushort)seq;
-            lock (_contigAckLock)
-            {
-                int contig = _contigAckSeqBySession.TryGetValue(session, out var c) ? c : -1;
-                if (contig < 0 || seq == contig + 1)
-                {
-                    _contigAckSeqBySession[session] = seq;   // first frame, or in-order
-                    return (ushort)seq;
-                }
-                if (seq <= contig)
-                    return (ushort)seq;                      // retransmit of an acked seq
-                // seq > contig + 1: chunk(s) between contig and seq dropped on RX.
-                // Dup-ack the last contiguous seq; do NOT advance past the hole.
-                return (ushort)contig;
-            }
-        }
-
-        /// <summary>Drop the gap-aware contiguous-ack baseline for a session so a
-        /// fresh open (new seq generation) starts clean. Called from
-        /// SendSessionOpen and the StartInner reset.</summary>
-        internal void ResetContigAck(byte session)
-        {
-            lock (_contigAckLock) _contigAckSeqBySession.Remove(session);
-        }
+        internal void SendSessionAckInternal(byte session, ushort ackSeq) => _sessionLife.SendSessionAck(session, ackSeq);
+        internal ushort GapAwareCatalogAckSeq(byte session, int seq) => _sessionLife.GapAwareCatalogAckSeq(session, seq);
         internal void MaybeSendConfigJsonReplyInternal(WheelDashboardState state, byte session) =>
             MaybeSendConfigJsonReply(state, session);
         internal void MaybeTriggerDashboardDownloadInternal(WheelDashboardState state) =>
@@ -2555,334 +2434,6 @@ namespace MozaPlugin.Telemetry
 
         // ── Port probing ────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Open management + telemetry sessions PitHouse-style: directly open
-        /// session 0x01 (mgmt) and 0x02 (telem) rather than probing 48 ports.
-        ///
-        /// Why this isn't a probe loop: PitHouse never probes. It opens 0x01/0x02
-        /// after a power-cycle and relies on them. The old 48-port probe existed
-        /// to co-exist with a concurrent PitHouse instance, but SimHub + PitHouse
-        /// can't share the serial port anyway, and the burst of 96 close+open
-        /// frames at 4ms pacing saturated the write queue for 4s. During that
-        /// window the <see cref="MozaPlugin.PollStatus"/> watchdog (2s interval,
-        /// 3-miss threshold) would fire mid-handshake and reset the wheel state,
-        /// looping forever before telemetry could start.
-        ///
-        /// Pre-probe close is targeted to host-managed sessions only (0x01..0x03):
-        /// if the previous SimHub instance crashed without sending end markers,
-        /// the wheel firmware still holds those sessions as open and a fresh
-        /// SendSessionOpen would be ignored. We close just enough to reclaim
-        /// the host-managed slots.
-        ///
-        /// Wheel-managed sessions (0x04..0x0a) are LEFT ALONE during a plugin
-        /// reload (game switch) — wheel device-inits these to push state
-        /// (0x05/0x07 file-transfer ack, 0x09 configJson state, 0x0a RPC).
-        /// Closing them severs wheel-side state and prevents the wheel from
-        /// re-pushing configJson on session 0x09 — without that handshake the
-        /// dashboard never renders. Pithouse never closes these sessions
-        /// mid-session either; verified in
-        /// usb-capture/ksp/mozahubstartup.pcapng (no host close-burst, wheel
-        /// device-inits 0x09 t=28.123 after host primes it with data on 0x09
-        /// at t=2.345 / 6.346).
-        ///
-        /// On a COLD START (fresh SimHub process — see
-        /// <paramref name="isColdStart"/>), we DO close the full host-touchable
-        /// range 0x01..0x0a. The wheel may still be holding sessions open from
-        /// a prior SimHub instance that exited without a clean Stop(), and on
-        /// CS-Pro / KS-Pro that stale state silently swallows our session-open
-        /// frames until manual user intervention (toggling the plugin
-        /// "Connection enabled" off and on, which closes the port and forces
-        /// the wheel to reset). The wider close on cold start mimics that
-        /// recovery proactively. It re-pushes configJson on reconnect because
-        /// the wheel re-emits its state burst once we send a fresh open
-        /// request — the cold-start path always runs through that burst
-        /// anyway, so there's no handshake to disturb.
-        /// </summary>
-        private void ProbeAndOpenSessions(bool isColdStart, CancellationToken cancel)
-        {
-            if (!_connection.IsConnected)
-                return;
-
-            const byte MgmtSession = 0x01;
-            const byte TelemSession = 0x02;
-            const int OpenAckTimeoutMs = 500;
-            const int CloseAckTimeoutMs = 500;
-
-            // Reclaim any sessions left open by a prior SimHub crash/kill.
-            // - Cold start in a fresh SimHub process: close 0x01..0x0A (wide).
-            //   The wide range covers host-managed slots PLUS wheel-managed
-            //   ones (0x04..0x0a) that the prior process may have left
-            //   half-engaged. CS-Pro / KS-Pro have been observed to silently
-            //   ignore fresh opens with that residual state in place; manually
-            //   toggling the plugin off/on recovers it because that path
-            //   closes the OS serial port and forces the wheel to drop its
-            //   sessions. The wide close emulates that recovery without
-            //   needing user intervention.
-            // - Plugin reload mid-SimHub (game switch via persistent wire):
-            //   close 0x01..0x03 only. Wheel-managed 0x04..0x0a are kept
-            //   intact so the configJson handshake (sess=0x09) stays bound —
-            //   if we closed it the wheel would need to re-emit its full
-            //   configJson burst and the dashboard would re-render. Verified
-            //   safe behaviour matches PitHouse's reload pattern.
-            //
-            // TryCloseSession waits up to 500ms for the fc:00 ack: when the
-            // wheel acks, the close has definitively been processed and we
-            // can re-open against a clean state immediately. Silent closes
-            // are accepted and we proceed regardless.
-            byte lastClosePort = isColdStart ? (byte)0x0A : (byte)0x03;
-            MozaLog.Debug(
-                $"[AZOM] Closing any stale {(isColdStart ? "cold-start" : "host")} sessions " +
-                $"(0x01..0x{lastClosePort:X2}{(isColdStart ? " — wide" : "")})...");
-            for (byte port = 1; port <= lastClosePort; port++)
-            {
-                if (cancel.IsCancellationRequested
-                    || _state == TelemetryState.Idle || !_connection.IsConnected) return;
-                bool acked = TryCloseSession(port, CloseAckTimeoutMs);
-                MozaLog.Debug(
-                    $"[AZOM] SessionClose 0x{port:X2} {(acked ? "acked" : "no ack within " + CloseAckTimeoutMs + "ms")}");
-            }
-
-            byte mgmtPort = TryOpenSession(MgmtSession, OpenAckTimeoutMs);
-            if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-            byte telemetryPort = TryOpenSession(TelemSession, OpenAckTimeoutMs);
-
-            // Slow-bring-up hardware (CS-Pro on Universal Hub): wheel takes
-            // 12-15 s to first ack a session-control frame after device-lock.
-            // If both opens stayed silent within the 500 ms budget, block here
-            // for the engagement signal before letting the rest of cold-start
-            // (hub enum, session 0x09 prime, tier-def emission, etc.) blast
-            // state into a wheel that hasn't woken yet. Health wheels never
-            // hit this branch; for CS-Pro the wheel eventually fc:00-acks
-            // sess=0x02 (~14 s on the 0.9.3-dev capture) and we proceed from
-            // a known-awake state. Pairs with DisplayWatchdog's 20 s
-            // sess=0x01 grace — the watchdog catches the rarer case where the
-            // wheel acks something but never engages sess=0x01 specifically.
-            if (mgmtPort == 0 && telemetryPort == 0 && _connection.IsConnected)
-            {
-                const int ExtendedAckWaitMs = 20_000;
-                const int ExtendedAckSliceMs = 100;
-                MozaLog.Info(
-                    $"[AZOM] Both sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens silent within " +
-                    $"{OpenAckTimeoutMs}ms — waiting up to {ExtendedAckWaitMs}ms for slow-bring-up " +
-                    "wheel (CS-Pro on Universal Hub takes ~14 s)");
-                bool gotLateAck = false;
-                _wheelReadyObserved = false;
-                try { _ackReceived.Reset(); }
-                catch (ObjectDisposedException) { return; }
-                // Slice the wait so a SUPERSESSION (a new Start() cancelling our
-                // token) or an external Stop()/disconnect releases the start
-                // semaphore within one slice instead of pinning it for the full
-                // 20 s. A single blocking Wait here observed neither `cancel` nor
-                // `_state`, so a Stop→Start inside the window (e.g. the user
-                // toggling telemetry-enable mid-bring-up) parked this StartInner
-                // the whole 20 s holding the semaphore; the re-Start then hit
-                // "could not acquire start lock after 10s" and telemetry never
-                // came up — KS+CM2 cold start, diagnostics bundle 2026-06-08.
-                int extWaited = 0;
-                while (extWaited < ExtendedAckWaitMs)
-                {
-                    if (cancel.IsCancellationRequested
-                        || _state == TelemetryState.Idle || !_connection.IsConnected) return;
-                    try
-                    {
-                        if (_ackReceived.Wait(ExtendedAckSliceMs, cancel))
-                        {
-                            gotLateAck = true;
-                            break;
-                        }
-                    }
-                    catch (OperationCanceledException) { return; }
-                    catch (ObjectDisposedException) { return; }
-                    extWaited += ExtendedAckSliceMs;
-                }
-                if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                // Belt-and-suspenders: even if the Wait timed out, the
-                // dispatcher may have flipped _wheelReadyObserved in the
-                // microseconds between timeout-fire and our read. Honour it.
-                byte ackedSession = _lastAckedSession;
-                bool wheelReadyWake = _wheelReadyObserved
-                    && ackedSession != MgmtSession
-                    && ackedSession != TelemSession;
-                if (wheelReadyWake)
-                {
-                    // Wheel just came online via sess=0x09 device-init in
-                    // response to our nudge. Its initial sess=0x01/0x02 opens
-                    // (sent before the wheel's session layer was up) were
-                    // dropped on the wheel side — re-issue both with a wider
-                    // budget now that the wheel is demonstrably listening.
-                    // Verified 2026-05-25 W17 hot-attach: first fc:00 on
-                    // sess=0x02 follows within ~1 s of a fresh open frame
-                    // from the wheel-ready point.
-                    const int WheelReadyRetryMs = 2_000;
-                    MozaLog.Info(
-                        "[AZOM] Wheel session-layer ready observed (sess=0x09 device-init) — " +
-                        $"retrying sess=0x{MgmtSession:X2}/0x{TelemSession:X2} opens with " +
-                        $"{WheelReadyRetryMs}ms budget");
-                    if (_connection.IsConnected)
-                        mgmtPort = TryOpenSession(MgmtSession, WheelReadyRetryMs);
-                    if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
-                    if (_connection.IsConnected)
-                        telemetryPort = TryOpenSession(TelemSession, WheelReadyRetryMs);
-                }
-                else if (gotLateAck)
-                {
-                    MozaLog.Info(
-                        $"[AZOM] Late ack on sess=0x{ackedSession:X2} after extended wait " +
-                        "— wheel is alive, proceeding with cold-start");
-                    if (ackedSession == MgmtSession) mgmtPort = MgmtSession;
-                    else if (ackedSession == TelemSession) telemetryPort = TelemSession;
-                    // Retry the still-unacked side with a 1 s budget — wheel
-                    // should ack promptly now that it's awake. CS-Pro famously
-                    // never acks sess=0x01, so the mgmt retry will time out
-                    // and we fall through to the MgmtSession default below.
-                    if (mgmtPort == 0 && _connection.IsConnected)
-                        mgmtPort = TryOpenSession(MgmtSession, 1_000);
-                    if (telemetryPort == 0 && _connection.IsConnected)
-                        telemetryPort = TryOpenSession(TelemSession, 1_000);
-                }
-                else
-                {
-                    MozaLog.Warn(
-                        $"[AZOM] No ack within {ExtendedAckWaitMs}ms extended wait — " +
-                        "proceeding with defaults; session watchdog will retry post-Active. " +
-                        "If this recurs after a SimHub restart, the cold-start wide close " +
-                        "(0x01..0x0a above) should already have cleared any stale wheel " +
-                        "session state — escalate via wire trace if the wedge persists.");
-                }
-            }
-
-            _mgmtPort = mgmtPort;
-
-            // Session-open frames use seq=port. Data chunks must start
-            // AFTER the open seq. PitHouse bridge capture shows first
-            // session 0x02 data at seq=4 (not 2). Initialize outbound
-            // seq counters so SendSessionPropertyBody (Math.Max(2, seq))
-            // and SendTierDefinition (Math.Max(2, seq+1)) produce
-            // correct first-use values.
-            // Under the seq lock for consistency with the tick-thread writers.
-            lock (_session02SeqLock) { _session02OutboundSeq = TelemSession + 1; } // port=2 → first data seq=3
-
-            if (telemetryPort != 0)
-            {
-                FlagByte = telemetryPort;
-                MozaLog.Debug(
-                    $"[AZOM] Sessions opened: mgmt=0x{mgmtPort:X2} telem=0x{telemetryPort:X2}");
-            }
-            else if (mgmtPort != 0)
-            {
-                FlagByte = mgmtPort;
-                MozaLog.Warn(
-                    $"[AZOM] Telem session 0x{TelemSession:X2} did not ack, using mgmt 0x{mgmtPort:X2} for telemetry");
-            }
-            else
-            {
-                // No acks — proceed anyway using PitHouse defaults. Real wheels
-                // may silently accept data on 0x02 even without an explicit ack.
-                FlagByte = TelemSession;
-                MozaLog.Warn(
-                    "[AZOM] No session acks received, proceeding with defaults mgmt=0x01 telem=0x02");
-                _mgmtPort = MgmtSession;
-            }
-        }
-
-        /// <summary>
-        /// Send a SESSION_OPEN for the given session byte and wait up to
-        /// <paramref name="timeoutMs"/> for a matching fc:00 ack. Returns the
-        /// session byte on success, 0 on timeout.
-        ///
-        /// Single-attempt: an earlier revision added a 3× retry loop with
-        /// Thread.Sleep between attempts, but every Reset()/Wait() on
-        /// <see cref="_ackReceived"/> opened a window where <see cref="Dispose"/>
-        /// running on the UI thread (SimHub plugin teardown / game-switch
-        /// reload) could dispose the event mid-Wait, throwing
-        /// <see cref="ObjectDisposedException"/> out of the bg StartInner
-        /// thread up through <see cref="ThreadPool.QueueUserWorkItem"/> —
-        /// unhandled in .NET Framework 4.8 plugin hosts. The retry was also
-        /// speculative: under normal conditions the wheel acks promptly, and
-        /// genuine drops cause the wheel itself to retransmit its own opens.
-        ///
-        /// The wheel's echoed ack_seq is parsed (<see cref="_lastAckedSeq"/>)
-        /// for diagnostic logging but not used to gate the open — firmware
-        /// variants legitimately echo non-matching seqs and rejecting those
-        /// breaks disable+re-enable recovery in the field.
-        /// </summary>
-        internal byte TryOpenSession(byte session, int timeoutMs)
-        {
-            try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
-            _lastAckedSession = 0;
-            _lastAckedSeq = -1;
-
-            SendSessionOpen(session, session);
-
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (true)
-            {
-                int remaining = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
-                if (remaining <= 0) return 0;
-
-                bool gotSignal;
-                try { gotSignal = _ackReceived.Wait(remaining); }
-                catch (ObjectDisposedException) { return 0; }
-                if (!gotSignal) return 0;
-
-                if (_lastAckedSession == session)
-                {
-                    int gotAckSeq = _lastAckedSeq;
-                    if (gotAckSeq != -1 && gotAckSeq != session)
-                    {
-                        MozaLog.Debug(
-                            $"[AZOM] OpenSession 0x{session:X2}: ack_seq={gotAckSeq} " +
-                            $"(expected {session}); accepting (firmware may use own port counter)");
-                    }
-                    return session;
-                }
-
-                // Stale ack (different session) — discard and keep waiting.
-                MozaLog.Debug(
-                    $"[AZOM] OpenSession 0x{session:X2}: ignoring stale ack for 0x{_lastAckedSession:X2}");
-                try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
-                _lastAckedSession = 0;
-            }
-        }
-
-        /// <summary>
-        /// Send a SessionClose for the given session and wait up to
-        /// <paramref name="timeoutMs"/> for the matching fc:00 ack. Returns
-        /// true on ack, false on timeout. Reuses the same ack path as
-        /// <see cref="TryOpenSession"/> — the wheel signals close
-        /// acceptance with fc:00 [session] just as it does for open
-        /// acceptance.
-        ///
-        /// Best-effort: a timeout is NOT fatal. Callers proceed with the
-        /// subsequent open regardless; firmwares that omit close-acks
-        /// degrade to the prior blind-blast behavior.
-        /// </summary>
-        internal bool TryCloseSession(byte session, int timeoutMs)
-        {
-            try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return false; }
-            _lastAckedSession = 0;
-            _lastAckedSeq = -1;
-
-            SendSessionClose(session);
-
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (true)
-            {
-                int remaining = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
-                if (remaining <= 0) return false;
-
-                bool gotSignal;
-                try { gotSignal = _ackReceived.Wait(remaining); }
-                catch (ObjectDisposedException) { return false; }
-                if (!gotSignal) return false;
-
-                if (_lastAckedSession == session) return true;
-
-                // Stale ack for a different session — discard and keep waiting.
-                try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return false; }
-                _lastAckedSession = 0;
-            }
-        }
 
         /// <summary>
         /// Wait for the wheel's pre-tier-def channel registration burst to stop
@@ -3432,63 +2983,26 @@ namespace MozaPlugin.Telemetry
             return _rpc.Call(method, arg, timeoutMs);
         }
 
-        private void SendSessionEnd(byte session, ushort seq)
-        {
-            var end = new byte[]
-            {
-                MozaProtocol.MessageStart, 0x06,
-                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
-                0x7C, 0x00,
-                session, 0x00,
-                (byte)(seq & 0xFF), (byte)((seq >> 8) & 0xFF),
-                0x00
-            };
-            end[end.Length - 1] = MozaProtocol.CalculateWireChecksum(end);
-            _connection.Send(end);
-        }
-
         private void SendDisplayProbe()
         {
             if (!_connection.IsConnected) return;
 
             // Heartbeat/ping first
-            _connection.Send(BuildDisplayFrame(0x00));
+            _connection.Send(_frames.BuildDisplayFrame(0x00));
 
             // Identity probe: 0x09 → 0x04 → 0x06 → 0x02 → 0x05
-            _connection.Send(BuildDisplayFrame(0x09));
-            _connection.Send(BuildDisplayFrameWithData(0x04, new byte[] { 0x00, 0x00, 0x00, 0x00 }));
-            _connection.Send(BuildDisplayFrame(0x06));
-            _connection.Send(BuildDisplayFrameWithData(0x02, new byte[] { 0x00 }));
-            _connection.Send(BuildDisplayFrameWithData(0x05, new byte[] { 0x00, 0x00, 0x00, 0x00 }));
+            _connection.Send(_frames.BuildDisplayFrame(0x09));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x04, new byte[] { 0x00, 0x00, 0x00, 0x00 }));
+            _connection.Send(_frames.BuildDisplayFrame(0x06));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x02, new byte[] { 0x00 }));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x05, new byte[] { 0x00, 0x00, 0x00, 0x00 }));
 
             // Version queries: 0x07, 0x0F, 0x11, 0x08, 0x10 (sub-device 1)
-            _connection.Send(BuildDisplayFrameWithData(0x07, new byte[] { 0x01 }));
-            _connection.Send(BuildDisplayFrameWithData(0x0F, new byte[] { 0x01 }));
-            _connection.Send(BuildDisplayFrameWithData(0x11, new byte[] { 0x04 }));
-            _connection.Send(BuildDisplayFrameWithData(0x08, new byte[] { 0x01 }));
-            _connection.Send(BuildDisplayFrameWithData(0x10, new byte[] { 0x00 }));
-        }
-
-        private byte[] BuildDisplayFrame(byte cmd)
-        {
-            var frame = new byte[] { MozaProtocol.MessageStart, 0x01,
-                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
-                cmd, 0x00 };
-            frame[5] = MozaProtocol.CalculateWireChecksum(frame);
-            return frame;
-        }
-
-        private byte[] BuildDisplayFrameWithData(byte cmd, byte[] data)
-        {
-            var frame = new byte[4 + 1 + data.Length + 1]; // start+N+grp+dev + cmd + data + checksum
-            frame[0] = MozaProtocol.MessageStart;
-            frame[1] = (byte)(1 + data.Length); // N = cmd + data
-            frame[2] = MozaProtocol.TelemetrySendGroup;
-            frame[3] = _targetDeviceId;
-            frame[4] = cmd;
-            Array.Copy(data, 0, frame, 5, data.Length);
-            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame);
-            return frame;
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x07, new byte[] { 0x01 }));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x0F, new byte[] { 0x01 }));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x11, new byte[] { 0x04 }));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x08, new byte[] { 0x01 }));
+            _connection.Send(_frames.BuildDisplayFrameWithData(0x10, new byte[] { 0x00 }));
         }
 
         // ── Preamble message handling ───────────────────────────────────────
@@ -4070,9 +3584,9 @@ namespace MozaPlugin.Telemetry
         private void TickEmitEnableAndSequence()
         {
             if (!TestMode && (!_gameRunning || !_profileTelemetryEnabled)) return;
-            SendStreamSlot((int)StreamKind.Enable, _cachedEnableFrame);
+            SendStreamSlot((int)StreamKind.Enable, _frames.EnableFrame);
             if (SendSequenceCounter)
-                SendStreamSlot((int)StreamKind.Sequence, BuildSequenceCounterFrame());
+                SendStreamSlot((int)StreamKind.Sequence, _frames.BuildSequenceCounterFrame());
         }
 
         /// <summary>Peripheral output polls (handbrake + pedals) at ~1 Hz,
@@ -4082,26 +3596,26 @@ namespace MozaPlugin.Telemetry
         {
             int slow = Math.Max(8, 1000 / _baseTickMs); // ~1Hz cycle (33 ticks @ 30ms base)
             int phase = _tickCounter % slow;
-            if (phase == 0)             _connection.Send(_handbrakePresenceFrame);
-            else if (phase == slow / 5) _connection.Send(_handbrakeOutputFrame);
+            if (phase == 0)             _connection.Send(Frames.TelemetryFrameCache.HandbrakePresenceFrame);
+            else if (phase == slow / 5) _connection.Send(Frames.TelemetryFrameCache.HandbrakeOutputFrame);
             else if (phase == 2 * slow / 5)
             {
-                _connection.Send(_pedalThrottleOutFrame);
-                _connection.Send(_pedalBrakeOutFrame);
-                _connection.Send(_pedalClutchOutFrame);
+                _connection.Send(Frames.TelemetryFrameCache.PedalThrottleOutFrame);
+                _connection.Send(Frames.TelemetryFrameCache.PedalBrakeOutFrame);
+                _connection.Send(Frames.TelemetryFrameCache.PedalClutchOutFrame);
             }
         }
 
         /// <summary>LED state polls. Group 1 ~1 Hz, group 2 ~0.2 Hz. Load-bearing
         /// for per-group telemetry engagement on the GS V2 Pro — see the field-
-        /// block comment near <c>_ledStatePollGroup1</c>.</summary>
+        /// block comment near <c>TelemetryFrameCache.LedStatePollGroup1</c>.</summary>
         private void TickEmitLedStatePolls()
         {
             int slow = Math.Max(8, 1000 / _baseTickMs);
             if (_tickCounter % slow == 3 * slow / 5)
-                _connection.Send(_ledStatePollGroup1);
+                _connection.Send(Frames.TelemetryFrameCache.LedStatePollGroup1);
             if (_tickCounter % (slow * 5) == 4 * slow / 5)
-                _connection.Send(_ledStatePollGroup2);
+                _connection.Send(Frames.TelemetryFrameCache.LedStatePollGroup2);
         }
 
         /// <summary>Retransmit unacked session-data chunks. Per-chunk
@@ -4498,7 +4012,7 @@ namespace MozaPlugin.Telemetry
             // Hot-swap detection still works via PollStatus's wheel-model probe.
             SendDashKeepalive();
             if (SendTelemetryMode)
-                SendStreamSlot((int)StreamKind.Mode, _cachedModeFrame);
+                SendStreamSlot((int)StreamKind.Mode, _frames.ModeFrame);
             if ((_slowCounter & 1) == 1)
                 SendDisplayConfig();
             else if (_slowCounter % 8 == 0)
@@ -4507,106 +4021,11 @@ namespace MozaPlugin.Telemetry
         }
 
         // ── Session management ──────────────────────────────────────────────
+        // Session open/close/ack/prime/end frame builders + the open/close
+        // state machine live in Sessions/SessionLifecycle.cs. The prime shim
+        // stays for DisplayWatchdog + the sess=0x09 keepalive callers.
 
-        /// <summary>
-        /// Send a type=0x00 end-marker on the given session. Used to reclaim sessions
-        /// left open after a previous SimHub crash/kill, where End() did not run.
-        /// If the session is already closed, the wheel silently ignores this frame.
-        /// </summary>
-        private void SendSessionClose(byte session)
-        {
-            // Length byte is the payload count (cmd + data, not incl. group/dev/cksum).
-            // Payload is 6 bytes: 7C 00 <session> 00 <ack_lo> <ack_hi>. Must match
-            // len=6 — a shorter frame with len=6 caused the wheel/sim to over-read
-            // and corrupt the next frame in the stream, breaking the read loop.
-            var frame = new byte[]
-            {
-                MozaProtocol.MessageStart, 0x06,
-                // Target the active dashboard device (wheel 0x17 / CM2 0x14|0x12),
-                // matching SendSessionOpen — closing on the wheel left a CM2's
-                // stale sessions open and spammed the wheel with rejected cmds.
-                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
-                0x7C, 0x00,
-                session, 0x00,          // type=0x00 (end marker)
-                0x00, 0x00,             // ack_seq = 0 (LE)
-                0x00                    // checksum placeholder
-            };
-            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame);
-            _connection.Send(frame);
-        }
-
-        private void SendSessionOpen(byte session, byte port)
-        {
-            // Fresh seq generation incoming — clear the gap-aware contiguous
-            // ack baseline so the re-opened session re-bases cleanly.
-            ResetContigAck(session);
-            var frame = new byte[]
-            {
-                MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
-                0x7C, 0x00,
-                session, 0x81,          // session byte + type (channel open)
-                port, 0x00,             // seq = port (LE)
-                port, 0x00,             // session_id = port (LE)
-                0xFD, 0x02,             // receive_window = 765 (LE)
-                0x00                    // checksum placeholder
-            };
-            frame[14] = MozaProtocol.CalculateWireChecksum(frame);
-            _connection.Send(frame);
-        }
-
-        private void SendSessionAck(byte session, ushort ackSeq)
-        {
-            var frame = new byte[]
-            {
-                MozaProtocol.MessageStart, 0x05,
-                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
-                0xFC, 0x00,
-                session,
-                (byte)(ackSeq & 0xFF),
-                (byte)(ackSeq >> 8),
-                0x00
-            };
-            frame[9] = MozaProtocol.CalculateWireChecksum(frame);
-            // Priority lane: acks must not get buried behind tier-def bursts in
-            // the one-shot FIFO. Wheel times out sessions whose acks lag past
-            // ~1 s and silently drops them (observed root cause of issue #43
-            // "telemetry dies after dashboard switch"): during the switch, the
-            // ~1300-frame tier-def burst stalled sess=0x02 acks behind 4ms-paced
-            // FIFO, wheel concluded sess=0x02 was dead, telemetry never recovered
-            // until full handshake reset. PH wire traces show sess=0x02 ack-lag
-            // stays ≤ 870 ms even under heavy h2b load.
-            _connection.SendPriority(frame);
-        }
-
-        /// <summary>
-        /// Prime a wheel-managed session with a zero-length data frame to
-        /// encourage the wheel to device-init its end. Pithouse does this on
-        /// session 0x09 (configJson state push) at startup — verified in
-        /// usb-capture/ksp/mozahubstartup.pcapng frames 639/1211 (host sends
-        /// `7c 00 09 01 [seq] [ack] 00 00` at t=2.345/6.346, wheel device-inits
-        /// 0x09 type=0x81 at t=28.123 as part of its 0x05/0x07/0x09/0x0a burst).
-        /// Wheels that have never had the host prime 0x09 only open 0x05/0x07
-        /// in the burst, leaving configJson handshake stuck and dashboard
-        /// rendering blocked.
-        /// </summary>
-        internal void SendSessionPrime(byte session, ushort seq)
-        {
-            var frame = new byte[]
-            {
-                MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, _targetDeviceId,
-                0x7C, 0x00,
-                session, 0x01,                  // type=0x01 (data chunk)
-                (byte)(seq & 0xFF),
-                (byte)(seq >> 8),
-                0x00, 0x00,                     // ack_seq = 0
-                0x00, 0x00,                     // 2 bytes of empty data (matches Pithouse)
-                0x00                            // checksum placeholder
-            };
-            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame);
-            _connection.Send(frame);
-        }
+        internal void SendSessionPrime(byte session, ushort seq) => _sessionLife.SendSessionPrime(session, seq);
 
         /// <summary>
         /// Per-tick V0 telemetry: one value frame per profile channel on
@@ -4876,7 +4295,7 @@ namespace MozaPlugin.Telemetry
             _connection.Send(BuildGroup40Frame3(0x28, 0x00, 0x00));
             _connection.Send(BuildGroup40Frame3(0x28, 0x01, 0x00));
             _connection.Send(BuildGroup40Frame(0x09, 0x00));
-            _connection.Send(_cachedModeFrame);
+            _connection.Send(_frames.ModeFrame);
         }
 
         private byte[] BuildChannelEnableFrame(byte page, byte channelIndex)
@@ -4991,55 +4410,7 @@ namespace MozaPlugin.Telemetry
             return frame;
         }
 
-        // ── Cached frame construction ───────────────────────────────────────
-
-        private void BuildCachedFrames()
-        {
-            _cachedModeFrame = BuildStaticFrame(new byte[] {
-                MozaProtocol.MessageStart, 4,
-                MozaProtocol.TelemetryModeGroup, MozaProtocol.DeviceWheel,
-                0x28, 0x02, 0x01, 0x00 });
-
-            _cachedEnableFrame = BuildStaticFrame(new byte[] {
-                MozaProtocol.MessageStart, 6,
-                MozaProtocol.BaseSendTelemetry, MozaProtocol.DeviceWheel,
-                0xFD, 0xDE, 0x00, 0x00, 0x00, 0x00 });
-
-            _cachedSequenceFrame = BuildStaticFrame(new byte[] {
-                MozaProtocol.MessageStart, 6,
-                0x2D, MozaProtocol.DeviceBase,
-                0xF5, 0x31, 0x00, 0x00, 0x00, 0x00 });
-
-            _cachedHeartbeatFrames = new byte[13][];
-            for (int i = 0; i < 13; i++)
-            {
-                byte dev = (byte)(18 + i);
-                var frame = new byte[] { MozaProtocol.MessageStart, 0x00, 0x00, dev, 0x00 };
-                frame[4] = MozaProtocol.CalculateWireChecksum(frame);
-                _cachedHeartbeatFrames[i] = frame;
-            }
-        }
-
-        private static byte[] BuildStaticFrame(byte[] body)
-        {
-            var frame = new byte[body.Length + 1];
-            Array.Copy(body, 0, frame, 0, body.Length);
-            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(body);
-            return frame;
-        }
-
-        private byte[] BuildSequenceCounterFrame()
-        {
-            byte seq = _sequenceCounter++;
-            _cachedSequenceFrame[9] = seq;
-            _cachedSequenceFrame[10] = MozaProtocol.CalculateWireChecksum(
-                _cachedSequenceFrame, _cachedSequenceFrame.Length - 1);
-            // Return a copy: the write queue holds a reference until the write thread
-            // drains it, and we mutate _cachedSequenceFrame on the next tick.
-            var copy = new byte[_cachedSequenceFrame.Length];
-            Array.Copy(_cachedSequenceFrame, copy, copy.Length);
-            return copy;
-        }
+        // Cached frame construction lives in Frames/TelemetryFrameCache.cs.
 
         // ── Periodic streams ────────────────────────────────────────────────
 
@@ -5048,10 +4419,11 @@ namespace MozaPlugin.Telemetry
         private void SendHeartbeat()
         {
             int mask = DetectedDeviceMask;
-            for (int i = 0; i < _cachedHeartbeatFrames.Length; i++)
+            var heartbeats = _frames.HeartbeatFrames;
+            for (int i = 0; i < heartbeats.Length; i++)
             {
                 if (mask == 0 || (mask & (1 << i)) != 0)
-                    _connection.Send(_cachedHeartbeatFrames[i]);
+                    _connection.Send(heartbeats[i]);
             }
         }
 
@@ -5062,20 +4434,13 @@ namespace MozaPlugin.Telemetry
             // Distinct from group 0x00 heartbeats and SerialStream fc:00 acks.
             // Unclear whether the wheel requires this for telemetry to flow, but
             // Pithouse sends it consistently (~15× per session).
-            _connection.Send(_dashKeepaliveFrameDash);
-            _connection.Send(_dashKeepaliveFrame15);
-            _connection.Send(_dashKeepaliveFrameWheel);
+            _connection.Send(Frames.TelemetryFrameCache.DashKeepaliveFrameDash);
+            _connection.Send(Frames.TelemetryFrameCache.DashKeepaliveFrame15);
+            _connection.Send(Frames.TelemetryFrameCache.DashKeepaliveFrameWheel);
             // CM2 standalone path: add a ping at 0x12 (CM2 bridge/main) so the
             // device keeps its connection state warm against the active target.
             if (IsStandaloneDashboardTarget && _targetDeviceId == MozaProtocol.DeviceMain)
-                _connection.Send(_dashKeepaliveFrameMain);
-        }
-
-        private static byte[] BuildKeepaliveFrame(byte dev)
-        {
-            var frame = new byte[] { MozaProtocol.MessageStart, 0x01, MozaProtocol.TelemetrySendGroup, dev, 0x00, 0x00 };
-            frame[5] = MozaProtocol.CalculateWireChecksum(frame);
-            return frame;
+                _connection.Send(Frames.TelemetryFrameCache.DashKeepaliveFrameMain);
         }
 
         /// <summary>
@@ -5280,53 +4645,17 @@ namespace MozaPlugin.Telemetry
         {
             int pageCount = _profile?.PageCount ?? 1;
             if (pageCount < 1) pageCount = 1;
-            EnsureDisplayConfigCache(pageCount);
+            var frames = _frames.GetDisplayConfigFrames(pageCount);
 
             int page = _displayConfigPage % pageCount;
             _displayConfigPage++;
 
-            var frames = _cachedDisplayConfigFrames!;
             int baseIdx = page * 3;
             _connection.Send(frames[baseIdx + 0]);
             // 7C:23 dashboard-activate: tells the wheel which dashboard pages are
             // active. PitHouse sends one per page interleaved with 7C:27 at ~1 Hz.
             _connection.Send(frames[baseIdx + 1]);
             _connection.Send(frames[baseIdx + 2]);
-        }
-
-        private void EnsureDisplayConfigCache(int pageCount)
-        {
-            if (_cachedDisplayConfigFrames != null && _cachedDisplayConfigPageCount == pageCount)
-                return;
-
-            var frames = new byte[pageCount * 3][];
-            for (int page = 0; page < pageCount; page++)
-            {
-                byte b2 = (byte)(0x05 + 2 * page);
-                byte b4 = (byte)(0x03 + 2 * page);
-                byte z  = (byte)(0x06 + 2 * page);
-                byte ab2 = (byte)(0x07 + 2 * page);
-                byte ab4 = (byte)(0x05 + 2 * page);
-
-                var configFrame = new byte[] { MozaProtocol.MessageStart, 0x0A, MozaProtocol.TelemetrySendGroup,
-                    MozaProtocol.DeviceWheel, 0x7C, 0x27, 0x0F, 0x80, b2, 0x00, b4, 0x00, 0xFE, 0x01, 0x00 };
-                configFrame[14] = MozaProtocol.CalculateWireChecksum(configFrame);
-
-                var activateFrame = new byte[] { MozaProtocol.MessageStart, 0x0A, MozaProtocol.TelemetrySendGroup,
-                    MozaProtocol.DeviceWheel, 0x7C, 0x23, 0x46, 0x80, ab2, 0x00, ab4, 0x00, 0xFE, 0x01, 0x00 };
-                activateFrame[14] = MozaProtocol.CalculateWireChecksum(activateFrame);
-
-                var configFrame2 = new byte[] { MozaProtocol.MessageStart, 0x06, MozaProtocol.TelemetrySendGroup,
-                    MozaProtocol.DeviceWheel, 0x7C, 0x27, 0x0F, 0x00, z, 0x00, 0x00 };
-                configFrame2[10] = MozaProtocol.CalculateWireChecksum(configFrame2);
-
-                frames[page * 3 + 0] = configFrame;
-                frames[page * 3 + 1] = activateFrame;
-                frames[page * 3 + 2] = configFrame2;
-            }
-
-            _cachedDisplayConfigFrames = frames;
-            _cachedDisplayConfigPageCount = pageCount;
         }
 
         public void Dispose()
@@ -5344,7 +4673,7 @@ namespace MozaPlugin.Telemetry
             try { cts?.Cancel(); } catch (ObjectDisposedException) { }
 
             Stop();
-            try { _ackReceived.Dispose(); } catch { }
+            _sessionLife.DisposeAckEvent();
             try { _mgmtResponseEvent.Dispose(); } catch { }
             try { _uploader?.Dispose(); } catch { }
             try { _dashboardDownloader?.Dispose(); } catch { }

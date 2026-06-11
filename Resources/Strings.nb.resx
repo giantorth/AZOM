@@ -499,4 +499,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>Parkert</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Telemetri stoppet etter gjentatte feil — aktiver på nytt for å prøve igjen</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>Rattet har ingen skjerm — telemetri ikke nødvendig</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Rattet rapporterte fastvarefeil</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Fastvaren til rattet rapporterte gjentatte parameterfeil. Aktiver seriell logging for å diagnostisere umiddelbart.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Aktiver seriell logging</value></data>
 </root>

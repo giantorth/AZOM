@@ -155,6 +155,59 @@ namespace MozaPlugin
             PaintHeaderBanner(visible, pendingRestart, hasAsset, current, latest);
         }
 
+        // Guards the firmware-warning "Dismiss" for this session. Unlike the
+        // update banner this auto-rearms: if the storm clears the dismiss is
+        // dropped, so a fresh storm later in the session shows the warning again.
+        private bool _firmwareWarningDismissedThisSession;
+
+        // Repaints the wheel firmware-error warning banner. Driven by the 500ms
+        // RefreshDisplay tick alongside RefreshHeaderBanner. Shows whenever the
+        // wheel is mid param-read storm (the detector in FirmwareDebugLog) and
+        // the user hasn't dismissed the current burst.
+        internal void RefreshFirmwareWarningBanner()
+        {
+            if (HeaderFirmwareWarningBanner == null) return;
+
+            bool storm = _plugin?.WheelParamStormActive ?? false;
+            if (!storm)
+            {
+                // Storm gone — rearm so the next one is announced.
+                _firmwareWarningDismissedThisSession = false;
+                HeaderFirmwareWarningBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            HeaderFirmwareWarningBanner.Visibility =
+                _firmwareWarningDismissedThisSession ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void HeaderFirmwareCapture_Click(object sender, RoutedEventArgs e)
+        {
+            // Take the user to the serial-capture section (About tab) so they can
+            // enable capture and grab the wheel traffic for us. Navigation only —
+            // the user starts/stops + exports from the existing controls there.
+            try
+            {
+                if (MainTabs != null && AboutTab != null)
+                    MainTabs.SelectedItem = AboutTab;
+                // Scroll the capture controls into view once the tab has laid out.
+                Dispatcher.BeginInvoke(
+                    new Action(() => { try { SerialCaptureToggleButton?.BringIntoView(); } catch { } }),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Error($"[AZOM] Firmware-warning navigate failed: {ex}");
+            }
+        }
+
+        private void HeaderFirmwareDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            _firmwareWarningDismissedThisSession = true;
+            if (HeaderFirmwareWarningBanner != null)
+                HeaderFirmwareWarningBanner.Visibility = Visibility.Collapsed;
+        }
+
         private void PaintAboutBanner(
             bool visible, bool pendingRestart, bool hasAsset, string current, string latest)
         {

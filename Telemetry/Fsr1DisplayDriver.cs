@@ -114,10 +114,11 @@ namespace MozaPlugin.Telemetry
             var plugin = MozaPlugin.Instance;
             int oneHzEvery = Math.Max(1, (int)Math.Round(1000.0 / TickIntervalMs));
             bool testMode = plugin?.DashboardTestPatternActive ?? false;
+            bool ruler = plugin?.Fsr1ByteRulerActive ?? false;
 
             // Telemetry disabled by the user: keepalive only (keeps the wheel engaged).
-            // The test pattern overrides this so the screen can be verified with no game.
-            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode)
+            // The test pattern / byte ruler override this so the screen renders with no game.
+            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode && !ruler)
             {
                 if (_tickCounter % oneHzEvery == 0)
                     _connection.SendStream(StreamKind.Enable, Fsr1DisplayEmitter.Keepalive43);
@@ -163,6 +164,12 @@ namespace MozaPlugin.Telemetry
                 return Clamp((long)Math.Round(t * outMax), 0, outMax);
             }
 
+            // Byte-ruler diagnostic overrides value computation: every data byte = its
+            // own offset, so each box on the wheel reveals which byte(s) feed it.
+            byte[] RecordFor(Fsr1Dashboard dash) =>
+                ruler ? Fsr1DisplayEmitter.BuildByteRulerRecord(dash)
+                      : Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f));
+
             // PitHouse streams exactly ONE record type — the one for the wheel's
             // currently-displayed page — not all of them. Match that: when the active
             // index (tracked from the Param-6 0x0E log / g32-81 ack) maps to a known
@@ -191,7 +198,7 @@ namespace MozaPlugin.Telemetry
                     var dash = active[slot];
                     _connection.SendStream(
                         (StreamKind)((int)StreamKind.TierDash0 + slot),
-                        Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f)));
+                        RecordFor(dash));
                 }
             }
             else
@@ -210,7 +217,7 @@ namespace MozaPlugin.Telemetry
                     if (dash.Fields.Length == 0) continue;
                     _connection.SendStream(
                         (StreamKind)((int)StreamKind.TierDash0 + slot),
-                        Fsr1DisplayEmitter.BuildRecord(dash, f => ValueFor(dash, f)));
+                        RecordFor(dash));
                 }
             }
 

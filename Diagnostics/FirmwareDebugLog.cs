@@ -38,6 +38,36 @@ namespace MozaPlugin.Diagnostics
             }
         }
 
+        /// <summary>
+        /// Summary of the wheel's recent param-read/write failure rate, used to
+        /// detect the legacy-"CS" Table 8 storm (firmware spews
+        /// <c>param_manage.c:424 Table 8: Failed to Read Parameter N</c> when the
+        /// plugin reads parameters that wheel doesn't implement). PitHouse on the
+        /// same hardware produces zero such lines, so any sustained rate is a
+        /// plugin-caused fault. Consumed by the header warning banner and the
+        /// runtime read backoff.
+        /// </summary>
+        public readonly struct FirmwareErrorState
+        {
+            /// <summary>True once the failure rate crosses the storm threshold.</summary>
+            public readonly bool StormActive;
+            /// <summary>Failures seen within the rolling window.</summary>
+            public readonly int RecentFailCount;
+            /// <summary>UTC of the first failure in the current burst (default if none).</summary>
+            public readonly DateTime FirstSeenUtc;
+            /// <summary>A representative failure line for diagnostics/UI.</summary>
+            public readonly string SampleLine;
+
+            public FirmwareErrorState(bool stormActive, int recentFailCount,
+                DateTime firstSeenUtc, string sampleLine)
+            {
+                StormActive = stormActive;
+                RecentFailCount = recentFailCount;
+                FirstSeenUtc = firstSeenUtc;
+                SampleLine = sampleLine;
+            }
+        }
+
         // Cap covers a few minutes of dense init chatter (observed ~4/s during
         // active dashboard switches, lower at idle). Older entries drop
         // silently. Each entry is small (timestamp + ~60 char string), so the
@@ -47,6 +77,46 @@ namespace MozaPlugin.Diagnostics
         private readonly LinkedList<Entry> _entries = new LinkedList<Entry>();
         private readonly object _gate = new object();
         private long _totalReceived;
+
+        // Param-failure storm detection. The wheel firmware logs one
+        // "Failed to Read/Write Parameter N" line per parameter it can't service
+        // (the legacy bare-"CS" wheel sweeps 0..127). We track the timestamps of
+        // recent failures in a small ring and call it a storm once the count in
+        // the trailing window crosses the threshold. PitHouse never emits these,
+        // so the threshold only needs to clear stray noise — a sustained burst is
+        // always a plugin-caused fault. Guarded by the same _gate as the ring
+        // buffer (a private leaf lock taken only on the serial-read thread's
+        // capture path and the UI reader — never on the ack path, so it cannot
+        // deadlock the Tick→ack flow).
+        private const int StormWindowSeconds = 10;
+        // 3 is safe against false positives: the detector only matches
+        // "Failed to Read/Write Parameter" lines, which PitHouse never emits (the
+        // benign startup error_code 40/41/42 lines do NOT match this pattern).
+        private const int StormThreshold = 3;
+        private const int MaxFailTimestamps = 256;
+        private readonly LinkedList<DateTime> _failTimestamps = new LinkedList<DateTime>();
+        private DateTime _firstFailUtc;
+        private string _lastFailSample = string.Empty;
+        // Latch so the storm is logged once per connection (a record for users
+        // who never open the plugin pane), not once per failing parameter.
+        private bool _stormLogged;
+
+        private static bool IsParamFailure(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            return text.IndexOf("Failed to Read Parameter", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf("Failed to Write Parameter", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private void PruneFailTimestamps(DateTime nowUtc)
+        {
+            // Caller holds _gate.
+            var cutoff = nowUtc - TimeSpan.FromSeconds(StormWindowSeconds);
+            while (_failTimestamps.Count > 0 && _failTimestamps.First.Value < cutoff)
+                _failTimestamps.RemoveFirst();
+            if (_failTimestamps.Count == 0)
+                _firstFailUtc = default;
+        }
 
         /// <summary>
         /// Record a firmware-debug frame. <paramref name="rawDeviceId"/> is the
@@ -69,6 +139,45 @@ namespace MozaPlugin.Diagnostics
                 while (_entries.Count > MaxEntries)
                     _entries.RemoveFirst();
                 _totalReceived++;
+
+                if (IsParamFailure(entry.Text))
+                {
+                    if (_failTimestamps.Count == 0)
+                        _firstFailUtc = entry.TimestampUtc;
+                    _failTimestamps.AddLast(entry.TimestampUtc);
+                    while (_failTimestamps.Count > MaxFailTimestamps)
+                        _failTimestamps.RemoveFirst();
+                    _lastFailSample = entry.Text;
+                    PruneFailTimestamps(entry.TimestampUtc);
+
+                    if (!_stormLogged && _failTimestamps.Count >= StormThreshold)
+                    {
+                        _stormLogged = true;
+                        MozaLog.Warn(
+                            "[AZOM] Wheel firmware param-read storm detected " +
+                            $"({_failTimestamps.Count}+ failures in {StormWindowSeconds}s): \"{entry.Text}\". " +
+                            "Enable serial capture (AZOM About tab) to diagnose immediately.");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Current param-failure storm verdict, evaluated against the trailing
+        /// window. Safe to call from the UI thread. Returns a default (no storm)
+        /// state when no recent failures are held.
+        /// </summary>
+        public FirmwareErrorState GetFirmwareErrorState()
+        {
+            lock (_gate)
+            {
+                PruneFailTimestamps(DateTime.UtcNow);
+                int count = _failTimestamps.Count;
+                bool storm = count >= StormThreshold;
+                return new FirmwareErrorState(
+                    storm, count,
+                    count > 0 ? _firstFailUtc : default,
+                    count > 0 ? _lastFailSample : string.Empty);
             }
         }
 
@@ -108,6 +217,10 @@ namespace MozaPlugin.Diagnostics
             {
                 _entries.Clear();
                 _totalReceived = 0;
+                _failTimestamps.Clear();
+                _firstFailUtc = default;
+                _lastFailSample = string.Empty;
+                _stormLogged = false;
             }
         }
 

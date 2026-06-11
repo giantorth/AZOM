@@ -494,4 +494,7 @@
   <data name="Status_Parked" xml:space="preserve"><value>Остановлено</value></data>
   <data name="Status_TelemetryParked" xml:space="preserve"><value>Телеметрия остановлена после повторных сбоев — включите снова для повтора</value></data>
   <data name="Status_DegradedScreenless" xml:space="preserve"><value>У руля нет дисплея — телеметрия не требуется</value></data>
+  <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Руль сообщил об ошибках прошивки</value></data>
+  <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Прошивка вашего руля повторно сообщала об ошибках параметров. Включите захват трафика для немедленной диагностики.</value></data>
+  <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Включить захват трафика</value></data>
 </root>
