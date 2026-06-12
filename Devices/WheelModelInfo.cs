@@ -94,6 +94,16 @@ namespace MozaPlugin.Devices
         public bool HasSleepLight { get; }
 
         /// <summary>
+        /// Maximum live LED-update wire rate in frames/sec; <c>0</c> = unlimited
+        /// (default — SimHub's 60 Hz tick drives the stream). The legacy bare-"CS"
+        /// rim is wireless and wedges its param manager when the RPM stream is
+        /// pushed at the full radio cadence (~3 ms gaps), so it is capped. The cap
+        /// coalesces — the latest colour state still goes out, just no faster than
+        /// the limit.
+        /// </summary>
+        public int MaxLedFps { get; }
+
+        /// <summary>
         /// Returns the Group 3 start index for the given knob (0-based).
         /// E.g. CS Pro knob 2 → 12 (skip knob 0's 12 LEDs).
         /// </summary>
@@ -164,10 +174,10 @@ namespace MozaPlugin.Devices
             // hasSleepLight=false: pushing wheel-idle-mode/timeout/speed/color at
             // this wheel triggers a Table 8 read-fail storm in its firmware that
             // makes it intermittently unresponsive.
-            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, maxLedFps: 30)),
         };
 
-        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true)
+        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0)
         {
             RpmLedCount = rpmLedCount;
             ButtonLedCount = buttonLedCount;
@@ -182,6 +192,7 @@ namespace MozaPlugin.Devices
             HasDisplay = hasDisplay;
             BrowSegmentSize = browSegmentSize;
             HasSleepLight = hasSleepLight;
+            MaxLedFps = maxLedFps;
         }
 
         /// <summary>

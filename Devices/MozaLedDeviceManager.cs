@@ -398,6 +398,18 @@ namespace MozaPlugin.Devices
                 bool alwaysResendBitmask = plugin.Settings.AlwaysResendBitmask;
                 bool anySent = false;
 
+                // Per-model live LED wire-rate cap (frames/sec; 0 = unlimited).
+                // SimHub drives this at 60 Hz; some rims (the wireless bare-"CS")
+                // can't take the RPM stream at the full radio cadence and wedge
+                // their param manager. When throttled we skip this tick's LED
+                // sends WITHOUT updating _lastLeds/_lastButtons/_lastKnobs, so the
+                // change is re-evaluated next tick and the latest colour state
+                // still goes out — just no faster than the cap. The keepalive
+                // below is seconds-scale (gated on _lastSendTime) and unaffected.
+                int maxLedFps = modelInfo?.MaxLedFps ?? 0;
+                bool ledThrottled = maxLedFps > 0
+                    && (DateTime.UtcNow - _lastSendTime).TotalMilliseconds < 1000.0 / maxLedFps;
+
                 // Wheels with flag LEDs receive a single (rpmN + 6)-LED telemetry
                 // sequence from SimHub laid out as [flag 1..3][rpm 1..N][flag 4..6].
                 // Pre-detection (modelInfo null) we fall back to pure RPM handling.
@@ -423,7 +435,7 @@ namespace MozaPlugin.Devices
 
                 // --- RPM LEDs ---
                 bool rpmChanged = !ColorsEqual(rpmColors, _lastLeds);
-                bool shouldSendRpm = rpmChanged || (!limitUpdates && forceRefresh);
+                bool shouldSendRpm = !ledThrottled && (rpmChanged || (!limitUpdates && forceRefresh));
 
                 if (shouldSendRpm)
                 {
@@ -544,7 +556,7 @@ namespace MozaPlugin.Devices
                     buttonColors = ScaleColorsForBrightness(buttonColors, buttonsBrightness);
 
                     bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
-                    bool shouldSendButtons = buttonsChanged || (!limitUpdates && forceRefresh);
+                    bool shouldSendButtons = !ledThrottled && (buttonsChanged || (!limitUpdates && forceRefresh));
 
                     if (shouldSendButtons)
                     {
@@ -635,7 +647,7 @@ namespace MozaPlugin.Devices
                     if (knobsActive)
                     {
                         bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
-                        bool shouldSendKnobs = knobsChanged || (!limitUpdates && forceRefresh);
+                        bool shouldSendKnobs = !ledThrottled && (knobsChanged || (!limitUpdates && forceRefresh));
 
                         if (shouldSendKnobs)
                         {
