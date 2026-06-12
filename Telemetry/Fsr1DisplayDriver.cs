@@ -155,7 +155,10 @@ namespace MozaPlugin.Telemetry
                 double raw = resolve != null ? resolve(prop) : 0.0;
                 raw = raw * (m?.Scale ?? 1.0) + (m?.Bias ?? 0.0);
                 if (f.Kind == Fsr1FieldKind.Direct)
-                    return Clamp((long)Math.Round(raw), 0, outMax);
+                    // Send the scaled value's digits as an integer — truncate, don't round.
+                    // Precision is carried by Scale (shift the wanted decimals into the integer,
+                    // e.g. ×100); the display is assumed to apply the inverse scale on its side.
+                    return Clamp((long)raw, 0, outMax);
 
                 double inMin = m != null ? m.InMin : f.DefaultInMin;
                 double inMax = m != null ? m.InMax : f.DefaultInMax;
