@@ -20,19 +20,6 @@ namespace MozaPlugin.Telemetry
         private readonly MozaHidReader _hidReader;
         private bool _allPropertiesNamesWarned;
 
-        // Process-wide monotonic millisecond clock backing the
-        // @internal/TimeStamp channel (v1/preset/TimeStamp). Community
-        // dashboards (kenobi LMU GT3, General) read this as a render clock to
-        // flash an element for a fixed window after a watched value changes:
-        //   tt = Telemetry.get("v1/preset/TimeStamp").value;
-        //   return changed && (tt - lastChangeTt) < 1200;   // ms
-        // The dashboard only uses differences, so the epoch is irrelevant;
-        // it must be monotonic and in milliseconds. Stopwatch is monotonic
-        // (unaffected by wall-clock changes) and static so the clock is
-        // continuous across plugin recycle within a SimHub process.
-        private static readonly System.Diagnostics.Stopwatch _monotonicClock =
-            System.Diagnostics.Stopwatch.StartNew();
-
         public SimHubPropertyResolver(PluginManager pluginManager, MozaData data, MozaHidReader hidReader)
         {
             _pluginManager = pluginManager;
@@ -167,15 +154,18 @@ namespace MozaPlugin.Telemetry
                     return hid.GetCurrentAngleDegrees(maxAngleDeg);
                 }
                 case "@internal/TimeStamp":
-                    // Monotonic ms clock for v1/preset/TimeStamp. Packed as
-                    // float (compression 0x07 — the only ✓-verified 32-bit
-                    // numeric code; matches MOZA's own v1/preset/* channels.
-                    // uint32_t's 0x09 is an inferred code the firmware also
-                    // uses for 64-bit location_t, which mis-sizes the tier).
-                    // float is exact to 2^24 ms (~4.7 h uptime), then degrades
-                    // gracefully; the dashboard only consumes sub-second
-                    // differences, so coarsening past that is harmless.
-                    return _monotonicClock.ElapsedMilliseconds;
+                    // v1/preset/TimeStamp render clock, packed as float32
+                    // (compression 0x07 — matches PitHouse's tier-def for this
+                    // channel). Replicates PitHouse's source exactly: the signed
+                    // 32-bit Win32 tick count (ms since boot, wraps ~24.9 days).
+                    // The wheel renders the absolute value — not just deltas — so
+                    // the magnitude/sign must match PitHouse: on a long-uptime PC
+                    // TickCount is negative and climbs toward zero, which is what
+                    // PitHouse shows. Stopwatch.ElapsedMilliseconds (always ≥ 0,
+                    // unbounded) instead produced a large ever-growing positive
+                    // number the wheel could not render, garbling dashboards that
+                    // read this channel (e.g. F1 Mercedes CM2 brake-bias flash).
+                    return Environment.TickCount;
                 default:
                     return 0.0;
             }
