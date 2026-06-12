@@ -119,6 +119,23 @@ namespace MozaPlugin.Telemetry.Dashboard
             return true;
         }
 
+        // The v1/preset/* namespace (TimeStamp, CurrentTorque,
+        // SteeringWheelAngle) is supplied by the wheel firmware from its own
+        // internal state — these are values the wheel measures or owns (its
+        // clock, its torque output, its steering-encoder angle), not host
+        // telemetry. PitHouse never subscribes to or transmits them:
+        // wire-verified against a single-channel preset/TimeStamp dashboard
+        // (bridge-timestamp-pithouse capture) where the wheel renders a live
+        // counting value with ZERO host tier-def subscription and ZERO value
+        // frames. Including a preset/* channel in our subscription makes the
+        // host override the wheel's correct internal value — e.g. sending
+        // @internal/TimeStamp as a large positive ms count garbled the display
+        // and broke the F1-Mercedes brake-bias flash logic. Drop the whole
+        // namespace from every subscription so the wheel fills it itself.
+        internal static bool IsWheelInternalPresetChannel(string url)
+            => !string.IsNullOrEmpty(url)
+               && url.IndexOf("/preset/", StringComparison.Ordinal) >= 0;
+
         public MultiStreamProfile BuildProfileFromCatalog(
             IReadOnlyList<string> catalog,
             string profileName = "WheelCatalog",
@@ -144,6 +161,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             {
                 if (string.IsNullOrEmpty(url)) continue;
                 if (!includeRadarTrackMap && IsRadarTrackMapChannel(url)) continue;
+                if (IsWheelInternalPresetChannel(url)) continue;
                 if (!seenUrls.Add(url)) continue;
                 string suffix = url.Substring(url.LastIndexOf('/') + 1);
                 ChannelDefinition ch;
@@ -734,6 +752,7 @@ namespace MozaPlugin.Telemetry.Dashboard
 
             foreach (var url in urls)
             {
+                if (IsWheelInternalPresetChannel(url)) continue;
                 if (!map.TryGetValue(url, out var info))
                     continue;
 

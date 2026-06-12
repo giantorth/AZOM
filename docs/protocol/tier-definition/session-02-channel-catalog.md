@@ -120,9 +120,25 @@ the heuristic fallback and the host fed the wheel a constant 0 (breaking the
 full literal `v1/preset/TimeStamp` (moza-wire `20260602-212424`, idx 35) AND as
 `v1/\sTimeStamp` (`20260602-184935`, idx 2), so `\s` → `preset/` reproduces the
 known URL exactly. Fix: expand `\s` → `preset/` in the literal branch of
-`ChannelCatalogParser`. The `v1/preset/TimeStamp` value source is the
-plugin-computed `@internal/TimeStamp` monotonic ms clock (see
-[`../telemetry/channels.md`](../telemetry/channels.md)).
+`ChannelCatalogParser`.
+
+**`v1/preset/*` is a wheel-internal namespace — the host must NOT send it
+(corrected 2026-06-12).** The wheel firmware supplies `preset/` values
+(`TimeStamp`, `CurrentTorque`, `SteeringWheelAngle`) to its own dashboard
+engine from internal state (its clock, torque output, steering-encoder
+angle). Wire-verified against a single-channel `preset/TimeStamp` test
+dashboard (`sim/logs/bridge-timestamp-pithouse.jsonl`, PitHouse↔real wheel):
+PitHouse's tier-def subscribes to **no** `comp=7`/float channel and sends
+**zero** `7d:23` value frames, yet the wheel renders a live timestamp
+counting toward zero — proving the value is wheel-sourced. Earlier builds
+mapped `v1/preset/TimeStamp` to the plugin-computed `@internal/TimeStamp`
+clock and *subscribed* to it; that **overrode** the wheel's correct internal
+value with a large positive ms count, garbling the display and breaking the
+`(tt - lastTt)` flash-on-change logic. `DashboardProfileStore.IsWheelInternalPresetChannel`
+now drops the whole `preset/` namespace from every subscription so the wheel
+fills it itself, matching PitHouse. (The constant-0 symptom in the `\s`
+history above was a *different* bug — a garbled URL that still subscribed;
+the fix is to not subscribe at all.)
 
 ### Channel indexing
 

@@ -153,19 +153,13 @@ namespace MozaPlugin.Telemetry
                     if (hid == null || maxAngleDeg <= 0) return 0.0;
                     return hid.GetCurrentAngleDegrees(maxAngleDeg);
                 }
-                case "@internal/TimeStamp":
-                    // v1/preset/TimeStamp render clock, packed as float32
-                    // (compression 0x07 — matches PitHouse's tier-def for this
-                    // channel). Replicates PitHouse's source exactly: the signed
-                    // 32-bit Win32 tick count (ms since boot, wraps ~24.9 days).
-                    // The wheel renders the absolute value — not just deltas — so
-                    // the magnitude/sign must match PitHouse: on a long-uptime PC
-                    // TickCount is negative and climbs toward zero, which is what
-                    // PitHouse shows. Stopwatch.ElapsedMilliseconds (always ≥ 0,
-                    // unbounded) instead produced a large ever-growing positive
-                    // number the wheel could not render, garbling dashboards that
-                    // read this channel (e.g. F1 Mercedes CM2 brake-bias flash).
-                    return Environment.TickCount;
+                // NOTE: there is deliberately no "@internal/TimeStamp" case.
+                // v1/preset/* is the wheel-internal namespace — the firmware
+                // supplies TimeStamp/CurrentTorque/SteeringWheelAngle to its own
+                // dashboard engine, so DashboardProfileStore.IsWheelInternalPresetChannel
+                // drops preset/* from every subscription and the host never
+                // emits it. (Telemetry.json still maps it to @internal/TimeStamp,
+                // but that mapping is never reached.)
                 default:
                     return 0.0;
             }
