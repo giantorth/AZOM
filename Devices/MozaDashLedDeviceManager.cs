@@ -31,6 +31,15 @@ namespace MozaPlugin.Devices
 
         private int _lastBitmask = -1;
 
+        // LED-bitmask keepalive: the dash firmware blanks its LEDs if it doesn't
+        // get a fresh dash-send-telemetry frame within a few seconds, even when the
+        // value is unchanged. PitHouse re-sends the bitmask every telemetry frame
+        // (cm2.pcapng: ~21/s, including FD DE 00000000 when static); we re-send the
+        // last bitmask at 1 Hz when nothing changes — same pattern the wheel uses
+        // (MozaLedDeviceManager.KeepaliveIntervalSeconds).
+        private DateTime _lastSendTime = DateTime.MinValue;
+        private const double KeepaliveIntervalSeconds = 1.0;
+
         public LedModuleSettings LedModuleSettings { get; set; } = null!;
 
         public LedDeviceState LastState => _lastState;
@@ -62,6 +71,7 @@ namespace MozaPlugin.Devices
             else
             {
                 _lastBitmask = -1;
+                _lastSendTime = DateTime.MinValue;
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -150,9 +160,12 @@ namespace MozaPlugin.Devices
                 // drives the bus CM2's RPM/flag LEDs exactly this way — a per-frame
                 // bitmask on 0x14; the firmware lights each set bit in its stored
                 // colour. Verified cm2.pcapng 2026-06-08.
-                if (alwaysResendBitmask || bitmask != _lastBitmask)
+                var now = DateTime.UtcNow;
+                bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
+                if (alwaysResendBitmask || bitmask != _lastBitmask || keepaliveDue)
                 {
                     _lastBitmask = bitmask;
+                    _lastSendTime = now;
                     plugin.DeviceManager.WriteSetting("dash-send-telemetry", bitmask);
                 }
 
