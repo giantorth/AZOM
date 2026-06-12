@@ -335,6 +335,12 @@ namespace MozaPlugin.Devices
                 bool fileExists = File.Exists(deviceJsonPath);
                 bool stale = false;
 
+                // Template content version. A bump here forces a rewrite of an
+                // already-deployed definition whose GUID/PID/ProductName are
+                // unchanged but whose body changed (e.g. CM2 SchemaVersion 1→2
+                // dropping the individual-LEDs section and 10/6 LED layout).
+                int templateSchema = ReadResourceSchemaVersion(resourceName);
+
                 if (fileExists)
                 {
                     // Compare existing PID + DescriptorUniqueId against expected.
@@ -371,6 +377,16 @@ namespace MozaPlugin.Devices
                                 .SelectToken("DeviceDescription.ProductName")
                                 ?.Value<string>();
                             if (!string.Equals(productName, expectedProduct, StringComparison.Ordinal))
+                                stale = true;
+                        }
+
+                        // Content-version guard: a newer template SchemaVersion than
+                        // the deployed file means the shipped definition body changed
+                        // without a GUID/PID/ProductName change. Missing field = 0.
+                        if (!stale)
+                        {
+                            int existingSchema = existing.SelectToken("SchemaVersion")?.Value<int>() ?? 0;
+                            if (existingSchema < templateSchema)
                                 stale = true;
                         }
                     }
@@ -425,6 +441,32 @@ namespace MozaPlugin.Devices
             {
                 MozaLog.Error($"[AZOM] Error deploying device definition '{deviceName}': {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Read the <c>SchemaVersion</c> of an embedded device-definition template.
+        /// Defaults to 1 if the resource is missing/unparseable so a deployed file
+        /// with no SchemaVersion (treated as 0) still refreshes once.
+        /// </summary>
+        private static int ReadResourceSchemaVersion(string resourceName)
+        {
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null) return 1;
+                    using (var reader = new StreamReader(stream))
+                    {
+                        var template = JObject.Parse(reader.ReadToEnd());
+                        return template.SelectToken("SchemaVersion")?.Value<int>() ?? 1;
+                    }
+                }
+            }
+            catch
+            {
+                return 1;
             }
         }
     }

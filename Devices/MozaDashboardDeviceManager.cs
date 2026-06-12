@@ -54,6 +54,15 @@ namespace MozaPlugin.Devices
         /// <summary>Send setting reads on the dashboard connection (e.g. DashSettingsReadCommands).</summary>
         public void ReadSettings(params string[] commandNames) => _deviceManager.ReadSettings(commandNames);
 
+        /// <summary>
+        /// Write an int setting to an explicit device id on the dashboard
+        /// connection. Used to push the live RPM/flag LED bitmask
+        /// (dash-send-telemetry) to a standalone-USB CM2, which bridges as the
+        /// root device (0x12) on this dedicated pipe.
+        /// </summary>
+        public bool WriteSettingForDevice(string commandName, byte deviceId, int value)
+            => _deviceManager.WriteSettingForDevice(commandName, deviceId, value);
+
         public void Disconnect() => _connection.Disconnect();
 
         public void Dispose()

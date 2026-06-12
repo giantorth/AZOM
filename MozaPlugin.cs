@@ -585,6 +585,27 @@ namespace MozaPlugin
         internal byte PreferredStandaloneDashboardTargetDeviceId =>
             IsCm2BehindBaseCandidate ? MozaProtocol.DeviceDash : MozaProtocol.DeviceMain;
 
+        /// <summary>
+        /// Push the dashboard's live RPM/flag LED bitmask (dash-send-telemetry,
+        /// group 0x41 / FD DE) to the active dashboard sink, routed by connection
+        /// path so the frame reaches the right device on the right pipe:
+        ///   • standalone-USB CM2 → dedicated dashboard pipe, dev 0x12
+        ///   • CM2 behind the wheelbase → main pipe, dev 0x14
+        ///   • legacy SHDP dashboard → main pipe, dev 0x14
+        /// Called from <see cref="Devices.MozaDashLedDeviceManager"/> per frame.
+        /// </summary>
+        internal bool WriteDashLedBitmask(int bitmask)
+        {
+            if (DashboardUsbConnected)
+                return _dashboardManager.WriteSettingForDevice(
+                    "dash-send-telemetry", PreferredStandaloneDashboardTargetDeviceId, bitmask);
+
+            byte dev = ShouldUseStandaloneDashboardTarget()
+                ? PreferredStandaloneDashboardTargetDeviceId   // DeviceDash (0x14) behind base
+                : MozaProtocol.DeviceDash;                     // legacy SHDP
+            return _deviceManager.WriteSettingForDevice("dash-send-telemetry", dev, bitmask);
+        }
+
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;

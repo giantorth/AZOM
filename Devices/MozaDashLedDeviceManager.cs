@@ -121,14 +121,26 @@ namespace MozaPlugin.Devices
                     ledColors, buttonColors, encoderColors, matrixColors, rawColors,
                     rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
 
-                // Merge SimHub Individual-LED overrides. Dashboard physical order:
-                // [rpm 0..9][flag 0..5] — flags surface on the `buttons` channel.
+                // Per-device LED layout, derived from the SimHub stream so each dash
+                // template maps correctly into the 16-bit mask:
+                //   SHDP : 10 RPM (leds) + 6 flags (buttons)  → bits 0-9 / 10-15
+                //   CM2  : 16 RPM (leds), no flag section      → bits 0-15
+                // flagCount is capped at FlagLedCount; rpmCount takes whatever bits
+                // the flags don't, so a 16-RPM CM2 (empty buttons) fills all 16 and
+                // SHDP stays at 10 regardless of any SimHub array padding.
+                int flagCount = Math.Min(buttonColors.Length, MozaDeviceConstants.FlagLedCount);
+                int rpmCount = Math.Min(ledColors.Length, 16 - flagCount);
+
+                // Merge SimHub Individual-LED overrides. Dashboard physical order is
+                // [rpm 0..rpmCount-1][flag 0..flagCount-1]; flags surface on the
+                // `buttons` channel. (No-op on CM2 — its profile has the individual
+                // section disabled, so rawColors is empty.)
                 if (rawColors.Length > 0)
                 {
                     ledColors = MozaLedDeviceManager.ApplyOverrides(
-                        ledColors, rawColors, 0, MozaDeviceConstants.RpmLedCount);
+                        ledColors, rawColors, 0, rpmCount);
                     buttonColors = MozaLedDeviceManager.ApplyOverrides(
-                        buttonColors, rawColors, MozaDeviceConstants.RpmLedCount, MozaDeviceConstants.FlagLedCount);
+                        buttonColors, rawColors, rpmCount, flagCount);
                 }
 
                 if (ledColors.Length == 0 && buttonColors.Length == 0)
@@ -140,33 +152,34 @@ namespace MozaPlugin.Devices
 
                 bool alwaysResendBitmask = plugin.Settings.AlwaysResendBitmask;
 
-                // Build bitmask: bits 0-9 = RPM LEDs (from telemetry), bits 10-15 = flag LEDs (from buttons)
+                // Build bitmask: RPM LEDs at bits 0..rpmCount-1 (from telemetry),
+                // flag LEDs at bits rpmCount..rpmCount+flagCount-1 (from buttons).
                 int bitmask = 0;
-                int rpmCount = Math.Min(ledColors.Length, MozaDeviceConstants.RpmLedCount);
                 for (int i = 0; i < rpmCount; i++)
                 {
                     if (ledColors[i].R > 0 || ledColors[i].G > 0 || ledColors[i].B > 0)
                         bitmask |= (1 << i);
                 }
-                int flagCount = Math.Min(buttonColors.Length, MozaDeviceConstants.FlagLedCount);
                 for (int i = 0; i < flagCount; i++)
                 {
                     if (buttonColors[i].R > 0 || buttonColors[i].G > 0 || buttonColors[i].B > 0)
-                        bitmask |= (1 << (MozaDeviceConstants.RpmLedCount + i));
+                        bitmask |= (1 << (rpmCount + i));
                 }
 
                 // CM2 and SHDP dashboards alike take the 16-bit on/off bitmask via
-                // dash-send-telemetry (group 0x41 cmd FD DE → dev 0x14). PitHouse
-                // drives the bus CM2's RPM/flag LEDs exactly this way — a per-frame
-                // bitmask on 0x14; the firmware lights each set bit in its stored
-                // colour. Verified cm2.pcapng 2026-06-08.
+                // dash-send-telemetry (group 0x41 cmd FD DE). The firmware lights each
+                // set bit in its stored colour. PitHouse drives the bus CM2's RPM/flag
+                // LEDs exactly this way — a per-frame bitmask (verified cm2.pcapng
+                // 2026-06-08). WriteDashLedBitmask routes to the right device id /
+                // connection for the active dashboard sink (standalone-USB CM2 → 0x12
+                // on the dedicated pipe, behind-base CM2 / SHDP → 0x14 on the base).
                 var now = DateTime.UtcNow;
                 bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
                 if (alwaysResendBitmask || bitmask != _lastBitmask || keepaliveDue)
                 {
                     _lastBitmask = bitmask;
                     _lastSendTime = now;
-                    plugin.DeviceManager.WriteSetting("dash-send-telemetry", bitmask);
+                    plugin.WriteDashLedBitmask(bitmask);
                 }
 
                 // Dashboard brightness is stored config (set via plugin UI slider →

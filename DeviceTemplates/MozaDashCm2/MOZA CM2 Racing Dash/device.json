@@ -1,13 +1,13 @@
 {
   "DescriptorUniqueId": "6a2d9b0f-8b1e-4d32-9c18-1f5ec8a81025",
-  "SchemaVersion": 1,
+  "SchemaVersion": 2,
   "MinimumSimHubVersion": "9.11.8",
   "DeviceDescription": {
     "BrandName": "MOZA",
     "ProductName": "CM2 Racing Dash"
   },
   "LedsFeature": {
-    "IsIndividualLedsSectionEnabled": true,
+    "IsIndividualLedsSectionEnabled": false,
     "PhysicalLedsMappings": {
       "Items": [
         { "SourceRole": 1, "SourceIndex": 0, "RepeatCount": 16, "RepeatMode": 1 },
