@@ -721,9 +721,11 @@ namespace MozaPlugin.Devices
                     {
                         _detectionState.OldWheelDetected = true;
                         // Stamp first-detect time (mirror of new-protocol path).
-                        // Old-protocol wheels are always HasDisplay=false so the
-                        // wedge watchdog never actually fires for them, but the
-                        // timestamp is cheap and keeps both branches symmetric.
+                        // WheelModelInfo stays null for old-protocol wheels (the
+                        // wheel-model-name resolve below is gated on NewWheelDetected),
+                        // so the display-wedge watchdog is gated to NewWheelDetected
+                        // only and never runs for old wheels; the timestamp is cheap
+                        // and keeps both branches symmetric.
                         _plugin.NoteWheelDetected();
                         _deviceManager.LockWheelId(deviceId);
                         _plugin.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);

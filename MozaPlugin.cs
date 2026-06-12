@@ -3073,9 +3073,16 @@ namespace MozaPlugin
             // display detection (cleared in DeviceProber's display-model-name
             // case) or a manual Connection-enable toggle, so a permanently
             // wedged display can't loop the connection.
+            // Gated to NewWheelDetected only: old-protocol (ES) wheels never
+            // resolve WheelModelInfo (the wheel-model-name resolve is gated on
+            // NewWheelDetected because dev 0x13's model name is the base's, not
+            // the rim's), so WheelModelInfo stays null and `?.HasDisplay != false`
+            // reads null!=false == true — which would otherwise force a one-shot
+            // disconnect on a screenless ES wheel that has no display sub-device
+            // to wait for. Old wheels have no display; exclude them outright.
             const long DisplayWedgeTimeoutMs = 60_000;
             if (!DisplayWedgeRecoveryFired
-                && (DetectionState.NewWheelDetected || DetectionState.OldWheelDetected)
+                && DetectionState.NewWheelDetected
                 && WheelModelInfo?.HasDisplay != false
                 && !IsDisplayDetected
                 && _wheelDetectedUtcTicks != 0)
