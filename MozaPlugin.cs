@@ -626,6 +626,25 @@ namespace MozaPlugin
             return _deviceManager.WriteArrayForDevice("dash-flag-colors", dev, rgb18);
         }
 
+        /// <summary>
+        /// Push a single RPM LED's colour to the dash's live indicator-colour
+        /// register (wire 0B 00). Routed/named per topology like the bitmask:
+        /// standalone-USB CM2 → cm2-indicator-color on 0x12, behind-base CM2 →
+        /// dash-rpm-color on 0x14. <paramref name="index"/> is 0-based.
+        /// </summary>
+        internal bool WriteDashRpmColor(int index, byte r, byte g, byte b)
+        {
+            var rgb = new byte[] { r, g, b };
+            if (DashboardUsbConnected)
+                return _dashboardManager.WriteArrayForDevice(
+                    $"cm2-indicator-color{index + 1}", PreferredStandaloneDashboardTargetDeviceId, rgb);
+
+            byte dev = ShouldUseStandaloneDashboardTarget()
+                ? PreferredStandaloneDashboardTargetDeviceId
+                : MozaProtocol.DeviceDash;
+            return _deviceManager.WriteArrayForDevice($"dash-rpm-color{index + 1}", dev, rgb);
+        }
+
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;

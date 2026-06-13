@@ -52,6 +52,15 @@ namespace MozaPlugin.Devices
         private bool _lastFlagPrimed;
         private DateTime _lastFlagSendTime = DateTime.MinValue;
 
+        // RPM LED colour sync: the bitmask only toggles each RPM LED on/off; the
+        // colour comes from a device register. We push SimHub's computed gradient
+        // to the live indicator register (cm2-indicator-color / dash-rpm-color,
+        // 0B 00) so the bar matches SimHub. This is the LIVE register — no throttle,
+        // change-gated only. All 10 indices (incl. redline) come from the pipeline.
+        // Last-written colour per index, change detection.
+        private readonly Color[] _lastRpmColors = new Color[RpmLedCount];
+        private bool _rpmColorsPrimed;
+
         public LedModuleSettings LedModuleSettings { get; set; } = null!;
 
         public LedDeviceState LastState => _lastState;
@@ -86,6 +95,7 @@ namespace MozaPlugin.Devices
                 _lastSendTime = DateTime.MinValue;
                 _lastFlagPrimed = false;
                 _lastFlagSendTime = DateTime.MinValue;
+                _rpmColorsPrimed = false;
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -159,6 +169,18 @@ namespace MozaPlugin.Devices
                 if (rawColors.Length > 0)
                     ledColors = MozaLedDeviceManager.ApplyOverrides(ledColors, rawColors, 0, rpmCount);
 
+                // ── RPM colours → live indicator register (0B 00) ───────────────
+                // Push SimHub's per-LED colour so the bar shows the user's gradient
+                // (the bitmask below only lights LEDs in whatever colour the device
+                // last stored). Written BEFORE the bitmask so an LED is never lit a
+                // frame before its colour lands. All 10 indices from the pipeline
+                // (latest non-black — an off LED keeps its last colour).
+                // Change-gated; live register, no throttle. If the firmware ignores
+                // 0B 00 this is a silent no-op
+                // (hardware-test gate — see plan; fallback is the 1B 00 FF stored
+                // register with a flash-write throttle).
+                SyncRpmColors(plugin, ledColors);
+
                 if (rpmCount > 0)
                 {
                     int bitmask = 0;
@@ -225,6 +247,34 @@ namespace MozaPlugin.Devices
             {
                 AfterDisplay?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        /// <summary>
+        /// Push SimHub's RPM gradient to the dash's live indicator-colour register
+        /// (cm2-indicator-color / dash-rpm-color, wire 0B 00), change-gated. All 10
+        /// indices (incl. redline) take the latest non-black pipeline colour — an
+        /// off LED keeps its last colour, since the bitmask handles on/off. No
+        /// throttle: this is the live, non-persistent register.
+        /// </summary>
+        private void SyncRpmColors(MozaPlugin plugin, Color[] ledColors)
+        {
+            int count = Math.Min(ledColors.Length, RpmLedCount);
+            for (int i = 0; i < count; i++)
+            {
+                var c = ledColors[i];
+                // Off this frame — keep the last known indicator colour.
+                if (c.R == 0 && c.G == 0 && c.B == 0) continue;
+
+                if (!_rpmColorsPrimed
+                    || c.R != _lastRpmColors[i].R
+                    || c.G != _lastRpmColors[i].G
+                    || c.B != _lastRpmColors[i].B)
+                {
+                    _lastRpmColors[i] = c;
+                    plugin.WriteDashRpmColor(i, c.R, c.G, c.B);
+                }
+            }
+            _rpmColorsPrimed = true;
         }
     }
 }
