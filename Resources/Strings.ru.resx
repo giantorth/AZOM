@@ -460,6 +460,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Режим LED энкодера</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Восстанавливать цвета при выкл.</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Когда SimHub полностью гасит светодиоды энкодера, восстанавливаются сохранённые цвета руля вместо тёмного состояния.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Восстановление цвета телеметрии</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Макс. время статики</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Восстанавливать исходные цвета энкодера после того, как цвет телеметрии не менялся столько времени. 0 = выкл.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Эффект простоя энкодера</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Скорость простоя энкодера</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>НАСТРОЙКИ ЭНКОДЕРОВ</value></data>

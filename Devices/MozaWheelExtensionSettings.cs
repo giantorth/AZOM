@@ -64,6 +64,7 @@ namespace MozaPlugin.Devices
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
         public bool? WheelKnobDefaultDuringTelemetry { get; set; }
+        public int WheelKnobStaticTimeoutMs { get; set; } = -1;
 
         /// <summary>
         /// Capture current wheel state from the plugin. When <paramref name="profile"/>
@@ -134,6 +135,7 @@ namespace MozaPlugin.Devices
             WheelKnobRingColors = MozaProfile.PackColors(data.KnobRingColors);
             WheelKnobRingBrightness = data.KnobRingBrightness;
             WheelKnobDefaultDuringTelemetry = data.WheelKnobDefaultDuringTelemetry;
+            WheelKnobStaticTimeoutMs = data.WheelKnobStaticTimeoutMs;
         }
 
         /// <summary>
@@ -254,6 +256,7 @@ namespace MozaPlugin.Devices
             if (WheelKnobRingBrightness >= 0) data.KnobRingBrightness = WheelKnobRingBrightness;
             if (WheelKnobDefaultDuringTelemetry.HasValue)
                 data.WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry.Value;
+            if (WheelKnobStaticTimeoutMs >= 0) data.WheelKnobStaticTimeoutMs = WheelKnobStaticTimeoutMs;
 
             // Migration done. Stamp the plugin-side flag so every subsequent
             // SetSettings on any wheel extension skips this method entirely.
@@ -324,6 +327,8 @@ namespace MozaPlugin.Devices
             if (ov.WheelKnobRingBrightness   < 0 && WheelKnobRingBrightness >= 0) ov.WheelKnobRingBrightness = WheelKnobRingBrightness;
             if (ov.WheelKnobDefaultDuringTelemetry == null && WheelKnobDefaultDuringTelemetry != null)
                 ov.WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry;
+            if (ov.WheelKnobStaticTimeoutMs < 0 && WheelKnobStaticTimeoutMs >= 0)
+                ov.WheelKnobStaticTimeoutMs = WheelKnobStaticTimeoutMs;
         }
 
         /// <summary>
@@ -379,6 +384,7 @@ namespace MozaPlugin.Devices
             WheelKnobRingColors       = ov.WheelKnobRingColors;
             WheelKnobRingBrightness = ov.WheelKnobRingBrightness;
             WheelKnobDefaultDuringTelemetry = ov.WheelKnobDefaultDuringTelemetry;
+            WheelKnobStaticTimeoutMs = ov.WheelKnobStaticTimeoutMs;
         }
     }
 }

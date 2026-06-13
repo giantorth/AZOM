@@ -465,6 +465,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Bryter-LED-modus</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Gjenopprett farger ved av</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Når SimHub slår knotte-LED-ene helt av, gjenopprettes rattets lagrede knottefarger i stedet for å bli mørke.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Telemetri-fargegjenoppretting</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Maks. statisk tid</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Gjenopprett rattets opprinnelige knottefarger etter at telemetrifargen har vært uendret så lenge. 0 = av.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Bryter tomgangs-effekt</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Bryter tomgangs-hastighet</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>BRYTER-INNSTILLINGER</value></data>

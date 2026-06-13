@@ -460,6 +460,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Drehregler-LED-Modus</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Farben wiederherstellen bei Aus</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Wenn SimHub die Drehregler-LEDs vollständig ausschaltet, die gespeicherten Drehregler-Farben des Lenkrads wiederherstellen, statt dunkel zu bleiben.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Telemetrie-Farbwiederherstellung</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Max. statische Zeit</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Native Drehregler-Farben wiederherstellen, nachdem die Telemetrie-Farbe so lange unverändert war. 0 = aus.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Drehregler-Leerlauf-Effekt</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Drehregler-Leerlauf-Geschwindigkeit</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>DREHREGLER-EINSTELLUNGEN</value></data>

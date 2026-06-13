@@ -460,6 +460,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>노브 LED 모드</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>꺼짐 시 색상 복원</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>SimHub가 노브 LED를 완전히 끄면 어둡게 두는 대신 휠에 저장된 노브 색상을 복원합니다.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>텔레메트리 색상 복원</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>최대 정적 시간</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>텔레메트리 색상이 이 시간 동안 변하지 않으면 노브의 기본 색상을 복원합니다. 0 = 끄기.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>노브 대기 효과</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>노브 대기 효과 속도</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>노브 설정</value></data>

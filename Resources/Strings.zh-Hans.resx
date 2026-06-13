@@ -460,6 +460,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>旋钮 LED 模式</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>熄灭时恢复颜色</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>当 SimHub 将旋钮 LED 完全熄灭时，恢复方向盘存储的旋钮颜色，而不是保持熄灭。</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>遥测颜色恢复</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>最长静止时间</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>当遥测颜色保持不变达到此时长后，恢复旋钮的原生颜色。0 = 关闭。</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>旋钮待机效果</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>旋钮待机速度</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>旋钮设置</value></data>

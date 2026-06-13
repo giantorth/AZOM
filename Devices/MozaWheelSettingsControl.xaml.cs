@@ -854,6 +854,15 @@ skipReadByMode:
                     if (WiKnobDefaultTelemetryToggle != null
                         && (WiKnobDefaultTelemetryToggle.IsChecked == true) != _data.WheelKnobDefaultDuringTelemetry)
                         WiKnobDefaultTelemetryToggle.IsChecked = _data.WheelKnobDefaultDuringTelemetry;
+                    if (WiKnobStaticTimeoutSlider != null)
+                    {
+                        int staticMs = _data.WheelKnobStaticTimeoutMs;
+                        if (staticMs < 0) staticMs = 0;
+                        WiKnobStaticTimeoutSlider.Value = System.Math.Max(WiKnobStaticTimeoutSlider.Minimum,
+                            System.Math.Min(WiKnobStaticTimeoutSlider.Maximum, staticMs));
+                        if (WiKnobStaticTimeoutValue != null)
+                            WiKnobStaticTimeoutValue.Text = staticMs == 0 ? Strings.Option_Off : $"{staticMs} ms";
+                    }
 
                     // Idle-effect speed sliders. Read from _data (mirrored from
                     // the overlay by ApplyWheelToHardware on detection, and
@@ -1181,6 +1190,19 @@ skipReadByMode:
             bool on = WiKnobDefaultTelemetryToggle.IsChecked == true;
             _data.WheelKnobDefaultDuringTelemetry = on;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobDefaultDuringTelemetry = on);
+            _plugin.SaveSettings();
+        }
+
+        // Max time the live knob colour may be held unchanged before telemetry
+        // ownership is released (knob reverts to native per-position colours).
+        // 0 ms = off. Independent of the restore-when-off toggle above.
+        private void WiKnobStaticTimeoutSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents || _plugin == null || _data == null) return;
+            int ms = (int)System.Math.Round(e.NewValue);
+            WiKnobStaticTimeoutValue.Text = ms == 0 ? Strings.Option_Off : $"{ms} ms";
+            _data.WheelKnobStaticTimeoutMs = ms;
+            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobStaticTimeoutMs = ms);
             _plugin.SaveSettings();
         }
 

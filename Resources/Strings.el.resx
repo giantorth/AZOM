@@ -460,6 +460,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Λειτουργία LED Ποτενσιόμετρων</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Επαναφορά χρωμάτων όταν σβηστό</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Όταν το SimHub σβήνει εντελώς τα LED του διακόπτη, επαναφέρει τα αποθηκευμένα χρώματα του τιμονιού αντί να μείνει σκοτεινό.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Επαναφορά χρώματος τηλεμετρίας</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Μέγ. στατικός χρόνος</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Επαναφορά εγγενών χρωμάτων διακόπτη αφού το χρώμα τηλεμετρίας παραμείνει αμετάβλητο τόσο. 0 = ανενεργό.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Εφφέ Αδράνειας Ποτενσιόμετρων</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Ταχύτητα Αδράνειας Ποτενσιόμετρων</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ ΠΟΤΕΝΣΙΟΜΕΤΡΩΝ</value></data>

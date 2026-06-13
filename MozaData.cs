@@ -238,6 +238,11 @@ namespace MozaPlugin
         // colours (per-knob Active + per-LED ring Inactive) instead of holding black.
         // Unlike the per-button flags this is a single wheel-wide switch.
         public volatile bool WheelKnobDefaultDuringTelemetry;
+        // Max time (ms) the live knob colours may stay unchanged before telemetry
+        // ownership is released so the wheel shows its native per-position colours.
+        // Lets a colour held a long time be ignored. 0 = off; re-engages on the next
+        // colour change. Independent of WheelKnobDefaultDuringTelemetry.
+        public volatile int WheelKnobStaticTimeoutMs;
         public readonly byte[][] WheelFlagColors = InitFlagColorArray();
         public readonly byte[] WheelIdleColor = new byte[] { 255, 255, 255 };
 

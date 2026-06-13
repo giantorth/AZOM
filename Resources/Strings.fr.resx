@@ -460,6 +460,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Mode LED encodeur</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Restaurer les couleurs à l'extinction</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Lorsque SimHub éteint complètement les LED du bouton, restaure les couleurs enregistrées du volant au lieu de rester éteint.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Restauration des couleurs de télémétrie</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Durée statique max.</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Restaurer les couleurs natives du bouton après que la couleur de télémétrie soit restée inchangée pendant cette durée. 0 = désactivé.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Effet au repos encodeur</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Vitesse au repos encodeur</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>RÉGLAGES DES ENCODEURS</value></data>

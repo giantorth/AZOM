@@ -465,6 +465,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Modo LED perilla</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Restaurar colores al apagar</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Cuando SimHub apaga por completo los LED del mando, restaura los colores guardados del volante en lugar de quedar apagado.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Restauración de color de telemetría</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Tiempo estático máx.</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Restaurar los colores nativos del mando después de que el color de telemetría se mantenga sin cambios este tiempo. 0 = desactivado.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Efecto en reposo perilla</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Velocidad reposo perilla</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>AJUSTES DE PERILLAS</value></data>

@@ -467,6 +467,9 @@
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Knob LED Mode</value></data>
   <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Restore colors when off</value></data>
   <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>When SimHub drives the knob LEDs fully off, restore the wheel's stored knob colors instead of going dark.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Telemetry Color Restore</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Max static time</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Restore native knob colors after the telemetry color has been held unchanged this long. 0 = off.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Knob Idle Effect</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Knob Idle Speed</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>KNOB SETTINGS</value></data>

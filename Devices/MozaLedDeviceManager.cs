@@ -129,6 +129,15 @@ namespace MozaPlugin.Devices
 
         private Color[]? _lastKnobs;
 
+        // Static-hold restore tracking (WheelKnobStaticTimeoutMs). _lastKnobRawColors
+        // is the last incoming (post-brightness) knob frame, used purely to detect when
+        // the displayed colours actually change; _lastKnobColorChangeTime stamps that
+        // change; _knobStaticHoldReleased latches once we've released ownership due to a
+        // static hold and stays set (suppressing re-engagement) until the colours change.
+        private Color[]? _lastKnobRawColors;
+        private DateTime _lastKnobColorChangeTime = DateTime.MinValue;
+        private bool _knobStaticHoldReleased;
+
         // Per-component bitmask tracking (avoid redundant bitmask sends)
         private int _lastRpmBitmask = -1;
         private int _lastButtonBitmask = -1;
@@ -198,6 +207,9 @@ namespace MozaPlugin.Devices
                 _lastRpmBitmask = -1;
                 _lastButtonBitmask = -1;
                 _lastKnobBitmask = -1;
+                _lastKnobRawColors = null;
+                _lastKnobColorChangeTime = DateTime.MinValue;
+                _knobStaticHoldReleased = false;
                 _lastKnobSendTime = DateTime.MinValue;
                 _lastKnobActivityTime = DateTime.MinValue;
                 _ledsAwake = false;
@@ -291,6 +303,9 @@ namespace MozaPlugin.Devices
             {
                 _lastKnobs = null;
                 _lastKnobBitmask = -1;
+                _lastKnobRawColors = null;
+                _lastKnobColorChangeTime = DateTime.MinValue;
+                _knobStaticHoldReleased = false;
             }
             if ((kind & LedKind.Flag) != 0)
             {
@@ -657,31 +672,47 @@ namespace MozaPlugin.Devices
                     // below to avoid the static-default flash described there.
                     bool knobsActive = knobBitmask != 0 || _lastKnobBitmask > 0;
 
-                    // "Default during telemetry" for knobs (single wheel-wide toggle):
-                    // when enabled and the incoming frame is fully off, fully release
-                    // telemetry ownership of the knobs by writing active_mask=0 AND
-                    // window_mask=0 — exactly the form PitHouse uses (286/286 knob writes
-                    // are active=0/window=0). These knobs store a separate colour per
-                    // rotation position, so the only correct "show original" is to stop
-                    // driving them entirely and let the firmware render the native
-                    // per-position colours. A non-zero window leaves telemetry owning the
-                    // knobs (all-off → dark), and sending any colour overrides the
-                    // per-position state — both wrong. Reset _lastKnobs/_lastKnobBitmask
-                    // so the keepalive below doesn't re-claim the knobs; a returning
-                    // non-zero frame re-engages through the normal path.
-                    if (plugin.Data.WheelKnobDefaultDuringTelemetry && knobBitmask == 0)
+                    // Static-hold restore (WheelKnobStaticTimeoutMs): when the live knob
+                    // colours stay unchanged for longer than the timeout, release telemetry
+                    // ownership so the wheel shows its native per-position colours — lets a
+                    // colour held a long time be ignored. 0 = off. The release stays latched
+                    // (_knobStaticHoldReleased) until the colours actually change, so we
+                    // don't immediately re-engage on the very next identical frame.
+                    var nowUtc = DateTime.UtcNow;
+                    int knobStaticTimeoutMs = plugin.Data.WheelKnobStaticTimeoutMs;
+                    if (!ColorsEqual(knobColors, _lastKnobRawColors))
                     {
-                        if (_lastKnobBitmask > 0 && !ledThrottled)
-                        {
-                            plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
-                                BuildWindowedBitmaskBytes(0, 0));
-                            _lastKnobBitmask = -1;
-                            _lastKnobs = null;
-                            _lastKnobSendTime = DateTime.UtcNow;
-                            anySent = true;
-                        }
+                        _lastKnobRawColors = (Color[])knobColors.Clone();
+                        _lastKnobColorChangeTime = nowUtc;
+                        _knobStaticHoldReleased = false;
                     }
-                    else if (knobsActive)
+                    bool knobStaticTimedOut = knobStaticTimeoutMs > 0
+                        && (nowUtc - _lastKnobColorChangeTime).TotalMilliseconds >= knobStaticTimeoutMs;
+
+                    // Release telemetry ownership of the knobs (active_mask=0 AND
+                    // window_mask=0 — exactly the form PitHouse uses; 286/286 knob writes
+                    // are active=0/window=0) so the firmware renders the native per-position
+                    // colours. Two independent triggers:
+                    //   • "Default during telemetry" toggle + the frame is fully off.
+                    //   • Static-hold timeout above.
+                    // These knobs store a separate colour per rotation position, so the only
+                    // correct "show original" is to stop driving them entirely. A non-zero
+                    // window leaves telemetry owning the knobs (all-off → dark), and sending
+                    // any colour overrides the per-position state — both wrong. Reset
+                    // _lastKnobs/_lastKnobBitmask so the keepalive below doesn't re-claim the
+                    // knobs; a returning (or changed) frame re-engages through the normal path.
+                    bool releaseForOff = plugin.Data.WheelKnobDefaultDuringTelemetry && knobBitmask == 0;
+                    if ((releaseForOff || knobStaticTimedOut) && _lastKnobBitmask > 0 && !ledThrottled)
+                    {
+                        plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
+                            BuildWindowedBitmaskBytes(0, 0));
+                        _lastKnobBitmask = -1;
+                        _lastKnobs = null;
+                        if (knobStaticTimedOut) _knobStaticHoldReleased = true;
+                        _lastKnobSendTime = nowUtc;
+                        anySent = true;
+                    }
+                    else if (knobsActive && !_knobStaticHoldReleased)
                     {
                         bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
                         bool shouldSendKnobs = !ledThrottled && (knobsChanged || (!limitUpdates && forceRefresh));
