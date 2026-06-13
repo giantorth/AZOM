@@ -55,5 +55,22 @@ namespace MozaPlugin.UI
             slider.Value = Clamp(value, min, max);
             SetValueText(label, $"{value}{suffix}");
         }
+
+        /// <summary>
+        /// True when <paramref name="text"/> begins with the literal prefix of a
+        /// composite-format string (everything before its first <c>{</c>
+        /// placeholder). Used by status-text state machines that previously did
+        /// <c>Text.StartsWith("English literal")</c> — that broke once the status
+        /// was localized, so we compare against the active culture's format prefix
+        /// instead. Format strings with no placeholder compare against the whole
+        /// string.
+        /// </summary>
+        public static bool StatusMatchesFormatPrefix(string text, string format)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(format)) return false;
+            int brace = format.IndexOf('{');
+            string prefix = brace >= 0 ? format.Substring(0, brace) : format;
+            return prefix.Length > 0 && text.StartsWith(prefix, System.StringComparison.Ordinal);
+        }
     }
 }

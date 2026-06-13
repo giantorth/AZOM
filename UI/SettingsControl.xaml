@@ -289,6 +289,23 @@
                                        Foreground="#FFD7A0"/>
                             <TextBlock Text="{Binding Body}" Foreground="#FFD7A0"
                                        TextWrapping="Wrap" Margin="0,2,0,0"/>
+                            <!-- Restart button: only the device-definition-deployed
+                                 banner shows it (ShowRestartButton). Wired to
+                                 MozaPlugin.RestartSimHub() via HintRestart_Click. -->
+                            <Button Content="{x:Static res:Strings.Button_RestartSimHub}"
+                                    Click="HintRestart_Click"
+                                    HorizontalAlignment="Left" Margin="0,8,0,0">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource MozaButton}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowRestartButton}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
                     </Border>
                 </DataTemplate>

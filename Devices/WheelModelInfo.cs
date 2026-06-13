@@ -94,6 +94,16 @@ namespace MozaPlugin.Devices
         public bool HasSleepLight { get; }
 
         /// <summary>
+        /// Maximum live LED-update wire rate in frames/sec; <c>0</c> = unlimited
+        /// (default — SimHub's 60 Hz tick drives the stream). The legacy bare-"CS"
+        /// rim is wireless and wedges its param manager when the RPM stream is
+        /// pushed at the full radio cadence (~3 ms gaps), so it is capped. The cap
+        /// coalesces — the latest colour state still goes out, just no faster than
+        /// the limit.
+        /// </summary>
+        public int MaxLedFps { get; }
+
+        /// <summary>
         /// Returns the Group 3 start index for the given knob (0-based).
         /// E.g. CS Pro knob 2 → 12 (skip knob 0's 12 LEDs).
         /// </summary>
@@ -164,10 +174,19 @@ namespace MozaPlugin.Devices
             // hasSleepLight=false: pushing wheel-idle-mode/timeout/speed/color at
             // this wheel triggers a Table 8 read-fail storm in its firmware that
             // makes it intermittently unresponsive.
-            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, maxLedFps: 30)),
+            // ES — MOZA's entry wheel, integrated into the wheelbase as a module at
+            // internal id 0x18 (firmware model-name "ES", hw "RS21-D05-HW SM-C").
+            // Old-protocol RPM only: 10 RGB RPM LEDs driven via the wheel-old-rpm-*
+            // path; no button / flag / knob LEDs, no display. hasDisplay:false keeps
+            // the dashboard pipeline + 0x43 display probe OFF (screenless);
+            // hasSleepLight:false avoids the Table-8 read-fail storm legacy rims hit
+            // on sleep-light writes. Button-LED count is conservative (0) — refine
+            // from a live capability read if ES exposes addressable button LEDs.
+            ("ES",      "ES",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
         };
 
-        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true)
+        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0)
         {
             RpmLedCount = rpmLedCount;
             ButtonLedCount = buttonLedCount;
@@ -182,6 +201,7 @@ namespace MozaPlugin.Devices
             HasDisplay = hasDisplay;
             BrowSegmentSize = browSegmentSize;
             HasSleepLight = hasSleepLight;
+            MaxLedFps = maxLedFps;
         }
 
         /// <summary>

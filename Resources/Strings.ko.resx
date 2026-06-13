@@ -404,6 +404,15 @@
   <data name="DataGridHeader_CurrentValue" xml:space="preserve"><value>현재 값</value></data>
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>SimHub 속성 바인딩 편집</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>기본값으로 재설정</value></data>
+  <data name="Button_ResetField" xml:space="preserve"><value>필드 초기화</value></data>
+  <data name="Button_SplitField" xml:space="preserve"><value>필드 분할</value></data>
+  <data name="Button_RemoveSplit" xml:space="preserve"><value>분할 제거</value></data>
+  <data name="Viz_Title" xml:space="preserve"><value>실시간 FSR1 데이터</value></data>
+  <data name="Edit_StartByte" xml:space="preserve"><value>시작 바이트</value></data>
+  <data name="Edit_EndByte" xml:space="preserve"><value>끝 바이트</value></data>
+  <data name="Edit_Endian_LE" xml:space="preserve"><value>리틀 엔디안</value></data>
+  <data name="Edit_Scale" xml:space="preserve"><value>배율</value></data>
+  <data name="Edit_Bias" xml:space="preserve"><value>바이어스</value></data>
   <data name="Section_Display" xml:space="preserve"><value>디스플레이</value></data>
   <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>디스플레이 밝기</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>대기 시간</value></data>
@@ -452,6 +461,11 @@
   <data name="Label_ButtonPlaceholder" xml:space="preserve"><value>버튼 01</value></data>
   <data name="Section_KnobLedMode" xml:space="preserve"><value>노브 LED 모드</value></data>
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>노브 LED 모드</value></data>
+  <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>꺼짐 시 색상 복원</value></data>
+  <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>SimHub가 노브 LED를 완전히 끄면 어둡게 두는 대신 휠에 저장된 노브 색상을 복원합니다.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>텔레메트리 색상 복원</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>최대 정적 시간</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>텔레메트리 색상이 이 시간 동안 변하지 않으면 노브의 기본 색상을 복원합니다. 0 = 끄기.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>노브 대기 효과</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>노브 대기 효과 속도</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>노브 설정</value></data>
@@ -496,4 +510,86 @@
   <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>휠이 펌웨어 오류를 보고했습니다</value></data>
   <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>휠 펌웨어가 반복적인 파라미터 오류를 보고했습니다. 즉시 진단하려면 시리얼 캡처를 켜세요.</value></data>
   <data name="Button_EnableSerialCapture" xml:space="preserve"><value>시리얼 캡처 켜기</value></data>
+  <data name="Banner_PortLocked_Title" xml:space="preserve"><value>MOZA 하드웨어가 감지되었지만 포트가 사용 중입니다</value></data>
+  <data name="Banner_PortLocked_Body" xml:space="preserve"><value>{0}에서 MOZA 장치를 찾았지만 다른 응용 프로그램이 포트를 사용 중입니다. MOZA PitHouse(또는 휠베이스와 통신하는 다른 프로그램)를 닫고 새로 고침을 클릭하세요.</value></data>
+  <data name="Banner_PortVanished_Title" xml:space="preserve"><value>MOZA 포트가 사라졌습니다</value></data>
+  <data name="Banner_PortVanished_Body" xml:space="preserve"><value>{0}의 MOZA 장치가 열기에 응답하지 않습니다. 휠베이스(또는 USB 케이블)를 다시 연결하고 새로 고침을 클릭하세요.</value></data>
+  <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>MOZA 휠에 디스플레이가 없습니다</value></data>
+  <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>화면이 없는 휠에서는 정상입니다 — 별도의 조치가 필요하지 않습니다.</value></data>
+  <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>반복된 실패 후 텔레메트리가 중지되었습니다</value></data>
+  <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>다시 시도하려면 대시보드 텔레메트리를 껐다가 켜세요.</value></data>
+  <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>SimHub 다시 시작</value></data>
+  <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>새 장치 정의가 배포되었습니다. SimHub를 다시 시작하여 장치 목록에 추가하세요.</value></data>
+  <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0}이(가) SimHub에 추가되지 않았습니다</value></data>
+  <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>MOZA 대시보드가 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>이 휠베이스에는 앰비언트 LED 스트립이 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 스트립을 제어하려면 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>휠 '{1}'이(가) 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 포트</value></data>
+  <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>노브 표시등</value></data>
+  <data name="Sdk_Status_Disabled" xml:space="preserve"><value>비활성화됨</value></data>
+  <data name="Sdk_Status_Starting" xml:space="preserve"><value>시작 중…</value></data>
+  <data name="Sdk_Status_Stopped" xml:space="preserve"><value>중지됨</value></data>
+  <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>실행 중 (PID {0})</value></data>
+  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>서버가 시작되지 않음 — 위의 토글로 활성화하세요</value></data>
+  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>아직 요청 없음</value></data>
+  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>아직 요청 없음 — 타사 도구는 설정을 읽거나 쓸 때만 여기서 통신합니다</value></data>
+  <data name="Status_CapturingClickStop" xml:space="preserve"><value>캡처 중… (상시 캡처가 켜져 있음 — 준비되면 중지를 클릭하세요)</value></data>
+  <data name="Status_CapturingOpenTab" xml:space="preserve"><value>캡처 중… (다른 탭을 열어 장치를 사용한 뒤 돌아와 중지하세요)</value></data>
+  <data name="Status_ExportedTo" xml:space="preserve"><value>{0}(으)로 내보냄</value></data>
+  <data name="Status_CalibrationSent" xml:space="preserve"><value>보정 전송됨</value></data>
+  <data name="Status_HbCalibrating" xml:space="preserve"><value>보정 중 — 끝까지 당긴 후 멈추세요</value></data>
+  <data name="Status_Done" xml:space="preserve"><value>완료</value></data>
+  <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>텔레메트리 송신기를 사용할 수 없음 (플러그인이 초기화되지 않음).</value></data>
+  <data name="Status_PickMzdashFirst" xml:space="preserve"><value>먼저 .mzdash 파일이나 라이브러리 항목을 선택하세요.</value></data>
+  <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(아직 configJson 상태를 받지 못함)</value></data>
+  <data name="Status_NoMBoosterSelected" xml:space="preserve"><value>선택된 mBooster 없음</value></data>
+  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>플러그인이 로드되지 않음</value></data>
+  <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>"{0}"의 원시 바이트를 확인할 수 없습니다 — 대신 로컬 파일을 선택하세요.</value></data>
+  <data name="Upload_FolderPrefix" xml:space="preserve"><value>폴더: {0}</value></data>
+  <data name="Upload_Queued" xml:space="preserve"><value>업로드 대기 중 — "{0}"을(를) 휠로 전송하는 중…</value></data>
+  <data name="Upload_NotStarted" xml:space="preserve"><value>업로드를 시작하지 못함 — 휠이 연결되지 않았거나 관리 세션이 아직 없습니다.</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>업로드 완료 (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>업로드 중지됨 (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_FileDialog_Title" xml:space="preserve"><value>업로드할 .mzdash 파일을 선택하세요</value></data>
+  <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 대시보드 (*.mzdash)|*.mzdash|모든 파일 (*.*)|*.*</value></data>
+  <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>.mzdash 대시보드 파일이 있는 폴더를 선택하세요</value></data>
+  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>대시보드 폴더 자동 감지</value></data>
+  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>MOZA Pit House 대시보드 폴더를 찾을 수 없습니다:
+{0}
+
+MOZA Pit House를 설치하고 대시보드를 로드하거나, 사용자 지정 위치를 지정하려면 폴더 설정…을 사용하세요.</value></data>
+  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>연결된 휠(UID {0})에 대한 대시보드 폴더가 없습니다.
+검색한 위치:
+{1}
+
+먼저 MOZA Pit House에서 이 휠의 대시보드를 여세요.</value></data>
+  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>_dashes 아래에서 휠별 대시보드 폴더를 찾을 수 없습니다. MOZA Pit House를 열어 대시보드를 로드한 뒤 다시 시도하세요.</value></data>
+  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>여러 대시보드 폴더({0}개)가 발견되었고 연결된 휠이 없습니다. 휠을 연결하고 다시 시도하거나, 폴더 설정…으로 직접 선택하세요.</value></data>
+  <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>모든 플러그인 설정과 프로필이 영구적으로 삭제됩니다.
+
+계속하시겠습니까?</value></data>
+  <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>모든 설정 지우기</value></data>
+  <data name="Dialog_ExportFailed" xml:space="preserve"><value>내보내기 실패: {0}</value></data>
+  <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>.mzdash 파일을 읽지 못했습니다:
+{0}</value></data>
+  <data name="Dialog_CannotDeleteNoId" xml:space="preserve"><value>"{0}"을(를) 삭제할 수 없습니다: 휠이 id를 할당하지 않았습니다.</value></data>
+  <data name="Dialog_ConfirmDelete_Body" xml:space="preserve"><value>휠에서 "{0}"을(를) 삭제하시겠습니까?
+
+DirName: {1}
+Id: {2}</value></data>
+  <data name="Dialog_ConfirmDelete_Caption" xml:space="preserve"><value>Moza — 삭제 확인</value></data>
+  <data name="Dialog_TelemetrySenderUnavailable" xml:space="preserve"><value>텔레메트리 송신기를 사용할 수 없습니다.</value></data>
+  <data name="Dialog_CompletelyRemoveTimeout" xml:space="preserve"><value>completelyRemove("{0}")가 시간 초과되었습니다. 대시보드가 여전히 휠에 남아 있을 수 있습니다.</value></data>
+  <data name="Import_Label_Folder" xml:space="preserve"><value>폴더</value></data>
+  <data name="Import_Label_Preset" xml:space="preserve"><value>프리셋</value></data>
+  <data name="Import_Label_Profile" xml:space="preserve"><value>프로필</value></data>
+  <data name="Import_Label_Changes" xml:space="preserve"><value>변경 사항</value></data>
+  <data name="Import_NoMotorPresets" xml:space="preserve"><value>// 이 폴더에 Motor 프리셋이 없습니다</value></data>
+  <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// 이 폴더에 Pedals 프리셋이 없습니다</value></data>
+  <data name="Import_NoActiveProfile" xml:space="preserve"><value>활성 SimHub 프로필이 없습니다.</value></data>
+  <data name="Import_Footer_NoMappable" xml:space="preserve"><value>이 프리셋에 매핑 가능한 설정이 없습니다</value></data>
+  <data name="Import_Footer_AllMatch" xml:space="preserve"><value>{0}개 설정이 이미 일치합니다 — 적용할 항목이 없습니다</value></data>
+  <data name="Import_Footer_WillChange" xml:space="preserve"><value>{1}개 중 {0}개 설정이 변경됩니다</value></data>
+  <data name="Status_CaptureStopped" xml:space="preserve"><value>중지됨 — {0}개 프레임 캡처됨</value></data>
+  <data name="Diag_ZipFilter" xml:space="preserve"><value>ZIP 보관 파일 (*.zip)|*.zip</value></data>
 </root>

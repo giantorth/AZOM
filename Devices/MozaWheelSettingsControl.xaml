@@ -485,6 +485,28 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_KnobTelemetryRestore}" Icon="{StaticResource IconBolt}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,4">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_KnobDefaultDuringTelemetry}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="WiKnobDefaultTelemetryToggle" VerticalAlignment="Center"
+                                                      ToolTip="{x:Static res:Strings.Tooltip_KnobDefaultDuringTelemetry}"
+                                                      Click="WiKnobDefaultTelemetryToggle_Click"/>
+                                </StackPanel>
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KnobStaticTimeout}" Style="{StaticResource SliderLabel}"
+                                               ToolTip="{x:Static res:Strings.Tooltip_KnobStaticTimeout}"/>
+                                    <Slider Grid.Column="1" x:Name="WiKnobStaticTimeoutSlider" MinWidth="80" Minimum="0" Maximum="30000" TickFrequency="100" SmallChange="100" LargeChange="1000" IsSnapToTickEnabled="True" ValueChanged="WiKnobStaticTimeoutSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="WiKnobStaticTimeoutValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=WiKnobStaticTimeoutSlider}" Text="Off"/>
+                                </Grid>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_KnobSettings}" Icon="{StaticResource IconKnob}">
                             <StackPanel>
                                 <!-- Signal mode subsection -->

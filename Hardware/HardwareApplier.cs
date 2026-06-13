@@ -199,6 +199,11 @@ namespace MozaPlugin.Hardware
             int[]? knobBgColors       = EffArr(ov?.WheelKnobBackgroundColors, profile.WheelKnobBackgroundColors);
             int[]? knobPrimaryColors  = EffArr(ov?.WheelKnobPrimaryColors, profile.WheelKnobPrimaryColors);
             int[]? knobRingColors     = EffArr(ov?.WheelKnobRingColors, profile.WheelKnobRingColors);
+            bool knobDefaultTelemetry = ov?.WheelKnobDefaultDuringTelemetry
+                                        ?? profile.WheelKnobDefaultDuringTelemetry;
+            int knobStaticTimeoutMs   = (ov != null && ov.WheelKnobStaticTimeoutMs >= 0)
+                                        ? ov.WheelKnobStaticTimeoutMs
+                                        : profile.WheelKnobStaticTimeoutMs;
 
             // Mirror colors into _data (UI uses _data.* for swatches).
             MozaProfile.UnpackColorsInto(rpmColors, _data.WheelRpmColors);
@@ -223,6 +228,8 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(knobPrimaryColors, _data.WheelKnobPrimaryColors);
             MozaProfile.UnpackColorsInto(knobRingColors, _data.KnobRingColors);
             if (knobRingBri >= 0) _data.KnobRingBrightness = knobRingBri;
+            _data.WheelKnobDefaultDuringTelemetry = knobDefaultTelemetry;
+            _data.WheelKnobStaticTimeoutMs = knobStaticTimeoutMs;
 
             // Hardware writes — gated per-section on the matching detection
             // flag. NOT gated on _data.IsConnected: that's the "any device
@@ -411,25 +418,7 @@ namespace MozaPlugin.Hardware
             if (profile.DashDisplayStandbyMin >= 0) sender?.SendDashDisplayStandbyMinutes(profile.DashDisplayStandbyMin);
 
             if (isCm2)
-            {
                 ApplyCm2DashboardConfig(profile);
-            }
-            else
-            {
-                if (profile.DashRpmIndicatorMode >= 0)
-                    _deviceManager.WriteSetting("dash-rpm-indicator-mode", profile.DashRpmIndicatorMode);
-                if (profile.DashRpmDisplayMode >= 0)
-                    _deviceManager.WriteSetting("dash-rpm-display-mode", profile.DashRpmDisplayMode);
-                // Legacy SHDP dashboard: dash-flags-indicator-mode defaults to 1
-                // when the profile has no stored value (firmware default 0 silently
-                // drops flag colour writes); a saved profile value wins.
-                _deviceManager.WriteSetting("dash-flags-indicator-mode",
-                    profile.DashFlagsIndicatorMode >= 0 ? profile.DashFlagsIndicatorMode : 1);
-
-                WriteColorArray(profile.DashRpmColors, "dash-rpm-color", 10);
-                WriteColorArray(profile.DashRpmBlinkColors, "dash-rpm-blink-color", 10);
-                WriteColorArray(profile.DashFlagColors, "dash-flag-color", 6);
-            }
         }
 
         /// <summary>

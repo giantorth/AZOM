@@ -11,14 +11,13 @@ namespace MozaPlugin.Devices
     internal static class MozaDeviceConstants
     {
         /// <summary>
-        /// DescriptorUniqueId GUIDs from the .shdp device definitions.
+        /// DescriptorUniqueId GUIDs for the MOZA device definitions.
         /// These are permanent — changing them orphans existing user device instances.
         /// </summary>
-        public const string DashGuid          = "c97a4d00-a66d-4e2f-a9b4-e7fc348dcc33";
         public const string DashCm2Guid       = "6a2d9b0f-8b1e-4d32-9c18-1f5ec8a81025";
         // CM1 base-bridged dash (group-0x35, dev 0x14). Its own identity so it
-        // never collides with the CM2 / legacy dash — a user may run a CM1 AND a
-        // CM2 at once, so the two are independent, not mutually exclusive.
+        // never collides with the CM2 — a user may run a CM1 AND a CM2 at once,
+        // so the two are independent, not mutually exclusive.
         public const string DashCm1Guid       = "86f772c3-0cab-4f1b-baa8-39eb178420f9";
         public const string WheelGenericGuid  = "ed153fcb-774d-4cea-97db-5f7096cd1099";
         public const string WheelOldProtoGuid = "5e70f006-ba71-4987-9e88-840d650b12ef";
@@ -49,6 +48,11 @@ namespace MozaPlugin.Devices
             { "W17",     "503269ba-fc50-44d4-9844-8800da5f9f10" },  // CS Pro (firmware reports "W17", was "CSP")
             { "W18",     "14c84064-a968-43b9-ab92-a02f512632ce" },  // KS Pro (firmware reports "W18")
             { "W13",     "c4f0cf35-e68c-4756-a04a-b2f8b5d6dbf3" },  // FSR V2 (firmware reports "W13", was "FSR2")
+            // ES entry wheel (firmware reports "ES", read from module id 0x18).
+            // Pinned so the ES device GUID is stable regardless of the UUID-v5
+            // prefix logic. ES wheels had no model-specific template before; this
+            // is their first dedicated GUID (they previously used WheelOldProtoGuid).
+            { "ES",      "4f76a688-a602-47d7-b629-881204a051be" },
         };
 
         /// <summary>
@@ -212,11 +216,10 @@ namespace MozaPlugin.Devices
             return null;
         }
 
-        /// <summary>Returns true if the DeviceTypeID is a known dashboard device (legacy SHDP, standalone CM2, or base-bridged CM1).</summary>
+        /// <summary>Returns true if the DeviceTypeID is a known dashboard device (standalone CM2 or base-bridged CM1).</summary>
         public static bool IsDashDevice(string deviceTypeId) =>
             !string.IsNullOrEmpty(deviceTypeId)
-            && (Matches(deviceTypeId, DashGuid)
-                || Matches(deviceTypeId, DashCm2Guid)
+            && (Matches(deviceTypeId, DashCm2Guid)
                 || Matches(deviceTypeId, DashCm1Guid));
 
         /// <summary>Returns true if the DeviceTypeID is the wheel base ambient LED device.</summary>

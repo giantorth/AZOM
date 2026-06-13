@@ -1,0 +1,28 @@
+{
+  "Status_CaptureStopped": {
+    "en": "stopped — {0} frames captured",
+    "de": "gestoppt – {0} Frames aufgezeichnet",
+    "el": "σταμάτησε — καταγράφηκαν {0} πλαίσια",
+    "es": "detenido: {0} tramas capturadas",
+    "fr": "arrêté — {0} trames capturées",
+    "it": "fermato — {0} frame acquisiti",
+    "ko": "중지됨 — {0}개 프레임 캡처됨",
+    "nb": "stoppet – {0} rammer tatt opp",
+    "ru": "остановлено — захвачено кадров: {0}",
+    "vi": "đã dừng — đã ghi {0} khung",
+    "zh-Hans": "已停止——已捕获 {0} 帧"
+  },
+  "Diag_ZipFilter": {
+    "en": "ZIP archive (*.zip)|*.zip",
+    "de": "ZIP-Archiv (*.zip)|*.zip",
+    "el": "Αρχείο ZIP (*.zip)|*.zip",
+    "es": "Archivo ZIP (*.zip)|*.zip",
+    "fr": "Archive ZIP (*.zip)|*.zip",
+    "it": "Archivio ZIP (*.zip)|*.zip",
+    "ko": "ZIP 보관 파일 (*.zip)|*.zip",
+    "nb": "ZIP-arkiv (*.zip)|*.zip",
+    "ru": "ZIP-архив (*.zip)|*.zip",
+    "vi": "Tệp nén ZIP (*.zip)|*.zip",
+    "zh-Hans": "ZIP 压缩包 (*.zip)|*.zip"
+  }
+}

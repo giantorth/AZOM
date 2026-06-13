@@ -52,7 +52,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
-                                   Text="FOLDER"
+                                   Text="{x:Static res:Strings.Import_Label_Folder}"
                                    FontFamily="{StaticResource FontMono}"
                                    FontSize="11"
                                    Foreground="{StaticResource TextFaintBrush}"
@@ -97,7 +97,7 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                             <TextBlock x:Name="MotorEmptyText"
-                                       Text="// no Motor presets in this folder"
+                                       Text="{x:Static res:Strings.Import_NoMotorPresets}"
                                        FontFamily="{StaticResource FontMono}"
                                        Foreground="{StaticResource TextFaintBrush}"
                                        HorizontalAlignment="Center"
@@ -125,7 +125,7 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                             <TextBlock x:Name="PedalsEmptyText"
-                                       Text="// no Pedals presets in this folder"
+                                       Text="{x:Static res:Strings.Import_NoPedalsPresets}"
                                        FontFamily="{StaticResource FontMono}"
                                        Foreground="{StaticResource TextFaintBrush}"
                                        HorizontalAlignment="Center"
@@ -176,7 +176,7 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0"
-                                   Text="PRESET"
+                                   Text="{x:Static res:Strings.Import_Label_Preset}"
                                    FontFamily="{StaticResource FontMono}"
                                    FontSize="11"
                                    Foreground="{StaticResource TextFaintBrush}"
@@ -190,7 +190,7 @@
                                    TextTrimming="CharacterEllipsis"
                                    Margin="0,0,0,4"/>
                         <TextBlock Grid.Row="1" Grid.Column="0"
-                                   Text="PROFILE"
+                                   Text="{x:Static res:Strings.Import_Label_Profile}"
                                    FontFamily="{StaticResource FontMono}"
                                    FontSize="11"
                                    Foreground="{StaticResource TextFaintBrush}"
@@ -221,7 +221,7 @@
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="0,0,0,1"
                                 Padding="12,8">
-                            <TextBlock Text="CHANGES"
+                            <TextBlock Text="{x:Static res:Strings.Import_Label_Changes}"
                                        FontFamily="{StaticResource FontMono}"
                                        FontSize="11"
                                        Foreground="{StaticResource TextFaintBrush}"/>

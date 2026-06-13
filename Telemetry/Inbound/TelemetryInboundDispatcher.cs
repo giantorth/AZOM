@@ -275,6 +275,16 @@ namespace MozaPlugin.Telemetry.Inbound
                         // dashboard) silently drop and the host keeps emitting
                         // tier-defs for the prior slot's channel catalog.
                         _sender.SlotTracker.ReplayPendingSwitchIfReady();
+
+                        // configJson state (EnabledDashboards) just became
+                        // available. On cold start the catalog burst can land
+                        // BEFORE this, so the first catalog-only synth resolved
+                        // the dashboard key (wheel:<id>) to nothing and applied 0
+                        // user channel mappings — leaving the synth pinned with
+                        // default bindings until a dashboard switch. Re-apply now
+                        // that the key resolves; no tier-def re-emit (only the
+                        // per-channel SimHubProperty binding changes).
+                        _sender.ReapplyUserChannelMappingsAfterConfigJson();
                     }
                 }
                 else if (result == ConfigJsonClient.ChunkResult.GapDetected)

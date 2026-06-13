@@ -16,7 +16,7 @@ namespace MozaPlugin.UI
         // A fresh device.json was deployed this session; SimHub must restart
         // before it picks the file up.
         DeviceDefinitionDeployed,
-        // Dashboard hardware detected over the wire, but "MOZA Dashboard"
+        // Dashboard hardware detected over the wire, but "MOZA CM2 Racing Dash"
         // hasn't been added under SimHub > Devices.
         ProfileNotAddedDash,
         // Wheelbase has an ambient LED strip but "MOZA Wheel Base" hasn't
@@ -46,6 +46,15 @@ namespace MozaPlugin.UI
         public string Title { get; }
         public string Body { get; }
         public string? RelatedModel { get; }
+
+        /// <summary>
+        /// True for banners whose remediation is a SimHub restart — drives the
+        /// "Restart SimHub" button in the hint template. Currently only the
+        /// device-definition-deployed banner (a fresh device.json needs a restart
+        /// before SimHub loads it). Derived from <see cref="Kind"/>, so it doesn't
+        /// participate in equality.
+        /// </summary>
+        public bool ShowRestartButton => Kind == StatusHintKind.DeviceDefinitionDeployed;
 
         public StatusHint(StatusHintKind kind, string title, string body, string? relatedModel = null)
         {

@@ -139,7 +139,7 @@ namespace MozaPlugin.Telemetry
                 if (string.IsNullOrEmpty(prop))
                     return f.Constant.HasValue ? (float)f.Constant.Value : 0f;
                 double raw = resolve != null ? resolve(prop) : 0.0;
-                return (float)(raw * f.Scale);
+                return (float)(raw * (m?.Scale ?? f.Scale)); // per-field gain override
             }
 
             // Stream the full flat field set as group-0x35 records, 10 per frame, one

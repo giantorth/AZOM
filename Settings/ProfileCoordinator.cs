@@ -324,6 +324,10 @@ namespace MozaPlugin.Settings
         /// <summary>
         /// True iff telemetry is enabled for the current wheel page. Per-wheel-page
         /// (shared across profiles); reads return false when wheel not identified.
+        /// When the wheel is identified but has no explicit entry yet, falls back to
+        /// <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/> (true
+        /// for fresh installs, false for existing users) — dict-missing is "no
+        /// opinion", resolved to the install default, not a hard off.
         /// </summary>
         internal bool ActiveTelemetryEnabled
         {
@@ -331,7 +335,9 @@ namespace MozaPlugin.Settings
             {
                 var g = _plugin.GetCurrentWheelPageGuid();
                 if (!g.HasValue || _plugin.Settings?.WheelTelemetryEnabledByPageGuid == null) return false;
-                return _plugin.Settings.WheelTelemetryEnabledByPageGuid.TryGetValue(g.Value, out var v) && v;
+                if (_plugin.Settings.WheelTelemetryEnabledByPageGuid.TryGetValue(g.Value, out var v))
+                    return v;
+                return _plugin.Settings.TelemetryEnabledDefaultForNewWheels;
             }
             set
             {

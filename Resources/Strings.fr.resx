@@ -404,6 +404,15 @@
   <data name="DataGridHeader_CurrentValue" xml:space="preserve"><value>Valeur actuelle</value></data>
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Modifier la liaison à la propriété SimHub</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RÉINITIALISER PAR DÉFAUT</value></data>
+  <data name="Button_ResetField" xml:space="preserve"><value>RÉINITIALISER LE CHAMP</value></data>
+  <data name="Button_SplitField" xml:space="preserve"><value>DIVISER LE CHAMP</value></data>
+  <data name="Button_RemoveSplit" xml:space="preserve"><value>SUPPRIMER LA DIVISION</value></data>
+  <data name="Viz_Title" xml:space="preserve"><value>DONNÉES FSR1 EN DIRECT</value></data>
+  <data name="Edit_StartByte" xml:space="preserve"><value>Octet de début</value></data>
+  <data name="Edit_EndByte" xml:space="preserve"><value>Octet de fin</value></data>
+  <data name="Edit_Endian_LE" xml:space="preserve"><value>Petit-boutiste</value></data>
+  <data name="Edit_Scale" xml:space="preserve"><value>Échelle</value></data>
+  <data name="Edit_Bias" xml:space="preserve"><value>Décalage</value></data>
   <data name="Section_Display" xml:space="preserve"><value>AFFICHAGE</value></data>
   <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Luminosité de l'affichage</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Délai de veille</value></data>
@@ -452,6 +461,11 @@
   <data name="Label_ButtonPlaceholder" xml:space="preserve"><value>BOUTON 01</value></data>
   <data name="Section_KnobLedMode" xml:space="preserve"><value>MODE LED ENCODEUR</value></data>
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Mode LED encodeur</value></data>
+  <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Restaurer les couleurs à l'extinction</value></data>
+  <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Lorsque SimHub éteint complètement les LED du bouton, restaure les couleurs enregistrées du volant au lieu de rester éteint.</value></data>
+  <data name="Section_KnobTelemetryRestore" xml:space="preserve"><value>Restauration des couleurs de télémétrie</value></data>
+  <data name="SliderLabel_KnobStaticTimeout" xml:space="preserve"><value>Durée statique max.</value></data>
+  <data name="Tooltip_KnobStaticTimeout" xml:space="preserve"><value>Restaurer les couleurs natives du bouton après que la couleur de télémétrie soit restée inchangée pendant cette durée. 0 = désactivé.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Effet au repos encodeur</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Vitesse au repos encodeur</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>RÉGLAGES DES ENCODEURS</value></data>
@@ -497,4 +511,86 @@
   <data name="Banner_WheelFirmwareErrors_Title" xml:space="preserve"><value>Le volant a signalé des erreurs de firmware</value></data>
   <data name="Banner_WheelFirmwareErrors_Body" xml:space="preserve"><value>Le firmware de votre volant a signalé des erreurs de paramètres répétées. Activez la capture série pour diagnostiquer immédiatement.</value></data>
   <data name="Button_EnableSerialCapture" xml:space="preserve"><value>Activer la capture série</value></data>
+  <data name="Banner_PortLocked_Title" xml:space="preserve"><value>Matériel MOZA détecté, mais le port est occupé</value></data>
+  <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Un périphérique MOZA a été trouvé sur {0}, mais le port est occupé par une autre application. Fermez MOZA PitHouse (ou toute autre application communiquant avec la base) et cliquez sur Actualiser.</value></data>
+  <data name="Banner_PortVanished_Title" xml:space="preserve"><value>Le port MOZA a disparu</value></data>
+  <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Le périphérique MOZA sur {0} ne répond plus à l'ouverture. Rebranchez la base (ou son câble USB) et cliquez sur Actualiser.</value></data>
+  <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>Le volant MOZA n'a pas d'écran</value></data>
+  <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>C'est normal pour les volants sans écran — aucune action nécessaire.</value></data>
+  <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Télémétrie arrêtée après des échecs répétés</value></data>
+  <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Désactivez puis réactivez la télémétrie du tableau de bord pour réessayer.</value></data>
+  <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Redémarrer SimHub</value></data>
+  <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>De nouvelles définitions de périphériques ont été déployées. Redémarrez SimHub pour les ajouter sous Périphériques.</value></data>
+  <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} non ajouté dans SimHub</value></data>
+  <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Un tableau de bord MOZA est connecté, mais le périphérique n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Cette base possède un bandeau LED d'ambiance, mais « {0} » n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0} pour piloter le bandeau.</value></data>
+  <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Le volant « {1} » est connecté, mais « {0} » n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
+  <data name="Banner_PortFallbackName" xml:space="preserve"><value>le port COM MOZA</value></data>
+  <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicateurs de molette</value></data>
+  <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Désactivé</value></data>
+  <data name="Sdk_Status_Starting" xml:space="preserve"><value>Démarrage…</value></data>
+  <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Arrêté</value></data>
+  <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>En cours (PID {0})</value></data>
+  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Serveur non démarré — activez-le avec le bouton ci-dessus</value></data>
+  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Aucune requête pour l'instant</value></data>
+  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Aucune requête pour l'instant — les outils tiers ne communiquent ici que lorsqu'ils lisent ou écrivent un paramètre</value></data>
+  <data name="Status_CapturingClickStop" xml:space="preserve"><value>capture… (la capture permanente est activée — cliquez sur Arrêter une fois prêt)</value></data>
+  <data name="Status_CapturingOpenTab" xml:space="preserve"><value>capture… (ouvrez un autre onglet et utilisez le périphérique, puis revenez pour arrêter)</value></data>
+  <data name="Status_ExportedTo" xml:space="preserve"><value>exporté vers {0}</value></data>
+  <data name="Status_CalibrationSent" xml:space="preserve"><value>Calibrage envoyé</value></data>
+  <data name="Status_HbCalibrating" xml:space="preserve"><value>Calibrage — tirez à fond puis relâchez</value></data>
+  <data name="Status_Done" xml:space="preserve"><value>Terminé</value></data>
+  <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Émetteur de télémétrie indisponible (plugin non initialisé).</value></data>
+  <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Sélectionnez d'abord un fichier .mzdash ou une entrée de bibliothèque.</value></data>
+  <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(aucun état configJson reçu pour l'instant)</value></data>
+  <data name="Status_NoMBoosterSelected" xml:space="preserve"><value>Aucun mBooster sélectionné</value></data>
+  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin non chargé</value></data>
+  <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Impossible de résoudre les octets bruts pour « {0} » — choisissez plutôt un fichier local.</value></data>
+  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Dossier : {0}</value></data>
+  <data name="Upload_Queued" xml:space="preserve"><value>Téléversement en file d'attente — envoi de « {0} » vers le volant…</value></data>
+  <data name="Upload_NotStarted" xml:space="preserve"><value>Téléversement non démarré — volant non connecté ou aucune session de gestion pour l'instant.</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Téléversement terminé (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Téléversement arrêté (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Sélectionnez un fichier .mzdash à téléverser</value></data>
+  <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Tableau de bord Moza (*.mzdash)|*.mzdash|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Sélectionnez le dossier contenant les fichiers de tableau de bord .mzdash</value></data>
+  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Détection automatique du dossier des tableaux de bord</value></data>
+  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Dossier de tableaux de bord MOZA Pit House introuvable à :
+{0}
+
+Installez MOZA Pit House et chargez un tableau de bord, ou utilisez « Définir le dossier… » pour indiquer un emplacement personnalisé.</value></data>
+  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Aucun dossier de tableau de bord pour le volant connecté (UID {0}).
+Recherché dans :
+{1}
+
+Ouvrez d'abord un tableau de bord dans MOZA Pit House pour ce volant.</value></data>
+  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Aucun dossier de tableau de bord spécifique au volant trouvé dans _dashes. Ouvrez MOZA Pit House, chargez un tableau de bord, puis réessayez.</value></data>
+  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Plusieurs dossiers de tableaux de bord trouvés ({0}) et aucun volant connecté. Connectez votre volant et réessayez, ou utilisez « Définir le dossier… » pour choisir manuellement.</value></data>
+  <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Cela supprimera définitivement tous les paramètres et profils du plugin.
+
+Êtes-vous sûr ?</value></data>
+  <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Effacer tous les paramètres</value></data>
+  <data name="Dialog_ExportFailed" xml:space="preserve"><value>Échec de l'exportation : {0}</value></data>
+  <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Échec de la lecture du fichier .mzdash :
+{0}</value></data>
+  <data name="Dialog_CannotDeleteNoId" xml:space="preserve"><value>Impossible de supprimer « {0} » : le volant n'a pas attribué d'identifiant.</value></data>
+  <data name="Dialog_ConfirmDelete_Body" xml:space="preserve"><value>Supprimer « {0} » du volant ?
+
+DirName : {1}
+Id : {2}</value></data>
+  <data name="Dialog_ConfirmDelete_Caption" xml:space="preserve"><value>Moza — confirmer la suppression</value></data>
+  <data name="Dialog_TelemetrySenderUnavailable" xml:space="preserve"><value>Émetteur de télémétrie indisponible.</value></data>
+  <data name="Dialog_CompletelyRemoveTimeout" xml:space="preserve"><value>completelyRemove(« {0} ») a expiré. Le tableau de bord est peut-être toujours présent sur le volant.</value></data>
+  <data name="Import_Label_Folder" xml:space="preserve"><value>DOSSIER</value></data>
+  <data name="Import_Label_Preset" xml:space="preserve"><value>PRÉRÉGLAGE</value></data>
+  <data name="Import_Label_Profile" xml:space="preserve"><value>PROFIL</value></data>
+  <data name="Import_Label_Changes" xml:space="preserve"><value>MODIFICATIONS</value></data>
+  <data name="Import_NoMotorPresets" xml:space="preserve"><value>// aucun préréglage Motor dans ce dossier</value></data>
+  <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// aucun préréglage Pedals dans ce dossier</value></data>
+  <data name="Import_NoActiveProfile" xml:space="preserve"><value>Aucun profil SimHub actif.</value></data>
+  <data name="Import_Footer_NoMappable" xml:space="preserve"><value>aucun paramètre mappable dans ce préréglage</value></data>
+  <data name="Import_Footer_AllMatch" xml:space="preserve"><value>les {0} paramètres correspondent déjà — rien à appliquer</value></data>
+  <data name="Import_Footer_WillChange" xml:space="preserve"><value>{0} sur {1} paramètres seront modifiés</value></data>
+  <data name="Status_CaptureStopped" xml:space="preserve"><value>arrêté — {0} trames capturées</value></data>
+  <data name="Diag_ZipFilter" xml:space="preserve"><value>Archive ZIP (*.zip)|*.zip</value></data>
 </root>

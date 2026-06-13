@@ -391,6 +391,14 @@ namespace MozaPlugin
         public Dictionary<Guid, bool> WheelTelemetryEnabledByPageGuid { get; set; }
             = new Dictionary<Guid, bool>();
 
+        // Default telemetry-enable state for a wheel page that has no explicit entry
+        // in WheelTelemetryEnabledByPageGuid yet (dict-missing = "no opinion"). Fresh
+        // installs set this true via the ReadCommonSettings create-if-not-found factory
+        // so new users get dashboard telemetry on out of the box; existing users'
+        // on-disk JSON lacks the field, so it deserializes to false and their
+        // never-toggled wheels stay off, preserving prior behavior.
+        public bool TelemetryEnabledDefaultForNewWheels { get; set; } = false;
+
         // Per-wheel-page firmware-era pick. Keyed by SimHub page GUID, stored as int
         // (cast from MozaWheelEra). Firmware era is a property of the wheel/firmware,
         // not the game — making it per-(game × wheel) would just force the user to

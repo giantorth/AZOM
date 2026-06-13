@@ -585,6 +585,66 @@ namespace MozaPlugin
         internal byte PreferredStandaloneDashboardTargetDeviceId =>
             IsCm2BehindBaseCandidate ? MozaProtocol.DeviceDash : MozaProtocol.DeviceMain;
 
+        /// <summary>
+        /// Push the dashboard's live RPM LED bitmask (dash-send-telemetry,
+        /// group 0x41 / FD DE) to the active dashboard sink, routed by connection
+        /// path so the frame reaches the right device on the right pipe:
+        ///   • standalone-USB CM2 → dedicated dashboard pipe, dev 0x12
+        ///   • CM2 behind the wheelbase → main pipe, dev 0x14
+        ///   • base-bridged dash (e.g. CM1) → main pipe, dev 0x14
+        /// Called from <see cref="Devices.MozaDashLedDeviceManager"/> per frame.
+        /// </summary>
+        internal bool WriteDashLedBitmask(int bitmask)
+        {
+            if (DashboardUsbConnected)
+                return _dashboardManager.WriteSettingForDevice(
+                    "dash-send-telemetry", PreferredStandaloneDashboardTargetDeviceId, bitmask);
+
+            byte dev = ShouldUseStandaloneDashboardTarget()
+                ? PreferredStandaloneDashboardTargetDeviceId   // DeviceDash (0x14) behind base
+                : MozaProtocol.DeviceDash;                     // base-bridged dash (CM1) at 0x14
+            return _deviceManager.WriteSettingForDevice("dash-send-telemetry", dev, bitmask);
+        }
+
+        /// <summary>
+        /// Push the CM2's 6 flag-LED colours as the live dash-flag-colors array
+        /// (group 0x32 cmd 08 00, 6×RGB, black = off). PitHouse drives the bus
+        /// CM2's flag LEDs exactly this way — streamed per frame, the firmware
+        /// lights each non-black flag (verified cm2t.pcapng). Routed to the same
+        /// device/connection as the RPM bitmask (standalone-USB CM2 → 0x12 on the
+        /// dedicated pipe, behind-base CM2 → 0x14 on the base).
+        /// </summary>
+        internal bool WriteDashFlagColors(byte[] rgb18)
+        {
+            if (DashboardUsbConnected)
+                return _dashboardManager.WriteArrayForDevice(
+                    "dash-flag-colors", PreferredStandaloneDashboardTargetDeviceId, rgb18);
+
+            byte dev = ShouldUseStandaloneDashboardTarget()
+                ? PreferredStandaloneDashboardTargetDeviceId
+                : MozaProtocol.DeviceDash;
+            return _deviceManager.WriteArrayForDevice("dash-flag-colors", dev, rgb18);
+        }
+
+        /// <summary>
+        /// Push a single RPM LED's colour to the dash's live indicator-colour
+        /// register (wire 0B 00). Routed/named per topology like the bitmask:
+        /// standalone-USB CM2 → cm2-indicator-color on 0x12, behind-base CM2 →
+        /// dash-rpm-color on 0x14. <paramref name="index"/> is 0-based.
+        /// </summary>
+        internal bool WriteDashRpmColor(int index, byte r, byte g, byte b)
+        {
+            var rgb = new byte[] { r, g, b };
+            if (DashboardUsbConnected)
+                return _dashboardManager.WriteArrayForDevice(
+                    $"cm2-indicator-color{index + 1}", PreferredStandaloneDashboardTargetDeviceId, rgb);
+
+            byte dev = ShouldUseStandaloneDashboardTarget()
+                ? PreferredStandaloneDashboardTargetDeviceId
+                : MozaProtocol.DeviceDash;
+            return _deviceManager.WriteArrayForDevice($"dash-rpm-color{index + 1}", dev, rgb);
+        }
+
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
@@ -745,7 +805,8 @@ namespace MozaPlugin
             try
             {
                 _data = new MozaData();
-                _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings", () => new MozaPluginSettings());
+                _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings",
+                    () => new MozaPluginSettings { TelemetryEnabledDefaultForNewWheels = true });
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
 
@@ -2411,7 +2472,7 @@ namespace MozaPlugin
             _dashboardTestPattern = on;
             if (_telemetrySender != null) _telemetrySender.TestMode = on;
             if (_cm2Sender != null) _cm2Sender.TestMode = on;
-            if (on) _fsr1ProbeStep = -1; // mutually exclusive with the byte probe
+            if (on) { _fsr1ProbeStep = -1; _fsr1FieldProbe = null; } // exclusive with both probes
         }
 
         // FSR V1 single-byte probe diagnostic. The driver streams an all-zero record with
@@ -2422,8 +2483,10 @@ namespace MozaPlugin
         // active page's record(s); -1 = probe off. Volatile: UI writes, driver reads.
         private volatile int _fsr1ProbeStep = -1;
 
-        /// <summary>True while the FSR V1 single-byte probe diagnostic is active.</summary>
-        internal bool Fsr1ProbeActive => _fsr1ProbeStep >= 0;
+        /// <summary>True while EITHER FSR V1 probe diagnostic is active — the toolbar
+        /// single-byte stepper or the row-driven field-span probe. The two are mutually
+        /// exclusive; the driver gates its probe override on this.</summary>
+        internal bool Fsr1ProbeActive => _fsr1ProbeStep >= 0 || _fsr1FieldProbe != null;
 
         /// <summary>Current 0-based probe step across the active page's data bytes.</summary>
         internal int Fsr1ProbeStepIndex => _fsr1ProbeStep;
@@ -2486,7 +2549,7 @@ namespace MozaPlugin
         internal void SetFsr1Probe(bool on)
         {
             _fsr1ProbeStep = on ? 0 : -1;
-            if (on) SetDashboardTestPattern(false);
+            if (on) { _fsr1FieldProbe = null; SetDashboardTestPattern(false); } // exclusive with the field probe
         }
 
         /// <summary>Step the probe offset by <paramref name="delta"/>, wrapping within the
@@ -2500,6 +2563,67 @@ namespace MozaPlugin
             if (s < 0) s += total;
             _fsr1ProbeStep = s;
         }
+
+        // Row-driven field-span probe. Armed while a field's inline editor is open so the
+        // user watches the on-screen box for that field as they step its boundary edges.
+        // Distinct from the byte-stepper (_fsr1ProbeStep) and mutually exclusive with it;
+        // holds the record + field id and resolves to the field's CURRENT span on demand.
+        private sealed class Fsr1FieldProbe { public string RecordKey = ""; public string FieldId = ""; }
+        private volatile Fsr1FieldProbe? _fsr1FieldProbe;
+
+        /// <summary>Arm the row-driven field-span probe on one FSR1 field (disarms the
+        /// byte-stepper and the test pattern). Re-call as the field's span changes.</summary>
+        internal void SetFsr1FieldProbe(string recordKey, string fieldId)
+        {
+            if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return;
+            _fsr1ProbeStep = -1;
+            SetDashboardTestPattern(false);
+            _fsr1FieldProbe = new Fsr1FieldProbe { RecordKey = recordKey, FieldId = fieldId };
+        }
+
+        /// <summary>Disarm the field-span probe (row editor closed).</summary>
+        internal void ClearFsr1FieldProbe() => _fsr1FieldProbe = null;
+
+        /// <summary>The field-span probe's CURRENT resolved target — record type + the
+        /// contiguous byte span (start..end inclusive) the field occupies after applying
+        /// its user override — or null when the field-span probe is not armed / unresolvable.</summary>
+        internal (byte type, int startOff, int endOff)? Fsr1FieldProbeTarget()
+        {
+            var p = _fsr1FieldProbe;
+            if (p == null) return null;
+            var dash = Telemetry.Fsr1DashboardCatalog.ByKey(p.RecordKey);
+            var def = dash?.Fields.FirstOrDefault(x => x.FieldId == p.FieldId);
+            if (dash == null || def == null) return null;
+            var m = GetFsr1FieldMapping(p.RecordKey, p.FieldId);
+            var (offsets, _) = Telemetry.Fsr1DashboardCatalog.ResolveLayout(def, m, dash.PayloadLen);
+            if (offsets.Length == 0) return null;
+            return (dash.RecordType, offsets[0], offsets[offsets.Length - 1]);
+        }
+
+        // ── FSR1 live numeric visualization channel ─────────────────────────
+        // When the channel-mapping panel is showing an FSR1 wheel, it asks the driver to
+        // publish a per-tick snapshot of the data it streams (each field's resolved span,
+        // raw bytes, post-scale value) so the UI can draw a live byte strip. Volatile
+        // single-writer (driver) / single-reader (UI 2 Hz timer), matching driver threading.
+        private volatile bool _fsr1VizActive;
+        private volatile Telemetry.Fsr1VizSnapshot? _fsr1Viz;
+
+        /// <summary>True while the channel-mapping panel wants the FSR1 viz snapshot.</summary>
+        internal bool Fsr1VizActive => _fsr1VizActive;
+
+        /// <summary>Arm/disarm FSR1 viz capture (panel load/teardown). Clears the last
+        /// snapshot on disarm so a stale strip never lingers.</summary>
+        internal void SetFsr1VizActive(bool on)
+        {
+            _fsr1VizActive = on;
+            if (!on) _fsr1Viz = null;
+        }
+
+        /// <summary>Driver publishes the latest streamed-data snapshot (or null).</summary>
+        internal void SetFsr1VizSnapshot(Telemetry.Fsr1VizSnapshot? snap) => _fsr1Viz = snap;
+
+        /// <summary>UI reads the latest FSR1 viz snapshot, or null when none yet.</summary>
+        internal Telemetry.Fsr1VizSnapshot? GetFsr1VizSnapshot() => _fsr1Viz;
 
         /// <summary>True when some display pipeline is live and can render a test
         /// pattern: a tier-def sender is Active, or a standalone FSR1/CM1 driver runs.</summary>
@@ -2949,12 +3073,37 @@ namespace MozaPlugin
                 {
                     _wheelModelRecheckTick = 0;
                     _deviceManager.ReadSetting("wheel-model-name");
+                    // ES wheels carry their real model at module id 0x18 (the
+                    // locked-id read above returns the base/motor name on ES), so
+                    // re-read it on the same cadence — a rim swap to a different
+                    // model is then caught by model-name hot-swap. No-op on a non-ES
+                    // old wheel (0x18 silent); modern wheels skip this branch.
+                    if (DetectionState.OldWheelDetected)
+                        _deviceManager.ReadSetting("es-wheel-model-name");
                 }
 
                 // Probe other wheel IDs for hot-swap detection.
                 // Handles ES → new-protocol case where the base keeps responding
                 // on the locked ID (19) so miss counter never fires.
                 _deviceManager.ProbeOtherWheelIds();
+
+                // Generic old-proto definition is the FALLBACK: deploy it only if no
+                // model-specific definition was already deployed for this old wheel.
+                // An ES wheel deploys "MOZA ES" from the es-wheel-model-name case
+                // (which sets OldProtoFallbackDeployed), so it never gets the generic
+                // device. The grace window lets a slightly-late 0x18 reply set that
+                // flag before this fires, avoiding a duplicate deploy.
+                const long OldProtoFallbackGraceMs = 3000;
+                if (DetectionState.OldWheelDetected
+                    && !DetectionState.OldProtoFallbackDeployed
+                    && _wheelDetectedUtcTicks != 0
+                    && (DateTime.UtcNow.Ticks - _wheelDetectedUtcTicks) / TimeSpan.TicksPerMillisecond >= OldProtoFallbackGraceMs)
+                {
+                    DetectionState.OldProtoFallbackDeployed = true;
+                    if (DeviceDefinitionDeployer.DeployOldProtoWheel(_connection.DiscoveredPid))
+                        DeviceDefinitionDeployed = true;
+                    MozaLog.Info("[AZOM] Old-protocol wheel: no model-specific definition — deployed generic old-proto (fallback)");
+                }
             }
 
             // Base temps/state are dev-0x13 reads the base main controller answers.
@@ -3035,9 +3184,16 @@ namespace MozaPlugin
             // display detection (cleared in DeviceProber's display-model-name
             // case) or a manual Connection-enable toggle, so a permanently
             // wedged display can't loop the connection.
+            // Gated to NewWheelDetected only: old-protocol (ES) wheels never
+            // resolve WheelModelInfo (the wheel-model-name resolve is gated on
+            // NewWheelDetected because dev 0x13's model name is the base's, not
+            // the rim's), so WheelModelInfo stays null and `?.HasDisplay != false`
+            // reads null!=false == true — which would otherwise force a one-shot
+            // disconnect on a screenless ES wheel that has no display sub-device
+            // to wait for. Old wheels have no display; exclude them outright.
             const long DisplayWedgeTimeoutMs = 60_000;
             if (!DisplayWedgeRecoveryFired
-                && (DetectionState.NewWheelDetected || DetectionState.OldWheelDetected)
+                && DetectionState.NewWheelDetected
                 && WheelModelInfo?.HasDisplay != false
                 && !IsDisplayDetected
                 && _wheelDetectedUtcTicks != 0)
@@ -3475,17 +3631,21 @@ namespace MozaPlugin
         /// when no profile/wheel is resolvable. Caller must not mutate returned
         /// dict directly — use the channel-mapping write helpers in MozaPlugin.cs.
         /// </summary>
-        // CM2 dash settings are keyed under the dash device GUID (a fixed page) with
-        // a single dashboard key, so the CM2's dashboard/channel config is fully
-        // independent of the wheel's. pageGuid==null means "the current wheel page".
-        internal static readonly Guid Cm2PageGuid = Guid.Parse(Devices.MozaDeviceConstants.DashGuid);
+        // CM2 dash settings are keyed under a fixed page GUID with a single
+        // dashboard key, so the CM2's dashboard/channel config is fully independent
+        // of the wheel's. pageGuid==null means "the current wheel page".
+        // This literal is the GUID of the retired SHDP "MOZA Dashboard" device; it
+        // is retained verbatim as the CM2 persistence key so existing users' saved
+        // CM2 dashboard/channel mappings (keyed under it) survive the SHDP removal.
+        // It is a persistence key only — not a live SimHub device id.
+        internal static readonly Guid Cm2PageGuid = Guid.Parse("c97a4d00-a66d-4e2f-a9b4-e7fc348dcc33");
         internal const string Cm2DashKey = "cm2";
 
         // CM1 base-bridged dash gets its OWN page GUID so its field mappings,
         // active-dashboard selection and the CM1/CM2 discriminator never share a
-        // key with the CM2 / legacy dash (which use Cm2PageGuid). A user can run
-        // a CM1 and a CM2 simultaneously; keeping the identities disjoint is what
-        // lets both persist independently.
+        // key with the CM2 dash (which uses Cm2PageGuid). A user can run a CM1 and
+        // a CM2 simultaneously; keeping the identities disjoint is what lets both
+        // persist independently.
         internal static readonly Guid Cm1PageGuid = Guid.Parse(Devices.MozaDeviceConstants.DashCm1Guid);
 
         internal Dictionary<string, Dictionary<string, string>>? GetActiveChannelMappings(Guid? pageGuid = null)
@@ -3522,12 +3682,20 @@ namespace MozaPlugin
         // FSR V1 (group-0x42) + CM1 (group-0x35) field mappings and the active
         // dashboard/page index store live in Telemetry/Fsr1Cm1MappingCoordinator.cs.
         internal Fsr1FieldMapping? GetFsr1FieldMapping(string recordKey, string fieldId) => _fsr1Cm1Mapping.GetFsr1FieldMapping(recordKey, fieldId);
-        internal void SetFsr1FieldMapping(string recordKey, string fieldId, string property, double inMin, double inMax) => _fsr1Cm1Mapping.SetFsr1FieldMapping(recordKey, fieldId, property, inMin, inMax);
+        internal void SetFsr1FieldMapping(string recordKey, string fieldId, Fsr1FieldMapping? mapping) => _fsr1Cm1Mapping.SetFsr1FieldMapping(recordKey, fieldId, mapping);
         internal int GetActiveFsr1Index() => _fsr1Cm1Mapping.GetActiveFsr1Index();
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
+
+        // FSR1 synthetic split fields (net-new fields carved out of a catalog field).
+        internal System.Collections.Generic.List<Fsr1SyntheticField> GetSyntheticFields(string recordKey) => _fsr1Cm1Mapping.GetSyntheticFields(recordKey);
+        internal bool SplitFsr1Field(string recordKey, string fieldId) => _fsr1Cm1Mapping.SplitFsr1Field(recordKey, fieldId);
+        internal bool RemoveFsr1Split(string recordKey, string fieldId) => _fsr1Cm1Mapping.RemoveFsr1Split(recordKey, fieldId);
+        internal void ClearSyntheticFields(string recordKey) => _fsr1Cm1Mapping.ClearSyntheticFields(recordKey);
+        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId) => Fsr1FieldComposer.FindField(this, recordKey, fieldId);
+
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId) => _fsr1Cm1Mapping.GetCm1FieldMapping(fieldId);
-        internal void SetCm1FieldMapping(string fieldId, string property) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property);
+        internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);
         internal void ClearCm1Mappings() => _fsr1Cm1Mapping.ClearCm1Mappings();
         internal int GetActiveCm1Index() => _fsr1Cm1Mapping.GetActiveCm1Index();
         internal void SetActiveCm1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveCm1Index(index, sendToWheel);

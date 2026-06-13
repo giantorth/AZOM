@@ -50,6 +50,15 @@ namespace MozaPlugin.Devices
         // device-side standby animation can take back over.
         private bool _wasActive;
 
+        // LED-bitmask keepalive: the base firmware blanks its strip LEDs if the
+        // bitmask isn't refreshed within a few seconds, even when unchanged — the
+        // R25 capture sends the bitmask every frame (colors only on change). Re-send
+        // the last bitmask at 1 Hz when the value is static, matching the dash/wheel
+        // keepalive. Active path only — the idle-release path below stays quiet so
+        // the firmware standby animation resumes.
+        private DateTime _lastSendTime = DateTime.MinValue;
+        private const double KeepaliveIntervalSeconds = 1.0;
+
         public LedModuleSettings LedModuleSettings { get; set; } = null!;
 
         public LedDeviceState LastState => _lastState;
@@ -85,6 +94,7 @@ namespace MozaPlugin.Devices
                 _lastColorHash[0] = 0;
                 _lastColorHash[1] = 0;
                 _wasActive = false;
+                _lastSendTime = DateTime.MinValue;
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -179,10 +189,18 @@ namespace MozaPlugin.Devices
 
                 // Walk both physical strips in parallel — same pattern, just
                 // different SimHub source slice and target command suffix.
-                ProcessStrip(plugin, ledColors, brightness, stripIndex: 0, sourceOffset: 0,
-                    alwaysResendBitmask: alwaysResendBitmask);
-                ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: LedsPerStrip,
-                    alwaysResendBitmask: alwaysResendBitmask);
+                // keepaliveDue is computed once and shared so both strips refresh
+                // on the same 1 Hz tick; _lastSendTime advances only when a bitmask
+                // actually went out (change or keepalive), so a continuously moving
+                // value never triggers a redundant keepalive frame.
+                var now = DateTime.UtcNow;
+                bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
+                bool sent0 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 0, sourceOffset: 0,
+                    alwaysResendBitmask: alwaysResendBitmask, keepaliveDue: keepaliveDue);
+                bool sent1 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: LedsPerStrip,
+                    alwaysResendBitmask: alwaysResendBitmask, keepaliveDue: keepaliveDue);
+                if (sent0 || sent1)
+                    _lastSendTime = now;
             }
             finally
             {
@@ -190,8 +208,10 @@ namespace MozaPlugin.Devices
             }
         }
 
-        private void ProcessStrip(MozaPlugin plugin, Color[] ledColors, double brightness,
-            int stripIndex, int sourceOffset, bool alwaysResendBitmask)
+        // Returns true if a bitmask frame was sent for this strip (change or
+        // keepalive) so the caller can advance the shared keepalive timer.
+        private bool ProcessStrip(MozaPlugin plugin, Color[] ledColors, double brightness,
+            int stripIndex, int sourceOffset, bool alwaysResendBitmask, bool keepaliveDue)
         {
             // Materialise the 9 colors for this strip with brightness applied.
             // Source array may be shorter than expected — pad with black so
@@ -229,11 +249,13 @@ namespace MozaPlugin.Devices
                 _lastColorHash[stripIndex] = colorHash;
             }
 
-            if (alwaysResendBitmask || bitmaskChanged)
+            if (alwaysResendBitmask || bitmaskChanged || keepaliveDue)
             {
                 SendBitmask(plugin, stripIndex, bitmask);
                 _lastBitmask[stripIndex] = bitmask;
+                return true;
             }
+            return false;
         }
 
         // Send a strip's 9 colors as two cmd-0x1A chunks: LEDs 0..4 (5

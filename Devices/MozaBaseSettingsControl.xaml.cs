@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.UI;
+using MozaPlugin.Resources;
 
 namespace MozaPlugin.Devices
 {
@@ -69,7 +70,7 @@ namespace MozaPlugin.Devices
             if (!ResolvePlugin())
             {
                 StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = "Plugin not loaded";
+                StatusText.Text = Strings.Status_PluginNotLoaded;
                 BaseAmbientNotDetectedPanel.Visibility = Visibility.Visible;
                 BasePanel.Visibility = Visibility.Collapsed;
                 return;

@@ -124,8 +124,21 @@ code (`AssettoCorsa`, `AssettoCorsaCompetizione`, `Automobilista2`, `rFactor2`).
 translates the four games confirmed against real dashboards and passes any other
 `PluginManager.GameName` value through unchanged (no fabricated short-codes). This is
 the **string** counterpart to the numeric `@internal/*` channels in
-`ResolveInternalChannel` (e.g. `@internal/SteeringWheelAngle`, `@internal/TimeStamp`);
+`ResolveInternalChannel` (e.g. `@internal/SteeringWheelAngle`);
 `ResolveAsString` tries the string resolver first, then falls back to the numeric one.
+
+**`v1/preset/*` is wheel-internal — not host-emitted (corrected 2026-06-12).**
+The `preset/` namespace (`TimeStamp`, `CurrentTorque`, `SteeringWheelAngle`) is
+filled by the wheel firmware from its own state, not sent by the host. PitHouse
+subscribes to none of them and sends no value frames for them (wire-verified —
+see [`../tier-definition/session-02-channel-catalog.md`](../tier-definition/session-02-channel-catalog.md)).
+`DashboardProfileStore.IsWheelInternalPresetChannel` drops the whole namespace
+from every subscription, so a `preset/*` channel never enters a tier-def or
+value frame. The old `@internal/TimeStamp` resolver case was removed (it was
+unreachable once the namespace is excluded); the `Telemetry.json`
+`v1/preset/TimeStamp → @internal/TimeStamp` mapping remains but is never
+resolved. Host-sending `preset/TimeStamp` previously overrode the wheel's own
+clock with a large positive ms count and garbled dashboards that render it.
 
 **`OpponentCount` / `PlayerIndex` are not radar-gated.** `DashboardProfileStore.IsRadarTrackMapChannel`
 gates only the *bulky* track-map / radar geometry (`patch/Location`, `patch/Location_N`,

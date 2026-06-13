@@ -63,6 +63,8 @@ namespace MozaPlugin.Devices
         // Group 3 per-LED ring colors (packed R<<16|G<<8|B per LED, up to 56)
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
+        public bool? WheelKnobDefaultDuringTelemetry { get; set; }
+        public int WheelKnobStaticTimeoutMs { get; set; } = -1;
 
         /// <summary>
         /// Capture current wheel state from the plugin. When <paramref name="profile"/>
@@ -132,6 +134,8 @@ namespace MozaPlugin.Devices
             WheelKnobPrimaryColors = MozaProfile.PackColors(data.WheelKnobPrimaryColors);
             WheelKnobRingColors = MozaProfile.PackColors(data.KnobRingColors);
             WheelKnobRingBrightness = data.KnobRingBrightness;
+            WheelKnobDefaultDuringTelemetry = data.WheelKnobDefaultDuringTelemetry;
+            WheelKnobStaticTimeoutMs = data.WheelKnobStaticTimeoutMs;
         }
 
         /// <summary>
@@ -250,6 +254,9 @@ namespace MozaPlugin.Devices
             MozaProfile.UnpackColorsInto(WheelKnobPrimaryColors, data.WheelKnobPrimaryColors);
             MozaProfile.UnpackColorsInto(WheelKnobRingColors, data.KnobRingColors);
             if (WheelKnobRingBrightness >= 0) data.KnobRingBrightness = WheelKnobRingBrightness;
+            if (WheelKnobDefaultDuringTelemetry.HasValue)
+                data.WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry.Value;
+            if (WheelKnobStaticTimeoutMs >= 0) data.WheelKnobStaticTimeoutMs = WheelKnobStaticTimeoutMs;
 
             // Migration done. Stamp the plugin-side flag so every subsequent
             // SetSettings on any wheel extension skips this method entirely.
@@ -318,6 +325,10 @@ namespace MozaPlugin.Devices
             if (ov.WheelKnobRingColors       == null && WheelKnobRingColors       != null)
                 ov.WheelKnobRingColors       = (int[])WheelKnobRingColors.Clone();
             if (ov.WheelKnobRingBrightness   < 0 && WheelKnobRingBrightness >= 0) ov.WheelKnobRingBrightness = WheelKnobRingBrightness;
+            if (ov.WheelKnobDefaultDuringTelemetry == null && WheelKnobDefaultDuringTelemetry != null)
+                ov.WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry;
+            if (ov.WheelKnobStaticTimeoutMs < 0 && WheelKnobStaticTimeoutMs >= 0)
+                ov.WheelKnobStaticTimeoutMs = WheelKnobStaticTimeoutMs;
         }
 
         /// <summary>
@@ -372,6 +383,8 @@ namespace MozaPlugin.Devices
             WheelKnobPrimaryColors    = ov.WheelKnobPrimaryColors;
             WheelKnobRingColors       = ov.WheelKnobRingColors;
             WheelKnobRingBrightness = ov.WheelKnobRingBrightness;
+            WheelKnobDefaultDuringTelemetry = ov.WheelKnobDefaultDuringTelemetry;
+            WheelKnobStaticTimeoutMs = ov.WheelKnobStaticTimeoutMs;
         }
     }
 }

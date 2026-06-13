@@ -129,6 +129,15 @@ namespace MozaPlugin.Devices
 
         private Color[]? _lastKnobs;
 
+        // Static-hold restore tracking (WheelKnobStaticTimeoutMs). _lastKnobRawColors
+        // is the last incoming (post-brightness) knob frame, used purely to detect when
+        // the displayed colours actually change; _lastKnobColorChangeTime stamps that
+        // change; _knobStaticHoldReleased latches once we've released ownership due to a
+        // static hold and stays set (suppressing re-engagement) until the colours change.
+        private Color[]? _lastKnobRawColors;
+        private DateTime _lastKnobColorChangeTime = DateTime.MinValue;
+        private bool _knobStaticHoldReleased;
+
         // Per-component bitmask tracking (avoid redundant bitmask sends)
         private int _lastRpmBitmask = -1;
         private int _lastButtonBitmask = -1;
@@ -198,6 +207,9 @@ namespace MozaPlugin.Devices
                 _lastRpmBitmask = -1;
                 _lastButtonBitmask = -1;
                 _lastKnobBitmask = -1;
+                _lastKnobRawColors = null;
+                _lastKnobColorChangeTime = DateTime.MinValue;
+                _knobStaticHoldReleased = false;
                 _lastKnobSendTime = DateTime.MinValue;
                 _lastKnobActivityTime = DateTime.MinValue;
                 _ledsAwake = false;
@@ -214,20 +226,30 @@ namespace MozaPlugin.Devices
             if (p == null)
                 return false;
 
-            // Old-protocol device — only match old-protocol wheels
+            // Generic old-protocol fallback device — matches an old wheel only
+            // when it did NOT resolve a model-specific identity (a model-less
+            // rim). An ES wheel resolves model "ES" from id 0x18 and is served by
+            // its own model-specific device below, so the marker device steps
+            // aside for it.
             if (ExpectedModelPrefix == MozaDeviceConstants.OldProtocolMarker)
-                return p.IsOldWheelDetected;
+                return p.IsOldWheelDetected && string.IsNullOrEmpty(p.Data.WheelModelName);
 
-            // All other prefixes require a new-protocol wheel
-            if (!p.IsNewWheelDetected)
+            // Any other device requires a detected wheel — new OR old protocol.
+            // (ES is an identified OLD-protocol wheel with a specific prefix, so
+            // a specific prefix no longer implies new-protocol.)
+            if (!p.IsNewWheelDetected && !p.IsOldWheelDetected)
                 return false;
 
-            // Empty prefix = generic fallback, matches any new-protocol wheel
-            // UNLESS a model-specific device extension is active for this wheel
+            // Empty prefix = generic new-protocol fallback, matches any
+            // new-protocol wheel UNLESS a model-specific device extension is
+            // active for this wheel.
             if (ExpectedModelPrefix.Length == 0)
-                return !p.IsModelSpecificExtensionActive(p.Data.WheelModelName);
+                return p.IsNewWheelDetected
+                    && !p.IsModelSpecificExtensionActive(p.Data.WheelModelName);
 
-            // Specific model — match against detected wheel's firmware model name
+            // Specific model — match against the detected wheel's firmware model
+            // name. Works for new-protocol (0x17) wheels and old-protocol ES
+            // (@ 0x18) alike.
             var modelName = p.Data.WheelModelName;
             if (string.IsNullOrEmpty(modelName))
                 return false;
@@ -281,6 +303,9 @@ namespace MozaPlugin.Devices
             {
                 _lastKnobs = null;
                 _lastKnobBitmask = -1;
+                _lastKnobRawColors = null;
+                _lastKnobColorChangeTime = DateTime.MinValue;
+                _knobStaticHoldReleased = false;
             }
             if ((kind & LedKind.Flag) != 0)
             {
@@ -341,8 +366,11 @@ namespace MozaPlugin.Devices
                 if (!IsConnected())
                     return;
 
-                bool isOldWheel = ExpectedModelPrefix == MozaDeviceConstants.OldProtocolMarker
-                    && plugin.IsOldWheelDetected;
+                // IsConnected() above already matched this device to the connected
+                // wheel, so the global detection flag tells us its protocol. ES is
+                // an identified old-protocol wheel with a specific prefix, so derive
+                // old/new from the flag rather than the OldProtocolMarker prefix.
+                bool isOldWheel = plugin.IsOldWheelDetected;
                 bool isNewWheel = !isOldWheel && plugin.IsNewWheelDetected;
                 if (!isNewWheel && !isOldWheel)
                     return;
@@ -398,6 +426,18 @@ namespace MozaPlugin.Devices
                 bool alwaysResendBitmask = plugin.Settings.AlwaysResendBitmask;
                 bool anySent = false;
 
+                // Per-model live LED wire-rate cap (frames/sec; 0 = unlimited).
+                // SimHub drives this at 60 Hz; some rims (the wireless bare-"CS")
+                // can't take the RPM stream at the full radio cadence and wedge
+                // their param manager. When throttled we skip this tick's LED
+                // sends WITHOUT updating _lastLeds/_lastButtons/_lastKnobs, so the
+                // change is re-evaluated next tick and the latest colour state
+                // still goes out — just no faster than the cap. The keepalive
+                // below is seconds-scale (gated on _lastSendTime) and unaffected.
+                int maxLedFps = modelInfo?.MaxLedFps ?? 0;
+                bool ledThrottled = maxLedFps > 0
+                    && (DateTime.UtcNow - _lastSendTime).TotalMilliseconds < 1000.0 / maxLedFps;
+
                 // Wheels with flag LEDs receive a single (rpmN + 6)-LED telemetry
                 // sequence from SimHub laid out as [flag 1..3][rpm 1..N][flag 4..6].
                 // Pre-detection (modelInfo null) we fall back to pure RPM handling.
@@ -423,7 +463,7 @@ namespace MozaPlugin.Devices
 
                 // --- RPM LEDs ---
                 bool rpmChanged = !ColorsEqual(rpmColors, _lastLeds);
-                bool shouldSendRpm = rpmChanged || (!limitUpdates && forceRefresh);
+                bool shouldSendRpm = !ledThrottled && (rpmChanged || (!limitUpdates && forceRefresh));
 
                 if (shouldSendRpm)
                 {
@@ -544,7 +584,7 @@ namespace MozaPlugin.Devices
                     buttonColors = ScaleColorsForBrightness(buttonColors, buttonsBrightness);
 
                     bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
-                    bool shouldSendButtons = buttonsChanged || (!limitUpdates && forceRefresh);
+                    bool shouldSendButtons = !ledThrottled && (buttonsChanged || (!limitUpdates && forceRefresh));
 
                     if (shouldSendButtons)
                     {
@@ -632,10 +672,50 @@ namespace MozaPlugin.Devices
                     // below to avoid the static-default flash described there.
                     bool knobsActive = knobBitmask != 0 || _lastKnobBitmask > 0;
 
-                    if (knobsActive)
+                    // Static-hold restore (WheelKnobStaticTimeoutMs): when the live knob
+                    // colours stay unchanged for longer than the timeout, release telemetry
+                    // ownership so the wheel shows its native per-position colours — lets a
+                    // colour held a long time be ignored. 0 = off. The release stays latched
+                    // (_knobStaticHoldReleased) until the colours actually change, so we
+                    // don't immediately re-engage on the very next identical frame.
+                    var nowUtc = DateTime.UtcNow;
+                    int knobStaticTimeoutMs = plugin.Data.WheelKnobStaticTimeoutMs;
+                    if (!ColorsEqual(knobColors, _lastKnobRawColors))
+                    {
+                        _lastKnobRawColors = (Color[])knobColors.Clone();
+                        _lastKnobColorChangeTime = nowUtc;
+                        _knobStaticHoldReleased = false;
+                    }
+                    bool knobStaticTimedOut = knobStaticTimeoutMs > 0
+                        && (nowUtc - _lastKnobColorChangeTime).TotalMilliseconds >= knobStaticTimeoutMs;
+
+                    // Release telemetry ownership of the knobs (active_mask=0 AND
+                    // window_mask=0 — exactly the form PitHouse uses; 286/286 knob writes
+                    // are active=0/window=0) so the firmware renders the native per-position
+                    // colours. Two independent triggers:
+                    //   • "Default during telemetry" toggle + the frame is fully off.
+                    //   • Static-hold timeout above.
+                    // These knobs store a separate colour per rotation position, so the only
+                    // correct "show original" is to stop driving them entirely. A non-zero
+                    // window leaves telemetry owning the knobs (all-off → dark), and sending
+                    // any colour overrides the per-position state — both wrong. Reset
+                    // _lastKnobs/_lastKnobBitmask so the keepalive below doesn't re-claim the
+                    // knobs; a returning (or changed) frame re-engages through the normal path.
+                    bool releaseForOff = plugin.Data.WheelKnobDefaultDuringTelemetry && knobBitmask == 0;
+                    if ((releaseForOff || knobStaticTimedOut) && _lastKnobBitmask > 0 && !ledThrottled)
+                    {
+                        plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
+                            BuildWindowedBitmaskBytes(0, 0));
+                        _lastKnobBitmask = -1;
+                        _lastKnobs = null;
+                        if (knobStaticTimedOut) _knobStaticHoldReleased = true;
+                        _lastKnobSendTime = nowUtc;
+                        anySent = true;
+                    }
+                    else if (knobsActive && !_knobStaticHoldReleased)
                     {
                         bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
-                        bool shouldSendKnobs = knobsChanged || (!limitUpdates && forceRefresh);
+                        bool shouldSendKnobs = !ledThrottled && (knobsChanged || (!limitUpdates && forceRefresh));
 
                         if (shouldSendKnobs)
                         {

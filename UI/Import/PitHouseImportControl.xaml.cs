@@ -179,7 +179,7 @@ namespace MozaPlugin.UI.Import
                 if (profile == null)
                 {
                     System.Windows.MessageBox.Show(Window.GetWindow(this),
-                        "No active SimHub profile.",
+                        Strings.Import_NoActiveProfile,
                         Strings.Import_DialogTitle,
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
@@ -277,11 +277,11 @@ namespace MozaPlugin.UI.Import
             // sees the impact without having to scan the list.
             int totalMapped = Plan.Diffs.Count;
             if (totalMapped == 0)
-                FooterStatusText.Text = "no mappable settings in this preset";
+                FooterStatusText.Text = Strings.Import_Footer_NoMappable;
             else if (changedCount == 0)
-                FooterStatusText.Text = $"all {totalMapped} settings already match — nothing to apply";
+                FooterStatusText.Text = string.Format(Strings.Import_Footer_AllMatch, totalMapped);
             else
-                FooterStatusText.Text = $"{changedCount} of {totalMapped} setting{(totalMapped == 1 ? "" : "s")} will change";
+                FooterStatusText.Text = string.Format(Strings.Import_Footer_WillChange, changedCount, totalMapped);
 
             PickerPanel.Visibility = Visibility.Collapsed;
             ConfirmPanel.Visibility = Visibility.Visible;

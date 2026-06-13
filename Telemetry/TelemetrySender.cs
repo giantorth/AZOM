@@ -2749,25 +2749,15 @@ namespace MozaPlugin.Telemetry
             // skipped this branch when profile was null at apply time, so the
             // synthesised path owns it. Resolved per active dashboard key
             // candidate (wheel:<id> > file:<name>:<sha> > builtin:<name>).
-            var plugin = MozaPlugin.Instance;
-            int mappedCount = 0;
-            if (plugin != null)
-            {
-                var channelMap = plugin.GetActiveChannelMappings(MappingPageGuid);
-                if (channelMap != null)
-                {
-                    var keys = MappingDashKeys ?? plugin.GetActiveDashboardKeyCandidates();
-                    foreach (var dashKey in keys)
-                    {
-                        if (channelMap.TryGetValue(dashKey, out var overrides) && overrides != null)
-                        {
-                            DashboardProfileStore.ApplyUserMappings(synthesised, overrides);
-                            mappedCount = overrides.Count;
-                            break;
-                        }
-                    }
-                }
-            }
+            //
+            // Cold-start race: the wheel:<id> candidate needs the configJson
+            // state (EnabledDashboards), which can land AFTER this catalog burst
+            // — so a first synth here may resolve 0 overrides. The catalog-keyed
+            // dedup at the top would then pin the mapping-less profile until a
+            // dashboard switch. ReapplyUserChannelMappingsAfterConfigJson (called
+            // from the inbound configJson StateReady handler) closes that race by
+            // re-applying to the live profile once the state arrives.
+            int mappedCount = ApplyUserChannelMappings(synthesised);
 
             int chCount = 0;
             foreach (var t in synthesised.Tiers) chCount += t.Channels.Count;
@@ -2839,6 +2829,69 @@ namespace MozaPlugin.Telemetry
             // recovery path in ProbeAndOpenSessions). Restoring with the
             // same gating: only fires after a real catalog/endMarker advance.
             MozaPlugin.Instance?.RaiseDashboardSelectionChangedInternal();
+        }
+
+        /// <summary>
+        /// Resolve the active channel-mapping overrides (profile × page ×
+        /// dashboard key) and apply them to <paramref name="profile"/>'s channels
+        /// in place, overriding each matched URL's
+        /// <see cref="ChannelDefinition.SimHubProperty"/>. Returns the number of
+        /// override entries applied; 0 when none resolve (e.g. the wheel:&lt;id&gt;
+        /// dashboard key can't be resolved yet because the configJson state hasn't
+        /// arrived). Only the per-channel property binding changes — the wire
+        /// layout is untouched, so callers need no tier-def re-emit (the frame
+        /// builder reads ch.SimHubProperty live each frame). The dashboard key is
+        /// resolved per candidate (wheel:&lt;id&gt; > file:&lt;name&gt;:&lt;sha&gt;
+        /// > builtin:&lt;name&gt;), or the fixed <see cref="MappingDashKeys"/> for
+        /// a CM2 sender.
+        /// </summary>
+        private int ApplyUserChannelMappings(MultiStreamProfile profile)
+        {
+            if (profile == null) return 0;
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null) return 0;
+            var channelMap = plugin.GetActiveChannelMappings(MappingPageGuid);
+            if (channelMap == null) return 0;
+            var keys = MappingDashKeys ?? plugin.GetActiveDashboardKeyCandidates();
+            foreach (var dashKey in keys)
+            {
+                if (channelMap.TryGetValue(dashKey, out var overrides) && overrides != null)
+                {
+                    DashboardProfileStore.ApplyUserMappings(profile, overrides);
+                    return overrides.Count;
+                }
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Re-resolve and re-apply user channel mappings to the live profile after
+        /// the wheel's configJson state (EnabledDashboards) arrives. Invoked from
+        /// the inbound configJson StateReady handler.
+        ///
+        /// The catalog-only synth (<see cref="MaybeSwapProfileForCatalog"/>)
+        /// applies user mappings keyed on the active dashboard key, which
+        /// <see cref="MozaPlugin.GetActiveDashboardKeyCandidates"/> resolves from
+        /// the wheel's configJson (the wheel:&lt;id&gt; candidate). On cold start
+        /// the wheel's catalog burst can land BEFORE its configJson burst
+        /// (verified: catalog at T, configJson ~1.2 s later), so the first synth
+        /// resolves 0 overrides and the catalog-keyed dedup then pins the
+        /// mapping-less profile until a dashboard switch forces a re-synth — the
+        /// reported "custom mappings don't load until I switch dashboards" bug.
+        /// Re-applying here closes that race with no tier-def re-emit: only the
+        /// per-channel SimHubProperty binding changes, picked up on the next value
+        /// frame (see <see cref="TelemetryFrameBuilder"/>'s live property read).
+        /// Idempotent when mappings were already applied or none are configured.
+        /// </summary>
+        internal void ReapplyUserChannelMappingsAfterConfigJson()
+        {
+            var profile = _profile;
+            if (profile == null || profile.Tiers.Count == 0) return;
+            int n = ApplyUserChannelMappings(profile);
+            if (n > 0)
+                MozaLog.Debug(
+                    $"[AZOM] Re-applied {n} user channel mapping(s) to live \"{profile.Name}\" " +
+                    "after configJson state arrived (cold-start catalog-before-configJson race)");
         }
 
         /// <summary>

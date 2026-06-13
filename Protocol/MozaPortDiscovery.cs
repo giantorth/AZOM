@@ -244,38 +244,30 @@ namespace MozaPlugin.Protocol
             return results;
         }
 
-        // Match keys named "VID_346E&PID_xxxx&MI_00" (composite CDC child)
-        // OR "VID_346E&PID_xxxx" (single-interface CDC device, e.g. mBooster
-        // Pedals PID 0x0008). Both forms are admitted; the downstream
-        // Service=="usbser" + Device Parameters\PortName presence checks in
-        // EnumerateFromRegistry filter out non-CDC composite parents (which
-        // bind usbccgp and have no PortName).
+        // Match any MOZA USB device-ID key "VID_346E&PID_xxxx" optionally
+        // followed by an '&'-delimited suffix — the bare single-interface form
+        // (e.g. mBooster Pedals PID 0x0008), the composite child "…&MI_00", and
+        // the revision-bearing forms Windows emits on some USB topologies
+        // (deep hub chains, etc.): "…&REV_0100", "…&REV_0100&MI_00". We do not
+        // enumerate exact suffix shapes — the authoritative CDC gate is
+        // downstream in EnumerateFromRegistry (Service=="usbser" + Device
+        // Parameters\PortName presence + live-COM check), which rejects the
+        // composite parent (binds usbccgp, no PortName) and any non-serial
+        // interface regardless of how the key is spelled.
         private static bool TryParseMozaCdcKey(string keyName, out ushort pid)
         {
             pid = 0;
             if (string.IsNullOrEmpty(keyName)) return false;
 
             const string vidPrefix = "VID_346E&PID_";
-            const string miSuffix = "&MI_00";
-            if (keyName.Length < vidPrefix.Length + 4) return false;
+            int afterPid = vidPrefix.Length + 4;
+            if (keyName.Length < afterPid) return false;
             if (string.Compare(keyName, 0, vidPrefix, 0, vidPrefix.Length,
                                StringComparison.OrdinalIgnoreCase) != 0) return false;
 
-            int afterPid = vidPrefix.Length + 4;
-            if (keyName.Length == afterPid)
-            {
-                // Single-interface CDC form: "VID_346E&PID_xxxx".
-            }
-            else if (keyName.Length == afterPid + miSuffix.Length &&
-                     string.Compare(keyName, afterPid, miSuffix, 0, miSuffix.Length,
-                                    StringComparison.OrdinalIgnoreCase) == 0)
-            {
-                // Composite CDC child form: "VID_346E&PID_xxxx&MI_00".
-            }
-            else
-            {
-                return false;
-            }
+            // Anything after the 4-hex PID must start with '&' so we don't
+            // accept a longer (malformed) PID field as a match.
+            if (keyName.Length > afterPid && keyName[afterPid] != '&') return false;
 
             var pidHex = keyName.Substring(vidPrefix.Length, 4);
             return ushort.TryParse(pidHex, NumberStyles.HexNumber,

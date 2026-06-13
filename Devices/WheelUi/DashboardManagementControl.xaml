@@ -360,12 +360,192 @@
                                                        FontFamily="{DynamicResource FontMono}"
                                                        Foreground="{DynamicResource TextDimBrush}"/>
                                         </StackPanel>
+
+                                        <!-- FSR V1 only: wire-boundary editor. Step the field's
+                                             left/right data byte; the on-screen box the span feeds
+                                             lights live (field-probe armed while this editor is open).
+                                             Width is held to 1..3 bytes; BE/LE toggle shows at width 2;
+                                             Scale/Bias apply raw·Scale+Bias before packing. -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                                    Visibility="{Binding IsFsr1,
+                                                                Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{x:Static res:Strings.Edit_StartByte}"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <Button Content="◀" Width="30" Margin="6,0,0,0"
+                                                    Click="FieldStartMinus_Click" Tag="{Binding}"
+                                                    IsEnabled="{Binding CanStartMinus}"/>
+                                            <TextBlock Text="{Binding Start}" MinWidth="20"
+                                                       VerticalAlignment="Center" TextAlignment="Center"
+                                                       FontFamily="{DynamicResource FontMono}"
+                                                       Foreground="{DynamicResource TextBrush}"/>
+                                            <Button Content="▶" Width="30"
+                                                    Click="FieldStartPlus_Click" Tag="{Binding}"
+                                                    IsEnabled="{Binding CanStartPlus}"/>
+
+                                            <TextBlock Text="{x:Static res:Strings.Edit_EndByte}"
+                                                       VerticalAlignment="Center" Margin="14,0,0,0"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <Button Content="◀" Width="30" Margin="6,0,0,0"
+                                                    Click="FieldEndMinus_Click" Tag="{Binding}"
+                                                    IsEnabled="{Binding CanEndMinus}"/>
+                                            <TextBlock Text="{Binding End}" MinWidth="20"
+                                                       VerticalAlignment="Center" TextAlignment="Center"
+                                                       FontFamily="{DynamicResource FontMono}"
+                                                       Foreground="{DynamicResource TextBrush}"/>
+                                            <Button Content="▶" Width="30"
+                                                    Click="FieldEndPlus_Click" Tag="{Binding}"
+                                                    IsEnabled="{Binding CanEndPlus}"/>
+
+                                            <TextBlock Text="{Binding EncodingText}"
+                                                       VerticalAlignment="Center" Margin="14,0,0,0"
+                                                       FontFamily="{DynamicResource FontMono}"
+                                                       Foreground="{DynamicResource TextDimBrush}"/>
+                                            <CheckBox Content="{x:Static res:Strings.Edit_Endian_LE}"
+                                                      VerticalAlignment="Center" Margin="14,0,0,0"
+                                                      Foreground="{DynamicResource TextBrush}"
+                                                      IsChecked="{Binding LittleEndian, Mode=TwoWay}"
+                                                      Visibility="{Binding EndianApplies,
+                                                                  Converter={StaticResource BoolToVisibility}}"/>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                                    Visibility="{Binding IsFsr1,
+                                                                Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{x:Static res:Strings.Edit_Scale}"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <TextBox Text="{Binding Scale, Mode=TwoWay,
+                                                           UpdateSourceTrigger=LostFocus}"
+                                                     Width="70" Margin="6,0,0,0" Padding="6,3"
+                                                     Foreground="{DynamicResource TextBrush}"
+                                                     Background="{DynamicResource BgDeepBrush}"
+                                                     BorderBrush="{DynamicResource BorderBrush}"
+                                                     BorderThickness="1"/>
+                                            <TextBlock Text="{x:Static res:Strings.Edit_Bias}"
+                                                       VerticalAlignment="Center" Margin="12,0,0,0"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <TextBox Text="{Binding Bias, Mode=TwoWay,
+                                                           UpdateSourceTrigger=LostFocus}"
+                                                     Width="70" Margin="6,0,0,0" Padding="6,3"
+                                                     Foreground="{DynamicResource TextBrush}"
+                                                     Background="{DynamicResource BgDeepBrush}"
+                                                     BorderBrush="{DynamicResource BorderBrush}"
+                                                     BorderThickness="1"/>
+                                            <Button Content="{x:Static res:Strings.Button_SplitField}"
+                                                    Margin="14,0,0,0"
+                                                    Click="FieldSplit_Click" Tag="{Binding}"
+                                                    Visibility="{Binding CanSplit,
+                                                                Converter={StaticResource BoolToVisibility}}"/>
+                                            <Button Content="{x:Static res:Strings.Button_RemoveSplit}"
+                                                    Margin="8,0,0,0"
+                                                    Click="FieldRemoveSplit_Click" Tag="{Binding}"
+                                                    Visibility="{Binding IsSynthetic,
+                                                                Converter={StaticResource BoolToVisibility}}"/>
+                                            <Button Content="{x:Static res:Strings.Button_ResetField}"
+                                                    Margin="8,0,0,0"
+                                                    Click="FieldReset_Click" Tag="{Binding}"
+                                                    Visibility="{Binding IsCatalogFsr1,
+                                                                Converter={StaticResource BoolToVisibility}}"/>
+                                        </StackPanel>
+
+                                        <!-- CM1 only: per-field gain. CM1 is always BE float32,
+                                             so only Scale applies (no boundary/endianness). -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                                    Visibility="{Binding IsCm1,
+                                                                Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{x:Static res:Strings.Edit_Scale}"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource MutedHintText}"/>
+                                            <TextBox Text="{Binding Scale, Mode=TwoWay,
+                                                           UpdateSourceTrigger=LostFocus}"
+                                                     Width="70" Margin="6,0,0,0" Padding="6,3"
+                                                     Foreground="{DynamicResource TextBrush}"
+                                                     Background="{DynamicResource BgDeepBrush}"
+                                                     BorderBrush="{DynamicResource BorderBrush}"
+                                                     BorderThickness="1"/>
+                                            <Button Content="{x:Static res:Strings.Button_ResetField}"
+                                                    Margin="14,0,0,0"
+                                                    Click="FieldReset_Click" Tag="{Binding}"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- FSR V1 only: live numeric byte-strip visualization. One record per
+                     active dashboard; each field's data-byte span is boxed and labelled
+                     with the raw bytes (hex) AND the post-scale/transform value. Refreshed
+                     ~2 Hz from the live driver output via GetFsr1VizSnapshot(). The whole
+                     block is hidden when the snapshot is empty (non-FSR1 wheels). -->
+                <StackPanel x:Name="Fsr1VizPanel" Margin="0,0,0,10" Visibility="Collapsed">
+                <TextBlock Text="{x:Static res:Strings.Viz_Title}"
+                           Style="{StaticResource MutedHintText}"
+                           FontWeight="SemiBold" Margin="0,4,0,6"/>
+                <ItemsControl x:Name="Fsr1VizList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,8"
+                                    Background="{DynamicResource BgCard2Brush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="8,6">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Label}"
+                                               Foreground="{DynamicResource TextBrush}"
+                                               FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <!-- Field boxes laid out left→right in Start order. Each box
+                                         shows the field label, the raw bytes (hex) and the scaled
+                                         value. A synthetic split box is tinted to stand out. -->
+                                    <ItemsControl ItemsSource="{Binding Fields}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,6,6"
+                                                        MinWidth="74"
+                                                        Background="{Binding BoxBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrightBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="3"
+                                                        Padding="6,4">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Label}"
+                                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                                   FontSize="11"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   MaxWidth="140"/>
+                                                        <TextBlock Text="{Binding RangeText}"
+                                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                                   FontFamily="{DynamicResource FontMono}"
+                                                                   FontSize="10"/>
+                                                        <TextBlock Text="{Binding HexText}"
+                                                                   Foreground="{DynamicResource AmberBrush}"
+                                                                   FontFamily="{DynamicResource FontMono}"
+                                                                   FontSize="12"/>
+                                                        <TextBlock Text="{Binding ValueText}"
+                                                                   Foreground="{DynamicResource CyanBrush}"
+                                                                   FontFamily="{DynamicResource FontMono}"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                </StackPanel>
+
                 <StackPanel Orientation="Horizontal">
                     <Button Content="{x:Static res:Strings.Button_ResetToDefaults}" Click="TelemetryResetMappings_Click"/>
                     <TextBlock x:Name="TelemetryMappingStatus"

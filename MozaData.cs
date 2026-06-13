@@ -200,6 +200,13 @@ namespace MozaPlugin
         // Display tick).
         public readonly object LedColorLock = new object();
 
+        // Armed the first time the user commits an LED color via WriteLedColor. Until then,
+        // detection-time color read responses must always seed _data even while telemetry is
+        // live (otherwise the A5 gate eats the initial seed and swatches come up empty on a
+        // profile with no saved colors). Reset on ClearWheelIdentity so a hot-swapped wheel
+        // re-seeds. volatile — read on the serial thread, written on the UI thread.
+        private volatile bool _ledColorEditArmed;
+
         /// <summary>
         /// Atomic 3-byte RGB write into <paramref name="dst"/> under <see cref="LedColorLock"/>.
         /// Use from UI handlers in place of three separate <c>dst[0]=…; dst[1]=…; dst[2]=…</c>
@@ -207,6 +214,8 @@ namespace MozaPlugin
         /// </summary>
         public void WriteLedColor(byte[] dst, byte r, byte g, byte b)
         {
+            // Arm the A5 read-suppression gate: now there is a user pick worth protecting.
+            _ledColorEditArmed = true;
             lock (LedColorLock)
             {
                 dst[0] = r;
@@ -223,6 +232,17 @@ namespace MozaPlugin
         // sent through the live button-color telemetry pipeline is replaced with that
         // button's configured static color (see WheelButtonColors).
         public readonly bool[] WheelButtonDefaultDuringTelemetry = new bool[14];
+        // Single "default during telemetry" toggle for the knob ring LEDs. When true,
+        // an all-off knob frame from the live telemetry pipeline releases telemetry
+        // ownership (active_mask=0) so the firmware restores the wheel's stored knob
+        // colours (per-knob Active + per-LED ring Inactive) instead of holding black.
+        // Unlike the per-button flags this is a single wheel-wide switch.
+        public volatile bool WheelKnobDefaultDuringTelemetry;
+        // Max time (ms) the live knob colours may stay unchanged before telemetry
+        // ownership is released so the wheel shows its native per-position colours.
+        // Lets a colour held a long time be ignored. 0 = off; re-engages on the next
+        // colour change. Independent of WheelKnobDefaultDuringTelemetry.
+        public volatile int WheelKnobStaticTimeoutMs;
         public readonly byte[][] WheelFlagColors = InitFlagColorArray();
         public readonly byte[] WheelIdleColor = new byte[] { 255, 255, 255 };
 
@@ -565,7 +585,16 @@ namespace MozaPlugin
             // (interval between read send and read response, vs UI write landing).
             // Disk + overlay still hold the user's pick correctly; the gate is
             // only protecting the live `_data` mirror used by UI swatches.
-            if (Devices.MozaLedDeviceManager.IsLiveAnywhere() && IsWheelLedColorCommand(commandName))
+            //
+            // Carve-out: the gate stays disarmed until the user's first LED-color
+            // edit (`_ledColorEditArmed`, set by WriteLedColor). Before any edit
+            // there is no pick to clobber, so the detection-time seed reads must
+            // always land — otherwise telemetry that starts before the seed
+            // responses arrive leaves `_data` at hardcoded defaults and the
+            // swatches come up empty on a profile with no saved colors.
+            if (_ledColorEditArmed
+                && Devices.MozaLedDeviceManager.IsLiveAnywhere()
+                && IsWheelLedColorCommand(commandName))
                 return;
 
             // Color commands need at least 3 bytes (R, G, B)
@@ -710,6 +739,32 @@ namespace MozaPlugin
             {
                 WheelMcuUid = (byte[])data.Clone();
             }
+            // ES (old-protocol) wheel identity, read from the wheel's own module
+            // id 0x18 (0x17 is silent on ES). These populate the same Wheel*
+            // fields a modern wheel fills from 0x17 — so an ES wheel gets a real
+            // model ("ES") that drives model→GUID→profile resolution, plus correct
+            // diagnostics + SDK manifest values. dev 0x13 separately fills Base*
+            // with the motor identity ("R5 Black # MOT-1").
+            else if (commandName == "es-wheel-model-name")
+            {
+                WheelModelName = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "es-wheel-hw-version")
+            {
+                WheelHwVersion = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "es-wheel-sw-version")
+            {
+                WheelSwVersion = ParseNullTerminatedString(data);
+            }
+            else if (commandName == "es-wheel-mcu-uid")
+            {
+                WheelMcuUid = (byte[])data.Clone();
+            }
+            else if (commandName == "es-wheel-device-type")
+            {
+                WheelDeviceType = (byte[])data.Clone();
+            }
             // Base identity (parallel to wheel identity, dev 0x13). Drives the
             // Motor + Wheel Base manifest entries served at
             // /MOZARacing/ProductDevice/{id} so iRacing's CoAP client engages
@@ -787,6 +842,9 @@ namespace MozaPlugin
 
         public void ClearWheelIdentity()
         {
+            // Re-arm the LED-color seed: a hot-swapped wheel must re-read its own
+            // colors into _data before the A5 gate suppresses reads again.
+            _ledColorEditArmed = false;
             WheelModelName = "";
             WheelSerialNumber = "";
             WheelSwVersion = "";

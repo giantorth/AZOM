@@ -209,6 +209,20 @@ namespace MozaPlugin.Protocol
             AddCommand("base-mcu-uid",       "base",  6, 0xFF, new byte[] { },   0, "array");
             AddCommand("base-identity-11",   "base", 17, 0xFF, new byte[] { 4 }, 0, "array");
 
+            // ===== ES WHEEL IDENTITY (device 0x18) =====
+            // The ES (old-protocol) steering wheel answers identity probes at its
+            // own internal id 0x18 — a module of the wheelbase MCU, distinct from
+            // the base (0x13) which returns the motor name ("R5 Black # MOT-1").
+            // Live probe (R5 + ES, 2026-06-12): 0x07 → "ES", 0x08 → "…SM-C".
+            // Same probe shapes as base-*/wheel-*; the parser maps the swapped id
+            // 0x81 → "es-wheel" so these resolve against this bucket and don't
+            // collide with base-*/wheel-* in the shared response groups.
+            AddCommand("es-wheel-model-name",  "es-wheel",  7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("es-wheel-sw-version",  "es-wheel", 15, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("es-wheel-hw-version",  "es-wheel",  8, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("es-wheel-mcu-uid",     "es-wheel",  6, 0xFF, new byte[] { },   0, "array");
+            AddCommand("es-wheel-device-type", "es-wheel",  4, 0xFF, new byte[] { },   0, "array");
+
             // ===== WHEEL SETTINGS (read group 64, write group 63) =====
             AddCommand("wheel-brightness",         "wheel", 64, 63, new byte[] { 1 },          1, "int");
             AddCommand("wheel-rpm-timings",        "wheel", 64, 63, new byte[] { 2 },         10, "array");

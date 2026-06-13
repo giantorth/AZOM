@@ -51,8 +51,25 @@ namespace MozaPlugin.Devices
             return ok;
         }
 
-        /// <summary>Send setting reads on the dashboard connection (e.g. DashSettingsReadCommands).</summary>
+        /// <summary>Send setting reads on the dashboard connection.</summary>
         public void ReadSettings(params string[] commandNames) => _deviceManager.ReadSettings(commandNames);
+
+        /// <summary>
+        /// Write an int setting to an explicit device id on the dashboard
+        /// connection. Used to push the live RPM/flag LED bitmask
+        /// (dash-send-telemetry) to a standalone-USB CM2, which bridges as the
+        /// root device (0x12) on this dedicated pipe.
+        /// </summary>
+        public bool WriteSettingForDevice(string commandName, byte deviceId, int value)
+            => _deviceManager.WriteSettingForDevice(commandName, deviceId, value);
+
+        /// <summary>
+        /// Write a byte-array command to an explicit device id on the dashboard
+        /// connection. Used to push the live flag-LED colours (dash-flag-colors,
+        /// group 0x32 cmd 08 00) to a standalone-USB CM2 at root device 0x12.
+        /// </summary>
+        public bool WriteArrayForDevice(string commandName, byte deviceId, byte[] payload)
+            => _deviceManager.WriteArrayForDevice(commandName, deviceId, payload);
 
         public void Disconnect() => _connection.Disconnect();
 

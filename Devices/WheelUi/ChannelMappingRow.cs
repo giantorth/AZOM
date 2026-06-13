@@ -34,10 +34,181 @@ namespace MozaPlugin.Devices.WheelUi
         /// <summary>True for a CM1 base-bridged dash field (group-0x35). Flat — uses
         /// FieldId only (no RecordKey); the row maps the field to a SimHub property.</summary>
         public bool IsCm1 { get; set; }
+        /// <summary>True for a net-new synthetic split field (not in the static catalog).
+        /// Such a row offers "Remove split" instead of "Reset field" and always persists a
+        /// full mapping with an explicit byte span.</summary>
+        public bool IsSynthetic { get; set; }
         public string RecordKey { get; set; } = "";
         public string FieldId { get; set; } = "";
         /// <summary>Human-readable field output capability, e.g. "0–255".</summary>
         public string CapabilityText { get; set; } = "";
+        /// <summary>Record payload length (wire len byte) — caps the highest editable data
+        /// byte at <c>PayloadLen-1</c>. Set by the FSR1 factory; 0 for non-FSR1 rows.</summary>
+        public int PayloadLen { get; set; }
+
+        // ── FSR1 boundary / scale editor state (coupled-divider model) ──────
+        // An FSR1 record is a CONTIGUOUS, gapless partition of data bytes [5, PayloadLen-1]
+        // (that is how PitHouse packs it — every byte belongs to exactly one field). So the
+        // editor treats each field as separated from its neighbours by a shared divider:
+        // stepping a boundary moves that one divider, reapportioning a single byte between
+        // this field and the adjacent one. PrevField/NextField are wired by the FSR1 factory
+        // in field order; null at the record's fixed edges (first field's left edge = 5,
+        // last field's right edge = PayloadLen-1, neither of which can move). Span mutation
+        // goes through SetSpan (raises UI only); the code-behind owns persistence + probe so
+        // the per-property persist listener never double-fires on a coupled move.
+
+        /// <summary>Adjacent field sharing this field's LEFT divider, or null at the record start.</summary>
+        public ChannelMappingRow? PrevField { get; set; }
+        /// <summary>Adjacent field sharing this field's RIGHT divider, or null at the record end.</summary>
+        public ChannelMappingRow? NextField { get; set; }
+
+        /// <summary>Payload-relative first data byte of the field (inclusive).</summary>
+        public int Start { get; set; } = 5;
+        /// <summary>Payload-relative last data byte of the field (inclusive).</summary>
+        public int End { get; set; } = 5;
+
+        private bool _littleEndian;
+        /// <summary>Width-2 byte order. Ignored for width 1/3 (U8 / U24-BE are fixed). </summary>
+        public bool LittleEndian
+        {
+            get => _littleEndian;
+            set
+            {
+                if (_littleEndian == value) return;
+                _littleEndian = value;
+                // Raise LittleEndian itself so the persist listener fires, then the
+                // layout-dependent properties (EncodingText etc.) for the UI.
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LittleEndian)));
+                RaiseLayoutChanged();
+            }
+        }
+
+        private double _scale = 1;
+        /// <summary>Per-field gain: emitted value = <c>raw·Scale + Bias</c>. 1 = no gain.</summary>
+        public double Scale
+        {
+            get => _scale;
+            set
+            {
+                if (_scale.Equals(value)) return;
+                _scale = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Scale)));
+            }
+        }
+
+        private double _bias;
+        /// <summary>Per-field offset added after Scale. 0 = none. (FSR1 only; CM1 uses Scale alone.)</summary>
+        public double Bias
+        {
+            get => _bias;
+            set
+            {
+                if (_bias.Equals(value)) return;
+                _bias = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Bias)));
+            }
+        }
+
+        /// <summary>Field width in bytes (1..3), derived from the current Start/End span.</summary>
+        public int Width => End - Start + 1;
+
+        /// <summary>The resolved encoding label shown next to the steppers, e.g. "U8", "U16 BE".</summary>
+        public string EncodingText => Width switch
+        {
+            1 => "U8",
+            2 => _littleEndian ? "U16 LE" : "U16 BE",
+            _ => "U24 BE",
+        };
+
+        /// <summary>BE/LE toggle only applies to a 2-byte field; hidden otherwise.</summary>
+        public bool EndianApplies => Width == 2;
+
+        /// <summary>An FSR1 field ≥ 2 bytes wide can be split into two smaller fields.</summary>
+        public bool CanSplit => IsFsr1 && Width >= 2;
+
+        /// <summary>A catalog (non-synthetic) FSR1 field — offers "Reset field"; a synthetic split
+        /// offers "Remove split" instead. Fixed per row lifetime (no notify).</summary>
+        public bool IsCatalogFsr1 => IsFsr1 && !IsSynthetic;
+
+        // Divider guards. A divider can move only if BOTH neighbours can absorb it: the field
+        // gaining a byte stays ≤ 3 wide, the field losing a byte stays ≥ 1 wide. A boundary at
+        // a record edge (Prev/Next == null) is fixed and never moves.
+        public bool CanStartMinus => PrevField != null && PrevField.Width > 1 && Width < 3;
+        public bool CanStartPlus => PrevField != null && Width > 1 && PrevField.Width < 3;
+        public bool CanEndMinus => NextField != null && Width > 1 && NextField.Width < 3;
+        public bool CanEndPlus => NextField != null && NextField.Width > 1 && Width < 3;
+
+        /// <summary>Move the LEFT divider one byte toward the record start: this field grows
+        /// left, the previous field shrinks from its right. Returns the neighbour that also
+        /// changed (so the caller can persist it), or null if the move was not allowed.</summary>
+        public ChannelMappingRow? StartMinus()
+        {
+            if (!CanStartMinus) return null;
+            var p = PrevField!;
+            p.SetSpan(p.Start, p.End - 1);
+            SetSpan(Start - 1, End);
+            return p;
+        }
+
+        /// <summary>Move the LEFT divider one byte toward the record end: this field shrinks
+        /// from its left, the previous field grows right.</summary>
+        public ChannelMappingRow? StartPlus()
+        {
+            if (!CanStartPlus) return null;
+            var p = PrevField!;
+            p.SetSpan(p.Start, p.End + 1);
+            SetSpan(Start + 1, End);
+            return p;
+        }
+
+        /// <summary>Move the RIGHT divider one byte toward the record start: this field shrinks
+        /// from its right, the next field grows left.</summary>
+        public ChannelMappingRow? EndMinus()
+        {
+            if (!CanEndMinus) return null;
+            var n = NextField!;
+            n.SetSpan(n.Start - 1, n.End);
+            SetSpan(Start, End - 1);
+            return n;
+        }
+
+        /// <summary>Move the RIGHT divider one byte toward the record end: this field grows
+        /// right, the next field shrinks from its left.</summary>
+        public ChannelMappingRow? EndPlus()
+        {
+            if (!CanEndPlus) return null;
+            var n = NextField!;
+            n.SetSpan(n.Start + 1, n.End);
+            SetSpan(Start, End + 1);
+            return n;
+        }
+
+        /// <summary>Set the span and refresh the dependent UI state. Does NOT route through the
+        /// Start/End setters, so the per-property persist listener is not triggered — the
+        /// code-behind persists both sides of a divider move explicitly.</summary>
+        public void SetSpan(int start, int end)
+        {
+            Start = start;
+            End = end;
+            RaiseLayoutChanged();
+        }
+
+        // A span/endianness change can flip the encoding text, the BE/LE visibility, and every
+        // stepper guard (a neighbour's guards depend on this field's width) — re-raise the lot.
+        // Public so the code-behind can refresh sibling rows after a divider move ripples out.
+        public void RaiseLayoutChanged()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Start)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(End)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Width)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EncodingText)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EndianApplies)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanSplit)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanStartMinus)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanStartPlus)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanEndMinus)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanEndPlus)));
+        }
 
         private double _inMin;
         public double InMin

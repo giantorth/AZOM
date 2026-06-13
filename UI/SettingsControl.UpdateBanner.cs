@@ -866,6 +866,18 @@ namespace MozaPlugin
         private void UpdateBanner_Restart_Click(object sender, RoutedEventArgs e) => DoRestart();
         private void HeaderUpdateRestart_Click(object sender, RoutedEventArgs e) => DoRestart();
 
+        // Restart button on the device-definition-deployed status-hint banner.
+        // The button lives inside the HintBanners ItemsControl template (no
+        // x:Name), so disable the clicked button directly to block a double-fire,
+        // re-enabling it only if the exit request couldn't be issued.
+        private void HintRestart_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null) button.IsEnabled = false;
+            bool ok = _plugin?.RestartSimHub() ?? false;
+            if (!ok && button != null) button.IsEnabled = true;
+        }
+
         // Asks SimHub to exit and relaunch so the freshly-installed DLL loads.
         // Disables the Restart buttons first so a double-click can't fire two
         // exit requests; re-enables them if the request couldn't be issued so

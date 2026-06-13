@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
+using MozaPlugin.Resources;
 
 namespace MozaPlugin.Devices.WheelUi
 {
@@ -41,8 +42,8 @@ namespace MozaPlugin.Devices.WheelUi
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "Moza dashboard (*.mzdash)|*.mzdash|All files (*.*)|*.*",
-                Title = "Pick a .mzdash file to upload",
+                Filter = Strings.Upload_FileDialog_Filter,
+                Title = Strings.Upload_FileDialog_Title,
             };
             if (dlg.ShowDialog() != true) return;
             try
@@ -57,7 +58,7 @@ namespace MozaPlugin.Devices.WheelUi
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to read .mzdash file:\n{ex.Message}",
+                MessageBox.Show(string.Format(Strings.Dialog_ReadMzdashFailed, ex.Message),
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -102,7 +103,7 @@ namespace MozaPlugin.Devices.WheelUi
             if (_plugin == null) return;
             using (var dlg = new System.Windows.Forms.FolderBrowserDialog())
             {
-                dlg.Description = "Select folder containing .mzdash dashboard files";
+                dlg.Description = Strings.Upload_FolderDialog_Description;
                 dlg.ShowNewFolderButton = false;
                 if (!string.IsNullOrEmpty(_plugin.ActiveTelemetryMzdashFolder)
                     && System.IO.Directory.Exists(_plugin.ActiveTelemetryMzdashFolder))
@@ -123,9 +124,8 @@ namespace MozaPlugin.Devices.WheelUi
             if (!System.IO.Directory.Exists(dashesRoot))
             {
                 MessageBox.Show(
-                    $"MOZA Pit House dashboard folder not found at:\n{dashesRoot}\n\n" +
-                    "Install MOZA Pit House and load a dashboard, or use Set Folder… to point at a custom location.",
-                    "Auto-detect dashboard folder",
+                    string.Format(Strings.Upload_AutoDetect_NotFound, dashesRoot),
+                    Strings.Upload_AutoDetect_Caption,
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -146,9 +146,7 @@ namespace MozaPlugin.Devices.WheelUi
                 if (match != null)
                     picked = match;
                 else
-                    failReason = $"No dashboard folder for the connected wheel (UID {uidHex}).\n" +
-                                 $"Looked under:\n{dashesRoot}\n\n" +
-                                 "Open a dashboard in MOZA Pit House for this wheel first.";
+                    failReason = string.Format(Strings.Upload_AutoDetect_NoFolderForWheel, uidHex, dashesRoot);
             }
             else
             {
@@ -159,16 +157,14 @@ namespace MozaPlugin.Devices.WheelUi
                 if (guidDirs.Count == 1)
                     picked = guidDirs[0];
                 else if (guidDirs.Count == 0)
-                    failReason = "No wheel-specific dashboard folders found under _dashes. " +
-                                 "Open MOZA Pit House and load a dashboard, then try again.";
+                    failReason = Strings.Upload_AutoDetect_NoFolders;
                 else
-                    failReason = $"Multiple dashboard folders found ({guidDirs.Count}) and no wheel is connected. " +
-                                 "Connect your wheel and try again, or use Set Folder… to choose manually.";
+                    failReason = string.Format(Strings.Upload_AutoDetect_Multiple, guidDirs.Count);
             }
 
             if (picked == null)
             {
-                MessageBox.Show(failReason, "Auto-detect dashboard folder",
+                MessageBox.Show(failReason, Strings.Upload_AutoDetect_Caption,
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -190,7 +186,7 @@ namespace MozaPlugin.Devices.WheelUi
         {
             if (UploadFolderInfo == null) return;
             var folder = _plugin?.ActiveTelemetryMzdashFolder;
-            UploadFolderInfo.Text = string.IsNullOrEmpty(folder) ? "" : $"Folder: {folder}";
+            UploadFolderInfo.Text = string.IsNullOrEmpty(folder) ? "" : string.Format(Strings.Upload_FolderPrefix, folder);
         }
 
         private void UploadLibraryCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -206,7 +202,7 @@ namespace MozaPlugin.Devices.WheelUi
                 _uploadPickedSourceLabel = "";
                 _uploadPickedSourceDirectory = "";
                 if (UploadStatusText != null)
-                    UploadStatusText.Text = $"Cannot resolve raw bytes for \"{name}\" — pick a local file instead.";
+                    UploadStatusText.Text = string.Format(Strings.Upload_CannotResolveBytes, name);
                 return;
             }
             _uploadPickedContent = bytes;
@@ -216,8 +212,9 @@ namespace MozaPlugin.Devices.WheelUi
             // DashCache so widget PNG assets can be looked up. Builtins from
             // embedded resources have no dir → single-file upload.
             _uploadPickedSourceDirectory = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
-            if (UploadStatusText != null && UploadStatusText.Text.StartsWith("Cannot resolve"))
-                UploadStatusText.Text = "idle";
+            if (UploadStatusText != null
+                && UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_CannotResolveBytes))
+                UploadStatusText.Text = Strings.Status_Idle;
         }
 
         private void UploadNow_Click(object sender, RoutedEventArgs e)
@@ -227,13 +224,13 @@ namespace MozaPlugin.Devices.WheelUi
             if (ts == null)
             {
                 if (UploadStatusText != null)
-                    UploadStatusText.Text = "Telemetry sender unavailable (plugin not initialised).";
+                    UploadStatusText.Text = Strings.Status_TelemetrySenderUnavailableInit;
                 return;
             }
             if (_uploadPickedContent == null || _uploadPickedContent.Length == 0)
             {
                 if (UploadStatusText != null)
-                    UploadStatusText.Text = "Pick a .mzdash file or library entry first.";
+                    UploadStatusText.Text = Strings.Status_PickMzdashFirst;
                 return;
             }
             string name = !string.IsNullOrEmpty(_uploadPickedName) ? _uploadPickedName : "dashboard";
@@ -244,8 +241,8 @@ namespace MozaPlugin.Devices.WheelUi
             if (UploadStatusText != null)
             {
                 UploadStatusText.Text = queued
-                    ? $"Upload queued — pushing \"{name}\" to the wheel…"
-                    : "Upload not started — wheel not connected or no management session yet.";
+                    ? string.Format(Strings.Upload_Queued, name)
+                    : Strings.Upload_NotStarted;
             }
         }
 
@@ -279,27 +276,27 @@ namespace MozaPlugin.Devices.WheelUi
             if (((Button)sender).Tag is not WheelFileRow row) return;
             if (string.IsNullOrEmpty(row.Id))
             {
-                MessageBox.Show($"Cannot delete \"{row.Title}\": wheel did not assign an id.",
+                MessageBox.Show(string.Format(Strings.Dialog_CannotDeleteNoId, row.Title),
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             var confirm = MessageBox.Show(
-                $"Delete \"{row.Title}\" from the wheel?\n\nDirName: {row.DirName}\nId: {row.Id}",
-                "Moza — confirm delete",
+                string.Format(Strings.Dialog_ConfirmDelete_Body, row.Title, row.DirName, row.Id),
+                Strings.Dialog_ConfirmDelete_Caption,
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Question);
             if (confirm != MessageBoxResult.OK) return;
             var ts = _plugin?.TelemetrySender;
             if (ts == null)
             {
-                MessageBox.Show("Telemetry sender unavailable.",
+                MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             byte[]? reply = ts.SendRpcCall("completelyRemove", row.Id);
             if (reply == null)
                 MessageBox.Show(
-                    $"completelyRemove(\"{row.Id}\") timed out. The dashboard may still be present on the wheel.",
+                    string.Format(Strings.Dialog_CompletelyRemoveTimeout, row.Id),
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Warning);
 #pragma warning restore CS0162
         }
@@ -347,9 +344,9 @@ namespace MozaPlugin.Devices.WheelUi
             if (UploadStatusText != null && !inFlight && total != 0)
             {
                 if (bw == total)
-                    UploadStatusText.Text = $"Upload complete (bytes_written={bw} == total_size={total}, status=0x{status:X2})";
-                else if (UploadStatusText.Text.StartsWith("Upload queued"))
-                    UploadStatusText.Text = $"Upload stopped (bytes_written={bw} / total_size={total}, status=0x{status:X2})";
+                    UploadStatusText.Text = string.Format(Strings.Upload_Complete, bw, total, status.ToString("X2"));
+                else if (UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
+                    UploadStatusText.Text = string.Format(Strings.Upload_Stopped, bw, total, status.ToString("X2"));
             }
 
             // Enable the upload button only when the wheel is connected and a
@@ -401,7 +398,7 @@ namespace MozaPlugin.Devices.WheelUi
             if (WheelFilesStatusBox != null)
             {
                 if (state == null)
-                    WheelFilesStatusBox.Text = "(no configJson state received yet)";
+                    WheelFilesStatusBox.Text = Strings.Status_NoConfigJsonState;
                 else
                     WheelFilesStatusBox.Text =
                         $"{rows.Count} dashboards (captured {state.CapturedAt:HH:mm:ss})";

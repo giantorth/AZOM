@@ -20,3 +20,17 @@ Extracted byte-exact 2026-04-23 from `usb-capture/ksp/putOnWheelAndOpenPitHouse.
 | identity_09 | `00 04` (hub/base return `00 01`) |
 
 Sim's `pedal_identity` in `WHEEL_MODELS['kspro']` covers these. PitHouse probes pedal on KS Pro captures; sim answers via procedural per-device identity dispatch.
+
+### SR-P Lite on R5 base (live probe 2026-06-12)
+
+On a base that integrates pedals into the base MCU, `0x19` is a **base-MCU module**, not separate silicon — it shares the base's MCU UID and sw-version and is distinguished by model-name + hw module code (`PM` = Pedal Module):
+
+| Field | Pedal (dev 0x19) |
+|-------|------------------|
+| name | `SR-P Lite` |
+| hw_version | `RS21-D05-HW PM-C` |
+| sw_version | `RS21-D05-MC WB` (shared with base `0x12/0x13` and ES wheel `0x18`) |
+| mcu_uid | shared with base / ES wheel |
+| dev_type | `01 02 10 09` (same as base — not distinguishing) |
+
+Contrast the KS Pro pedal above (`RS21-D01-*`, own `hw_id`), which is a separate device. See [`known-wheel-models.md`](known-wheel-models.md) § ES wheel identity for the full device-id map.

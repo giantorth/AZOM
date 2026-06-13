@@ -71,6 +71,10 @@ namespace MozaPlugin
         public int[]? WheelKnobPrimaryColors { get; set; }
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
+        // null = no override (fall through to baseline). Single wheel-wide toggle.
+        public bool? WheelKnobDefaultDuringTelemetry { get; set; }
+        // Knob static-hold restore timeout (ms). -1 = no override; 0 = off.
+        public int WheelKnobStaticTimeoutMs { get; set; } = -1;
 
         // Telemetry — per-game dashboard selection (per-wheel-page-per-game).
         public string? TelemetryProfileName { get; set; }
@@ -112,6 +116,8 @@ namespace MozaPlugin
                 WheelKnobRingColors = WheelKnobRingColors != null
                     ? (int[])WheelKnobRingColors.Clone() : null,
                 WheelKnobRingBrightness = WheelKnobRingBrightness,
+                WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry,
+                WheelKnobStaticTimeoutMs = WheelKnobStaticTimeoutMs,
                 TelemetryProfileName = TelemetryProfileName,
                 TelemetryMzdashPath = TelemetryMzdashPath,
             };
@@ -136,8 +142,54 @@ namespace MozaPlugin
         /// <summary>Source value mapped to the field's full-scale output.</summary>
         public double InMax { get; set; } = 1;
 
+        // ── Boundary / encoding / gain overrides (null = use the catalog default) ──
+        // Per-profile layer over the static Fsr1DashboardCatalog so users can correct
+        // wrong-grid fields (e.g. GT-style 0x11/0x12) without a code change. A null
+        // override means "no opinion → catalog default"; only deviations are persisted.
+        /// <summary>Payload-relative first byte, null = catalog default.</summary>
+        public int? StartOffset { get; set; }
+        /// <summary>Payload-relative last byte (inclusive), null = catalog default.</summary>
+        public int? EndOffset { get; set; }
+        /// <summary>Width-2 only: true = U16-LE, false = U16-BE; null = catalog default.</summary>
+        public bool? LittleEndian { get; set; }
+        /// <summary>Output gain: raw·Scale + Bias; null = 1.0. (CM1: per-field gain.)</summary>
+        public double? Scale { get; set; }
+        /// <summary>Output offset added after Scale; null = 0.0.</summary>
+        public double? Bias { get; set; }
+
         public Fsr1FieldMapping Clone() =>
-            new Fsr1FieldMapping { Property = Property, InMin = InMin, InMax = InMax };
+            new Fsr1FieldMapping
+            {
+                Property = Property, InMin = InMin, InMax = InMax,
+                StartOffset = StartOffset, EndOffset = EndOffset,
+                LittleEndian = LittleEndian, Scale = Scale, Bias = Bias,
+            };
+    }
+
+    /// <summary>
+    /// A net-new FSR V1 field split out of a catalog field — it does not exist in the
+    /// static <see cref="MozaPlugin.Telemetry.Fsr1DashboardCatalog"/>, so it lives in the
+    /// profile and is merged into the field list at every enumeration point (driver, UI,
+    /// probe, viz). Carries its identity plus full mapping inline, so there is a single
+    /// source of truth (no two-dict consistency hazard). The inline mapping ALWAYS sets an
+    /// explicit StartOffset/EndOffset, so a synthetic never prunes to nothing.
+    /// </summary>
+    public sealed class Fsr1SyntheticField
+    {
+        /// <summary>Generated unique key within the record (e.g. "split1"). Never parsed.</summary>
+        public string FieldId { get; set; } = "";
+        /// <summary>Display label shown in the channel-mapping list.</summary>
+        public string Label { get; set; } = "";
+        /// <summary>Channel mapping + explicit byte span owned by this synthetic field.</summary>
+        public Fsr1FieldMapping Mapping { get; set; } = new Fsr1FieldMapping();
+
+        public Fsr1SyntheticField Clone() =>
+            new Fsr1SyntheticField
+            {
+                FieldId = FieldId,
+                Label = Label,
+                Mapping = Mapping?.Clone() ?? new Fsr1FieldMapping(),
+            };
     }
 
     public sealed class Ab9Settings
@@ -330,6 +382,10 @@ namespace MozaPlugin
         public int[]? WheelKnobPrimaryColors { get; set; }    // [5] — W17/W18
         public int[]? WheelKnobRingColors { get; set; }       // [56] — Group 3 per-LED ring
         public int WheelKnobRingBrightness { get; set; } = -1;
+        // Single wheel-wide "restore stored knob colors when telemetry sends off" toggle.
+        public bool WheelKnobDefaultDuringTelemetry { get; set; }
+        // Knob static-hold restore timeout in ms (0 = off).
+        public int WheelKnobStaticTimeoutMs { get; set; }
         public int[]? DashRpmColors { get; set; }         // [10]
         public int[]? DashRpmBlinkColors { get; set; }   // [10]
         public int[]? DashFlagColors { get; set; }        // [6]
@@ -387,10 +443,20 @@ namespace MozaPlugin
         public Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>> Fsr1DashboardMappings { get; set; }
             = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
 
+        // ===== FSR V1 synthetic split fields (per-profile, net-new) =====
+        // A "split" carves a new sub-span out of a catalog field; the resulting field is
+        // net-new (not in the static catalog) and gets its own channel mapping. Stored here
+        // and merged into the field list at every enumeration point (see Fsr1FieldComposer).
+        // Outer key  = wheel page DescriptorUniqueId GUID
+        // Middle key = record-type key (Fsr1DashboardCatalog.Key, e.g. "type-02")
+        // List       = the synthetic fields added to that record, in creation order.
+        public Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>> Fsr1SyntheticFields { get; set; }
+            = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
+
         // CM1 base-bridged dash (group-0x35) field mappings. Flat — the CM1 streams one
         // keyed field set regardless of selected dashboard, so there is no per-dashboard
         // record-key level:
-        //   Outer key = dash device GUID (MozaDeviceConstants.DashGuid)
+        //   Outer key = dash device GUID (MozaDeviceConstants.DashCm1Guid)
         //   Inner key = field id (Cm1FieldDef.FieldId, e.g. "f54d")
         // Reuses Fsr1FieldMapping (only Property is used; InMin/InMax unused for CM1).
         public Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>> Cm1FieldMappings { get; set; }
@@ -492,6 +558,8 @@ namespace MozaPlugin
             WheelKnobPrimaryColors = CloneArray(p.WheelKnobPrimaryColors);
             WheelKnobRingColors = CloneArray(p.WheelKnobRingColors);
             WheelKnobRingBrightness = p.WheelKnobRingBrightness;
+            WheelKnobDefaultDuringTelemetry = p.WheelKnobDefaultDuringTelemetry;
+            WheelKnobStaticTimeoutMs = p.WheelKnobStaticTimeoutMs;
             DashRpmColors = CloneArray(p.DashRpmColors);
             DashRpmBlinkColors = CloneArray(p.DashRpmBlinkColors);
             DashFlagColors = CloneArray(p.DashFlagColors);
@@ -553,6 +621,26 @@ namespace MozaPlugin
                         middle[rec.Key] = inner;
                     }
                     Fsr1DashboardMappings[kvp.Key] = middle;
+                }
+            }
+
+            // FSR V1 synthetic split fields (deep clone)
+            Fsr1SyntheticFields = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
+            if (p.Fsr1SyntheticFields != null)
+            {
+                foreach (var kvp in p.Fsr1SyntheticFields)
+                {
+                    if (kvp.Value == null) continue;
+                    var middle = new Dictionary<string, List<Fsr1SyntheticField>>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var rec in kvp.Value)
+                    {
+                        if (rec.Value == null) continue;
+                        var list = new List<Fsr1SyntheticField>(rec.Value.Count);
+                        foreach (var syn in rec.Value)
+                            if (syn != null) list.Add(syn.Clone());
+                        middle[rec.Key] = list;
+                    }
+                    Fsr1SyntheticFields[kvp.Key] = middle;
                 }
             }
 

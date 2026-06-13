@@ -18,6 +18,12 @@ namespace MozaPlugin.Protocol
         public const byte DeviceBase = 19;
         public const byte DeviceDash = 20;
         public const byte DeviceWheel = 23;
+        // ES (old-protocol) steering wheel: a module of the wheelbase MCU,
+        // reachable at its own internal id 0x18 (24). Distinct from DeviceWheel
+        // (0x17), which is silent on ES hardware. Shares the base MCU UID +
+        // sw-version; identified by model-name (group 0x07 → "ES") and hw-version
+        // (0x08 → "…SM-C"). See docs/protocol/identity/known-wheel-models.md.
+        public const byte DeviceEsWheel = 24; // 0x18
         public const byte DevicePedals = 25;
         public const byte DeviceHPattern = 26;
         public const byte DeviceSequential = 26;

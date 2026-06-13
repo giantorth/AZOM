@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using MozaPlugin.Sdk;
 using MozaPlugin.Sdk.Coap;
+using MozaPlugin.Resources;
 
 namespace MozaPlugin
 {
@@ -102,7 +103,7 @@ namespace MozaPlugin
                 && _plugin.ControlUdpServer == null
                 && _plugin.SdkStubManager == null)
             {
-                SdkServerStatusText.Text = "Disabled";
+                SdkServerStatusText.Text = Strings.Sdk_Status_Disabled;
                 return;
             }
 
@@ -127,16 +128,16 @@ namespace MozaPlugin
             if (!string.IsNullOrEmpty(liveStatus)) return liveStatus!;
             // The toggles are live, so an "enabled" intent with no live status
             // yet is just the brief window before the background start finishes.
-            return enabledIntent ? "Starting…" : "Disabled";
+            return enabledIntent ? Strings.Sdk_Status_Starting : Strings.Sdk_Status_Disabled;
         }
 
         private static string DescribeStubStatus(Sdk.CoapStubManager? stub, bool enabledIntent)
         {
             if (stub == null)
-                return enabledIntent ? "Starting…" : "Disabled";
+                return enabledIntent ? Strings.Sdk_Status_Starting : Strings.Sdk_Status_Disabled;
             return stub.IsRunning
-                ? $"Running (PID {stub.ProcessId})"
-                : "Stopped";
+                ? string.Format(Strings.Sdk_Status_RunningPid, stub.ProcessId)
+                : Strings.Sdk_Status_Stopped;
         }
 
         /// <summary>
@@ -157,10 +158,10 @@ namespace MozaPlugin
             if (server == null)
             {
                 if (_sdkRecentRequests.Count != 1
-                    || !string.Equals(_sdkRecentRequests[0], "Server not started — enable with the toggle above", StringComparison.Ordinal))
+                    || !string.Equals(_sdkRecentRequests[0], Strings.Sdk_ServerNotStarted, StringComparison.Ordinal))
                 {
                     _sdkRecentRequests.Clear();
-                    _sdkRecentRequests.Add("Server not started — enable with the toggle above");
+                    _sdkRecentRequests.Add(Strings.Sdk_ServerNotStarted);
                 }
                 _sdkRecentDirty = false;
                 return;
@@ -185,7 +186,7 @@ namespace MozaPlugin
             _sdkRecentRequests.Clear();
             if (rendered.Count == 0)
             {
-                _sdkRecentRequests.Add("No requests yet");
+                _sdkRecentRequests.Add(Strings.Sdk_NoRequestsYet);
             }
             else
             {
@@ -272,10 +273,10 @@ namespace MozaPlugin
             if (server == null)
             {
                 if (_controlUdpRecentRequests.Count != 1
-                    || !string.Equals(_controlUdpRecentRequests[0], "Server not started — enable with the toggle above", StringComparison.Ordinal))
+                    || !string.Equals(_controlUdpRecentRequests[0], Strings.Sdk_ServerNotStarted, StringComparison.Ordinal))
                 {
                     _controlUdpRecentRequests.Clear();
-                    _controlUdpRecentRequests.Add("Server not started — enable with the toggle above");
+                    _controlUdpRecentRequests.Add(Strings.Sdk_ServerNotStarted);
                 }
                 _controlUdpRecentDirty = false;
                 return;
@@ -294,7 +295,7 @@ namespace MozaPlugin
             _controlUdpRecentRequests.Clear();
             if (rendered.Count == 0)
             {
-                _controlUdpRecentRequests.Add("No requests yet — third-party tools only talk here when they read or write a setting");
+                _controlUdpRecentRequests.Add(Strings.Sdk_NoRequestsYet_Udp);
             }
             else
             {

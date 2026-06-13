@@ -200,8 +200,6 @@ namespace MozaPlugin.Devices
                 MozaLog.Info(
                     $"[AZOM] Standalone dashboard detected from USB PID " +
                     $"{dashPid} ({MozaUsbIds.Describe(dashPid)}; {reason})");
-                // Skip the legacy SHDP group-0x33 dash reads — a CM2 is driven by
-                // the 0x43 telemetry path, so those reads are pointless bleedthrough.
             }
 
             try { _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }

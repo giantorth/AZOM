@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MozaControls;
 using MozaPlugin.Devices.WheelUi;
+using MozaPlugin.Resources;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
@@ -765,7 +766,7 @@ skipReadByMode:
             if (!ResolvePlugin())
             {
                 StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = "Plugin not loaded";
+                StatusText.Text = Strings.Status_PluginNotLoaded;
                 WheelNotDetectedPanel.Visibility = Visibility.Visible;
                 DashboardTab.Visibility = Visibility.Collapsed;
                 RpmTab.Visibility = Visibility.Collapsed;
@@ -783,7 +784,10 @@ skipReadByMode:
             StatusText.Text = wheelConnected ? "Connected" : "Disconnected";
 
             bool isOldProtoDevice = LinkedLedDriver?.ExpectedModelPrefix == MozaDeviceConstants.OldProtocolMarker;
-            bool oldWheel = wheelConnected && isOldProtoDevice && _plugin!.IsOldWheelDetected;
+            // IsConnected() already matched this device to the connected wheel, so
+            // the global flag tells us its protocol. Covers both the generic
+            // old-proto marker device and a model-specific old wheel (ES @ 0x18).
+            bool oldWheel = wheelConnected && _plugin!.IsOldWheelDetected;
             // Wait for wheel-model-name to arrive before declaring the panel
             // "ready": the per-page guid is keyed off the model prefix, and any
             // UI write into a per-page bundle/overlay before that resolves
@@ -847,6 +851,18 @@ skipReadByMode:
                     SetComboSafe(WheelKnobIdleEffectCombo, _data.WheelKnobIdleEffect);
                     SetComboSafe(WheelKnobLedModeCombo, _data.WheelKnobLedMode);
                     SetComboSafe(WheelButtonLedModeCombo, _data.WheelButtonsLedMode);
+                    if (WiKnobDefaultTelemetryToggle != null
+                        && (WiKnobDefaultTelemetryToggle.IsChecked == true) != _data.WheelKnobDefaultDuringTelemetry)
+                        WiKnobDefaultTelemetryToggle.IsChecked = _data.WheelKnobDefaultDuringTelemetry;
+                    if (WiKnobStaticTimeoutSlider != null)
+                    {
+                        int staticMs = _data.WheelKnobStaticTimeoutMs;
+                        if (staticMs < 0) staticMs = 0;
+                        WiKnobStaticTimeoutSlider.Value = System.Math.Max(WiKnobStaticTimeoutSlider.Minimum,
+                            System.Math.Min(WiKnobStaticTimeoutSlider.Maximum, staticMs));
+                        if (WiKnobStaticTimeoutValue != null)
+                            WiKnobStaticTimeoutValue.Text = staticMs == 0 ? Strings.Option_Off : $"{staticMs} ms";
+                    }
 
                     // Idle-effect speed sliders. Read from _data (mirrored from
                     // the overlay by ApplyWheelToHardware on detection, and
@@ -1161,6 +1177,32 @@ skipReadByMode:
             _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobLedMode = val);
             _plugin.WriteIfWheelDetected("wheel-knob-led-mode", val);
             if (val == 2) _plugin.RepushStaticPalette(LedKind.Knob);
+            _plugin.SaveSettings();
+        }
+
+        // Single wheel-wide "default during telemetry" toggle for the knob ring LEDs:
+        // when the live pipeline drives the knobs fully off, release telemetry ownership
+        // so the wheel reverts to its stored knob colours (see the knob block in
+        // MozaLedDeviceManager.Display + _data.WheelKnobDefaultDuringTelemetry).
+        private void WiKnobDefaultTelemetryToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null || _data == null) return;
+            bool on = WiKnobDefaultTelemetryToggle.IsChecked == true;
+            _data.WheelKnobDefaultDuringTelemetry = on;
+            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobDefaultDuringTelemetry = on);
+            _plugin.SaveSettings();
+        }
+
+        // Max time the live knob colour may be held unchanged before telemetry
+        // ownership is released (knob reverts to native per-position colours).
+        // 0 ms = off. Independent of the restore-when-off toggle above.
+        private void WiKnobStaticTimeoutSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents || _plugin == null || _data == null) return;
+            int ms = (int)System.Math.Round(e.NewValue);
+            WiKnobStaticTimeoutValue.Text = ms == 0 ? Strings.Option_Off : $"{ms} ms";
+            _data.WheelKnobStaticTimeoutMs = ms;
+            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobStaticTimeoutMs = ms);
             _plugin.SaveSettings();
         }
 

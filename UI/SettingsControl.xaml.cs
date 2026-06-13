@@ -92,7 +92,7 @@ namespace MozaPlugin
                 if (SerialTrafficCapture.Instance.Enabled)
                 {
                     SerialCaptureToggleButton.Content = "Stop capture";
-                    SerialCaptureStatusText.Text = "capturing… (always-capture is on — click Stop when ready)";
+                    SerialCaptureStatusText.Text = Strings.Status_CapturingClickStop;
                 }
             }
 
@@ -1176,7 +1176,7 @@ namespace MozaPlugin
         private void BaseCalibrateButton_Click(object sender, RoutedEventArgs e)
         {
             _plugin.WriteIfBaseConnected("base-calibration", 1);
-            BaseCalibrateStatus.Text = "Calibration sent";
+            BaseCalibrateStatus.Text = Strings.Status_CalibrationSent;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             timer.Tick += (s, _) => { BaseCalibrateStatus.Text = ""; ((DispatcherTimer)s!).Stop(); };
             timer.Start();
@@ -1223,13 +1223,13 @@ namespace MozaPlugin
         private void HbCalStartButton_Click(object sender, RoutedEventArgs e)
         {
             _plugin.WriteIfHandbrakeDetected("handbrake-cal-start", 1);
-            HbCalStatus.Text = "Calibrating — pull fully then stop";
+            HbCalStatus.Text = Strings.Status_HbCalibrating;
         }
 
         private void HbCalStopButton_Click(object sender, RoutedEventArgs e)
         {
             _plugin.WriteIfHandbrakeDetected("handbrake-cal-stop", 1);
-            HbCalStatus.Text = "Done";
+            HbCalStatus.Text = Strings.Status_Done;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             timer.Tick += (s, _) => { HbCalStatus.Text = ""; ((DispatcherTimer)s!).Stop(); };
             timer.Start();
@@ -1437,8 +1437,8 @@ namespace MozaPlugin
         private void ClearAllSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
-                "This will permanently delete all plugin settings and profiles.\n\nAre you sure?",
-                "Clear All Settings",
+                Strings.Dialog_ClearAllSettings_Body,
+                Strings.Dialog_ClearAllSettings_Caption,
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
@@ -1654,7 +1654,7 @@ namespace MozaPlugin
                 SerialCaptureOutputBox.Text = string.Empty;
                 SerialCaptureExportButton.IsEnabled = false;
                 SerialCaptureCopyButton.IsEnabled = false;
-                SerialCaptureStatusText.Text = "capturing… (open another tab and use the device, then come back to stop)";
+                SerialCaptureStatusText.Text = Strings.Status_CapturingOpenTab;
                 return;
             }
 
@@ -1662,7 +1662,7 @@ namespace MozaPlugin
             _serialCaptureSnapshot = snap;
             _serialCaptureRendered = SerialTrafficCapture.Format(snap);
             SerialCaptureToggleButton.Content = "Start capture";
-            SerialCaptureStatusText.Text = $"stopped — {snap.Count} frames captured";
+            SerialCaptureStatusText.Text = string.Format(Strings.Status_CaptureStopped, snap.Count);
             SerialCaptureOutputBox.Text = _serialCaptureRendered;
             SerialCaptureOutputBox.Visibility = System.Windows.Visibility.Visible;
             SerialCaptureExportButton.IsEnabled = true;
@@ -1696,7 +1696,7 @@ namespace MozaPlugin
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
                 FileName = $"{prefix}moza-diagnostics-bundle-{stamp}.zip",
-                Filter = "ZIP archive (*.zip)|*.zip",
+                Filter = Strings.Diag_ZipFilter,
                 DefaultExt = ".zip",
                 AddExtension = true,
                 OverwritePrompt = true,
@@ -1707,14 +1707,14 @@ namespace MozaPlugin
             {
                 var captureText = _serialCaptureRendered ?? "(no capture buffer — click Start, exercise the device, then Stop)\n";
                 DiagnosticsBundleWriter.Write(dlg.FileName, BuildDiagnosticsDump(), captureText, _serialCaptureSnapshot);
-                SerialCaptureStatusText.Text = $"exported to {dlg.FileName}";
+                SerialCaptureStatusText.Text = string.Format(Strings.Status_ExportedTo, dlg.FileName);
             }
             catch (Exception ex)
             {
                 MozaLog.Error($"[AZOM] Diagnostics export failed: {ex}");
                 System.Windows.MessageBox.Show(
                     System.Windows.Window.GetWindow(this),
-                    $"Export failed: {ex.Message}",
+                    string.Format(Strings.Dialog_ExportFailed, ex.Message),
                     "AZOM",
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
@@ -1760,8 +1760,8 @@ namespace MozaPlugin
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "Moza dashboard (*.mzdash)|*.mzdash|All files (*.*)|*.*",
-                Title = "Pick a .mzdash file to upload",
+                Filter = Strings.Upload_FileDialog_Filter,
+                Title = Strings.Upload_FileDialog_Title,
             };
             if (dlg.ShowDialog() != true) return;
             try
@@ -1776,7 +1776,7 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Failed to read .mzdash file:\n{ex.Message}",
+                System.Windows.MessageBox.Show(string.Format(Strings.Dialog_ReadMzdashFailed, ex.Message),
                     "Moza", System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
             }
@@ -1824,7 +1824,7 @@ namespace MozaPlugin
                 _uploadPickedSourceLabel = "";
                 _uploadPickedSourceDirectory = "";
                 if (UploadStatusText != null)
-                    UploadStatusText.Text = $"Cannot resolve raw bytes for \"{name}\" — pick a local file instead.";
+                    UploadStatusText.Text = string.Format(Strings.Upload_CannotResolveBytes, name);
                 return;
             }
             _uploadPickedContent = bytes;
@@ -1834,8 +1834,9 @@ namespace MozaPlugin
             // DashCache so widget PNG assets can be looked up. Builtins from
             // embedded resources have no dir → single-file upload.
             _uploadPickedSourceDirectory = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
-            if (UploadStatusText != null && UploadStatusText.Text.StartsWith("Cannot resolve"))
-                UploadStatusText.Text = "idle";
+            if (UploadStatusText != null
+                && UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_CannotResolveBytes))
+                UploadStatusText.Text = Strings.Status_Idle;
         }
 
         private void UploadNow_Click(object sender, RoutedEventArgs e)
@@ -1844,13 +1845,13 @@ namespace MozaPlugin
             if (ts == null)
             {
                 if (UploadStatusText != null)
-                    UploadStatusText.Text = "Telemetry sender unavailable (plugin not initialised).";
+                    UploadStatusText.Text = Strings.Status_TelemetrySenderUnavailableInit;
                 return;
             }
             if (_uploadPickedContent == null || _uploadPickedContent.Length == 0)
             {
                 if (UploadStatusText != null)
-                    UploadStatusText.Text = "Pick a .mzdash file or library entry first.";
+                    UploadStatusText.Text = Strings.Status_PickMzdashFirst;
                 return;
             }
             string name = !string.IsNullOrEmpty(_uploadPickedName) ? _uploadPickedName : "dashboard";
@@ -1861,8 +1862,8 @@ namespace MozaPlugin
             if (UploadStatusText != null)
             {
                 UploadStatusText.Text = queued
-                    ? $"Upload queued — pushing \"{name}\" to the wheel…"
-                    : "Upload not started — wheel not connected or no management session yet.";
+                    ? string.Format(Strings.Upload_Queued, name)
+                    : Strings.Upload_NotStarted;
             }
         }
 
@@ -1925,9 +1926,9 @@ namespace MozaPlugin
             if (UploadStatusText != null && !inFlight && total != 0)
             {
                 if (bw == total)
-                    UploadStatusText.Text = $"Upload complete (bytes_written={bw} == total_size={total}, status=0x{status:X2})";
-                else if (UploadStatusText.Text.StartsWith("Upload queued"))
-                    UploadStatusText.Text = $"Upload stopped (bytes_written={bw} / total_size={total}, status=0x{status:X2})";
+                    UploadStatusText.Text = string.Format(Strings.Upload_Complete, bw, total, status.ToString("X2"));
+                else if (UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
+                    UploadStatusText.Text = string.Format(Strings.Upload_Stopped, bw, total, status.ToString("X2"));
             }
 
             // Enable the upload button only when the wheel is connected and a
@@ -2016,7 +2017,7 @@ namespace MozaPlugin
             if (WheelFilesStatusBox != null)
             {
                 if (state == null)
-                    WheelFilesStatusBox.Text = "(no configJson state received yet)";
+                    WheelFilesStatusBox.Text = Strings.Status_NoConfigJsonState;
                 else
                     WheelFilesStatusBox.Text =
                         $"{rows.Count} dashboards (captured {state.CapturedAt:HH:mm:ss})";
@@ -2040,21 +2041,21 @@ namespace MozaPlugin
             if (string.IsNullOrEmpty(row.Id))
             {
                 System.Windows.MessageBox.Show(
-                    $"Cannot delete \"{row.Title}\": wheel did not assign an id.",
+                    string.Format(Strings.Dialog_CannotDeleteNoId, row.Title),
                     "Moza", System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Warning);
                 return;
             }
             var confirm = System.Windows.MessageBox.Show(
-                $"Delete \"{row.Title}\" from the wheel?\n\nDirName: {row.DirName}\nId: {row.Id}",
-                "Moza — confirm delete",
+                string.Format(Strings.Dialog_ConfirmDelete_Body, row.Title, row.DirName, row.Id),
+                Strings.Dialog_ConfirmDelete_Caption,
                 System.Windows.MessageBoxButton.OKCancel,
                 System.Windows.MessageBoxImage.Question);
             if (confirm != System.Windows.MessageBoxResult.OK) return;
             var ts = _plugin.TelemetrySender;
             if (ts == null)
             {
-                System.Windows.MessageBox.Show("Telemetry sender unavailable.",
+                System.Windows.MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
                     "Moza", System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
                 return;
@@ -2062,7 +2063,7 @@ namespace MozaPlugin
             byte[]? reply = ts.SendRpcCall("completelyRemove", row.Id);
             if (reply == null)
                 System.Windows.MessageBox.Show(
-                    $"completelyRemove(\"{row.Id}\") timed out. The dashboard may still be present on the wheel.",
+                    string.Format(Strings.Dialog_CompletelyRemoveTimeout, row.Id),
                     "Moza", System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Warning);
             // Wheel pushes a refreshed configJson state after completelyRemove —
@@ -2321,7 +2322,7 @@ namespace MozaPlugin
             if (selected == null)
             {
                 MBoosterStatusDot.Fill = Brushes.Gray;
-                MBoosterStatusLabel.Text = "No mBooster selected";
+                MBoosterStatusLabel.Text = Strings.Status_NoMBoosterSelected;
                 MBoosterDevicePanel.Visibility = Visibility.Collapsed;
                 return;
             }

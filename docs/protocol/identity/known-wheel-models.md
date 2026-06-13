@@ -66,21 +66,49 @@ Response (16 bytes ASCII, null-padded):
 `0x87` = `0x07 | 0x80`; `0x71` = nibble-swap of `0x17`. Length byte `0x11` =
 17 (1 cmd echo + 16 string bytes).
 
-### ES wheel identity caveat
+### ES wheel identity (device 0x18)
 
-ES (old-protocol) wheels share device ID `0x13` with the wheelbase. Probes
-sent to `0x13` return **base** identity, not wheel identity. Example: ES
-wheel mounted on R5 base returns:
+> **Corrected 2026-06-12 (live R5 base + ES wheel).** Earlier notes claimed
+> the ES wheel shared `0x13` with the base and that its model name could not
+> be queried. That was wrong: `0x13` returns the **base/motor** identity, but
+> the ES wheel answers its own identity probes at **device `0x18`**.
+
+The ES (entry) wheel is a **module of the wheelbase MCU**, not a separate
+device. It does **not** answer at the standard wheel id `0x17` (silent); its
+identity lives at `0x18`:
 
 ```
-0x07/01 → "R5 Black # MOT-1"
+0x18  0x07/01 → "ES"                  (model name)
+0x18  0x08/01 → "RS21-D05-HW SM-C"    (hw — SM = Steering Module)
+0x18  0x0F/01 → "RS21-D05-MC WB"      (sw — shared with the base MCU)
+0x18  0x06    → <12-byte UID>         (same UID as the base — shared silicon)
+0x18  0x04    → 01 02 10 09           (dev-type — identical to the base; see dev-type-table.md)
 ```
 
-— that's the base's name. **There is no known way to query an ES wheel's
-own model name via the serial protocol.** Plugin and sim treat ES wheels
-as "wheel address = 0x13" with the wheel's identity coming from the
-base; downstream code must check whether the protocol device is ES
-before assigning model-specific behavior (LED count, button count).
+For contrast, `0x13` (base) on the same unit returns `"R5 Black # MOT-1"`,
+hw `"…BM-C"` (Base Module). So the wheel and base are distinguished by
+**model-name (0x07) and hw module code (0x08)**, not by MCU UID, sw-version,
+or dev-type (which are shared across the base MCU's modules `0x12/0x13/0x18/0x19`).
+
+**Device-id map on this unit (R5 + ES + SR-P Lite + handbrake):**
+
+| dev | model (0x07) | hw (0x08) | MCU UID / sw | what |
+|-----|--------------|-----------|--------------|------|
+| `0x12` / `0x13` | `R5 Black # MOT-1` | `…BM-C` | shared `…WB` | base / motor |
+| `0x18` | `ES` | `…SM-C` | shared `…WB` | **ES wheel** |
+| `0x19` | `SR-P Lite` | `…PM-C` | shared `…WB` | integrated pedals |
+| `0x1B` | `HB # S01` | `…HB-C` | **own UID / `…HB`** | handbrake (separate MCU) |
+
+The base does **not** echo-answer arbitrary ids: `0x14/0x15/0x16/0x17/0x1A/0x1C`
+and out-of-range ids (`0x22/0x44/0x55/0x99/0xAA`) are all silent. Only the
+real modules above respond.
+
+**Plugin handling.** The plugin probes `0x18` via the dedicated `es-wheel-*`
+identity commands (device type `es-wheel`, parser hint maps the swapped id
+`0x81` → `es-wheel`), resolving the wheel to the `"ES"`
+[`WheelModelInfo`](../../../Devices/WheelModelInfo.cs) entry (RPM-only,
+`HasDisplay=false`). See the detection flow in
+[`wheel-probe-sequence.md`](wheel-probe-sequence.md).
 
 ### Cross-references
 

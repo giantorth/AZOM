@@ -472,6 +472,7 @@ namespace MozaPlugin
                 case "base":     return MozaProtocol.DeviceBase;
                 case "pedals":   return MozaProtocol.DevicePedals;
                 case "wheel":    return _wheelDeviceId;
+                case "es-wheel": return MozaProtocol.DeviceEsWheel;
                 case "dash":     return MozaProtocol.DeviceDash;
                 case "hub":      return MozaProtocol.DeviceHub;
                 case "main":     return MozaProtocol.DeviceMain;

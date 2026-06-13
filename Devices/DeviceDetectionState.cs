@@ -49,6 +49,15 @@ namespace MozaPlugin.Devices
         public volatile string LastKnownWheelModel = "";
         public int WheelPollMisses;
 
+        // One-shot guard for old-protocol wheel device-definition deployment. Set
+        // once a definition has been deployed for this old wheel — either the
+        // model-specific one (e.g. "MOZA ES", deployed from the es-wheel-model-name
+        // case once id 0x18 answers) or the generic old-proto fallback (deployed in
+        // PollStatus when no model-specific deploy happened within a grace window).
+        // Gating the PollStatus fallback on this flag stops an ES wheel from also
+        // getting the generic device, and stops re-deploying every tick.
+        public volatile bool OldProtoFallbackDeployed;
+
         // Bit g set => wheel LED group g present. Accessed via Interlocked.
         private int _wheelLedGroupMask;
 
@@ -97,6 +106,7 @@ namespace MozaPlugin.Devices
             PedalsOwner = null;
             HandbrakeOwner = null;
             BaseOwner = null;
+            OldProtoFallbackDeployed = false;
         }
 
         /// <summary>
@@ -112,6 +122,7 @@ namespace MozaPlugin.Devices
             Group3ColorsRead = false;
             WheelPollMisses = 0;
             LastKnownWheelModel = "";
+            OldProtoFallbackDeployed = false;
         }
     }
 }

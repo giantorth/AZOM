@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using MozaPlugin.Protocol;
+using MozaPlugin.Resources;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Devices
@@ -19,12 +20,10 @@ namespace MozaPlugin.Devices
     /// </summary>
     internal static class DeviceDefinitionDeployer
     {
-        private const string DashResource = "MozaPlugin.Devices.Dash.device.json";
         private const string DashCm2Resource = "MozaPlugin.Devices.DashCm2.device.json";
         private const string DashCm1Resource = "MozaPlugin.Devices.DashCm1.device.json";
         private const string OldProtoResource = "MozaPlugin.Devices.WheelOldProto.device.json";
         private const string BaseAmbientResource = "MozaPlugin.Devices.WheelBase.device.json";
-        private const string DashDeviceName = "MOZA Dashboard";
         private const string DashCm2DeviceName = "MOZA CM2 Racing Dash";
         private const string DashCm2ProductName = "CM2 Racing Dash";
         private const string DashCm1DeviceName = "MOZA CM1 Racing Dash";
@@ -36,6 +35,16 @@ namespace MozaPlugin.Devices
         // 0x0004 placeholder doesn't match any known device. Used only when
         // registry discovery returns no PID (probe path under Wine).
         private const string FallbackPid = "0x0006";
+
+        // Content version of the dynamically generated wheel device.json. Bump
+        // when the generated body changes in a way that should re-deploy over an
+        // already-written file whose LED/button/knob counts are unchanged — e.g.
+        // localizing the knob-section TitleOverride. The staleness check in
+        // DeployGeneratedWheelDefinition rewrites any file with an older
+        // SchemaVersion. v2: localized "Knob Indicators" TitleOverride. v3:
+        // RPM-only wheels (ES, bare CS) no longer emit a phantom button physical
+        // LED (10 RPM was counted as 11) and disable the buttons-backlight section.
+        private const int GeneratedWheelSchemaVersion = 3;
 
         /// <summary>
         /// Deploy a dynamically generated device definition for a new-protocol wheel.
@@ -60,19 +69,13 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Deploy the embedded dashboard device definition. Routes by PID
-        /// (CM2 = 0x0025 → CM2 template, else legacy SHDP). <paramref name="forceCm2"/>
-        /// overrides: true forces the CM2 template (CM2 wired through the base),
-        /// false forces legacy, null keeps the PID default.
+        /// Deploy the embedded CM2 dashboard device definition. The only
+        /// standalone dashboard PID is the CM2's 0x0025, and a bus-bridged dash
+        /// is either a CM2 or a CM1 (the latter via <see cref="DeployCm1Dashboard"/>),
+        /// so every <c>DeployDashboard</c> target is the CM2 template.
         /// </summary>
-        public static bool DeployDashboard(string? discoveredPid, bool? forceCm2 = null)
-        {
-            bool cm2 = forceCm2
-                ?? string.Equals(discoveredPid, MozaUsbIds.PidDashboardCm2, StringComparison.OrdinalIgnoreCase);
-            return cm2
-                ? DeployFromResource(DashCm2DeviceName, DashCm2Resource, discoveredPid, MozaDeviceConstants.DashCm2Guid)
-                : DeployFromResource(DashDeviceName, DashResource, discoveredPid, MozaDeviceConstants.DashGuid);
-        }
+        public static bool DeployDashboard(string? discoveredPid)
+            => DeployFromResource(DashCm2DeviceName, DashCm2Resource, discoveredPid, MozaDeviceConstants.DashCm2Guid);
 
         /// <summary>
         /// Deploy the CM1 base-bridged dash definition (its own GUID, distinct
@@ -160,7 +163,27 @@ namespace MozaPlugin.Devices
                         int existingLed = existing.SelectToken("LedsFeature.LogicalTelemetryLeds.LedCount")?.Value<int>() ?? -1;
                         int existingButtons = (existing.SelectToken("LedsFeature.LogicalButtonsSection.Items") as JArray)?.Count ?? -1;
                         int existingExtra = existing.SelectToken("LedsFeature.LogicalExtraSection.LedCount")?.Value<int>() ?? 0;
-                        stale = existingLed != expectedTelemetryCount || existingButtons != buttonCount || existingExtra != knobCount;
+                        int existingSchema = existing.SelectToken("SchemaVersion")?.Value<int>() ?? 0;
+                        string? existingKnobTitle = existing
+                            .SelectToken("LedsFeature.LogicalExtraSection.TitleOverride")?.Value<string>();
+                        bool? existingIndividual = existing
+                            .SelectToken("LedsFeature.IsIndividualLedsSectionEnabled")?.Value<bool>();
+                        bool expectedIndividual = buttonCount > 0 || knobCount > 0;
+                        stale = existingLed != expectedTelemetryCount
+                            || existingButtons != buttonCount
+                            || existingExtra != knobCount
+                            // Content-version bump (e.g. localized TitleOverride) forces a
+                            // one-time rewrite for users whose file predates the change.
+                            || existingSchema < GeneratedWheelSchemaVersion
+                            // Individual-LEDs flag drifted (RPM-only wheels must have it
+                            // off). Targeted: only files with the wrong value rewrite, so
+                            // button/knob wheels aren't needlessly re-deployed.
+                            || (existingIndividual.HasValue && existingIndividual.Value != expectedIndividual)
+                            // Knob-section label drifted from the current UI culture's
+                            // translation — re-deploy so it matches (handles a SimHub
+                            // language change after the file was first written).
+                            || (knobCount > 0 && !string.Equals(
+                                    existingKnobTitle, Strings.DeviceDef_KnobIndicators, StringComparison.Ordinal));
                     }
                     catch (Exception parseEx)
                     {
@@ -214,16 +237,21 @@ namespace MozaPlugin.Devices
             for (int i = 1; i < telemetryCount; i++)
                 physItems.Add(new JObject());
 
-            // Button LEDs: buttonCount slots
-            physItems.Add(new JObject
+            // Button LEDs: buttonCount slots. Gated on buttonCount > 0 — an
+            // RPM-only wheel (ES, bare CS) must NOT emit a button header item, or
+            // SimHub counts a phantom physical LED (e.g. 10 RPM → 11 total).
+            if (buttonCount > 0)
             {
-                ["SourceRole"] = 2,
-                ["SourceIndex"] = 0,
-                ["RepeatCount"] = buttonCount,
-                ["RepeatMode"] = 1
-            });
-            for (int i = 1; i < buttonCount; i++)
-                physItems.Add(new JObject());
+                physItems.Add(new JObject
+                {
+                    ["SourceRole"] = 2,
+                    ["SourceIndex"] = 0,
+                    ["RepeatCount"] = buttonCount,
+                    ["RepeatMode"] = 1
+                });
+                for (int i = 1; i < buttonCount; i++)
+                    physItems.Add(new JObject());
+            }
 
             // Knob indicator LEDs (Extra/encoders channel): one per rotary knob
             if (knobCount > 0)
@@ -253,7 +281,7 @@ namespace MozaPlugin.Devices
             var device = new JObject
             {
                 ["DescriptorUniqueId"] = guid,
-                ["SchemaVersion"] = 1,
+                ["SchemaVersion"] = GeneratedWheelSchemaVersion,
                 ["MinimumSimHubVersion"] = "9.11.8",
                 ["DeviceDescription"] = new JObject
                 {
@@ -262,7 +290,12 @@ namespace MozaPlugin.Devices
                 },
                 ["LedsFeature"] = new JObject
                 {
-                    ["IsIndividualLedsSectionEnabled"] = true,
+                    // Individual-LEDs section is only meaningful when the wheel has
+                    // addressable button and/or knob LEDs beyond the RPM strip. For
+                    // RPM-only wheels (e.g. ES, bare CS) it adds a useless editor
+                    // section, so disable it — matching the hand-authored old-proto
+                    // template.
+                    ["IsIndividualLedsSectionEnabled"] = buttonCount > 0 || knobCount > 0,
                     ["PhysicalLedsMappings"] = new JObject { ["Items"] = physItems },
                     ["LogicalTelemetryLeds"] = new JObject
                     {
@@ -274,13 +307,15 @@ namespace MozaPlugin.Devices
                     {
                         ["IsButtonEditorEnabled"] = false,
                         ["Items"] = buttonItems,
-                        ["IsEnabled"] = true
+                        // Disabled for RPM-only wheels so the "enable buttons
+                        // backlight" section doesn't show with zero buttons.
+                        ["IsEnabled"] = buttonCount > 0
                     },
                     ["LogicalExtraSection"] = knobCount > 0
                         ? new JObject
                         {
                             ["LedCount"] = knobCount,
-                            ["TitleOverride"] = "Knob Indicators",
+                            ["TitleOverride"] = Strings.DeviceDef_KnobIndicators,
                             ["IsEnabled"] = true
                         }
                         : new JObject { ["IsEnabled"] = false },
@@ -335,14 +370,18 @@ namespace MozaPlugin.Devices
                 bool fileExists = File.Exists(deviceJsonPath);
                 bool stale = false;
 
+                // Template content version. A bump here forces a rewrite of an
+                // already-deployed definition whose GUID/PID/ProductName are
+                // unchanged but whose body changed (e.g. CM2 SchemaVersion 1→2
+                // dropping the individual-LEDs section and 10/6 LED layout).
+                int templateSchema = ReadResourceSchemaVersion(resourceName);
+
                 if (fileExists)
                 {
                     // Compare existing PID + DescriptorUniqueId against expected.
                     // PID mismatch covers user moving between hardware variants;
                     // DescriptorUniqueId mismatch covers the plugin shipping a new
-                    // template for the same PID (e.g. previously-deployed SHDP
-                    // template with PID 0x0025 must be replaced with the CM2
-                    // template that uses a different GUID).
+                    // template for the same PID under a different GUID.
                     try
                     {
                         var existing = JObject.Parse(File.ReadAllText(deviceJsonPath));
@@ -371,6 +410,16 @@ namespace MozaPlugin.Devices
                                 .SelectToken("DeviceDescription.ProductName")
                                 ?.Value<string>();
                             if (!string.Equals(productName, expectedProduct, StringComparison.Ordinal))
+                                stale = true;
+                        }
+
+                        // Content-version guard: a newer template SchemaVersion than
+                        // the deployed file means the shipped definition body changed
+                        // without a GUID/PID/ProductName change. Missing field = 0.
+                        if (!stale)
+                        {
+                            int existingSchema = existing.SelectToken("SchemaVersion")?.Value<int>() ?? 0;
+                            if (existingSchema < templateSchema)
                                 stale = true;
                         }
                     }
@@ -425,6 +474,32 @@ namespace MozaPlugin.Devices
             {
                 MozaLog.Error($"[AZOM] Error deploying device definition '{deviceName}': {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Read the <c>SchemaVersion</c> of an embedded device-definition template.
+        /// Defaults to 1 if the resource is missing/unparseable so a deployed file
+        /// with no SchemaVersion (treated as 0) still refreshes once.
+        /// </summary>
+        private static int ReadResourceSchemaVersion(string resourceName)
+        {
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null) return 1;
+                    using (var reader = new StreamReader(stream))
+                    {
+                        var template = JObject.Parse(reader.ReadToEnd());
+                        return template.SelectToken("SchemaVersion")?.Value<int>() ?? 1;
+                    }
+                }
+            }
+            catch
+            {
+                return 1;
             }
         }
     }

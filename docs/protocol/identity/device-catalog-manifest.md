@@ -69,12 +69,15 @@ both properties hold under SHA-1 derivation.
 
 ## ES-wheel topology
 
-ES wheels put the wheel and base on the same physical MCU at dev
-`0x13`. The plugin's base-identity probes and wheel-identity probes
-then read the same UID. When `BaseMcuUid` is byte-equal to
-`WheelMcuUid`, [`DeviceCatalog.IsEsWheelTopology`](../../../Sdk/DeviceCatalog.cs)
+The ES wheel is a **module of the wheelbase MCU**: the base/motor answers at
+dev `0x13` while the wheel answers its own identity probes at dev `0x18`
+(see [`known-wheel-models.md`](known-wheel-models.md) § ES wheel identity).
+Both share the base's MCU UID. The plugin reads base identity at `0x13`
+(`BaseMcuUid`) and ES-wheel identity at `0x18` (`WheelMcuUid`, via the
+`es-wheel-*` commands). When the two UIDs are byte-equal,
+[`DeviceCatalog.IsEsWheelTopology`](../../../Sdk/DeviceCatalog.cs)
 returns `true` and the catalogue suppresses the Motor and Wheel Base
-entries — only the Steering Wheel is advertised.
+entries — only the Steering Wheel (productName `"ES"`) is advertised.
 
 ## Cold-start sequence (iRacing client)
 

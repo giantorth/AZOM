@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
+using MozaPlugin.Resources;
 
 namespace MozaPlugin.UI
 {
@@ -48,12 +49,11 @@ namespace MozaPlugin.UI
                 && connection.LastFailure.Kind == ConnectionFailureKind.AccessDenied
                 && MozaPortDiscovery.Instance.Enumerate().Count >= 1)
             {
-                var port = connection.LastFailure.PortName ?? "the MOZA COM port";
+                var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;
                 list.Add(new StatusHint(
                     StatusHintKind.PortLockedByOtherApp,
-                    "MOZA hardware detected but the port is in use",
-                    $"Found a MOZA device on {port}, but the port is held by another application. " +
-                    $"Close MOZA PitHouse (or anything else talking to the wheelbase) and click Refresh."));
+                    Strings.Banner_PortLocked_Title,
+                    string.Format(Strings.Banner_PortLocked_Body, port)));
             }
 
             // Rule 1b: PortVanished — registry saw the port but Open can't find it
@@ -65,12 +65,11 @@ namespace MozaPlugin.UI
                 && connection.ConsecutiveOpenFailures >= 2
                 && connection.LastFailure.Kind == ConnectionFailureKind.PortVanished)
             {
-                var port = connection.LastFailure.PortName ?? "the MOZA COM port";
+                var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;
                 list.Add(new StatusHint(
                     StatusHintKind.PortVanished,
-                    "MOZA port disappeared",
-                    $"The MOZA device on {port} stopped responding to open. Replug the wheelbase " +
-                    "(or its USB cable) and click Refresh."));
+                    Strings.Banner_PortVanished_Title,
+                    string.Format(Strings.Banner_PortVanished_Body, port)));
             }
 
             // Rule 1c: TelemetryParked — the recovery ladder exhausted its restart
@@ -87,17 +86,17 @@ namespace MozaPlugin.UI
                     // no "failure", no "toggle to retry" nag.
                     list.Add(new StatusHint(
                         StatusHintKind.TelemetryDegraded,
-                        "MOZA wheel has no display",
+                        Strings.Banner_TelemetryDegraded_Title,
                         (string.IsNullOrEmpty(reason) ? "" : reason + " ")
-                        + "This is expected for wheels without a screen — no action needed."));
+                        + Strings.Banner_TelemetryDegraded_Body));
                 }
                 else
                 {
                     list.Add(new StatusHint(
                         StatusHintKind.TelemetryParked,
-                        "Telemetry stopped after repeated failures",
+                        Strings.Banner_TelemetryParked_Title,
                         (string.IsNullOrEmpty(reason) ? "" : reason + " ")
-                        + "Toggle dashboard telemetry off and on to retry."));
+                        + Strings.Banner_TelemetryParked_Body));
                 }
             }
 
@@ -106,8 +105,8 @@ namespace MozaPlugin.UI
             {
                 list.Add(new StatusHint(
                     StatusHintKind.DeviceDefinitionDeployed,
-                    "Restart SimHub",
-                    "New device definitions were deployed. Restart SimHub to add them under Devices."));
+                    Strings.Banner_RestartSimHub_Title,
+                    Strings.Banner_RestartSimHub_Body));
             }
 
             // Rules 3-5: profile-not-added. Suppressed when DeviceDefinitionDeployed
@@ -122,21 +121,21 @@ namespace MozaPlugin.UI
                 // Rule 3: ProfileNotAddedDash
                 if (detection.DashDetected && !plugin.DashDeviceExtensionActive)
                 {
+                    const string dashDeviceName = "MOZA CM2 Racing Dash";
                     list.Add(new StatusHint(
                         StatusHintKind.ProfileNotAddedDash,
-                        "MOZA Dashboard not added in SimHub",
-                        "A MOZA dashboard is connected, but the device hasn't been added in SimHub. " +
-                        "Open Devices > Add device > MOZA Dashboard."));
+                        string.Format(Strings.Banner_ProfileNotAdded_TitleFmt, dashDeviceName),
+                        string.Format(Strings.Banner_ProfileNotAddedDash_Body, dashDeviceName)));
                 }
 
                 // Rule 4: ProfileNotAddedBaseAmbient
                 if (detection.BaseAmbientLedSupported && !plugin.BaseAmbientDeviceExtensionActive)
                 {
+                    const string baseDeviceName = "MOZA Wheel Base";
                     list.Add(new StatusHint(
                         StatusHintKind.ProfileNotAddedBaseAmbient,
-                        "MOZA Wheel Base not added in SimHub",
-                        "This wheelbase has an ambient LED strip, but 'MOZA Wheel Base' hasn't been added " +
-                        "in SimHub. Open Devices > Add device > MOZA Wheel Base to drive the strip."));
+                        string.Format(Strings.Banner_ProfileNotAdded_TitleFmt, baseDeviceName),
+                        string.Format(Strings.Banner_ProfileNotAddedBaseAmbient_Body, baseDeviceName)));
                 }
 
                 // Rule 5: ProfileNotAddedWheel
@@ -146,29 +145,25 @@ namespace MozaPlugin.UI
                 // toggles when its Init fires.
                 bool wheelDetected = detection.NewWheelDetected || detection.OldWheelDetected;
                 var model = detection.LastKnownWheelModel;
+                // Reaching here with a resolved model means a model-specific
+                // "MOZA <model>" device was deployed — for new-protocol wheels AND
+                // for an identified old wheel like ES (id 0x18). Use the
+                // model-specific extension + friendly name in both cases. A generic
+                // model-less old wheel never gets here (its model is empty) and is
+                // covered by the shared old-proto device's own status path.
                 if (wheelDetected && !string.IsNullOrEmpty(model))
                 {
-                    bool active;
-                    string friendly;
-                    if (detection.OldWheelDetected)
-                    {
-                        active = plugin.DeviceExtensionActive;
-                        friendly = "Old Protocol Wheel";
-                    }
-                    else
-                    {
-                        active = plugin.IsModelSpecificExtensionActive(model);
-                        var prefix = WheelModelInfo.ExtractPrefix(model);
-                        friendly = WheelModelInfo.GetFriendlyName(prefix);
-                    }
+                    bool active = plugin.IsModelSpecificExtensionActive(model);
+                    var prefix = WheelModelInfo.ExtractPrefix(model);
+                    string friendly = WheelModelInfo.GetFriendlyName(prefix);
 
                     if (!active)
                     {
+                        var wheelDeviceName = "MOZA " + friendly;
                         list.Add(new StatusHint(
                             StatusHintKind.ProfileNotAddedWheel,
-                            $"MOZA {friendly} not added in SimHub",
-                            $"Wheel '{model}' is connected, but 'MOZA {friendly}' hasn't been added in " +
-                            $"SimHub. Open Devices > Add device > MOZA {friendly}.",
+                            string.Format(Strings.Banner_ProfileNotAdded_TitleFmt, wheelDeviceName),
+                            string.Format(Strings.Banner_ProfileNotAddedWheel_Body, wheelDeviceName, model),
                             relatedModel: model));
                     }
                 }

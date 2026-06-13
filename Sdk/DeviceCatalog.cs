@@ -44,8 +44,9 @@ namespace MozaPlugin.Sdk
     /// UID — see <see cref="DeriveDeviceIdWithSuffix"/>.
     /// </para>
     /// <para>
-    /// ES wheels (where the wheel and base are one physical device on
-    /// dev 0x13) are handled by <see cref="IsEsWheelTopology"/>: when
+    /// ES wheels (where the wheel is a module of the wheelbase MCU —
+    /// its identity is read from dev 0x18 and carries the base's MCU UID)
+    /// are handled by <see cref="IsEsWheelTopology"/>: when
     /// <c>BaseMcuUid</c> and <c>WheelMcuUid</c> are byte-equal, we
     /// emit only the wheel manifest and skip the Motor / Wheel Base
     /// synthesis (no separate base device exists).
@@ -144,10 +145,11 @@ namespace MozaPlugin.Sdk
             bool haveWheel = wheelUid.Length > 0;
             bool haveDisplay = displayUid.Length > 0;
 
-            // ES-wheel topology: wheel and base are the same physical MCU on
-            // dev 0x13 (probes echoed the wheel's identity into Base*).
-            // Suppress the Motor / Wheel Base entries to avoid advertising
-            // ghost devices to iRacing.
+            // ES-wheel topology: the wheel is a module of the wheelbase MCU, so
+            // its identity (read from dev 0x18) carries the same MCU UID as the
+            // base (dev 0x13). When the UIDs match, suppress the Motor / Wheel
+            // Base entries to avoid advertising ghost devices to iRacing — the
+            // single Steering Wheel entry (productName "ES") below represents it.
             bool esTopology = IsEsWheelTopology(baseUid, wheelUid);
 
             // Motor parent prefix: the 12-char mcuUid every child device

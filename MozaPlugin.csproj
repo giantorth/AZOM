@@ -118,7 +118,6 @@
     <EmbeddedResource Include="Data\Telemetry.json" LogicalName="MozaPlugin.Data.Telemetry.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelGeneric\MOZA Racing Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelGeneric.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelOldProto\MOZA Old Protocol Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelOldProto.device.json" />
-    <EmbeddedResource Include="DeviceTemplates\MozaDashShdp\MOZA Dashboard\device.json" LogicalName="MozaPlugin.Devices.Dash.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm2\MOZA CM2 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm2.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm1\MOZA CM1 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm1.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelBase\MOZA Wheel Base\device.json" LogicalName="MozaPlugin.Devices.WheelBase.device.json" />

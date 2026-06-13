@@ -1,6 +1,6 @@
 {
   "DescriptorUniqueId": "6a2d9b0f-8b1e-4d32-9c18-1f5ec8a81025",
-  "SchemaVersion": 1,
+  "SchemaVersion": 3,
   "MinimumSimHubVersion": "9.11.8",
   "DeviceDescription": {
     "BrandName": "MOZA",

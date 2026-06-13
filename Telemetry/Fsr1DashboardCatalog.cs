@@ -388,5 +388,60 @@ namespace MozaPlugin.Telemetry
             foreach (var t in types) { var d = ByType(t); if (d != null) list.Add(d); }
             return list.ToArray();
         }
+
+        // ── Per-profile override resolution ─────────────────────────────────
+        // Turn (catalog default, user override, payload length) into the effective
+        // wire layout. The driver, emitter, and UI all go through this so they agree
+        // on where a field sits and how it is packed. A null override field means
+        // "use the catalog default" (dict-missing ≠ explicit-off).
+
+        /// <summary>Resolve the effective byte span + encoding for one field, applying
+        /// any user override on top of the catalog default. Start/end are clamped to the
+        /// record's data range <c>[5, payloadLen-1]</c>, width is clamped to 1..3 (the
+        /// FSR1's byte-aligned encodings), and endianness only matters for width 2.</summary>
+        internal static (int[] offsets, Fsr1Encoding encoding) ResolveLayout(
+            Fsr1FieldDef def, Fsr1FieldMapping? m, int payloadLen)
+        {
+            int defStart = def.Offsets.Length > 0 ? def.Offsets[0] : 5;
+            int defEnd = def.Offsets.Length > 0 ? def.Offsets[def.Offsets.Length - 1] : defStart;
+            int start = m?.StartOffset ?? defStart;
+            int end = m?.EndOffset ?? defEnd;
+
+            int maxOff = payloadLen - 1;
+            if (start < 5) start = 5;
+            if (start > maxOff) start = maxOff;
+            if (end < start) end = start;
+            if (end > maxOff) end = maxOff;
+            if (end - start > 2) end = start + 2;   // width ≤ 3
+
+            int width = end - start + 1;
+            Fsr1Encoding enc = width switch
+            {
+                1 => Fsr1Encoding.U8,
+                2 => (m?.LittleEndian ?? (def.Encoding == Fsr1Encoding.U16_LE))
+                        ? Fsr1Encoding.U16_LE : Fsr1Encoding.U16_BE,
+                _ => Fsr1Encoding.U24_BE,
+            };
+
+            var offsets = new int[width];
+            for (int i = 0; i < width; i++) offsets[i] = start + i;
+            return (offsets, enc);
+        }
+
+        /// <summary>Output ceiling for a resolved encoding (mirrors
+        /// <see cref="Fsr1FieldDef.OutputMax"/> but for the overridden width): the
+        /// field's <paramref name="fullScale"/> cap if set, else the encoding capability.</summary>
+        internal static long OutputMaxFor(Fsr1Encoding enc, long fullScale)
+        {
+            if (fullScale > 0) return fullScale;
+            return enc switch
+            {
+                Fsr1Encoding.U8 => 0xFF,
+                Fsr1Encoding.U16_BE => 0xFFFF,
+                Fsr1Encoding.U16_LE => 0xFFFF,
+                Fsr1Encoding.U24_BE => 0xFFFFFF,
+                _ => 0xFF,
+            };
+        }
     }
 }

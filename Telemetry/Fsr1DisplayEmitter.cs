@@ -119,6 +119,58 @@ namespace MozaPlugin.Telemetry
             return frame;
         }
 
+        /// <summary>
+        /// Build a live record using a per-field <paramref name="layoutFor"/> resolver that
+        /// returns the effective <c>(offsets, encoding, value)</c> — the driver supplies this
+        /// so per-profile boundary/encoding overrides take effect. Falls through to the
+        /// catalog layout for any field whose resolver returns a null offsets array.
+        /// </summary>
+        internal static byte[] BuildRecord(
+            Fsr1Dashboard dash, Func<Fsr1FieldDef, (int[]? offsets, Fsr1Encoding enc, long value)> layoutFor)
+            => BuildRecord(dash, dash?.Fields, layoutFor);
+
+        /// <summary>
+        /// As above, but packs an EXPLICIT field list rather than <c>dash.Fields</c> — the
+        /// driver passes the composed list (catalog + synthetic split fields) so net-new
+        /// fields are streamed too. <paramref name="fields"/> null falls back to the catalog.
+        /// </summary>
+        internal static byte[] BuildRecord(
+            Fsr1Dashboard dash, System.Collections.Generic.IReadOnlyList<Fsr1FieldDef>? fields,
+            Func<Fsr1FieldDef, (int[]? offsets, Fsr1Encoding enc, long value)> layoutFor)
+        {
+            if (dash == null) throw new ArgumentNullException(nameof(dash));
+            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
+            var fs = fields ?? dash.Fields;
+            int count = fs.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var f = fs[i];
+                var (offsets, enc, value) = layoutFor(f);
+                if (offsets == null) WriteField(frame, f, value);
+                else WriteField(frame, offsets, enc, value);
+            }
+            Finish(frame);
+            return frame;
+        }
+
+        /// <summary>
+        /// Diagnostic field-span probe record: all data bytes are 0 except the contiguous
+        /// span <paramref name="startOff"/>..<paramref name="endOff"/> (inclusive), each set
+        /// to <paramref name="value"/>. Lights exactly the on-screen box(es) the edited
+        /// field's CURRENT span feeds, so the user watches the box move/grow as the boundary
+        /// steppers change the span. b1/b2 anchors are preserved; offsets 3–4 stay 0 (padding).
+        /// </summary>
+        internal static byte[] BuildProbeSpanRecord(Fsr1Dashboard dash, int startOff, int endOff, int value)
+        {
+            if (dash == null) throw new ArgumentNullException(nameof(dash));
+            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
+            int max = dash.PayloadLen - 1;
+            for (int o = startOff; o <= endOff; o++)
+                if (o >= 5 && o <= max) frame[4 + o] = (byte)(value & 0xFF);
+            Finish(frame);
+            return frame;
+        }
+
         // 7E | len | grp | dev | payload(payloadLen) | csum ; payload[0..2]=type,b1,b2
         private static byte[] NewFrame(byte type, int payloadLen, byte b1, byte b2)
         {
@@ -136,30 +188,36 @@ namespace MozaPlugin.Telemetry
         private static void Finish(byte[] frame) =>
             frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
 
-        // payload offset N is at frame index 4+N.
-        private static void WriteField(byte[] frame, Fsr1FieldDef f, long value)
+        // payload offset N is at frame index 4+N. Def-keyed form uses the catalog layout.
+        private static void WriteField(byte[] frame, Fsr1FieldDef f, long value) =>
+            WriteField(frame, f.Offsets, f.Encoding, value);
+
+        // Layout-explicit form: pack value into the given contiguous offsets with the given
+        // encoding (used by the override path; offsets MUST match the encoding's width).
+        private static void WriteField(byte[] frame, int[] offsets, Fsr1Encoding enc, long value)
         {
             long v = value;
             if (v < 0) v = 0;
-            if (v > f.CapabilityMax) v = f.CapabilityMax;
-            int o0 = 4 + f.Offsets[0];
-            switch (f.Encoding)
+            long cap = Fsr1DashboardCatalog.OutputMaxFor(enc, 0);
+            if (v > cap) v = cap;
+            int o0 = 4 + offsets[0];
+            switch (enc)
             {
                 case Fsr1Encoding.U8:
                     frame[o0] = (byte)(v & 0xFF);
                     break;
                 case Fsr1Encoding.U16_BE:
                     frame[o0] = (byte)((v >> 8) & 0xFF);
-                    frame[4 + f.Offsets[1]] = (byte)(v & 0xFF);
+                    frame[4 + offsets[1]] = (byte)(v & 0xFF);
                     break;
                 case Fsr1Encoding.U16_LE:
                     frame[o0] = (byte)(v & 0xFF);
-                    frame[4 + f.Offsets[1]] = (byte)((v >> 8) & 0xFF);
+                    frame[4 + offsets[1]] = (byte)((v >> 8) & 0xFF);
                     break;
                 case Fsr1Encoding.U24_BE:
                     frame[o0] = (byte)((v >> 16) & 0xFF);
-                    frame[4 + f.Offsets[1]] = (byte)((v >> 8) & 0xFF);
-                    frame[4 + f.Offsets[2]] = (byte)(v & 0xFF);
+                    frame[4 + offsets[1]] = (byte)((v >> 8) & 0xFF);
+                    frame[4 + offsets[2]] = (byte)(v & 0xFF);
                     break;
             }
         }

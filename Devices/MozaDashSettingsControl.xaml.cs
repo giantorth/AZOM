@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
+using MozaPlugin.Resources;
 
 namespace MozaPlugin.Devices
 {
@@ -253,7 +254,7 @@ namespace MozaPlugin.Devices
             if (!ResolvePlugin() || _plugin == null)
             {
                 StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = "Plugin not loaded";
+                StatusText.Text = Strings.Status_PluginNotLoaded;
                 DashNotDetectedPanel.Visibility = Visibility.Visible;
                 DashPanel.Visibility = Visibility.Collapsed;
                 return;

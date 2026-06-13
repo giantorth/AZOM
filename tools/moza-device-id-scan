@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""moza-device-id-scan — identity-probe a MOZA base's internal serial device ids.
+
+Sends the plugin-exact identity cascade (groups 0x04 dev-type, 0x07 model-name,
+0x08 hw-version, 0x0F sw-version, 0x06 mcu-uid, 0x11 ident-11) to each device id
+and prints the full reply payloads, so you can map what physically answers on a
+given base.
+
+Why this exists: a user-supplied PowerShell probe claimed the ES wheel lives at
+device 0x18. Verified live (R5 base + ES wheel, 2026-06-12): 0x18 IS the ES
+steering wheel (model "ES", hw "...SM-C"). The companion script that probed 0x13
+was reading the BASE/motor ("R5 Black # MOT-1", hw "...BM-C"), not the wheel.
+On that unit:
+
+    0x12/0x13  base/motor      hw BM-C   ) share one MCU UID +
+    0x18       ES wheel        hw SM-C   ) sw-version "RS21-D05-MC WB"
+    0x19       SR-P Lite peds  hw PM-C   )
+    0x1B       handbrake       hw HB-C   <- SEPARATE MCU UID + sw-version
+
+0x17 (modern wheel id) and arbitrary ids (0x15/0x16/0x22/...) are silent — the
+base does not echo-answer every address.
+
+Wire details (match Protocol/MozaProtocol.cs + Protocol/SerialProbeCore.cs):
+  frame   = [0x7E, len, group, dev, <cmd bytes>, checksum]
+  len     = number of cmd bytes after group+dev (NOT incl. checksum)
+  cksum   = (0x0D + sum(all bytes before cksum) + 0x7E for each 0x7E at idx>=2) & 0xFF
+  stuffing= every 0x7E after the leading start byte is doubled
+  reply   = group has bit7 set (0x07->0x87); dev nibble-swapped (0x18->0x81);
+            reply payload = data[i+4 : i+4+len]  (NB: the leaked PS1 parser used
+            data[i+4 : i+2+len], an off-by-2 that dropped the last 2 bytes).
+
+Usage: tools/moza-device-id-scan [PORT] [id ...]
+  PORT defaults to /dev/ttyACM0; ids default to the diagnostic spread below.
+Requires exclusive access to the port (no SimHub/PitHouse/bridge holding it).
+"""
+import sys
+import time
+
+import serial  # pyserial
+
+MAGIC = 0x0D
+START = 0x7E
+
+# (label, group, [cmd bytes]) — the plugin's identity reads (MozaCommandDatabase)
+CASCADE = [
+    ("dev-type  0x04", 0x04, []),
+    ("model     0x07", 0x07, [1]),
+    ("hw-ver    0x08", 0x08, [1]),
+    ("sw-ver    0x0F", 0x0F, [1]),
+    ("mcu-uid   0x06", 0x06, []),
+    ("ident-11  0x11", 0x11, [4]),
+]
+
+# Default spread: real ids on an ES/R5 bus + control ids that must stay silent.
+DEFAULT_IDS = [0x12, 0x13, 0x14, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x22, 0x55]
+
+
+def checksum(frame):
+    n = len(frame) - 1
+    s = MAGIC + sum(frame[:n])
+    for i in range(2, n):
+        if frame[i] == START:
+            s += START
+    return s & 0xFF
+
+
+def stuff(frame):
+    out = bytearray([frame[0]])
+    for b in frame[1:]:
+        out.append(b)
+        if b == START:
+            out.append(START)
+    return bytes(out)
+
+
+def hexs(b):
+    return " ".join(f"{x:02X}" for x in b) if b else "(empty)"
+
+
+def parse(data):
+    """Yield (group, dev, payload) per 0x7E frame, un-stuffing the payload."""
+    out, i = [], 0
+    while i < len(data):
+        if data[i] != START:
+            i += 1
+            continue
+        if i + 2 >= len(data):
+            break
+        ln = data[i + 1]
+        end = i + 4 + ln + 1  # start,len,grp,dev + ln payload + checksum
+        if end > len(data):
+            break
+        grp, dev = data[i + 2], data[i + 3]
+        body = data[i + 4:i + 4 + ln]
+        un, j = bytearray(), 0
+        while j < len(body):
+            if body[j] == START and j + 1 < len(body) and body[j + 1] == START:
+                un.append(START)
+                j += 2
+            else:
+                un.append(body[j])
+                j += 1
+        out.append((grp, dev, bytes(un)))
+        i = end
+    return out
+
+
+def query(port, dev, group, cmd, wait=0.4):
+    frame = [START, len(cmd), group, dev, *cmd, 0x00]
+    frame[-1] = checksum(frame)
+    port.reset_input_buffer()
+    port.write(stuff(frame))
+    port.flush()
+    deadline = time.time() + wait
+    buf = bytearray()
+    while time.time() < deadline:
+        n = port.in_waiting
+        if n:
+            buf += port.read(n)
+        else:
+            time.sleep(0.02)
+    resp_group = group | 0x80
+    for grp, _dev, pl in parse(buf):
+        if grp == resp_group:
+            return pl
+    return None
+
+
+def main():
+    args = sys.argv[1:]
+    port_name = "/dev/ttyACM0"
+    ids = []
+    for a in args:
+        if a.startswith("/dev/") or a.upper().startswith("COM"):
+            port_name = a
+        else:
+            ids.append(int(a, 0))
+    if not ids:
+        ids = DEFAULT_IDS
+
+    print(f"Opening {port_name} @115200 8N1 ...")
+    port = serial.Serial(port_name, 115200, bytesize=8, parity="N",
+                         stopbits=1, timeout=0.1, dsrdtr=False)
+    port.dtr = True
+    time.sleep(0.2)
+    port.reset_input_buffer()
+    try:
+        for label, group, cmd in CASCADE:
+            print(f"\n{label}:")
+            for dev in ids:
+                pl = query(port, dev, group, cmd)
+                asc = ""
+                if pl:
+                    a = "".join(chr(c) if 32 <= c <= 126 else "." for c in pl)
+                    if any(32 <= c <= 126 for c in pl):
+                        asc = f'   "{a}"'
+                shown = hexs(pl) if pl is not None else "SILENT"
+                print(f"   0x{dev:02X}: {shown:<40}{asc}")
+    finally:
+        port.close()
+
+
+if __name__ == "__main__":
+    main()

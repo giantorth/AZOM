@@ -102,6 +102,14 @@ namespace MozaPlugin.Protocol
             if (deviceHint == null && deviceId == MozaProtocol.DeviceBase)
                 deviceHint = "base";
 
+            // dev 0x18 → "es-wheel" so the ES steering wheel's identity probes
+            // (groups 4/6/7/8/15) resolve against the es-wheel-* bucket. The ES
+            // wheel is a module of the wheelbase MCU with its own internal id;
+            // 0x13 returns the motor name, so without this hint a 0x18 model-name
+            // reply would collide with base-*/wheel-* in the shared groups.
+            if (deviceHint == null && deviceId == MozaProtocol.DeviceEsWheel)
+                deviceHint = "es-wheel";
+
             // Explicit bus override (AB9 connection passes "ab9" to dodge dev 0x12 collision).
             if (busHint != null)
                 deviceHint = busHint;
