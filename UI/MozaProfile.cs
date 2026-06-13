@@ -71,6 +71,8 @@ namespace MozaPlugin
         public int[]? WheelKnobPrimaryColors { get; set; }
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
+        // null = no override (fall through to baseline). Single wheel-wide toggle.
+        public bool? WheelKnobDefaultDuringTelemetry { get; set; }
 
         // Telemetry — per-game dashboard selection (per-wheel-page-per-game).
         public string? TelemetryProfileName { get; set; }
@@ -112,6 +114,7 @@ namespace MozaPlugin
                 WheelKnobRingColors = WheelKnobRingColors != null
                     ? (int[])WheelKnobRingColors.Clone() : null,
                 WheelKnobRingBrightness = WheelKnobRingBrightness,
+                WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry,
                 TelemetryProfileName = TelemetryProfileName,
                 TelemetryMzdashPath = TelemetryMzdashPath,
             };
@@ -350,6 +353,8 @@ namespace MozaPlugin
         public int[]? WheelKnobPrimaryColors { get; set; }    // [5] — W17/W18
         public int[]? WheelKnobRingColors { get; set; }       // [56] — Group 3 per-LED ring
         public int WheelKnobRingBrightness { get; set; } = -1;
+        // Single wheel-wide "restore stored knob colors when telemetry sends off" toggle.
+        public bool WheelKnobDefaultDuringTelemetry { get; set; }
         public int[]? DashRpmColors { get; set; }         // [10]
         public int[]? DashRpmBlinkColors { get; set; }   // [10]
         public int[]? DashFlagColors { get; set; }        // [6]
@@ -512,6 +517,7 @@ namespace MozaPlugin
             WheelKnobPrimaryColors = CloneArray(p.WheelKnobPrimaryColors);
             WheelKnobRingColors = CloneArray(p.WheelKnobRingColors);
             WheelKnobRingBrightness = p.WheelKnobRingBrightness;
+            WheelKnobDefaultDuringTelemetry = p.WheelKnobDefaultDuringTelemetry;
             DashRpmColors = CloneArray(p.DashRpmColors);
             DashRpmBlinkColors = CloneArray(p.DashRpmBlinkColors);
             DashFlagColors = CloneArray(p.DashFlagColors);

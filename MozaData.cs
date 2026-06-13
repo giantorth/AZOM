@@ -232,6 +232,12 @@ namespace MozaPlugin
         // sent through the live button-color telemetry pipeline is replaced with that
         // button's configured static color (see WheelButtonColors).
         public readonly bool[] WheelButtonDefaultDuringTelemetry = new bool[14];
+        // Single "default during telemetry" toggle for the knob ring LEDs. When true,
+        // an all-off knob frame from the live telemetry pipeline releases telemetry
+        // ownership (active_mask=0) so the firmware restores the wheel's stored knob
+        // colours (per-knob Active + per-LED ring Inactive) instead of holding black.
+        // Unlike the per-button flags this is a single wheel-wide switch.
+        public volatile bool WheelKnobDefaultDuringTelemetry;
         public readonly byte[][] WheelFlagColors = InitFlagColorArray();
         public readonly byte[] WheelIdleColor = new byte[] { 255, 255, 255 };
 

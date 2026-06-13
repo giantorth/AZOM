@@ -458,6 +458,8 @@
   <data name="Label_ButtonPlaceholder" xml:space="preserve"><value>NÚT 01</value></data>
   <data name="Section_KnobLedMode" xml:space="preserve"><value>CHẾ ĐỘ LED NÚM XOAY</value></data>
   <data name="SliderLabel_KnobLedMode" xml:space="preserve"><value>Chế độ LED núm xoay</value></data>
+  <data name="SliderLabel_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Khôi phục màu khi tắt</value></data>
+  <data name="Tooltip_KnobDefaultDuringTelemetry" xml:space="preserve"><value>Khi SimHub tắt hoàn toàn đèn LED núm xoay, khôi phục màu núm đã lưu của vô lăng thay vì để tối.</value></data>
   <data name="SliderLabel_KnobIdleEffect" xml:space="preserve"><value>Hiệu ứng núm xoay lúc nhàn rỗi</value></data>
   <data name="SliderLabel_KnobIdleSpeed" xml:space="preserve"><value>Tốc độ núm xoay lúc nhàn rỗi</value></data>
   <data name="Section_KnobSettings" xml:space="preserve"><value>CÀI ĐẶT NÚM XOAY</value></data>

@@ -539,6 +539,8 @@ namespace MozaPlugin.Resources
         public static string Label_ButtonPlaceholder => Get("Label_ButtonPlaceholder");
         public static string Section_KnobLedMode => Get("Section_KnobLedMode");
         public static string SliderLabel_KnobLedMode => Get("SliderLabel_KnobLedMode");
+        public static string SliderLabel_KnobDefaultDuringTelemetry => Get("SliderLabel_KnobDefaultDuringTelemetry");
+        public static string Tooltip_KnobDefaultDuringTelemetry => Get("Tooltip_KnobDefaultDuringTelemetry");
         public static string SliderLabel_KnobIdleEffect => Get("SliderLabel_KnobIdleEffect");
         public static string SliderLabel_KnobIdleSpeed => Get("SliderLabel_KnobIdleSpeed");
         public static string Section_KnobSettings => Get("Section_KnobSettings");

@@ -657,7 +657,31 @@ namespace MozaPlugin.Devices
                     // below to avoid the static-default flash described there.
                     bool knobsActive = knobBitmask != 0 || _lastKnobBitmask > 0;
 
-                    if (knobsActive)
+                    // "Default during telemetry" for knobs (single wheel-wide toggle):
+                    // when enabled and the incoming frame is fully off, fully release
+                    // telemetry ownership of the knobs by writing active_mask=0 AND
+                    // window_mask=0 — exactly the form PitHouse uses (286/286 knob writes
+                    // are active=0/window=0). These knobs store a separate colour per
+                    // rotation position, so the only correct "show original" is to stop
+                    // driving them entirely and let the firmware render the native
+                    // per-position colours. A non-zero window leaves telemetry owning the
+                    // knobs (all-off → dark), and sending any colour overrides the
+                    // per-position state — both wrong. Reset _lastKnobs/_lastKnobBitmask
+                    // so the keepalive below doesn't re-claim the knobs; a returning
+                    // non-zero frame re-engages through the normal path.
+                    if (plugin.Data.WheelKnobDefaultDuringTelemetry && knobBitmask == 0)
+                    {
+                        if (_lastKnobBitmask > 0 && !ledThrottled)
+                        {
+                            plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
+                                BuildWindowedBitmaskBytes(0, 0));
+                            _lastKnobBitmask = -1;
+                            _lastKnobs = null;
+                            _lastKnobSendTime = DateTime.UtcNow;
+                            anySent = true;
+                        }
+                    }
+                    else if (knobsActive)
                     {
                         bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
                         bool shouldSendKnobs = !ledThrottled && (knobsChanged || (!limitUpdates && forceRefresh));

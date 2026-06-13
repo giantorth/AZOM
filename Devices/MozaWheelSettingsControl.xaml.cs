@@ -851,6 +851,9 @@ skipReadByMode:
                     SetComboSafe(WheelKnobIdleEffectCombo, _data.WheelKnobIdleEffect);
                     SetComboSafe(WheelKnobLedModeCombo, _data.WheelKnobLedMode);
                     SetComboSafe(WheelButtonLedModeCombo, _data.WheelButtonsLedMode);
+                    if (WiKnobDefaultTelemetryToggle != null
+                        && (WiKnobDefaultTelemetryToggle.IsChecked == true) != _data.WheelKnobDefaultDuringTelemetry)
+                        WiKnobDefaultTelemetryToggle.IsChecked = _data.WheelKnobDefaultDuringTelemetry;
 
                     // Idle-effect speed sliders. Read from _data (mirrored from
                     // the overlay by ApplyWheelToHardware on detection, and
@@ -1165,6 +1168,19 @@ skipReadByMode:
             _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobLedMode = val);
             _plugin.WriteIfWheelDetected("wheel-knob-led-mode", val);
             if (val == 2) _plugin.RepushStaticPalette(LedKind.Knob);
+            _plugin.SaveSettings();
+        }
+
+        // Single wheel-wide "default during telemetry" toggle for the knob ring LEDs:
+        // when the live pipeline drives the knobs fully off, release telemetry ownership
+        // so the wheel reverts to its stored knob colours (see the knob block in
+        // MozaLedDeviceManager.Display + _data.WheelKnobDefaultDuringTelemetry).
+        private void WiKnobDefaultTelemetryToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null || _data == null) return;
+            bool on = WiKnobDefaultTelemetryToggle.IsChecked == true;
+            _data.WheelKnobDefaultDuringTelemetry = on;
+            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobDefaultDuringTelemetry = on);
             _plugin.SaveSettings();
         }
 

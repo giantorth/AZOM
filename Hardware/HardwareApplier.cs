@@ -199,6 +199,8 @@ namespace MozaPlugin.Hardware
             int[]? knobBgColors       = EffArr(ov?.WheelKnobBackgroundColors, profile.WheelKnobBackgroundColors);
             int[]? knobPrimaryColors  = EffArr(ov?.WheelKnobPrimaryColors, profile.WheelKnobPrimaryColors);
             int[]? knobRingColors     = EffArr(ov?.WheelKnobRingColors, profile.WheelKnobRingColors);
+            bool knobDefaultTelemetry = ov?.WheelKnobDefaultDuringTelemetry
+                                        ?? profile.WheelKnobDefaultDuringTelemetry;
 
             // Mirror colors into _data (UI uses _data.* for swatches).
             MozaProfile.UnpackColorsInto(rpmColors, _data.WheelRpmColors);
@@ -223,6 +225,7 @@ namespace MozaPlugin.Hardware
             MozaProfile.UnpackColorsInto(knobPrimaryColors, _data.WheelKnobPrimaryColors);
             MozaProfile.UnpackColorsInto(knobRingColors, _data.KnobRingColors);
             if (knobRingBri >= 0) _data.KnobRingBrightness = knobRingBri;
+            _data.WheelKnobDefaultDuringTelemetry = knobDefaultTelemetry;
 
             // Hardware writes — gated per-section on the matching detection
             // flag. NOT gated on _data.IsConnected: that's the "any device
