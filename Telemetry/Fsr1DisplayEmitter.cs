@@ -127,11 +127,24 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         internal static byte[] BuildRecord(
             Fsr1Dashboard dash, Func<Fsr1FieldDef, (int[]? offsets, Fsr1Encoding enc, long value)> layoutFor)
+            => BuildRecord(dash, dash?.Fields, layoutFor);
+
+        /// <summary>
+        /// As above, but packs an EXPLICIT field list rather than <c>dash.Fields</c> — the
+        /// driver passes the composed list (catalog + synthetic split fields) so net-new
+        /// fields are streamed too. <paramref name="fields"/> null falls back to the catalog.
+        /// </summary>
+        internal static byte[] BuildRecord(
+            Fsr1Dashboard dash, System.Collections.Generic.IReadOnlyList<Fsr1FieldDef>? fields,
+            Func<Fsr1FieldDef, (int[]? offsets, Fsr1Encoding enc, long value)> layoutFor)
         {
             if (dash == null) throw new ArgumentNullException(nameof(dash));
             var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
-            foreach (var f in dash.Fields)
+            var fs = fields ?? dash.Fields;
+            int count = fs.Count;
+            for (int i = 0; i < count; i++)
             {
+                var f = fs[i];
                 var (offsets, enc, value) = layoutFor(f);
                 if (offsets == null) WriteField(frame, f, value);
                 else WriteField(frame, offsets, enc, value);

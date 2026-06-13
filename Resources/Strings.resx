@@ -412,6 +412,9 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Edit SimHub property binding</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RESET TO DEFAULTS</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RESET FIELD</value></data>
+  <data name="Button_SplitField" xml:space="preserve"><value>SPLIT FIELD</value></data>
+  <data name="Button_RemoveSplit" xml:space="preserve"><value>REMOVE SPLIT</value></data>
+  <data name="Viz_Title" xml:space="preserve"><value>LIVE FSR1 DATA</value></data>
   <data name="Edit_StartByte" xml:space="preserve"><value>Start byte</value></data>
   <data name="Edit_EndByte" xml:space="preserve"><value>End byte</value></data>
   <data name="Edit_Endian_LE" xml:space="preserve"><value>Little-endian</value></data>

@@ -34,6 +34,10 @@ namespace MozaPlugin.Devices.WheelUi
         /// <summary>True for a CM1 base-bridged dash field (group-0x35). Flat — uses
         /// FieldId only (no RecordKey); the row maps the field to a SimHub property.</summary>
         public bool IsCm1 { get; set; }
+        /// <summary>True for a net-new synthetic split field (not in the static catalog).
+        /// Such a row offers "Remove split" instead of "Reset field" and always persists a
+        /// full mapping with an explicit byte span.</summary>
+        public bool IsSynthetic { get; set; }
         public string RecordKey { get; set; } = "";
         public string FieldId { get; set; } = "";
         /// <summary>Human-readable field output capability, e.g. "0–255".</summary>
@@ -119,6 +123,13 @@ namespace MozaPlugin.Devices.WheelUi
         /// <summary>BE/LE toggle only applies to a 2-byte field; hidden otherwise.</summary>
         public bool EndianApplies => Width == 2;
 
+        /// <summary>An FSR1 field ≥ 2 bytes wide can be split into two smaller fields.</summary>
+        public bool CanSplit => IsFsr1 && Width >= 2;
+
+        /// <summary>A catalog (non-synthetic) FSR1 field — offers "Reset field"; a synthetic split
+        /// offers "Remove split" instead. Fixed per row lifetime (no notify).</summary>
+        public bool IsCatalogFsr1 => IsFsr1 && !IsSynthetic;
+
         // Divider guards. A divider can move only if BOTH neighbours can absorb it: the field
         // gaining a byte stays ≤ 3 wide, the field losing a byte stays ≥ 1 wide. A boundary at
         // a record edge (Prev/Next == null) is fixed and never moves.
@@ -192,6 +203,7 @@ namespace MozaPlugin.Devices.WheelUi
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Width)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EncodingText)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EndianApplies)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanSplit)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanStartMinus)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanStartPlus)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanEndMinus)));

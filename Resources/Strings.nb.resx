@@ -410,6 +410,9 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Rediger SimHub-egenskapskobling</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>TILBAKESTILL TIL STANDARD</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>TILBAKESTILL FELT</value></data>
+  <data name="Button_SplitField" xml:space="preserve"><value>DEL FELT</value></data>
+  <data name="Button_RemoveSplit" xml:space="preserve"><value>FJERN DELING</value></data>
+  <data name="Viz_Title" xml:space="preserve"><value>SANNTIDS-FSR1-DATA</value></data>
   <data name="Edit_StartByte" xml:space="preserve"><value>Startbyte</value></data>
   <data name="Edit_EndByte" xml:space="preserve"><value>Sluttbyte</value></data>
   <data name="Edit_Endian_LE" xml:space="preserve"><value>Little-endian</value></data>

@@ -432,9 +432,21 @@
                                                      Background="{DynamicResource BgDeepBrush}"
                                                      BorderBrush="{DynamicResource BorderBrush}"
                                                      BorderThickness="1"/>
-                                            <Button Content="{x:Static res:Strings.Button_ResetField}"
+                                            <Button Content="{x:Static res:Strings.Button_SplitField}"
                                                     Margin="14,0,0,0"
-                                                    Click="FieldReset_Click" Tag="{Binding}"/>
+                                                    Click="FieldSplit_Click" Tag="{Binding}"
+                                                    Visibility="{Binding CanSplit,
+                                                                Converter={StaticResource BoolToVisibility}}"/>
+                                            <Button Content="{x:Static res:Strings.Button_RemoveSplit}"
+                                                    Margin="8,0,0,0"
+                                                    Click="FieldRemoveSplit_Click" Tag="{Binding}"
+                                                    Visibility="{Binding IsSynthetic,
+                                                                Converter={StaticResource BoolToVisibility}}"/>
+                                            <Button Content="{x:Static res:Strings.Button_ResetField}"
+                                                    Margin="8,0,0,0"
+                                                    Click="FieldReset_Click" Tag="{Binding}"
+                                                    Visibility="{Binding IsCatalogFsr1,
+                                                                Converter={StaticResource BoolToVisibility}}"/>
                                         </StackPanel>
 
                                         <!-- CM1 only: per-field gain. CM1 is always BE float32,
@@ -462,6 +474,78 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- FSR V1 only: live numeric byte-strip visualization. One record per
+                     active dashboard; each field's data-byte span is boxed and labelled
+                     with the raw bytes (hex) AND the post-scale/transform value. Refreshed
+                     ~2 Hz from the live driver output via GetFsr1VizSnapshot(). The whole
+                     block is hidden when the snapshot is empty (non-FSR1 wheels). -->
+                <StackPanel x:Name="Fsr1VizPanel" Margin="0,0,0,10" Visibility="Collapsed">
+                <TextBlock Text="{x:Static res:Strings.Viz_Title}"
+                           Style="{StaticResource MutedHintText}"
+                           FontWeight="SemiBold" Margin="0,4,0,6"/>
+                <ItemsControl x:Name="Fsr1VizList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,8"
+                                    Background="{DynamicResource BgCard2Brush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="8,6">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Label}"
+                                               Foreground="{DynamicResource TextBrush}"
+                                               FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                    <!-- Field boxes laid out left→right in Start order. Each box
+                                         shows the field label, the raw bytes (hex) and the scaled
+                                         value. A synthetic split box is tinted to stand out. -->
+                                    <ItemsControl ItemsSource="{Binding Fields}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,6,6"
+                                                        MinWidth="74"
+                                                        Background="{Binding BoxBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrightBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="3"
+                                                        Padding="6,4">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Label}"
+                                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                                   FontSize="11"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   MaxWidth="140"/>
+                                                        <TextBlock Text="{Binding RangeText}"
+                                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                                   FontFamily="{DynamicResource FontMono}"
+                                                                   FontSize="10"/>
+                                                        <TextBlock Text="{Binding HexText}"
+                                                                   Foreground="{DynamicResource AmberBrush}"
+                                                                   FontFamily="{DynamicResource FontMono}"
+                                                                   FontSize="12"/>
+                                                        <TextBlock Text="{Binding ValueText}"
+                                                                   Foreground="{DynamicResource CyanBrush}"
+                                                                   FontFamily="{DynamicResource FontMono}"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                </StackPanel>
+
                 <StackPanel Orientation="Horizontal">
                     <Button Content="{x:Static res:Strings.Button_ResetToDefaults}" Click="TelemetryResetMappings_Click"/>
                     <TextBlock x:Name="TelemetryMappingStatus"

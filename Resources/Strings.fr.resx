@@ -405,6 +405,9 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Modifier la liaison à la propriété SimHub</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RÉINITIALISER PAR DÉFAUT</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RÉINITIALISER LE CHAMP</value></data>
+  <data name="Button_SplitField" xml:space="preserve"><value>DIVISER LE CHAMP</value></data>
+  <data name="Button_RemoveSplit" xml:space="preserve"><value>SUPPRIMER LA DIVISION</value></data>
+  <data name="Viz_Title" xml:space="preserve"><value>DONNÉES FSR1 EN DIRECT</value></data>
   <data name="Edit_StartByte" xml:space="preserve"><value>Octet de début</value></data>
   <data name="Edit_EndByte" xml:space="preserve"><value>Octet de fin</value></data>
   <data name="Edit_Endian_LE" xml:space="preserve"><value>Petit-boutiste</value></data>

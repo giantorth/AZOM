@@ -74,11 +74,14 @@ namespace MozaPlugin.Devices.WheelUi
                 // adjacent to an anchor has a FIXED edge there (no shared divider to step), so it
                 // stays unlinked (Prev/Next null) rather than coupling across the anchor.
                 var dashRows = new List<ChannelMappingRow>();
-                foreach (var f in dash.Fields)
+                // Compose catalog fields with per-profile synthetic split fields so net-new
+                // splits surface as their own rows (and get their own channel mapping).
+                foreach (var f in Telemetry.Fsr1FieldComposer.FieldsFor(plugin, dash))
                 {
                     if (!f.IsUserMappable) continue;
                     var m = plugin.GetFsr1FieldMapping(dash.Key, f.FieldId);
                     bool direct = f.Kind == Telemetry.Fsr1FieldKind.Direct;
+                    bool synthetic = Telemetry.Fsr1FieldComposer.IsSynthetic(plugin, dash.Key, f.FieldId);
                     // Resolve the effective span/encoding (catalog default merged with the
                     // per-profile override) so the boundary editor opens on the live layout.
                     var (offsets, enc) = Telemetry.Fsr1DashboardCatalog.ResolveLayout(f, m, dash.PayloadLen);
@@ -86,6 +89,7 @@ namespace MozaPlugin.Devices.WheelUi
                     {
                         AllProperties = props,
                         IsFsr1 = true,
+                        IsSynthetic = synthetic,
                         RecordKey = dash.Key,
                         FieldId = f.FieldId,
                         Name = $"{dash.Label} · {f.Label}" + (f.Decoded ? "" : "  (raw)"),

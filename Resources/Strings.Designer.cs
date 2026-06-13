@@ -486,6 +486,9 @@ namespace MozaPlugin.Resources
         public static string Tooltip_EditMapping => Get("Tooltip_EditMapping");
         public static string Button_ResetToDefaults => Get("Button_ResetToDefaults");
         public static string Button_ResetField => Get("Button_ResetField");
+        public static string Button_SplitField => Get("Button_SplitField");
+        public static string Button_RemoveSplit => Get("Button_RemoveSplit");
+        public static string Viz_Title => Get("Viz_Title");
         public static string Edit_StartByte => Get("Edit_StartByte");
         public static string Edit_EndByte => Get("Edit_EndByte");
         public static string Edit_Endian_LE => Get("Edit_Endian_LE");

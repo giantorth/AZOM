@@ -259,6 +259,10 @@ Open item: whether the `0x40` config re-sweep is strictly required on a host swi
 
 The contributor's exact channels were game/hub-specific (`ATSRHubMain.Telemetry.*`, `PersistantTrackerPlugin.*`, plus generic `DataCorePlugin.*`); the **meaning** of each slot is the durable finding, since channel→slot assignment is host-chosen and user-overridable. The catalog seeds each decoded slot's default with the canonical `simhub_property` from [`Data/Telemetry.json`](../../../Data/Telemetry.json) (MOZA's own channel catalog) — e.g. speed → `DataCorePlugin.GameData.SpeedKmh`, fuel remaining laps → `DataCorePlugin.GameData.FuelLaps`, fuel/lap → `DataCorePlugin.GameData.FuelConsumeLap`. The one exception is **light stage** (record `12` @21): Telemetry.json has only individual light bools (`HighBeamLight`, `RainLight`, …), no aggregate, so it ships with no default. The `0x42` path is byte-aligned `u16` (not tier-def bit-packing), so only the property *names* are taken from Telemetry.json, not its compression codes.
 
+#### Per-profile field overrides & synthetic splits (plugin-side, not wire protocol)
+
+The plugin lets a user retune any `0x42` field without changing the wire format: move its start/end data byte, flip endianness (width 2), apply Scale/Bias, and remap its SimHub channel. Overrides are stored deviation-only — a field at its catalog default persists nothing. A user may also **split** a field into two — the new "synthetic" field is net-new (absent from the static catalog), owns a sub-span of the record's data bytes, and carries its own channel mapping; it's stored in the profile and merged into the field set at every enumeration point (stream/UI/probe/viz). The record stays a contiguous gapless partition of `[5, PayloadLen-1]`; *remove split* reclaims the bytes into a neighbour. None of this changes the bytes on the wire — it only changes which SimHub value drives each byte span.
+
 ### Group `0x43` (67) — Live Telemetry Stream (write-only)
 
 Main game telemetry sent at ~17–20×/sec. See [`../telemetry/live-stream.md`](../telemetry/live-stream.md) for full packet analysis and bit-packing format.

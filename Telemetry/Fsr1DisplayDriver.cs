@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Timers;
 using GameReaderCommon;
@@ -199,7 +200,34 @@ namespace MozaPlugin.Telemetry
                 if (probe)
                     return Fsr1DisplayEmitter.BuildProbeRecord(
                         dash, dash.RecordType == probeType ? probeOff : -1, ProbeValue);
-                return Fsr1DisplayEmitter.BuildRecord(dash, f => LayoutValueFor(dash, f));
+                // Compose catalog + synthetic split fields so net-new fields are packed too.
+                var fields = Fsr1FieldComposer.FieldsFor(plugin, dash);
+                return Fsr1DisplayEmitter.BuildRecord(dash, fields, f => LayoutValueFor(dash, f));
+            }
+
+            // Build the live numeric-viz record for one dash from its REAL telemetry values
+            // (independent of probe/test — the panel shows actual data, not the probe pattern).
+            Fsr1VizRecord BuildVizRecord(Fsr1Dashboard dash)
+            {
+                var fields = Fsr1FieldComposer.FieldsFor(plugin, dash);
+                var frame = Fsr1DisplayEmitter.BuildRecord(dash, fields, f => LayoutValueFor(dash, f));
+                var vfields = new List<Fsr1VizField>(fields.Count);
+                foreach (var f in fields)
+                {
+                    var (offsets, enc, value) = LayoutValueFor(dash, f);
+                    if (offsets == null || offsets.Length == 0) continue;
+                    int start = offsets[0], end = offsets[offsets.Length - 1];
+                    var bytes = new byte[end - start + 1];
+                    for (int o = start; o <= end; o++)
+                    {
+                        int idx = 4 + o;
+                        bytes[o - start] = (idx >= 0 && idx < frame.Length) ? frame[idx] : (byte)0;
+                    }
+                    bool synth = Fsr1FieldComposer.IsSynthetic(plugin, dash.Key, f.FieldId);
+                    vfields.Add(new Fsr1VizField(f.Label, start, end, enc.ToString(), value, bytes, synth));
+                }
+                vfields.Sort((a, b) => a.Start.CompareTo(b.Start));
+                return new Fsr1VizRecord(dash.RecordType, dash.Label, dash.PayloadLen, vfields.ToArray());
             }
 
             // PitHouse streams exactly ONE record type — the one for the wheel's
@@ -251,6 +279,17 @@ namespace MozaPlugin.Telemetry
                         (StreamKind)((int)StreamKind.TierDash0 + slot),
                         RecordFor(dash));
                 }
+            }
+
+            // Live numeric viz: publish a snapshot of the active record set's real telemetry
+            // values for the channel-mapping panel's byte strip (only while it asks for it).
+            if (plugin != null && plugin.Fsr1VizActive)
+            {
+                var vizSet = active.Length > 0 ? active : live;
+                var records = new Fsr1VizRecord[vizSet.Length];
+                for (int i = 0; i < vizSet.Length; i++)
+                    records[i] = BuildVizRecord(vizSet[i]);
+                plugin.SetFsr1VizSnapshot(new Fsr1VizSnapshot(records));
             }
 
             if (_tickCounter % oneHzEvery == 0)

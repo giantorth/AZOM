@@ -405,6 +405,9 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Επεξεργασία σύνδεσης ιδιότητας SimHub</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΣΤΑ ΠΡΟΕΠΙΛΕΓΜΕΝΑ</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΠΕΔΙΟΥ</value></data>
+  <data name="Button_SplitField" xml:space="preserve"><value>ΔΙΑΙΡΕΣΗ ΠΕΔΙΟΥ</value></data>
+  <data name="Button_RemoveSplit" xml:space="preserve"><value>ΚΑΤΑΡΓΗΣΗ ΔΙΑΙΡΕΣΗΣ</value></data>
+  <data name="Viz_Title" xml:space="preserve"><value>ΖΩΝΤΑΝΑ ΔΕΔΟΜΕΝΑ FSR1</value></data>
   <data name="Edit_StartByte" xml:space="preserve"><value>Αρχικό byte</value></data>
   <data name="Edit_EndByte" xml:space="preserve"><value>Τελικό byte</value></data>
   <data name="Edit_Endian_LE" xml:space="preserve"><value>Little-endian</value></data>

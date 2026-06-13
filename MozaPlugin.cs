@@ -2600,6 +2600,31 @@ namespace MozaPlugin
             return (dash.RecordType, offsets[0], offsets[offsets.Length - 1]);
         }
 
+        // ── FSR1 live numeric visualization channel ─────────────────────────
+        // When the channel-mapping panel is showing an FSR1 wheel, it asks the driver to
+        // publish a per-tick snapshot of the data it streams (each field's resolved span,
+        // raw bytes, post-scale value) so the UI can draw a live byte strip. Volatile
+        // single-writer (driver) / single-reader (UI 2 Hz timer), matching driver threading.
+        private volatile bool _fsr1VizActive;
+        private volatile Telemetry.Fsr1VizSnapshot? _fsr1Viz;
+
+        /// <summary>True while the channel-mapping panel wants the FSR1 viz snapshot.</summary>
+        internal bool Fsr1VizActive => _fsr1VizActive;
+
+        /// <summary>Arm/disarm FSR1 viz capture (panel load/teardown). Clears the last
+        /// snapshot on disarm so a stale strip never lingers.</summary>
+        internal void SetFsr1VizActive(bool on)
+        {
+            _fsr1VizActive = on;
+            if (!on) _fsr1Viz = null;
+        }
+
+        /// <summary>Driver publishes the latest streamed-data snapshot (or null).</summary>
+        internal void SetFsr1VizSnapshot(Telemetry.Fsr1VizSnapshot? snap) => _fsr1Viz = snap;
+
+        /// <summary>UI reads the latest FSR1 viz snapshot, or null when none yet.</summary>
+        internal Telemetry.Fsr1VizSnapshot? GetFsr1VizSnapshot() => _fsr1Viz;
+
         /// <summary>True when some display pipeline is live and can render a test
         /// pattern: a tier-def sender is Active, or a standalone FSR1/CM1 driver runs.</summary>
         internal bool IsAnyDashboardDisplayRunning =>
@@ -3661,6 +3686,14 @@ namespace MozaPlugin
         internal int GetActiveFsr1Index() => _fsr1Cm1Mapping.GetActiveFsr1Index();
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
+
+        // FSR1 synthetic split fields (net-new fields carved out of a catalog field).
+        internal System.Collections.Generic.List<Fsr1SyntheticField> GetSyntheticFields(string recordKey) => _fsr1Cm1Mapping.GetSyntheticFields(recordKey);
+        internal bool SplitFsr1Field(string recordKey, string fieldId) => _fsr1Cm1Mapping.SplitFsr1Field(recordKey, fieldId);
+        internal bool RemoveFsr1Split(string recordKey, string fieldId) => _fsr1Cm1Mapping.RemoveFsr1Split(recordKey, fieldId);
+        internal void ClearSyntheticFields(string recordKey) => _fsr1Cm1Mapping.ClearSyntheticFields(recordKey);
+        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId) => Fsr1FieldComposer.FindField(this, recordKey, fieldId);
+
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId) => _fsr1Cm1Mapping.GetCm1FieldMapping(fieldId);
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);
         internal void ClearCm1Mappings() => _fsr1Cm1Mapping.ClearCm1Mappings();

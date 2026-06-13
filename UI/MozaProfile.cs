@@ -166,6 +166,32 @@ namespace MozaPlugin
             };
     }
 
+    /// <summary>
+    /// A net-new FSR V1 field split out of a catalog field — it does not exist in the
+    /// static <see cref="MozaPlugin.Telemetry.Fsr1DashboardCatalog"/>, so it lives in the
+    /// profile and is merged into the field list at every enumeration point (driver, UI,
+    /// probe, viz). Carries its identity plus full mapping inline, so there is a single
+    /// source of truth (no two-dict consistency hazard). The inline mapping ALWAYS sets an
+    /// explicit StartOffset/EndOffset, so a synthetic never prunes to nothing.
+    /// </summary>
+    public sealed class Fsr1SyntheticField
+    {
+        /// <summary>Generated unique key within the record (e.g. "split1"). Never parsed.</summary>
+        public string FieldId { get; set; } = "";
+        /// <summary>Display label shown in the channel-mapping list.</summary>
+        public string Label { get; set; } = "";
+        /// <summary>Channel mapping + explicit byte span owned by this synthetic field.</summary>
+        public Fsr1FieldMapping Mapping { get; set; } = new Fsr1FieldMapping();
+
+        public Fsr1SyntheticField Clone() =>
+            new Fsr1SyntheticField
+            {
+                FieldId = FieldId,
+                Label = Label,
+                Mapping = Mapping?.Clone() ?? new Fsr1FieldMapping(),
+            };
+    }
+
     public sealed class Ab9Settings
     {
         public Ab9Mode Mode { get; set; } = Ab9Mode.SevenPlusR_L1;
@@ -417,6 +443,16 @@ namespace MozaPlugin
         public Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>> Fsr1DashboardMappings { get; set; }
             = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
 
+        // ===== FSR V1 synthetic split fields (per-profile, net-new) =====
+        // A "split" carves a new sub-span out of a catalog field; the resulting field is
+        // net-new (not in the static catalog) and gets its own channel mapping. Stored here
+        // and merged into the field list at every enumeration point (see Fsr1FieldComposer).
+        // Outer key  = wheel page DescriptorUniqueId GUID
+        // Middle key = record-type key (Fsr1DashboardCatalog.Key, e.g. "type-02")
+        // List       = the synthetic fields added to that record, in creation order.
+        public Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>> Fsr1SyntheticFields { get; set; }
+            = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
+
         // CM1 base-bridged dash (group-0x35) field mappings. Flat — the CM1 streams one
         // keyed field set regardless of selected dashboard, so there is no per-dashboard
         // record-key level:
@@ -585,6 +621,26 @@ namespace MozaPlugin
                         middle[rec.Key] = inner;
                     }
                     Fsr1DashboardMappings[kvp.Key] = middle;
+                }
+            }
+
+            // FSR V1 synthetic split fields (deep clone)
+            Fsr1SyntheticFields = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
+            if (p.Fsr1SyntheticFields != null)
+            {
+                foreach (var kvp in p.Fsr1SyntheticFields)
+                {
+                    if (kvp.Value == null) continue;
+                    var middle = new Dictionary<string, List<Fsr1SyntheticField>>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var rec in kvp.Value)
+                    {
+                        if (rec.Value == null) continue;
+                        var list = new List<Fsr1SyntheticField>(rec.Value.Count);
+                        foreach (var syn in rec.Value)
+                            if (syn != null) list.Add(syn.Clone());
+                        middle[rec.Key] = list;
+                    }
+                    Fsr1SyntheticFields[kvp.Key] = middle;
                 }
             }
 
