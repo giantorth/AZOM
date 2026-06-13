@@ -606,6 +606,26 @@ namespace MozaPlugin
             return _deviceManager.WriteSettingForDevice("dash-send-telemetry", dev, bitmask);
         }
 
+        /// <summary>
+        /// Push the CM2's 6 flag-LED colours as the live dash-flag-colors array
+        /// (group 0x32 cmd 08 00, 6×RGB, black = off). PitHouse drives the bus
+        /// CM2's flag LEDs exactly this way — streamed per frame, the firmware
+        /// lights each non-black flag (verified cm2t.pcapng). Routed to the same
+        /// device/connection as the RPM bitmask (standalone-USB CM2 → 0x12 on the
+        /// dedicated pipe, behind-base CM2 → 0x14 on the base).
+        /// </summary>
+        internal bool WriteDashFlagColors(byte[] rgb18)
+        {
+            if (DashboardUsbConnected)
+                return _dashboardManager.WriteArrayForDevice(
+                    "dash-flag-colors", PreferredStandaloneDashboardTargetDeviceId, rgb18);
+
+            byte dev = ShouldUseStandaloneDashboardTarget()
+                ? PreferredStandaloneDashboardTargetDeviceId
+                : MozaProtocol.DeviceDash;
+            return _deviceManager.WriteArrayForDevice("dash-flag-colors", dev, rgb18);
+        }
+
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;

@@ -10,13 +10,27 @@
     "IsIndividualLedsSectionEnabled": false,
     "PhysicalLedsMappings": {
       "Items": [
-        { "SourceRole": 1, "SourceIndex": 0, "RepeatCount": 16, "RepeatMode": 1 },
-        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+        { "SourceRole": 1, "SourceIndex": 0, "RepeatCount": 10, "RepeatMode": 1 },
+        {}, {}, {}, {}, {}, {}, {}, {}, {},
+        { "SourceRole": 2, "SourceIndex": 0, "RepeatCount": 6, "RepeatMode": 1 },
+        {}, {}, {}, {}, {}
       ]
     },
     "LogicalTelemetryLeds": {
-      "LedCount": 16,
+      "LedCount": 10,
       "Segments": [],
+      "IsEnabled": true
+    },
+    "LogicalButtonsSection": {
+      "IsButtonEditorEnabled": false,
+      "Items": [
+        { "Left": 20, "Top": 20, "Width": 40 },
+        { "Left": 20, "Top": 20, "Width": 40 },
+        { "Left": 20, "Top": 20, "Width": 40 },
+        { "Left": 20, "Top": 20, "Width": 40 },
+        { "Left": 20, "Top": 20, "Width": 40 },
+        { "Left": 20, "Top": 20, "Width": 40 }
+      ],
       "IsEnabled": true
     },
     "IsEnabled": true

@@ -63,6 +63,14 @@ namespace MozaPlugin.Devices
         public bool WriteSettingForDevice(string commandName, byte deviceId, int value)
             => _deviceManager.WriteSettingForDevice(commandName, deviceId, value);
 
+        /// <summary>
+        /// Write a byte-array command to an explicit device id on the dashboard
+        /// connection. Used to push the live flag-LED colours (dash-flag-colors,
+        /// group 0x32 cmd 08 00) to a standalone-USB CM2 at root device 0x12.
+        /// </summary>
+        public bool WriteArrayForDevice(string commandName, byte deviceId, byte[] payload)
+            => _deviceManager.WriteArrayForDevice(commandName, deviceId, payload);
+
         public void Disconnect() => _connection.Disconnect();
 
         public void Dispose()
