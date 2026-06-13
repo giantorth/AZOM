@@ -594,7 +594,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.Boost"
+      "simhub_property": "DataCorePlugin.GameData.Boost",
+      "simhub_scale": 100.0
     },
     {
       "name": "FuelRemain",
@@ -616,7 +617,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.FuelPercent",
-      "simhub_scale": 1.0,
+      "simhub_scale": 100.0,
       "simhub_field": "FuelPercent",
       "is_visible": true
     },
@@ -796,7 +797,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.ERSPercent"
+      "simhub_property": "DataCorePlugin.GameData.ERSPercent",
+      "simhub_scale": 100.0
     },
     {
       "name": "ERSStored",
@@ -1720,7 +1722,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearFrontLeft",
-      "simhub_scale": 1.0,
+      "simhub_scale": 100.0,
       "simhub_field": "TyreWearFrontLeft",
       "is_visible": true
     },
@@ -1744,7 +1746,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearFrontRight",
-      "simhub_scale": 1.0,
+      "simhub_scale": 100.0,
       "simhub_field": "TyreWearFrontRight",
       "is_visible": true
     },
@@ -1768,7 +1770,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearRearLeft",
-      "simhub_scale": 1.0,
+      "simhub_scale": 100.0,
       "simhub_field": "TyreWearRearLeft",
       "is_visible": true
     },
@@ -1792,7 +1794,7 @@
       "default_value": 0,
       "compression": "percent_1",
       "simhub_property": "DataCorePlugin.GameData.TyreWearRearRight",
-      "simhub_scale": 1.0,
+      "simhub_scale": 100.0,
       "simhub_field": "TyreWearRearRight",
       "is_visible": true
     },
@@ -1816,7 +1818,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.FrontLeftWingDamage"
+      "simhub_property": "DataCorePlugin.GameData.FrontLeftWingDamage",
+      "simhub_scale": 100.0
     },
     {
       "name": "WingWearFR",
@@ -1838,7 +1841,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.FrontRightWingDamage"
+      "simhub_property": "DataCorePlugin.GameData.FrontRightWingDamage",
+      "simhub_scale": 100.0
     },
     {
       "name": "WingWearR",
@@ -1860,7 +1864,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.RearWingDamage"
+      "simhub_property": "DataCorePlugin.GameData.RearWingDamage",
+      "simhub_scale": 100.0
     },
     {
       "name": "EngineWear",
@@ -1882,7 +1887,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.EngineDamage"
+      "simhub_property": "DataCorePlugin.GameData.EngineDamage",
+      "simhub_scale": 100.0
     },
     {
       "name": "GearBoxWear",
@@ -1904,7 +1910,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.GearBoxDamage"
+      "simhub_property": "DataCorePlugin.GameData.GearBoxDamage",
+      "simhub_scale": 100.0
     },
     {
       "name": "FuelCapacity",
@@ -3136,7 +3143,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.CarSettings_CurrentDisplayedRPMPercent"
+      "simhub_property": "DataCorePlugin.GameData.CarSettings_CurrentDisplayedRPMPercent",
+      "simhub_scale": 100.0
     },
     {
       "name": "WheelSpin",
@@ -6781,7 +6789,8 @@
       "default_value": 0,
       "compression": "percent_1",
       "is_visible": true,
-      "simhub_property": "DataCorePlugin.GameData.TurboPercent"
+      "simhub_property": "DataCorePlugin.GameData.TurboPercent",
+      "simhub_scale": 100.0
     },
     {
       "name": "TyreDirtFrontLeft",
