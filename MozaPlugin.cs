@@ -805,7 +805,8 @@ namespace MozaPlugin
             try
             {
                 _data = new MozaData();
-                _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings", () => new MozaPluginSettings());
+                _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings",
+                    () => new MozaPluginSettings { TelemetryEnabledDefaultForNewWheels = true });
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
 
