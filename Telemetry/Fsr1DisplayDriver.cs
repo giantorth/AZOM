@@ -304,12 +304,22 @@ namespace MozaPlugin.Telemetry
                         foreach (var dash in active)
                             _connection.Send(Fsr1DisplayEmitter.BuildDeclaration(dash));
                     }
-                    for (int slot = 0; slot < active.Length; slot++)
+                    int streamSlot = 0;
+                    foreach (var dash in active)
                     {
-                        var dash = active[slot];
+                        if (dash.IsBackground)
+                        {
+                            // Background tyre/status cache (type-0d): one-shot at ~0.5 Hz so the
+                            // primary page keeps its full refresh. Matches PitHouse interleaving
+                            // ~1 cache frame per 100 primary frames. Send() = non-retransmitting.
+                            if (_tickCounter % (oneHzEvery * 2) == 0)
+                                _connection.Send(RecordFor(dash));
+                            continue;
+                        }
                         _connection.SendStream(
-                            (StreamKind)((int)StreamKind.TierDash0 + slot),
+                            (StreamKind)((int)StreamKind.TierDash0 + streamSlot),
                             RecordFor(dash));
+                        streamSlot++;
                     }
                 }
                 else
@@ -326,6 +336,12 @@ namespace MozaPlugin.Telemetry
                     {
                         var dash = live[slot];
                         if (dash.Fields.Length == 0) continue;
+                        if (dash.IsBackground)
+                        {
+                            if (_tickCounter % (oneHzEvery * 2) == 0)
+                                _connection.Send(RecordFor(dash));
+                            continue;
+                        }
                         _connection.SendStream(
                             (StreamKind)((int)StreamKind.TierDash0 + slot),
                             RecordFor(dash));
