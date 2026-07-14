@@ -181,6 +181,16 @@ namespace MozaPlugin.Telemetry
                 double raw = resolve != null ? resolve(prop) : 0.0;
                 // User override wins; otherwise the catalog default (tyre +300, lap time ×1000).
                 raw = raw * (m?.Scale ?? f.DefaultScale) + (m?.Bias ?? f.DefaultBias);
+                if (f.Kind == Fsr1FieldKind.SignedMagnitude)
+                {
+                    // 24-bit sign-magnitude: bit23 = sign (set when negative), low bits = |value|.
+                    // Gap/delta is a signed ms delta to best; a negative delta (ahead) must not
+                    // clamp to 0. Cap the magnitude below bit23 so the sign stays isolated.
+                    long sv = (long)raw;
+                    long mag = System.Math.Abs(sv);
+                    if (mag > 0x7FFFFF) mag = 0x7FFFFF;
+                    return (sv < 0 ? 0x800000L : 0L) | mag;
+                }
                 if (f.Kind == Fsr1FieldKind.Direct)
                     // Send the scaled value's digits as an integer — truncate, don't round.
                     // Precision is carried by Scale (shift the wanted decimals into the integer,

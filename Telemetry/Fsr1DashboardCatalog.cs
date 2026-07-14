@@ -16,6 +16,10 @@ namespace MozaPlugin.Telemetry
         Direct,
         /// <summary>Protocol anchor, not user-mappable: 0x4B when the engine runs, else 0.</summary>
         EngineFlag,
+        /// <summary>24-bit sign-magnitude: bit23 = sign (set when the source is negative), the low
+        /// bits carry |value|. Used by the gap/delta field — a signed ms delta to best (negative =
+        /// ahead/faster). Plain Direct would clamp negatives to 0.</summary>
+        SignedMagnitude,
     }
 
     /// <summary>
@@ -147,8 +151,8 @@ namespace MozaPlugin.Telemetry
                 Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U8, prop, scale: scale, bias: bias), 8);
             public Fields U16(string id, string label, string prop = "", long fullScale = 0, double scale = 1.0) =>
                 Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U16_BE, prop, fullScale, scale), 16);
-            public Fields U24(string id, string label, string prop = "", double scale = 1.0) =>
-                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U24_BE, prop, scale: scale), 24);
+            public Fields U24(string id, string label, string prop = "", double scale = 1.0, Fsr1FieldKind kind = Fsr1FieldKind.Direct) =>
+                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U24_BE, prop, scale: scale, kind: kind), 24);
             public Fields Bits(string id, string label, int width, string prop = "", long fullScale = 0, double scale = 1.0, double bias = 0.0) =>
                 Add(MakeBits(id, label, _bit, width, prop, fullScale, scale, bias), width);
             /// <summary>Four 10-bit values LSB-packed into 5 bytes (tyre temp / pressure group).
@@ -192,13 +196,13 @@ namespace MozaPlugin.Telemetry
             public Fsr1FieldDef[] Done() => _list.ToArray();
         }
 
-        private static Fsr1FieldDef MakeByte(string id, string label, int byteStart, Fsr1Encoding enc, string prop, long fullScale = 0, double scale = 1.0, double bias = 0.0)
+        private static Fsr1FieldDef MakeByte(string id, string label, int byteStart, Fsr1Encoding enc, string prop, long fullScale = 0, double scale = 1.0, double bias = 0.0, Fsr1FieldKind kind = Fsr1FieldKind.Direct)
         {
             int w = enc == Fsr1Encoding.U8 ? 1 : enc == Fsr1Encoding.U24_BE ? 3 : 2;
             var offs = new int[w];
             for (int i = 0; i < w; i++) offs[i] = byteStart + i;
             return new Fsr1FieldDef { FieldId = id, Label = label, Offsets = offs, Encoding = enc,
-                Kind = Fsr1FieldKind.Direct, DefaultProperty = prop, Decoded = true, FullScale = fullScale,
+                Kind = kind, DefaultProperty = prop, Decoded = true, FullScale = fullScale,
                 DefaultScale = scale, DefaultBias = bias };
         }
 
@@ -362,7 +366,7 @@ namespace MozaPlugin.Telemetry
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("rpm", "RPM", G + "Rpms")
                     .U8("pos", "Position", G + "Position")
@@ -392,7 +396,7 @@ namespace MozaPlugin.Telemetry
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U8("pos", "Position", G + "Position")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
@@ -418,7 +422,7 @@ namespace MozaPlugin.Telemetry
                 PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x02,
                 Fields = new Fields()
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("rpm", "RPM", G + "Rpms")
                     .U16("maxRpm", "Max RPM", G + "MaxRpm")
@@ -445,7 +449,7 @@ namespace MozaPlugin.Telemetry
                 RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — race info", IsLive = true,
                 PayloadLen = 24, LiveB1 = 0x0e, LiveB2 = 0x01,
                 Fields = new Fields()
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("rpm", "RPM", G + "Rpms")
@@ -468,7 +472,7 @@ namespace MozaPlugin.Telemetry
                 Fields = new Fields()
                     .U24("stl", "Session time left", SessionTimeLeft, MsScale)
                     .U24("elt", "Estimated lap time", "", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("rpm", "RPM", G + "Rpms")
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
