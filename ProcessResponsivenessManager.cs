@@ -15,8 +15,9 @@ namespace MozaPlugin
     ///      <c>PROCESS_POWER_THROTTLING_EXECUTION_SPEED</c> (control bit set, state bit
     ///      clear) keeps us at full speed in the background, as PitHouse does.
     ///   2. <b>Background timer-resolution clamp</b> (Win10 2004+): a foreground
-    ///      <c>timeBeginPeriod(1)</c> is silently ignored once we lose focus unless we also
-    ///      set <c>PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION</c> (Win11).
+    ///      <c>timeBeginPeriod(1)</c> is silently ignored once we lose focus unless we opt
+    ///      OUT of <c>PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION</c> — control bit
+    ///      set, state bit CLEAR ("always honor Timer Resolution Requests", Win11).
     ///
     /// Both throttling bits live in the same <c>ProcessPowerThrottling</c> word, so this
     /// class is their single owner — <see cref="SetExecutionThrottleOptOut"/> and the
@@ -107,8 +108,8 @@ namespace MozaPlugin
         }
 
         // Recompute the desired ProcessPowerThrottling word from the two requests and
-        // push it if it changed. EXECUTION_SPEED follows the opt-out; IGNORE_TIMER_RESOLUTION
-        // follows the timer raise. Must hold _gate.
+        // push it if it changed. Both mechanisms are opted OUT of whenever either request
+        // is live. Must hold _gate.
         private void ReconcilePowerThrottlingLocked()
         {
             uint control, state;
@@ -121,9 +122,15 @@ namespace MozaPlugin
             else
             {
                 control = PROCESS_POWER_THROTTLING_EXECUTION_SPEED | PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
-                // EXECUTION_SPEED state bit clear => throttling disabled (full speed).
-                // IGNORE_TIMER_RESOLUTION state bit set => keep our requested resolution.
-                state = _timerRaised ? PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION : 0;
+                // ControlMask selects the mechanism; StateMask turns it ON. We want BOTH
+                // mechanisms OFF, so StateMask stays 0:
+                //   EXECUTION_SPEED off        => EcoQoS disabled, full clock.
+                //   IGNORE_TIMER_RESOLUTION off => "always honor Timer Resolution Requests".
+                // Setting the IGNORE_TIMER_RESOLUTION bit means the opposite — Windows then
+                // discards our own timeBeginPeriod(1), pinning every timer to the 15.625ms
+                // default grid (a 20ms worker lands on 31.25ms => 50Hz runs at 32Hz). Only
+                // Win11 accepts this bit, so the fault was invisible on Win10.
+                state = 0;
             }
 
             if (_ptApplied && control == _ptControl && state == _ptState) return;

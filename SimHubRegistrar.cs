@@ -404,18 +404,41 @@ namespace MozaPlugin
             MozaLog.Debug($"[AZOM] FSR1 byte probe → {_plugin.Fsr1ProbeTargetLabel()} via action");
         }
 
-        // Cycle the wheel's displayed dashboard to the next/previous enabled slot,
-        // wrapping around. Mirrors the DashboardManagementControl combo switch:
-        // ConfigJsonList is slot-ordered (dropdown index IS the slot), the wheel's
-        // WheelReportedSlot is the ground-truth current slot, and
-        // OnDashboardSwitched(slot) routes through SwitchToProfile so FF kind=4 +
-        // the pipeline cycle honor the EnableHotRenegotiation flag. delta is +1
-        // (next) or -1 (prev). No-op when the wheel has 0 or 1 dashboards.
+        // Cycle the displayed dashboard to the next/previous page, wrapping around.
+        // Branches by display family the same way DashboardManagementControl's combo
+        // does, because FSR1/CM1 don't speak tier-def and carry no ConfigJsonList:
+        //   FSR V1 wheel  → group-0x32/0x81 select over its 19 fixed pages (0..18)
+        //   CM1 bus dash  → group-0x32/0x81 select over its 13 fixed pages (1..13)
+        //   tier-def wheel → ConfigJsonList slot cycle (below)
+        // The wheel's own screen wins over a secondary CM1 dash, so the CM1 branch is
+        // the fall-through for a screenless wheel. delta is +1 (next) or -1 (prev).
         private void CycleDashboard(int delta)
         {
+            // FSR V1 wheel: its own screen has 19 fixed hardware pages. Step and wrap,
+            // emitting the same select the dash dropdown does (drained by the driver).
+            if (_plugin.IsFsr1DisplayWheel)
+            {
+                int nf = Fsr1DisplayEmitter.MaxDashboardIndex + 1;              // 19
+                int targetf = ((_plugin.GetActiveFsr1Index() + delta) % nf + nf) % nf;
+                _plugin.SetActiveFsr1Index(targetf, sendToWheel: true);
+                MozaLog.Debug($"[AZOM] FSR1 dashboard cycle {(delta > 0 ? "next" : "prev")} → page {targetf} via action");
+                return;
+            }
+
             var list = _plugin.WheelStateForDiagnostics?.ConfigJsonList;
             if (list == null || list.Count == 0)
             {
+                // No tier-def wheel screen: fall back to a CM1 base-bridged dash if present.
+                if (_plugin.DashIsCm1)
+                {
+                    int min = Cm1DisplayEmitter.MinDashboardIndex;             // 1
+                    int nc = Cm1DisplayEmitter.MaxDashboardIndex - min + 1;    // 13
+                    int curc = _plugin.GetActiveCm1Index() - min;
+                    int targetc = ((curc + delta) % nc + nc) % nc + min;
+                    _plugin.SetActiveCm1Index(targetc, sendToWheel: true);
+                    MozaLog.Debug($"[AZOM] CM1 dashboard cycle {(delta > 0 ? "next" : "prev")} → page {targetc} via action");
+                    return;
+                }
                 MozaLog.Debug("[AZOM] Dashboard cycle ignored: no wheel dashboard list");
                 return;
             }

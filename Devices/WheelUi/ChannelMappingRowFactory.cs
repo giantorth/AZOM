@@ -102,7 +102,7 @@ namespace MozaPlugin.Devices.WheelUi
                         IsSynthetic = synthetic,
                         RecordKey = dash.Key,
                         FieldId = f.FieldId,
-                        Name = f.Label + (f.Decoded ? "" : "  (raw)"),
+                        Name = f.Label + (dash.IsBackground ? "  (cache)" : "") + (f.Decoded ? "" : "  (raw)"),
                         Url = dash.Key + "/" + f.FieldId,
                         Compression = packed ? $"{slot.BitWidth}-bit" : enc.ToString(),
                         CapabilityText = direct ? "direct value" : $"0–{cap}",

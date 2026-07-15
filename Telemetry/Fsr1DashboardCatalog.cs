@@ -16,6 +16,10 @@ namespace MozaPlugin.Telemetry
         Direct,
         /// <summary>Protocol anchor, not user-mappable: 0x4B when the engine runs, else 0.</summary>
         EngineFlag,
+        /// <summary>24-bit sign-magnitude: bit23 = sign (set when the source is negative), the low
+        /// bits carry |value|. Used by the gap/delta field — a signed ms delta to best (negative =
+        /// ahead/faster). Plain Direct would clamp negatives to 0.</summary>
+        SignedMagnitude,
     }
 
     /// <summary>
@@ -105,6 +109,11 @@ namespace MozaPlugin.Telemetry
         public byte LiveB1;            // b1 anchor (per-dashboard config; option-A default)
         public byte LiveB2;            // b2 anchor (per-dashboard config; option-A default)
         public bool IsLive;            // false = declared-only (never streams live)
+        // Background tyre/status cache record — not a selectable page. PitHouse interleaves it
+        // sparsely (~0.5 Hz) alongside the active page so the firmware can show tyre temps,
+        // pressure, track/air temp, car count and lap count on pages whose primary record lacks
+        // them. The driver streams it via a low-rate one-shot Send, not a full-rate slot.
+        public bool IsBackground;
         public Fsr1FieldDef[] Fields = System.Array.Empty<Fsr1FieldDef>();
     }
 
@@ -138,12 +147,12 @@ namespace MozaPlugin.Telemetry
 
             private Fields Add(Fsr1FieldDef f, int bits) { _list.Add(f); _bit += bits; return this; }
 
-            public Fields U8(string id, string label, string prop = "", double bias = 0.0) =>
-                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U8, prop, bias: bias), 8);
-            public Fields U16(string id, string label, string prop = "", long fullScale = 0) =>
-                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U16_BE, prop, fullScale), 16);
-            public Fields U24(string id, string label, string prop = "", double scale = 1.0) =>
-                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U24_BE, prop, scale: scale), 24);
+            public Fields U8(string id, string label, string prop = "", double bias = 0.0, double scale = 1.0) =>
+                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U8, prop, scale: scale, bias: bias), 8);
+            public Fields U16(string id, string label, string prop = "", long fullScale = 0, double scale = 1.0) =>
+                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U16_BE, prop, fullScale, scale), 16);
+            public Fields U24(string id, string label, string prop = "", double scale = 1.0, Fsr1FieldKind kind = Fsr1FieldKind.Direct) =>
+                Add(MakeByte(id, label, _bit >> 3, Fsr1Encoding.U24_BE, prop, scale: scale, kind: kind), 24);
             public Fields Bits(string id, string label, int width, string prop = "", long fullScale = 0, double scale = 1.0, double bias = 0.0) =>
                 Add(MakeBits(id, label, _bit, width, prop, fullScale, scale, bias), width);
             /// <summary>Four 10-bit values LSB-packed into 5 bytes (tyre temp / pressure group).
@@ -187,13 +196,13 @@ namespace MozaPlugin.Telemetry
             public Fsr1FieldDef[] Done() => _list.ToArray();
         }
 
-        private static Fsr1FieldDef MakeByte(string id, string label, int byteStart, Fsr1Encoding enc, string prop, long fullScale = 0, double scale = 1.0, double bias = 0.0)
+        private static Fsr1FieldDef MakeByte(string id, string label, int byteStart, Fsr1Encoding enc, string prop, long fullScale = 0, double scale = 1.0, double bias = 0.0, Fsr1FieldKind kind = Fsr1FieldKind.Direct)
         {
             int w = enc == Fsr1Encoding.U8 ? 1 : enc == Fsr1Encoding.U24_BE ? 3 : 2;
             var offs = new int[w];
             for (int i = 0; i < w; i++) offs[i] = byteStart + i;
             return new Fsr1FieldDef { FieldId = id, Label = label, Offsets = offs, Encoding = enc,
-                Kind = Fsr1FieldKind.Direct, DefaultProperty = prop, Decoded = true, FullScale = fullScale,
+                Kind = kind, DefaultProperty = prop, Decoded = true, FullScale = fullScale,
                 DefaultScale = scale, DefaultBias = bias };
         }
 
@@ -222,6 +231,17 @@ namespace MozaPlugin.Telemetry
         // maps straight into the 2-bit field. Live delta to session best (signed seconds) for gap fields.
         private const string ErsDeployMode = F1RawStatus + "m_ersDeployMode";
         private const string LiveDelta = "PersistantTrackerPlugin.SessionBestLiveDeltaSeconds";
+        // Fuel remaining as laps of range (signed: negative = short). Wire = laps × 100 (verified).
+        private const string FuelRemainLaps = F1RawStatus + "m_fuelRemainingLaps";
+        // ERS this-lap energy (Joules). Deploy bar shows budget REMAINING = 100 − deployed/40000 (of the
+        // 4 MJ deploy cap; verified clean). Harvest bar = harvested/20000 (of the 2 MJ MGU-K cap; the
+        // capture's harvest data was sparse so the scale is approximate — tune on-wheel if needed).
+        private const string ErsDeployedThisLap = F1RawStatus + "m_ersDeployedThisLap";
+        private const string ErsHarvestedThisLap = F1RawStatus + "m_ersHarvestedThisLapMGUK";
+        // Fuel mix / class 0–3 (lean/standard/rich/max).
+        private const string FuelMix = F1RawStatus + "m_fuelMix";
+        // Session time remaining (seconds → ms via MsScale) for the GT session clock.
+        private const string SessionTimeLeft = "DataCorePlugin.GameRawData.PacketSessionData.m_sessionTimeLeft";
         private static readonly string[] InnerTempProps =
         {
             F1Raw + "m_tyresInnerTemperature03", F1Raw + "m_tyresInnerTemperature04",
@@ -256,14 +276,14 @@ namespace MozaPlugin.Telemetry
                 Fields = new Fields()
                     .Pack10x4("tti", "Tyre inner", Corners, InnerTempProps, TyreTempBias)
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
-                    .U16("frl", "Fuel remain laps", "")
+                    .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
                     .U16("fsl", "Fuel surplus laps", "")
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U8("pos", "Position", G + "Position")
                     .U8("lap", "Lap", G + "CurrentLap")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
-                    .U8("ersD", "ERS deployed", "")
-                    .U8("ersH", "ERS harvested", "")
+                    .U8("ersD", "ERS deploy left", ErsDeployedThisLap, bias: 100.0, scale: -1.0 / 40000.0)
+                    .U8("ersH", "ERS harvested", ErsHarvestedThisLap, scale: 1.0 / 20000.0)
                     .GearDrsErs("gde")
                     .Done(),
             },
@@ -346,7 +366,7 @@ namespace MozaPlugin.Telemetry
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("rpm", "RPM", G + "Rpms")
                     .U8("pos", "Position", G + "Position")
@@ -376,7 +396,7 @@ namespace MozaPlugin.Telemetry
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U8("pos", "Position", G + "Position")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
@@ -402,7 +422,7 @@ namespace MozaPlugin.Telemetry
                 PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x02,
                 Fields = new Fields()
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("rpm", "RPM", G + "Rpms")
                     .U16("maxRpm", "Max RPM", G + "MaxRpm")
@@ -411,7 +431,7 @@ namespace MozaPlugin.Telemetry
             },
             new()
             {
-                RecordType = 0x0d, Key = "type-0d", Label = "Dashboard 0D — tyres / pressure", IsLive = true,
+                RecordType = 0x0d, Key = "type-0d", Label = "Tyre / status cache", IsLive = true, IsBackground = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .Pack10x4("tti", "Tyre inner", Corners, InnerTempProps, TyreTempBias)
@@ -429,8 +449,8 @@ namespace MozaPlugin.Telemetry
                 RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — race info", IsLive = true,
                 PayloadLen = 24, LiveB1 = 0x0e, LiveB2 = 0x01,
                 Fields = new Fields()
-                    .U24("gap", "Gap", LiveDelta, MsScale)
-                    .U16("frl", "Fuel remain laps", "")
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
+                    .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
                     .U16("spd", "Speed", G + "SpeedKmh")
                     .U16("rpm", "RPM", G + "Rpms")
                     .U8("lap", "Lap", G + "CurrentLap")
@@ -441,7 +461,7 @@ namespace MozaPlugin.Telemetry
                     .U8("boost", "Boost", "")
                     .U8("ecu", "ECU map", G + "EngineMap")
                     .U8("tc2", "TC2", "")
-                    .U8("fuelClass", "Fuel class", "")
+                    .U8("fuelClass", "Fuel mix", FuelMix)
                     .U8("gear", "Gear", G + "Gear", bias: 1.0)
                     .Done(),
             },
@@ -450,12 +470,12 @@ namespace MozaPlugin.Telemetry
                 RecordType = 0x11, Key = "type-11", Label = "Dashboard 11 — GT (A)", IsLive = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
                 Fields = new Fields()
-                    .U24("stl", "Session time left", "", MsScale)
+                    .U24("stl", "Session time left", SessionTimeLeft, MsScale)
                     .U24("elt", "Estimated lap time", "", MsScale)
-                    .U24("gap", "Gap", LiveDelta, MsScale)
+                    .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("rpm", "RPM", G + "Rpms")
                     .U16("spd", "Speed", G + "SpeedKmh")
-                    .U16("frl", "Fuel remain laps", "")
+                    .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
                     .Nibbles("gear", "Gear", G + "Gear", "abs", "ABS level", G + "ABSLevel", bias0: 1.0)
                     .U8("pos", "Position", G + "Position")
                     .U8("clutch", "Clutch", G + "Clutch")
@@ -493,23 +513,26 @@ namespace MozaPlugin.Telemetry
         // full live set). See docs/protocol/devices/wheel-0x17.md § Group 0x42.
         private static readonly System.Collections.Generic.Dictionary<int, byte[]> IndexToRecordTypes = new()
         {
-            { 0, new byte[] { 0x01 } },
-            { 1, new byte[] { 0x02 } },
-            { 2, new byte[] { 0x06 } },
-            { 3, new byte[] { 0x06 } },
+            // 0x0d = background tyre/status cache (IsBackground) — appended to every page whose
+            // display shows tyre temps / pressure / track-air / car-count / lap-count that its
+            // primary record doesn't carry. Streamed sparsely (see the driver), not full-rate.
+            { 0, new byte[] { 0x01, 0x0d } },   // shows inner+outer tyre temps; primary has inner only
+            { 1, new byte[] { 0x02, 0x0d } },   // brake dash also shows tyre temps
+            { 2, new byte[] { 0x06, 0x0d } },
+            { 3, new byte[] { 0x06, 0x0d } },
             { 4, new byte[] { 0x03 } },
             { 5, new byte[] { 0x04 } },
             { 6, new byte[] { 0x04 } },
-            { 7, new byte[] { 0x06 } },
-            { 8, new byte[] { 0x05 } },
+            { 7, new byte[] { 0x06, 0x0d } },
+            { 8, new byte[] { 0x05 } },         // already carries car-count + lap-count
             { 9, new byte[] { 0x03 } },
-            { 10, new byte[] { 0x08 } },
-            { 11, new byte[] { 0x09 } },
-            { 12, new byte[] { 0x0e } },
+            { 10, new byte[] { 0x08 } },        // tyre dash carries its own inner+outer temps
+            { 11, new byte[] { 0x09, 0x0d } },  // GT timing: tyres/pressure/track/air/lap-count
+            { 12, new byte[] { 0x0e, 0x0d } },  // race info: car-count + lap-count total
             { 13, new byte[] { 0x04 } },
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
-            { 17, new byte[] { 0x11, 0x12 } },
+            { 17, new byte[] { 0x11, 0x12, 0x0d } },  // GT style: tyres + totals
             { 18, new byte[] { 0x0c } },
         };
 

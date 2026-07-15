@@ -121,6 +121,16 @@
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm2\MOZA CM2 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm2.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm1\MOZA CM1 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm1.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelBase\MOZA Wheel Base\device.json" LogicalName="MozaPlugin.Devices.WheelBase.device.json" />
+    <!-- Device-profile artwork. SimHub renders a profile's picture from a
+         `thumbnail.png` sidecar next to device.json; DeviceDefinitionDeployer
+         writes one out per detected wheel. Filename = the firmware model prefix
+         (WheelModelInfo.KnownModels), which is what the deployer looks up.
+         Non-recursive on purpose: `Unwired/` parks art for wheels whose prefix
+         isn't known yet, and must stay out of the DLL until it can resolve.
+         Regenerate with tools/make-device-thumbnail. -->
+    <EmbeddedResource Include="DeviceTemplates\Thumbnails\*.png">
+      <LogicalName>MozaPlugin.Devices.Thumbnails.%(Filename).png</LogicalName>
+    </EmbeddedResource>
     <!-- Factory dashboards shipped with MOZA wheel firmware. Copied verbatim
          from PitHouse `bin/dashes/<Name>/<Name>.mzdash`. Name underscores in
          filenames map back to spaces in dashboard display name (e.g.
