@@ -178,7 +178,11 @@ namespace MozaPlugin.Devices
         private DateTime _btnFedUtc = DateTime.MinValue;
         private DateTime _knobDrivenUtc = DateTime.MinValue;
         private DateTime _knobFedUtc = DateTime.MinValue;
-        private const double KeepaliveIntervalSeconds = 1.0;
+        // The firmware drops live-LED ownership 1000 ms after the last feed. Scheduling
+        // the feed AT 1.0 s guaranteed a late arrival once Display() sampling jitter was
+        // added (+98 ms observed), reverting the knob ring to stored colours ~0.7x/s.
+        // Must satisfy: interval + jitter < 1000 ms.
+        private const double KeepaliveIntervalSeconds = 0.75;
         // Default per-section hold (seconds) when the wheel page has no explicit
         // WheelKeepaliveTimeoutSec; the Options slider overrides it. 0 = no hold.
         private const double KeepaliveHoldSeconds = 45.0;
@@ -856,8 +860,9 @@ namespace MozaPlugin.Devices
                         {
                             _lastKnobs = (Color[])knobColors.Clone();
 
-                            SendColorChunks(plugin, knobColors, count, "wheel-telemetry-knob-colors",
-                                streamBase: StreamKind.WheelKnobColor0, maxStreamChunks: 1);
+                            // Stays on the paced one-shot FIFO — see StreamKind.WheelKnobBitmask.
+                            // Streaming these flickers the ring back to its stored colours.
+                            SendColorChunks(plugin, knobColors, count, "wheel-telemetry-knob-colors");
 
                             int windowMask = (1 << knobCount) - 1;
                             // The CS Pro re-renders the knob ring ONLY on a bitmask write — a
@@ -1011,8 +1016,7 @@ namespace MozaPlugin.Devices
         {
             if (_lastKnobs == null) return;
             int count = Math.Min(_lastKnobs.Length, modelInfo.KnobCount);
-            SendColorChunks(plugin, _lastKnobs, count, "wheel-telemetry-knob-colors",
-                streamBase: StreamKind.WheelKnobColor0, maxStreamChunks: 1);
+            SendColorChunks(plugin, _lastKnobs, count, "wheel-telemetry-knob-colors");
             if (_lastKnobBitmask >= 0)
                 plugin.DeviceManager.WriteArrayStream("wheel-send-knob-telemetry",
                     BuildWindowedBitmaskBytes(_lastKnobBitmask, (1 << modelInfo.KnobCount) - 1), StreamKind.WheelKnobBitmask);
