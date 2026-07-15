@@ -728,7 +728,8 @@ namespace MozaPlugin.Devices
                                 buttonBitmask |= (1 << protocolIndex);
                         }
 
-                        SendColorChunks(plugin, buttonColors, buttonCount, "wheel-telemetry-button-colors", buttonMap);
+                        SendColorChunks(plugin, buttonColors, buttonCount, "wheel-telemetry-button-colors", buttonMap,
+                            streamBase: StreamKind.WheelButtonColor0, maxStreamChunks: 4);
 
                         if (alwaysResendBitmask || buttonBitmask != _lastButtonBitmask)
                         {
@@ -855,7 +856,8 @@ namespace MozaPlugin.Devices
                         {
                             _lastKnobs = (Color[])knobColors.Clone();
 
-                            SendColorChunks(plugin, knobColors, count, "wheel-telemetry-knob-colors");
+                            SendColorChunks(plugin, knobColors, count, "wheel-telemetry-knob-colors",
+                                streamBase: StreamKind.WheelKnobColor0, maxStreamChunks: 1);
 
                             int windowMask = (1 << knobCount) - 1;
                             // The CS Pro re-renders the knob ring ONLY on a bitmask write — a
@@ -996,7 +998,8 @@ namespace MozaPlugin.Devices
             var modelInfo = plugin.WheelModelInfo;
             if (modelInfo == null) return;
             int count = Math.Min(_lastButtons.Length, modelInfo.ButtonLedCount);
-            SendColorChunks(plugin, _lastButtons, count, "wheel-telemetry-button-colors", modelInfo.ButtonLedMap);
+            SendColorChunks(plugin, _lastButtons, count, "wheel-telemetry-button-colors", modelInfo.ButtonLedMap,
+                streamBase: StreamKind.WheelButtonColor0, maxStreamChunks: 4);
             if (_lastButtonBitmask >= 0)
                 plugin.DeviceManager.WriteArrayStream("wheel-send-buttons-telemetry",
                     BuildWindowedBitmaskBytes(_lastButtonBitmask, modelInfo.ButtonWindowMask), StreamKind.WheelButtonBitmask);
@@ -1008,7 +1011,8 @@ namespace MozaPlugin.Devices
         {
             if (_lastKnobs == null) return;
             int count = Math.Min(_lastKnobs.Length, modelInfo.KnobCount);
-            SendColorChunks(plugin, _lastKnobs, count, "wheel-telemetry-knob-colors");
+            SendColorChunks(plugin, _lastKnobs, count, "wheel-telemetry-knob-colors",
+                streamBase: StreamKind.WheelKnobColor0, maxStreamChunks: 1);
             if (_lastKnobBitmask >= 0)
                 plugin.DeviceManager.WriteArrayStream("wheel-send-knob-telemetry",
                     BuildWindowedBitmaskBytes(_lastKnobBitmask, (1 << modelInfo.KnobCount) - 1), StreamKind.WheelKnobBitmask);

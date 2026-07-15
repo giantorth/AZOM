@@ -60,8 +60,17 @@ namespace MozaPlugin.Protocol
         WheelRpmColor2 = 31,
         WheelRpmColor3 = 32,
         WheelRpmBitmask = 33,     // wheel-send-rpm-telemetry (windowed bitmask)
-        WheelButtonBitmask = 34,  // wheel-send-buttons-telemetry
-        WheelKnobBitmask = 35,    // wheel-send-knob-telemetry
+        // Colours get their own slots ordered BEFORE their bitmask, same rule as the
+        // Dash lanes below: a colour left on the paced one-shot FIFO lands AFTER its
+        // stream-lane bitmask, so the group flips out of sync with the RPM strip.
+        // 4 button slots cover the widest set (W11 = 16 LEDs); 1 knob slot covers 5.
+        WheelButtonColor0 = 34,
+        WheelButtonColor1 = 35,
+        WheelButtonColor2 = 36,
+        WheelButtonColor3 = 37,
+        WheelButtonBitmask = 38,  // wheel-send-buttons-telemetry — after colours
+        WheelKnobColor0 = 39,
+        WheelKnobBitmask = 40,    // wheel-send-knob-telemetry — after colours
         // (The old-protocol 0x41 FD DE bitmask — wheel-old-send-telemetry — is NOT
         // here: it's only emitted by single-display legacy/ES rims that stay on the
         // paced one-shot lane, and it shares the ES wake-pulse command.)
@@ -70,27 +79,27 @@ namespace MozaPlugin.Protocol
         // BEFORE DashRpmBitmask so the write loop (drains slots in index order)
         // emits colours before the lit-mask in the same pass — matching the
         // manager's "never light an LED before its colour lands" sequencing.
-        DashRpmColor0 = 36,
-        DashRpmColor1 = 37,
-        DashRpmColor2 = 38,
-        DashRpmColor3 = 39,
-        DashRpmColor4 = 40,
-        DashRpmColor5 = 41,
-        DashRpmColor6 = 42,
-        DashRpmColor7 = 43,
-        DashRpmColor8 = 44,
-        DashRpmColor9 = 45,
-        DashRpmBitmask = 46,      // CM2 dash-send-telemetry (41 FD DE) — after colours
-        DashFlagColors = 47,      // CM2 dash-flag-colors (32 08 00, 18-byte array)
+        DashRpmColor0 = 41,
+        DashRpmColor1 = 42,
+        DashRpmColor2 = 43,
+        DashRpmColor3 = 44,
+        DashRpmColor4 = 45,
+        DashRpmColor5 = 46,
+        DashRpmColor6 = 47,
+        DashRpmColor7 = 48,
+        DashRpmColor8 = 49,
+        DashRpmColor9 = 50,
+        DashRpmBitmask = 51,      // CM2 dash-send-telemetry (41 FD DE) — after colours
+        DashFlagColors = 52,      // CM2 dash-flag-colors (32 08 00, 18-byte array)
 
-        // ── Wheelbase LFE lanes (absolute slots 48+) ─────────────────────────
+        // ── Wheelbase LFE lanes (absolute slots 53+) ─────────────────────────
         // Host-rendered wheelbase low-frequency effects (cmd 0x2D/0x77) on the
         // BASE primary connection. Engine (continuous while driving) and ABS
         // (while ABS active) can be live simultaneously, so they get separate
         // latest-wins lanes and never coalesce into one another. Gearshift is a
         // discrete burst → the paced one-shot FIFO, so it needs no lane.
-        BaseLfeEngine = 48,
-        BaseLfeAbs = 49,
+        BaseLfeEngine = 53,
+        BaseLfeAbs = 54,
     }
 
     /// <summary>Device family targeted by the serial probe fallback (registry-empty case).</summary>
@@ -135,15 +144,15 @@ namespace MozaPlugin.Protocol
         //   11..17 — AB9 / mBooster (absolute, per StreamKind).
         //   18..28 — a SECOND tier-def pipeline at slot-base 18 (a bus-attached CM2
         //            dash sharing this connection). See TelemetrySender.StreamSlotBase.
-        //   29..47 — LED lanes (wheel RPM colour chunks + bitmasks, CM2 RPM/flag) —
-        //            high-rate latest-wins LED writes moved off the throttled one-shot
-        //            FIFO. See the LED StreamKind members.
-        //   48..49 — wheelbase LFE lanes (engine + ABS host-rendered effect streams).
+        //   29..52 — LED lanes (wheel RPM/button/knob colour chunks + bitmasks, CM2
+        //            RPM/flag) — high-rate latest-wins LED writes moved off the
+        //            throttled one-shot FIFO. See the LED StreamKind members.
+        //   53..54 — wheelbase LFE lanes (engine + ABS host-rendered effect streams).
         // A CM2 on its own USB connection runs at base 0 on THAT connection, so the
         // second block is only used when two pipelines share one connection.
         // NOTE: keep this >= (highest StreamKind + 1). The static ctor below
         // asserts the regions are disjoint and fit.
-        private const int StreamSlotCount = 50;
+        private const int StreamSlotCount = 55;
 
         // Startup slot-layout invariant: the LED lanes (29+) must not alias the
         // wheel value pipeline (0..10), AB9/mBooster (11..17), or the CM2 second
@@ -153,13 +162,13 @@ namespace MozaPlugin.Protocol
         static MozaSerialConnection()
         {
             const int ledFirst = (int)StreamKind.WheelRpmColor0; // 29
-            const int ledLast = (int)StreamKind.DashFlagColors;  // 47 (highest LED slot)
+            const int ledLast = (int)StreamKind.DashFlagColors;  // 52 (highest LED slot)
             const int cm2ValueLast = 18 + 11 - 1;                // CM2 base 18 + block 11
             System.Diagnostics.Debug.Assert(ledFirst > cm2ValueLast,
                 "LED stream slots must start after the CM2 value pipeline (18..28)");
             System.Diagnostics.Debug.Assert(ledLast < StreamSlotCount,
                 "StreamSlotCount too small for the LED stream slots");
-            const int lfeLast = (int)StreamKind.BaseLfeAbs;      // 49 (highest slot overall)
+            const int lfeLast = (int)StreamKind.BaseLfeAbs;      // 54 (highest slot overall)
             System.Diagnostics.Debug.Assert(lfeLast > ledLast,
                 "wheelbase LFE stream slots must start after the LED lanes");
             System.Diagnostics.Debug.Assert(lfeLast < StreamSlotCount,
