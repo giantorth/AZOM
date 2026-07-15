@@ -36,6 +36,12 @@ namespace MozaPlugin.Devices
         // registry discovery returns no PID (probe path under Wine).
         private const string FallbackPid = "0x0006";
 
+        // SimHub renders a device profile's picture from a thumbnail.png sitting
+        // next to device.json (PictureWrapper, [JsonIgnore] — not a device.json
+        // field). Art is embedded per firmware model prefix; see the csproj glob.
+        private const string ThumbnailFileName = "thumbnail.png";
+        private const string ThumbnailResourcePrefix = "MozaPlugin.Devices.Thumbnails.";
+
         // Content version of the dynamically generated wheel device.json. Bump
         // when the generated body changes in a way that should re-deploy over an
         // already-written file whose LED/button/knob counts are unchanged — e.g.
@@ -65,7 +71,7 @@ namespace MozaPlugin.Devices
                 modelInfo.RpmLedCount, modelInfo.HasFlagLeds,
                 modelInfo.ButtonLedCount, modelInfo.KnobCount,
                 modelInfo.BrowSegmentSize,
-                discoveredPid);
+                discoveredPid, prefix);
         }
 
         /// <summary>
@@ -140,7 +146,8 @@ namespace MozaPlugin.Devices
             => DeployFromResource(OldProtoDeviceName, OldProtoResource, discoveredPid, MozaDeviceConstants.WheelOldProtoGuid);
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
-            int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid)
+            int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid,
+            string modelPrefix)
         {
             try
             {
@@ -193,7 +200,12 @@ namespace MozaPlugin.Devices
                     }
 
                     if (!stale)
+                    {
+                        // Definition is current, but the artwork may still be
+                        // missing (added by a plugin update, or user-deleted).
+                        EnsureThumbnail(deviceDir, modelPrefix);
                         return false;
+                    }
                 }
 
                 Directory.CreateDirectory(deviceDir);
@@ -204,6 +216,7 @@ namespace MozaPlugin.Devices
                 var pid = discoveredPid ?? FallbackPid;
                 var json = GenerateWheelDeviceJson(guid, productName, rpmCount, hasFlagLeds, buttonCount, knobCount, browSegmentSize, pid);
                 File.WriteAllText(deviceJsonPath, json);
+                EnsureThumbnail(deviceDir, modelPrefix);
 
                 string action = stale ? "Refreshed" : "Deployed";
                 MozaLog.Debug(
@@ -217,6 +230,97 @@ namespace MozaPlugin.Devices
                 MozaLog.Error($"[AZOM] Error deploying device definition '{deviceName}': {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Top up artwork for wheel definitions that are already on disk.
+        /// <see cref="DeployForModel"/> only ever reaches the wheel that is
+        /// currently attached, so definitions left behind by other wheels the
+        /// user has owned would stay picture-less until that wheel is plugged
+        /// back in. Called once at Init.
+        ///
+        /// Only writes into directories that already exist — it never creates a
+        /// definition for a wheel the user has not actually had connected, and
+        /// never rewrites device.json. Cosmetic, so it reports nothing and never
+        /// asks for a SimHub restart.
+        /// </summary>
+        public static void RefreshDeployedThumbnails()
+        {
+            try
+            {
+                var userDefsDir = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User");
+                if (!Directory.Exists(userDefsDir))
+                    return;
+
+                foreach (var (prefix, friendlyName, _) in WheelModelInfo.KnownModels)
+                {
+                    var deviceDir = Path.Combine(userDefsDir, "MOZA " + friendlyName);
+                    if (File.Exists(Path.Combine(deviceDir, "device.json")))
+                        EnsureThumbnail(deviceDir, prefix);
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not refresh deployed device thumbnails: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Write the model's product render to <c>thumbnail.png</c> beside its
+        /// device.json — SimHub renders the device-profile picture from that
+        /// sidecar. No-op when no art ships for the model (most of them), or
+        /// when the file already matches. Cosmetic only: it never throws into
+        /// the deploy path and never flips the caller's "restart SimHub" result,
+        /// since the picture appears on the next SimHub start regardless.
+        /// </summary>
+        private static void EnsureThumbnail(string deviceDir, string modelPrefix)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(modelPrefix))
+                    return;
+
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream(ThumbnailResourcePrefix + modelPrefix + ".png"))
+                {
+                    if (stream == null)
+                        return;
+
+                    var bytes = new byte[stream.Length];
+                    int read = 0;
+                    while (read < bytes.Length)
+                    {
+                        int n = stream.Read(bytes, read, bytes.Length - read);
+                        if (n <= 0) break;
+                        read += n;
+                    }
+
+                    var thumbnailPath = Path.Combine(deviceDir, ThumbnailFileName);
+                    if (File.Exists(thumbnailPath) && BytesEqual(File.ReadAllBytes(thumbnailPath), bytes))
+                        return;
+
+                    Directory.CreateDirectory(deviceDir);
+                    File.WriteAllBytes(thumbnailPath, bytes);
+                    MozaLog.Debug($"[AZOM] Wrote device thumbnail for {modelPrefix}: {thumbnailPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not write device thumbnail for '{modelPrefix}': {ex.Message}");
+            }
+        }
+
+        private static bool BytesEqual(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length)
+                return false;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i])
+                    return false;
+            }
+            return true;
         }
 
         private static string GenerateWheelDeviceJson(string guid, string productName, int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string pid)

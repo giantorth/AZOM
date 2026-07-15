@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""Turn a MOZA product render into a SimHub device-profile thumbnail.
+
+SimHub renders a device profile's picture from a `thumbnail.png` sidecar sitting
+next to `device.json` (see docs/simhub.md § Device pictures). The spec, read out
+of SimHub.Plugins.dll rather than guessed:
+
+  DeviceDescription ctor:  Thumbnail = new PictureWrapper(descriptor, "thumbnail.png", 512)
+  PictureWrapper.SetPicture: WuQuantizer.OptimizetoPng(Images.FitImage(512, 512, ..., Transparent))
+
+i.e. fit inside a 512x512 box (aspect preserved, long side becomes 512 -- NOT
+padded to a square), then palette-quantize. Every stock thumbnail under
+DevicesDefinitions/Embedded/ is 512 on its long side, 8-bit PaletteAlpha,
+13-72 KB. This script reproduces that with ImageMagick.
+
+Marketing renders are 4000-8000 px with large empty margins, so they must be
+trimmed to the wheel before the fit -- SimHub's own ImageQualityAnalyzer flags
+anything with >3% dead margin as badly cropped.
+
+Usage:
+  tools/make-device-thumbnail SRC DST [--remove-white-bg] [--fuzz 12%] [--fit 512]
+
+--remove-white-bg is for renders delivered on an opaque white background instead
+of alpha (MOZA ships both). Getting this right needs three steps, each of which
+fixes a failure the previous one leaves behind:
+
+  1. Near-white -> binary mask. A plain `-transparent white` is not usable: the
+     wheels contain legitimate white (display text, MOZA logo, ring markings),
+     and it punches holes straight through them.
+  2. Connected-components with an area threshold, so only *large* white regions
+     (the background and the enclosed cutouts between spokes and rim) are
+     removed and small white details survive. A border flood-fill can't do this
+     — it never reaches cutouts enclosed by the wheel, which then render as
+     white blobs on SimHub's dark UI.
+  3. Dilate the mask before applying it. The render's edge is anti-aliased
+     against white, so a pixel-exact mask leaves a 1-2px white fringe tracing
+     the silhouette — very visible on dark. Raising --fuzz to catch it instead
+     eats the light-grey button faces (they're the same brightness), so the
+     fringe must be removed geometrically, not by colour.
+
+Dilation radius and area threshold scale with the source resolution, since both
+are meaningless as absolute pixel counts across an 8000px render vs a 512px one.
+
+--erode-alpha fixes a second, independent defect, present in renders that DO ship
+alpha: a thin white outline baked into the silhouette, left over from whatever cut
+the object off its white background. It reads as a white glow hugging the wheel on
+any non-white background. The ring sits on fully OPAQUE pixels, so dividing a
+white matte back out of the semi-transparent edge (F = (C-(1-a))/a) does nothing
+for it — tried, no visible change — and no colour tolerance can target it without
+also eating the wheel's own light-grey parts. Shrinking the alpha silhouette by
+~1-2 output px removes it geometrically. Radius scales with source resolution.
+
+Output is verified before it is written off as good: wrong type, a missing alpha
+channel or a slack crop is reported as a FAIL line and a non-zero exit. Note the
+checks cannot see a white fringe or a white blob — inspect the result over a
+DARK background before shipping it (SimHub's UI is dark; a white halo is
+invisible against the checkerboard most viewers show).
+"""
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+def identify(path, fmt):
+    out = subprocess.run(
+        ["identify", "-format", fmt, str(path)],
+        capture_output=True, text=True, check=True,
+    )
+    return out.stdout.strip()
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Build a SimHub device thumbnail from a product render.")
+    ap.add_argument("src", type=Path)
+    ap.add_argument("dst", type=Path)
+    ap.add_argument("--remove-white-bg", action="store_true",
+                    help="strip an opaque white background (and enclosed white cutouts) to alpha")
+    ap.add_argument("--erode-alpha", action="store_true",
+                    help="shrink the alpha silhouette to cut off a white outline baked into the "
+                         "render's edge (the white 'glow'). For alpha sources; --remove-white-bg "
+                         "already does the equivalent via its mask dilation.")
+    ap.add_argument("--erode-frac", type=float, default=0.002,
+                    help="--erode-alpha radius as a fraction of the source long side "
+                         "(default 0.002, ~16px on an 8000px render)")
+    ap.add_argument("--fuzz", default="12%", help="near-white tolerance for --remove-white-bg (default 12%%)")
+    ap.add_argument("--fit", type=int, default=512, help="long-side pixels (default 512, SimHub's FitSize)")
+    ap.add_argument("--dilate-frac", type=float, default=0.0025,
+                    help="mask dilation as a fraction of the source long side (default 0.0025, "
+                         "~20px on an 8000px render) — removes the anti-aliased white fringe")
+    ap.add_argument("--area-frac", type=float, default=0.0005,
+                    help="min white-region area to strip, as a fraction of total pixels "
+                         "(default 0.0005) — above this = background/cutout, below = detail to keep")
+    args = ap.parse_args()
+
+    for exe in ("magick", "identify"):
+        if not shutil.which(exe):
+            sys.exit(f"{exe} not found; install ImageMagick")
+    if not args.src.is_file():
+        sys.exit(f"no such file: {args.src}")
+
+    cmd = ["magick", str(args.src)]
+    if args.erode_alpha:
+        w, h = (int(v) for v in identify(args.src, "%w\n%h").splitlines())
+        erode = max(1, round(max(w, h) * args.erode_frac))
+        print(f"  alpha erode: source {w}x{h}, Erode Disk:{erode}")
+        cmd += ["(", "+clone", "-alpha", "extract",
+                "-morphology", "Erode", f"Disk:{erode}", ")",
+                "-alpha", "off", "-compose", "CopyOpacity", "-composite"]
+    if args.remove_white_bg:
+        w, h = (int(v) for v in identify(args.src, "%w\n%h").splitlines())
+        dilate = max(1, round(max(w, h) * args.dilate_frac))
+        area = max(1, round(w * h * args.area_frac))
+        print(f"  white-bg strip: source {w}x{h}, dilate Disk:{dilate}, area-threshold {area:,}px")
+        cmd += [
+            "(", "+clone", "-alpha", "off",
+            # near-white -> white, everything else -> black
+            "-fuzz", args.fuzz, "-fill", "white", "-opaque", "white",
+            "+fuzz", "-fill", "black", "+opaque", "white",
+            # keep only large white regions: background + enclosed cutouts.
+            # Small white (display text, logo, markings) merges back to black.
+            "-define", f"connected-components:area-threshold={area}",
+            "-define", "connected-components:mean-color=true",
+            "-connected-components", "8",
+            # grow into the anti-aliased edge so no white fringe survives
+            "-morphology", "Dilate", f"Disk:{dilate}",
+            "-negate", ")",
+            "-alpha", "off", "-compose", "CopyOpacity", "-composite",
+        ]
+    cmd += [
+        "-trim", "+repage",
+        "-resize", f"{args.fit}x{args.fit}",
+        "-colors", "255",  # 255 + 1 transparent index => PNG8 keeps a real alpha channel
+        f"PNG8:{args.dst}",
+    ]
+
+    args.dst.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(cmd, check=True)
+
+    w, h, imgtype, alpha = identify(
+        args.dst, "%w\n%h\n%[type]\n%[fx:mean.a]").splitlines()
+    w, h, alpha = int(w), int(h), float(alpha)
+    size = args.dst.stat().st_size
+
+    # Fraction of pixels that are both opaque and near-white: the signature of
+    # leftover background/cutout blobs. Wheels sit around 0-1% (display text,
+    # logos, LEDs); a white box or unstripped cutout pushes it well above that.
+    white = float(subprocess.run(
+        ["magick", str(args.dst), "-fx", "(a>0.9 && (r+g+b)/3>0.85) ? 1 : 0",
+         "-alpha", "off", "-format", "%[fx:mean]", "info:"],
+        capture_output=True, text=True, check=True).stdout.strip())
+
+    print(f"{args.dst}: {w}x{h} {imgtype} alpha_mean={alpha:.3f} "
+          f"opaque_white={white:.1%} {size:,} bytes")
+
+    fails = []
+    if max(w, h) != args.fit:
+        fails.append(f"long side is {max(w, h)}, expected {args.fit}")
+    if imgtype != "PaletteAlpha":
+        fails.append(f"type is {imgtype}, expected PaletteAlpha (alpha channel lost)")
+    if alpha >= 1.0:
+        fails.append("fully opaque -- background was not removed (try --remove-white-bg)")
+    if white > 0.03:
+        fails.append(f"{white:.1%} of pixels are opaque near-white -- likely an unstripped "
+                     "background or enclosed cutout; check it over a DARK background")
+    if fails:
+        for f in fails:
+            print(f"  FAIL: {f}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

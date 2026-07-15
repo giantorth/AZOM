@@ -1372,6 +1372,11 @@ namespace MozaPlugin
                     }
                 }
 
+                // Top up artwork on already-deployed wheel definitions. The
+                // per-model deploy only reaches the attached wheel, so other
+                // wheels the user owns would never get a picture.
+                DeviceDefinitionDeployer.RefreshDeployedThumbnails();
+
                 // Now safe to initialize the profile system — ApplyProfile (called
                 // by AutoApplyProfile on the initially selected game's profile)
                 // delegates to _hardwareApplier which is now constructed.
