@@ -43,69 +43,48 @@ namespace MozaPlugin.Protocol
         MBoosterEffect = 17,
 
         // ── LED lanes (absolute slots 29+) ───────────────────────────────────
-        // High-rate, latest-wins LED writes ride the coalescing stream lane
-        // instead of the paced/throttled one-shot FIFO, so a co-resident value
-        // stream (a CM2 sharing the wheelbase bus) can never starve them. These
-        // MUST start at 29 — absolute slots 18..28 are the CM2 second tier-def
-        // pipeline (StreamSlotBase 18 + logical 0..10, written via int-cast, not
-        // named members), so a named member at 18..28 would alias a CM2 value
-        // slot. See the slot-layout comment + StreamSlotCount below.
+        // Latest-wins LED writes ride the coalescing stream lane instead of the
+        // paced/throttled one-shot FIFO, so a co-resident value stream (a CM2
+        // sharing the wheelbase bus) can never starve them. These MUST start at
+        // 29 — absolute slots 18..28 are the CM2 second tier-def pipeline
+        // (StreamSlotBase 18 + logical 0..10, written via int-cast, not named
+        // members), so a named member at 18..28 would alias a CM2 value slot.
+        // See the slot-layout comment + StreamSlotCount below.
         //
-        // Wheel RPM colours are sent 5 LEDs per 20-byte chunk under ONE command
-        // (SendColorChunks); each CHUNK gets its own slot so they coalesce
-        // independently (a new chunk-0 supersedes only the old chunk-0 — chunk-3
-        // is never dropped). 4 slots cover the widest rim (W18 = 18 LEDs).
-        WheelRpmColor0 = 29,
-        WheelRpmColor1 = 30,
-        WheelRpmColor2 = 31,
-        WheelRpmColor3 = 32,
-        WheelRpmBitmask = 33,     // wheel-send-rpm-telemetry (windowed bitmask)
-        // Button colours get their own slots ordered BEFORE their bitmask, same rule as
-        // the Dash lanes below: a colour left on the paced one-shot FIFO lands AFTER its
-        // stream-lane bitmask, so the group flips out of sync with the RPM strip.
-        // 4 slots cover the widest set (W11 = 16 LEDs).
-        WheelButtonColor0 = 34,
-        WheelButtonColor1 = 35,
-        WheelButtonColor2 = 36,
-        WheelButtonColor3 = 37,
-        WheelButtonBitmask = 38,  // wheel-send-buttons-telemetry — after colours
-        // Knob COLOURS deliberately get NO slot — they stay on the paced one-shot FIFO.
-        // Measured when streamed: ring flickers back to its stored colours even though the
-        // feed is on time (0/77 past the 1000 ms ownership deadline, max 848 ms) and the
-        // host discards nothing (0/78 chunk frames lost). The loss is DOWNSTREAM — the
-        // stream lane emits the whole LED set back-to-back and this rim drops unpaced
-        // bursts, which the knob frames tail. The FIFO's 4 ms pacing is what spaces them.
-        // ~1.4 Hz group, so it gains nothing from streaming. Do not give them a slot.
-        WheelKnobBitmask = 39,    // wheel-send-knob-telemetry
-        // (The old-protocol 0x41 FD DE bitmask — wheel-old-send-telemetry — is NOT
-        // here: it's only emitted by single-display legacy/ES rims that stay on the
-        // paced one-shot lane, and it shares the ES wake-pulse command.)
+        // WHEEL live LED writes (RPM/button/knob colours + bitmasks) are NOT here:
+        // they stay on the paced one-shot FIFO. Streaming them emitted the whole set
+        // in <1 ms host-side with nothing discarded (measured), but the rim drops
+        // unpaced bursts — losing frames, which reads as laggy / off-time animation
+        // and knob rings reverting to stored colours. The FIFO's 4 ms spacing is what
+        // the rim needs, and its ordering keeps each colour ahead of its bitmask.
+        // Only the CM2 dash (its own USB pipe, or the bus lane) streams.
+        //
         // CM2 per-LED RPM indicator colours (0B 00) — up to 10 discrete writes per
         // frame (the SyncRpmColors amplifier); one slot each bounds them. Ordered
         // BEFORE DashRpmBitmask so the write loop (drains slots in index order)
         // emits colours before the lit-mask in the same pass — matching the
         // manager's "never light an LED before its colour lands" sequencing.
-        DashRpmColor0 = 40,
-        DashRpmColor1 = 41,
-        DashRpmColor2 = 42,
-        DashRpmColor3 = 43,
-        DashRpmColor4 = 44,
-        DashRpmColor5 = 45,
-        DashRpmColor6 = 46,
-        DashRpmColor7 = 47,
-        DashRpmColor8 = 48,
-        DashRpmColor9 = 49,
-        DashRpmBitmask = 50,      // CM2 dash-send-telemetry (41 FD DE) — after colours
-        DashFlagColors = 51,      // CM2 dash-flag-colors (32 08 00, 18-byte array)
+        DashRpmColor0 = 29,
+        DashRpmColor1 = 30,
+        DashRpmColor2 = 31,
+        DashRpmColor3 = 32,
+        DashRpmColor4 = 33,
+        DashRpmColor5 = 34,
+        DashRpmColor6 = 35,
+        DashRpmColor7 = 36,
+        DashRpmColor8 = 37,
+        DashRpmColor9 = 38,
+        DashRpmBitmask = 39,      // CM2 dash-send-telemetry (41 FD DE) — after colours
+        DashFlagColors = 40,      // CM2 dash-flag-colors (32 08 00, 18-byte array)
 
-        // ── Wheelbase LFE lanes (absolute slots 52+) ─────────────────────────
+        // ── Wheelbase LFE lanes (absolute slots 41+) ─────────────────────────
         // Host-rendered wheelbase low-frequency effects (cmd 0x2D/0x77) on the
         // BASE primary connection. Engine (continuous while driving) and ABS
         // (while ABS active) can be live simultaneously, so they get separate
         // latest-wins lanes and never coalesce into one another. Gearshift is a
         // discrete burst → the paced one-shot FIFO, so it needs no lane.
-        BaseLfeEngine = 52,
-        BaseLfeAbs = 53,
+        BaseLfeEngine = 41,
+        BaseLfeAbs = 42,
     }
 
     /// <summary>Device family targeted by the serial probe fallback (registry-empty case).</summary>
@@ -150,15 +129,15 @@ namespace MozaPlugin.Protocol
         //   11..17 — AB9 / mBooster (absolute, per StreamKind).
         //   18..28 — a SECOND tier-def pipeline at slot-base 18 (a bus-attached CM2
         //            dash sharing this connection). See TelemetrySender.StreamSlotBase.
-        //   29..51 — LED lanes (wheel RPM/button colour chunks + bitmasks, CM2 RPM/flag)
-        //            — high-rate latest-wins LED writes moved off the throttled one-shot
-        //            FIFO. Knob colours stay on the FIFO. See the LED StreamKind members.
-        //   52..53 — wheelbase LFE lanes (engine + ABS host-rendered effect streams).
+        //   29..40 — LED lanes (CM2 dash RPM colours + bitmask + flag colours). Wheel
+        //            live LED writes are NOT here — they stay on the paced one-shot
+        //            FIFO (the rim drops unpaced bursts). See the LED StreamKind members.
+        //   41..42 — wheelbase LFE lanes (engine + ABS host-rendered effect streams).
         // A CM2 on its own USB connection runs at base 0 on THAT connection, so the
         // second block is only used when two pipelines share one connection.
         // NOTE: keep this >= (highest StreamKind + 1). The static ctor below
         // asserts the regions are disjoint and fit.
-        private const int StreamSlotCount = 54;
+        private const int StreamSlotCount = 43;
 
         // Startup slot-layout invariant: the LED lanes (29+) must not alias the
         // wheel value pipeline (0..10), AB9/mBooster (11..17), or the CM2 second
@@ -167,14 +146,14 @@ namespace MozaPlugin.Protocol
         // bases silently drop frames otherwise — fail loud in dev builds.
         static MozaSerialConnection()
         {
-            const int ledFirst = (int)StreamKind.WheelRpmColor0; // 29
-            const int ledLast = (int)StreamKind.DashFlagColors;  // 51 (highest LED slot)
+            const int ledFirst = (int)StreamKind.DashRpmColor0;  // 29
+            const int ledLast = (int)StreamKind.DashFlagColors;  // 40 (highest LED slot)
             const int cm2ValueLast = 18 + 11 - 1;                // CM2 base 18 + block 11
             System.Diagnostics.Debug.Assert(ledFirst > cm2ValueLast,
                 "LED stream slots must start after the CM2 value pipeline (18..28)");
             System.Diagnostics.Debug.Assert(ledLast < StreamSlotCount,
                 "StreamSlotCount too small for the LED stream slots");
-            const int lfeLast = (int)StreamKind.BaseLfeAbs;      // 53 (highest slot overall)
+            const int lfeLast = (int)StreamKind.BaseLfeAbs;      // 42 (highest slot overall)
             System.Diagnostics.Debug.Assert(lfeLast > ledLast,
                 "wheelbase LFE stream slots must start after the LED lanes");
             System.Diagnostics.Debug.Assert(lfeLast < StreamSlotCount,
