@@ -129,10 +129,6 @@ namespace MozaPlugin.Telemetry.Era
             if (m.Contains("W17") || m.Contains("W18")) return MozaWheelEra.Era2026;
             if (m.Contains("KSPRO") || m.Contains("KS PRO") || m.Contains("KSP-PRO"))
                 return MozaWheelEra.Era2026;
-            if (m.Contains("R5"))   return MozaWheelEra.Era2026;
-
-            // Era2024 — V0 URL subscription. R9 wheel-base / older CSP firmware.
-            if (m.Contains("R9"))   return MozaWheelEra.Era2024;
 
             // VGS-class wheels (VGS, GS V2P, F1, FSR) speak the V2 path; with no
             // Type02 catalog they fall back to the compact tier-def builder, so
