@@ -113,7 +113,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>브레이크 · 보정</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>클러치 · 보정</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>센서 비율</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = 각도 센서 · 100% = 로드셀</value></data>
   <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 액티브 시프터</value></data>
   <data name="Status_SearchingForAb9" xml:space="preserve"><value>AB9 검색 중...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>기계식 레이아웃</value></data>
@@ -145,24 +144,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>브레이크</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>클러치</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>페달 느낌</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// 아래 출력 커브와 무관하게 페달의 느낌을 결정합니다</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>데드존 (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>최대 힘 (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>소프트웨어 측에서만 처리됩니다. 데드존과 최대 힘 모두 원시 페달 신호에 자체 힘 보정이 없으므로 페달 이동 0-100%를 고정된 0-200kg 전체 스케일로 가정합니다. 최대 힘은 아래 입력 커브가 100%에 도달하는 지점을 설정합니다.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>이동 시작/종료 (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>실제 하드웨어 캘리브레이션 값을 기록합니다 (cmdId 0x84/0x85) — Pit House 캡처를 리버스 엔지니어링하여 확인됨, Moza의 공식 확인은 아닙니다. 두 노드를 드래그하여 페달 이동의 물리적 시작/끝 지점을 설정한 후, 사용 중인 하드웨어에서 올바르게 작동하는지 확인해 주세요.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>프론트 리밋 강성</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>엔드 리밋 강성</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>실제 하드웨어 캘리브레이션 값을 기록합니다 (cmdId 0xB2) — Pit House 캡처를 리버스 엔지니어링하여 확인됨, Moza의 공식 확인은 아닙니다. 페달이 물리적 이동의 시작/끝 지점에 도달했을 때 느껴지는 단단함을 설정합니다.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>소프트웨어 측에서만 처리됩니다: 게임(및 아래 시뮬레이션 입력 매핑의 출력 커브)에 도달하기 전에 보고된 페달 위치를 재구성합니다. 장치에는 아무것도 기록되지 않습니다.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>시뮬레이션 입력 매핑</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// 로드셀/페달 신호를 게임에 매핑 (핏하우스 방식)</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>최대 임계값 (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Pit House 캡처를 리버스 엔지니어링하여 확인됨 (cmdId 0xB3) — Moza의 공식 확인은 아닙니다. 사용 중인 하드웨어에서 올바르게 작동하는지 확인해 주세요.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>노드를 좌우로 드래그하여 입력 축에서의 위치를 이동합니다 — 예를 들어 마지막 노드를 왼쪽으로 드래그하면 입력 100%에 도달하기 전에 출력 100%에 도달합니다.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>효과</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// 트리거: ABS는 게임 신호 · 락업은 브레이크&gt;0.8 · 임계값은 에지 · 엔진은 연속</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>트랙션 컨트롤</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>휠 스핀</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>기어 변속</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>노면 질감</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>사용</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>1초 테스트</value></data>
@@ -174,7 +169,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>부드러움</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>트리거 입력 레벨</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>진동 감쇠</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>페달 궤적 (최근 5초)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 실험적 기능 — mBooster 펌웨어가 적용하지 않을 수 있음</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>방향 반전</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>최소 (원시값)</value></data>
@@ -710,4 +704,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>가져오기</value></data>
   <data name="Label_Export" xml:space="preserve"><value>내보내기</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>노면 진동</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>각도</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>로드셀</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>페달 느낌 및 시뮬레이션 입력 매핑</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>브레이크 페이드 (실험적)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>시작 온도 (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>실험적 — 활성화되어 있는 동안 실제 하드웨어 캘리브레이션 값인 이동 종료 지점과 최대 임계값을 기록하여(더 많은 이동 거리와 힘이 필요해짐) 브레이크가 식으면서 설정한 값으로 복원합니다. 페달 느낌 / 시뮬레이션 입력 매핑에서 해당 값이 이미 설정되어 있어야 하며, 그렇지 않으면 효과가 없습니다.</value></data>
 </root>

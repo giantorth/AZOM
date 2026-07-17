@@ -38,6 +38,8 @@
     <Color x:Key="AmberSoftColor">#22FFB84D</Color>
     <Color x:Key="RedColor">#FFFF5566</Color>
     <Color x:Key="RedGlowColor">#66FF5566</Color>
+    <Color x:Key="BlueColor">#FF4D8CFF</Color>
+    <Color x:Key="BlueGlowColor">#664D8CFF</Color>
 
     <!-- ============================================================ -->
     <!-- Brushes                                                       -->
@@ -68,6 +70,7 @@
     <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}"/>
     <SolidColorBrush x:Key="AmberSoftBrush" Color="{StaticResource AmberSoftColor}"/>
     <SolidColorBrush x:Key="RedBrush" Color="{StaticResource RedColor}"/>
+    <SolidColorBrush x:Key="BlueBrush" Color="{StaticResource BlueColor}"/>
 
     <!-- Gradient fills used by slider track, EQ bars, temperature meters -->
     <LinearGradientBrush x:Key="CyanFillBrush" StartPoint="0,0" EndPoint="1,0">
@@ -113,6 +116,11 @@
     <LinearGradientBrush x:Key="BwOutFillBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource AmberColor}" Offset="0"/>
         <GradientStop Color="#00FFB84D" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- Third-series fill (blue) — mBooster pedal-trace graph's Clutch line. -->
+    <LinearGradientBrush x:Key="BwThirdFillBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlueColor}" Offset="0"/>
+        <GradientStop Color="#004D8CFF" Offset="1"/>
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="TopBarBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="#20000000" Offset="0"/>

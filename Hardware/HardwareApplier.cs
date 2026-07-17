@@ -1018,6 +1018,38 @@ namespace MozaPlugin.Hardware
             ApplyPedalsToHardware(profile);
             ApplyShifterToHardware(profile);
             ApplyAb9ToHardware(profile);
+            ApplyMBoosterToHardware(profile);
+        }
+
+        /// <summary>
+        /// Re-push mBooster hardware calibration (Direction/Min/Max/output-
+        /// curve/Travel Start-End/Endstop stiffness/Sensor Ratio/Max
+        /// Threshold) for every currently-connected mBooster. Before this,
+        /// <see cref="MozaPlugin.ApplyMBoosterToHardware"/> only ever ran on
+        /// (re)connect (<see cref="MozaPlugin.OnMBoosterDeviceDetected"/>) or
+        /// the manual "Apply Cal" button — a profile switch with the device
+        /// already connected silently left the PREVIOUS profile's calibration
+        /// on the hardware, since nothing re-applied the new one. Doesn't
+        /// read <paramref name="profile"/> directly (unlike the other
+        /// Apply*ToHardware methods) — MozaPlugin.GetOrCreateMBoosterSettings
+        /// resolves per-device settings off <c>ProfileStore.CurrentProfile</c>,
+        /// which is already the new profile by the time
+        /// ProfileCoordinator.OnProfileChanged calls this (it reads
+        /// CurrentProfile fresh before invoking ApplyProfile). Host-rendered
+        /// effect settings (Abs/Lockup/Engine/etc., Pedal Feel, custom
+        /// effects) don't need this — MBoosterEffectWorker re-reads settings
+        /// fresh every ~20ms tick regardless of profile switches; only the
+        /// one-shot hardware calibration writes needed this explicit re-push.
+        /// </summary>
+        private void ApplyMBoosterToHardware(MozaProfile profile)
+        {
+            var registry = _plugin.MBoosterRegistry;
+            if (registry == null) return;
+            foreach (var controller in registry.Devices)
+            {
+                var s = _plugin.GetOrCreateMBoosterSettings(controller.Identity);
+                _plugin.ApplyMBoosterToHardware(controller, s);
+            }
         }
 
         // ===== Device-extension entry points =====

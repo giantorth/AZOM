@@ -116,7 +116,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>FRENO · CALIBRAZIONE</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>FRIZIONE · CALIBRAZIONE</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Rapporto Sensore</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = Sensore Angolare · 100% = Cella di Carico</value></data>
   <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>CAMBIO ATTIVO AB9</value></data>
   <data name="Status_SearchingForAb9" xml:space="preserve"><value>Ricerca AB9 in corso...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>SCHEMA MECCANICO</value></data>
@@ -148,24 +147,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Freno</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Frizione</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>SENSAZIONE DEL PEDALE</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// definisce la sensazione del pedale, indipendentemente dalla curva di output sotto</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Zona morta (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Forza massima (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Solo lato software. Zona morta e Forza massima presuppongono entrambe una scala fissa 0-200kg per lo 0-100% della corsa del pedale, poiché il segnale grezzo non ha una propria calibrazione della forza. Forza massima definisce dove la curva di input sotto raggiunge il 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Inizio / Fine Corsa (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Scrive una calibrazione hardware reale (cmdId 0x84/0x85) — decodificato tramite reverse engineering da catture di Pit House, non confermato da Moza. Trascina i due nodi per impostare l'inizio/fine fisico della corsa del pedale, poi verifica che funzioni correttamente sul tuo hardware.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Rigidità limite anteriore</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Rigidità limite finale</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Scrive una calibrazione hardware reale (cmdId 0xB2) — decodificato tramite reverse engineering da catture di Pit House, non confermato da Moza. Imposta quanto risulta rigido il pedale quando raggiunge l'inizio/fine della sua corsa fisica.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Solo lato software: rimodella la posizione del pedale segnalata prima che raggiunga il gioco (e la curva di output di Mappatura Input Sim sotto). Non viene scritto nulla sul dispositivo.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>MAPPATURA INPUT SIM</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// mappa il segnale della cella di carico/pedale al gioco, in stile Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Soglia massima (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Decodificato tramite reverse engineering da una cattura di Pit House (cmdId 0xB3) — non confermato da Moza. Verifica che funzioni correttamente sul tuo hardware.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Trascina un nodo lateralmente per spostare la sua posizione sull'asse di input — ad esempio trascina l'ultimo nodo a sinistra per raggiungere il 100% di output prima del 100% di input.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFETTI</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// attivatori: ABS su segnale di gioco · Bloccaggio con freno&gt;0.8 · Soglia sul limite · Motore continuo</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Controllo di trazione</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Pattinamento ruote</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Cambio Marcia</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Texture stradale</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Abilita</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Test 1s</value></data>
@@ -177,7 +172,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Morbidezza</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Livello di attivazione</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decadimento della vibrazione</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Traccia pedale (ultimi 5s)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// sperimentale — potrebbe non essere supportato dal firmware mBooster</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Direzione invertita</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (grezzo)</value></data>
@@ -714,4 +708,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importa</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Esporta</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Rombo stradale</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Angolo</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Cella di Carico</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>SENSAZIONE DEL PEDALE &amp; MAPPATURA INPUT SIM</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Fading dei Freni (Sperimentale)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura di Innesco (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Sperimentale — mentre è attivo, scrive le calibrazioni hardware reali di Fine Corsa e Soglia massima (serve più corsa e più forza), poi ripristina i valori configurati man mano che i freni si raffreddano. Richiede che questi siano già impostati in Sensazione del Pedale / Mappatura Input Sim — altrimenti non ha effetto.</value></data>
 </root>

@@ -113,7 +113,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>ТОРМОЗ · КАЛИБРОВКА</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>СЦЕПЛЕНИЕ · КАЛИБРОВКА</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Соотношение датчиков</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = датчик угла · 100% = тензодатчик</value></data>
   <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>АКТИВНАЯ КУЛИСА AB9</value></data>
   <data name="Status_SearchingForAb9" xml:space="preserve"><value>Поиск AB9…</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>МЕХАНИЧЕСКАЯ СХЕМА</value></data>
@@ -145,24 +144,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Тормоз</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Сцепление</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>ОЩУЩЕНИЕ ПЕДАЛИ</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// определяет ощущение педали, независимо от кривой вывода ниже</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Мёртвая зона (кг)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Макс. усилие (кг)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Только на стороне ПО. Мёртвая зона и Макс. усилие используют одну и ту же фиксированную полную шкалу 0-200 кг для 0-100% хода педали, поскольку необработанный сигнал педали не имеет собственной калибровки по силе. Макс. усилие задаёт, где кривая ввода ниже достигает 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Начало / Конец хода (мм)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Записывает реальные калибровочные значения на устройство (cmdId 0x84/0x85) — определено с помощью обратной разработки на основе захвата трафика Pit House, не подтверждено Moza. Перетащите два узла, чтобы задать физические начало и конец хода педали, затем проверьте корректную работу на вашем оборудовании.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Жёсткость переднего упора</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Жёсткость заднего упора</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Записывает реальные калибровочные значения на устройство (cmdId 0xB2) — определено с помощью обратной разработки на основе захвата трафика Pit House, не подтверждено Moza. Задаёт, насколько жёстко ощущается педаль при достижении начала/конца физического хода.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Только на стороне ПО: преобразует сообщаемое положение педали до того, как оно попадёт в игру (и в кривую вывода в разделе «Сопоставление ввода симулятора» ниже). На устройство ничего не записывается.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>СОПОСТАВЛЕНИЕ ВВОДА СИМУЛЯТОРА</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// сопоставление сигнала тензодатчика/педали с игрой, в стиле Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Макс. порог (кг)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Определено с помощью обратной разработки на основе захвата трафика Pit House (cmdId 0xB3) — не подтверждено Moza. Пожалуйста, проверьте корректную работу на вашем оборудовании.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Перетащите узел в сторону, чтобы изменить его положение на оси ввода — например, перетащите последний узел влево, чтобы 100% выхода достигалось раньше 100% входа.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>ЭФФЕКТЫ</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// триггеры: ABS по сигналу игры · Блокировка при тормозе&gt;0,8 · Порог по фронту · Двигатель непрерывно</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Контроль тяги</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Пробуксовка колёс</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Переключение передач</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Текстура дороги</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Включить</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Тест 1с</value></data>
@@ -174,7 +169,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Плавность</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>График педали (последние 5с)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// экспериментально — прошивка mBooster может это игнорировать</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Инвертированное направление</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Мин (сырое)</value></data>
@@ -711,4 +705,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Импорт</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Экспорт</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Дорожная вибрация</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Угол</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Тензодатчик</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>ОЩУЩЕНИЕ ПЕДАЛИ &amp; СОПОСТАВЛЕНИЕ ВВОДА СИМУЛЯТОРА</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Затухание тормозов (Экспериментально)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Температура начала (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Экспериментально — пока активно, записывает реальные калибровки оборудования для конца хода и макс. порога (требуется больше хода и больше усилия), а затем восстанавливает заданные вами значения по мере остывания тормозов. Требует, чтобы эти значения уже были заданы в разделе «Ощущение педали / Сопоставление ввода симулятора» — иначе не действует.</value></data>
 </root>

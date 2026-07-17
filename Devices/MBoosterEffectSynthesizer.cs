@@ -45,6 +45,69 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// TRACTION CONTROL — same oscillating-pulse shape as
+        /// <see cref="SynthesizeAbs"/> (identical formula, own function so
+        /// each effect can be tuned/verified independently later). Unlike
+        /// ABS, this waveform is NOT reproduced from a protocol-note/capture
+        /// reference — there is no verified Traction Control wire effect —
+        /// it's a deliberate reuse of ABS's already-tuned "feel" for a
+        /// structurally identical wheel-slip cue.
+        /// </summary>
+        public static double SynthesizeTractionControl(double intensity, double phase, double smoothness01)
+        {
+            if (double.IsNaN(smoothness01)) smoothness01 = 1.0;
+            else if (smoothness01 < 0) smoothness01 = 0;
+            else if (smoothness01 > 1) smoothness01 = 1;
+            double depth = 0.5 - 0.4 * smoothness01;
+            double wave = (1.0 - depth) + depth * Math.Sin(phase);
+            return wave * intensity;
+        }
+
+        /// <summary>
+        /// WHEEL SPIN — same oscillating-pulse shape as
+        /// <see cref="SynthesizeAbs"/>/<see cref="SynthesizeTractionControl"/>
+        /// (identical formula, own function per this file's one-function-
+        /// per-effect convention). Like Traction Control, this waveform is
+        /// NOT a protocol-verified reference — it's a deliberate reuse of
+        /// ABS's already-tuned "feel" for another structurally identical
+        /// wheel-slip cue, this time triggered by a raw wheel-speed
+        /// heuristic (see MBoosterEffectWorker.UpdateWheelSpinRequest)
+        /// rather than a game-provided activation flag.
+        /// </summary>
+        public static double SynthesizeWheelSpin(double intensity, double phase, double smoothness01)
+        {
+            if (double.IsNaN(smoothness01)) smoothness01 = 1.0;
+            else if (smoothness01 < 0) smoothness01 = 0;
+            else if (smoothness01 > 1) smoothness01 = 1;
+            double depth = 0.5 - 0.4 * smoothness01;
+            double wave = (1.0 - depth) + depth * Math.Sin(phase);
+            return wave * intensity;
+        }
+
+        /// <summary>
+        /// GEAR SHIFT — a short oscillating burst that linearly decays to
+        /// silence over <paramref name="durationSec"/>, unlike every other
+        /// effect in this file (all continuous/repeating while their gate
+        /// stays true). Fixed ripple depth (no Smoothness slider, same as
+        /// Traction Control/Wheel Spin) — <c>wave = 0.7 + 0.3*sin(phase)</c>,
+        /// so the wave never crosses zero mid-burst. Not a protocol-verified
+        /// reference; a deliberate, simple "click that fades fast" shape for
+        /// a one-shot pulse. <c>amp = wave * envelope * intensity</c>, where
+        /// <c>envelope</c> ramps linearly from 1 (burst start) to 0 (burst
+        /// end). See MBoosterEffectWorker.UpdateGearShiftRequest/
+        /// GearShiftPulseDurationSec for how the pulse itself is latched
+        /// across ticks.
+        /// </summary>
+        public static double SynthesizeGearShift(double intensity, double phase, double elapsedSec, double durationSec)
+        {
+            if (durationSec <= 0) return 0;
+            if (elapsedSec >= durationSec) return 0;
+            double envelope = 1.0 - (elapsedSec / durationSec);
+            double wave = 0.7 + 0.3 * Math.Sin(phase);
+            return wave * envelope * intensity;
+        }
+
+        /// <summary>
         /// LOCKUP — linear ramp up over 0.5 s, then hold.
         /// <c>ramp = clamp(elapsed / 0.5, 0, 1); amp = ramp * intensity</c>.
         /// </summary>

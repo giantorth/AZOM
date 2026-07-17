@@ -118,7 +118,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>BREMS · KALIBRERING</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>CLUTCH · KALIBRERING</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensorforhold</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0 % = vinkelsensor · 100 % = lastcelle</value></data>
   <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 ACTIVE SHIFTER</value></data>
   <data name="Status_SearchingForAb9" xml:space="preserve"><value>Søker etter AB9...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>MEKANISK OPPSETT</value></data>
@@ -150,24 +149,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Brems</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Clutch</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>PEDALFØLELSE</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// bestemmer hvordan pedalen føles, uavhengig av utgangskurven under</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Dødsone (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Maks kraft (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Bare programvareside. Dødsone og Maks kraft forutsetter begge en fast 0-200kg fullskala for 0-100% pedalbevegelse, siden det rå pedalsignalet ikke har egen kraftkalibrering. Maks kraft angir hvor inngangskurven under når 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Start / Slutt på Bevegelse (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Skriver ekte maskinvarekalibrering (cmdId 0x84/0x85) — reverse-engineert fra Pit House-opptak, ikke bekreftet av Moza. Dra de to nodene for å angi det fysiske start-/sluttpunktet for pedalbevegelsen, og bekreft deretter at dette fungerer korrekt på din maskinvare.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Frontgrense-stivhet</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Sluttgrense-stivhet</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Skriver ekte maskinvarekalibrering (cmdId 0xB2) — reverse-engineert fra Pit House-opptak, ikke bekreftet av Moza. Angir hvor hardt pedalen føles når den når start-/sluttpunktet for den fysiske bevegelsen.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Bare programvareside: omformer den rapporterte pedalposisjonen før den når spillet (og utgangskurven i Sim-inngangskartlegging under). Ingenting skrives til enheten.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM-INNGANGSKARTLEGGING</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// kartlegger lastcelle-/pedalsignalet til spillet, Pit House-stil</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Maks terskel (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Reverse-engineert fra en Pit House-opptak (cmdId 0xB3) — ikke bekreftet av Moza. Vennligst bekreft at dette fungerer korrekt på din maskinvare.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Dra en node sidelengs for å flytte posisjonen på inngangsaksen — dra f.eks. den siste noden til venstre slik at 100 % utgang nås før 100 % inngang.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFEKTER</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// utløsere: ABS på spillsignal · lockup på brems&gt;0,8 · terskel på flanke · motor kontinuerlig</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Traksjonskontroll</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Hjulspinn</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Girskift</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Veitekstur</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Aktiver</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Test 1s</value></data>
@@ -179,7 +174,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Glatthet</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Pedalspor (siste 5s)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// eksperimentelt — kanskje ikke respektert av mBooster-firmware</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Reversert retning</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (rå)</value></data>
@@ -716,4 +710,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Eksporter</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Veirumling</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Vinkel</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Lastcelle</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>PEDALFØLELSE &amp; SIM-INNGANGSKARTLEGGING</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsefading (Eksperimentell)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Starttemperatur (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Eksperimentell — skriver de ekte maskinvarekalibreringene for Sluttpunkt for bevegelse og Maks terskel mens den er aktiv (mer bevegelse og mer kraft kreves), og gjenoppretter deretter dine konfigurerte verdier etter hvert som bremsene kjøles ned. Krever at disse allerede er satt i Pedalfølelse / Sim-inngangskartlegging — har ellers ingen effekt.</value></data>
 </root>

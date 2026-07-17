@@ -113,7 +113,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>ΦΡΕΝΟ · ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>ΣΥΜΠΛΕΚΤΗΣ · ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Αναλογία Αισθητήρα</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = Αισθητήρας Γωνίας · 100% = Load Cell</value></data>
   <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 ΕΝΕΡΓΟΣ ΛΕΒΙΕΣ</value></data>
   <data name="Status_SearchingForAb9" xml:space="preserve"><value>Αναζήτηση AB9...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>ΜΗΧΑΝΙΚΗ ΔΙΑΤΑΞΗ</value></data>
@@ -145,24 +144,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Φρένο</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Συμπλέκτης</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>ΑΙΣΘΗΣΗ ΠΕΝΤΑΛ</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// καθορίζει πώς αισθάνεται το πεντάλ, ανεξάρτητα από την καμπύλη εξόδου παρακάτω</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Νεκρή ζώνη (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Μέγιστη δύναμη (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Μόνο από την πλευρά του λογισμικού. Η Νεκρή ζώνη και η Μέγιστη δύναμη θεωρούν και οι δύο μια σταθερή πλήρη κλίμακα 0-200kg για το 0-100% της διαδρομής του πεντάλ, καθώς το ανεπεξέργαστο σήμα δεν έχει δική του βαθμονόμηση δύναμης. Η Μέγιστη δύναμη καθορίζει πού η καμπύλη εισόδου παρακάτω φτάνει στο 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Αρχή / Τέλος Διαδρομής (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Γράφει πραγματική βαθμονόμηση υλικού (cmdId 0x84/0x85) — αντίστροφη μηχανική από καταγραφές του Pit House, δεν έχει επιβεβαιωθεί από τη Moza. Σύρετε τους δύο κόμβους για να ορίσετε το φυσικό σημείο έναρξης/λήξης της διαδρομής του πεντάλ και έπειτα επιβεβαιώστε ότι λειτουργεί σωστά στο υλικό σας.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Σκληρότητα εμπρός ορίου</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Σκληρότητα τελικού ορίου</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Γράφει πραγματική βαθμονόμηση υλικού (cmdId 0xB2) — αντίστροφη μηχανική από καταγραφές του Pit House, δεν έχει επιβεβαιωθεί από τη Moza. Ορίζει πόσο σκληρό αισθάνεται το πεντάλ όταν φτάνει στην αρχή/το τέλος της φυσικής διαδρομής του.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Μόνο από την πλευρά του λογισμικού: αναδιαμορφώνει τη θέση του πεντάλ πριν φτάσει στο παιχνίδι (και στην καμπύλη εξόδου παρακάτω). Δεν αποστέλλεται τίποτα στη συσκευή.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>ΑΝΤΙΣΤΟΙΧΙΣΗ ΕΙΣΟΔΟΥ ΠΡΟΣΟΜΟΙΩΣΗΣ</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// αντιστοίχιση σήματος κυψέλης φόρτισης/πεντάλ στο παιχνίδι, στυλ Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Μέγιστο κατώφλι (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Αντίστροφη μηχανική από καταγραφή του Pit House (cmdId 0xB3) — δεν έχει επιβεβαιωθεί από τη Moza. Παρακαλούμε επιβεβαιώστε ότι λειτουργεί σωστά στο υλικό σας.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Σύρετε έναν κόμβο πλευρικά για να αλλάξετε τη θέση του στον άξονα εισόδου — π.χ. σύρετε τον τελευταίο κόμβο αριστερά για να επιτευχθεί το 100% εξόδου πριν από το 100% εισόδου.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>ΕΦΦΕ</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// triggers: ABS σε σήμα παιχνιδιού · Κλείδωμα σε φρένο>0.8 · Κατώφλι σε άκρο · Κινητήρας συνεχής</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Έλεγχος Πρόσφυσης</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Πάτινάρισμα Τροχών</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Αλλαγή Ταχύτητας</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Υφή δρόμου</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Ενεργοποίηση</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Δοκιμή 1δ</value></data>
@@ -174,7 +169,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Ομαλότητα</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Επίπεδο ενεργοποίησης</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Απόσβεση δόνησης</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Ίχνος πεντάλ (τελευταία 5δ)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// πειραματικό — ενδέχεται να μην υποστηρίζεται από firmware mBooster</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Αντίστροφη κατεύθυνση</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Ελάχ. Τιμή αισθητήρα</value></data>
@@ -710,4 +704,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Εισαγωγή</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Εξαγωγή</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Θόρυβος δρόμου</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Γωνία</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Κυψέλη Φορτίου</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>ΑΙΣΘΗΣΗ ΠΕΝΤΑΛ &amp; ΑΝΤΙΣΤΟΙΧΙΣΗ ΕΙΣΟΔΟΥ ΠΡΟΣΟΜΟΙΩΣΗΣ</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Εξασθένηση Φρένων (Πειραματικό)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Θερμοκρασία Έναρξης (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Πειραματικό — όσο είναι ενεργό, γράφει τις πραγματικές βαθμονομήσεις υλικού για το Τέλος Διαδρομής και το Μέγιστο κατώφλι (απαιτείται περισσότερη διαδρομή και περισσότερη δύναμη), και επαναφέρει τις ρυθμισμένες τιμές σας καθώς κρυώνουν τα φρένα. Απαιτεί να έχουν ήδη οριστεί αυτές οι τιμές στην Αίσθηση Πεντάλ / Αντιστοίχιση Εισόδου Προσομοίωσης — διαφορετικά δεν έχει καμία επίδραση.</value></data>
 </root>

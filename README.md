@@ -83,9 +83,8 @@ Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 <tr>
 <td width="50%" valign="top">
 
-Guide about this plugin from a beta tester (español)
-
-[![Youtube Video](https://github.com/user-attachments/assets/816b2239-45d1-4519-957e-382ba9f26f9d)](https://www.youtube.com/watch?v=KwLeVaii0TY)
+Guide about this plugin from an early tester (español and english dubbing)
+[![Youtube Video](https://github.com/user-attachments/assets/5ab8ee11-6bbb-4eee-9e54-dc23a6917681)](https://www.youtube.com/watch?v=iVBn3PWbf4c)
 
 </td>
 <td width="50%" valign="top">

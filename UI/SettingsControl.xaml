@@ -40,6 +40,13 @@
                 <Setter Property="TextWrapping" Value="Wrap"/>
                 <Setter Property="Margin" Value="0,0,12,0"/>
             </Style>
+            <!-- Small min/max bound marker flanking a slider's track (e.g. "5" ...
+                 track ... "30") — quieter than SliderLabel/MutedHintText since it's
+                 just the fixed range, not something the user reads every time. -->
+            <Style x:Key="SliderRangeEndLabel" TargetType="TextBlock" BasedOn="{StaticResource LabelText}">
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            </Style>
             <!-- Left-justified label for the narrow 3-across LFE columns: no min/max
                  width (SliderLabel's 180 min + 280 max + default Stretch centers the
                  text in a wide column, leaving a gap on the left). -->
@@ -223,6 +230,44 @@
             <!-- Row-grid template used by every restyled slider row -->
             <Style x:Key="RowGrid" TargetType="Grid">
                 <Setter Property="Margin" Value="0,4"/>
+            </Style>
+
+            <!-- One selectable row per connected mBooster in the Pedals card's
+                 device list — a plain-label look, click to select. Highlight is
+                 driven by a DataTrigger on the row view-model's own IsSelected
+                 (plain view state set by RefreshMBoosterTab), NOT by any
+                 built-in WPF selection/grouping mechanism — deliberate, see
+                 MBoosterDeviceRow.cs's doc comment for why. -->
+            <Style x:Key="MBoosterDeviceRowButtonStyle" TargetType="Button">
+                <Setter Property="Padding" Value="10,7"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Padding="{TemplateBinding Padding}" CornerRadius="4"
+                                    BorderThickness="1"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}">
+                                <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderBrightBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource CyanSoftBrush}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                    </DataTrigger>
+                </Style.Triggers>
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -1544,7 +1589,6 @@
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="50%"/>
                                     </Grid>
-                                    <TextBlock Text="{x:Static res:Strings.Hint_AngleSensorVsLoadCell}" Style="{StaticResource MutedHintText}" Margin="0,0,0,4"/>
                                 </StackPanel>
                                                     </ctrl:SectionCard>
                             <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_BrakeOutputCurve}"
@@ -1963,263 +2007,286 @@
 
             <!-- ==================== mBOOSTER TAB ==================== -->
             <TabItem x:Name="MBoosterTab" Header="{x:Static res:Strings.TabHeader_MBooster}" Visibility="Collapsed">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Pinned pedal trace — shows every connected pedal's live
+                         position (Brake/Throttle/Clutch), independent of device
+                         selection, so it stays visible while the rest of the
+                         tab scrolls underneath it. -->
+                    <ctrl:SectionCard Grid.Row="0" Title="{x:Static res:Strings.Section_MBoosterPedals}"
+                                      Subtitle="{x:Static res:Strings.Subtitle_MBoosterPedals}"
+                                      Icon="{StaticResource IconPedals}" Margin="22,18,22,0">
+                        <StackPanel>
+                            <ctrl:BandwidthSparkline x:Name="MBoosterPedalTraceViz" Height="70"
+                                                      InBrush="{StaticResource RedBrush}"
+                                                      InFillBrush="{StaticResource McuFillBrush}"
+                                                      OutBrush="{StaticResource GreenBrush}"
+                                                      OutFillBrush="{StaticResource MotorFillBrush}"
+                                                      ThirdBrush="{StaticResource BlueBrush}"
+                                                      ThirdFillBrush="{StaticResource BwThirdFillBrush}"
+                                                      MaxValue="100"
+                                                      ShowGridlines="True"/>
+
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,12,0,12" Text="{x:Static res:Strings.Hint_MBoosterIntro}"/>
+
+                            <!-- One row per connected PEDAL (HID axis) — a chained mBooster
+                                 hosting several pedals on one connection gets one row per axis,
+                                 not one row for the whole connection. The label is a plain
+                                 clickable Button (see MBoosterDeviceRowButtonStyle); clicking a
+                                 row selects BOTH the physical device AND that specific pedal for
+                                 the Pedal Feel/Sim Input/Effects/Calibration cards below,
+                                 replacing the old trio of Device combo + per-axis Pedal Roles
+                                 panel + Configure-pedal combo. Each row's own Role combo edits
+                                 THAT pedal's Role regardless of which row is selected, with
+                                 cross-row uniqueness enforced in code (assigning a role clears it
+                                 off whichever other pedal previously held it). No per-device
+                                 DisplayName editor here (not required) — the row label still
+                                 reflects any DisplayName already set via BuildMBoosterComboLabel. -->
+                            <ItemsControl x:Name="MBoosterDeviceRowsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="160"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Style="{StaticResource MBoosterDeviceRowButtonStyle}"
+                                                    Content="{Binding Label}" HorizontalAlignment="Left"
+                                                    Click="MBoosterDeviceRow_Click"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}"
+                                                       VerticalAlignment="Center" Margin="16,0,10,0"/>
+                                            <ComboBox Grid.Column="2" SelectedIndex="{Binding RoleIndex, Mode=TwoWay}">
+                                                <ComboBoxItem Content="{x:Static res:Strings.Option_Disabled}"/>
+                                                <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"/>
+                                                <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
+                                                <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"/>
+                                            </ComboBox>
+                                            <!-- Only shown for the selected row — editing a non-selected
+                                                 device's name isn't useful since its config isn't on
+                                                 screen anyway, and it declutters the common case. -->
+                                            <TextBlock Grid.Column="3" Text="{x:Static res:Strings.SliderLabel_DisplayName}" Style="{StaticResource LabelText}"
+                                                       VerticalAlignment="Center" Margin="16,0,10,0"
+                                                       Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
+                                            <TextBox Grid.Column="4" Style="{StaticResource LfeNameBox}" MaxLength="40"
+                                                     Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                                     ToolTip="{x:Static res:Strings.Hint_MBoosterDisplayName}"
+                                                     Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ctrl:SectionCard>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_MBoosterPedals}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_MBoosterPedals}"
-                                          Icon="{StaticResource IconPedals}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,12" Text="{x:Static res:Strings.Hint_MBoosterIntro}"/>
-                                <Grid Margin="0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Device}" Style="{StaticResource LabelText}" Margin="0,0,10,0"/>
-                                    <ComboBox Grid.Column="1" x:Name="MBoosterDeviceCombo" Width="320" Margin="0,0,24,0" SelectionChanged="MBoosterDeviceCombo_Changed"/>
-                                    <TextBlock Grid.Column="2" x:Name="MBoosterRoleLabel" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}" Margin="0,0,10,0"/>
-                                    <ComboBox Grid.Column="3" x:Name="MBoosterRoleCombo" Width="160" Margin="0,0,24,0" SelectionChanged="MBoosterRoleCombo_Changed">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Disabled}"  Tag="0"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"  Tag="1"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"     Tag="2"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"    Tag="3"/>
-                                    </ComboBox>
-                                    <TextBlock Grid.Column="4" Text="{x:Static res:Strings.SliderLabel_DisplayName}" Style="{StaticResource LabelText}" Margin="0,0,10,0"/>
-                                    <TextBox Grid.Column="5" x:Name="MBoosterDisplayNameBox" Width="220"
-                                             ToolTip="{x:Static res:Strings.Hint_MBoosterDisplayName}"
-                                             KeyDown="MBoosterDisplayNameBox_KeyDown" LostFocus="MBoosterDisplayNameBox_LostFocus"/>
-                                </Grid>
-
-                                <!-- Per-axis pedal roles — shown only when a lane hosts more than one
-                                     pedal (a chained mBooster). One role selector per detected HID axis. -->
-                                <StackPanel x:Name="MBoosterAxisRolesPanel" Visibility="Collapsed" Margin="0,10,0,0">
-                                    <TextBlock Text="{x:Static res:Strings.Section_PedalRoles}" Style="{StaticResource LabelText}" Margin="0,0,0,4"/>
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8"
-                                               Text="{x:Static res:Strings.Hint_MBoosterAxisRoles}"/>
-                                    <ItemsControl x:Name="MBoosterAxisRolesList">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="0,3">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="140"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding Label}" Style="{StaticResource LabelText}" VerticalAlignment="Center"/>
-                                                    <ComboBox Grid.Column="1" Width="160" SelectedIndex="{Binding SelectedRoleIndex, Mode=TwoWay}">
-                                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Disabled}"/>
-                                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"/>
-                                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
-                                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"/>
-                                                    </ComboBox>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
 
                         <!-- Per-device panel: wraps Pedal Feel + Sim Input Mapping + Effects + Calibration into nested cards -->
                         <StackPanel x:Name="MBoosterDevicePanel" Visibility="Collapsed">
 
-                            <!-- One per-pedal selector scoping ALL config below (Pedal Feel,
-                                 Sim Input Mapping, Effects, Calibration). Hidden for a single-
-                                 pedal lane; on a chain, each pedal keeps its own config and
-                                 effects are sent to that pedal's own motor device id. -->
-                            <StackPanel x:Name="MBoosterEffectPedalPanel" Orientation="Horizontal" Margin="0,0,0,14" Visibility="Collapsed">
-                                <TextBlock Text="{x:Static res:Strings.Label_EffectsForPedal}" Style="{StaticResource LabelText}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <ComboBox x:Name="MBoosterEffectPedalCombo" MinWidth="140" SelectionChanged="MBoosterEffectPedalCombo_SelectionChanged"/>
-                            </StackPanel>
-
-                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_PedalFeel}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_PedalFeel}"
-                                              Icon="{StaticResource IconCurve}">
-                                <StackPanel>
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_TravelRangeMm}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" Margin="0,0,0,6"/>
-                                    <ctrl:MozaRangeSlider x:Name="MBoosterTravelRangeSlider" Height="90"
-                                                          Minimum="3.8" Maximum="49.7" MinGap="3.8" MaxGap="32.1"
-                                                          Unit="mm" Decimals="1"
-                                                          LowValue="3.8" HighValue="35.9"
-                                                          RangeChanged="MBoosterTravelRangeSlider_RangeChanged"/>
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,8,0,16" Text="{x:Static res:Strings.Hint_TravelRangeMm}"/>
-
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_EndstopFrontStiffness}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterEndstopFrontSlider" Style="{StaticResource SettingSlider}" Minimum="1" Maximum="10" TickFrequency="1" ValueChanged="MBoosterEndstopFrontSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterEndstopFrontValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterEndstopFrontSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="1"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_EndstopEndStiffness}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterEndstopEndSlider" Style="{StaticResource SettingSlider}" Minimum="1" Maximum="10" TickFrequency="1" ValueChanged="MBoosterEndstopEndSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterEndstopEndValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterEndstopEndSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="1"/>
-                                    </Grid>
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_EndstopStiffness}"/>
-
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterDeadzoneSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="40" TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0.0"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterMaxForceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterMaxForceSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="200"/>
-                                    </Grid>
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_DeadzoneScaleAssumption}"/>
-
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_InputCurveHostOnly}"/>
-                                    <ctrl:MozaCurveEditor x:Name="MBoosterInputCurveEditor" Height="220"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Linear"/>
-                                        <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_SCurve"/>
-                                        <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Exponential"/>
-                                        <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
-                                    </StackPanel>
-
-                                    <!-- Data-store sliders, driven by MBoosterInputCurveEditor -->
-                                    <StackPanel Visibility="Collapsed">
-                                        <Slider x:Name="MBoosterInputY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY1Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterInputY1Value" Text="20"/>
-                                        <Slider x:Name="MBoosterInputY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY2Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterInputY2Value" Text="40"/>
-                                        <Slider x:Name="MBoosterInputY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY3Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterInputY3Value" Text="60"/>
-                                        <Slider x:Name="MBoosterInputY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY4Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterInputY4Value" Text="80"/>
-                                        <Slider x:Name="MBoosterInputY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY5Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterInputY5Value" Text="100"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </ctrl:SectionCard>
-
-                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_SimInputMapping}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_SimInputMapping}"
+                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_PedalFeelSimInput}"
                                               Icon="{StaticResource IconCurve}"
-                                              AccentBrush="{StaticResource AmberBrush}">
-                                <StackPanel>
-                                    <!-- Sensor Output Ratio + Max Threshold are load-cell / pressure-
-                                         sensor settings that only a BRAKE has — hidden for throttle/
-                                         clutch pedals (see UpdateMBoosterConfigVisibilityForRole). The
-                                         output curve below applies to every pedal mode. -->
-                                    <StackPanel x:Name="MBoosterBrakeOnlyPanel">
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SensorRatio}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterRatioSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterRatioSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterRatioValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterRatioSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0%"/>
-                                    </Grid>
-                                    <TextBlock Text="{x:Static res:Strings.Hint_AngleSensorVsLoadCell}" Style="{StaticResource MutedHintText}" Margin="0,0,0,8"/>
+                                              IsCollapsible="True">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxThresholdKg}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterMaxThresholdSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxThresholdSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterMaxThresholdValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterMaxThresholdSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="100"/>
-                                    </Grid>
-                                    <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Text="{x:Static res:Strings.Hint_MaxThresholdReverseEngineered}" Margin="0,0,0,8"/>
-                                    </StackPanel><!-- MBoosterBrakeOnlyPanel -->
+                                    <!-- Left half: Pedal Feel -->
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <TextBlock Text="{x:Static res:Strings.Section_PedalFeel}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
+                                        <ctrl:MozaCurveEditor x:Name="MBoosterInputCurveEditor" Height="220"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
+                                            <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Linear"/>
+                                            <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_SCurve"/>
+                                            <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Exponential"/>
+                                            <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
+                                        </StackPanel>
 
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,4,0,8" Text="{x:Static res:Strings.Subtitle_MapPhysicalPositionToGame}"/>
-                                    <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_OutputCurveDragX}"/>
-                                    <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220"
-                                                          AccentBrush="{StaticResource AmberBrush}"
-                                                          AllowHorizontalDrag="True"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Linear"/>
-                                        <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterCurvePreset_SCurve"/>
-                                        <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Exponential"/>
-                                        <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterCurvePreset_Parabolic"/>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_TravelRangeMm}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" Margin="0,0,0,6"/>
+                                        <ctrl:MozaRangeSlider x:Name="MBoosterTravelRangeSlider" Height="90" Margin="0,0,0,16"
+                                                              AccentBrush="{StaticResource CyanBrush}"
+                                                              Minimum="3.8" Maximum="49.7" MinGap="3.8" MaxGap="32.1"
+                                                              Unit="mm" Decimals="1"
+                                                              LowValue="3.8" HighValue="35.9"
+                                                              RangeChanged="MBoosterTravelRangeSlider_RangeChanged"/>
+
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_EndstopFrontStiffness}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="MBoosterEndstopFrontSlider" Style="{StaticResource SettingSlider}" Minimum="1" Maximum="10" TickFrequency="1" ValueChanged="MBoosterEndstopFrontSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="MBoosterEndstopFrontValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterEndstopFrontSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="1"/>
+                                        </Grid>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_EndstopEndStiffness}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="MBoosterEndstopEndSlider" Style="{StaticResource SettingSlider}" Minimum="1" Maximum="10" TickFrequency="1" ValueChanged="MBoosterEndstopEndSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="MBoosterEndstopEndValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterEndstopEndSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="1"/>
+                                        </Grid>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"/>
+                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                            <Slider Grid.Column="2" x:Name="MBoosterDeadzoneSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="40" TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
+                                            <TextBlock Grid.Column="3" Text="40" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                            <TextBox Grid.Column="4" x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="0.0"/>
+                                        </Grid>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"/>
+                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                            <Slider Grid.Column="2" x:Name="MBoosterMaxForceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
+                                            <TextBlock Grid.Column="3" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                            <TextBox Grid.Column="4" x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterMaxForceSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="200"/>
+                                        </Grid>
+                                        <!-- Data-store sliders, driven by MBoosterInputCurveEditor -->
+                                        <StackPanel Visibility="Collapsed">
+                                            <Slider x:Name="MBoosterInputY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY1Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY1Value" Text="20"/>
+                                            <Slider x:Name="MBoosterInputY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY2Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY2Value" Text="40"/>
+                                            <Slider x:Name="MBoosterInputY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY3Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY3Value" Text="60"/>
+                                            <Slider x:Name="MBoosterInputY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY4Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY4Value" Text="80"/>
+                                            <Slider x:Name="MBoosterInputY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY5Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY5Value" Text="100"/>
+                                        </StackPanel>
                                     </StackPanel>
 
-                                    <!-- Data-store sliders, driven by MBoosterCurveEditor -->
-                                    <StackPanel Visibility="Collapsed">
-                                        <Slider x:Name="MBoosterY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY1Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterY1Value" Text="20"/>
-                                        <Slider x:Name="MBoosterY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY2Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterY2Value" Text="40"/>
-                                        <Slider x:Name="MBoosterY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY3Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterY3Value" Text="60"/>
-                                        <Slider x:Name="MBoosterY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY4Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterY4Value" Text="80"/>
-                                        <Slider x:Name="MBoosterY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY5Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterY5Value" Text="100"/>
-                                        <Slider x:Name="MBoosterX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX1Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterX1Value" Text="20"/>
-                                        <Slider x:Name="MBoosterX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX2Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterX2Value" Text="40"/>
-                                        <Slider x:Name="MBoosterX3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX3Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterX3Value" Text="60"/>
-                                        <Slider x:Name="MBoosterX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX4Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterX4Value" Text="80"/>
-                                        <Slider x:Name="MBoosterX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX5Slider_ValueChanged"/>
-                                        <TextBox x:Name="MBoosterX5Value" Text="100"/>
+                                    <!-- Divider between the two halves -->
+                                    <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderBrush}"/>
+
+                                    <!-- Right half: Sim Input Mapping -->
+                                    <StackPanel Grid.Column="2" Margin="16,0,0,0">
+                                        <TextBlock Text="{x:Static res:Strings.Section_SimInputMapping}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
+                                        <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220"
+                                                              AccentBrush="{StaticResource CyanBrush}"
+                                                              AllowHorizontalDrag="True"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
+                                            <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Linear"/>
+                                            <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterCurvePreset_SCurve"/>
+                                            <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Exponential"/>
+                                            <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterCurvePreset_Parabolic"/>
+                                        </StackPanel>
+
+                                        <!-- Sensor Output Ratio + Max Threshold are load-cell / pressure-
+                                             sensor settings that only a BRAKE has — hidden for throttle/
+                                             clutch pedals (see UpdateMBoosterConfigVisibilityForRole). The
+                                             output curve above applies to every pedal mode. -->
+                                        <StackPanel x:Name="MBoosterBrakeOnlyPanel">
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SensorRatio}" Style="{StaticResource SliderLabel}"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Static res:Strings.Label_AngleSensor}" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                            <Slider Grid.Column="2" x:Name="MBoosterRatioSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterRatioSlider_ValueChanged"/>
+                                            <TextBlock Grid.Column="3" Text="{x:Static res:Strings.Label_LoadCell}" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                            <TextBox Grid.Column="4" x:Name="MBoosterRatioValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterRatioSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="0%"/>
+                                        </Grid>
+
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxThresholdKg}" Style="{StaticResource SliderLabel}"/>
+                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                            <Slider Grid.Column="2" x:Name="MBoosterMaxThresholdSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxThresholdSlider_ValueChanged"/>
+                                            <TextBlock Grid.Column="3" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                            <TextBox Grid.Column="4" x:Name="MBoosterMaxThresholdValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterMaxThresholdSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="100"/>
+                                        </Grid>
+                                        </StackPanel><!-- MBoosterBrakeOnlyPanel -->
+
+                                        <!-- Data-store sliders, driven by MBoosterCurveEditor -->
+                                        <StackPanel Visibility="Collapsed">
+                                            <Slider x:Name="MBoosterY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY1Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY1Value" Text="20"/>
+                                            <Slider x:Name="MBoosterY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY2Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY2Value" Text="40"/>
+                                            <Slider x:Name="MBoosterY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY3Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY3Value" Text="60"/>
+                                            <Slider x:Name="MBoosterY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY4Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY4Value" Text="80"/>
+                                            <Slider x:Name="MBoosterY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY5Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX1Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX1Value" Text="20"/>
+                                            <Slider x:Name="MBoosterX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX2Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX2Value" Text="40"/>
+                                            <Slider x:Name="MBoosterX3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX3Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX3Value" Text="60"/>
+                                            <Slider x:Name="MBoosterX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX4Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX4Value" Text="80"/>
+                                            <Slider x:Name="MBoosterX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX5Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX5Value" Text="100"/>
+                                        </StackPanel>
                                     </StackPanel>
-                                </StackPanel>
+                                </Grid>
                             </ctrl:SectionCard>
-
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_Effects}"
                                               Subtitle="{x:Static res:Strings.Subtitle_EffectsTriggers}"
-                                              Icon="{StaticResource IconBolt}">
+                                              Icon="{StaticResource IconBolt}"
+                                              IsCollapsible="True">
                                 <StackPanel>
 
-                            <TextBlock Text="{x:Static res:Strings.Label_PedalTrace}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" Margin="0,0,0,6"/>
-                            <ctrl:BandwidthSparkline x:Name="MBoosterPedalTraceViz" Height="70" Margin="0,0,0,16"
-                                                      InBrush="{StaticResource CyanBrush}"
-                                                      InFillBrush="{StaticResource BwInFillBrush}"
-                                                      OutBrush="Transparent"
-                                                      MaxValue="100"/>
-
+                            <!-- Pedal-position trace lives pinned at the top of the tab now (see
+                                 MBoosterPedalTraceViz above the ScrollViewer) — not duplicated here. -->
                             <!-- Shown instead of the effect cards when the selected pedal is passive
                                  (no motor — vibration effects can't play). -->
                             <TextBlock x:Name="MBoosterEffectsPassiveNote" Text="{x:Static res:Strings.Note_PassivePedalNoEffects}"
@@ -2227,7 +2294,7 @@
 
                             <StackPanel x:Name="MBoosterEffectsCardsPanel">
 
-                            <Expander Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True">
+                            <Expander Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterAbsEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterAbsEnable_Changed" Unchecked="MBoosterAbsEnable_Changed"/>
@@ -2236,12 +2303,16 @@
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterAbsFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="5" Maximum="30" TickFrequency="1" ValueChanged="MBoosterAbsFrequencySlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterAbsFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                        <TextBlock Grid.Column="1" Text="5" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterAbsFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="5" Maximum="30" TickFrequency="1" ValueChanged="MBoosterAbsFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="30" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterAbsFrequencyValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=MBoosterAbsFrequencySlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="22"/>
@@ -2274,7 +2345,139 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_Lockup}" IsExpanded="True">
+                            <Expander Header="{x:Static res:Strings.Section_TractionControl}" IsExpanded="True" Margin="0,0,0,10">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <ctrl:OffOnToggle x:Name="MBoosterTcEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterTcEnable_Changed" Unchecked="MBoosterTcEnable_Changed"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterTcTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterTcTestToggle_Changed" Unchecked="MBoosterTcTestToggle_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
+                                        <TextBlock Grid.Column="1" Text="10" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterTcFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="10" Maximum="100" TickFrequency="1" ValueChanged="MBoosterTcFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="100" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterTcFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterTcFrequencySlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="22"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Intensity}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterTcIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterTcIntensity_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterTcIntensityValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterTcIntensity}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
+                            <Expander Header="{x:Static res:Strings.Section_WheelSpin}" IsExpanded="True" Margin="0,0,0,10">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <ctrl:OffOnToggle x:Name="MBoosterWheelSpinEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterWheelSpinEnable_Changed" Unchecked="MBoosterWheelSpinEnable_Changed"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterWheelSpinTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterWheelSpinTestToggle_Changed" Unchecked="MBoosterWheelSpinTestToggle_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
+                                        <TextBlock Grid.Column="1" Text="30" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterWheelSpinFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="30" Maximum="80" TickFrequency="1" ValueChanged="MBoosterWheelSpinFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="80" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterWheelSpinFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterWheelSpinFrequencySlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="22"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Intensity}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterWheelSpinIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterWheelSpinIntensity_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterWheelSpinIntensityValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterWheelSpinIntensity}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
+                            <Expander Header="{x:Static res:Strings.Section_MBoosterGearShift}" IsExpanded="True" Margin="0,0,0,10">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <ctrl:OffOnToggle x:Name="MBoosterGearShiftEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterGearShiftEnable_Changed" Unchecked="MBoosterGearShiftEnable_Changed"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterGearShiftTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterGearShiftTestToggle_Changed" Unchecked="MBoosterGearShiftTestToggle_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
+                                        <TextBlock Grid.Column="1" Text="20" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterGearShiftFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="20" Maximum="100" TickFrequency="1" ValueChanged="MBoosterGearShiftFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="100" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterGearShiftFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterGearShiftFrequencySlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="22"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Intensity}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterGearShiftIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterGearShiftIntensity_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterGearShiftIntensityValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterGearShiftIntensity}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_VibrateOnNeutral}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterGearShiftVibrateOnNeutralCheck" VerticalAlignment="Center"
+                                                  Checked="MBoosterGearShiftVibrateOnNeutralCheck_Changed" Unchecked="MBoosterGearShiftVibrateOnNeutralCheck_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ShiftDebounce}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterGearShiftDebounceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="1000" TickFrequency="50" SmallChange="50" LargeChange="50" IsSnapToTickEnabled="True" ValueChanged="MBoosterGearShiftDebounceSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterGearShiftDebounceValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterGearShiftDebounceSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="500 ms"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
+                            <Expander Header="{x:Static res:Strings.Section_Lockup}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterLockupEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterLockupEnable_Changed" Unchecked="MBoosterLockupEnable_Changed"/>
@@ -2283,12 +2486,16 @@
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterLockupFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="10" Maximum="100" TickFrequency="1" ValueChanged="MBoosterLockupFrequencySlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterLockupFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                        <TextBlock Grid.Column="1" Text="10" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterLockupFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="10" Maximum="100" TickFrequency="1" ValueChanged="MBoosterLockupFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="100" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterLockupFrequencyValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=MBoosterLockupFrequencySlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="55"/>
@@ -2308,7 +2515,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_Threshold}" IsExpanded="True">
+                            <Expander Header="{x:Static res:Strings.Section_Threshold}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterThresholdEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterThresholdEnable_Changed" Unchecked="MBoosterThresholdEnable_Changed"/>
@@ -2330,12 +2537,16 @@
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterThresholdFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="5" Maximum="100" TickFrequency="1" ValueChanged="MBoosterThresholdFrequencySlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterThresholdFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                        <TextBlock Grid.Column="1" Text="5" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterThresholdFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="5" Maximum="100" TickFrequency="1" ValueChanged="MBoosterThresholdFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="100" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterThresholdFrequencyValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=MBoosterThresholdFrequencySlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="70"/>
@@ -2368,25 +2579,12 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_EngineContinuous}" IsExpanded="True">
+                            <Expander Header="{x:Static res:Strings.Section_EngineContinuous}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterEngineEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterEngineEnable_Changed" Unchecked="MBoosterEngineEnable_Changed"/>
                                         <ctrl:OffOnToggle x:Name="MBoosterEngineTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterEngineTestToggle_Changed" Unchecked="MBoosterEngineTestToggle_Changed"/>
                                     </StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterEngineFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="60" Maximum="200" TickFrequency="1" ValueChanged="MBoosterEngineFrequencySlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterEngineFrequencyValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterEngineFrequencySlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="100"/>
-                                    </Grid>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -2402,7 +2600,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_RoadTexture}" IsExpanded="True">
+                            <Expander Header="{x:Static res:Strings.Section_RoadTexture}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterRoadTextureEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterRoadTextureEnable_Changed" Unchecked="MBoosterRoadTextureEnable_Changed"/>
@@ -2436,7 +2634,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False">
+                            <Expander Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_BrakeFadeExperimental}"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -2467,7 +2665,8 @@
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_CustomEffects}"
                                               Subtitle="{x:Static res:Strings.Subtitle_CustomEffectsExperimental}"
                                               Icon="{StaticResource IconBolt}"
-                                              AccentBrush="{StaticResource AmberBrush}">
+                                              AccentBrush="{StaticResource AmberBrush}"
+                                              IsCollapsible="True">
                                 <StackPanel>
                                     <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8"
                                                Text="{x:Static res:Strings.Hint_CustomEffectsExperimental}"/>
@@ -2628,7 +2827,9 @@
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_Calibration}"
                                               Subtitle="{x:Static res:Strings.Subtitle_CalibrationExperimental}"
                                               Icon="{StaticResource IconCal}"
-                                              AccentBrush="{StaticResource AmberBrush}">
+                                              AccentBrush="{StaticResource AmberBrush}"
+                                              IsCollapsible="True"
+                                              Visibility="Collapsed">
                                 <StackPanel>
                                     <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_MBoosterCalibrationWarning}"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,4">
@@ -2670,7 +2871,8 @@
 
                         </StackPanel>
                     </StackPanel>
-                </ScrollViewer>
+                    </ScrollViewer>
+                </Grid>
             </TabItem>
 
             <!-- ==================== HUB TAB ==================== -->

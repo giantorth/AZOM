@@ -521,6 +521,28 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// EXPERIMENTAL / unverified — resample the output curve at 6 evenly
+        /// spaced breakpoints (100/7, 200/7, ..., 600/7 percent) instead of
+        /// the wire protocol's usual 20/40/60/80/100, for the
+        /// <c>mbooster-brake-curve7-*</c> commands (cmdId 0xAB — see
+        /// MozaCommandDatabase.cs and MozaMBoosterProtocol.EncodeCurve7Point).
+        /// Spotted once in pedal_travel.pcapng sent alongside a Travel Start
+        /// write; not confirmed as an actual protocol requirement. Same
+        /// null-curveY-is-identity fallback as <see cref="ResampleCurveAtFixedBreakpoints"/>
+        /// (via <see cref="EvaluateCurveArbitraryX"/>'s own null guard).
+        /// Returned array is indexed 0..5 for wire selectors 1..6
+        /// (<c>result[i]</c> is selector <c>i + 1</c>'s value).
+        /// </summary>
+        internal static float[] ResampleCurveAtSevenths(float[]? curveX, float[]? curveY)
+        {
+            var xs = (curveX != null && curveX.Length == 5) ? curveX : DefaultCurveX;
+            var result = new float[6];
+            for (int i = 1; i <= 6; i++)
+                result[i - 1] = (float)EvaluateCurveArbitraryX(xs, curveY!, i * 100.0 / 7.0);
+            return result;
+        }
+
+        /// <summary>
         /// Fallback pairing for <see cref="OnHidAxisUpdate"/> when the HID
         /// identity doesn't exactly match a known CDC identity. Per
         /// docs/protocol/devices/mbooster.md "HID identity reconciliation",

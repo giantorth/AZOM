@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -160,13 +161,20 @@ namespace MozaPlugin
             _bandwidthTimer?.Stop();
             UnsubscribeStalks();
             // Closing the settings panel takes the sustained Engine/ABS/
-            // Road Texture/Lockup/Threshold/Brake Fade test toggles out of
-            // view — stop them so a forgotten toggle doesn't leave the pedal
-            // buzzing indefinitely with no UI left to turn it off.
+            // Traction Control/Wheel Spin/Gear Shift/Road Texture/Lockup/
+            // Threshold/Brake Fade test toggles out of view — stop them so
+            // a forgotten toggle doesn't leave the pedal buzzing
+            // indefinitely with no UI left to turn it off.
             if (MBoosterEngineTestToggle?.IsChecked == true)
                 CurrentMBoosterController()?.SetEngineTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterAbsTestToggle?.IsChecked == true)
                 CurrentMBoosterController()?.SetAbsTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterTcTestToggle?.IsChecked == true)
+                CurrentMBoosterController()?.SetTcTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterWheelSpinTestToggle?.IsChecked == true)
+                CurrentMBoosterController()?.SetWheelSpinTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterGearShiftTestToggle?.IsChecked == true)
+                CurrentMBoosterController()?.SetGearShiftTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterRoadTextureTestToggle?.IsChecked == true)
                 CurrentMBoosterController()?.SetRoadTextureTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterLockupTestToggle?.IsChecked == true)
@@ -292,7 +300,7 @@ namespace MozaPlugin
             }
 
             UpdateHandbrakeButtonStatus(connected);
-            UpdateMBoosterCurveMarkers();
+            UpdateMBoosterCurveMarkers(connected);
 
             // Phase 6: fan out live HID data to the per-device wheel control's
             // Inputs sub-tab so its paddle bars + active-button text update at
@@ -306,7 +314,7 @@ namespace MozaPlugin
         // Runs at the same 30 Hz cadence as the standard pedal bars above
         // instead of the 500ms general refresh — that felt sluggish for
         // direct pedal feedback.
-        private void UpdateMBoosterCurveMarkers()
+        private void UpdateMBoosterCurveMarkers(bool hidConnected)
         {
             if (MBoosterDevicePanel.Visibility != Visibility.Visible) return;
             var selected = _plugin?.MBoosterRegistry?.FindByIdentity(_mboosterSelectedIdentity ?? "");
@@ -327,11 +335,21 @@ namespace MozaPlugin
             MBoosterInputCurveEditor.LiveX = preCurve;
             MBoosterCurveEditor.LiveX = pct;
 
-            // Effects card pedal trace — same 30 Hz cadence, same position
-            // value as the output curve's live dot.
-            _mboosterPedalTraceSamples.Add(pct);
-            while (_mboosterPedalTraceSamples.Count > MBoosterPedalTraceSamples)
-                _mboosterPedalTraceSamples.RemoveAt(0);
+            // Effects card pedal trace — same 30 Hz cadence as the Inputs
+            // tab's pedal bars above, and the same merged 0-100 values
+            // (_data.*Position), so it shows every connected pedal's live
+            // position — mBooster or not, whichever device currently holds
+            // each role — not just an mBooster's own HID reading.
+            PushMBoosterTraceSample(_mboosterBrakeTraceSamples, hidConnected ? _data.BrakePosition : 0);
+            PushMBoosterTraceSample(_mboosterThrottleTraceSamples, hidConnected ? _data.ThrottlePosition : 0);
+            PushMBoosterTraceSample(_mboosterClutchTraceSamples, hidConnected ? _data.ClutchPosition : 0);
+        }
+
+        private static void PushMBoosterTraceSample(ObservableCollection<double> samples, double value)
+        {
+            samples.Add(value);
+            while (samples.Count > MBoosterPedalTraceSamples)
+                samples.RemoveAt(0);
         }
 
         private void UpdateHandbrakeButtonStatus(bool connected)
@@ -2575,13 +2593,29 @@ namespace MozaPlugin
         }
 
         // =====================================================================
-        // mBooster tab — multi-device. ComboBox selects the active device;
-        // settings panel below populates from the selection's per-device
+        // mBooster tab — multi-device, multi-pedal. MBoosterDeviceRowsList (one
+        // row per connected PEDAL, not per physical connection — see
+        // MBoosterDeviceRow.cs) selects the active device+pedal; the settings
+        // panel below populates from that selection's per-device/per-pedal
         // entry in MozaProfile.MBoosterSettings (lazily created).
         // =====================================================================
 
         private string? _mboosterSelectedIdentity;
         private bool _mboosterUiSeeded;
+
+        // One row per connected PEDAL (HID axis) across every connected
+        // mBooster — see MBoosterDeviceRow.cs. Replaces the old trio of
+        // "Device combo" + "per-axis Pedal Roles panel" + "Configure pedal
+        // combo", which all overlapped the same selection/role concerns.
+        // Rebuilt only when the signature (identity+axisCount+connected-mask
+        // per device) changes, so a mid-click isn't disrupted by the 500ms
+        // refresh tick; Role/IsSelected on existing rows are still resynced
+        // every refresh (cheap — just property pushes, not a visual rebuild)
+        // so an out-of-band profile switch or role edit is reflected promptly.
+        private readonly System.Collections.ObjectModel.ObservableCollection<MBoosterDeviceRow> _mboosterDeviceRows =
+            new System.Collections.ObjectModel.ObservableCollection<MBoosterDeviceRow>();
+        private string? _mboosterDeviceRowsSignature;
+
         // Active-profile name + device identity the tab was last seeded for.
         // mBooster settings are per-profile (GetOrCreateMBoosterSettings reads
         // ProfileStore.CurrentProfile) and per-device; the seed-once gate below
@@ -2596,26 +2630,10 @@ namespace MozaPlugin
         private readonly System.Collections.ObjectModel.ObservableCollection<MBoosterCustomEffectRow> _mboosterCustomEffectRows =
             new System.Collections.ObjectModel.ObservableCollection<MBoosterCustomEffectRow>();
 
-        // Per-axis pedal-role selectors for a chained mBooster (one row per
-        // detected HID axis). Rebuilt only when the selected device or its axis
-        // count changes (tracked below) so an open dropdown isn't disrupted on
-        // the 500ms refresh tick.
-        private readonly System.Collections.ObjectModel.ObservableCollection<MBoosterAxisRoleRow> _mboosterAxisRoleRows =
-            new System.Collections.ObjectModel.ObservableCollection<MBoosterAxisRoleRow>();
-        private string? _mboosterAxisListIdentity;
-        private int _mboosterAxisListCount = -1;
-        private string? _mboosterAxisListConnected;
-
-        // Same rebuild-guard signature for the "Configure pedal" combo, so it
-        // repopulates on the SAME cadence as the roles panel above and their
-        // "Pedal N" numbering can't drift out of sync.
-        private string? _mboosterEffectComboIdentity;
-        private int _mboosterEffectComboCount = -1;
-        private string? _mboosterEffectComboConnected;
-
         private void RefreshMBoosterTab()
         {
-            var registry = _plugin?.MBoosterRegistry;
+            if (_plugin == null) { MBoosterTab.Visibility = Visibility.Collapsed; return; }
+            var registry = _plugin.MBoosterRegistry;
             if (registry == null) { MBoosterTab.Visibility = Visibility.Collapsed; return; }
             var devices = registry.Devices;
             if (devices.Count == 0)
@@ -2626,46 +2644,143 @@ namespace MozaPlugin
             }
             MBoosterTab.Visibility = Visibility.Visible;
 
-            // Rebuild the device combo if the list changed.
+            // Rebuild the device/pedal row list if any device's identity, axis
+            // count, or connectivity changed. One row per connected PEDAL — a
+            // chained mBooster hosting several pedals on one connection gets
+            // one row per detected axis, not one row for the whole connection
+            // (see MBoosterDeviceRow.cs — this replaces the old trio of Device
+            // combo + per-axis Pedal Roles panel + Configure-pedal combo).
+            var sigBuilder = new System.Text.StringBuilder();
+            foreach (var c in devices)
+            {
+                int sigAxisCount = c.AxisCount > 0 ? c.AxisCount : 1;
+                sigBuilder.Append(c.Identity).Append('|').Append(sigAxisCount).Append('|');
+                var sigConnected = c.ConnectedAxes;
+                if (sigConnected != null)
+                    for (int k = 0; k < sigConnected.Length; k++) sigBuilder.Append(sigConnected[k] ? '1' : '0');
+                sigBuilder.Append(';');
+            }
+            string rowsSignature = sigBuilder.ToString();
+            bool rowsStale = !string.Equals(rowsSignature, _mboosterDeviceRowsSignature, StringComparison.Ordinal);
+
             using (_suppressor.Begin())
             {
-                int prevSelected = -1;
-                for (int i = 0; i < devices.Count; i++)
+                // Keep the existing (identity, axis) selection if it's still
+                // valid (device still connected, axis still in range and
+                // connected); otherwise fall back to axis 0 of the first device.
+                bool selectionValid = false;
+                bool selectedDeviceStillPresent = false;
+                int sameDeviceRetargetAxis = 0;
+                foreach (var c in devices)
                 {
-                    if (string.Equals(devices[i].Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)) continue;
+                    selectedDeviceStillPresent = true;
+                    int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
+                    var connected = c.ConnectedAxes;
+                    bool selAxisKnownConnected = connected != null && _mboosterEffectPedalIndex < connected.Length
+                        ? connected[_mboosterEffectPedalIndex]
+                        : _mboosterEffectPedalIndex == 0;
+                    selectionValid = _mboosterEffectPedalIndex >= 0 && _mboosterEffectPedalIndex < axisCount && selAxisKnownConnected;
+                    if (!selectionValid && connected != null)
                     {
-                        prevSelected = i;
-                        break;
-                    }
-                }
-                // Rebuild when the identity set/order changed, not just the
-                // count — a 1:1 device swap (count unchanged) would otherwise
-                // leave stale labels while _mboosterSelectedIdentity is
-                // reassigned to a different device below.
-                bool comboStale = MBoosterDeviceCombo.Items.Count != devices.Count;
-                for (int i = 0; !comboStale && i < devices.Count; i++)
-                {
-                    comboStale = !(MBoosterDeviceCombo.Items[i] is ComboBoxItem existing)
-                        || !string.Equals(existing.Tag as string, devices[i].Identity, StringComparison.OrdinalIgnoreCase);
-                }
-                if (comboStale)
-                {
-                    MBoosterDeviceCombo.Items.Clear();
-                    for (int i = 0; i < devices.Count; i++)
-                    {
-                        var c = devices[i];
-                        var item = new ComboBoxItem
+                        // The device's real wired axis just became known (the
+                        // "PD Linked" diagnostic landed) and it isn't the axis-0
+                        // placeholder we'd optimistically selected before that —
+                        // a standalone unit's sole pedal commonly reports on a
+                        // non-zero axis regardless of chain status (see
+                        // MBoosterDeviceController's ConnectedAxes doc comment).
+                        // Follow the SAME physical device onto whichever axis is
+                        // now known-connected instead of falling through to
+                        // devices[0] below, which would silently reassign the
+                        // user's selection to a different device a couple
+                        // seconds after they picked one at startup.
+                        for (int axis = 0; axis < connected.Length; axis++)
                         {
-                            Content = BuildMBoosterComboLabel(c),
-                            Tag = c.Identity,
-                        };
-                        MBoosterDeviceCombo.Items.Add(item);
+                            if (connected[axis]) { sameDeviceRetargetAxis = axis; break; }
+                        }
+                    }
+                    break;
+                }
+                if (!selectionValid)
+                {
+                    if (selectedDeviceStillPresent)
+                        _mboosterEffectPedalIndex = sameDeviceRetargetAxis;
+                    else
+                    {
+                        _mboosterSelectedIdentity = devices[0].Identity;
+                        _mboosterEffectPedalIndex = 0;
                     }
                 }
-                if (prevSelected < 0) prevSelected = 0;
-                if (MBoosterDeviceCombo.SelectedIndex != prevSelected)
-                    MBoosterDeviceCombo.SelectedIndex = prevSelected;
-                _mboosterSelectedIdentity = devices[prevSelected].Identity;
+
+                if (rowsStale)
+                {
+                    _mboosterDeviceRowsSignature = rowsSignature;
+                    _mboosterDeviceRows.Clear();
+                    foreach (var c in devices)
+                    {
+                        var rowSettings = _plugin.GetOrCreateMBoosterSettings(c.Identity);
+                        int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
+                        var connected = c.ConnectedAxes;
+                        string deviceLabel = BuildMBoosterComboLabel(c);
+
+                        // Which axes are ACTUALLY wired. The HID interface
+                        // commonly reports 3 axes (Rx/Ry/Rz) regardless of how
+                        // many pedals are physically connected — ConnectedAxes
+                        // (from the "PD Linked" firmware diagnostic) is the
+                        // only way to tell which are real. Until that
+                        // diagnostic arrives (null), assume only axis 0 is
+                        // real: the common case is a standalone single pedal,
+                        // and a genuine chain's extra axes appear as soon as
+                        // the diagnostic confirms them, instead of showing
+                        // phantom pedals from the very first refresh.
+                        var connectedAxes = new List<int>();
+                        for (int axis = 0; axis < axisCount && axis < MBoosterDeviceController.MaxAxes; axis++)
+                        {
+                            bool axisKnownConnected = connected != null && axis < connected.Length
+                                ? connected[axis]
+                                : axis == 0;
+                            if (axisKnownConnected) connectedAxes.Add(axis);
+                        }
+
+                        // Only label rows "— Pedal N" when this device genuinely
+                        // hosts more than one wired pedal — not just because its
+                        // HID interface happens to expose 3 axes.
+                        bool multiplePedals = connectedAxes.Count > 1;
+                        int shown = 0;
+                        foreach (int axis in connectedAxes)
+                        {
+                            ++shown;
+                            string label = multiplePedals
+                                ? $"{deviceLabel} — {string.Format(Strings.Label_PedalAxis, shown)}"
+                                : deviceLabel;
+                            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, axisCount);
+                            bool isSelected = string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
+                                && axis == _mboosterEffectPedalIndex;
+                            _mboosterDeviceRows.Add(new MBoosterDeviceRow(c.Identity, axis, label, isSelected, role,
+                                rowSettings.DisplayName, OnMBoosterDeviceRowRoleChanged, OnMBoosterDeviceRowDisplayNameChanged));
+                        }
+                    }
+                    MBoosterDeviceRowsList.ItemsSource = _mboosterDeviceRows;
+                }
+                else
+                {
+                    foreach (var row in _mboosterDeviceRows)
+                    {
+                        var rowController = registry.FindByIdentity(row.Identity);
+                        var rowSettings = _plugin.GetOrCreateMBoosterSettings(row.Identity);
+                        int axisCount = rowController != null && rowController.AxisCount > 0 ? rowController.AxisCount : 1;
+                        row.RoleIndex = (int)global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, axisCount);
+                        row.IsSelected = string.Equals(row.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
+                            && row.AxisIndex == _mboosterEffectPedalIndex;
+                        // DisplayName is per-profile like every other mBooster
+                        // setting, so a profile switch can change it without
+                        // changing rowsSignature (which only tracks physical
+                        // connectivity). The setter no-ops unless the value
+                        // actually differs, and OnMBoosterDeviceRowDisplayNameChanged
+                        // recomputes Label when it fires.
+                        row.DisplayName = rowSettings.DisplayName;
+                    }
+                }
             }
 
             var selected = registry.FindByIdentity(_mboosterSelectedIdentity ?? "");
@@ -2676,15 +2791,6 @@ namespace MozaPlugin
             }
 
             MBoosterDevicePanel.Visibility = Visibility.Visible;
-
-            // Per-axis pedal-role selectors (multi-pedal chain). Runs every
-            // refresh (outside the seed-once gate) so it appears as soon as the
-            // HID reports the lane's axis count, which can lag the CDC detect.
-            PopulateMBoosterAxisRoles(selected);
-            // The "Configure pedal" combo shares the same every-refresh + guard
-            // cadence so its "Pedal N" numbering stays locked to the roles panel
-            // above (both walk the connected axes identically).
-            PopulateMBoosterEffectPedalCombo(selected);
 
             // Live position marker (on the curve editors) is updated at
             // 30 Hz from UpdateHidInputDisplays (UpdateMBoosterCurveMarkers)
@@ -2708,14 +2814,12 @@ namespace MozaPlugin
             var s = _plugin.GetOrCreateMBoosterSettings(selected.Identity);
             using (_suppressor.Begin())
             {
-                SetMBoosterRoleCombo(s.Role);
-                MBoosterDisplayNameBox.Text = s.DisplayName ?? "";
-                // The "Configure pedal" combo + _mboosterEffectPedalIndex are
-                // maintained by PopulateMBoosterEffectPedalCombo (called every
-                // refresh above), which resets to the master pedal on a device
-                // change — so here we just seed whichever pedal it settled on.
-                // (Test toggles are never persisted; SeedMBoosterEffectControls
-                // always clears them.)
+                // Role is seeded per-row by the device rows block above (each
+                // MBoosterDeviceRow owns its own Role), not here.
+                // _mboosterEffectPedalIndex is resolved/validated by the device
+                // rows block above too — here we just seed whichever pedal it
+                // settled on. (Test toggles are never persisted;
+                // SeedMBoosterEffectControls always clears them.)
                 SeedMBoosterEffectControls(PeekMBoosterEffectTarget());
                 UpdateMBoosterEffectPassiveState();
                 UpdateMBoosterConfigVisibilityForRole();
@@ -2732,20 +2836,154 @@ namespace MozaPlugin
             _mboosterSeededIdentity = selected.Identity;
         }
 
-        private void SetMBoosterRoleCombo(MBoosterRole role)
+        /// <summary>Click handler for a pedal row's label Button (see
+        /// MBoosterDeviceRow.cs's doc comment for why this is a plain Click
+        /// event rather than RadioButton+GroupName+TwoWay binding). The row
+        /// itself is the sender's DataContext, courtesy of the ItemsControl's
+        /// DataTemplate.</summary>
+        private void MBoosterDeviceRow_Click(object sender, RoutedEventArgs e)
         {
-            for (int i = 0; i < MBoosterRoleCombo.Items.Count; i++)
+            if (sender is not FrameworkElement fe || fe.DataContext is not MBoosterDeviceRow row) return;
+            OnMBoosterDeviceRowSelected(row.Identity, row.AxisIndex);
+        }
+
+        /// <summary>Row selection logic — fires when a pedal row's label Button
+        /// is clicked. Selects BOTH the physical device AND the specific pedal
+        /// (axis) on it in one step, replacing what the old MBoosterDeviceCombo_Changed
+        /// (device only) + MBoosterEffectPedalCombo_SelectionChanged (pedal only)
+        /// used to do separately.</summary>
+        private void OnMBoosterDeviceRowSelected(string identity, int axisIndex)
+        {
+            if (_suppressEvents) return;
+            if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
+                && axisIndex == _mboosterEffectPedalIndex)
+                return;
+            // Stop any sustained Engine/ABS/Traction Control/Wheel Spin/
+            // Gear Shift/Road Texture/Lockup/Threshold/Brake Fade test on
+            // the pedal we're navigating away from — otherwise it keeps
+            // buzzing with no visible toggle left to turn it off (the new
+            // pedal's tab reseeds its own, unrelated toggle state).
+            if (MBoosterEngineTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetEngineTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterAbsTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetAbsTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterTcTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetTcTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterWheelSpinTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetWheelSpinTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterGearShiftTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetGearShiftTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterRoadTextureTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetRoadTextureTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterLockupTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetLockupTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterThresholdTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
+            if (MBoosterBrakeFadeTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
+            StopAllCustomEffectTests();
+            _mboosterSelectedIdentity = identity;
+            _mboosterEffectPedalIndex = axisIndex;
+            _mboosterUiSeeded = false;
+            RefreshMBoosterTab();
+        }
+
+        /// <summary>
+        /// Write <paramref name="role"/> to wherever <see cref="MozaMBoosterRegistry.ResolveAxisRole"/>
+        /// actually reads it for (<paramref name="axisCount"/>, <paramref name="axisIndex"/>)
+        /// — <c>Role</c> for a standalone pedal, <c>AxisRoles[axisIndex]</c> for
+        /// one pedal of a chain (seeding the array from the currently-resolved
+        /// roles first, so unedited axes keep their effective role).
+        /// </summary>
+        private static void SetMBoosterPedalRole(MBoosterDeviceSettings s, int axisCount, int axisIndex, MBoosterRole role)
+        {
+            if (axisCount <= 1) { s.Role = role; return; }
+            var roles = s.AxisRoles;
+            if (roles == null || roles.Length != axisCount)
             {
-                if (MBoosterRoleCombo.Items[i] is ComboBoxItem ci
-                    && ci.Tag is string tag
-                    && int.TryParse(tag, out int v)
-                    && v == (int)role)
-                {
-                    MBoosterRoleCombo.SelectedIndex = i;
-                    return;
-                }
+                var seeded = new MBoosterRole[axisCount];
+                for (int i = 0; i < axisCount; i++)
+                    seeded[i] = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, i, axisCount);
+                s.AxisRoles = roles = seeded;
             }
-            MBoosterRoleCombo.SelectedIndex = 0;
+            if (axisIndex >= 0 && axisIndex < roles.Length)
+                roles[axisIndex] = role;
+        }
+
+        /// <summary>Role-combo callback for <see cref="MBoosterDeviceRow"/> — edits
+        /// THAT row's pedal Role regardless of which row is currently selected.
+        /// Enforces "only one pedal may occupy a role": assigning a non-Disabled
+        /// role clears it off any OTHER pedal that already held it (a physical
+        /// pedal can only be one thing, so two rows both claiming Brake is
+        /// always a mistake, not a valid state).</summary>
+        private void OnMBoosterDeviceRowRoleChanged(string identity, int axisIndex, MBoosterRole role)
+        {
+            if (_suppressEvents) return;
+            if (_plugin == null) return;
+            var s = _plugin.GetOrCreateMBoosterSettings(identity);
+            var controller = _plugin.MBoosterRegistry?.FindByIdentity(identity);
+            int axisCount = controller != null && controller.AxisCount > 0 ? controller.AxisCount : 1;
+            SetMBoosterPedalRole(s, axisCount, axisIndex, role);
+            _plugin.SaveSettings();
+            if (role != MBoosterRole.Disabled)
+                ClearDuplicateMBoosterRoleAssignments(identity, axisIndex, role);
+            if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase) && axisIndex == _mboosterEffectPedalIndex)
+                UpdateMBoosterConfigVisibilityForRole();
+        }
+
+        /// <summary>Bumps every OTHER known pedal row currently showing
+        /// <paramref name="role"/> to Disabled — setting a row's RoleIndex
+        /// recurses into <see cref="OnMBoosterDeviceRowRoleChanged"/>, which
+        /// persists it through the same Role/AxisRoles write path (and won't
+        /// recurse further, since Disabled never triggers another clear
+        /// pass). Only considers rows already built (<see cref="_mboosterDeviceRows"/>)
+        /// — a pedal not yet known to the UI can't visibly collide with one
+        /// that is.</summary>
+        private void ClearDuplicateMBoosterRoleAssignments(string keepIdentity, int keepAxisIndex, MBoosterRole role)
+        {
+            foreach (var row in _mboosterDeviceRows)
+            {
+                if (string.Equals(row.Identity, keepIdentity, StringComparison.OrdinalIgnoreCase) && row.AxisIndex == keepAxisIndex)
+                    continue;
+                if (row.RoleIndex == (int)role)
+                    row.RoleIndex = (int)MBoosterRole.Disabled;
+            }
+        }
+
+        /// <summary>DisplayName edit callback — fires from MBoosterDeviceRow
+        /// .DisplayName's setter (only when the value actually changes), both
+        /// for a genuine user edit (the TwoWay-bound TextBox shown for the
+        /// selected row) and RefreshMBoosterTab's per-tick resync (e.g. after
+        /// a profile switch changes the saved name). Persists the value and
+        /// recomputes every row sharing this identity's Label immediately —
+        /// Label isn't part of rowsSignature, so RefreshMBoosterTab wouldn't
+        /// otherwise notice a DisplayName change until some other signature
+        /// field happened to change too.</summary>
+        private void OnMBoosterDeviceRowDisplayNameChanged(string identity, string newDisplayName)
+        {
+            if (_plugin == null) return;
+            var s = _plugin.GetOrCreateMBoosterSettings(identity);
+            s.DisplayName = newDisplayName ?? "";
+            _plugin.SaveSettings();
+
+            var controller = _plugin.MBoosterRegistry?.FindByIdentity(identity);
+            if (controller == null) return;
+            string deviceLabel = BuildMBoosterComboLabel(controller);
+
+            int matchCount = 0;
+            foreach (var row in _mboosterDeviceRows)
+                if (string.Equals(row.Identity, identity, StringComparison.OrdinalIgnoreCase)) matchCount++;
+            bool multiplePedals = matchCount > 1;
+
+            int shown = 0;
+            foreach (var row in _mboosterDeviceRows)
+            {
+                if (!string.Equals(row.Identity, identity, StringComparison.OrdinalIgnoreCase)) continue;
+                ++shown;
+                row.Label = multiplePedals
+                    ? $"{deviceLabel} — {string.Format(Strings.Label_PedalAxis, shown)}"
+                    : deviceLabel;
+            }
         }
 
         private MBoosterDeviceSettings? CurrentMBoosterSettings()
@@ -2793,12 +3031,34 @@ namespace MozaPlugin
             return s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p) ? p : null;
         }
 
-        /// <summary>Seed the five vibration-effect cards' controls from one
+        /// <summary>Seed the eight vibration-effect cards' controls from one
         /// pedal's effect settings. Assumes the event suppressor is active. Brake
         /// Fade is seeded separately by <see cref="RefreshMBoosterTab"/> since it's
         /// per-lane (master pedal only).</summary>
         private void SeedMBoosterEffectControls(IMBoosterEffects? fx)
         {
+            MBoosterTcEnable.IsChecked       = fx?.TractionControl?.Enabled          ?? false;
+            MBoosterTcFrequencySlider.Value  = fx?.TractionControl?.FrequencyHz      ?? MBoosterUiConstants.TractionControlFreqMinHz;
+            SetValueText(MBoosterTcFrequencyValue, MBoosterTcFrequencySlider.Value.ToString("F0"));
+            MBoosterTcIntensity.Value        = fx?.TractionControl?.IntensityPct     ?? 50;
+            SetValueText(MBoosterTcIntensityValue, (fx?.TractionControl?.IntensityPct ?? 50).ToString());
+            MBoosterTcTestToggle.IsChecked = false;
+            MBoosterWheelSpinEnable.IsChecked       = fx?.WheelSpin?.Enabled          ?? false;
+            MBoosterWheelSpinFrequencySlider.Value  = fx?.WheelSpin?.FrequencyHz      ?? MBoosterUiConstants.WheelSpinFreqMinHz;
+            SetValueText(MBoosterWheelSpinFrequencyValue, MBoosterWheelSpinFrequencySlider.Value.ToString("F0"));
+            MBoosterWheelSpinIntensity.Value        = fx?.WheelSpin?.IntensityPct     ?? 50;
+            SetValueText(MBoosterWheelSpinIntensityValue, (fx?.WheelSpin?.IntensityPct ?? 50).ToString());
+            MBoosterWheelSpinTestToggle.IsChecked = false;
+            MBoosterGearShiftEnable.IsChecked       = fx?.GearShift?.Enabled          ?? false;
+            MBoosterGearShiftFrequencySlider.Value  = fx?.GearShift?.FrequencyHz      ?? MBoosterUiConstants.GearShiftFreqMinHz;
+            SetValueText(MBoosterGearShiftFrequencyValue, MBoosterGearShiftFrequencySlider.Value.ToString("F0"));
+            MBoosterGearShiftIntensity.Value        = fx?.GearShift?.IntensityPct     ?? 50;
+            SetValueText(MBoosterGearShiftIntensityValue, (fx?.GearShift?.IntensityPct ?? 50).ToString());
+            MBoosterGearShiftVibrateOnNeutralCheck.IsChecked = fx?.GearShift?.VibrateOnNeutral ?? false;
+            int gearShiftDebounceMs = fx?.GearShift?.DebounceMs ?? 500;
+            MBoosterGearShiftDebounceSlider.Value = gearShiftDebounceMs;
+            MBoosterGearShiftDebounceValue.Text = $"{gearShiftDebounceMs} ms";
+            MBoosterGearShiftTestToggle.IsChecked = false;
             MBoosterAbsEnable.IsChecked       = fx?.Abs?.Enabled          ?? false;
             MBoosterAbsFrequencySlider.Value  = fx?.Abs?.FrequencyHz      ?? MBoosterUiConstants.AbsFreqMinHz;
             SetValueText(MBoosterAbsFrequencyValue, MBoosterAbsFrequencySlider.Value.ToString("F0"));
@@ -2824,8 +3084,6 @@ namespace MozaPlugin
             SetValueText(MBoosterThresholdDecayValue, (fx?.Threshold?.DecayPct ?? 20).ToString());
             MBoosterThresholdTestToggle.IsChecked = false;
             MBoosterEngineEnable.IsChecked    = fx?.Engine?.Enabled       ?? false;
-            MBoosterEngineFrequencySlider.Value = fx?.Engine?.FrequencyHz ?? MBoosterUiConstants.EngineFreqMinHz;
-            SetValueText(MBoosterEngineFrequencyValue, MBoosterEngineFrequencySlider.Value.ToString("F0"));
             MBoosterEngineIntensity.Value     = fx?.Engine?.IntensityPct  ?? 50;
             SetValueText(MBoosterEngineIntensityValue, (fx?.Engine?.IntensityPct ?? 50).ToString());
             MBoosterEngineTestToggle.IsChecked = false;
@@ -2910,31 +3168,8 @@ namespace MozaPlugin
             return string.IsNullOrWhiteSpace(name) ? baseLabel : $"{name} — {baseLabel}";
         }
 
-        private void MBoosterDisplayNameBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Enter && e.Key != Key.Return) return;
-            (sender as TextBox)?.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
-            e.Handled = true;
-        }
-
-        private void MBoosterDisplayNameBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            var s = CurrentMBoosterSettings();
-            if (s == null) return;
-            var v = (MBoosterDisplayNameBox.Text ?? "").Trim();
-            if (s.DisplayName == v) return;
-            s.DisplayName = v;
-            _plugin.SaveSettings();
-            // Reflect the new name in the device combo immediately rather
-            // than waiting for the next 500ms refresh tick / device add-drop.
-            var controller = CurrentMBoosterController();
-            if (controller != null && MBoosterDeviceCombo.SelectedItem is ComboBoxItem item)
-                item.Content = BuildMBoosterComboLabel(controller);
-        }
-
         // ===== Custom Effects (Experimental) =====
-        // Dynamic per-device list — unlike the five built-in effects (static
+        // Dynamic per-device list — unlike the eight built-in effects (static
         // named XAML controls wired one-by-one), the count here is
         // user-defined, so the ItemsControl is bound to an ObservableCollection
         // of row view-models (MBoosterCustomEffectRow) instead. Rebuilt wholesale
@@ -2975,8 +3210,8 @@ namespace MozaPlugin
         /// <summary>
         /// Turn off every custom effect's sustained Test toggle for the
         /// currently-selected device — mirrors the explicit stop calls for
-        /// the five built-in effects' Test toggles in
-        /// <see cref="MBoosterDeviceCombo_Changed"/> and
+        /// the eight built-in effects' Test toggles in
+        /// <see cref="OnMBoosterDeviceRowSelected"/> and
         /// <see cref="OnUnloadedStopTimers"/>, so a forgotten toggle doesn't
         /// leave the pedal buzzing with no UI left to turn it off.
         /// </summary>
@@ -3091,241 +3326,9 @@ namespace MozaPlugin
             }
         }
 
-        private void MBoosterDeviceCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            if (MBoosterDeviceCombo.SelectedItem is not ComboBoxItem item) return;
-            if (item.Tag is not string identity) return;
-            if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)) return;
-            // Stop any sustained Engine/ABS/Road Texture/Lockup/Threshold/
-            // Brake Fade test on the device we're navigating away from —
-            // otherwise it keeps buzzing with no visible toggle left to turn
-            // it off (the new device's tab reseeds its own, unrelated
-            // toggle state).
-            if (MBoosterEngineTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetEngineTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterAbsTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetAbsTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterRoadTextureTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetRoadTextureTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterLockupTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetLockupTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterThresholdTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterBrakeFadeTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
-            StopAllCustomEffectTests();
-            // Reset the pedal trace to a flat baseline rather than carrying
-            // over the previous device's history into the new one's graph.
-            for (int i = 0; i < _mboosterPedalTraceSamples.Count; i++)
-                _mboosterPedalTraceSamples[i] = 0;
-            _mboosterSelectedIdentity = identity;
-            _mboosterUiSeeded = false;
-            RefreshMBoosterTab();
-        }
-
-        private void MBoosterRoleCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            var s = CurrentMBoosterSettings();
-            if (s == null) return;
-            if (MBoosterRoleCombo.SelectedItem is not ComboBoxItem ci) return;
-            if (ci.Tag is not string tag || !int.TryParse(tag, out int v)) return;
-            s.Role = (MBoosterRole)v;
-            _plugin.SaveSettings();
-            UpdateMBoosterConfigVisibilityForRole();
-        }
-
-        /// <summary>
-        /// Show one role selector per pedal on a chained mBooster. For a
-        /// single-axis lane the legacy single Role combo is kept (unchanged UX);
-        /// for a multi-pedal lane the per-axis panel replaces it. When the device
-        /// reports which slots are physically connected (<see cref="MBoosterDeviceController.ConnectedAxes"/>,
-        /// from its "PD Linked" diagnostic) only the connected pedals are shown;
-        /// otherwise every detected axis is listed. Rebuilt only when the device,
-        /// its axis count, or its connectivity changes.
-        /// </summary>
-        private void PopulateMBoosterAxisRoles(MBoosterDeviceController? controller)
-        {
-            MBoosterAxisRolesList.ItemsSource = _mboosterAxisRoleRows;
-            int axisCount = controller?.AxisCount ?? 0;
-            var connected = controller?.ConnectedAxes;
-            bool multi = axisCount > 1;
-
-            // Multi-pedal → per-axis panel replaces the single Role combo.
-            MBoosterAxisRolesPanel.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
-            MBoosterRoleCombo.Visibility = multi ? Visibility.Collapsed : Visibility.Visible;
-            MBoosterRoleLabel.Visibility = multi ? Visibility.Collapsed : Visibility.Visible;
-
-            if (!multi)
-            {
-                if (_mboosterAxisRoleRows.Count > 0) _mboosterAxisRoleRows.Clear();
-                _mboosterAxisListIdentity = controller?.Identity;
-                _mboosterAxisListCount = axisCount;
-                _mboosterAxisListConnected = null;
-                return;
-            }
-
-            // Rebuild only when the device / axis count / connectivity changed, so
-            // an open dropdown mid-selection isn't yanked out from under the user.
-            string connSig = "";
-            if (connected != null)
-            {
-                var cbuf = new char[connected.Length];
-                for (int k = 0; k < connected.Length; k++) cbuf[k] = connected[k] ? '1' : '0';
-                connSig = new string(cbuf);
-            }
-            if (string.Equals(controller?.Identity, _mboosterAxisListIdentity, StringComparison.OrdinalIgnoreCase)
-                && axisCount == _mboosterAxisListCount
-                && string.Equals(connSig, _mboosterAxisListConnected, StringComparison.Ordinal))
-                return;
-            _mboosterAxisListIdentity = controller?.Identity;
-            _mboosterAxisListCount = axisCount;
-            _mboosterAxisListConnected = connSig;
-
-            var s = controller != null ? _plugin?.GetOrCreateMBoosterSettings(controller.Identity) : null;
-            using (_suppressor.Begin())
-            {
-                _mboosterAxisRoleRows.Clear();
-                int shown = 0;
-                for (int i = 0; i < axisCount && i < MBoosterDeviceController.MaxAxes; i++)
-                {
-                    // Skip a slot the device says isn't physically connected.
-                    if (connected != null && i < connected.Length && !connected[i]) continue;
-                    var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, i, axisCount);
-                    string label = string.Format(Strings.Label_PedalAxis, ++shown);
-                    _mboosterAxisRoleRows.Add(new MBoosterAxisRoleRow(i, label, role, OnMBoosterAxisRoleChanged));
-                }
-            }
-        }
-
-        /// <summary>
-        /// Persist a per-axis role edit. Seeds the full AxisRoles array from the
-        /// currently-resolved roles (so unedited axes keep their effective role)
-        /// then sets the edited one — makes every axis explicit on first edit.
-        /// </summary>
-        private void OnMBoosterAxisRoleChanged(int axisIndex, MBoosterRole role)
-        {
-            if (_suppressEvents) return;
-            var controller = CurrentMBoosterController();
-            var s = CurrentMBoosterSettings();
-            if (controller == null || s == null) return;
-            int axisCount = controller.AxisCount > 0 ? controller.AxisCount : 1;
-            var roles = s.AxisRoles;
-            if (roles == null || roles.Length != axisCount)
-            {
-                var seeded = new MBoosterRole[axisCount];
-                for (int i = 0; i < axisCount; i++)
-                    seeded[i] = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, i, axisCount);
-                s.AxisRoles = roles = seeded;
-            }
-            if (axisIndex >= 0 && axisIndex < roles.Length)
-                roles[axisIndex] = role;
-            _plugin.SaveSettings();
-            UpdateMBoosterConfigVisibilityForRole();
-        }
-
-        /// <summary>
-        /// Populate the Effects section's pedal selector for a chained mBooster —
-        /// one entry per connected pedal (Tag = HID axis index). Hidden for a
-        /// single-pedal lane (effects apply to the sole pedal). The chosen pedal's
-        /// effects are stored per-pedal and sent to that pedal's motor device id
-        /// (0x12 host / 0x1d / 0x1e chain). Assumes the suppressor is active.
-        /// </summary>
-        private void PopulateMBoosterEffectPedalCombo(MBoosterDeviceController? controller)
-        {
-            int axisCount = controller?.AxisCount ?? 0;
-            var connected = controller?.ConnectedAxes;
-            bool multi = axisCount > 1;
-
-            // Visibility every call (cheap). Items rebuild ONLY when the device /
-            // axis count / connectivity changes — otherwise a per-refresh rebuild
-            // would reset the user's selection every tick, and the numbering uses
-            // the EXACT same connected-axis walk as PopulateMBoosterAxisRoles so
-            // the two "Pedal N" lists always agree.
-            MBoosterEffectPedalPanel.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
-
-            string connSig = "";
-            if (connected != null)
-            {
-                var cbuf = new char[connected.Length];
-                for (int k = 0; k < connected.Length; k++) cbuf[k] = connected[k] ? '1' : '0';
-                connSig = new string(cbuf);
-            }
-            bool identityChanged = !string.Equals(controller?.Identity, _mboosterEffectComboIdentity, StringComparison.OrdinalIgnoreCase);
-            if (!identityChanged
-                && axisCount == _mboosterEffectComboCount
-                && string.Equals(connSig, _mboosterEffectComboConnected, StringComparison.Ordinal))
-                return;
-            _mboosterEffectComboIdentity = controller?.Identity;
-            _mboosterEffectComboCount = axisCount;
-            _mboosterEffectComboConnected = connSig;
-
-            // A different device → start at the master pedal, mirroring the seed.
-            if (identityChanged) _mboosterEffectPedalIndex = 0;
-
-            using (_suppressor.Begin())
-            {
-                MBoosterEffectPedalCombo.Items.Clear();
-                if (!multi) return;
-                int shown = 0;
-                for (int i = 0; i < axisCount && i < MBoosterDeviceController.MaxAxes; i++)
-                {
-                    if (connected != null && i < connected.Length && !connected[i]) continue;
-                    MBoosterEffectPedalCombo.Items.Add(new ComboBoxItem
-                    {
-                        Content = string.Format(Strings.Label_PedalAxis, ++shown),
-                        Tag = i,
-                    });
-                }
-                // Select the item for the current pedal; if that axis is gone,
-                // fall back to the first and re-home the index there.
-                int sel = -1;
-                for (int k = 0; k < MBoosterEffectPedalCombo.Items.Count; k++)
-                    if (MBoosterEffectPedalCombo.Items[k] is ComboBoxItem it && it.Tag is int t && t == _mboosterEffectPedalIndex)
-                    { sel = k; break; }
-                if (sel < 0 && MBoosterEffectPedalCombo.Items.Count > 0)
-                {
-                    sel = 0;
-                    if (MBoosterEffectPedalCombo.Items[0] is ComboBoxItem f && f.Tag is int ft) _mboosterEffectPedalIndex = ft;
-                }
-                if (sel >= 0) MBoosterEffectPedalCombo.SelectedIndex = sel;
-            }
-        }
-
-        /// <summary>
-        /// Switch which pedal the Effects cards edit. Stops any running Test on
-        /// the pedal we're leaving (so it doesn't keep vibrating), then re-seeds
-        /// the cards from the newly-selected pedal's effects.
-        /// </summary>
-        private void MBoosterEffectPedalCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            if (MBoosterEffectPedalCombo.SelectedItem is not ComboBoxItem item || item.Tag is not int newIndex) return;
-            if (newIndex == _mboosterEffectPedalIndex) return;
-
-            var c = CurrentMBoosterController();
-            if (c != null)
-            {
-                c.SetEngineTestActive(false, _mboosterEffectPedalIndex);
-                c.SetAbsTestActive(false, _mboosterEffectPedalIndex);
-                c.SetRoadTextureTestActive(false, _mboosterEffectPedalIndex);
-                c.SetLockupTestActive(false, _mboosterEffectPedalIndex);
-                c.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
-            }
-            // Also stop any custom-effect Test on the pedal we're leaving (its
-            // rows are about to be replaced by the new pedal's).
-            StopAllCustomEffectTests();
-            _mboosterEffectPedalIndex = newIndex;
-            using (_suppressor.Begin())
-            {
-                SeedMBoosterConfigControls(PeekMBoosterEffectTarget());
-                SeedMBoosterEffectControls(PeekMBoosterEffectTarget());
-                PopulateMBoosterCustomEffectsList(PeekMBoosterEffectTarget());
-            }
-            UpdateMBoosterEffectPassiveState();
-            UpdateMBoosterConfigVisibilityForRole();
-        }
+        // PopulateMBoosterAxisRoles / OnMBoosterAxisRoleChanged / PopulateMBoosterEffectPedalCombo /
+        // MBoosterEffectPedalCombo_SelectionChanged used to live here — all three retired in favor
+        // of the single unified per-pedal MBoosterDeviceRow list built in RefreshMBoosterTab.
 
         /// <summary>
         /// Hide the vibration-effect cards when the selected pedal is passive
@@ -3417,6 +3420,166 @@ namespace MozaPlugin
         {
             if (_suppressEvents) return;
             CurrentMBoosterController()?.SetAbsTestActive(MBoosterAbsTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
+        }
+
+        private void MBoosterTcEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.TractionControl ??= new MBoosterEffectSettings()).Enabled = MBoosterTcEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterTcIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterTcIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.TractionControl ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        // Fixed vibration frequency (10-100Hz). See MBoosterEffectSettings
+        // .FrequencyHz and MBoosterEffectWorker.UpdateTractionControlRequest.
+        private void MBoosterTcFrequencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max((int)MBoosterUiConstants.TractionControlFreqMinHz, Math.Min((int)MBoosterUiConstants.TractionControlFreqMaxHz, (int)Math.Round(e.NewValue)));
+            MBoosterTcFrequencyValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.TractionControl ??= new MBoosterEffectSettings()).FrequencyHz = v;
+            _plugin.SaveSettings();
+        }
+        // Sustained test toggle — substitutes live throttle position for
+        // tcActive (there's no live TC-activation signal to press against
+        // outside a real TC event), vibrating continuously at the live
+        // Frequency/Intensity slider values for as long as it's on. See
+        // MBoosterDeviceController.SetTcTestActive and
+        // MBoosterEffectWorker's _tcTestSustained.
+        private void MBoosterTcTestToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            CurrentMBoosterController()?.SetTcTestActive(MBoosterTcTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
+        }
+
+        private void MBoosterWheelSpinEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.WheelSpin ??= new MBoosterEffectSettings()).Enabled = MBoosterWheelSpinEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterWheelSpinIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterWheelSpinIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.WheelSpin ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        // Fixed vibration frequency (10-100Hz) — same range as Traction
+        // Control. See MBoosterEffectSettings.FrequencyHz and
+        // MBoosterEffectWorker.UpdateWheelSpinRequest.
+        private void MBoosterWheelSpinFrequencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max((int)MBoosterUiConstants.WheelSpinFreqMinHz, Math.Min((int)MBoosterUiConstants.WheelSpinFreqMaxHz, (int)Math.Round(e.NewValue)));
+            MBoosterWheelSpinFrequencyValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.WheelSpin ??= new MBoosterEffectSettings()).FrequencyHz = v;
+            _plugin.SaveSettings();
+        }
+        // Sustained test toggle — substitutes live throttle position for
+        // the wheelspin heuristic (there's no live wheelspin signal to
+        // press against outside a real spin event), vibrating continuously
+        // at the live Frequency/Intensity slider values for as long as it's
+        // on. See MBoosterDeviceController.SetWheelSpinTestActive and
+        // MBoosterEffectWorker's _wheelSpinTestSustained.
+        private void MBoosterWheelSpinTestToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            CurrentMBoosterController()?.SetWheelSpinTestActive(MBoosterWheelSpinTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
+        }
+
+        private void MBoosterGearShiftEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GearShift ??= new MBoosterEffectSettings()).Enabled = MBoosterGearShiftEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterGearShiftIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterGearShiftIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GearShift ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        // Fixed vibration frequency (10-100Hz) — same range as Traction
+        // Control/Wheel Spin. See MBoosterEffectSettings.FrequencyHz and
+        // MBoosterEffectWorker.UpdateGearShiftRequest.
+        private void MBoosterGearShiftFrequencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max((int)MBoosterUiConstants.GearShiftFreqMinHz, Math.Min((int)MBoosterUiConstants.GearShiftFreqMaxHz, (int)Math.Round(e.NewValue)));
+            MBoosterGearShiftFrequencyValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GearShift ??= new MBoosterEffectSettings()).FrequencyHz = v;
+            _plugin.SaveSettings();
+        }
+        // Whether a shift landing in Neutral still fires the pulse — off by
+        // default (an H-pattern shift produces two transitions, e.g.
+        // "1"->"N"->"2", and the engagement bump into the new gear is
+        // normally what's wanted). Same knob/rationale as the wheelbase's
+        // own GearshiftVibrateOnNeutralCheck.
+        private void MBoosterGearShiftVibrateOnNeutralCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GearShift ??= new MBoosterEffectSettings()).VibrateOnNeutral = MBoosterGearShiftVibrateOnNeutralCheck.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        // Minimum time (ms) between fired pulses — absorbs an H-pattern's
+        // double transition (gear->N->gear) so one physical shift doesn't
+        // fire twice. Same range/step/default as the wheelbase's own
+        // GearshiftDebounceSlider.
+        private void MBoosterGearShiftDebounceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = (int)Math.Round(e.NewValue);
+            // Snap to 50 ms grid (IsSnapToTickEnabled + TickFrequency=50
+            // already enforces this on user input, but be defensive against
+            // external sources that bypass the tick grid).
+            v = ((v + 25) / 50) * 50;
+            v = Math.Max((int)MBoosterUiConstants.GearShiftDebounceMinMs, Math.Min((int)MBoosterUiConstants.GearShiftDebounceMaxMs, v));
+            MBoosterGearShiftDebounceValue.Text = $"{v} ms";
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GearShift ??= new MBoosterEffectSettings()).DebounceMs = v;
+            _plugin.SaveSettings();
+        }
+        // Sustained test toggle — bypasses the real pulse/debounce/neutral
+        // machinery entirely, vibrating continuously at the live Frequency/
+        // Intensity slider values for as long as it's on (there's no live
+        // "gear just changed" signal to press against outside a real
+        // shift). See MBoosterDeviceController.SetGearShiftTestActive and
+        // MBoosterEffectWorker's _gearShiftTestSustained.
+        private void MBoosterGearShiftTestToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            CurrentMBoosterController()?.SetGearShiftTestActive(MBoosterGearShiftTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
         }
 
         private void MBoosterLockupEnable_Changed(object sender, RoutedEventArgs e)
@@ -3549,19 +3712,6 @@ namespace MozaPlugin
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             (s.Engine ??= new MBoosterEffectSettings()).IntensityPct = v;
-            _plugin.SaveSettings();
-        }
-        // Fixed vibration frequency (60-200Hz) — replaces the old RPM-driven
-        // auto-frequency mapping. See MBoosterEffectSettings.FrequencyHz and
-        // MBoosterEffectWorker.UpdateEngineRequest.
-        private void MBoosterEngineFrequencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_suppressEvents) return;
-            int v = Math.Max((int)MBoosterUiConstants.EngineFreqMinHz, Math.Min((int)MBoosterUiConstants.EngineFreqMaxHz, (int)Math.Round(e.NewValue)));
-            MBoosterEngineFrequencyValue.Text = v.ToString();
-            var s = CurrentMBoosterEffectTarget();
-            if (s == null) return;
-            (s.Engine ??= new MBoosterEffectSettings()).FrequencyHz = v;
             _plugin.SaveSettings();
         }
         // Sustained test toggle — unlike the other effects' fire-and-forget
@@ -3739,6 +3889,13 @@ namespace MozaPlugin
             var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(s.CurveX, s.CurveY);
             for (int i = 0; i < 5; i++)
                 controller.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", resampled[i]);
+            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+            // and MBoosterDeviceController.PushCurve7Resync; untested for this
+            // control specifically, applied on the same-root-cause theory
+            // (this curve IS the data curve7 re-expresses, so a stale curve7
+            // could plausibly mask a fresh curve edit the same way it masked Travel).
+            controller.PushCurve7Resync(s.CurveX, s.CurveY,
+                controller.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex));
         }
 
         /// <summary>The wire-command role prefix (throttle/brake/clutch) for the
@@ -3859,11 +4016,15 @@ namespace MozaPlugin
             // Travel is a physical setting on every pedal mode — push to THIS
             // pedal's own mBooster unit (device 0x12 host / 0x1d / 0x1e chain).
             var controller = CurrentMBoosterController();
-            byte dev = MBoosterDeviceController.MotorDeviceForAxis(_mboosterEffectPedalIndex);
+            byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
             controller?.SendIntWrite("mbooster-brake-travel-start",
                 global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(s.TravelStartMm), dev);
             controller?.SendIntWrite("mbooster-brake-travel-end",
                 global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(s.TravelEndMm), dev);
+            // EXPERIMENTAL / unverified — confirmed on hardware to be required
+            // for a Travel edit to actually take effect (see
+            // MBoosterDeviceController.PushCurve7Resync).
+            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             _plugin.SaveSettings();
         }
 
@@ -3905,8 +4066,13 @@ namespace MozaPlugin
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             s.SensorOutputRatioPct = v;
-            CurrentMBoosterController()?.SendFloatWrite("mbooster-brake-angle-ratio", v,
-                MBoosterDeviceController.MotorDeviceForAxis(_mboosterEffectPedalIndex));
+            var controller = CurrentMBoosterController();
+            byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+            controller?.SendFloatWrite("mbooster-brake-angle-ratio", v, dev);
+            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+            // and MBoosterDeviceController.PushCurve7Resync; untested for this
+            // control specifically, applied on the same-root-cause theory.
+            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             _plugin.SaveSettings();
         }
 
@@ -3922,9 +4088,14 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.MaxThresholdKg = v;
-                CurrentMBoosterController()?.SendIntWrite("mbooster-brake-threshold",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v),
-                    MBoosterDeviceController.MotorDeviceForAxis(_mboosterEffectPedalIndex));
+                var controller = CurrentMBoosterController();
+                byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+                controller?.SendIntWrite("mbooster-brake-threshold",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev);
+                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+                // and MBoosterDeviceController.PushCurve7Resync; untested for this
+                // control specifically, applied on the same-root-cause theory.
+                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             });
 
         // End Stop Stiffness (Front Limit / End Limit), 1-10 — Pit House's
@@ -3939,9 +4110,14 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.EndstopFrontStiffness = v;
-                CurrentMBoosterController()?.SendIntWrite("mbooster-brake-endstop-front",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v),
-                    MBoosterDeviceController.MotorDeviceForAxis(_mboosterEffectPedalIndex));
+                var controller = CurrentMBoosterController();
+                byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+                controller?.SendIntWrite("mbooster-brake-endstop-front",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
+                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+                // and MBoosterDeviceController.PushCurve7Resync; untested for this
+                // control specifically, applied on the same-root-cause theory.
+                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             });
 
         private void MBoosterEndstopEndSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
@@ -3950,9 +4126,14 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.EndstopEndStiffness = v;
-                CurrentMBoosterController()?.SendIntWrite("mbooster-brake-endstop-end",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v),
-                    MBoosterDeviceController.MotorDeviceForAxis(_mboosterEffectPedalIndex));
+                var controller = CurrentMBoosterController();
+                byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+                controller?.SendIntWrite("mbooster-brake-endstop-end",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
+                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+                // and MBoosterDeviceController.PushCurve7Resync; untested for this
+                // control specifically, applied on the same-root-cause theory.
+                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             });
 
         private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)

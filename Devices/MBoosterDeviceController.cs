@@ -23,9 +23,13 @@ namespace MozaPlugin.Devices
     public sealed class MBoosterDeviceController : IDisposable
     {
         private readonly MozaSerialConnection _connection;
-        // One effect worker per motor device on the chain (0x12 host + 0x1d/0x1e
-        // chain ports). Each drives its own pedal's effects to its own device id;
-        // _workers[0] is the primary (owns the shared keepalive + Brake Fade).
+        // One effect worker per possible HID axis slot (0/1/2). Each resolves
+        // its own target device id LIVE (MotorDeviceForCurrentAxis) rather
+        // than owning a fixed one — 0x12 (host) unless this controller
+        // genuinely has more than one axis connected (a real chain), since a
+        // standalone unit's sole pedal commonly reports on a non-zero axis
+        // regardless of chain status. _workers[0] is the primary (owns the
+        // shared keepalive + Brake Fade).
         private readonly MBoosterEffectWorker[] _workers;
         private readonly Func<MBoosterDeviceSettings?> _settingsLookup;
         private readonly Func<bool> _isShuttingDown;
@@ -186,12 +190,17 @@ namespace MozaPlugin.Devices
             // recovered device.
             _connection.Disconnected += OnConnectionDisconnected;
 
+            // One worker per possible HID axis slot (0/1/2). Which physical
+            // device each one's frames actually address is resolved live per
+            // tick (MBoosterEffectWorker.TargetDevice → MotorDeviceForCurrentAxis),
+            // not fixed here — ConnectedAxes isn't known yet at construction
+            // time (it arrives asynchronously from a "PD Linked" diagnostic).
             var motorIds = MozaMBoosterProtocol.MotorDeviceIds; // {0x12, 0x1d, 0x1e}
             _workers = new MBoosterEffectWorker[motorIds.Length];
             for (int i = 0; i < motorIds.Length; i++)
                 _workers[i] = new MBoosterEffectWorker(
                     this, _settingsLookup, _isShuttingDown, customEffectFormulaEvaluator,
-                    pedalAxisIndex: i, targetDevice: motorIds[i], isPrimary: i == 0);
+                    pedalAxisIndex: i, isPrimary: i == 0);
         }
 
         /// <summary>The effect worker driving pedal <paramref name="pedalIndex"/>
@@ -201,11 +210,40 @@ namespace MozaPlugin.Devices
 
         /// <summary>The motor/config device id for a pedal by HID axis index
         /// (0x12 host, 0x1d/0x1e chain ports) — used to address a chained
-        /// mBooster unit's own load-cell config. Master (0x12) if out of range.</summary>
+        /// mBooster unit's own load-cell config. Master (0x12) if out of range.
+        /// Only meaningful for a GENUINE physical chain (multiple mBooster
+        /// units on one connection) — see <see cref="MotorDeviceForCurrentAxis"/>,
+        /// which is almost always what callers actually want instead.</summary>
         public static byte MotorDeviceForAxis(int axisIndex)
         {
             var ids = MozaMBoosterProtocol.MotorDeviceIds;
             return (axisIndex >= 0 && axisIndex < ids.Length) ? ids[axisIndex] : MozaProtocol.DeviceMain;
+        }
+
+        /// <summary>
+        /// The motor/config device id for THIS controller's pedal at HID axis
+        /// <paramref name="axisIndex"/> — 0x12 (host) unless this controller
+        /// genuinely has more than one axis physically connected (a real
+        /// chain of multiple mBooster units on one connection), in which case
+        /// chain position maps to 0x1d/0x1e via <see cref="MotorDeviceForAxis"/>.
+        /// A STANDALONE unit's sole pedal always lives at 0x12 regardless of
+        /// which logical HID axis (Rx/Ry/Rz) it happens to report on — the
+        /// axis-index-to-device-id mapping only applies when that axis index
+        /// corresponds to a real separate physical unit, not to wherever a
+        /// lone pedal's data happens to land in the report descriptor.
+        /// Defaults to "not a chain" (0x12) when <see cref="ConnectedAxes"/>
+        /// hasn't arrived yet (null) — the common case is standalone, and
+        /// this corrects itself once the "PD Linked" diagnostic confirms
+        /// whether it's actually a chain.
+        /// </summary>
+        public byte MotorDeviceForCurrentAxis(int axisIndex)
+        {
+            var connected = _connectedAxes;
+            int connectedCount = 0;
+            if (connected != null)
+                foreach (var b in connected) if (b) connectedCount++;
+            bool isChain = connected != null && connectedCount > 1;
+            return isChain ? MotorDeviceForAxis(axisIndex) : MozaProtocol.DeviceMain;
         }
 
         private void OnConnectionDisconnected()
@@ -476,6 +514,25 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// EXPERIMENTAL / unverified — resend the output curve at 7
+        /// breakpoints (<c>mbooster-brake-curve7-*</c>, cmdId 0xAB) after a
+        /// real hardware calibration write. pedal_travel.pcapng showed Pit
+        /// House doing exactly this alongside a Travel Start write, and
+        /// omitting it is what made Travel Start/End silently no-op on
+        /// hardware despite the raw register write reading back fine — see
+        /// MozaCommandDatabase.cs's mbooster-brake-curve7-* comment. Callers
+        /// use this after any of Travel/Endstop/Ratio/Threshold's own writes
+        /// on the theory that the same firmware requirement applies to all of
+        /// them, not just Travel — unconfirmed for the others.
+        /// </summary>
+        public void PushCurve7Resync(float[]? curveX, float[]? curveY, byte device)
+        {
+            var curve7 = MozaMBoosterRegistry.ResampleCurveAtSevenths(curveX, curveY);
+            for (int i = 0; i < curve7.Length; i++)
+                SendIntWrite($"mbooster-brake-curve7-{i + 1}", MozaMBoosterProtocol.EncodeCurve7Point(curve7[i]), device);
+        }
+
+        /// <summary>
         /// Build + send a read for a registered <c>mbooster-*</c> command. Read
         /// responses (group 35 + 0x80 = 0xA3) land on <see cref="MessageReceived"/>
         /// and the caller must <see cref="MozaResponseParser.Parse"/> them with
@@ -524,7 +581,10 @@ namespace MozaPlugin.Devices
             }
         }
 
-        /// <summary>Fire all five disable frames; called on disconnect / shutdown.</summary>
+        /// <summary>Fire all five disable frames; called on disconnect / shutdown.
+        /// Traction Control and Custom Effects share Engine's wire ID (no
+        /// verified ID of their own), so the Engine disable frame below
+        /// already covers them too.</summary>
         public void SendAllDisableFrames()
         {
             if (!_connection.IsConnected) return;
@@ -568,6 +628,50 @@ namespace MozaPlugin.Devices
         {
             if (on && !_connection.IsConnected) return;
             WorkerFor(pedalIndex)?.SetAbsTestSustained(on);
+        }
+
+        /// <summary>
+        /// Continuously runs Traction Control — substituting live throttle
+        /// position for tcActive, same substitution ABS makes with brake
+        /// position — at its currently configured Frequency/Intensity/
+        /// Smoothness while <paramref name="on"/> is true. See
+        /// <see cref="SetAbsTestActive"/> for the analogous ABS toggle; same
+        /// live-tracking and always-allow-off semantics apply here.
+        /// </summary>
+        public void SetTcTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetTcTestSustained(on);
+        }
+
+        /// <summary>
+        /// Continuously runs Wheel Spin — substituting live throttle
+        /// position for the wheelspin heuristic, same substitution Traction
+        /// Control makes — at its currently configured Frequency/Intensity
+        /// while <paramref name="on"/> is true. See
+        /// <see cref="SetTcTestActive"/> for the analogous Traction Control
+        /// toggle; same live-tracking and always-allow-off semantics apply
+        /// here.
+        /// </summary>
+        public void SetWheelSpinTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetWheelSpinTestSustained(on);
+        }
+
+        /// <summary>
+        /// Continuously runs Gear Shift at its currently configured
+        /// Frequency/Intensity while <paramref name="on"/> is true, bypassing
+        /// the real one-shot pulse/debounce/neutral-suppression machinery
+        /// entirely — there's no live "gear just changed" signal to press
+        /// against outside a real shift. See <see cref="SetTcTestActive"/>
+        /// for the analogous Traction Control toggle; same live-tracking and
+        /// always-allow-off semantics apply here.
+        /// </summary>
+        public void SetGearShiftTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetGearShiftTestSustained(on);
         }
 
         /// <summary>
@@ -625,15 +729,21 @@ namespace MozaPlugin.Devices
         /// this writes REAL hardware calibration — see
         /// MBoosterEffectWorker.UpdateBrakeFade. Each of the two
         /// calibrations independently requires its own configured base
-        /// value (MBoosterDeviceSettings.TravelEndMm / MaxThresholdKg
-        /// &gt;= 0) or that one stays a no-op. Always-allow-off semantics
-        /// apply here (see <see cref="SetEngineTestActive"/>) so a stuck
-        /// toggle can still restore the base values even if disconnected.
+        /// value (that pedal's own TravelEndMm / MaxThresholdKg &gt;= 0) or
+        /// that one stays a no-op. Always-allow-off semantics apply here
+        /// (see <see cref="SetEngineTestActive"/>) so a stuck toggle can
+        /// still restore the base values even if disconnected.
         /// </summary>
         public void SetBrakeFadeTestActive(bool on)
         {
             if (on && !_connection.IsConnected) return;
-            _workers[0].SetBrakeFadeTestSustained(on); // Brake Fade is per-lane (primary)
+            // Broadcast to every worker — Brake Fade only actually acts on
+            // whichever axis's role resolves to Brake (see
+            // MBoosterEffectWorker.Tick), which isn't necessarily axis 0/the
+            // primary worker (a standalone unit's sole pedal can report on
+            // any HID axis). The other workers' flag just sits unused since
+            // their own Tick() gate never lets Brake Fade run.
+            foreach (var w in _workers) w.SetBrakeFadeTestSustained(on);
         }
 
         /// <summary>
