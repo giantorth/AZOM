@@ -229,6 +229,7 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Era 2024 — (abbonamento URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Era 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>La modalità Auto rileva l'era del firmware del volante dall'handshake e seleziona il protocollo corrispondente. Modifica solo se la telemetria non funziona.</value></data>
+  <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Mostra tutte le schede (avanzato)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DEFINIZIONI DISPOSITIVO</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>RIDISTRIBUISCI TUTTE LE DEFINIZIONI</value></data>
   <data name="Status_RedeployedFmt" xml:space="preserve"><value>Scritte {0} di {1} definizioni per il PID {2}. Riavvia SimHub per applicarle.</value></data>

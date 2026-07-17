@@ -311,6 +311,7 @@ namespace MozaPlugin.Resources
         public static string Option_FirmwareEra2024 => Get("Option_FirmwareEra2024");
         public static string Option_FirmwareEra2026 => Get("Option_FirmwareEra2026");
         public static string Hint_FirmwareEra => Get("Hint_FirmwareEra");
+        public static string SliderLabel_ShowAllTabs => Get("SliderLabel_ShowAllTabs");
         public static string Section_DeviceDefinitions => Get("Section_DeviceDefinitions");
         public static string Button_RedeployDefinitions => Get("Button_RedeployDefinitions");
         public static string Status_RedeployedFmt => Get("Status_RedeployedFmt");

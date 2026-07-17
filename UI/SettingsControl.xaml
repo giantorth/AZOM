@@ -3162,6 +3162,11 @@
                                                Style="{StaticResource MutedHintText}"
                                                VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
+                                              Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
+                                </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
 
@@ -3185,7 +3190,7 @@
                  (Devices/MozaWheelSettingsControl.xaml — FilesTab). The
                  functionality is wheel-scoped, so it lives next to the rest
                  of the per-wheel settings rather than at the plugin level. -->
-            <TabItem Header="{x:Static res:Strings.TabHeader_Upload}" Visibility="Collapsed">
+            <TabItem x:Name="UploadTab" Header="{x:Static res:Strings.TabHeader_Upload}" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
 
@@ -3276,7 +3281,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="{x:Static res:Strings.TabHeader_WheelFiles}" Visibility="Collapsed">
+            <TabItem x:Name="WheelFilesTab" Header="{x:Static res:Strings.TabHeader_WheelFiles}" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <ctrl:SectionCard Title="{x:Static res:Strings.Section_WheelFiles}"
                                       Subtitle="{x:Static res:Strings.Subtitle_WheelFiles}"

@@ -75,6 +75,7 @@ namespace MozaPlugin
                 _clutchCurveLabels    = new[] { ClutchY1Value,    ClutchY2Value,    ClutchY3Value,    ClutchY4Value,    ClutchY5Value };
                 ConnectionToggle.IsChecked = plugin.ConnectionEnabled;
                 AutoApplyProfileCheck.IsChecked = plugin.Settings.AutoApplyProfileOnLaunch;
+                ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
                 SyncAutoStandbyCombo();
                 LimitWheelUpdatesCheck.IsChecked = plugin.Settings.LimitWheelUpdates;
                 AlwaysResendBitmaskCheck.IsChecked = plugin.Settings.AlwaysResendBitmask;
@@ -237,7 +238,43 @@ namespace MozaPlugin
                 RefreshDashboardUploadTab();
                 RefreshWheelFilesTab();
                 RefreshSdkTabTick();
+                // Last: the per-tab refreshes above each set their own tab's
+                // Visibility from detection, so the override only sticks if it
+                // runs after them. Turning it back off needs no undo here —
+                // those same assignments re-collapse on the next tick.
+                ApplyShowAllTabs();
             }
+        }
+
+        // Every tab the pane can hide: the detection-gated device tabs, plus the
+        // ones hidden unconditionally in XAML — the wheel tab (migrated to the
+        // per-wheel device page) and the dashboard upload / wheel files tabs
+        // (feature still in development). Nothing else drives the latter three's
+        // Visibility, so ShowAllTabs is the only thing that surfaces them.
+        private TabItem[] HideableTabs => new[]
+        {
+            BaseLfeTab, WheelTab, HandbrakeTab, PedalsTab, Ab9Tab,
+            ShifterTab, MBoosterTab, HubTab, StalksTab, UploadTab, WheelFilesTab,
+        };
+
+        private void ApplyShowAllTabs()
+        {
+            if (_plugin?.Settings?.ShowAllTabs != true) return;
+
+            foreach (var tab in HideableTabs)
+            {
+                if (tab != null)
+                    tab.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ShowAllTabsCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _plugin.Settings.ShowAllTabs = ShowAllTabsCheck.IsChecked == true;
+            _plugin.SaveSettings();
+            // Show immediately; hiding falls out of the next tick's per-tab pass.
+            ApplyShowAllTabs();
         }
 
         private void UpdateHidInputDisplays()
@@ -2276,6 +2313,7 @@ namespace MozaPlugin
             using (_suppressor.Begin())
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
+                ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
                 LimitWheelUpdatesCheck.IsChecked = _plugin.Settings.LimitWheelUpdates;
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;

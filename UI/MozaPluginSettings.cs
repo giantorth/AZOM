@@ -161,6 +161,14 @@ namespace MozaPlugin
         // Whether to automatically apply profile settings on launch
         public bool AutoApplyProfileOnLaunch { get; set; } = true;
 
+        // When true, every device tab in the plugin pane is shown regardless of
+        // detection — including the ones normally gated on hardware being present
+        // and the retired/in-development ones (wheel, dashboard upload, wheel
+        // files) whose content lives elsewhere or isn't finished. Diagnostic; the
+        // tabs still render against whatever state the plugin has, so a tab for
+        // absent hardware shows empty/idle values rather than live ones.
+        public bool ShowAllTabs { get; set; } = false;
+
         // When true, automatically put the wheelbase into Work Mode standby
         // (main-set-work-mode=1) after the idle timeout elapses with no game
         // running and no recent activity, and wake it (=0) the moment a game
