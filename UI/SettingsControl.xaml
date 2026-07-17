@@ -3153,6 +3153,18 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_DeviceDefinitions}" Icon="{StaticResource IconRefresh}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <Button x:Name="RedeployDefinitionsButton" Content="{x:Static res:Strings.Button_RedeployDefinitions}"
+                                            Click="RedeployDefinitionsButton_Click" MinWidth="120"/>
+                                    <TextBlock x:Name="RedeployDefinitionsStatusText" Text=""
+                                               Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,8">

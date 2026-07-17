@@ -2238,6 +2238,28 @@ namespace MozaPlugin
             _plugin.SaveSettings();
         }
 
+        private void RedeployDefinitionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show(
+                Strings.Dialog_RedeployDefinitions_Body,
+                Strings.Dialog_RedeployDefinitions_Caption,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            var wheelbasePid = DeviceDefinitionDeployer.ResolveWheelbasePid(_plugin.Connection);
+            var deployed = DeviceDefinitionDeployer.DeployAllKnown(
+                wheelbasePid, DeviceDefinitionDeployer.ResolveDashboardPid(wheelbasePid));
+
+            if (deployed.Written > 0)
+                _plugin.DeviceDefinitionDeployed = true;
+
+            RedeployDefinitionsStatusText.Text = string.Format(
+                Strings.Status_RedeployedFmt, deployed.Written, deployed.Total, wheelbasePid);
+        }
+
         private void ClearAllSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(

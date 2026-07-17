@@ -231,6 +231,9 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024-versjon — (URL-abonnement)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026-versjon — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detekterer rattets firmware-versjon fra handshake og velger riktig protokoll. Overstyr kun hvis telemetrien ikke virker.</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ENHETSDEFINISJONER</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>DISTRIBUER ALLE DEFINISJONER PÅ NYTT</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Skrev {0} av {1} definisjoner for PID {2}. Start SimHub på nytt for å ta dem i bruk.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>TILBAKESTILL</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>TØM ALLE INNSTILLINGER OG PROFILER</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Dette tilbakestiller alle plugin-innstillinger og profiler til standardverdiene.</value></data>
@@ -601,6 +604,10 @@ Søkte under:
 
 Er du sikker?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Tøm alle innstillinger</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Distribuer enhetsdefinisjoner på nytt</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dette skriver om SimHub-enhetsdefinisjonene for alle kjente MOZA-ratt, dashbord og wheelbaser, tilpasset den tilkoblede wheelbasen.
+
+Manuelle endringer i disse filene går tapt. Fortsette?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Eksport mislyktes: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Kunne ikke lese .mzdash-filen:
 {0}</value></data>

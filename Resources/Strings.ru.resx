@@ -226,6 +226,9 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Эра 2024 — (подписка по URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Эра 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Авто определяет эру прошивки руля по его рукопожатию и выбирает соответствующий протокол. Переопределяйте, только если телеметрия не работает.</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ОПРЕДЕЛЕНИЯ УСТРОЙСТВ</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>ПЕРЕУСТАНОВИТЬ ВСЕ ОПРЕДЕЛЕНИЯ</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Записано {0} из {1} определений для PID {2}. Перезапустите SimHub, чтобы применить их.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>СБРОС</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ОЧИСТИТЬ ВСЕ НАСТРОЙКИ И ПРОФИЛИ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Это сбросит все настройки и профили плагина к значениям по умолчанию.</value></data>
@@ -596,6 +599,10 @@
 
 Вы уверены?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Очистить все настройки</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Переустановить определения устройств</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Это перезапишет определения устройств SimHub для всех известных рулей, приборных панелей и баз MOZA в соответствии с подключённой базой.
+
+Ручные изменения в этих файлах будут потеряны. Продолжить?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Не удалось экспортировать: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Не удалось прочитать файл .mzdash:
 {0}</value></data>

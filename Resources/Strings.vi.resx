@@ -226,6 +226,9 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Thời kỳ 2024 — (đăng ký URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Thời kỳ 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Tự động phát hiện thời kỳ firmware của vô lăng từ bắt tay và chọn giao thức tương ứng. Chỉ ghi đè khi telemetry không hoạt động.</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ĐỊNH NGHĨA THIẾT BỊ</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>TRIỂN KHAI LẠI TẤT CẢ ĐỊNH NGHĨA</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Đã ghi {0}/{1} định nghĩa cho PID {2}. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>ĐẶT LẠI</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>XÓA TẤT CẢ CÀI ĐẶT &amp; HỒ SƠ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Thao tác này sẽ đặt lại toàn bộ cài đặt và hồ sơ của plugin về mặc định.</value></data>
@@ -596,6 +599,10 @@ Hãy mở một bảng đồng hồ trong MOZA Pit House cho vô-lăng này trư
 
 Bạn có chắc không?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Xóa tất cả thiết lập</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Triển khai lại định nghĩa thiết bị</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Thao tác này sẽ ghi lại các định nghĩa thiết bị SimHub cho mọi vô lăng, màn hình và wheelbase MOZA đã biết, khớp với wheelbase đang kết nối.
+
+Mọi chỉnh sửa thủ công trong các tệp đó sẽ bị mất. Tiếp tục?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Xuất thất bại: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Không đọc được tệp .mzdash:
 {0}</value></data>

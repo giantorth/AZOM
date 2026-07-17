@@ -229,6 +229,9 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Era 2024 — (abbonamento URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Era 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>La modalità Auto rileva l'era del firmware del volante dall'handshake e seleziona il protocollo corrispondente. Modifica solo se la telemetria non funziona.</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DEFINIZIONI DISPOSITIVO</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>RIDISTRIBUISCI TUTTE LE DEFINIZIONI</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Scritte {0} di {1} definizioni per il PID {2}. Riavvia SimHub per applicarle.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>RIPRISTINO</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>CANCELLA TUTTE LE IMPOSTAZIONI &amp; I PROFILI</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Questa operazione ripristinerà tutte le impostazioni e i profili del plugin ai valori predefiniti.</value></data>
@@ -599,6 +602,10 @@ Apri prima un cruscotto in MOZA Pit House per questo volante.</value></data>
 
 Sei sicuro?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Cancella tutte le impostazioni</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Ridistribuisci definizioni dispositivo</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Questo riscriverà le definizioni dispositivo di SimHub per tutti i volanti, dash e basi MOZA noti, adattate alla base collegata.
+
+Eventuali modifiche manuali a quei file andranno perse. Continuare?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Esportazione non riuscita: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Impossibile leggere il file .mzdash:
 {0}</value></data>

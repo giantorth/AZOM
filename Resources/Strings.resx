@@ -249,6 +249,9 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 era — (URL subscription)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 era — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detects the wheel&apos;s firmware era from its handshake and picks the matching protocol. Override only if telemetry does not work.</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DEVICE DEFINITIONS</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>REDEPLOY ALL DEFINITIONS</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Wrote {0} of {1} definitions for PID {2}. Restart SimHub to pick them up.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>RESET</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>CLEAR ALL SETTINGS &amp; PROFILES</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>This will reset all plugin settings and profiles to their defaults.</value></data>
@@ -619,6 +622,10 @@ Open a dashboard in MOZA Pit House for this wheel first.</value></data>
 
 Are you sure?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Clear All Settings</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Redeploy Device Definitions</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>This will rewrite the SimHub device definitions for every known MOZA wheel, dash and wheel base, matched to the connected wheelbase.
+
+Any manual edits to those files will be lost. Continue?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Export failed: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Failed to read .mzdash file:
 {0}</value></data>

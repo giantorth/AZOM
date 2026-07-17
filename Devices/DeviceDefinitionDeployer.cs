@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using MozaPlugin.Protocol;
@@ -74,6 +76,192 @@ namespace MozaPlugin.Devices
                 discoveredPid, prefix);
         }
 
+        /// <summary>Outcome of <see cref="DeployAllKnown"/>: files written vs attempted.</summary>
+        internal readonly struct DeployAllResult
+        {
+            public readonly int Written;
+            public readonly int Total;
+
+            public DeployAllResult(int written, int total)
+            {
+                Written = written;
+                Total = total;
+            }
+        }
+
+        /// <summary>
+        /// Force-rewrite every device definition the plugin knows how to emit:
+        /// one generated wheel definition per <see cref="WheelModelInfo.KnownModels"/>
+        /// entry (artwork included), plus the old-protocol wheel, the base ambient
+        /// strip, and the CM1/CM2 dashes. Unlike the lazy per-detection paths this
+        /// ignores the staleness checks — the user asked for a redeploy, so an
+        /// existing file that merely parses is still replaced (that is the repair
+        /// case). Complements <see cref="RefreshDeployedThumbnails"/>, which tops up
+        /// art but only for definitions already on disk.
+        ///
+        /// Every definition is stamped with <paramref name="wheelbasePid"/>: a
+        /// wheel/base LED device is reached over its host composite's HID
+        /// interface, so SimHub matches it on the WHEELBASE's PID, not on
+        /// anything the rim reports. Deploying for a wheel the user does not own
+        /// is harmless — an unused entry in SimHub's device list.
+        /// </summary>
+        public static DeployAllResult DeployAllKnown(string wheelbasePid, string dashboardPid)
+        {
+            int written = 0;
+            int total = 0;
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (prefix, friendlyName, info) in WheelModelInfo.KnownModels)
+            {
+                var deviceName = "MOZA " + friendlyName;
+
+                // Distinct prefixes can share a friendly name, hence a device
+                // directory ("GS V2P" and the bare "GS" are both "MOZA GS V2 Pro").
+                // Write each directory once; ResolveIdentityFor settles which
+                // prefix's GUID it carries.
+                if (!seenNames.Add(deviceName))
+                    continue;
+
+                total++;
+                if (DeployGeneratedWheelDefinition(
+                        deviceName, ResolveIdentityFor(deviceName, prefix), friendlyName,
+                        info.RpmLedCount, info.HasFlagLeds, info.ButtonLedCount, info.KnobCount,
+                        info.BrowSegmentSize, wheelbasePid, prefix, force: true))
+                    written++;
+            }
+
+            var resources = new (string DeviceName, string Resource, string Guid, string Pid)[]
+            {
+                (OldProtoDeviceName,    OldProtoResource,    MozaDeviceConstants.WheelOldProtoGuid, wheelbasePid),
+                (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid),
+                (DashCm1DeviceName,     DashCm1Resource,     MozaDeviceConstants.DashCm1Guid,       wheelbasePid),
+                (DashCm2DeviceName,     DashCm2Resource,     MozaDeviceConstants.DashCm2Guid,       dashboardPid),
+            };
+
+            foreach (var (deviceName, resource, guid, pid) in resources)
+            {
+                total++;
+                if (DeployFromResource(deviceName, resource, pid, guid, force: true))
+                    written++;
+            }
+
+            MozaLog.Info(
+                $"[AZOM] Redeployed all device definitions: {written}/{total} written " +
+                $"(wheelbase pid={wheelbasePid}, dash pid={dashboardPid}; restart SimHub to pick them up)");
+            return new DeployAllResult(written, total);
+        }
+
+        /// <summary>
+        /// Identity to stamp into <paramref name="deviceName"/>'s definition during a
+        /// bulk redeploy: the GUID already on disk when it belongs to a prefix sharing
+        /// this device directory, otherwise <paramref name="prefix"/>'s own GUID.
+        ///
+        /// A redeploy must refresh a definition's BODY without re-keying its IDENTITY.
+        /// Two firmware variants can share a directory under different GUIDs ("GS V2P"
+        /// and the bare "GS" are both "MOZA GS V2 Pro"), and only the connected wheel
+        /// says which is right — <see cref="MozaLedDeviceManager.IsModelConnected"/>
+        /// matches the wheel's reported model against the prefix the DEFINITION's GUID
+        /// resolves to, so stamping "GS V2P" over a bare-"GS" user's file would leave
+        /// their wheel's LEDs dark and orphan the SimHub device instance keyed to the
+        /// old GUID. Whatever the per-detection path wrote was chosen against the real
+        /// wheel, so it wins over this path's first-wins guess.
+        /// </summary>
+        private static string ResolveIdentityFor(string deviceName, string prefix)
+        {
+            var fallback = MozaDeviceConstants.ResolveWheelGuid(prefix);
+            try
+            {
+                var path = DeviceJsonPath(deviceName);
+                if (!File.Exists(path))
+                    return fallback;
+
+                string? existingGuid = JObject.Parse(File.ReadAllText(path))
+                    .SelectToken("DescriptorUniqueId")?.Value<string>();
+                if (string.IsNullOrEmpty(existingGuid))
+                    return fallback;
+
+                // Only honour a GUID that maps back to a model prefix landing in THIS
+                // directory; anything else (unregistered, generic, old-proto marker) is
+                // not an identity for this device and must not be carried forward.
+                var mapped = MozaDeviceConstants.GetWheelModelPrefix(existingGuid!);
+                if (string.IsNullOrEmpty(mapped))
+                    return fallback;
+
+                if (!string.Equals("MOZA " + WheelModelInfo.GetFriendlyName(mapped!), deviceName,
+                        StringComparison.Ordinal))
+                    return fallback;
+
+                if (!string.Equals(existingGuid, fallback, StringComparison.OrdinalIgnoreCase))
+                    MozaLog.Debug(
+                        $"[AZOM] Redeploy: keeping existing identity {existingGuid} (prefix={mapped}) " +
+                        $"for '{deviceName}' rather than re-keying to {fallback} (prefix={prefix})");
+                return existingGuid!;
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not read existing identity for '{deviceName}': {ex.Message}");
+                return fallback;
+            }
+        }
+
+        private static string DeviceJsonPath(string deviceName) =>
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                "DevicesDefinitions", "User", deviceName, "device.json");
+
+        /// <summary>
+        /// The PID every definition should carry: the primary pipe's live PID —
+        /// the wheelbase, or the hub when the wheel answers there — then a registry
+        /// walk, then <see cref="FallbackPid"/>.
+        ///
+        /// Never null, deliberately. <c>DiscoveredPid</c> is only set when the port
+        /// came from registry discovery; the serial-probe connect path (the norm
+        /// under Wine, where the registry walk finds nothing) leaves it null on a
+        /// perfectly live connection. The per-detection deploys stamp FallbackPid in
+        /// exactly that case, so this must too — a redeploy has to reproduce what
+        /// detection writes, not second-guess it.
+        /// </summary>
+        public static string ResolveWheelbasePid(MozaSerialConnection? primary)
+        {
+            // Prefer the live value verbatim — it is exactly what the lazy
+            // per-detection deploys stamp, so a redeploy stays consistent with
+            // them (including the hub-only topology, where the primary legitimately
+            // sits on the hub's PID).
+            var live = primary?.DiscoveredPid;
+            if (!string.IsNullOrEmpty(live))
+                return live!;
+
+            var ports = MozaPortDiscovery.Instance.Enumerate();
+            foreach (var port in ports)
+                if (port.Category == MozaDeviceCategory.Wheelbase)
+                    return FormatPid(port.Pid);
+
+            // Hub second: it only owns the wheel's HID when there is no base.
+            foreach (var port in ports)
+                if (port.Category == MozaDeviceCategory.Hub)
+                    return FormatPid(port.Pid);
+
+            return FallbackPid;
+        }
+
+        /// <summary>
+        /// The PID for the CM2 definition, which is topology-dependent: a
+        /// standalone-USB CM2 enumerates on its own <c>0x0025</c>, while a
+        /// bus-bridged one is reached through the base and carries the base's PID.
+        /// Prefer a real 0x0025 port when one is present so a redeploy can't stamp
+        /// the base's PID over a working standalone-CM2 definition.
+        /// </summary>
+        public static string ResolveDashboardPid(string wheelbasePid)
+        {
+            foreach (var port in MozaPortDiscovery.Instance.Enumerate())
+                if (port.Category == MozaDeviceCategory.Dashboard)
+                    return MozaUsbIds.PidDashboardCm2;
+
+            return wheelbasePid;
+        }
+
+        private static string FormatPid(ushort pid) =>
+            "0x" + pid.ToString("X4", CultureInfo.InvariantCulture);
+
         /// <summary>
         /// Deploy the embedded CM2 dashboard device definition. The only
         /// standalone dashboard PID is the CM2's 0x0025, and a bus-bridged dash
@@ -147,7 +335,7 @@ namespace MozaPlugin.Devices
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
             int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid,
-            string modelPrefix)
+            string modelPrefix, bool force = false)
         {
             try
             {
@@ -158,10 +346,11 @@ namespace MozaPlugin.Devices
 
                 int expectedTelemetryCount = rpmCount + (hasFlagLeds ? 6 : 0);
                 bool fileExists = File.Exists(deviceJsonPath);
-                bool stale = false;
 
-                if (fileExists)
+                if (fileExists && !force)
                 {
+                    bool stale;
+
                     // Compare existing LogicalTelemetryLeds.LedCount + LogicalButtonsSection.Items
                     // against expected. Mismatch = layout changed in a plugin update; rewrite.
                     try
@@ -175,10 +364,22 @@ namespace MozaPlugin.Devices
                             .SelectToken("LedsFeature.LogicalExtraSection.TitleOverride")?.Value<string>();
                         bool? existingIndividual = existing
                             .SelectToken("LedsFeature.IsIndividualLedsSectionEnabled")?.Value<bool>();
+                        string? existingDescriptorId = existing
+                            .SelectToken("DescriptorUniqueId")?.Value<string>();
                         bool expectedIndividual = buttonCount > 0 || knobCount > 0;
                         stale = existingLed != expectedTelemetryCount
                             || existingButtons != buttonCount
                             || existingExtra != knobCount
+                            // Identity drifted from the one THIS wheel's model prefix
+                            // resolves to. Two firmware variants can share a device
+                            // directory under different GUIDs ("GS V2P" vs bare "GS"),
+                            // and only the connected wheel settles which is correct —
+                            // so the detected model re-keys a file that a guess (a bulk
+                            // redeploy with no wheel attached) stamped with the other
+                            // variant's GUID. Without this the layout fields match and
+                            // the wrong identity would stick, leaving the wheel's LEDs
+                            // dark (see MozaLedDeviceManager.IsModelConnected).
+                            || !string.Equals(existingDescriptorId, guid, StringComparison.OrdinalIgnoreCase)
                             // Content-version bump (e.g. localized TitleOverride) forces a
                             // one-time rewrite for users whose file predates the change.
                             || existingSchema < GeneratedWheelSchemaVersion
@@ -218,7 +419,7 @@ namespace MozaPlugin.Devices
                 File.WriteAllText(deviceJsonPath, json);
                 EnsureThumbnail(deviceDir, modelPrefix);
 
-                string action = stale ? "Refreshed" : "Deployed";
+                string action = fileExists ? "Refreshed" : "Deployed";
                 MozaLog.Debug(
                     $"[AZOM] {action} device definition: {deviceName} " +
                     $"(guid={guid}, telemetryLeds={expectedTelemetryCount}, rpm={rpmCount}, flags={hasFlagLeds}, " +
@@ -467,7 +668,8 @@ namespace MozaPlugin.Devices
             return new JArray(new JObject { ["Size"] = size });
         }
 
-        private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid, string expectedDescriptorId)
+        private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid, string expectedDescriptorId,
+            bool force = false)
         {
             try
             {
@@ -477,16 +679,17 @@ namespace MozaPlugin.Devices
                 var deviceJsonPath = Path.Combine(deviceDir, "device.json");
 
                 bool fileExists = File.Exists(deviceJsonPath);
-                bool stale = false;
 
-                // Template content version. A bump here forces a rewrite of an
-                // already-deployed definition whose GUID/PID/ProductName are
-                // unchanged but whose body changed (e.g. CM2 SchemaVersion 1→2
-                // dropping the individual-LEDs section and 10/6 LED layout).
-                int templateSchema = ReadResourceSchemaVersion(resourceName);
-
-                if (fileExists)
+                if (fileExists && !force)
                 {
+                    bool stale;
+
+                    // Template content version. A bump here forces a rewrite of an
+                    // already-deployed definition whose GUID/PID/ProductName are
+                    // unchanged but whose body changed (e.g. CM2 SchemaVersion 1→2
+                    // dropping the individual-LEDs section and 10/6 LED layout).
+                    int templateSchema = ReadResourceSchemaVersion(resourceName);
+
                     // Compare existing PID + DescriptorUniqueId against expected.
                     // PID mismatch covers user moving between hardware variants;
                     // DescriptorUniqueId mismatch covers the plugin shipping a new
@@ -575,7 +778,7 @@ namespace MozaPlugin.Devices
                     File.WriteAllText(deviceJsonPath, json);
                 }
 
-                string action = stale ? "Refreshed" : "Deployed";
+                string action = fileExists ? "Refreshed" : "Deployed";
                 MozaLog.Info($"[AZOM] {action} device definition: {deviceName} (restart SimHub to add it)");
                 return true;
             }
