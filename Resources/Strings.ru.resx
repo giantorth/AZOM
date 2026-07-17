@@ -5,15 +5,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>База</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Руль</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Ручник</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Педали</value></data>
   <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>Кулиса AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Хаб</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Параметры</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Загрузка</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Файлы руля</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Импорт</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>О программе</value></data>
@@ -71,31 +68,18 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Уровень демпфирования</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Скорость срабатывания</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Лепестки</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Левый лепесток</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Правый лепесток</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Комбинированный</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Кнопки</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>НАСТРОЙКИ ЛЕПЕСТКОВ</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Режим лепестков</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Кнопки</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Комбинированный</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Раздельный</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Точка разделения сцепления</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Настройки ввода</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Поворотные энкодеры</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Энкодер</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Энкодер 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Энкодер 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Энкодер 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Энкодер 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Энкодер 5</value></data>
   <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Стик как D-Pad</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Назначение джойстика</value></data>
   <data name="Option_None" xml:space="preserve"><value>Нет</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Левый</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Правый</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Настройки светодиодов и кнопок находятся во вкладке устройства MOZA Wheel в разделе Устройства.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>ПОЛОЖЕНИЕ</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// текущее значение ручника</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Положение</value></data>
@@ -233,7 +217,6 @@
   <data name="Section_Reset" xml:space="preserve"><value>СБРОС</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ОЧИСТИТЬ ВСЕ НАСТРОЙКИ И ПРОФИЛИ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Это сбросит все настройки и профили плагина к значениям по умолчанию.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Пока не работает</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Загрузка панели находится в разработке и пока НЕ передаёт файлы на руль.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ЗАГРУЗКА ПАНЕЛИ</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// отправка файла .mzdash на подключённый руль</value></data>

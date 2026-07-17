@@ -65,15 +65,12 @@ namespace MozaPlugin.Resources
         }
 
         public static string TabHeader_Base => Get("TabHeader_Base");
-        public static string TabHeader_Wheel => Get("TabHeader_Wheel");
         public static string TabHeader_Handbrake => Get("TabHeader_Handbrake");
         public static string TabHeader_Pedals => Get("TabHeader_Pedals");
         public static string TabHeader_Ab9Shifter => Get("TabHeader_Ab9Shifter");
         public static string TabHeader_MBooster => Get("TabHeader_MBooster");
         public static string TabHeader_Hub => Get("TabHeader_Hub");
         public static string TabHeader_Options => Get("TabHeader_Options");
-        public static string TabHeader_Upload => Get("TabHeader_Upload");
-        public static string TabHeader_WheelFiles => Get("TabHeader_WheelFiles");
         public static string TabHeader_Sdk => Get("TabHeader_Sdk");
         public static string TabHeader_Import => Get("TabHeader_Import");
         public static string TabHeader_About => Get("TabHeader_About");
@@ -138,31 +135,18 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_Bluetooth => Get("SliderLabel_Bluetooth");
         public static string SliderLabel_DampingLevel => Get("SliderLabel_DampingLevel");
         public static string SliderLabel_TriggerSpeed => Get("SliderLabel_TriggerSpeed");
-        public static string Section_Paddles => Get("Section_Paddles");
-        public static string Label_LeftPaddle => Get("Label_LeftPaddle");
-        public static string Label_RightPaddle => Get("Label_RightPaddle");
-        public static string Label_Combined => Get("Label_Combined");
-        public static string Section_Buttons => Get("Section_Buttons");
         public static string Section_PaddleSettings => Get("Section_PaddleSettings");
         public static string SliderLabel_PaddlesMode => Get("SliderLabel_PaddlesMode");
         public static string Option_Buttons => Get("Option_Buttons");
         public static string Option_Combined => Get("Option_Combined");
         public static string Option_Split => Get("Option_Split");
         public static string SliderLabel_ClutchSplitPoint => Get("SliderLabel_ClutchSplitPoint");
-        public static string Section_InputSettings => Get("Section_InputSettings");
-        public static string SliderLabel_RotaryEncoders => Get("SliderLabel_RotaryEncoders");
         public static string Option_Knob => Get("Option_Knob");
-        public static string SliderLabel_Rotary1 => Get("SliderLabel_Rotary1");
-        public static string SliderLabel_Rotary2 => Get("SliderLabel_Rotary2");
-        public static string SliderLabel_Rotary3 => Get("SliderLabel_Rotary3");
-        public static string SliderLabel_Rotary4 => Get("SliderLabel_Rotary4");
-        public static string SliderLabel_Rotary5 => Get("SliderLabel_Rotary5");
         public static string SliderLabel_StickAsDpad => Get("SliderLabel_StickAsDpad");
         public static string SliderLabel_JoystickAssignment => Get("SliderLabel_JoystickAssignment");
         public static string Option_None => Get("Option_None");
         public static string Option_Left => Get("Option_Left");
         public static string Option_Right => Get("Option_Right");
-        public static string Hint_LedButtonSettingsInDeviceTab => Get("Hint_LedButtonSettingsInDeviceTab");
         public static string Section_Position => Get("Section_Position");
         public static string Subtitle_LiveHandbrakeInput => Get("Subtitle_LiveHandbrakeInput");
         public static string Label_Position => Get("Label_Position");
@@ -321,7 +305,6 @@ namespace MozaPlugin.Resources
         public static string Section_Language => Get("Section_Language");
         public static string SliderLabel_Language => Get("SliderLabel_Language");
         public static string Hint_LanguageChangeRestart => Get("Hint_LanguageChangeRestart");
-        public static string Banner_NotWorkingYet => Get("Banner_NotWorkingYet");
         public static string Hint_DashboardUploadNotWorking => Get("Hint_DashboardUploadNotWorking");
         public static string Section_DashboardUpload => Get("Section_DashboardUpload");
         public static string Subtitle_DashboardUpload => Get("Subtitle_DashboardUpload");

@@ -10,15 +10,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Base</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Ratt</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Håndbrekk</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Pedaler</value></data>
   <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9-girspak</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Alternativer</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Last opp</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Rattfiler</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Om</value></data>
@@ -76,31 +73,18 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Dempenivå</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Utløserhastighet</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Padler</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Venstre padle</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Høyre padle</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Kombinert</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Knapper</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>PADLE-INNSTILLINGER</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Padlemodus</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Knapper</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kombinert</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Delt</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Clutch-delingspunkt</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Inngangsinnstillinger</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Rotary-encodere</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Bryter</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Rotary 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Rotary 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Rotary 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Rotary 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Rotary 5</value></data>
   <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick som D-pad</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Joystick-tildeling</value></data>
   <data name="Option_None" xml:space="preserve"><value>Ingen</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Venstre</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Høyre</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>LED- og knappeinnstillinger ligger på MOZA Ratt-enhetsfanen under Enheter.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>POSISJON</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// håndbrekk-inngang live</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Posisjon</value></data>
@@ -238,7 +222,6 @@
   <data name="Section_Reset" xml:space="preserve"><value>TILBAKESTILL</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>TØM ALLE INNSTILLINGER OG PROFILER</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Dette tilbakestiller alle plugin-innstillinger og profiler til standardverdiene.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Fungerer ikke ennå</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard-opplasting er under utvikling og sender for øyeblikket IKKE filer til rattet.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-OPPLASTING</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// send en .mzdash-fil til tilkoblet ratt</value></data>

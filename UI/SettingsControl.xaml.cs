@@ -41,22 +41,7 @@ namespace MozaPlugin
         // ApplyPedalCurvePreset can take an arrays pair instead of 10 args.
         private Slider[]? _throttleCurveSliders, _brakeCurveSliders, _clutchCurveSliders;
         private TextBox[]? _throttleCurveLabels, _brakeCurveLabels, _clutchCurveLabels;
-        private readonly DateTime[] _buttonLastPressed = new DateTime[MozaData.MaxButtons];
 
-        // 500ms-refresh change-detection caches. RefreshDisplay walks every
-        // tab even when its visuals haven't changed, which lit up the UI thread
-        // and the GC. The fields below let the per-tab refresh short-circuit
-        // when nothing observable changed since the previous tick.
-        private byte[]? _md5CachedBytes;     // reference key (not contents)
-        private string? _md5CachedHex;
-        private DateTime _wheelFilesLastCapturedAt;
-        private string? _wheelFilesLastPickedName;
-        private int _wheelFilesLastRowCount = -1;
-        // Pre-allocated Run pool for UpdateActiveButtons. 30Hz cadence × N buttons
-        // would otherwise create N Runs/frame; we recycle them in place.
-        private Run[]? _activeButtonRuns;
-        private Run[]? _activeButtonSeparatorRuns;
-        private bool _activeButtonsShowingNone;
 
         public SettingsControl(MozaPlugin plugin)
         {
@@ -226,7 +211,6 @@ namespace MozaPlugin
             using (_suppressor.Begin())
             {
                 RefreshBaseTab();
-                RefreshWheelTab();
                 RefreshHandbrakeTab();
                 RefreshPedalsTab();
                 RefreshShifterTab();
@@ -235,8 +219,6 @@ namespace MozaPlugin
                 RefreshStalksTab();
                 RefreshMBoosterTab();
                 InitTelemetryTab();
-                RefreshDashboardUploadTab();
-                RefreshWheelFilesTab();
                 RefreshSdkTabTick();
                 // Last: the per-tab refreshes above each set their own tab's
                 // Visibility from detection, so the override only sticks if it
@@ -253,8 +235,8 @@ namespace MozaPlugin
         // Visibility, so ShowAllTabs is the only thing that surfaces them.
         private TabItem[] HideableTabs => new[]
         {
-            BaseLfeTab, WheelTab, HandbrakeTab, PedalsTab, Ab9Tab,
-            ShifterTab, MBoosterTab, HubTab, StalksTab, UploadTab, WheelFilesTab,
+            BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
+            ShifterTab, MBoosterTab, HubTab, StalksTab,
         };
 
         private void ApplyShowAllTabs()
@@ -300,9 +282,6 @@ namespace MozaPlugin
                 BrakeBar.Value         = _data.BrakePosition;
                 ClutchBar.Value        = _data.ClutchPosition;
                 HandbrakeBar.Value     = _data.HandbrakePosition;
-                LeftPaddleBar.Value    = _data.LeftPaddlePosition;
-                RightPaddleBar.Value   = _data.RightPaddlePosition;
-                CombinedPaddleBar.Value = _data.CombinedPaddlePosition;
             }
             else
             {
@@ -310,12 +289,8 @@ namespace MozaPlugin
                 BrakeBar.Value         = 0;
                 ClutchBar.Value        = 0;
                 HandbrakeBar.Value     = 0;
-                LeftPaddleBar.Value    = 0;
-                RightPaddleBar.Value   = 0;
-                CombinedPaddleBar.Value = 0;
             }
 
-            UpdateActiveButtons(connected);
             UpdateHandbrakeButtonStatus(connected);
             UpdateMBoosterCurveMarkers();
 
@@ -357,86 +332,6 @@ namespace MozaPlugin
             _mboosterPedalTraceSamples.Add(pct);
             while (_mboosterPedalTraceSamples.Count > MBoosterPedalTraceSamples)
                 _mboosterPedalTraceSamples.RemoveAt(0);
-        }
-
-        private void UpdateActiveButtons(bool connected)
-        {
-            if (!connected || _data.ButtonCount == 0)
-            {
-                ShowNoneOnce();
-                return;
-            }
-
-            // Pool the Run objects so the 30Hz refresh doesn't allocate
-            // a fresh Run per visible button (~720 allocations/sec on a
-            // 24-button wheel). The pool sizes match MozaData.MaxButtons.
-            if (_activeButtonRuns == null)
-            {
-                _activeButtonRuns = new Run[MozaData.MaxButtons];
-                _activeButtonSeparatorRuns = new Run[MozaData.MaxButtons];
-                for (int i = 0; i < MozaData.MaxButtons; i++)
-                {
-                    _activeButtonRuns[i] = new Run((i + 1).ToString());
-                    _activeButtonSeparatorRuns[i] = new Run(", ");
-                }
-            }
-
-            var now = DateTime.UtcNow;
-            int count = _data.ButtonCount;
-
-            // Record presses and decide whether anything is visible this tick.
-            // While at least one button is within its 1s fade window we rebuild
-            // every tick (the fade needs it); once fully idle we render "None"
-            // once and skip the per-tick Inlines churn entirely.
-            bool anyActive = false;
-            for (int i = 0; i < count; i++)
-            {
-                if (_data.ButtonStates[i]) _buttonLastPressed[i] = now;
-                if ((now - _buttonLastPressed[i]).TotalSeconds < 1.0) anyActive = true;
-            }
-            if (!anyActive)
-            {
-                ShowNoneOnce();
-                return;
-            }
-            _activeButtonsShowingNone = false;
-
-            ActiveButtonsText.Inlines.Clear();
-            int emitted = 0;
-            for (int i = 0; i < count; i++)
-            {
-                if ((now - _buttonLastPressed[i]).TotalSeconds < 1.0)
-                {
-                    if (emitted > 0)
-                        ActiveButtonsText.Inlines.Add(_activeButtonSeparatorRuns![emitted - 1]);
-
-                    var run = _activeButtonRuns[i];
-                    if (_data.ButtonStates[i])
-                    {
-                        run.FontWeight = FontWeights.Bold;
-                        run.Foreground = Brushes.White;
-                    }
-                    else
-                    {
-                        // Revert to inherited TextBlock defaults so a fade-out
-                        // button doesn't keep the bold/white styling from its press.
-                        run.ClearValue(Run.FontWeightProperty);
-                        run.ClearValue(Run.ForegroundProperty);
-                    }
-                    ActiveButtonsText.Inlines.Add(run);
-                    emitted++;
-                }
-            }
-        }
-
-        // Render the "None" placeholder once and latch it, so the idle case
-        // doesn't rebuild the InlineCollection (and allocate a Run) every tick.
-        private void ShowNoneOnce()
-        {
-            if (_activeButtonsShowingNone) return;
-            ActiveButtonsText.Inlines.Clear();
-            ActiveButtonsText.Inlines.Add(new Run("None"));
-            _activeButtonsShowingNone = true;
         }
 
         private void UpdateHandbrakeButtonStatus(bool connected)
@@ -1527,135 +1422,6 @@ namespace MozaPlugin
 
         // ===== Handbrake tab =====
 
-        // ===== Wheel Tab =====
-
-        private void RefreshWheelTab()
-        {
-            if (!_plugin.IsNewWheelDetected) return;
-
-            SetComboSafe(WheelPaddlesModeCombo, _data.WheelPaddlesMode);
-            UpdatePaddlePanelVisibility(_data.WheelPaddlesMode);
-            WheelClutchPointSlider.Value = Clamp(_data.WheelClutchPoint, 0, 100);
-            SetValueText(WheelClutchPointValue, $"{_data.WheelClutchPoint}%");
-
-            bool perKnob = _data.WheelKnobSignalModeSupported;
-            KnobModeLegacyPanel.Visibility = perKnob ? Visibility.Collapsed : Visibility.Visible;
-            KnobSignalModePanel.Visibility = perKnob ? Visibility.Visible : Visibility.Collapsed;
-            if (perKnob)
-            {
-                var rows = new[] { KnobSignalMode0Row, KnobSignalMode1Row, KnobSignalMode2Row, KnobSignalMode3Row, KnobSignalMode4Row };
-                var combos = new[] { KnobSignalMode0Combo, KnobSignalMode1Combo, KnobSignalMode2Combo, KnobSignalMode3Combo, KnobSignalMode4Combo };
-                for (int i = 0; i < 5; i++)
-                {
-                    int v = _data.WheelKnobSignalModes[i];
-                    rows[i].Visibility = v >= 0 ? Visibility.Visible : Visibility.Collapsed;
-                    if (v >= 0) SetComboSafe(combos[i], v);
-                }
-            }
-            else
-            {
-                SetComboSafe(KnobModeCombo, _data.WheelKnobMode);
-            }
-            if (_data.WheelDualStickSupported)
-            {
-                StickModeNewPanel.Visibility = Visibility.Visible;
-                StickModeOldPanel.Visibility = Visibility.Collapsed;
-                SetComboSafe(StickModeCombo, _data.WheelStickMode);
-            }
-            else
-            {
-                StickModeOldPanel.Visibility = Visibility.Visible;
-                StickModeNewPanel.Visibility = Visibility.Collapsed;
-                StickModeCheck.IsChecked = _data.WheelStickMode != 0;
-            }
-        }
-
-        private void UpdatePaddlePanelVisibility(int mode)
-        {
-            // 0=Buttons, 1=Combined, 2=Split
-            bool buttons = mode == 0;
-            bool combined = mode == 1;
-            CombinedPaddlePanel.Visibility = combined ? Visibility.Visible : Visibility.Collapsed;
-            SplitPaddlePanel.Visibility = !buttons && !combined ? Visibility.Visible : Visibility.Collapsed;
-            WheelClutchPointPanel.Visibility = combined ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void WheelPaddlesModeCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            int val = WheelPaddlesModeCombo.SelectedIndex;
-            _data.WheelPaddlesMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelPaddlesMode = val);
-            UpdatePaddlePanelVisibility(val);
-            _plugin.WriteIfWheelDetected("wheel-paddles-mode", val + 1); // display 0/1/2 → raw 1/2/3
-            _plugin.SaveSettings();
-        }
-
-        private void WheelClutchPointSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_suppressEvents) return;
-            int val = (int)Math.Round(e.NewValue);
-            WheelClutchPointValue.Text = $"{val}%";
-            _data.WheelClutchPoint = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
-            _plugin.WriteIfWheelDetected("wheel-clutch-point", val);
-            _plugin.SaveSettings();
-        }
-
-        private void KnobModeCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            int val = KnobModeCombo.SelectedIndex;
-            _data.WheelKnobMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobMode = val);
-            _plugin.WriteIfWheelDetected("wheel-knob-mode", val);
-            _plugin.SaveSettings();
-        }
-
-        private void WriteKnobSignalMode(int index, int value)
-        {
-            if (_suppressEvents) return;
-            _data.WheelKnobSignalModes[index] = value;
-            _plugin.UpdateActiveWheelOverlay(o =>
-                o.WheelKnobSignalModes = (int[])_data.WheelKnobSignalModes.Clone());
-            // index is the logical knob (LED/UI order); the wire command addresses
-            // the firmware signal-mode index, which differs on the KS Pro.
-            int fwIndex = _plugin.WheelModelInfo?.SignalModeFirmwareIndex(index) ?? index;
-            _plugin.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value);
-            _plugin.SaveSettings();
-        }
-
-        private void KnobSignalMode0Combo_Changed(object sender, SelectionChangedEventArgs e)
-            => WriteKnobSignalMode(0, KnobSignalMode0Combo.SelectedIndex);
-        private void KnobSignalMode1Combo_Changed(object sender, SelectionChangedEventArgs e)
-            => WriteKnobSignalMode(1, KnobSignalMode1Combo.SelectedIndex);
-        private void KnobSignalMode2Combo_Changed(object sender, SelectionChangedEventArgs e)
-            => WriteKnobSignalMode(2, KnobSignalMode2Combo.SelectedIndex);
-        private void KnobSignalMode3Combo_Changed(object sender, SelectionChangedEventArgs e)
-            => WriteKnobSignalMode(3, KnobSignalMode3Combo.SelectedIndex);
-        private void KnobSignalMode4Combo_Changed(object sender, SelectionChangedEventArgs e)
-            => WriteKnobSignalMode(4, KnobSignalMode4Combo.SelectedIndex);
-
-        private void StickModeCheck_Click(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            int val = StickModeCheck.IsChecked == true ? 1 : 0;
-            _data.WheelStickMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
-            _plugin.WriteIfWheelDetected("wheel-stick-mode", val * 256);
-            _plugin.SaveSettings();
-        }
-
-        private void StickModeCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            int val = StickModeCombo.SelectedIndex;
-            _data.WheelStickMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
-            _plugin.WriteIfWheelDetected("wheel-stick-mode-new", val);
-            _plugin.SaveSettings();
-        }
-
         // ===== Handbrake Range + Curve + Calibration =====
 
         private void RefreshHandbrakeTab()
@@ -2589,351 +2355,6 @@ namespace MozaPlugin
         // prefix for unknown wheels. Returns "" when no model is known yet so the
         // caller can omit the prefix entirely rather than emit a leading dash.
         
-        // ── Dashboard Upload tab ─────────────────────────────────────────
-        // Lets the user pick a .mzdash file (or a library entry) and push it
-        // to the connected wheel via TelemetrySender.TriggerManualUpload.
-        // Status panel reflects the WheelUploadCoordinator's latest ack:
-        // in-flight flag, bytes_written / total_size, status byte.
-
-        // Source bytes + name held in the UI while the user picks; pushed to
-        // the uploader on UploadNow_Click. Decouples picking from uploading
-        // so the user can review the parsed name/MD5 before sending.
-        private byte[]? _uploadPickedContent;
-        private string _uploadPickedName = "";
-        private string _uploadPickedSourceLabel = "";
-        // Directory the mzdash file lives in. Used to find sibling PNGs at
-        // <dir>/Resource/MD5/<hex>.png for the multi-file upload bundle.
-        // Empty for library/embedded picks.
-        private string _uploadPickedSourceDirectory = "";
-        private bool _uploadLibrarySeeded;
-
-        private void UploadSourceRadio_Click(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            bool libMode = UploadSourceLibraryRadio?.IsChecked == true;
-            if (UploadFilePanel != null)
-                UploadFilePanel.Visibility = libMode ? Visibility.Collapsed : Visibility.Visible;
-            if (UploadLibraryPanel != null)
-                UploadLibraryPanel.Visibility = libMode ? Visibility.Visible : Visibility.Collapsed;
-            if (libMode) SeedUploadLibrary(force: false);
-        }
-
-        private void UploadPickFile_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new Microsoft.Win32.OpenFileDialog
-            {
-                Filter = Strings.Upload_FileDialog_Filter,
-                Title = Strings.Upload_FileDialog_Title,
-            };
-            if (dlg.ShowDialog() != true) return;
-            try
-            {
-                byte[] bytes = System.IO.File.ReadAllBytes(dlg.FileName);
-                _uploadPickedContent = bytes;
-                _uploadPickedName = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName) ?? "";
-                _uploadPickedSourceLabel = dlg.FileName;
-                _uploadPickedSourceDirectory = System.IO.Path.GetDirectoryName(dlg.FileName) ?? "";
-                if (UploadPickedFileText != null)
-                    UploadPickedFileText.Text = dlg.FileName;
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show(string.Format(Strings.Dialog_ReadMzdashFailed, ex.Message),
-                    "Moza", System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Error);
-            }
-        }
-
-        private void UploadLibraryRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            SeedUploadLibrary(force: true);
-        }
-
-        private void SeedUploadLibrary(bool force)
-        {
-            if (UploadLibraryCombo == null) return;
-            if (_uploadLibrarySeeded && !force) return;
-            using (_suppressor.Begin())
-            {
-                string? prev = UploadLibraryCombo.SelectedItem as string;
-                UploadLibraryCombo.Items.Clear();
-                var seen = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                if (_plugin.DashCache != null)
-                {
-                    foreach (var name in _plugin.DashCache.CachedNames)
-                        if (seen.Add(name)) UploadLibraryCombo.Items.Add(name);
-                }
-                foreach (var p in _plugin.DashProfileStore.BuiltinProfiles)
-                    if (seen.Add(p.Name)) UploadLibraryCombo.Items.Add(p.Name);
-                if (!string.IsNullOrEmpty(prev) && UploadLibraryCombo.Items.Contains(prev))
-                    UploadLibraryCombo.SelectedItem = prev;
-                else if (UploadLibraryCombo.Items.Count > 0 && UploadLibraryCombo.SelectedItem == null)
-                    UploadLibraryCombo.SelectedIndex = 0;
-            }
-            _uploadLibrarySeeded = true;
-        }
-
-        private void UploadLibraryCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            if (UploadLibraryCombo?.SelectedItem is not string name || string.IsNullOrEmpty(name))
-                return;
-            byte[]? bytes = DashboardLibraryResolver.ResolveBytes(_plugin.DashCache, _plugin.DashProfileStore, name);
-            if (bytes == null)
-            {
-                _uploadPickedContent = null;
-                _uploadPickedName = "";
-                _uploadPickedSourceLabel = "";
-                _uploadPickedSourceDirectory = "";
-                if (UploadStatusText != null)
-                    UploadStatusText.Text = string.Format(Strings.Upload_CannotResolveBytes, name);
-                return;
-            }
-            _uploadPickedContent = bytes;
-            _uploadPickedName = name;
-            _uploadPickedSourceLabel = $"library: {name}";
-            // Library/folder entries: try to resolve the source dir from
-            // DashCache so widget PNG assets can be looked up. Builtins from
-            // embedded resources have no dir → single-file upload.
-            _uploadPickedSourceDirectory = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
-            if (UploadStatusText != null
-                && UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_CannotResolveBytes))
-                UploadStatusText.Text = Strings.Status_Idle;
-        }
-
-        private void UploadNow_Click(object sender, RoutedEventArgs e)
-        {
-            var ts = _plugin.TelemetrySender;
-            if (ts == null)
-            {
-                if (UploadStatusText != null)
-                    UploadStatusText.Text = Strings.Status_TelemetrySenderUnavailableInit;
-                return;
-            }
-            if (_uploadPickedContent == null || _uploadPickedContent.Length == 0)
-            {
-                if (UploadStatusText != null)
-                    UploadStatusText.Text = Strings.Status_PickMzdashFirst;
-                return;
-            }
-            string name = !string.IsNullOrEmpty(_uploadPickedName) ? _uploadPickedName : "dashboard";
-            string? sourceDir = string.IsNullOrEmpty(_uploadPickedSourceDirectory)
-                ? null
-                : _uploadPickedSourceDirectory;
-            bool queued = ts.TriggerManualUpload(_uploadPickedContent, name, sourceDir);
-            if (UploadStatusText != null)
-            {
-                UploadStatusText.Text = queued
-                    ? string.Format(Strings.Upload_Queued, name)
-                    : Strings.Upload_NotStarted;
-            }
-        }
-
-        private void RefreshDashboardUploadTab()
-        {
-            if (UploadInfoNameText == null) return; // tab template not yet realized
-            var ts = _plugin.TelemetrySender;
-
-            string activeName = ts?.MzdashName ?? "";
-            string displayName = !string.IsNullOrEmpty(_uploadPickedName)
-                ? _uploadPickedName
-                : (!string.IsNullOrEmpty(activeName) ? activeName : "—");
-            UploadInfoNameText.Text = displayName;
-
-            int rawSize = _uploadPickedContent?.Length ?? ts?.MzdashContent?.Length ?? 0;
-            UploadInfoRawSizeText.Text = rawSize > 0 ? $"{rawSize:N0} bytes" : "—";
-
-            byte[]? bytes = _uploadPickedContent ?? ts?.MzdashContent;
-            // MD5 caching: this refresh runs every 500ms. Hashing the full
-            // mzdash (~50–500KB) on the UI thread twice a second is wasteful
-            // when the content reference hasn't changed. The cache key is the
-            // array reference, not its contents — both producers (the file
-            // picker and TelemetrySender.MzdashContent) replace the whole
-            // array when content changes, so reference identity matches the
-            // "content changed" notion exactly.
-            string md5Hex;
-            if (bytes == null || bytes.Length == 0)
-            {
-                md5Hex = "—";
-                _md5CachedBytes = null;
-                _md5CachedHex = null;
-            }
-            else if (ReferenceEquals(bytes, _md5CachedBytes) && _md5CachedHex != null)
-            {
-                md5Hex = _md5CachedHex;
-            }
-            else
-            {
-                md5Hex = FileTransferBuilder.Md5Hex(FileTransferBuilder.ComputeMd5(bytes));
-                _md5CachedBytes = bytes;
-                _md5CachedHex = md5Hex;
-            }
-            UploadInfoMd5Text.Text = md5Hex;
-
-            bool inFlight = ts?.IsUploadInFlight ?? false;
-            UploadInfoInFlightText.Text = inFlight ? "yes" : "no";
-            UploadInfoInFlightText.Foreground = inFlight ? Brushes.Goldenrod : Brushes.Gray;
-
-            uint bw = ts?.UploadLastBytesWritten ?? 0;
-            uint total = ts?.UploadLastTotalSize ?? 0;
-            UploadInfoProgressText.Text = total == 0
-                ? "—"
-                : $"{bw:N0} / {total:N0}" + (bw == total && total != 0 ? "  (complete)" : "");
-
-            byte status = ts?.UploadLastStatusByte ?? 0;
-            UploadInfoStatusByteText.Text = status == 0 ? "—" : $"0x{status:X2}";
-
-            // Surface an automatic status hint when an upload finishes so the
-            // user doesn't have to interpret bw == total themselves.
-            if (UploadStatusText != null && !inFlight && total != 0)
-            {
-                if (bw == total)
-                    UploadStatusText.Text = string.Format(Strings.Upload_Complete, bw, total, status.ToString("X2"));
-                else if (UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
-                    UploadStatusText.Text = string.Format(Strings.Upload_Stopped, bw, total, status.ToString("X2"));
-            }
-
-            // Enable the upload button only when the wheel is connected and a
-            // management session has been negotiated — TriggerManualUpload
-            // rejects otherwise.
-            if (UploadNowButton != null)
-                UploadNowButton.IsEnabled = ts != null
-                    && _uploadPickedContent != null
-                    && _uploadPickedContent.Length > 0
-                    && _data.IsConnected;
-        }
-
-        // ── Wheel Files tab ─────────────────────────────────────────────
-        // Shows the wheel-side dashboard inventory derived from the most-recent
-        // session 0x09 configJson state push. Per-row Delete issues a
-        // `completelyRemove` RPC over session 0x0a.
-
-        public sealed class WheelFileRow
-        {
-            public string State { get; set; } = "";       // "enabled" / "disabled"
-            public string Title { get; set; } = "";
-            public string DirName { get; set; } = "";
-            public string Hash { get; set; } = "";
-            public string HashShort => string.IsNullOrEmpty(Hash) ? "" :
-                (Hash.Length > 12 ? Hash.Substring(0, 12) + "…" : Hash);
-            public string LastModified { get; set; } = "";
-            public string Id { get; set; } = "";
-        }
-
-        private void RefreshWheelFilesTab()
-        {
-            if (WheelFilesGrid == null) return;
-            var ts = _plugin.TelemetrySender;
-            var state = _plugin.WheelStateForDiagnostics;
-
-            // Change-detection gate: state.CapturedAt is bumped by the wheel
-            // every time a new configJson lands. _uploadPickedName changes
-            // when the user picks a different mzdash from the file picker.
-            // No new CapturedAt and no picker change → no point rebuilding
-            // the DataGrid (List<WheelFileRow> + selection re-application
-            // on every tick is the dominant cost).
-            DateTime currentCapturedAt = state?.CapturedAt ?? DateTime.MinValue;
-            if (state != null
-                && currentCapturedAt == _wheelFilesLastCapturedAt
-                && _wheelFilesLastPickedName == _uploadPickedName
-                && _wheelFilesLastRowCount >= 0)
-            {
-                return;
-            }
-            _wheelFilesLastCapturedAt = currentCapturedAt;
-            _wheelFilesLastPickedName = _uploadPickedName;
-
-            var rows = new System.Collections.Generic.List<WheelFileRow>();
-            if (state != null)
-            {
-                foreach (var d in state.EnabledDashboards)
-                    rows.Add(new WheelFileRow
-                    {
-                        State = "enabled",
-                        Title = d.Title,
-                        DirName = d.DirName,
-                        Hash = d.Hash,
-                        LastModified = d.LastModified,
-                        Id = d.Id,
-                    });
-                foreach (var d in state.DisabledDashboards)
-                    rows.Add(new WheelFileRow
-                    {
-                        State = "disabled",
-                        Title = d.Title,
-                        DirName = d.DirName,
-                        Hash = d.Hash,
-                        LastModified = d.LastModified,
-                        Id = d.Id,
-                    });
-            }
-            // Preserve grid selection across refresh by DirName key.
-            string? prevDir = (WheelFilesGrid.SelectedItem as WheelFileRow)?.DirName;
-            WheelFilesGrid.ItemsSource = rows;
-            _wheelFilesLastRowCount = rows.Count;
-            if (!string.IsNullOrEmpty(prevDir))
-            {
-                foreach (var r in rows)
-                    if (r.DirName == prevDir) { WheelFilesGrid.SelectedItem = r; break; }
-            }
-            if (WheelFilesStatusBox != null)
-            {
-                if (state == null)
-                    WheelFilesStatusBox.Text = Strings.Status_NoConfigJsonState;
-                else
-                    WheelFilesStatusBox.Text =
-                        $"{rows.Count} dashboards (captured {state.CapturedAt:HH:mm:ss})";
-            }
-        }
-
-        private void WheelFilesRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            RefreshWheelFilesTab();
-        }
-
-        private void WheelFilesDelete_Click(object sender, RoutedEventArgs e)
-        {
-            // Temporarily neutered: completelyRemove RPC wedges wheel firmware until
-            // the wheelbase is power-cycled. Button is also IsEnabled="False" in XAML;
-            // this guard is defensive in case the XAML flag is flipped without
-            // re-validating the RPC behaviour. Remove both when the firmware path is fixed.
-            return;
-#pragma warning disable CS0162 // Unreachable code — preserved scaffolding
-            if (((Button)sender).Tag is not WheelFileRow row) return;
-            if (string.IsNullOrEmpty(row.Id))
-            {
-                System.Windows.MessageBox.Show(
-                    string.Format(Strings.Dialog_CannotDeleteNoId, row.Title),
-                    "Moza", System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Warning);
-                return;
-            }
-            var confirm = System.Windows.MessageBox.Show(
-                string.Format(Strings.Dialog_ConfirmDelete_Body, row.Title, row.DirName, row.Id),
-                Strings.Dialog_ConfirmDelete_Caption,
-                System.Windows.MessageBoxButton.OKCancel,
-                System.Windows.MessageBoxImage.Question);
-            if (confirm != System.Windows.MessageBoxResult.OK) return;
-            var ts = _plugin.TelemetrySender;
-            if (ts == null)
-            {
-                System.Windows.MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
-                    "Moza", System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Error);
-                return;
-            }
-            byte[]? reply = ts.SendRpcCall("completelyRemove", row.Id);
-            if (reply == null)
-                System.Windows.MessageBox.Show(
-                    string.Format(Strings.Dialog_CompletelyRemoveTimeout, row.Id),
-                    "Moza", System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Warning);
-            // Wheel pushes a refreshed configJson state after completelyRemove —
-            // the next 500ms timer tick will refresh the grid via
-            // RefreshWheelFilesTab → ts.WheelState.
-#pragma warning restore CS0162
-        }
-
         // ===== AB9 Active Shifter Tab =====
 
         // Tracks whether the slider/combo values have been seeded from the profile

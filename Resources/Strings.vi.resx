@@ -5,15 +5,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Đế</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Vô lăng</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Phanh tay</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
   <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>Cần số AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Tùy chọn</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Tải lên</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Tệp trên vô lăng</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Nhập</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Giới thiệu</value></data>
@@ -71,31 +68,18 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Mức giảm chấn</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Tốc độ kích hoạt</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Lẫy</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Lẫy trái</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Lẫy phải</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Kết hợp</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Nút bấm</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>CÀI ĐẶT LẪY</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Chế độ lẫy</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Nút bấm</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kết hợp</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Tách riêng</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Điểm tách côn</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Cài đặt đầu vào</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Bộ mã hóa xoay</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Núm xoay</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Núm xoay 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Núm xoay 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Núm xoay 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Núm xoay 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Núm xoay 5</value></data>
   <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Cần điều khiển làm D-Pad</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Gán cần điều khiển</value></data>
   <data name="Option_None" xml:space="preserve"><value>Không</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Trái</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Phải</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Cài đặt LED và nút bấm nằm trong tab thiết bị MOZA Wheel ở mục Devices.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>VỊ TRÍ</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// tín hiệu phanh tay trực tiếp</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Vị trí</value></data>
@@ -233,7 +217,6 @@
   <data name="Section_Reset" xml:space="preserve"><value>ĐẶT LẠI</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>XÓA TẤT CẢ CÀI ĐẶT &amp; HỒ SƠ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Thao tác này sẽ đặt lại toàn bộ cài đặt và hồ sơ của plugin về mặc định.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Chưa hoạt động</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Tính năng tải lên bảng điều khiển đang được phát triển và HIỆN KHÔNG đẩy tệp lên vô lăng.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TẢI LÊN BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// đẩy một tệp .mzdash lên vô lăng đang kết nối</value></data>

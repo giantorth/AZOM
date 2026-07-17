@@ -12,15 +12,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Base</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Wheel</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Handbrake</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Pedals</value></data>
   <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 Shifter</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Upload</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Wheel Files</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
@@ -78,31 +75,18 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Damping Level</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Trigger Speed</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Paddles</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Left Paddle</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Right Paddle</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Combined</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Buttons</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>PADDLE SETTINGS</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Paddles Mode</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Buttons</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combined</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Split</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Clutch Split Point</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Input Settings</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Rotary Encoders</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Knob</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Rotary 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Rotary 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Rotary 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Rotary 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Rotary 5</value></data>
   <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick as D-Pad</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Joystick Assignment</value></data>
   <data name="Option_None" xml:space="preserve"><value>None</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Left</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Right</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>LED and button settings are in the MOZA Wheel device tab under Devices.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>POSITION</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// live handbrake input</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Position</value></data>
@@ -256,7 +240,6 @@
   <data name="Section_Reset" xml:space="preserve"><value>RESET</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>CLEAR ALL SETTINGS &amp; PROFILES</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>This will reset all plugin settings and profiles to their defaults.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Not working yet</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard upload is in development and does NOT currently push files to the wheel.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD UPLOAD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// push a .mzdash file to the connected wheel</value></data>

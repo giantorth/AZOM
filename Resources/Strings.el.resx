@@ -5,15 +5,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Βάση</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Τιμόνι</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Χειρόφρενο</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
   <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 Λεβιές</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Επιλογές</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Μεταφόρτωση</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Αρχεία Τιμονιού</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Εισαγωγή</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Σχετικά</value></data>
@@ -71,31 +68,18 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Επίπεδο Απόσβεσης</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Ταχύτητα Ενεργοποίησης</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Paddles</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Αριστερό Paddle</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Δεξί Paddle</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Συνδυασμένο</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Κουμπιά</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ PADDLE</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Λειτουργία Paddles</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Κουμπιά</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Συνδυασμένο</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Διαχωρισμένο</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Σημείο Διαχωρισμού Συμπλέκτη</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Ρυθμίσεις Εισόδου</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Περιστροφικοί Διακόπτες</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Ποτενσιόμετρο</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Περιστροφικός 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Περιστροφικός 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Περιστροφικός 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Περιστροφικός 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Περιστροφικός 5</value></data>
   <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick ως D-Pad</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Αντιστοίχιση Joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Κανένα</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Αριστερά</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Δεξιά</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Οι ρυθμίσεις LED και κουμπιών βρίσκονται στην καρτέλα MOZA Wheel Συσκευές.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>ΘΕΣΗ</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// Live είσοδος χειρόφρενου</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Θέση</value></data>
@@ -233,7 +217,6 @@
   <data name="Section_Reset" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ ΟΛΩΝ ΤΩΝ ΡΥΘΜΙΣΕΩΝ &amp; ΠΡΟΦΙΛ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Αυτό θα επαναφέρει όλες τις ρυθμίσεις plugin και τα προφίλ στις προεπιλογές τους.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Δεν λειτουργεί ακόμα</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Η μεταφόρτωση οθόνης βρίσκεται υπό ανάπτυξη και ΔΕΝ αποστέλλει αρχεία στο τιμόνι αυτή τη στιγμή.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ΜΕΤΑΦΟΡΤΩΣΗ ΟΘΟΝΗΣ</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// αποστολή .mzdash στο συνδεδεμένο τιμόνι</value></data>
