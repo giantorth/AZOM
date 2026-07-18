@@ -231,10 +231,15 @@ namespace MozaPlugin.Devices
         /// axis-index-to-device-id mapping only applies when that axis index
         /// corresponds to a real separate physical unit, not to wherever a
         /// lone pedal's data happens to land in the report descriptor.
-        /// Defaults to "not a chain" (0x12) when <see cref="ConnectedAxes"/>
-        /// hasn't arrived yet (null) — the common case is standalone, and
-        /// this corrects itself once the "PD Linked" diagnostic confirms
-        /// whether it's actually a chain.
+        /// Chain-ness is taken from <see cref="SubDeviceCount"/> (the presence
+        /// read, known at connect) OR the parsed <see cref="ConnectedAxes"/>,
+        /// whichever already shows more than one motor: the device streams the
+        /// "PD Linked:[T x B y C z]" diagnostic seconds after connect — and
+        /// sometimes first as an unparseable short form ("PD Linked: 1") — so
+        /// gating solely on ConnectedAxes collapses a real chain onto the
+        /// master 0x12 for that whole window (brake effects then fire from the
+        /// throttle motor). Confirmed on hardware: the device ids are
+        /// role-based (0x12 throttle / 0x1d brake / 0x1e clutch).
         /// </summary>
         public byte MotorDeviceForCurrentAxis(int axisIndex)
         {
@@ -242,7 +247,7 @@ namespace MozaPlugin.Devices
             int connectedCount = 0;
             if (connected != null)
                 foreach (var b in connected) if (b) connectedCount++;
-            bool isChain = connected != null && connectedCount > 1;
+            bool isChain = connectedCount > 1 || SubDeviceCount > 1;
             return isChain ? MotorDeviceForAxis(axisIndex) : MozaProtocol.DeviceMain;
         }
 
@@ -299,6 +304,8 @@ namespace MozaPlugin.Devices
                     // the raw bytes so the offset can be confirmed from a bundle.
                     SubDeviceCount = r.IntValue;
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} presence raw=[{ToHex(r.ArrayValue)}] intVal={r.IntValue}");
+                    if (SubDeviceCount > 1)
+                        MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} chain detected (subDevs={SubDeviceCount}) — routing effects per axis: ax0(Throttle)=0x{MotorDeviceForAxis(0):x2} ax1(Brake)=0x{MotorDeviceForAxis(1):x2} ax2(Clutch)=0x{MotorDeviceForAxis(2):x2}");
                     break;
                 case "mbooster-device-type":
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} device-type=[{ToHex(r.ArrayValue)}]");

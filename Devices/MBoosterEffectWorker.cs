@@ -187,8 +187,18 @@ namespace MozaPlugin.Devices
         private bool IsPedalAxisConnected()
         {
             var connected = _device.ConnectedAxes;
-            if (connected == null) return _pedalAxisIndex == 0;
-            return _pedalAxisIndex < connected.Length && connected[_pedalAxisIndex];
+            if (connected != null)
+                return _pedalAxisIndex < connected.Length && connected[_pedalAxisIndex];
+            // PD-Linked connectivity not parsed yet (it arrives seconds after
+            // connect, sometimes first as an unparseable short form). Fall
+            // back to the chain size known at connect from the presence read:
+            // on a multi-motor chain run every HID-reported axis — each routes
+            // to its own role-based device id (see
+            // MBoosterDeviceController.MotorDeviceForCurrentAxis) — otherwise
+            // only axis 0.
+            if (_device.SubDeviceCount > 1)
+                return _pedalAxisIndex < Math.Max(1, _device.AxisCount);
+            return _pedalAxisIndex == 0;
         }
 
         /// <summary>This pedal's full config — the master's flat fields for
