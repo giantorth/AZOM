@@ -3947,25 +3947,6 @@ namespace MozaPlugin
                 // Handles ES → new-protocol case where the base keeps responding
                 // on the locked ID (19) so miss counter never fires.
                 _deviceManager.ProbeOtherWheelIds();
-
-                // Generic old-proto definition is the FALLBACK: deploy it only if no
-                // model-specific definition was already deployed for this old wheel.
-                // An ES wheel deploys "MOZA ES" from the es-wheel-model-name case
-                // (which sets OldProtoFallbackDeployed), so it never gets the generic
-                // device. The grace window lets a slightly-late 0x18 reply set that
-                // flag before this fires, avoiding a duplicate deploy.
-                const long OldProtoFallbackGraceMs = 3000;
-                long oldProtoDetectedTicks = WheelDetectedUtcTicks;
-                if (DetectionState.OldWheelDetected
-                    && !DetectionState.OldProtoFallbackDeployed
-                    && oldProtoDetectedTicks != 0
-                    && (DateTime.UtcNow.Ticks - oldProtoDetectedTicks) / TimeSpan.TicksPerMillisecond >= OldProtoFallbackGraceMs)
-                {
-                    DetectionState.OldProtoFallbackDeployed = true;
-                    if (DeviceDefinitionDeployer.DeployOldProtoWheel(_connection.DiscoveredPid))
-                        DeviceDefinitionDeployed = true;
-                    MozaLog.Info("[AZOM] Old-protocol wheel: no model-specific definition — deployed generic old-proto (fallback)");
-                }
             }
 
             // Base temps/state are dev-0x13 reads the base main controller answers.

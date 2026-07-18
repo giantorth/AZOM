@@ -668,9 +668,6 @@ namespace MozaPlugin.Devices
                                 $"(rpm={info!.RpmLedCount}, buttons={info.ButtonLedCount}, hw={_data.WheelHwVersion})");
                             if (DeviceDefinitionDeployer.DeployForModel(esModel, _connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
-                            // Mark the definition handled so PollStatus does not also
-                            // deploy the generic old-proto fallback (no duplicate).
-                            _detectionState.OldProtoFallbackDeployed = true;
                             // Re-apply the profile now that the wheel page-GUID
                             // resolves — ES LED colours / brightness / indicator
                             // mode bind to the right per-wheel page overlay.
@@ -836,13 +833,11 @@ namespace MozaPlugin.Devices
                         _deviceManager.ReadSetting("es-wheel-mcu-uid");
                         _deviceManager.SendPithouseIdentityProbe(deviceId);
                         _deviceManager.ReadSettingsPaced(OldWheelSettingsReadCommands);
-                        // Device definition is deferred: an ES wheel deploys its
-                        // model-specific "MOZA ES" definition from the
-                        // es-wheel-model-name case once 0x18 answers; a genuinely
-                        // unidentifiable old wheel falls back to the generic
-                        // old-proto definition in PollStatus (gated on no model
-                        // resolving within a grace window) — so ES wheels never get
-                        // a duplicate generic device entry.
+                        // Device definition is deferred: an ES/ESX wheel deploys its
+                        // model-specific definition (e.g. "MOZA ES") from the
+                        // es-wheel-model-name case once id 0x18 answers. A wheel that
+                        // never resolves a model gets no definition — the generic
+                        // old-proto fallback was retired (no such wheel reaches it).
                         MozaLog.Info($"[AZOM] Old-protocol wheel detected on ID {deviceId}");
                         _plugin.StartTelemetryIfReady();
                     }

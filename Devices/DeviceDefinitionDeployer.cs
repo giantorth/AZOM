@@ -12,8 +12,8 @@ namespace MozaPlugin.Devices
     /// <summary>
     /// Writes SimHub device definitions (<c>device.json</c>) into
     /// <c>DevicesDefinitions/User/&lt;DeviceName&gt;/</c> at runtime when a
-    /// MOZA device is detected. Two sources: embedded resources (dashboard,
-    /// old-protocol wheel) and a generated JSON tree (new-protocol wheels,
+    /// MOZA device is detected. Two sources: embedded resources (dashboards,
+    /// base ambient strip) and a generated JSON tree (new-protocol wheels,
     /// where the LED/button layout depends on the detected model).
     ///
     /// Each method returns <c>true</c> when a file was actually written
@@ -24,13 +24,11 @@ namespace MozaPlugin.Devices
     {
         private const string DashCm2Resource = "MozaPlugin.Devices.DashCm2.device.json";
         private const string DashCm1Resource = "MozaPlugin.Devices.DashCm1.device.json";
-        private const string OldProtoResource = "MozaPlugin.Devices.WheelOldProto.device.json";
         private const string BaseAmbientResource = "MozaPlugin.Devices.WheelBase.device.json";
         private const string DashCm2DeviceName = "MOZA CM2 Racing Dash";
         private const string DashCm2ProductName = "CM2 Racing Dash";
         private const string DashCm1DeviceName = "MOZA CM1 Racing Dash";
         private const string DashCm1ProductName = "CM1 Racing Dash";
-        private const string OldProtoDeviceName = "MOZA Old Protocol Wheel";
         private const string BaseAmbientDeviceName = "MOZA Wheel Base";
 
         // 0x0006 (R9 wheelbase) is the most common documented PID. The prior
@@ -109,8 +107,8 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Force-rewrite every device definition the plugin knows how to emit:
         /// one generated wheel definition per <see cref="WheelModelInfo.KnownModels"/>
-        /// entry (artwork included), plus the old-protocol wheel, the base ambient
-        /// strip, and the CM1/CM2 dashes. Unlike the lazy per-detection paths this
+        /// entry (artwork included), plus the base ambient strip and the CM1/CM2
+        /// dashes. Unlike the lazy per-detection paths this
         /// ignores the staleness checks — the user asked for a redeploy, so an
         /// existing file that merely parses is still replaced (that is the repair
         /// case). Complements <see cref="RefreshDeployedThumbnails"/>, which tops up
@@ -149,7 +147,6 @@ namespace MozaPlugin.Devices
 
             var resources = new (string DeviceName, string Resource, string Guid, string Pid, string? ThumbnailKey)[]
             {
-                (OldProtoDeviceName,    OldProtoResource,    MozaDeviceConstants.WheelOldProtoGuid, wheelbasePid, null),
                 (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid, null),
                 (DashCm1DeviceName,     DashCm1Resource,     MozaDeviceConstants.DashCm1Guid,       wheelbasePid, DashCm1ThumbnailKey),
                 (DashCm2DeviceName,     DashCm2Resource,     MozaDeviceConstants.DashCm2Guid,       dashboardPid, DashCm2ThumbnailKey),
@@ -344,13 +341,6 @@ namespace MozaPlugin.Devices
         /// </summary>
         public static bool DeployBaseAmbient(string? discoveredPid)
             => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid, MozaDeviceConstants.BaseAmbientGuid);
-
-        /// <summary>
-        /// Deploy the old-protocol wheel device definition.
-        /// Called once when an ES wheel is detected.
-        /// </summary>
-        public static bool DeployOldProtoWheel(string? discoveredPid)
-            => DeployFromResource(OldProtoDeviceName, OldProtoResource, discoveredPid, MozaDeviceConstants.WheelOldProtoGuid);
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
             int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid,
