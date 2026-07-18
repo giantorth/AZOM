@@ -268,6 +268,16 @@ namespace MozaPlugin.Devices
             return MotorDeviceForCurrentAxis(axisFallback);
         }
 
+        /// <summary>Role→motor device id with no axis to fall back on (used by
+        /// the calibration reads): the mapped device, else the host 0x12.</summary>
+        public byte MotorDeviceForRole(int roleIndex)
+        {
+            var map = _roleToDevice;
+            if (map != null && roleIndex >= 0 && map.TryGetValue(roleIndex, out var dev))
+                return dev;
+            return MozaProtocol.DeviceMain;
+        }
+
         private static int CalibIndex(string name)
         {
             switch (name)
@@ -777,23 +787,37 @@ namespace MozaPlugin.Devices
         public void RequestCalibrationReads()
         {
             if (!_connection.IsConnected) return;
+            // Identity/presence come from the host 0x12 — they identify the
+            // unit, double as the detection-eliciting response, and presence
+            // triggers the chain probe that builds the role→motor map.
             foreach (var name in new[]
             {
-                // Identity first — the serial/model/presence reads are what let us
-                // key this lane by its own stable serial (and they double as a
-                // detection-eliciting response for a fresh, all-effects-off device).
                 "mbooster-model-name", "mbooster-serial-a", "mbooster-serial-b",
                 "mbooster-presence", "mbooster-device-type",
-                "mbooster-throttle-dir", "mbooster-throttle-min", "mbooster-throttle-max",
-                "mbooster-brake-dir", "mbooster-brake-min", "mbooster-brake-max",
-                "mbooster-clutch-dir", "mbooster-clutch-min", "mbooster-clutch-max",
-                "mbooster-throttle-y1", "mbooster-throttle-y2", "mbooster-throttle-y3", "mbooster-throttle-y4", "mbooster-throttle-y5",
-                "mbooster-brake-y1", "mbooster-brake-y2", "mbooster-brake-y3", "mbooster-brake-y4", "mbooster-brake-y5",
-                "mbooster-clutch-y1", "mbooster-clutch-y2", "mbooster-clutch-y3", "mbooster-clutch-y4", "mbooster-clutch-y5",
-                "mbooster-brake-angle-ratio", "mbooster-brake-threshold",
             })
-            {
                 SendRead(name);
+            // Per-role calibration read-backs go to each role's own mapped
+            // motor device (host 0x12 until the map resolves — the first burst
+            // is what discovers it), so a chained pedal's read reflects THAT
+            // pedal's real values rather than the host's defaults. Mirrors the
+            // writes (see MozaPlugin.ApplyMBoosterToHardware).
+            ReadRoleCalibration("throttle", 0);
+            ReadRoleCalibration("brake", 1);
+            ReadRoleCalibration("clutch", 2);
+        }
+
+        private void ReadRoleCalibration(string prefix, int roleIndex)
+        {
+            byte dev = MotorDeviceForRole(roleIndex);
+            SendRead($"mbooster-{prefix}-dir", dev);
+            SendRead($"mbooster-{prefix}-min", dev);
+            SendRead($"mbooster-{prefix}-max", dev);
+            for (int i = 1; i <= 5; i++) SendRead($"mbooster-{prefix}-y{i}", dev);
+            // Load-cell-only settings live under the brake-named command set.
+            if (roleIndex == 1)
+            {
+                SendRead("mbooster-brake-angle-ratio", dev);
+                SendRead("mbooster-brake-threshold", dev);
             }
         }
 

@@ -2279,9 +2279,25 @@ namespace MozaPlugin
                 else continue;
 
                 bool wroteAnyCalibration = false;
-                if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction); wroteAnyCalibration = true; }
-                if (cfg.Min >= 0) { controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min); wroteAnyCalibration = true; }
-                if (cfg.Max >= 0) { controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max); wroteAnyCalibration = true; }
+
+                // Every per-pedal calibration here is a PHYSICAL setting stored
+                // on that pedal's own mBooster unit (confirmed on hardware: each
+                // unit reports only its own pedal's calibration, under its own
+                // role register). Address it by the pedal's ROLE through the
+                // calibration-derived chain map (same as the effects — see
+                // MBoosterEffectWorker.TargetDevice), NOT the raw HID axis: the
+                // motor/config device id follows the chain plug position, which
+                // doesn't match the HID axis order, so an axis-index device
+                // sends these writes to the wrong physical pedal. Falls back to
+                // the axis mapping (0x12 for a standalone) until the map resolves.
+                int roleIdx = role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? 0
+                            : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? 1
+                            : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
+                byte dev = controller.MotorDeviceForRole(roleIdx, axis);
+
+                if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev); wroteAnyCalibration = true; }
+                if (cfg.Min >= 0) { controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev); wroteAnyCalibration = true; }
+                if (cfg.Max >= 0) { controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev); wroteAnyCalibration = true; }
                 if (cfg.CurveY != null && cfg.CurveY.Length == 5)
                 {
                     wroteAnyCalibration = true;
@@ -2291,17 +2307,8 @@ namespace MozaPlugin
                     // identity when it hasn't.
                     var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(cfg.CurveX, cfg.CurveY);
                     for (int k = 0; k < 5; k++)
-                        controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k]);
+                        controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k], dev);
                 }
-
-                // Load-cell / physical settings share the single brake-named wire
-                // command set, so each mBooster UNIT is addressed by its own
-                // device id (0x12 host, 0x1d/0x1e chain ports). Pedal travel +
-                // endstop exist on every pedal mode; sensor ratio + max threshold
-                // are load-cell-only and the UI only lets you set them for a
-                // brake (unset = -1 = skipped). Calibration above stays per-role
-                // on 0x12 — the host aggregates the output mapping (capture-verified).
-                byte dev = controller.MotorDeviceForCurrentAxis(axis);
                 if (cfg.TravelStartMm >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-travel-start",

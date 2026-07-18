@@ -3924,16 +3924,19 @@ namespace MozaPlugin
             // throttle) so dragging the curve previews on the right pedal.
             string? prefix = MBoosterSelectedPedalRolePrefix();
             if (prefix == null) return;
+            // Route to THIS pedal's own unit by role (not the host 0x12) — its
+            // output curve is a per-device setting, same as travel/threshold.
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
             var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(s.CurveX, s.CurveY);
             for (int i = 0; i < 5; i++)
-                controller.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", resampled[i]);
+                controller.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", resampled[i], dev);
             // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
             // and MBoosterDeviceController.PushCurve7Resync; untested for this
             // control specifically, applied on the same-root-cause theory
             // (this curve IS the data curve7 re-expresses, so a stale curve7
             // could plausibly mask a fresh curve edit the same way it masked Travel).
             controller.PushCurve7Resync(s.CurveX, s.CurveY,
-                controller.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex));
+                MBoosterCalibDevice(controller, _mboosterEffectPedalIndex));
         }
 
         /// <summary>The wire-command role prefix (throttle/brake/clutch) for the
@@ -4044,6 +4047,27 @@ namespace MozaPlugin
         // has no built-in "changed" CLR event (its Low/HighValue are plain
         // DPs), so it raises RangeChanged instead of the ValueChanged the
         // other mBooster sliders use.
+        /// <summary>Motor/config device id for the currently-selected mBooster
+        /// pedal's PHYSICAL (per-unit) calibration writes — travel, endstop,
+        /// max threshold, sensor ratio, curve7 — routed by ROLE through the
+        /// calibration-derived chain map (same as the effect worker; see
+        /// MBoosterDeviceController.MotorDeviceForRole), NOT the raw HID axis.
+        /// The motor/config device id follows the chain plug position, which
+        /// doesn't match the HID axis order, so an axis-index device sends
+        /// these to the wrong physical pedal. Falls back to the axis device
+        /// until the map resolves. (Direction/Min/Max/output-curve stay on the
+        /// host 0x12, which aggregates the output mapping.)</summary>
+        private static byte MBoosterCalibDevice(global::MozaPlugin.Devices.MBoosterDeviceController? controller, int axisIndex)
+        {
+            if (controller == null) return global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+            int axisCount = controller.AxisCount > 0 ? controller.AxisCount : 1;
+            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(controller.CurrentSettings, axisIndex, axisCount);
+            int roleIdx = role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? 0
+                        : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? 1
+                        : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
+            return controller.MotorDeviceForRole(roleIdx, axisIndex);
+        }
+
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)
         {
             if (_suppressEvents) return;
@@ -4054,7 +4078,7 @@ namespace MozaPlugin
             // Travel is a physical setting on every pedal mode — push to THIS
             // pedal's own mBooster unit (device 0x12 host / 0x1d / 0x1e chain).
             var controller = CurrentMBoosterController();
-            byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
             controller?.SendIntWrite("mbooster-brake-travel-start",
                 global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(s.TravelStartMm), dev);
             controller?.SendIntWrite("mbooster-brake-travel-end",
@@ -4105,7 +4129,7 @@ namespace MozaPlugin
             if (s == null) return;
             s.SensorOutputRatioPct = v;
             var controller = CurrentMBoosterController();
-            byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
             controller?.SendFloatWrite("mbooster-brake-angle-ratio", v, dev);
             // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
             // and MBoosterDeviceController.PushCurve7Resync; untested for this
@@ -4127,7 +4151,7 @@ namespace MozaPlugin
                 if (s == null) return;
                 s.MaxThresholdKg = v;
                 var controller = CurrentMBoosterController();
-                byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
                 controller?.SendIntWrite("mbooster-brake-threshold",
                     global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev);
                 // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
@@ -4149,7 +4173,7 @@ namespace MozaPlugin
                 if (s == null) return;
                 s.EndstopFrontStiffness = v;
                 var controller = CurrentMBoosterController();
-                byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
                 controller?.SendIntWrite("mbooster-brake-endstop-front",
                     global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
                 // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
@@ -4165,7 +4189,7 @@ namespace MozaPlugin
                 if (s == null) return;
                 s.EndstopEndStiffness = v;
                 var controller = CurrentMBoosterController();
-                byte dev = controller?.MotorDeviceForCurrentAxis(_mboosterEffectPedalIndex) ?? global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
                 controller?.SendIntWrite("mbooster-brake-endstop-end",
                     global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
                 // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
