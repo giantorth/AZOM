@@ -2385,13 +2385,6 @@ namespace MozaPlugin
                 ? Visibility.Visible : Visibility.Collapsed;
             if (!connected && !detected) return;
 
-            Ab9StatusDot.Fill = detected
-                ? Brushes.LimeGreen
-                : (connected ? Brushes.Goldenrod : Brushes.Gray);
-            Ab9StatusLabel.Text = detected
-                ? "AB9 connected"
-                : "Probing AB9…";
-
             // Re-seed the controls from the active profile every refresh tick so
             // the tab follows per-game profile switches (matching the other
             // tabs). Events are suppressed (RefreshDisplay holds the suppressor;

@@ -116,8 +116,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>FRENO · CALIBRAZIONE</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>FRIZIONE · CALIBRAZIONE</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Rapporto Sensore</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>CAMBIO ATTIVO AB9</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Ricerca AB9 in corso...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>SCHEMA MECCANICO</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>Schema 5+R 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>Schema 6+R 1</value></data>

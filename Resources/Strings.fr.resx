@@ -113,8 +113,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>FREIN · CALIBRATION</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>EMBRAYAGE · CALIBRATION</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Ratio des capteurs</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>LEVIER ACTIF AB9</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Recherche de l'AB9…</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>DISPOSITION MÉCANIQUE</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Disposition 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R Disposition 1</value></data>

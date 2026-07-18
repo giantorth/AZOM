@@ -113,8 +113,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>브레이크 · 보정</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>클러치 · 보정</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>센서 비율</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 액티브 시프터</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>AB9 검색 중...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>기계식 레이아웃</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R 레이아웃 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R 레이아웃 1</value></data>

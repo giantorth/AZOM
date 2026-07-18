@@ -113,8 +113,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>刹车 · 校准</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>离合 · 校准</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>传感器比例</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 主动排挡杆</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>正在搜索 AB9…</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>机械布局</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R 布局 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R 布局 1</value></data>

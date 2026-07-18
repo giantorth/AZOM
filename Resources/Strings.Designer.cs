@@ -182,8 +182,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_SensorRatio => Get("SliderLabel_SensorRatio");
         public static string Label_AngleSensor => Get("Label_AngleSensor");
         public static string Label_LoadCell => Get("Label_LoadCell");
-        public static string Section_Ab9ActiveShifter => Get("Section_Ab9ActiveShifter");
-        public static string Status_SearchingForAb9 => Get("Status_SearchingForAb9");
         public static string Section_MechanicalLayout => Get("Section_MechanicalLayout");
         public static string Option_Ab9Layout5R1 => Get("Option_Ab9Layout5R1");
         public static string Option_Ab9Layout6R1 => Get("Option_Ab9Layout6R1");

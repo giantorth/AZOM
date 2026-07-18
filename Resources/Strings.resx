@@ -122,8 +122,6 @@
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensor Ratio</value></data>
   <data name="Label_AngleSensor" xml:space="preserve"><value>Angle</value></data>
   <data name="Label_LoadCell" xml:space="preserve"><value>Load Cell</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 ACTIVE SHIFTER</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Searching for AB9...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>MECHANICAL LAYOUT</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Layout 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R Layout 1</value></data>
