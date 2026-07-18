@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>RÉGLAGES DES PALETTES</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Mode des palettes</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Boutons</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>Croix directionnelle</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combiné</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Séparé</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Point de séparation embrayage</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Encodeur</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick comme croix directionnelle</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Mode du stick gauche</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Affectation du joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Aucun</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Gauche</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// cliquez sur un drapeau pour le recolorer</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>DRAPEAU 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>VOLANT ES · INDICATEUR RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>INDICATEUR RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// protocole ES hérité</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Mode indicateur</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Mode d'affichage</value></data>

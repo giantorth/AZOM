@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>SCHALTWIPPEN-EINSTELLUNGEN</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Schaltwippen-Modus</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Tasten</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>Steuerkreuz</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kombiniert</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Geteilt</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Kupplungsschleifpunkt</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Drehregler</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick als Steuerkreuz</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Linker Stick-Modus</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Stick-Zuweisung</value></data>
   <data name="Option_None" xml:space="preserve"><value>Keine</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Links</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// Flagge anklicken zum Umfärben</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAGGE 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES-LENKRAD · RPM-INDIKATOR</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM-INDIKATOR</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// Legacy-ES-Protokoll</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indikatormodus</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Anzeigemodus</value></data>

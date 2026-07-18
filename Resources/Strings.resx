@@ -78,11 +78,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>PADDLE SETTINGS</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Paddles Mode</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Buttons</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combined</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Split</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Clutch Split Point</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Knob</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick as D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Left Stick Mode</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Joystick Assignment</value></data>
   <data name="Option_None" xml:space="preserve"><value>None</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Left</value></data>
@@ -483,7 +484,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// click a flag to recolor</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAG 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES WHEEL · RPM INDICATOR</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM INDICATOR</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// legacy ES protocol</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indicator Mode</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Display Mode</value></data>

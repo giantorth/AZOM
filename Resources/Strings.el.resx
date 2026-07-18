@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ PADDLE</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Λειτουργία Paddles</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Κουμπιά</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Συνδυασμένο</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Διαχωρισμένο</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Σημείο Διαχωρισμού Συμπλέκτη</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Ποτενσιόμετρο</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick ως D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Λειτουργία αριστερού stick</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Αντιστοίχιση Joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Κανένα</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Αριστερά</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// Κάντε κλικ σε σημαία για αλλαγή χρώματος</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>ΣΗΜΑΙΑ 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES WHEEL · ΔΕΙΚΤΗΣ RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ΔΕΙΚΤΗΣ RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// Παλαιό πρωτόκολλο ES</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Λειτουργία δείκτη</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Λειτουργία Εμφάνισης</value></data>

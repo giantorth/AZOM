@@ -76,11 +76,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>PADLE-INNSTILLINGER</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Padlemodus</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Knapper</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kombinert</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Delt</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Clutch-delingspunkt</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Bryter</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick som D-pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Venstre stikk-modus</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Joystick-tildeling</value></data>
   <data name="Option_None" xml:space="preserve"><value>Ingen</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Venstre</value></data>
@@ -462,7 +463,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// klikk et flagg for å endre farge</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAGG 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES-RATT · RPM-INDIKATOR</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM-INDIKATOR</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// eldre ES-protokoll</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indikatormodus</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Visningsmodus</value></data>

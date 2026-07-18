@@ -76,11 +76,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>AJUSTES DE LEVAS</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Modo de levas</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Botones</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combinado</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Dividido</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Punto de división del embrague</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Perilla</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Joystick como D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Modo del stick izquierdo</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Asignación de joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Ninguno</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Izquierda</value></data>
@@ -462,7 +463,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// pulsa una bandera para recolorear</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>BANDERA 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>VOLANTE ES · INDICADOR RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>INDICADOR RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// protocolo ES heredado</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Modo indicador</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Modo de visualización</value></data>

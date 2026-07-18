@@ -121,12 +121,6 @@
         <ui:PluginBanners DockPanel.Dock="Top" Margin="5,5,5,0"/>
         <!-- Header (always visible) -->
         <StackPanel DockPanel.Dock="Top" Margin="5">
-
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <Ellipse x:Name="StatusDot" Width="12" Height="12" Margin="0,0,8,0"/>
-                <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="14"/>
-            </StackPanel>
-
             <!-- Detection status -->
             <StackPanel x:Name="WheelNotDetectedPanel">
                 <TextBlock Text="{x:Static res:Strings.Status_SearchingForWheel}" Foreground="Gray" FontStyle="Italic" Margin="0,10"/>
@@ -156,7 +150,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0" Style="{StaticResource InnerCardBorder}" Margin="0,0,7,0">
+                            <Border x:Name="WiLivePaddlesCard" Grid.Column="0" Style="{StaticResource InnerCardBorder}" Margin="0,0,7,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Ellipse Width="7" Height="7" Fill="{StaticResource GreenBrush}"
@@ -189,7 +183,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Style="{StaticResource InnerCardBorder}" Margin="7,0,0,0">
+                            <Border x:Name="WiActiveButtonsCard" Grid.Column="1" Style="{StaticResource InnerCardBorder}" Margin="7,0,0,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Ellipse Width="7" Height="7" Fill="{StaticResource GreenBrush}"
@@ -205,7 +199,7 @@
                             </Border>
                         </Grid>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_PaddleSettings}" Icon="{StaticResource IconPaddle}">
+                        <ctrl:SectionCard x:Name="WiPaddleSettingsCard" Title="{x:Static res:Strings.Section_PaddleSettings}" Icon="{StaticResource IconPaddle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4">
                                     <TextBlock Text="{x:Static res:Strings.SliderLabel_PaddlesMode}" Style="{StaticResource SliderLabel}"/>
@@ -241,13 +235,16 @@
                         </ctrl:SectionCard>
 
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_Joystick}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_JoystickAssignment}"
                                           Icon="{StaticResource IconKnob}">
                             <StackPanel>
-                                <!-- Old protocol: single 'stick as D-Pad' checkbox -->
+                                <!-- Old protocol (incl. ES): left stick as buttons or D-Pad -->
                                 <StackPanel x:Name="WiStickModeOldPanel" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_StickAsDpad}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="WiStickModeCheck" VerticalAlignment="Center" Click="WiStickModeCheck_Click"/>
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_LeftStickMode}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:SegmentedControl x:Name="WiStickModeOldCombo"
+                                                           SelectionChanged="WiStickModeOldCombo_Changed">
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_Buttons}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_Dpad}"/>
+                                    </ctrl:SegmentedControl>
                                 </StackPanel>
                                 <!-- New protocol: assignment combo (None/Left/Right) -->
                                 <StackPanel x:Name="WiStickModeNewPanel" Orientation="Horizontal" Margin="0,4" Visibility="Collapsed">
@@ -264,6 +261,22 @@
                                            Text="{x:Static res:Strings.Hint_NoJoystickConfig}"
                                            Style="{StaticResource MutedHintText}" TextWrapping="Wrap"
                                            Visibility="Collapsed"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                        <!-- ES (old-protocol) RPM indicator mode. The ES has no tabs,
+                             so its single RPM setting lives on this main page. -->
+                        <ctrl:SectionCard x:Name="EsIndicatorCard"
+                                          Title="{x:Static res:Strings.Section_EsWheelRpmIndicator}"
+                                          Icon="{StaticResource IconBolt}"
+                                          Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <TextBlock Text="{x:Static res:Strings.SliderLabel_IndicatorMode}" Style="{StaticResource SliderLabel}"/>
+                                <ComboBox x:Name="EsRpmIndicatorCombo" Width="140" SelectionChanged="EsRpmIndicatorCombo_Changed">
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_SimHubMode}"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_AlwaysOn}"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Off}"/>
+                                </ComboBox>
                             </StackPanel>
                         </ctrl:SectionCard>
 
@@ -366,31 +379,6 @@
                                 </StackPanel>
                             </ctrl:SectionCard>
                         </StackPanel>
-                    </StackPanel>
-
-                    <!-- ES (old-protocol) wheel content -->
-                    <StackPanel x:Name="RpmEsContent" Visibility="Collapsed">
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_EsWheelRpmIndicator}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_EsLegacy}"
-                                          Icon="{StaticResource IconBolt}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,4">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_IndicatorMode}" Style="{StaticResource SliderLabel}"/>
-                                    <ComboBox x:Name="EsRpmIndicatorCombo" Width="140" SelectionChanged="EsRpmIndicatorCombo_Changed">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_SimHubMode}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_AlwaysOn}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Off}"/>
-                                    </ComboBox>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,4">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisplayMode}" Style="{StaticResource SliderLabel}"/>
-                                    <ComboBox x:Name="EsRpmDisplayCombo" Width="140" SelectionChanged="EsRpmDisplayCombo_Changed">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Mode1}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Mode2}"/>
-                                    </ComboBox>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
                     </StackPanel>
 
                     </StackPanel>

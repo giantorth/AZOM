@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>CÀI ĐẶT LẪY</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Chế độ lẫy</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Nút bấm</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kết hợp</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Tách riêng</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Điểm tách côn</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Núm xoay</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Cần điều khiển làm D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Chế độ cần trái</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Gán cần điều khiển</value></data>
   <data name="Option_None" xml:space="preserve"><value>Không</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Trái</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// nhấn vào một cờ để đổi màu</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>CỜ 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>VÔ LĂNG ES · ĐÈN BÁO RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ĐÈN BÁO RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// giao thức ES cũ</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Chế độ đèn báo</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Chế độ hiển thị</value></data>

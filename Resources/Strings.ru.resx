@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>НАСТРОЙКИ ЛЕПЕСТКОВ</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Режим лепестков</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Кнопки</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Комбинированный</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Раздельный</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Точка разделения сцепления</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Энкодер</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Стик как D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Режим левого стика</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Назначение джойстика</value></data>
   <data name="Option_None" xml:space="preserve"><value>Нет</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Левый</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// нажмите флаг для перекраски</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>ФЛАГ 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>РУЛЬ ES · ИНДИКАТОР RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ИНДИКАТОР RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// унаследованный протокол ES</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Режим индикатора</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Режим отображения</value></data>

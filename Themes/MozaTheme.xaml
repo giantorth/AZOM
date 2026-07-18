@@ -627,7 +627,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TabControl">
                     <DockPanel LastChildFill="True">
-                        <Border DockPanel.Dock="Top"
+                        <Border x:Name="HeaderBorder" DockPanel.Dock="Top"
                                 Background="{StaticResource BgPanelBrush}"
                                 BorderBrush="{StaticResource BorderBrush}"
                                 BorderThickness="0,0,0,1">
@@ -645,6 +645,13 @@
                                               SnapsToDevicePixels="True"/>
                         </Border>
                     </DockPanel>
+                    <ControlTemplate.Triggers>
+                        <!-- Headerless mode: a consumer sets Tag="headerless" to render
+                             a single page with no tab strip (the tab-less ES wheel). -->
+                        <Trigger Property="Tag" Value="headerless">
+                            <Setter TargetName="HeaderBorder" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

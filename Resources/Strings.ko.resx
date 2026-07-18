@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>패들 설정</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>패들 모드</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>버튼</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-패드</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>통합</value></data>
   <data name="Option_Split" xml:space="preserve"><value>분리</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>클러치 분리 지점</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>노브</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>스틱을 D-패드로 사용</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>왼쪽 스틱 모드</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>조이스틱 할당</value></data>
   <data name="Option_None" xml:space="preserve"><value>없음</value></data>
   <data name="Option_Left" xml:space="preserve"><value>왼쪽</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// 플래그를 클릭해 색상 변경</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>플래그 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES 휠 · RPM 인디케이터</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM 인디케이터</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// 레거시 ES 프로토콜</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>인디케이터 모드</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>표시 모드</value></data>

@@ -767,8 +767,6 @@ skipReadByMode:
         {
             if (!ResolvePlugin())
             {
-                StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = Strings.Status_PluginNotLoaded;
                 WheelNotDetectedPanel.Visibility = Visibility.Visible;
                 DashboardTab.Visibility = Visibility.Collapsed;
                 RpmTab.Visibility = Visibility.Collapsed;
@@ -784,8 +782,6 @@ skipReadByMode:
             // (not the lazily-injected LED driver) so the tab reflects detection
             // even at the desktop before any DataUpdate injects the driver.
             bool wheelConnected = MozaLedDeviceManager.IsModelConnected(_plugin, ExpectedModelPrefix);
-            StatusDot.Fill = wheelConnected ? Brushes.LimeGreen : Brushes.Red;
-            StatusText.Text = wheelConnected ? "Connected" : "Disconnected";
 
             bool isOldProtoDevice = ExpectedModelPrefix == MozaDeviceConstants.OldProtocolMarker;
             // IsConnected() already matched this device to the connected wheel, so
@@ -834,13 +830,17 @@ skipReadByMode:
                 bool showKnobsTab = newWheel && (modelInfoForTabs?.KnobCount ?? 0) > 0;
 
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
-                RpmTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
+                RpmTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;
                 KnobsTab.Visibility = showKnobsTab ? Visibility.Visible : Visibility.Collapsed;
                 SleepTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
 
                 RpmNewContent.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
-                RpmEsContent.Visibility = oldWheel ? Visibility.Visible : Visibility.Collapsed;
+
+                // The ES (old protocol) has only the Inputs page — no RPM/Buttons/
+                // Knobs/Dashboard/Sleep tabs — so drop the tab strip entirely and
+                // render its single page headerless.
+                WheelTabs.Tag = oldWheel ? "headerless" : null;
 
                 EnsureVisibleTabSelected();
 
@@ -1022,7 +1022,6 @@ skipReadByMode:
                 if (oldWheel)
                 {
                     SetComboSafe(EsRpmIndicatorCombo, (int)IndicatorMode.FromEsStored(_data!.WheelRpmIndicatorMode));
-                    SetComboSafe(EsRpmDisplayCombo, _data.WheelRpmDisplayMode);
                 }
             }
 
@@ -1030,7 +1029,7 @@ skipReadByMode:
             // directly from _data. No dependency on the (now hidden) plugin-pane
             // WheelTab controls — handlers in MozaWheelSettingsControl.Inputs.cs
             // own the persistence path.
-            RefreshInputsAndKnobsSignalMode(newWheel);
+            RefreshInputsAndKnobsSignalMode(newWheel, oldWheel);
         }
 
         // Pick the first visible tab whenever the current selection has been
@@ -1321,16 +1320,6 @@ skipReadByMode:
             _data!.WheelRpmIndicatorMode = stored;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelRpmIndicatorMode = stored);
             _plugin.WriteIfWheelDetected("wheel-rpm-indicator-mode", raw);
-            _plugin.SaveSettings();
-        }
-
-        private void EsRpmDisplayCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents || _plugin == null) return;
-            int val = EsRpmDisplayCombo.SelectedIndex;
-            _data!.WheelRpmDisplayMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelRpmDisplayMode = val);
-            _plugin.WriteIfWheelDetected("wheel-set-rpm-display-mode", val);
             _plugin.SaveSettings();
         }
 

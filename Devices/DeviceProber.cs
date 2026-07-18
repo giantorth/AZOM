@@ -172,6 +172,7 @@ namespace MozaPlugin.Devices
         internal static readonly string[] OldWheelSettingsReadCommands = new[]
         {
             "wheel-rpm-indicator-mode", "wheel-get-rpm-display-mode",
+            "wheel-stick-mode",
             "wheel-old-rpm-brightness",
             "wheel-old-rpm-color1", "wheel-old-rpm-color2", "wheel-old-rpm-color3",
             "wheel-old-rpm-color4", "wheel-old-rpm-color5", "wheel-old-rpm-color6",

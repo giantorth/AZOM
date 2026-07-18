@@ -138,11 +138,12 @@ namespace MozaPlugin.Resources
         public static string Section_PaddleSettings => Get("Section_PaddleSettings");
         public static string SliderLabel_PaddlesMode => Get("SliderLabel_PaddlesMode");
         public static string Option_Buttons => Get("Option_Buttons");
+        public static string Option_Dpad => Get("Option_Dpad");
         public static string Option_Combined => Get("Option_Combined");
         public static string Option_Split => Get("Option_Split");
         public static string SliderLabel_ClutchSplitPoint => Get("SliderLabel_ClutchSplitPoint");
         public static string Option_Knob => Get("Option_Knob");
-        public static string SliderLabel_StickAsDpad => Get("SliderLabel_StickAsDpad");
+        public static string SliderLabel_LeftStickMode => Get("SliderLabel_LeftStickMode");
         public static string SliderLabel_JoystickAssignment => Get("SliderLabel_JoystickAssignment");
         public static string Option_None => Get("Option_None");
         public static string Option_Left => Get("Option_Left");

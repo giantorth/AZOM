@@ -74,11 +74,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>IMPOSTAZIONI PALETTE</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Modalità Palette</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Pulsanti</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combinato</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Separato</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Punto di Stacco Frizione</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Manopola</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick come D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Modalità stick sinistro</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Assegnazione Joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Nessuno</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Sinistra</value></data>
@@ -460,7 +461,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// clicca una bandiera per cambiare colore</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>BANDIERA 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>VOLANTE ES · INDICATORE RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>INDICATORE RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// protocollo ES legacy</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Modalità Indicatore</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Modalità Display</value></data>

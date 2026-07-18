@@ -71,11 +71,12 @@
   <data name="Section_PaddleSettings" xml:space="preserve"><value>拨片设置</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>拨片模式</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>按键</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>方向键</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>合并</value></data>
   <data name="Option_Split" xml:space="preserve"><value>分离</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>离合分离点</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>旋钮</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>摇杆作为方向键</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>左摇杆模式</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>摇杆分配</value></data>
   <data name="Option_None" xml:space="preserve"><value>无</value></data>
   <data name="Option_Left" xml:space="preserve"><value>左</value></data>
@@ -457,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// 点击旗帜以重新上色</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>旗帜 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES 方向盘 · RPM 指示</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM 指示</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// 旧版 ES 协议</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>指示模式</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>显示模式</value></data>
