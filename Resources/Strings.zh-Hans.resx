@@ -622,9 +622,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>平滑</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>立即</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>拨杆</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>多功能拨杆</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>正在搜索拨杆…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>拨杆已连接</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>拨杆模式</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>按键盒</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>卡车模拟 (ETS2/ATS)</value></data>

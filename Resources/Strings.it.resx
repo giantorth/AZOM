@@ -625,9 +625,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Fluida</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immediata</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Leve</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Leve multifunzione</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Ricerca leve…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Leve collegate</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Modalità leva</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Button box</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>

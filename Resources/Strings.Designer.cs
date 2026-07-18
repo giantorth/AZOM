@@ -699,9 +699,6 @@ namespace MozaPlugin.Resources
         public static string Option_RotationSmooth => Get("Option_RotationSmooth");
         public static string Option_RotationImmediate => Get("Option_RotationImmediate");
         public static string TabHeader_Stalks => Get("TabHeader_Stalks");
-        public static string Section_Stalks => Get("Section_Stalks");
-        public static string Status_SearchingForStalks => Get("Status_SearchingForStalks");
-        public static string Status_StalksConnected => Get("Status_StalksConnected");
         public static string Section_StalkMode => Get("Section_StalkMode");
         public static string Option_StalkButtonBox => Get("Option_StalkButtonBox");
         public static string Option_StalkTruckSim => Get("Option_StalkTruckSim");

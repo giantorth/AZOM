@@ -627,9 +627,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Jevn</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Umiddelbar</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Spaker</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Multifunksjonsspaker</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Søker etter spaker…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Spaker tilkoblet</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Spakmodus</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Knappeboks</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>

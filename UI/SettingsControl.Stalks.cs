@@ -42,8 +42,6 @@ namespace MozaPlugin
             StalksTab.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
             if (!connected) return;
 
-            StalksStatusDot.Fill = Brushes.LimeGreen;
-            StalksStatusLabel.Text = Strings.Status_StalksConnected;
             if (!_stalksWired) WireStalksTab();
         }
 

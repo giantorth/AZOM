@@ -622,9 +622,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Плавный</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Мгновенный</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Подрулевые</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Многофункциональные подрулевые</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Поиск подрулевых…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Подрулевые подключены</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Режим подрулевых</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Кнопочная панель</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Симулятор грузовика (ETS2/ATS)</value></data>

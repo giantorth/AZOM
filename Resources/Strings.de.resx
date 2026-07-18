@@ -622,9 +622,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Sanft</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Sofort</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Hebel</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Multifunktions-Lenkstockhebel</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Suche nach Hebeln…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Hebel verbunden</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Hebelmodus</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Button-Box</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck-Sim (ETS2/ATS)</value></data>

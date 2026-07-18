@@ -622,9 +622,6 @@ Id : {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Fluide</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immédiate</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Commodos</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Commodos multifonctions</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Recherche des commodos…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Commodos connectés</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Mode commodo</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Boîte à boutons</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Simu camion (ETS2/ATS)</value></data>

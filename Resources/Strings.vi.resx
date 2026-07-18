@@ -622,9 +622,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Mượt</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Tức thì</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Cần gạt</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Cần gạt đa chức năng</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Đang tìm cần gạt…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Đã kết nối cần gạt</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Chế độ cần gạt</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Hộp nút</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Mô phỏng xe tải (ETS2/ATS)</value></data>

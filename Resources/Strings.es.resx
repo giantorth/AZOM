@@ -627,9 +627,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Suave</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Inmediata</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Palancas</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Palancas multifunción</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Buscando palancas…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Palancas conectadas</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Modo de palanca</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Caja de botones</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
