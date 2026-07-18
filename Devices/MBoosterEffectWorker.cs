@@ -164,16 +164,26 @@ namespace MozaPlugin.Devices
         private readonly bool _isPrimary;
 
         /// <summary>
-        /// The motor/config device id THIS worker's frames are addressed to.
-        /// Computed fresh each use (not fixed at construction) via
-        /// <see cref="MBoosterDeviceController.MotorDeviceForCurrentAxis"/> —
-        /// 0x12 (host) unless the controller genuinely has more than one axis
-        /// physically connected, since <see cref="MBoosterDeviceController.ConnectedAxes"/>
-        /// arrives asynchronously (a "PD Linked" diagnostic) well after these
-        /// workers are constructed, and a standalone unit's sole pedal
-        /// commonly reports on a non-zero HID axis regardless of chain status.
+        /// The motor device id THIS worker's frames are addressed to. Resolved
+        /// fresh each use by this pedal's ROLE (from the role dropdown /
+        /// <see cref="MozaMBoosterRegistry.ResolveAxisRole"/>) through the
+        /// calibration-derived chain map (<see cref="MBoosterDeviceController.MotorDeviceForRole"/>),
+        /// so a role's effects reach the physical pedal that role belongs to
+        /// even when the chain plug order (motor device id) doesn't match the
+        /// HID axis order. Falls back to the axis-index mapping when the role
+        /// isn't mapped yet (standalone, or chain not yet fingerprinted).
         /// </summary>
-        private byte TargetDevice => _device.MotorDeviceForCurrentAxis(_pedalAxisIndex);
+        private byte TargetDevice
+        {
+            get
+            {
+                var role = PedalRole(_settingsLookup());
+                int roleIdx = role == MBoosterRole.Throttle ? 0
+                            : role == MBoosterRole.Brake ? 1
+                            : role == MBoosterRole.Clutch ? 2 : -1;
+                return _device.MotorDeviceForRole(roleIdx, _pedalAxisIndex);
+            }
+        }
 
         /// <summary>
         /// Whether THIS worker's pedal axis is actually wired — same

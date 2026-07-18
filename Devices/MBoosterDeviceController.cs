@@ -251,9 +251,148 @@ namespace MozaPlugin.Devices
             return isChain ? MotorDeviceForAxis(axisIndex) : MozaProtocol.DeviceMain;
         }
 
+        /// <summary>
+        /// The motor device id for a pedal ROLE (0=Throttle,1=Brake,2=Clutch),
+        /// using the calibration-derived chain map (see
+        /// <see cref="RecomputeChainRoleMap"/>) so effects reach the physical
+        /// pedal that role belongs to even when the chain plug order doesn't
+        /// match the HID axis order. Falls back to the axis-index mapping
+        /// (<see cref="MotorDeviceForCurrentAxis"/>) when the role isn't
+        /// resolved yet — i.e. never routes worse than before the map exists.
+        /// </summary>
+        public byte MotorDeviceForRole(int roleIndex, int axisFallback)
+        {
+            var map = _roleToDevice;
+            if (map != null && roleIndex >= 0 && map.TryGetValue(roleIndex, out var dev))
+                return dev;
+            return MotorDeviceForCurrentAxis(axisFallback);
+        }
+
+        private static int CalibIndex(string name)
+        {
+            switch (name)
+            {
+                case "mbooster-throttle-min": return 0;
+                case "mbooster-throttle-max": return 1;
+                case "mbooster-brake-min":    return 2;
+                case "mbooster-brake-max":    return 3;
+                case "mbooster-clutch-min":   return 4;
+                case "mbooster-clutch-max":   return 5;
+                default: return -1;
+            }
+        }
+
+        private static string RoleName(int roleIndex) =>
+            roleIndex == 0 ? "Throttle" : roleIndex == 1 ? "Brake" : roleIndex == 2 ? "Clutch" : "?";
+
+        /// <summary>Record a per-role min/max calibration read for a device id
+        /// (host 0x12 from RequestCalibrationReads, chained 0x1d/0x1e from
+        /// ProbeChainDevices) and re-derive the role→motor map.</summary>
+        private void StoreCalib(byte device, string name, int value)
+        {
+            int idx = CalibIndex(name);
+            if (idx < 0) return;
+            lock (_calibLock)
+            {
+                if (!_deviceCalib.TryGetValue(device, out var arr))
+                {
+                    arr = new int[6];
+                    for (int i = 0; i < 6; i++) arr[i] = -1;
+                    _deviceCalib[device] = arr;
+                }
+                arr[idx] = value;
+            }
+            RecomputeChainRoleMap();
+        }
+
+        /// <summary>
+        /// Best-effort automatic role→motor mapping for a chain. The host 0x12
+        /// reports every pedal's per-role calibration; a chained single-pedal
+        /// device reports only its OWN pedal's calibration. So a chained device
+        /// D "is" active role R when D's calibration matches host role R's and
+        /// no OTHER active role's — a unique match. Whatever single active role
+        /// is then left unclaimed is the host's own pedal. Only unambiguous
+        /// matches are committed; anything else stays unresolved and routes by
+        /// axis index, so this can never make routing worse. Requires a
+        /// role-distinctive host calibration (e.g. a load-cell brake with a
+        /// min/max different from the throttle's) to disambiguate — if every
+        /// role reads the same, no map is produced.
+        /// </summary>
+        private void RecomputeChainRoleMap()
+        {
+            int[] host;
+            var chained = new List<KeyValuePair<byte, int[]>>();
+            lock (_calibLock)
+            {
+                if (!_deviceCalib.TryGetValue(MozaProtocol.DeviceMain, out var h)) return;
+                host = (int[])h.Clone();
+                foreach (var kv in _deviceCalib)
+                    if (kv.Key != MozaProtocol.DeviceMain)
+                        chained.Add(new KeyValuePair<byte, int[]>(kv.Key, (int[])kv.Value.Clone()));
+            }
+            for (int i = 0; i < 6; i++) if (host[i] < 0) return; // host not fully read
+
+            var types = _axisTypes; // 2 = passive (no motor); treat anything else as a real motor
+            var roleToDev = new Dictionary<int, byte>();
+            var claimed = new HashSet<int>();
+            foreach (var kv in chained)
+            {
+                int[] dc = kv.Value;
+                bool full = true;
+                for (int i = 0; i < 6; i++) if (dc[i] < 0) full = false;
+                if (!full) continue;
+
+                int matched = -1, matchCount = 0;
+                for (int role = 0; role < 3; role++)
+                {
+                    if (types != null && role < types.Length && types[role] == 2) continue; // passive — no motor
+                    if (dc[role * 2] == host[role * 2] && dc[role * 2 + 1] == host[role * 2 + 1])
+                    {
+                        matched = role;
+                        matchCount++;
+                    }
+                }
+                if (matchCount == 1 && !claimed.Contains(matched))
+                {
+                    roleToDev[matched] = kv.Key;
+                    claimed.Add(matched);
+                }
+            }
+
+            // The single active role nobody claimed is the host's own pedal.
+            var leftover = new List<int>();
+            for (int role = 0; role < 3; role++)
+            {
+                if (types != null && role < types.Length && types[role] == 2) continue;
+                if (!claimed.Contains(role)) leftover.Add(role);
+            }
+            if (leftover.Count == 1) roleToDev[leftover[0]] = MozaProtocol.DeviceMain;
+
+            if (roleToDev.Count == 0) return;
+            _roleToDevice = roleToDev;
+
+            var sb = new StringBuilder();
+            for (int role = 0; role < 3; role++)
+                if (roleToDev.TryGetValue(role, out var d))
+                {
+                    if (sb.Length > 0) sb.Append(' ');
+                    sb.Append(RoleName(role)).Append("=0x").Append(d.ToString("x2"));
+                }
+            string sig = sb.ToString();
+            if (sig != _lastRoleMapLogged)
+            {
+                _lastRoleMapLogged = sig;
+                MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} auto-mapped chain roles → motors: {sig}");
+            }
+        }
+
         private void OnConnectionDisconnected()
         {
             _detected = false;
+            _chainProbed = false;
+            _roleToDevice = null;
+            _lastRoleMapLogged = "";
+            lock (_calibLock) _deviceCalib.Clear();
         }
 
         private void OnConnectionMessage(byte[] data)
@@ -267,6 +406,34 @@ namespace MozaPlugin.Devices
             if (data[0] == MozaProtocol.FirmwareDebugGroup)
             {
                 LogPedalDiagnosticIfRelevant(data);
+                return;
+            }
+
+            // EXPERIMENTAL chain-mapping diagnostic: a response from a chained
+            // motor id carries the nibble-swapped device byte at data[1]
+            // (0x1d→0xd1, 0x1e→0xe1); the host 0x12→0x21 falls through to the
+            // normal identity handling below. Log each distinct chain-device
+            // read response (raw + best-effort decode) so a support bundle
+            // reveals whether a chained pedal self-reports its role/calibration
+            // — the missing link for mapping HID axis (role) to motor device id
+            // (chain plug position). Skip the 2-byte keepalive acks (group
+            // 0x80). Never let a chain response run the host identity switch.
+            if (data.Length >= 3 && data[0] != 0x80 && (data[1] == 0xd1 || data[1] == 0xe1))
+            {
+                int unswapped = ((data[1] & 0x0f) << 4) | ((data[1] & 0xf0) >> 4);
+                var probe = MozaResponseParser.Parse(data, busHint: "mbooster");
+                if (probe.HasValue && probe.Value.Name != null)
+                    StoreCalib((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
+                string hex = ToHex(data);
+                bool isNew;
+                lock (_chainProbeLogged) isNew = _chainProbeLogged.Add(hex);
+                if (isNew)
+                {
+                    string decoded = probe.HasValue
+                        ? $"{probe.Value.Name} int={probe.Value.IntValue} bytes=[{ToHex(probe.Value.ArrayValue)}]"
+                        : "(unparsed)";
+                    MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} chain-probe dev=0x{unswapped:x2} resp=[{hex}] {decoded}");
+                }
                 return;
             }
 
@@ -305,7 +472,10 @@ namespace MozaPlugin.Devices
                     SubDeviceCount = r.IntValue;
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} presence raw=[{ToHex(r.ArrayValue)}] intVal={r.IntValue}");
                     if (SubDeviceCount > 1)
+                    {
                         MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} chain detected (subDevs={SubDeviceCount}) — routing effects per axis: ax0(Throttle)=0x{MotorDeviceForAxis(0):x2} ax1(Brake)=0x{MotorDeviceForAxis(1):x2} ax2(Clutch)=0x{MotorDeviceForAxis(2):x2}");
+                        ProbeChainDevices();
+                    }
                     break;
                 case "mbooster-device-type":
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} device-type=[{ToHex(r.ArrayValue)}]");
@@ -313,6 +483,8 @@ namespace MozaPlugin.Devices
                 default:
                     // Calibration read-backs — log at Debug so the bundle shows what
                     // the device returned. Mapping into settings happens plugin-side.
+                    // Host (0x12) per-role min/max feeds the chain role→motor map.
+                    StoreCalib(MozaProtocol.DeviceMain, r.Name, r.IntValue);
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
                     break;
             }
@@ -336,6 +508,25 @@ namespace MozaPlugin.Devices
         // Each distinct diagnostic line logged once — the device re-streams these
         // continuously, so an unguarded log would flood the support bundle.
         private readonly HashSet<string> _diagLinesLogged = new HashSet<string>(StringComparer.Ordinal);
+
+        // EXPERIMENTAL chain-mapping probe (see ProbeChainDevices): fired once
+        // per connection when a chain is detected; each distinct chain-device
+        // response is logged once.
+        private volatile bool _chainProbed;
+        private readonly HashSet<string> _chainProbeLogged = new HashSet<string>(StringComparer.Ordinal);
+
+        // device-id → its reported [Tmin,Tmax,Bmin,Bmax,Cmin,Cmax] calibration
+        // (-1 = not read yet). The host 0x12 aggregates every pedal's per-role
+        // calibration; a chained single-pedal device reports only its OWN
+        // pedal's calibration. That difference is what lets RecomputeChainRoleMap
+        // work out which physical pedal (role) each chained motor id is.
+        private readonly object _calibLock = new object();
+        private readonly Dictionary<byte, int[]> _deviceCalib = new Dictionary<byte, int[]>();
+        // Resolved role index (0=Throttle,1=Brake,2=Clutch) → motor device id,
+        // from the calibration match. null/absent = unresolved → routing falls
+        // back to the axis-index mapping (never worse than before).
+        private volatile Dictionary<int, byte>? _roleToDevice;
+        private string _lastRoleMapLogged = "";
 
         private void LogPedalDiagnosticIfRelevant(byte[] data)
         {
@@ -379,6 +570,9 @@ namespace MozaPlugin.Devices
                     var arr = _axisTypes != null ? (byte[])_axisTypes.Clone() : new byte[3];
                     if (slot < arr.Length) arr[slot] = type;
                     _axisTypes = arr;
+                    // Passive/active info narrows which roles have a motor, so
+                    // re-derive the chain role→motor map now it's known.
+                    RecomputeChainRoleMap();
                 }
             }
         }
@@ -545,15 +739,48 @@ namespace MozaPlugin.Devices
         /// and the caller must <see cref="MozaResponseParser.Parse"/> them with
         /// <c>busHint: "mbooster"</c> to disambiguate from wheelbase main and AB9.
         /// </summary>
-        public bool SendRead(string commandName)
+        public bool SendRead(string commandName) => SendRead(commandName, MozaProtocol.DeviceMain);
+
+        /// <summary>Build + send an <c>mbooster-*</c> read addressed to a specific
+        /// device id (host 0x12 or a chained motor 0x1d/0x1e).</summary>
+        public bool SendRead(string commandName, byte device)
         {
             if (!_connection.IsConnected) return false;
             var cmd = MozaCommandDatabase.Get(commandName);
             if (cmd == null) return false;
-            var msg = cmd.BuildReadMessage(MozaProtocol.DeviceMain);
+            var msg = cmd.BuildReadMessage(device);
             if (msg == null) return false;
             _connection.Send(msg);
             return true;
+        }
+
+        /// <summary>
+        /// EXPERIMENTAL chain-mapping diagnostic — read identity + per-pedal
+        /// calibration from the chained motor device ids (0x1d/0x1e), once per
+        /// connection, so a support bundle reveals whether a chained pedal
+        /// self-reports its role/calibration. That is the missing link for
+        /// mapping HID axis (role) to motor device id (chain plug position):
+        /// "PD Linked" reports which roles exist but not which device id each
+        /// is at, and the host 0x12 aggregates all three roles' calibration so
+        /// it can't disambiguate on its own. Responses land in
+        /// <see cref="OnConnectionMessage"/> and are logged as "chain-probe …".
+        /// Benign — reads only, no writes.
+        /// </summary>
+        public void ProbeChainDevices()
+        {
+            if (!_connection.IsConnected || _chainProbed) return;
+            _chainProbed = true;
+            foreach (var dev in new byte[] { 0x1d, 0x1e })
+                foreach (var name in new[]
+                {
+                    "mbooster-model-name", "mbooster-serial-a", "mbooster-serial-b",
+                    "mbooster-presence", "mbooster-device-type",
+                    "mbooster-throttle-min", "mbooster-throttle-max",
+                    "mbooster-brake-min", "mbooster-brake-max",
+                    "mbooster-clutch-min", "mbooster-clutch-max",
+                    "mbooster-brake-threshold", "mbooster-brake-angle-ratio",
+                })
+                    SendRead(name, dev);
         }
 
         /// <summary>
