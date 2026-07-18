@@ -306,67 +306,49 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Best-effort automatic role→motor mapping for a chain. The host 0x12
-        /// reports every pedal's per-role calibration; a chained single-pedal
-        /// device reports only its OWN pedal's calibration. So a chained device
-        /// D "is" active role R when D's calibration matches host role R's and
-        /// no OTHER active role's — a unique match. Whatever single active role
-        /// is then left unclaimed is the host's own pedal. Only unambiguous
-        /// matches are committed; anything else stays unresolved and routes by
-        /// axis index, so this can never make routing worse. Requires a
-        /// role-distinctive host calibration (e.g. a load-cell brake with a
-        /// min/max different from the throttle's) to disambiguate — if every
-        /// role reads the same, no map is produced.
+        /// Automatic role→motor mapping for a chain, from the per-device
+        /// calibration reads. Confirmed on hardware: every mBooster in the
+        /// chain stores only ITS OWN pedal's calibration, under the register
+        /// for that pedal's role, and reads back the unconfigured full-range
+        /// default (min 0 / max 100) for the roles it doesn't have. So each
+        /// device's role is simply the single register that is NOT the default
+        /// — e.g. host 0x12 reads brake 16/99 (the rest 0/100) → Brake; chained
+        /// 0x1d reads throttle 3/99 (the rest 0/100) → Throttle. A device with
+        /// zero or more than one configured register is left unmapped (routes
+        /// by axis index), so this never routes worse than before.
         /// </summary>
         private void RecomputeChainRoleMap()
         {
-            int[] host;
-            var chained = new List<KeyValuePair<byte, int[]>>();
+            List<KeyValuePair<byte, int[]>> devices;
             lock (_calibLock)
             {
-                if (!_deviceCalib.TryGetValue(MozaProtocol.DeviceMain, out var h)) return;
-                host = (int[])h.Clone();
+                devices = new List<KeyValuePair<byte, int[]>>(_deviceCalib.Count);
                 foreach (var kv in _deviceCalib)
-                    if (kv.Key != MozaProtocol.DeviceMain)
-                        chained.Add(new KeyValuePair<byte, int[]>(kv.Key, (int[])kv.Value.Clone()));
+                    devices.Add(new KeyValuePair<byte, int[]>(kv.Key, (int[])kv.Value.Clone()));
             }
-            for (int i = 0; i < 6; i++) if (host[i] < 0) return; // host not fully read
 
-            var types = _axisTypes; // 2 = passive (no motor); treat anything else as a real motor
             var roleToDev = new Dictionary<int, byte>();
-            var claimed = new HashSet<int>();
-            foreach (var kv in chained)
+            var conflict = new HashSet<int>();
+            foreach (var kv in devices)
             {
-                int[] dc = kv.Value;
+                int[] c = kv.Value;
                 bool full = true;
-                for (int i = 0; i < 6; i++) if (dc[i] < 0) full = false;
+                for (int i = 0; i < 6; i++) if (c[i] < 0) full = false;
                 if (!full) continue;
 
-                int matched = -1, matchCount = 0;
-                for (int role = 0; role < 3; role++)
-                {
-                    if (types != null && role < types.Length && types[role] == 2) continue; // passive — no motor
-                    if (dc[role * 2] == host[role * 2] && dc[role * 2 + 1] == host[role * 2 + 1])
-                    {
-                        matched = role;
-                        matchCount++;
-                    }
-                }
-                if (matchCount == 1 && !claimed.Contains(matched))
-                {
-                    roleToDev[matched] = kv.Key;
-                    claimed.Add(matched);
-                }
-            }
+                // The one register that isn't the 0..100 unconfigured default
+                // names this device's own pedal.
+                int role = -1, count = 0;
+                for (int r = 0; r < 3; r++)
+                    if (!(c[r * 2] == 0 && c[r * 2 + 1] == 100)) { role = r; count++; }
+                if (count != 1) continue; // uncalibrated / ambiguous — leave to fallback
 
-            // The single active role nobody claimed is the host's own pedal.
-            var leftover = new List<int>();
-            for (int role = 0; role < 3; role++)
-            {
-                if (types != null && role < types.Length && types[role] == 2) continue;
-                if (!claimed.Contains(role)) leftover.Add(role);
+                if (roleToDev.TryGetValue(role, out var existing) && existing != kv.Key)
+                    conflict.Add(role); // two devices claim one role — trust neither
+                else
+                    roleToDev[role] = kv.Key;
             }
-            if (leftover.Count == 1) roleToDev[leftover[0]] = MozaProtocol.DeviceMain;
+            foreach (var r in conflict) roleToDev.Remove(r);
 
             if (roleToDev.Count == 0) return;
             _roleToDevice = roleToDev;
@@ -413,12 +395,12 @@ namespace MozaPlugin.Devices
             // motor id carries the nibble-swapped device byte at data[1]
             // (0x1d→0xd1, 0x1e→0xe1); the host 0x12→0x21 falls through to the
             // normal identity handling below. Log each distinct chain-device
-            // read response (raw + best-effort decode) so a support bundle
-            // reveals whether a chained pedal self-reports its role/calibration
-            // — the missing link for mapping HID axis (role) to motor device id
-            // (chain plug position). Skip the 2-byte keepalive acks (group
-            // 0x80). Never let a chain response run the host identity switch.
-            if (data.Length >= 3 && data[0] != 0x80 && (data[1] == 0xd1 || data[1] == 0xe1))
+            // read response (raw + best-effort decode) and feeds the
+            // calibration store that drives the role→motor map. Skip the
+            // 2-byte keepalive acks (group 0x80) and the ~50Hz motor-write
+            // echoes (group 0xa4, cmd 0xb1) — only read-backs carry mapping
+            // info. Never let a chain response run the host identity switch.
+            if (data.Length >= 3 && data[0] != 0x80 && data[0] != 0xa4 && (data[1] == 0xd1 || data[1] == 0xe1))
             {
                 int unswapped = ((data[1] & 0x0f) << 4) | ((data[1] & 0xf0) >> 4);
                 var probe = MozaResponseParser.Parse(data, busHint: "mbooster");
