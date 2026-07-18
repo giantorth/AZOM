@@ -40,9 +40,26 @@ namespace MozaPlugin.Devices
 
         // SimHub renders a device profile's picture from a thumbnail.png sitting
         // next to device.json (PictureWrapper, [JsonIgnore] — not a device.json
-        // field). Art is embedded per firmware model prefix; see the csproj glob.
+        // field). Art is embedded keyed by firmware model prefix (generated wheels)
+        // or by an explicit template key (dashes/base); see the csproj glob.
         private const string ThumbnailFileName = "thumbnail.png";
         private const string ThumbnailResourcePrefix = "MozaPlugin.Devices.Thumbnails.";
+
+        // Template-based definitions (the CM1/CM2 dashes, base ambient, old-proto
+        // wheel) deploy via DeployFromResource and have no firmware model prefix,
+        // so their art is keyed by an explicit thumbnail name. Extend as art
+        // arrives for the others.
+        private const string DashCm2ThumbnailKey = "CM2";
+        private const string DashCm1ThumbnailKey = "CM1";
+
+        // Device name → thumbnail key for the template-based definitions that ship
+        // art. Drives RefreshDeployedThumbnails' startup top-up; the per-detection
+        // DeployFromResource callers pass the key directly.
+        private static readonly (string DeviceName, string ThumbnailKey)[] TemplateThumbnails =
+        {
+            (DashCm2DeviceName, DashCm2ThumbnailKey),
+            (DashCm1DeviceName, DashCm1ThumbnailKey),
+        };
 
         // Content version of the dynamically generated wheel device.json. Bump
         // when the generated body changes in a way that should re-deploy over an
@@ -130,18 +147,18 @@ namespace MozaPlugin.Devices
                     written++;
             }
 
-            var resources = new (string DeviceName, string Resource, string Guid, string Pid)[]
+            var resources = new (string DeviceName, string Resource, string Guid, string Pid, string? ThumbnailKey)[]
             {
-                (OldProtoDeviceName,    OldProtoResource,    MozaDeviceConstants.WheelOldProtoGuid, wheelbasePid),
-                (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid),
-                (DashCm1DeviceName,     DashCm1Resource,     MozaDeviceConstants.DashCm1Guid,       wheelbasePid),
-                (DashCm2DeviceName,     DashCm2Resource,     MozaDeviceConstants.DashCm2Guid,       dashboardPid),
+                (OldProtoDeviceName,    OldProtoResource,    MozaDeviceConstants.WheelOldProtoGuid, wheelbasePid, null),
+                (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid, null),
+                (DashCm1DeviceName,     DashCm1Resource,     MozaDeviceConstants.DashCm1Guid,       wheelbasePid, DashCm1ThumbnailKey),
+                (DashCm2DeviceName,     DashCm2Resource,     MozaDeviceConstants.DashCm2Guid,       dashboardPid, DashCm2ThumbnailKey),
             };
 
-            foreach (var (deviceName, resource, guid, pid) in resources)
+            foreach (var (deviceName, resource, guid, pid, thumbnailKey) in resources)
             {
                 total++;
-                if (DeployFromResource(deviceName, resource, pid, guid, force: true))
+                if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey))
                     written++;
             }
 
@@ -269,7 +286,8 @@ namespace MozaPlugin.Devices
         /// so every <c>DeployDashboard</c> target is the CM2 template.
         /// </summary>
         public static bool DeployDashboard(string? discoveredPid)
-            => DeployFromResource(DashCm2DeviceName, DashCm2Resource, discoveredPid, MozaDeviceConstants.DashCm2Guid);
+            => DeployFromResource(DashCm2DeviceName, DashCm2Resource, discoveredPid, MozaDeviceConstants.DashCm2Guid,
+                thumbnailKey: DashCm2ThumbnailKey);
 
         /// <summary>
         /// Deploy the CM1 base-bridged dash definition (its own GUID, distinct
@@ -278,7 +296,8 @@ namespace MozaPlugin.Devices
         /// if a definition was written (SimHub restart required to pick it up).
         /// </summary>
         public static bool DeployCm1Dashboard(string? discoveredPid)
-            => DeployFromResource(DashCm1DeviceName, DashCm1Resource, discoveredPid, MozaDeviceConstants.DashCm1Guid);
+            => DeployFromResource(DashCm1DeviceName, DashCm1Resource, discoveredPid, MozaDeviceConstants.DashCm1Guid,
+                thumbnailKey: DashCm1ThumbnailKey);
 
         /// <summary>
         /// Remove the CM2 dash definition that <see cref="DeployDashboard"/> wrote
@@ -460,6 +479,15 @@ namespace MozaPlugin.Devices
                     if (File.Exists(Path.Combine(deviceDir, "device.json")))
                         EnsureThumbnail(deviceDir, prefix);
                 }
+
+                // Template-based definitions (dashes/base) that ship art — keyed by
+                // device name, not a firmware prefix.
+                foreach (var (deviceName, thumbnailKey) in TemplateThumbnails)
+                {
+                    var deviceDir = Path.Combine(userDefsDir, deviceName);
+                    if (File.Exists(Path.Combine(deviceDir, "device.json")))
+                        EnsureThumbnail(deviceDir, thumbnailKey);
+                }
             }
             catch (Exception ex)
             {
@@ -475,15 +503,15 @@ namespace MozaPlugin.Devices
         /// the deploy path and never flips the caller's "restart SimHub" result,
         /// since the picture appears on the next SimHub start regardless.
         /// </summary>
-        private static void EnsureThumbnail(string deviceDir, string modelPrefix)
+        private static void EnsureThumbnail(string deviceDir, string thumbnailKey)
         {
             try
             {
-                if (string.IsNullOrEmpty(modelPrefix))
+                if (string.IsNullOrEmpty(thumbnailKey))
                     return;
 
                 var assembly = Assembly.GetExecutingAssembly();
-                using (var stream = assembly.GetManifestResourceStream(ThumbnailResourcePrefix + modelPrefix + ".png"))
+                using (var stream = assembly.GetManifestResourceStream(ThumbnailResourcePrefix + thumbnailKey + ".png"))
                 {
                     if (stream == null)
                         return;
@@ -503,12 +531,12 @@ namespace MozaPlugin.Devices
 
                     Directory.CreateDirectory(deviceDir);
                     File.WriteAllBytes(thumbnailPath, bytes);
-                    MozaLog.Debug($"[AZOM] Wrote device thumbnail for {modelPrefix}: {thumbnailPath}");
+                    MozaLog.Debug($"[AZOM] Wrote device thumbnail for {thumbnailKey}: {thumbnailPath}");
                 }
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[AZOM] Could not write device thumbnail for '{modelPrefix}': {ex.Message}");
+                MozaLog.Warn($"[AZOM] Could not write device thumbnail for '{thumbnailKey}': {ex.Message}");
             }
         }
 
@@ -669,7 +697,7 @@ namespace MozaPlugin.Devices
         }
 
         private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid, string expectedDescriptorId,
-            bool force = false)
+            bool force = false, string? thumbnailKey = null)
         {
             try
             {
@@ -743,7 +771,13 @@ namespace MozaPlugin.Devices
                     }
 
                     if (!stale)
+                    {
+                        // Definition is current; the artwork may still be missing
+                        // (added by a plugin update, or user-deleted).
+                        if (thumbnailKey != null)
+                            EnsureThumbnail(deviceDir, thumbnailKey);
                         return false;
+                    }
                 }
 
                 var assembly = Assembly.GetExecutingAssembly();
@@ -777,6 +811,9 @@ namespace MozaPlugin.Devices
 
                     File.WriteAllText(deviceJsonPath, json);
                 }
+
+                if (thumbnailKey != null)
+                    EnsureThumbnail(deviceDir, thumbnailKey);
 
                 string action = fileExists ? "Refreshed" : "Deployed";
                 MozaLog.Info($"[AZOM] {action} device definition: {deviceName} (restart SimHub to add it)");
