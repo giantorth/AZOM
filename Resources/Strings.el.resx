@@ -7,7 +7,7 @@
   <data name="TabHeader_Base" xml:space="preserve"><value>Βάση</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Χειρόφρενο</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 Λεβιές</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Επιλογές</value></data>

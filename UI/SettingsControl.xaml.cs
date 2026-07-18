@@ -284,20 +284,14 @@ namespace MozaPlugin
                 UpdateRedesignSteeringAngle(0, valid: false);
             }
 
-            if (connected)
-            {
-                ThrottleBar.Value      = _data.ThrottlePosition;
-                BrakeBar.Value         = _data.BrakePosition;
-                ClutchBar.Value        = _data.ClutchPosition;
-                HandbrakeBar.Value     = _data.HandbrakePosition;
-            }
-            else
-            {
-                ThrottleBar.Value      = 0;
-                BrakeBar.Value         = 0;
-                ClutchBar.Value        = 0;
-                HandbrakeBar.Value     = 0;
-            }
+            HandbrakeBar.Value = connected ? _data.HandbrakePosition : 0;
+
+            // Pedals-tab live-input trace (replaced the throttle/brake/clutch
+            // bars). Pushed every frame so the sparkline scrolls whether or not a
+            // pedal is moving; same merged 0-100 values as the mBooster trace.
+            PushTraceSample(_pedalBrakeTraceSamples,    connected ? _data.BrakePosition : 0);
+            PushTraceSample(_pedalThrottleTraceSamples, connected ? _data.ThrottlePosition : 0);
+            PushTraceSample(_pedalClutchTraceSamples,   connected ? _data.ClutchPosition : 0);
 
             UpdateHandbrakeButtonStatus(connected);
             UpdateMBoosterCurveMarkers(connected);
@@ -340,15 +334,17 @@ namespace MozaPlugin
             // (_data.*Position), so it shows every connected pedal's live
             // position — mBooster or not, whichever device currently holds
             // each role — not just an mBooster's own HID reading.
-            PushMBoosterTraceSample(_mboosterBrakeTraceSamples, hidConnected ? _data.BrakePosition : 0);
-            PushMBoosterTraceSample(_mboosterThrottleTraceSamples, hidConnected ? _data.ThrottlePosition : 0);
-            PushMBoosterTraceSample(_mboosterClutchTraceSamples, hidConnected ? _data.ClutchPosition : 0);
+            PushTraceSample(_mboosterBrakeTraceSamples, hidConnected ? _data.BrakePosition : 0);
+            PushTraceSample(_mboosterThrottleTraceSamples, hidConnected ? _data.ThrottlePosition : 0);
+            PushTraceSample(_mboosterClutchTraceSamples, hidConnected ? _data.ClutchPosition : 0);
         }
 
-        private static void PushMBoosterTraceSample(ObservableCollection<double> samples, double value)
+        // Append one sample to a rolling trace buffer, trimming to PedalTraceSamples.
+        // Shared by the mBooster page trace and the Pedals-tab trace.
+        private static void PushTraceSample(ObservableCollection<double> samples, double value)
         {
             samples.Add(value);
-            while (samples.Count > MBoosterPedalTraceSamples)
+            while (samples.Count > PedalTraceSamples)
                 samples.RemoveAt(0);
         }
 
@@ -2602,6 +2598,11 @@ namespace MozaPlugin
 
         private string? _mboosterSelectedIdentity;
         private bool _mboosterUiSeeded;
+        // Separate one-shot gate for the no-device demo seed (Show-all-tabs).
+        // Seeded once on entry so a demo drag isn't reset every 500 ms tick;
+        // cleared when a real device appears so demo defaults re-apply if it
+        // later disconnects.
+        private bool _mboosterDemoSeeded;
 
         // One row per connected PEDAL (HID axis) across every connected
         // mBooster — see MBoosterDeviceRow.cs. Replaces the old trio of
@@ -2638,11 +2639,25 @@ namespace MozaPlugin
             var devices = registry.Devices;
             if (devices.Count == 0)
             {
-                MBoosterTab.Visibility = Visibility.Collapsed;
                 _mboosterUiSeeded = false;
+                if (_plugin.Settings?.ShowAllTabs == true)
+                {
+                    // Demo mode: no mBooster is connected, but the tab was force-
+                    // shown via Show-all-tabs. Surface the full per-pedal config UI
+                    // so it can be demonstrated. With no device to drive, every
+                    // control handler no-ops (each guards on a null effect target /
+                    // null controller), so nothing reaches hardware. The tab's own
+                    // visibility is owned by ApplyShowAllTabs.
+                    ShowMBoosterDemoPanels();
+                    return;
+                }
+                MBoosterTab.Visibility = Visibility.Collapsed;
                 return;
             }
             MBoosterTab.Visibility = Visibility.Visible;
+            // A real device is present — drop the demo-seed latch so demo
+            // defaults re-apply if it later disconnects with the tab still shown.
+            _mboosterDemoSeeded = false;
 
             // Rebuild the device/pedal row list if any device's identity, axis
             // count, or connectivity changed. One row per connected PEDAL — a
@@ -3356,6 +3371,36 @@ namespace MozaPlugin
         {
             bool isBrake = MBoosterSelectedPedalRolePrefix() == "brake";
             MBoosterBrakeOnlyPanel.Visibility = isBrake ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Force every device-gated mBooster panel visible for the no-hardware
+        // demo case (Show-all-tabs with nothing connected). Deliberately shows
+        // the role-specific panels too (effects cards, brake-only Sim Input) so
+        // the whole surface is demonstrable — the normal device-driven path
+        // (RefreshMBoosterTab + the role/passive updaters) re-gates them the
+        // moment a real device appears, so this never fights real functionality.
+        private void ShowMBoosterDemoPanels()
+        {
+            MBoosterDevicePanel.Visibility = Visibility.Visible;
+            MBoosterEffectsCardsPanel.Visibility = Visibility.Visible;
+            MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
+            MBoosterBrakeOnlyPanel.Visibility = Visibility.Visible;
+
+            // Seed every control to its default once. The curve editors take no
+            // node data of their own — they two-way bind to the hidden data-store
+            // sliders (BindEditorToSliders), so without a seed those sliders sit at
+            // 0 and the editors draw a collapsed/garbage curve. A null target makes
+            // both seeders fall back to MBoosterDefaultCurve (linear 20/40/60/80/100)
+            // and sane per-control defaults; the seed writes go through _suppressor
+            // so the slider ValueChanged handlers (which would no-op on the null
+            // target anyway) stay quiet while the bindings still update the editors.
+            if (_mboosterDemoSeeded) return;
+            using (_suppressor.Begin())
+            {
+                SeedMBoosterConfigControls(null);
+                SeedMBoosterEffectControls(null);
+            }
+            _mboosterDemoSeeded = true;
         }
 
         // ===== Effect handlers =====

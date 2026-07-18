@@ -7,7 +7,7 @@
   <data name="TabHeader_Base" xml:space="preserve"><value>베이스</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>핸드브레이크</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>페달</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 시프터</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>허브</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>옵션</value></data>

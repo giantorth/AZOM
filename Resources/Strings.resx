@@ -14,7 +14,7 @@
   <data name="TabHeader_Base" xml:space="preserve"><value>Base</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Handbrake</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Pedals</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 Shifter</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>

@@ -7,7 +7,7 @@
   <data name="TabHeader_Base" xml:space="preserve"><value>基座</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>手刹</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>踏板</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 排挡杆</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>选项</value></data>

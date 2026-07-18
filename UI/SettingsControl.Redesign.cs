@@ -64,10 +64,17 @@ namespace MozaPlugin
         // role feeds that role's buffer every tick, so all three pedals are
         // visible together regardless of which device's tab is open. A role
         // with no assigned device just holds flat at 0. ----
-        private const int MBoosterPedalTraceSamples = 150;
+        private const int PedalTraceSamples = 150;
         private readonly ObservableCollection<double> _mboosterBrakeTraceSamples = new ObservableCollection<double>();
         private readonly ObservableCollection<double> _mboosterThrottleTraceSamples = new ObservableCollection<double>();
         private readonly ObservableCollection<double> _mboosterClutchTraceSamples = new ObservableCollection<double>();
+        // Pedals-tab live-input trace (throttle/brake/clutch) — the scrolling
+        // graph that replaced the three progress bars. Its own buffers so it
+        // scrolls whenever the Inputs tick runs, independent of the mBooster
+        // trace's panel-gated feed.
+        private readonly ObservableCollection<double> _pedalBrakeTraceSamples = new ObservableCollection<double>();
+        private readonly ObservableCollection<double> _pedalThrottleTraceSamples = new ObservableCollection<double>();
+        private readonly ObservableCollection<double> _pedalClutchTraceSamples = new ObservableCollection<double>();
 
         /// <summary>
         /// Called from the existing constructor after InitializeComponent runs.
@@ -172,11 +179,23 @@ namespace MozaPlugin
                     MBoosterPedalTraceViz.OutSamples = _mboosterThrottleTraceSamples;
                     MBoosterPedalTraceViz.ThirdSamples = _mboosterClutchTraceSamples;
                 }
-                for (int i = 0; i < MBoosterPedalTraceSamples; i++)
+                // Pedals-tab live-input trace: In=Brake (red), Out=Throttle
+                // (green), Third=Clutch (cyan) — same colour language as the bars
+                // it replaced.
+                if (PedalTraceViz != null)
+                {
+                    PedalTraceViz.InSamples = _pedalBrakeTraceSamples;
+                    PedalTraceViz.OutSamples = _pedalThrottleTraceSamples;
+                    PedalTraceViz.ThirdSamples = _pedalClutchTraceSamples;
+                }
+                for (int i = 0; i < PedalTraceSamples; i++)
                 {
                     _mboosterBrakeTraceSamples.Add(0);
                     _mboosterThrottleTraceSamples.Add(0);
                     _mboosterClutchTraceSamples.Add(0);
+                    _pedalBrakeTraceSamples.Add(0);
+                    _pedalThrottleTraceSamples.Add(0);
+                    _pedalClutchTraceSamples.Add(0);
                 }
 
                 _bandwidthTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
