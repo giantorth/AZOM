@@ -24,11 +24,24 @@ namespace MozaPlugin
         private void RefreshStalksTab()
         {
             bool connected = _data?.IsStalksConnected ?? false;
+
+            // Demo mode: no stalks attached, but the tab is force-shown via
+            // Show-all-tabs. The whole tab is settings-driven — the button map,
+            // mode, and stage counts all come from StalksTruckSim settings, not
+            // hardware — so wire it up so the mapping list binds and the truck-sim
+            // panel seeds. Without this the early return below leaves the list
+            // unbound and the panel collapsed. The tab's own visibility is owned
+            // by ApplyShowAllTabs; the status dot stays on its "searching" default
+            // and the live-press highlight stays dark, both correct with no device.
+            if (!connected && _plugin?.Settings?.ShowAllTabs == true)
+            {
+                if (!_stalksWired) WireStalksTab();
+                return;
+            }
+
             StalksTab.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
             if (!connected) return;
 
-            StalksStatusDot.Fill = Brushes.LimeGreen;
-            StalksStatusLabel.Text = Strings.Status_StalksConnected;
             if (!_stalksWired) WireStalksTab();
         }
 

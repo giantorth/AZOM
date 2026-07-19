@@ -468,6 +468,10 @@ namespace MozaPlugin.Protocol
             AddCommand("shifter-paddle-sync", "shifter", 0x51, 0x52, new byte[] { 6 }, 2, "int");   // {1,2}
             // Read-only raw axis (output-x / ShifterTheta).
             AddCommand("shifter-theta",       "shifter", 0x53, 0xFF, new byte[] { 1 }, 2, "int");
+            // Generic device-type identity probe (grp 0x04, same shape as wheel-device-type:
+            // reply `01 02 XX 06`). Fired at a base/hub-relayed shifter to tell HGP from SGP
+            // where the PID isn't visible — a positive identity answer, not a timeout.
+            AddCommand("shifter-device-type", "shifter", 4, 0xFF, new byte[] { }, 0, "array");
             // Calibration (write-only, grp 0x54). Best-effort: present in foxblat
             // serial.yml + SDK ShifterCalibrateStart/Finish, absent from the local
             // parameter DB; gated on detection like handbrake calibration.
@@ -564,6 +568,28 @@ namespace MozaPlugin.Protocol
             // docs/protocol/devices/mbooster.md "Pedal Feel".
             AddCommand("mbooster-brake-travel-start", "mbooster", 35, 36, new byte[] { 0x84 }, 2, "int");
             AddCommand("mbooster-brake-travel-end",   "mbooster", 35, 36, new byte[] { 0x85 }, 2, "int");
+            // EXPERIMENTAL / unverified — spotted in pedal_travel.pcapng: Pit
+            // House sent these 6 alongside a single Travel Start write, never
+            // in isolation, so this is a correlation from one capture, not a
+            // confirmed protocol requirement. cmdId 0xAB, same "prefix bytes
+            // then payload" shape as endstop above: a fixed 0x00 byte + a 1-6
+            // selector before the 2-byte value. Values decoded near a linear
+            // ramp (selector/7 * 65535) with two outliers, consistent with
+            // this being the 5-point output curve
+            // (CurveX/CurveY) re-expressed at 7 evenly-spaced breakpoints
+            // instead of the usual 20/40/60/80/100 — see
+            // MozaMBoosterRegistry.ResampleCurveAtSevenths and
+            // MozaMBoosterProtocol.EncodeCurve7Point. Hypothesis: the
+            // firmware needs this resent for a Travel/Pedal-Feel write to
+            // actually take effect, even though the raw Travel register
+            // itself reads back correctly without it. Needs on-hardware
+            // confirmation — see docs/protocol/devices/mbooster.md "Pedal Feel".
+            AddCommand("mbooster-brake-curve7-1", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x01 }, 2, "int");
+            AddCommand("mbooster-brake-curve7-2", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x02 }, 2, "int");
+            AddCommand("mbooster-brake-curve7-3", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x03 }, 2, "int");
+            AddCommand("mbooster-brake-curve7-4", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x04 }, 2, "int");
+            AddCommand("mbooster-brake-curve7-5", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x05 }, 2, "int");
+            AddCommand("mbooster-brake-curve7-6", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x06 }, 2, "int");
             // Pit House "End Stop Stiffness" (Front Limit / End Limit) —
             // reverse-engineered from two real Pit House USB captures, each
             // sweeping one slider through all 10 values (1-10). Both share

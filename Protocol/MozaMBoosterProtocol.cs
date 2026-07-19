@@ -291,6 +291,29 @@ namespace MozaPlugin.Protocol
         }
 
         /// <summary>
+        /// EXPERIMENTAL / unverified — encoding for the <c>mbooster-brake-
+        /// curve7-*</c> commands (cmdId 0xAB) spotted alongside a Travel
+        /// Start write in pedal_travel.pcapng (see
+        /// MozaCommandDatabase.cs and MozaMBoosterRegistry.ResampleCurveAtSevenths).
+        /// Values decoded near <c>selector/7 * 65535</c>, i.e. a plain
+        /// fraction-of-full-scale over the 0-65535 range — same
+        /// "value * 65535 / fullscale" family as <see cref="EncodeEndstopStiffness"/>,
+        /// with fullscale = 100 (a curve-node percentage, 0-100 like
+        /// <c>MBoosterDeviceSettings.CurveY</c>): <c>raw = round(pct * 65535 / 100)</c>.
+        /// Not cross-checked against a second capture — treat with more
+        /// suspicion than this file's other Encode/Decode pairs.
+        /// </summary>
+        public static int EncodeCurve7Point(double pct)
+        {
+            if (double.IsNaN(pct)) pct = 0;
+            pct = Math.Max(0, Math.Min(100, pct));
+            double raw = Math.Round(pct * 65535.0 / 100.0);
+            if (raw <= 0) return 0;
+            if (raw >= 0xFFFF) return 0xFFFF;
+            return (int)raw;
+        }
+
+        /// <summary>
         /// Pit House "End Stop Stiffness" (Front Limit / End Limit) encoding
         /// — reverse-engineered from two real Pit House USB captures (wire
         /// command <c>mbooster-brake-endstop-front</c>/<c>-end</c>, cmdId

@@ -12,15 +12,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Base</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Wheel</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Handbrake</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Pedals</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9 Shifter</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Upload</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Wheel Files</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
@@ -78,31 +75,19 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Damping Level</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Trigger Speed</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Paddles</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Left Paddle</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Right Paddle</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Combined</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Buttons</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>PADDLE SETTINGS</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Paddles Mode</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Buttons</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combined</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Split</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Clutch Split Point</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Input Settings</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Rotary Encoders</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Knob</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Rotary 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Rotary 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Rotary 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Rotary 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Rotary 5</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick as D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Left Stick Mode</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Joystick Assignment</value></data>
   <data name="Option_None" xml:space="preserve"><value>None</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Left</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Right</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>LED and button settings are in the MOZA Wheel device tab under Devices.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>POSITION</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// live handbrake input</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Position</value></data>
@@ -129,16 +114,15 @@
   <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>THROTTLE OUTPUT CURVE</value></data>
   <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>BRAKE OUTPUT CURVE</value></data>
   <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>CLUTCH OUTPUT CURVE</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// map physical position to game input</value></data>
+  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value></value></data>
   <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// shape the brake response</value></data>
   <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// shape the clutch response</value></data>
   <data name="Section_ThrottleCalibration" xml:space="preserve"><value>THROTTLE · CALIBRATION</value></data>
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>BRAKE · CALIBRATION</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>CLUTCH · CALIBRATION</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensor Ratio</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = Angle Sensor · 100% = Load Cell</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 ACTIVE SHIFTER</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Searching for AB9...</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Angle</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Load Cell</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>MECHANICAL LAYOUT</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Layout 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R Layout 1</value></data>
@@ -160,7 +144,7 @@
   <data name="Section_GearShift" xml:space="preserve"><value>GEAR SHIFT</value></data>
   <data name="SliderLabel_VibrationIntensity" xml:space="preserve"><value>Vibration Intensity</value></data>
   <data name="Section_MBoosterPedals" xml:space="preserve"><value>MBOOSTER PEDALS</value></data>
-  <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value>// host-rendered effects · per-device role + position</value></data>
+  <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_Device" xml:space="preserve"><value>Device</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Role</value></data>
   <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Display Name</value></data>
@@ -169,25 +153,22 @@
   <data name="Option_Throttle" xml:space="preserve"><value>Throttle</value></data>
   <data name="Option_Brake" xml:space="preserve"><value>Brake</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Clutch</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>PEDAL FEEL &amp; SIM INPUT MAPPING</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>PEDAL FEEL</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// shape how the pedal feels, independent of the output curve below</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Deadzone (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Max Force (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Start / End of Travel (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Front Limit Stiffness</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>End Limit Stiffness</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value></value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value></value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM INPUT MAPPING</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Max Threshold (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value></value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Drag a node left/right to move where it sits on the input axis — e.g. drag the last node left so 100% output is reached before 100% input.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFECTS</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value></value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Traction Control</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Wheel Spin</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Gear Shift</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Road Texture</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Brake Fade (Experimental)</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Enable</value></data>
@@ -202,7 +183,6 @@
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibration Decay</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Onset Temperature (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimental — writes the real Travel End and Max Threshold hardware calibrations while active (more travel and more force needed), then restores your configured values as brakes cool. Requires those already set in Pedal Feel / Sim Input Mapping — has no effect otherwise.</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Pedal Trace</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Custom Effects (Experimental)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// experimental — user-defined vibration driven by SimHub/NCalc formulas</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Experimental — each custom effect vibrates the motor using a SimHub property or NCalc formula you supply. All custom effects (and the built-in Engine effect) share one wire channel, so only one can drive the motor at a time; the most recently processed active effect wins. Frequency/Intensity behave like Engine's own sliders.</value></data>
@@ -249,10 +229,13 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 era — (URL subscription)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 era — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detects the wheel&apos;s firmware era from its handshake and picks the matching protocol. Override only if telemetry does not work.</value></data>
+  <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Show all tabs (advanced)</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DEVICE DEFINITIONS</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>REDEPLOY ALL DEFINITIONS</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Wrote {0} of {1} definitions for PID {2}. Restart SimHub to pick them up.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>RESET</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>CLEAR ALL SETTINGS &amp; PROFILES</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>This will reset all plugin settings and profiles to their defaults.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Not working yet</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard upload is in development and does NOT currently push files to the wheel.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD UPLOAD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// push a .mzdash file to the connected wheel</value></data>
@@ -368,7 +351,7 @@
   <data name="Hint_ClickExpandToRender" xml:space="preserve"><value>Click expand to render the full multi-section report.</value></data>
   <data name="Hint_FullDiagRendered" xml:space="preserve"><value>// {0} lines · same content as Export bundle</value></data>
   <data name="Hint_FullDiagRenderFailed" xml:space="preserve"><value>// render failed</value></data>
-  <data name="Hint_MBoosterIntro" xml:space="preserve"><value>Each connected mBooster appears below. Pick a role (Throttle/Brake/Clutch) per device to route its pedal position. The Calibration section is experimental.</value></data>
+  <data name="Hint_MBoosterIntro" xml:space="preserve"><value></value></data>
   <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Not yet tested.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Pick LED Color</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>PALETTE</value></data>
@@ -501,7 +484,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// click a flag to recolor</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAG 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES WHEEL · RPM INDICATOR</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM INDICATOR</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// legacy ES protocol</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indicator Mode</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Display Mode</value></data>
@@ -619,6 +602,10 @@ Open a dashboard in MOZA Pit House for this wheel first.</value></data>
 
 Are you sure?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Clear All Settings</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Redeploy Device Definitions</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>This will rewrite the SimHub device definitions for every known MOZA wheel, dash and wheel base, matched to the connected wheelbase.
+
+Any manual edits to those files will be lost. Continue?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Export failed: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Failed to read .mzdash file:
 {0}</value></data>
@@ -662,9 +649,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Smooth</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immediate</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Stalks</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Multi-Function Stalks</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Searching for stalks…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Stalks connected</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Stalk Mode</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Button box</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
@@ -686,7 +670,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>This mBooster hosts more than one pedal on one connection. Assign each detected axis to a game input. The default order follows Moza's Rx/Ry/Rz layout (throttle/brake/clutch) — remap here if a pedal drives the wrong input.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Shifter</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>SHIFTER SETTINGS</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>LEDS</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// two configurable LEDs (SGP)</value></data>

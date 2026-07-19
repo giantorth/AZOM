@@ -18,28 +18,38 @@ trimmed to the wheel before the fit -- SimHub's own ImageQualityAnalyzer flags
 anything with >3% dead margin as badly cropped.
 
 Usage:
-  tools/make-device-thumbnail SRC DST [--remove-white-bg] [--fuzz 12%] [--fit 512]
+  tools/make-device-thumbnail SRC DST [--remove-white-bg [--white-bg-mode M]] [--fuzz 12%] [--fit 512]
 
 --remove-white-bg is for renders delivered on an opaque white background instead
-of alpha (MOZA ships both). Getting this right needs three steps, each of which
-fixes a failure the previous one leaves behind:
+of alpha (MOZA ships both). "What is background" has two answers depending on the
+device, so it has two modes (--white-bg-mode):
 
-  1. Near-white -> binary mask. A plain `-transparent white` is not usable: the
-     wheels contain legitimate white (display text, MOZA logo, ring markings),
-     and it punches holes straight through them.
-  2. Connected-components with an area threshold, so only *large* white regions
-     (the background and the enclosed cutouts between spokes and rim) are
-     removed and small white details survive. A border flood-fill can't do this
-     — it never reaches cutouts enclosed by the wheel, which then render as
-     white blobs on SimHub's dark UI.
-  3. Dilate the mask before applying it. The render's edge is anti-aliased
-     against white, so a pixel-exact mask leaves a 1-2px white fringe tracing
-     the silhouette — very visible on dark. Raising --fuzz to catch it instead
-     eats the light-grey button faces (they're the same brightness), so the
-     fringe must be removed geometrically, not by colour.
+  'border' (dashes, and any solid unit with a screen): remove only white REACHABLE
+    FROM THE IMAGE EDGE — flood transparency inward from a white frame added around
+    the render. Large white on the device FACE (screen numbers, the MOZA logo) is
+    enclosed by the device, never reached by the flood, and kept. Use this for
+    anything with a display; 'regions' would punch holes through that content.
 
-Dilation radius and area threshold scale with the source resolution, since both
-are meaningless as absolute pixel counts across an 8000px render vs a 512px one.
+  'regions' (wheels with enclosed white cutouts, e.g. KS Pro): remove any *large*
+    white region by area (connected-components + area threshold), which reaches
+    the cutouts between spokes and rim that the border flood can't — those are
+    enclosed by the wheel, not edge-connected. Small white (display text, logo,
+    ring markings) is below the threshold and survives. The trade-off: a LARGE
+    white element on the face would also be removed, so this mode is only safe on
+    faces whose white content is small relative to the cutouts.
+
+Both modes finish by eroding the alpha silhouette a couple of px: the render's
+edge is anti-aliased against white, so a pixel-exact cut leaves a 1-2px white
+fringe tracing the outline — very visible on dark. Raising --fuzz to catch it
+instead eats light-grey faces (same brightness), so the fringe is removed
+geometrically, not by colour.
+
+The verifier can't see a punched-out logo (it's transparent, not white), so
+ALWAYS inspect the result over BOTH a dark background (fringe/blob check) and a
+bright one like magenta (hole check — device-face content must not show through).
+
+Erode/dilate radius and area threshold scale with the source resolution, since
+they are meaningless as absolute pixel counts across an 8000px render vs a 512px one.
 
 --erode-alpha fixes a second, independent defect, present in renders that DO ship
 alpha: a thin white outline baked into the silhouette, left over from whatever cut
@@ -76,7 +86,15 @@ def main():
     ap.add_argument("src", type=Path)
     ap.add_argument("dst", type=Path)
     ap.add_argument("--remove-white-bg", action="store_true",
-                    help="strip an opaque white background (and enclosed white cutouts) to alpha")
+                    help="strip an opaque white background to alpha (see --white-bg-mode)")
+    ap.add_argument("--white-bg-mode", choices=("border", "regions"), default="regions",
+                    help="how --remove-white-bg decides what is background. "
+                         "'border' (dashes / solid units): remove only white CONNECTED TO THE "
+                         "IMAGE EDGE, so large white content on the device face (screen numbers, a "
+                         "logo) is kept. 'regions' (wheels with enclosed white cutouts, e.g. KS "
+                         "Pro): remove any large white region by area, reaching cutouts the border "
+                         "flood can't. 'regions' will punch holes through large white FACE content, "
+                         "so use 'border' for anything with a screen. Default: regions.")
     ap.add_argument("--erode-alpha", action="store_true",
                     help="shrink the alpha silhouette to cut off a white outline baked into the "
                          "render's edge (the white 'glow'). For alpha sources; --remove-white-bg "
@@ -86,6 +104,14 @@ def main():
                          "(default 0.002, ~16px on an 8000px render)")
     ap.add_argument("--fuzz", default="12%", help="near-white tolerance for --remove-white-bg (default 12%%)")
     ap.add_argument("--fit", type=int, default=512, help="long-side pixels (default 512, SimHub's FitSize)")
+    ap.add_argument("--full-color", action="store_true",
+                    help="output full-colour RGBA instead of an 8-bit palette. Use for renders with "
+                         "smooth colourful gradients (the dash screens) where 256 colours band or "
+                         "dither visibly. Larger file (~3x) but SimHub reads either.")
+    ap.add_argument("--dither", action="store_true",
+                    help="re-enable Floyd-Steinberg dithering in the palette step. Off by default: "
+                         "on smooth gradients (dash screens, dark rims) it scatters visible speckle "
+                         "noise, and disabling it is smaller and cleaner. Ignored with --full-color.")
     ap.add_argument("--dilate-frac", type=float, default=0.0025,
                     help="mask dilation as a fraction of the source long side (default 0.0025, "
                          "~20px on an 8000px render) — removes the anti-aliased white fringe")
@@ -111,29 +137,47 @@ def main():
     if args.remove_white_bg:
         w, h = (int(v) for v in identify(args.src, "%w\n%h").splitlines())
         dilate = max(1, round(max(w, h) * args.dilate_frac))
-        area = max(1, round(w * h * args.area_frac))
-        print(f"  white-bg strip: source {w}x{h}, dilate Disk:{dilate}, area-threshold {area:,}px")
-        cmd += [
-            "(", "+clone", "-alpha", "off",
-            # near-white -> white, everything else -> black
-            "-fuzz", args.fuzz, "-fill", "white", "-opaque", "white",
-            "+fuzz", "-fill", "black", "+opaque", "white",
-            # keep only large white regions: background + enclosed cutouts.
-            # Small white (display text, logo, markings) merges back to black.
-            "-define", f"connected-components:area-threshold={area}",
-            "-define", "connected-components:mean-color=true",
-            "-connected-components", "8",
-            # grow into the anti-aliased edge so no white fringe survives
-            "-morphology", "Dilate", f"Disk:{dilate}",
-            "-negate", ")",
-            "-alpha", "off", "-compose", "CopyOpacity", "-composite",
-        ]
-    cmd += [
-        "-trim", "+repage",
-        "-resize", f"{args.fit}x{args.fit}",
-        "-colors", "255",  # 255 + 1 transparent index => PNG8 keeps a real alpha channel
-        f"PNG8:{args.dst}",
-    ]
+        if args.white_bg_mode == "border":
+            # Flood transparency inward from a white frame added around the image,
+            # so ONLY white reachable from the edge (the background) is removed.
+            # White enclosed by the device (screen numbers, logo) is untouched.
+            # Then erode the alpha to shave the anti-aliased white fringe.
+            print(f"  white-bg strip (border): source {w}x{h}, edge-flood, alpha-erode Disk:{dilate}")
+            cmd += [
+                "-alpha", "set",
+                "-bordercolor", "white", "-border", "1",
+                "-fuzz", args.fuzz, "-fill", "none", "-floodfill", "+0+0", "white",
+                "-shave", "1x1",
+                "-channel", "A", "-morphology", "Erode", f"Disk:{dilate}", "+channel",
+            ]
+        else:
+            area = max(1, round(w * h * args.area_frac))
+            print(f"  white-bg strip (regions): source {w}x{h}, dilate Disk:{dilate}, "
+                  f"area-threshold {area:,}px")
+            cmd += [
+                "(", "+clone", "-alpha", "off",
+                # near-white -> white, everything else -> black
+                "-fuzz", args.fuzz, "-fill", "white", "-opaque", "white",
+                "+fuzz", "-fill", "black", "+opaque", "white",
+                # keep only large white regions: background + enclosed cutouts.
+                # Small white (display text, logo, markings) merges back to black.
+                "-define", f"connected-components:area-threshold={area}",
+                "-define", "connected-components:mean-color=true",
+                "-connected-components", "8",
+                # grow into the anti-aliased edge so no white fringe survives
+                "-morphology", "Dilate", f"Disk:{dilate}",
+                "-negate", ")",
+                "-alpha", "off", "-compose", "CopyOpacity", "-composite",
+            ]
+    cmd += ["-trim", "+repage", "-resize", f"{args.fit}x{args.fit}"]
+    if args.full_color:
+        # TrueColorAlpha — no palette, no banding/dither on smooth gradients.
+        cmd += [f"png32:{args.dst}"]
+    else:
+        # 8-bit palette (255 colours + 1 transparent index keeps a real alpha
+        # channel). Dithering off by default — it only adds speckle noise here.
+        cmd += ["-dither", "None"] if not args.dither else []
+        cmd += ["-colors", "255", f"PNG8:{args.dst}"]
 
     args.dst.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(cmd, check=True)
@@ -157,10 +201,15 @@ def main():
     fails = []
     if max(w, h) != args.fit:
         fails.append(f"long side is {max(w, h)}, expected {args.fit}")
-    if imgtype != "PaletteAlpha":
-        fails.append(f"type is {imgtype}, expected PaletteAlpha (alpha channel lost)")
-    if alpha >= 1.0:
-        fails.append("fully opaque -- background was not removed (try --remove-white-bg)")
+    # Both PaletteAlpha (8-bit) and TrueColorAlpha (--full-color) are fine; what
+    # matters is that an alpha channel survived. "Palette"/"TrueColor" without the
+    # Alpha suffix means it was flattened away.
+    if not imgtype.endswith("Alpha"):
+        fails.append(f"type is {imgtype} -- alpha channel lost")
+    # opaque_white is the real background-not-removed signal (a white box or
+    # unstripped cutout is opaque and near-white). A plain alpha-mean==1.0 check
+    # can't be used: a rectangular dash legitimately fills its trimmed bounding
+    # box, so its alpha mean is ~1.0 even with the background correctly stripped.
     if white > 0.03:
         fails.append(f"{white:.1%} of pixels are opaque near-white -- likely an unstripped "
                      "background or enclosed cutout; check it over a DARK background")

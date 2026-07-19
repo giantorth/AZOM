@@ -427,6 +427,42 @@ Key fields:
 - `TypeName` — Hardware communication protocol. `"LedsStandardHIDProtocol"` sends LED colors over HID reports. For virtual devices with no real HID hardware, use a placeholder `Vid`/`Pid` (e.g. `0x9999`) that won't match any real device; the HID path then stays idle while the virtual `ILedDeviceManager` injection handles the LED pipeline.
 - `.shdp` files are installed via SimHub's device import UI (not copied to `StandardDevicesTemplatesUser/`).
 
+#### Device picture (`thumbnail.png`)
+
+The picture SimHub shows for a Device Builder profile is **not** a `device.json` field — it is a
+`thumbnail.png` sidecar in the same folder as `device.json`. Decoded from `SimHub.Plugins.dll` 9.11.21:
+
+```csharp
+// DeviceDescription ctor
+Thumbnail = new PictureWrapper(descriptor, "thumbnail.png", 512);   // filename, FitSize
+
+// PictureWrapper
+[JsonIgnore] public BitmapImage Picture =>          // <descriptor dir>/thumbnail.png
+    File.Exists(f) ? Images.ByteToImage(File.ReadAllBytes(f)) : null;
+```
+
+- `DeviceDescription.Thumbnail` is `[JsonIgnore]`, so it never serializes into `device.json`. The
+  path is `Path.Combine(DescriptorContent.Directory, "thumbnail.png")`, where `Directory` is
+  assigned by the descriptor loader to the folder holding `device.json`.
+- The Device Builder descriptor overrides `Icon` to return `Thumbnail.Picture` when present, so the
+  sidecar **takes precedence** over the `DevicesLogos/` GUID-named fallback (which is
+  CWD-relative and keyed on the `_UserProject`/`_Embedded`-suffixed `DeviceTypeID`).
+  With neither, SimHub renders `DevicesLogos\nopicture.png`.
+- **Format.** The builder's picture importer runs
+  `WuQuantizer.OptimizetoPng(Images.FitImage(512, 512, …, Color.Transparent))` — fit *inside* a
+  512×512 box (aspect preserved, long side becomes 512; **not** padded to a square), then
+  palette-quantized. All 19 stock thumbnails under `DevicesDefinitions/Embedded/` are 512 on the
+  long side, 8-bit PaletteAlpha, 13–72 KB.
+- `ImageQualityAnalyzer.Analyze` backs a builder-UI quality warning: it wants a real alpha channel
+  and a tight crop (it flags >3 % transparent margin as improperly cropped).
+- `ExportToShdd` zips the whole folder (`SearchOption.AllDirectories`), so `thumbnail.png` travels
+  inside `.shdd`/`.shdp` exports automatically.
+- A sibling `buttoneditor.png` is the button-editor backdrop; only relevant with
+  `IsButtonEditorEnabled: true`.
+
+This plugin ships per-wheel art through this mechanism — see
+[DEVELOPMENT.md](DEVELOPMENT.md#device-extensions-devices).
+
 ### IDeviceExtensionFilter
 
 Tells SimHub which `DeviceExtension` to attach to which device type. SimHub discovers implementations via assembly scanning.

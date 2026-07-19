@@ -364,22 +364,45 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type controls:BandwidthSparkline}">
                     <Grid>
-                        <!-- Outbound drawn first (behind) so the typically-louder
-                             inbound line lays on top. Fill brushes default null
-                             (line-only) but the caller can supply gradient brushes
-                             for the under-glow effect. -->
+                        <!-- Third drawn furthest back, then outbound, then inbound
+                             on top — so for the two-series bandwidth chart the
+                             typically-louder inbound line still lays on top, and
+                             the mBooster pedal-trace graph's Clutch line (Third)
+                             sits behind Throttle (Out) and Brake (In). Fill
+                             brushes default null (line-only) but the caller can
+                             supply gradient brushes for the under-glow effect. -->
+                        <Path Data="{Binding ThirdFillGeometry, RelativeSource={RelativeSource TemplatedParent}}"
+                              Fill="{TemplateBinding ThirdFillBrush}"
+                              StrokeThickness="0"/>
                         <Path Data="{Binding OutFillGeometry, RelativeSource={RelativeSource TemplatedParent}}"
                               Fill="{TemplateBinding OutFillBrush}"
                               StrokeThickness="0"/>
+                        <Path Data="{Binding InFillGeometry, RelativeSource={RelativeSource TemplatedParent}}"
+                              Fill="{TemplateBinding InFillBrush}"
+                              StrokeThickness="0"/>
+
+                        <!-- Opt-in dashed horizontal gridlines (ShowGridlines) at
+                             100/75/50/25 % of the plot. Drawn on top of the fills
+                             (so they stay visible through the translucent
+                             envelopes instead of being buried under them) but
+                             behind the series' own line strokes + tip dots, so
+                             the actual data reads as the foreground layer. -->
+                        <Path Data="{Binding GridGeometry, RelativeSource={RelativeSource TemplatedParent}}"
+                              Stroke="{StaticResource TextDimBrush}" StrokeThickness="1"
+                              StrokeDashArray="2 3" Opacity="0.55"/>
+
+                        <Path Data="{Binding ThirdLineGeometry, RelativeSource={RelativeSource TemplatedParent}}"
+                              Stroke="{TemplateBinding ThirdBrush}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Fill="{x:Null}"/>
                         <Path Data="{Binding OutLineGeometry, RelativeSource={RelativeSource TemplatedParent}}"
                               Stroke="{TemplateBinding OutBrush}"
                               StrokeThickness="1.5"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"
                               Fill="{x:Null}"/>
-                        <Path Data="{Binding InFillGeometry, RelativeSource={RelativeSource TemplatedParent}}"
-                              Fill="{TemplateBinding InFillBrush}"
-                              StrokeThickness="0"/>
                         <Path Data="{Binding InLineGeometry, RelativeSource={RelativeSource TemplatedParent}}"
                               Stroke="{TemplateBinding InBrush}"
                               StrokeThickness="1.5"
@@ -387,6 +410,10 @@
                               StrokeEndLineCap="Round"
                               Fill="{x:Null}"/>
                         <Canvas IsHitTestVisible="False">
+                            <Ellipse Width="6" Height="6"
+                                     Fill="{TemplateBinding ThirdBrush}"
+                                     Canvas.Left="{Binding ThirdTipX, RelativeSource={RelativeSource TemplatedParent}}"
+                                     Canvas.Top="{Binding ThirdTipY, RelativeSource={RelativeSource TemplatedParent}}"/>
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding OutBrush}"
                                      Canvas.Left="{Binding OutTipX, RelativeSource={RelativeSource TemplatedParent}}"
@@ -500,10 +527,11 @@
                             SnapsToDevicePixels="True">
                         <DockPanel LastChildFill="True">
                             <!-- Header -->
-                            <Border DockPanel.Dock="Top"
+                            <Border x:Name="PART_Header" DockPanel.Dock="Top"
                                     BorderBrush="{StaticResource BorderBrush}"
                                     BorderThickness="0,0,0,1"
-                                    Padding="18,12">
+                                    Padding="18,12"
+                                    Background="Transparent">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -559,18 +587,51 @@
                                             </LinearGradientBrush>
                                         </Rectangle.Fill>
                                     </Rectangle>
-                                    <!-- Optional header-right content (HeaderedContentControl.Header);
-                                         null on most cards → Auto column collapses to nothing. -->
-                                    <ContentPresenter Grid.Column="4"
-                                                      Content="{TemplateBinding Header}"
-                                                      VerticalAlignment="Center"
-                                                      Margin="12,0,0,0"/>
+                                    <!-- Optional header-right content (HeaderedContentControl.Header;
+                                         null on most cards → renders nothing) plus the collapse/
+                                         expand chevron — hidden unless IsCollapsible is set; clicking
+                                         anywhere in the header (PART_Header, see
+                                         SectionCard.OnApplyTemplate) toggles IsExpanded. Both share
+                                         this one trailing Auto column. -->
+                                    <StackPanel Grid.Column="4" Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <ContentPresenter Content="{TemplateBinding Header}"
+                                                          VerticalAlignment="Center"
+                                                          Margin="12,0,0,0"/>
+                                        <Path x:Name="PART_Chevron" Margin="14,0,0,0"
+                                              Width="10" Height="6" Stretch="Uniform"
+                                              Data="M0,0 L5,6 L10,0"
+                                              Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.6"
+                                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              Fill="{x:Null}"
+                                              VerticalAlignment="Center"
+                                              RenderTransformOrigin="0.5,0.5"
+                                              Visibility="Collapsed">
+                                            <Path.RenderTransform>
+                                                <RotateTransform Angle="0"/>
+                                            </Path.RenderTransform>
+                                        </Path>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                             <!-- Body -->
-                            <ContentPresenter Margin="18,14,18,18"/>
+                            <ContentPresenter x:Name="PART_Body" Margin="18,14,18,18"/>
                         </DockPanel>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsCollapsible" Value="True">
+                            <Setter TargetName="PART_Chevron" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="PART_Header" Property="Cursor" Value="Hand"/>
+                        </Trigger>
+                        <Trigger Property="IsExpanded" Value="False">
+                            <Setter TargetName="PART_Body" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_Chevron" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="-90"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

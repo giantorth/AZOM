@@ -5,15 +5,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Đế</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Vô lăng</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Phanh tay</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>Cần số AB9</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Tùy chọn</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Tải lên</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Tệp trên vô lăng</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Nhập</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Giới thiệu</value></data>
@@ -71,31 +68,19 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Mức giảm chấn</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Tốc độ kích hoạt</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Lẫy</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Lẫy trái</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Lẫy phải</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Kết hợp</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Nút bấm</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>CÀI ĐẶT LẪY</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Chế độ lẫy</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Nút bấm</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kết hợp</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Tách riêng</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Điểm tách côn</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Cài đặt đầu vào</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Bộ mã hóa xoay</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Núm xoay</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Núm xoay 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Núm xoay 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Núm xoay 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Núm xoay 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Núm xoay 5</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Cần điều khiển làm D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Chế độ cần trái</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Gán cần điều khiển</value></data>
   <data name="Option_None" xml:space="preserve"><value>Không</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Trái</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Phải</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Cài đặt LED và nút bấm nằm trong tab thiết bị MOZA Wheel ở mục Devices.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>VỊ TRÍ</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// tín hiệu phanh tay trực tiếp</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Vị trí</value></data>
@@ -129,9 +114,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>PHANH · HIỆU CHUẨN</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>CÔN · HIỆU CHUẨN</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Tỷ lệ cảm biến</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = Cảm biến góc · 100% = Load Cell</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>CẦN SỐ CHỦ ĐỘNG AB9</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Đang tìm AB9...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>BỐ CỤC CƠ HỌC</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Bố cục 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R Bố cục 1</value></data>
@@ -161,24 +143,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Phanh</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Côn</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>CẢM GIÁC BÀN ĐẠP</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// quyết định cảm giác của bàn đạp, độc lập với đường cong đầu ra bên dưới</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Vùng chết (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Lực tối đa (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Chỉ xử lý ở phía phần mềm. Cả Vùng chết và Lực tối đa đều giả định thang đo cố định 0-200kg cho 0-100% hành trình bàn đạp, vì tín hiệu bàn đạp thô không có hiệu chỉnh lực riêng. Lực tối đa xác định vị trí đường cong đầu vào bên dưới đạt 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Bắt đầu / Kết thúc Hành trình (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Ghi giá trị hiệu chỉnh phần cứng thực tế (cmdId 0x84/0x85) — được dịch ngược từ các bản ghi Pit House, chưa được Moza xác nhận. Kéo hai nút để đặt điểm bắt đầu/kết thúc vật lý của hành trình bàn đạp, sau đó kiểm tra xem nó hoạt động đúng trên phần cứng của bạn hay không.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Độ cứng giới hạn đầu</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Độ cứng giới hạn cuối</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Ghi giá trị hiệu chỉnh phần cứng thực tế (cmdId 0xB2) — được dịch ngược từ các bản ghi Pit House, chưa được Moza xác nhận. Đặt độ cứng cảm nhận được khi bàn đạp chạm điểm bắt đầu/kết thúc hành trình vật lý.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Chỉ xử lý ở phía phần mềm: định hình lại vị trí bàn đạp được báo cáo trước khi nó đến game (và đường cong đầu ra trong Ánh xạ đầu vào Sim bên dưới). Không có gì được ghi vào thiết bị.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>ÁNH XẠ ĐẦU VÀO SIM</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// ánh xạ tín hiệu loadcell/bàn đạp vào game, theo kiểu Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Ngưỡng tối đa (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Được dịch ngược từ một bản ghi Pit House (cmdId 0xB3) — chưa được Moza xác nhận. Vui lòng kiểm tra xem nó hoạt động đúng trên phần cứng của bạn hay không.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Kéo một nút sang ngang để di chuyển vị trí của nó trên trục đầu vào — ví dụ kéo nút cuối sang trái để đạt 100% đầu ra trước khi đạt 100% đầu vào.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>HIỆU ỨNG</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// kích hoạt: ABS theo tín hiệu game · Khóa bánh khi phanh&gt;0.8 · Ngưỡng theo sườn xung · Động cơ liên tục</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Kiểm soát lực kéo</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Trượt bánh xe</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Sang số</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Kết cấu mặt đường</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Bật</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Thử 1 giây</value></data>
@@ -190,7 +168,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Độ mượt</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Mức kích hoạt đầu vào</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Độ suy giảm rung</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Đường di chuyển bàn đạp (5 giây gần nhất)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// thử nghiệm — có thể không được firmware mBooster áp dụng</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Chiều đảo ngược</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (thô)</value></data>
@@ -226,10 +203,13 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Thời kỳ 2024 — (đăng ký URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Thời kỳ 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Tự động phát hiện thời kỳ firmware của vô lăng từ bắt tay và chọn giao thức tương ứng. Chỉ ghi đè khi telemetry không hoạt động.</value></data>
+  <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Hiện tất cả các tab (nâng cao)</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ĐỊNH NGHĨA THIẾT BỊ</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>TRIỂN KHAI LẠI TẤT CẢ ĐỊNH NGHĨA</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Đã ghi {0}/{1} định nghĩa cho PID {2}. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>ĐẶT LẠI</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>XÓA TẤT CẢ CÀI ĐẶT &amp; HỒ SƠ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Thao tác này sẽ đặt lại toàn bộ cài đặt và hồ sơ của plugin về mặc định.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Chưa hoạt động</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Tính năng tải lên bảng điều khiển đang được phát triển và HIỆN KHÔNG đẩy tệp lên vô lăng.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TẢI LÊN BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// đẩy một tệp .mzdash lên vô lăng đang kết nối</value></data>
@@ -478,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// nhấn vào một cờ để đổi màu</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>CỜ 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>VÔ LĂNG ES · ĐÈN BÁO RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ĐÈN BÁO RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// giao thức ES cũ</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Chế độ đèn báo</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Chế độ hiển thị</value></data>
@@ -596,6 +576,10 @@ Hãy mở một bảng đồng hồ trong MOZA Pit House cho vô-lăng này trư
 
 Bạn có chắc không?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Xóa tất cả thiết lập</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Triển khai lại định nghĩa thiết bị</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Thao tác này sẽ ghi lại các định nghĩa thiết bị SimHub cho mọi vô lăng, màn hình và wheelbase MOZA đã biết, khớp với wheelbase đang kết nối.
+
+Mọi chỉnh sửa thủ công trong các tệp đó sẽ bị mất. Tiếp tục?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Xuất thất bại: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Không đọc được tệp .mzdash:
 {0}</value></data>
@@ -639,9 +623,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Mượt</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Tức thì</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Cần gạt</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Cần gạt đa chức năng</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Đang tìm cần gạt…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Đã kết nối cần gạt</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Chế độ cần gạt</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Hộp nút</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Mô phỏng xe tải (ETS2/ATS)</value></data>
@@ -676,7 +657,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>mBooster này lưu trữ nhiều bàn đạp trên một kết nối. Gán mỗi trục được phát hiện cho một đầu vào trò chơi. Thứ tự mặc định theo bố cục Rx/Ry/Rz của Moza (ga/phanh/côn) — gán lại tại đây nếu một bàn đạp điều khiển sai đầu vào.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Cần số</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>CÀI ĐẶT CẦN SỐ</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>ĐÈN LED</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// hai đèn LED tùy chỉnh (SGP)</value></data>
@@ -720,4 +702,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Nhập</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Xuất</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Rung mặt đường</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Góc</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Loadcell</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>CẢM GIÁC BÀN ĐẠP &amp; ÁNH XẠ ĐẦU VÀO SIM</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Mất Phanh Do Nhiệt (Thử nghiệm)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Nhiệt Độ Bắt Đầu (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Thử nghiệm — trong khi đang hoạt động, ghi các giá trị hiệu chỉnh phần cứng thực tế cho Kết thúc Hành trình và Ngưỡng tối đa (cần nhiều hành trình và lực hơn), sau đó khôi phục các giá trị bạn đã cấu hình khi phanh nguội dần. Yêu cầu các giá trị này đã được thiết lập trong Cảm giác Bàn đạp / Ánh xạ Đầu vào Sim — nếu không sẽ không có tác dụng.</value></data>
 </root>

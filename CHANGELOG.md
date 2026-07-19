@@ -2,6 +2,89 @@
 
 All notable changes to the AZOM MOZA SimHub plugin are documented here.
 
+## [1.5.1] - 2026-07-18
+
+### Added
+
+- **Wheel product images** — device definitions now deploy a matching wheel render, so each
+  MOZA device shows its own picture in SimHub's Devices list instead of a generic placeholder.
+  Covers ES, FSR V1, FSR V2, KS, KS Pro, CS Pro, TSW, Vision GS, CS, CS V2.1, GS, GS V2P, RS, 
+  RS V2, CM1, CM2 and Lamborghini Revuelto.  Art is also added up on already-deployed 
+  definitions at startup as needed.
+- **Next/previous-dashboard actions now work on FSR1 and CM1.** These displays don't speak
+  the same protocol, so the actions previously did nothing; they now cycle the FSR V1's
+  fixed pages and the CM1's 13, wrapping around.
+- **FSR1 default bindings for previously dead fields** — fuel remaining laps, ERS deploy left,
+  ERS harvested, fuel mix (was mislabelled "Fuel class"), and session time left.
+- **mBooster Traction Control, Wheel Spin, and Gear Shift** — three new pedal-motor effects
+  alongside the existing five. Traction Control mirrors ABS's pulse, driven by the game's TC flag;
+  Wheel Spin is its acceleration-side counterpart, triggered by a wheel-slip heuristic instead of
+  the game's own TC decision; Gear Shift fires a short pulse on every gear change, with its own
+  Vibrate on Neutral and Debounce controls, mirroring the wheelbase's own gearshift bump. All
+  three share Engine Vibration's wire slot rather than an unconfirmed effect type of their own.
+- **mBooster pedal rows are now renameable** — each connected pedal in the mBooster tab's device
+  list gets an editable display name (saved per profile), useful for telling pedals apart on a
+  multi-unit rig.
+- **"Redeploy all definitions" button** (Options tab) — force-rewrites every SimHub device
+  definition. Mostly useful for demos.
+- **"Show all tabs" option** (Options tab, advanced) — reveals every plugin tab regardless of
+  hardware detection, useful for demos.
+- **HGP and SGP shifters now get their own tabs** instead of sharing one, so both can be
+  configured independently. *(A base/hub-relayed HGP's identity discriminator isn't confirmed yet,
+  so its tab may not appear on that topology until that lands — a standalone-USB HGP and the SGP
+  on either topology are unaffected.)*
+
+### Changed
+
+- **Wheel LED writes are paced again instead of streamed.** All live wheel LED traffic (RPM,
+  button, and knob — colours and bitmasks) moved off the stream lanes back onto the paced FIFO.
+- **LED keepalive shortened to 0.75 s** (from 1.0 s) — the firmware drops live-LED ownership
+  1000 ms after the last feed, so scheduling at exactly 1.0 s always arrived late.
+- **FSR1 tyre/status record is now a background cache.** Record `0x0d` is no longer a selectable
+  page; it's appended as a secondary record to the pages that need it and sent at ~0.5 Hz, so
+  tyre temps and pressures, track/air temp, car count, and the "/total" on Position and Lap now
+  render on pages whose primary record doesn't carry them — without slowing the primary's
+  refresh. These rows are marked `(cache)` in the channel mapper.
+- **mBooster settings UI reorganized.** A single pedal-row list at the top of the mBooster tab
+  (one row per connected pedal, with its Role and — for the selected row — Display Name inline)
+  replaces the old trio of a device dropdown, a per-axis Pedal Roles panel, and a separate
+  "configure pedal" dropdown. Pedal Feel and Sim Input Mapping are now one combined, collapsible
+  card. The raw wire-level Calibration card is hidden by default (still experimental).
+- **mBooster Engine Vibration frequency is telemetry-derived again**, not a fixed user slider —
+  it now follows the same parametric model as the AB9 shifter's engine-vibration effect (frequency
+  scales with RPM toward redline), so only Intensity remains a user control.
+- **mBooster Pedal Trace is now a combined overlay.** The sparkline in the mBooster tab plots
+  Throttle/Brake/Clutch simultaneously instead of just the selected device, and the Pedals tab
+  gained its own live position graph.
+
+### Fixed
+
+- **Windows 11 timer resolution — smoother LED animations and correct display cadence.** An
+  inverted power-throttling flag told Windows to *ignore* the plugin's 1 ms timer request and pin
+  every timer to the default 15.625 ms grid, so a 20 ms worker actually fired at 31.25 ms and
+  50 Hz loops ran at ~32 Hz. 
+- **Button/knob colour ordering** — a colour could land after the bitmask that lights it, flipping
+  a group out of sync with the RPM strip; each colour now precedes its bitmask.
+- **ES wheel page simplified to a single tab-less page.** Updated settings page to better reflect
+  the capabilities of this wheel.
+- **mBooster routing on chained / multi-unit setups.** Effects and hardware calibration
+  (Direction/Min/Max, output curve, travel, endstops, sensor ratio, max threshold) were addressed
+  by HID axis index, which doesn't necessarily match the physical chain order — on a multi-pedal
+  rig this could send a setting or an effect's vibration to the wrong physical pedal. Each device's
+  role (Throttle/Brake/Clutch) is now resolved automatically from its own calibration read-back and
+  used for addressing, falling back to the old axis-index routing whenever it can't be resolved.
+- **mBooster hardware calibration now re-applies on a profile switch.** It previously only pushed
+  on (re)connect or the manual "Apply Cal" button, so switching SimHub profiles with the device
+  still connected silently left the *previous* profile's calibration live on the hardware.
+- **mBooster Gear Shift pulses could be missed** if the effect worker's own ~20 ms timer sampled
+  slower than a gear change came in — the one-tick change flag was replaced with a monotonic
+  counter each worker tracks independently, so a shift can no longer land between samples.
+- **Selected mBooster pedal no longer jumps to a different device** a couple of seconds after
+  opening settings — once a standalone unit's real wired axis resolves, the selection now follows
+  the same physical device onto the correct axis instead of falling back to the first device in
+  the list.
+- **mBooster Threshold effect no longer fires continuously** instead of only on a threshold cross.
+
 ## [1.5.0] - 2026-07-12
 
 mBooster custom-effect and engine-vibration work contributed by
@@ -443,6 +526,7 @@ First release that can drive the wheel's built-in dashboards (requires the match
 - Initial development: wheelbase control and build pipeline, per-wheel profiles, first device
   definitions, RPM range settings, blink colors, and the first telemetry/dashboard init attempts.
 
+[1.5.1]: https://github.com/giantorth/AZOM/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/giantorth/AZOM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/giantorth/AZOM/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/giantorth/AZOM/compare/v1.2.2...v1.3.0

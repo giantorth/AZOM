@@ -112,6 +112,15 @@ namespace MozaPlugin.Protocol
             if (deviceHint == null && deviceId == MozaProtocol.DeviceEsWheel)
                 deviceHint = "es-wheel";
 
+            // dev 0x1A → "shifter" so a base/hub-relayed shifter's identity probes
+            // (esp. the group-0x04 device-type reply, which shares its response group
+            // with wheel-*/es-wheel-*) resolve against the shifter-* bucket instead of
+            // matching wheel-device-type first. 0x1A is the shifter's exclusive bus id,
+            // so this never steals another device's reply. On its own USB pipe the
+            // shifter answers as 0x12 and the lane passes an explicit "shifter" busHint.
+            if (deviceHint == null && deviceId == MozaProtocol.DeviceHPattern)
+                deviceHint = "shifter";
+
             // Explicit bus override (AB9 connection passes "ab9" to dodge dev 0x12 collision).
             if (busHint != null)
                 deviceHint = busHint;

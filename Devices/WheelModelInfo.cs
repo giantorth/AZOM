@@ -221,6 +221,12 @@ namespace MozaPlugin.Devices
             // this wheel triggers a Table 8 read-fail storm in its firmware that
             // makes it intermittently unresponsive.
             ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, usesLegacyRpmTelemetry: true)),
+            // ESX — variant of the ES entry wheel; same old-protocol topology
+            // (wheelbase module at internal id 0x18, firmware model-name "ESX") and
+            // the same capabilities as the ES. Listed BEFORE "ES" so the longer
+            // prefix matches first (else an ESX wheel would resolve to the ES entry
+            // via StartsWith). GUID is UUID-v5 auto-generated; art is ESX.png.
+            ("ESX",     "ESX",        new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
             // ES — MOZA's entry wheel, integrated into the wheelbase as a module at
             // internal id 0x18 (firmware model-name "ES", hw "RS21-D05-HW SM-C").
             // Old-protocol RPM only: 10 RGB RPM LEDs driven via the wheel-old-rpm-*

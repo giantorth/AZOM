@@ -52,5 +52,46 @@ namespace MozaControls
             get => (Brush?)GetValue(AccentBrushProperty);
             set => SetValue(AccentBrushProperty, value);
         }
+
+        // Opt-in per instance (default false) so the many existing SectionCard
+        // usages across the app keep their current always-expanded look; only
+        // callers that set this get the header chevron + click-to-collapse.
+        public static readonly DependencyProperty IsCollapsibleProperty =
+            DependencyProperty.Register(nameof(IsCollapsible), typeof(bool), typeof(SectionCard),
+                new PropertyMetadata(false));
+
+        public bool IsCollapsible
+        {
+            get => (bool)GetValue(IsCollapsibleProperty);
+            set => SetValue(IsCollapsibleProperty, value);
+        }
+
+        public static readonly DependencyProperty IsExpandedProperty =
+            DependencyProperty.Register(nameof(IsExpanded), typeof(bool), typeof(SectionCard),
+                new PropertyMetadata(true));
+
+        public bool IsExpanded
+        {
+            get => (bool)GetValue(IsExpandedProperty);
+            set => SetValue(IsExpandedProperty, value);
+        }
+
+        private Border? _headerBorder;
+
+        public override void OnApplyTemplate()
+        {
+            base.OnApplyTemplate();
+            if (_headerBorder != null)
+                _headerBorder.MouseLeftButtonUp -= OnHeaderClicked;
+            _headerBorder = GetTemplateChild("PART_Header") as Border;
+            if (_headerBorder != null)
+                _headerBorder.MouseLeftButtonUp += OnHeaderClicked;
+        }
+
+        private void OnHeaderClicked(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (!IsCollapsible) return;
+            IsExpanded = !IsExpanded;
+        }
     }
 }

@@ -183,13 +183,21 @@ namespace MozaPlugin.Telemetry
                 raw = raw * (m?.Scale ?? f.DefaultScale) + (m?.Bias ?? f.DefaultBias);
                 if (f.Kind == Fsr1FieldKind.SignedMagnitude)
                 {
-                    // 24-bit sign-magnitude: bit23 = sign (set when negative), low bits = |value|.
-                    // Gap/delta is a signed ms delta to best; a negative delta (ahead) must not
-                    // clamp to 0. Cap the magnitude below bit23 so the sign stays isolated.
+                    // Sign-magnitude: bit23 (data[9] bit7) = sign, the low **16 bits** (data[10-11])
+                    // = |value|. The firmware reads a 16-bit magnitude — the whole ACC capture kept
+                    // data[9] as pure sign (0x00/0x80). So clamp |value| to 0xFFFF: a >65.535 s gap
+                    // saturates instead of overflowing into the sign byte and wrapping to a wrong
+                    // small value. A negative delta (ahead) must not clamp to 0.
                     long sv = (long)raw;
                     long mag = System.Math.Abs(sv);
-                    if (mag > 0x7FFFFF) mag = 0x7FFFFF;
-                    return (sv < 0 ? 0x800000L : 0L) | mag;
+                    if (mag > 0xFFFF) mag = 0xFFFF;
+                    long v = (sv < 0 ? 0x800000L : 0L) | mag;
+                    // Diagnostic: shows what we actually resolve vs what SimHub displays for this
+                    // property. If 'resolved' ≠ the SimHub inspector value, we're reading a different
+                    // value than the UI shows (path/timing), not a wire-format problem.
+                    if (_tickCounter % oneHzEvery == 0)
+                        MozaLog.Debug($"[AZOM] FSR1 gap '{prop}' resolved={raw / 1000.0:F3}s -> wire {(v >> 16) & 0xFF:X2} {(v >> 8) & 0xFF:X2} {v & 0xFF:X2} (shows {(sv < 0 ? "-" : "")}{mag / 1000.0:F3}s)");
+                    return v;
                 }
                 if (f.Kind == Fsr1FieldKind.Direct)
                     // Send the scaled value's digits as an integer — truncate, don't round.

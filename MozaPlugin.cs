@@ -779,6 +779,9 @@ namespace MozaPlugin
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
         internal bool IsShifterDetected => DetectionState.ShifterDetected;
         internal bool IsShifterHasLeds => DetectionState.ShifterHasLeds;
+        // Positive per-model gates for the dedicated HGP / SGP tabs (Unknown → neither).
+        internal bool IsHgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Hgp;
+        internal bool IsSgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Sgp;
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
@@ -1657,6 +1660,21 @@ namespace MozaPlugin
         private string? _lastAb9GearString;
         private DateTime _lastAb9GearShiftSendUtc = DateTime.MinValue;
 
+        // mBooster per-shift edge state. Separate gear-string latch from the
+        // wheelbase's/AB9's own — only the raw "did the gear string change
+        // this tick" edge + whether the new gear is neutral are computed
+        // here (once, globally); each mBooster device's own Gear Shift
+        // effect applies its own VibrateOnNeutral/DebounceMs on top of that
+        // raw edge in MBoosterEffectWorker.UpdateGearShiftRequest, so no
+        // debounce timestamp is needed at this layer.
+        private string? _lastMBoosterGearString;
+        // Monotonic shift counter for the mBooster Gear Shift effect — see
+        // MBoosterTelemetrySnapshot.GearShiftSeq. Advanced once per detected
+        // gear-string change; the per-device workers each track the last
+        // value they acted on so none can miss a shift the way a one-tick
+        // bool edge would when sampled by their slower ~20ms timer.
+        private int _mboosterShiftSeq;
+
         // Wheelbase LFE momentary test triggers (from the UI test buttons). No-op
         // when the firmware doesn't support LFE. Each plays a fixed pattern:
         // engine = 2 s sweep, ABS = 1 s burst, gearshift = two rapid bumps.
@@ -1887,15 +1905,29 @@ namespace MozaPlugin
                 var nd = data.NewData;
                 double brake01 = (nd?.Brake ?? 0.0) / 100.0;
                 if (brake01 < 0) brake01 = 0; if (brake01 > 1) brake01 = 1;
-                // ABSActive is SimHub's loosely-typed property — games supply
-                // bool / int / sbyte / byte / short / long depending on backend.
-                // Pattern-match the common shapes to skip Convert.ToInt32's
-                // InvariantCulture lookup and the try/catch on the hot path
-                // (DataUpdate runs at SimHub's data rate, ~60Hz+). Unknown
-                // types fall through to false — same observable behaviour as
-                // the catch-and-default that lived here previously.
+                double throttle01 = (nd?.Throttle ?? 0.0) / 100.0;
+                if (throttle01 < 0) throttle01 = 0; if (throttle01 > 1) throttle01 = 1;
+                // ABSActive/TCActive are SimHub's loosely-typed properties —
+                // games supply bool / int / sbyte / byte / short / long
+                // depending on backend. Pattern-match the common shapes to
+                // skip Convert.ToInt32's InvariantCulture lookup and the
+                // try/catch on the hot path (DataUpdate runs at SimHub's
+                // data rate, ~60Hz+). Unknown types fall through to false —
+                // same observable behaviour as the catch-and-default that
+                // lived here previously.
                 object? rawAbs = nd?.ABSActive;
                 bool absActive = rawAbs switch
+                {
+                    bool b   => b,
+                    int i    => i != 0,
+                    byte by  => by != 0,
+                    sbyte sb => sb != 0,
+                    short sh => sh != 0,
+                    long lo  => lo != 0,
+                    _ => false,
+                };
+                object? rawTc = nd?.TCActive;
+                bool tcActive = rawTc switch
                 {
                     bool b   => b,
                     int i    => i != 0,
@@ -1928,16 +1960,44 @@ namespace MozaPlugin
                 double brakeTempC = tempUnit.IndexOf("F", StringComparison.OrdinalIgnoreCase) >= 0
                     ? (brakeTempRaw - 32.0) * 5.0 / 9.0
                     : brakeTempRaw;
+                // Gear-change edge for the mBooster's Gear Shift effect —
+                // same string-latch + warm-up-guard pattern as
+                // CheckGearshiftEvent (wheelbase) / CheckAb9GearshiftEvent,
+                // but with its own independent latch and no debounce here
+                // (each mBooster device applies its own debounce/neutral
+                // settings in MBoosterEffectWorker.UpdateGearShiftRequest).
+                string? gearForMBooster = nd?.Gear;
+                if (!string.IsNullOrEmpty(gearForMBooster))
+                {
+                    if (_lastMBoosterGearString == null)
+                    {
+                        _lastMBoosterGearString = gearForMBooster; // warm-up: don't fire on the first observed value
+                    }
+                    else if (gearForMBooster != _lastMBoosterGearString)
+                    {
+                        _lastMBoosterGearString = gearForMBooster;
+                        _mboosterShiftSeq++; // monotonic — the worker samples this on its own timer; a bool edge would be dropped when DataUpdate outruns it
+                    }
+                }
+                // Level (not edge): true whenever the current gear is Neutral,
+                // so the worker reads valid neutral-ness even if it samples a
+                // tick or two after _mboosterShiftSeq advanced.
+                bool gearIsNeutral = gearForMBooster == "N" || gearForMBooster == "0";
                 var snap = new MBoosterTelemetrySnapshot(
                     gameRunning: data.GameRunning,
                     rpm: rpm,
+                    maxRpm: maxRpm,
                     idleRpm: idleRpm,
                     brake: brake01,
+                    throttle: throttle01,
                     absActive: absActive,
+                    tcActive: tcActive,
                     vehicleSpeedMs: vehicleMs,
                     avgWheelSpeedMs: avgWheelMs,
                     suspensionHeaveG: suspensionHeaveG,
-                    brakeTempC: brakeTempC);
+                    brakeTempC: brakeTempC,
+                    gearShiftSeq: _mboosterShiftSeq,
+                    gearIsNeutral: gearIsNeutral);
                 _mboosterRegistry.OnDataUpdate(snap);
             }
 
@@ -2221,48 +2281,86 @@ namespace MozaPlugin
                 else if (s.Pedals != null && s.Pedals.TryGetValue(axis, out var p) && p != null) cfg = p;
                 else continue;
 
-                if (cfg.Direction >= 0) controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction);
-                if (cfg.Min >= 0) controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min);
-                if (cfg.Max >= 0) controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max);
+                bool wroteAnyCalibration = false;
+
+                // Every per-pedal calibration here is a PHYSICAL setting stored
+                // on that pedal's own mBooster unit (confirmed on hardware: each
+                // unit reports only its own pedal's calibration, under its own
+                // role register). Address it by the pedal's ROLE through the
+                // calibration-derived chain map (same as the effects — see
+                // MBoosterEffectWorker.TargetDevice), NOT the raw HID axis: the
+                // motor/config device id follows the chain plug position, which
+                // doesn't match the HID axis order, so an axis-index device
+                // sends these writes to the wrong physical pedal. Falls back to
+                // the axis mapping (0x12 for a standalone) until the map resolves.
+                int roleIdx = role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? 0
+                            : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? 1
+                            : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
+                byte dev = controller.MotorDeviceForRole(roleIdx, axis);
+
+                if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev); wroteAnyCalibration = true; }
+                if (cfg.Min >= 0) { controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev); wroteAnyCalibration = true; }
+                if (cfg.Max >= 0) { controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev); wroteAnyCalibration = true; }
                 if (cfg.CurveY != null && cfg.CurveY.Length == 5)
                 {
+                    wroteAnyCalibration = true;
                     // Resample at the fixed 20/40/60/80/100 breakpoints in case
                     // CurveX has been horizontally dragged (see
                     // MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints) —
                     // identity when it hasn't.
                     var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(cfg.CurveX, cfg.CurveY);
                     for (int k = 0; k < 5; k++)
-                        controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k]);
+                        controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k], dev);
                 }
-
-                // Load-cell / physical settings share the single brake-named wire
-                // command set, so each mBooster UNIT is addressed by its own
-                // device id (0x12 host, 0x1d/0x1e chain ports). Pedal travel +
-                // endstop exist on every pedal mode; sensor ratio + max threshold
-                // are load-cell-only and the UI only lets you set them for a
-                // brake (unset = -1 = skipped). Calibration above stays per-role
-                // on 0x12 — the host aggregates the output mapping (capture-verified).
-                byte dev = global::MozaPlugin.Devices.MBoosterDeviceController.MotorDeviceForAxis(axis);
                 if (cfg.TravelStartMm >= 0)
+                {
                     controller.SendIntWrite("mbooster-brake-travel-start",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelStartMm), dev);
+                    wroteAnyCalibration = true;
+                }
                 if (cfg.TravelEndMm >= 0)
+                {
                     controller.SendIntWrite("mbooster-brake-travel-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelEndMm), dev);
+                    wroteAnyCalibration = true;
+                }
                 if (cfg.EndstopFrontStiffness >= 0)
+                {
                     controller.SendIntWrite("mbooster-brake-endstop-front",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopFrontStiffness), dev);
+                    wroteAnyCalibration = true;
+                }
                 if (cfg.EndstopEndStiffness >= 0)
+                {
                     controller.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopEndStiffness), dev);
+                    wroteAnyCalibration = true;
+                }
                 if (role == global::MozaPlugin.Devices.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0)
+                    {
                         controller.SendFloatWrite("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct, dev);
+                        wroteAnyCalibration = true;
+                    }
                     if (cfg.MaxThresholdKg >= 0)
+                    {
                         controller.SendIntWrite("mbooster-brake-threshold",
                             global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(cfg.MaxThresholdKg), dev);
+                        wroteAnyCalibration = true;
+                    }
                 }
+
+                // EXPERIMENTAL / unverified — confirmed on hardware to be
+                // required for a Travel edit to actually take effect; applied
+                // here too on the theory the same firmware requirement covers
+                // every write above, not just Travel. See
+                // MBoosterDeviceController.PushCurve7Resync. Guarded like the
+                // writes above (not unconditional) to preserve this method's
+                // "fresh profile with no overrides produces zero hardware
+                // writes" guarantee.
+                if (wroteAnyCalibration)
+                    controller.PushCurve7Resync(cfg.CurveX, cfg.CurveY, dev);
             }
         }
 
@@ -3859,25 +3957,6 @@ namespace MozaPlugin
                 // Handles ES → new-protocol case where the base keeps responding
                 // on the locked ID (19) so miss counter never fires.
                 _deviceManager.ProbeOtherWheelIds();
-
-                // Generic old-proto definition is the FALLBACK: deploy it only if no
-                // model-specific definition was already deployed for this old wheel.
-                // An ES wheel deploys "MOZA ES" from the es-wheel-model-name case
-                // (which sets OldProtoFallbackDeployed), so it never gets the generic
-                // device. The grace window lets a slightly-late 0x18 reply set that
-                // flag before this fires, avoiding a duplicate deploy.
-                const long OldProtoFallbackGraceMs = 3000;
-                long oldProtoDetectedTicks = WheelDetectedUtcTicks;
-                if (DetectionState.OldWheelDetected
-                    && !DetectionState.OldProtoFallbackDeployed
-                    && oldProtoDetectedTicks != 0
-                    && (DateTime.UtcNow.Ticks - oldProtoDetectedTicks) / TimeSpan.TicksPerMillisecond >= OldProtoFallbackGraceMs)
-                {
-                    DetectionState.OldProtoFallbackDeployed = true;
-                    if (DeviceDefinitionDeployer.DeployOldProtoWheel(_connection.DiscoveredPid))
-                        DeviceDefinitionDeployed = true;
-                    MozaLog.Info("[AZOM] Old-protocol wheel: no model-specific definition — deployed generic old-proto (fallback)");
-                }
             }
 
             // Base temps/state are dev-0x13 reads the base main controller answers.

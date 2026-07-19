@@ -5,15 +5,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>База</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Руль</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Ручник</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Педали</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>Кулиса AB9</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Хаб</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Параметры</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Загрузка</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Файлы руля</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Импорт</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>О программе</value></data>
@@ -71,31 +68,19 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Уровень демпфирования</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Скорость срабатывания</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Лепестки</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Левый лепесток</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Правый лепесток</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Комбинированный</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Кнопки</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>НАСТРОЙКИ ЛЕПЕСТКОВ</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Режим лепестков</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Кнопки</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-Pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Комбинированный</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Раздельный</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Точка разделения сцепления</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Настройки ввода</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Поворотные энкодеры</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Энкодер</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Энкодер 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Энкодер 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Энкодер 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Энкодер 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Энкодер 5</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Стик как D-Pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Режим левого стика</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Назначение джойстика</value></data>
   <data name="Option_None" xml:space="preserve"><value>Нет</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Левый</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Правый</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Настройки светодиодов и кнопок находятся во вкладке устройства MOZA Wheel в разделе Устройства.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>ПОЛОЖЕНИЕ</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// текущее значение ручника</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Положение</value></data>
@@ -129,9 +114,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>ТОРМОЗ · КАЛИБРОВКА</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>СЦЕПЛЕНИЕ · КАЛИБРОВКА</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Соотношение датчиков</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0% = датчик угла · 100% = тензодатчик</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>АКТИВНАЯ КУЛИСА AB9</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Поиск AB9…</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>МЕХАНИЧЕСКАЯ СХЕМА</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Схема 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R Схема 1</value></data>
@@ -161,24 +143,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Тормоз</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Сцепление</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>ОЩУЩЕНИЕ ПЕДАЛИ</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// определяет ощущение педали, независимо от кривой вывода ниже</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Мёртвая зона (кг)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Макс. усилие (кг)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Только на стороне ПО. Мёртвая зона и Макс. усилие используют одну и ту же фиксированную полную шкалу 0-200 кг для 0-100% хода педали, поскольку необработанный сигнал педали не имеет собственной калибровки по силе. Макс. усилие задаёт, где кривая ввода ниже достигает 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Начало / Конец хода (мм)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Записывает реальные калибровочные значения на устройство (cmdId 0x84/0x85) — определено с помощью обратной разработки на основе захвата трафика Pit House, не подтверждено Moza. Перетащите два узла, чтобы задать физические начало и конец хода педали, затем проверьте корректную работу на вашем оборудовании.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Жёсткость переднего упора</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Жёсткость заднего упора</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Записывает реальные калибровочные значения на устройство (cmdId 0xB2) — определено с помощью обратной разработки на основе захвата трафика Pit House, не подтверждено Moza. Задаёт, насколько жёстко ощущается педаль при достижении начала/конца физического хода.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Только на стороне ПО: преобразует сообщаемое положение педали до того, как оно попадёт в игру (и в кривую вывода в разделе «Сопоставление ввода симулятора» ниже). На устройство ничего не записывается.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>СОПОСТАВЛЕНИЕ ВВОДА СИМУЛЯТОРА</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// сопоставление сигнала тензодатчика/педали с игрой, в стиле Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Макс. порог (кг)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Определено с помощью обратной разработки на основе захвата трафика Pit House (cmdId 0xB3) — не подтверждено Moza. Пожалуйста, проверьте корректную работу на вашем оборудовании.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Перетащите узел в сторону, чтобы изменить его положение на оси ввода — например, перетащите последний узел влево, чтобы 100% выхода достигалось раньше 100% входа.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>ЭФФЕКТЫ</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// триггеры: ABS по сигналу игры · Блокировка при тормозе&gt;0,8 · Порог по фронту · Двигатель непрерывно</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Контроль тяги</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Пробуксовка колёс</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Переключение передач</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Текстура дороги</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Включить</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Тест 1с</value></data>
@@ -190,7 +168,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Плавность</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>График педали (последние 5с)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// экспериментально — прошивка mBooster может это игнорировать</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Инвертированное направление</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Мин (сырое)</value></data>
@@ -226,10 +203,13 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Эра 2024 — (подписка по URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Эра 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Авто определяет эру прошивки руля по его рукопожатию и выбирает соответствующий протокол. Переопределяйте, только если телеметрия не работает.</value></data>
+  <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Показывать все вкладки (для опытных)</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ОПРЕДЕЛЕНИЯ УСТРОЙСТВ</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>ПЕРЕУСТАНОВИТЬ ВСЕ ОПРЕДЕЛЕНИЯ</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Записано {0} из {1} определений для PID {2}. Перезапустите SimHub, чтобы применить их.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>СБРОС</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ОЧИСТИТЬ ВСЕ НАСТРОЙКИ И ПРОФИЛИ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Это сбросит все настройки и профили плагина к значениям по умолчанию.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Пока не работает</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Загрузка панели находится в разработке и пока НЕ передаёт файлы на руль.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ЗАГРУЗКА ПАНЕЛИ</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// отправка файла .mzdash на подключённый руль</value></data>
@@ -478,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// нажмите флаг для перекраски</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>ФЛАГ 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>РУЛЬ ES · ИНДИКАТОР RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ИНДИКАТОР RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// унаследованный протокол ES</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Режим индикатора</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Режим отображения</value></data>
@@ -596,6 +576,10 @@
 
 Вы уверены?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Очистить все настройки</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Переустановить определения устройств</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Это перезапишет определения устройств SimHub для всех известных рулей, приборных панелей и баз MOZA в соответствии с подключённой базой.
+
+Ручные изменения в этих файлах будут потеряны. Продолжить?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Не удалось экспортировать: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Не удалось прочитать файл .mzdash:
 {0}</value></data>
@@ -639,9 +623,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Плавный</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Мгновенный</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Подрулевые</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Многофункциональные подрулевые</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Поиск подрулевых…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Подрулевые подключены</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Режим подрулевых</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Кнопочная панель</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Симулятор грузовика (ETS2/ATS)</value></data>
@@ -676,7 +657,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Этот mBooster обслуживает несколько педалей по одному подключению. Назначьте каждую обнаруженную ось на игровой вход. Порядок по умолчанию соответствует раскладке Moza Rx/Ry/Rz (газ/тормоз/сцепление) — переназначьте здесь, если педаль управляет не тем входом.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Кулиса</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>НАСТРОЙКИ КУЛИСЫ</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>ПОДСВЕТКА</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// два настраиваемых светодиода (SGP)</value></data>
@@ -720,4 +702,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Импорт</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Экспорт</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Дорожная вибрация</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Угол</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Тензодатчик</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>ОЩУЩЕНИЕ ПЕДАЛИ &amp; СОПОСТАВЛЕНИЕ ВВОДА СИМУЛЯТОРА</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Затухание тормозов (Экспериментально)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Температура начала (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Экспериментально — пока активно, записывает реальные калибровки оборудования для конца хода и макс. порога (требуется больше хода и больше усилия), а затем восстанавливает заданные вами значения по мере остывания тормозов. Требует, чтобы эти значения уже были заданы в разделе «Ощущение педали / Сопоставление ввода симулятора» — иначе не действует.</value></data>
 </root>

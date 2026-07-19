@@ -10,15 +10,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Base</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Ratt</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Håndbrekk</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Pedaler</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9-girspak</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Alternativer</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Last opp</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Rattfiler</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Om</value></data>
@@ -76,31 +73,19 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Dempenivå</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Utløserhastighet</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Padler</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Venstre padle</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Høyre padle</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Kombinert</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Knapper</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>PADLE-INNSTILLINGER</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Padlemodus</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Knapper</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>D-pad</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Kombinert</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Delt</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Clutch-delingspunkt</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Inngangsinnstillinger</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Rotary-encodere</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Bryter</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Rotary 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Rotary 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Rotary 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Rotary 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Rotary 5</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick som D-pad</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Venstre stikk-modus</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Joystick-tildeling</value></data>
   <data name="Option_None" xml:space="preserve"><value>Ingen</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Venstre</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Høyre</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>LED- og knappeinnstillinger ligger på MOZA Ratt-enhetsfanen under Enheter.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>POSISJON</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// håndbrekk-inngang live</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Posisjon</value></data>
@@ -134,9 +119,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>BREMS · KALIBRERING</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>CLUTCH · KALIBRERING</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensorforhold</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0 % = vinkelsensor · 100 % = lastcelle</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>AB9 ACTIVE SHIFTER</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Søker etter AB9...</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>MEKANISK OPPSETT</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R-oppsett 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R-oppsett 1</value></data>
@@ -166,24 +148,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Brems</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Clutch</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>PEDALFØLELSE</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// bestemmer hvordan pedalen føles, uavhengig av utgangskurven under</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Dødsone (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Maks kraft (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Bare programvareside. Dødsone og Maks kraft forutsetter begge en fast 0-200kg fullskala for 0-100% pedalbevegelse, siden det rå pedalsignalet ikke har egen kraftkalibrering. Maks kraft angir hvor inngangskurven under når 100%.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Start / Slutt på Bevegelse (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Skriver ekte maskinvarekalibrering (cmdId 0x84/0x85) — reverse-engineert fra Pit House-opptak, ikke bekreftet av Moza. Dra de to nodene for å angi det fysiske start-/sluttpunktet for pedalbevegelsen, og bekreft deretter at dette fungerer korrekt på din maskinvare.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Frontgrense-stivhet</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Sluttgrense-stivhet</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Skriver ekte maskinvarekalibrering (cmdId 0xB2) — reverse-engineert fra Pit House-opptak, ikke bekreftet av Moza. Angir hvor hardt pedalen føles når den når start-/sluttpunktet for den fysiske bevegelsen.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Bare programvareside: omformer den rapporterte pedalposisjonen før den når spillet (og utgangskurven i Sim-inngangskartlegging under). Ingenting skrives til enheten.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM-INNGANGSKARTLEGGING</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// kartlegger lastcelle-/pedalsignalet til spillet, Pit House-stil</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Maks terskel (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Reverse-engineert fra en Pit House-opptak (cmdId 0xB3) — ikke bekreftet av Moza. Vennligst bekreft at dette fungerer korrekt på din maskinvare.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Dra en node sidelengs for å flytte posisjonen på inngangsaksen — dra f.eks. den siste noden til venstre slik at 100 % utgang nås før 100 % inngang.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFEKTER</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// utløsere: ABS på spillsignal · lockup på brems&gt;0,8 · terskel på flanke · motor kontinuerlig</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Traksjonskontroll</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Hjulspinn</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Girskift</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Veitekstur</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Aktiver</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Test 1s</value></data>
@@ -195,7 +173,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Glatthet</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Pedalspor (siste 5s)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// eksperimentelt — kanskje ikke respektert av mBooster-firmware</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Reversert retning</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (rå)</value></data>
@@ -231,10 +208,13 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024-versjon — (URL-abonnement)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026-versjon — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detekterer rattets firmware-versjon fra handshake og velger riktig protokoll. Overstyr kun hvis telemetrien ikke virker.</value></data>
+  <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Vis alle faner (avansert)</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ENHETSDEFINISJONER</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>DISTRIBUER ALLE DEFINISJONER PÅ NYTT</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>Skrev {0} av {1} definisjoner for PID {2}. Start SimHub på nytt for å ta dem i bruk.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>TILBAKESTILL</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>TØM ALLE INNSTILLINGER OG PROFILER</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Dette tilbakestiller alle plugin-innstillinger og profiler til standardverdiene.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Fungerer ikke ennå</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard-opplasting er under utvikling og sender for øyeblikket IKKE filer til rattet.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-OPPLASTING</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// send en .mzdash-fil til tilkoblet ratt</value></data>
@@ -483,7 +463,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// klikk et flagg for å endre farge</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAGG 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ES-RATT · RPM-INDIKATOR</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM-INDIKATOR</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// eldre ES-protokoll</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indikatormodus</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Visningsmodus</value></data>
@@ -601,6 +581,10 @@ Søkte under:
 
 Er du sikker?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Tøm alle innstillinger</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Distribuer enhetsdefinisjoner på nytt</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dette skriver om SimHub-enhetsdefinisjonene for alle kjente MOZA-ratt, dashbord og wheelbaser, tilpasset den tilkoblede wheelbasen.
+
+Manuelle endringer i disse filene går tapt. Fortsette?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Eksport mislyktes: {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Kunne ikke lese .mzdash-filen:
 {0}</value></data>
@@ -644,9 +628,6 @@ Id: {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Jevn</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Umiddelbar</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Spaker</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Multifunksjonsspaker</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Søker etter spaker…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Spaker tilkoblet</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Spakmodus</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Knappeboks</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
@@ -681,7 +662,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Denne mBooster er vert for mer enn ett pedal på én tilkobling. Tildel hver oppdaget akse til en spillinngang. Standardrekkefølgen følger Mozas Rx/Ry/Rz-oppsett (gass/brems/clutch) — tilordne på nytt her hvis et pedal styrer feil inngang.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Girspak</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>GIRSPAK-INNSTILLINGER</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>LED</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// to konfigurerbare LED-er (SGP)</value></data>
@@ -725,4 +707,10 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Eksporter</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Veirumling</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Vinkel</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Lastcelle</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>PEDALFØLELSE &amp; SIM-INNGANGSKARTLEGGING</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsefading (Eksperimentell)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Starttemperatur (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Eksperimentell — skriver de ekte maskinvarekalibreringene for Sluttpunkt for bevegelse og Maks terskel mens den er aktiv (mer bevegelse og mer kraft kreves), og gjenoppretter deretter dine konfigurerte verdier etter hvert som bremsene kjøles ned. Krever at disse allerede er satt i Pedalfølelse / Sim-inngangskartlegging — har ellers ingen effekt.</value></data>
 </root>

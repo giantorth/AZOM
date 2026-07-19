@@ -5,15 +5,12 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="TabHeader_Base" xml:space="preserve"><value>Base</value></data>
-  <data name="TabHeader_Wheel" xml:space="preserve"><value>Volant</value></data>
   <data name="TabHeader_Handbrake" xml:space="preserve"><value>Frein à main</value></data>
   <data name="TabHeader_Pedals" xml:space="preserve"><value>Pédales</value></data>
-  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>Levier AB9</value></data>
+  <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
-  <data name="TabHeader_Upload" xml:space="preserve"><value>Téléverser</value></data>
-  <data name="TabHeader_WheelFiles" xml:space="preserve"><value>Fichiers du volant</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>À propos</value></data>
@@ -71,31 +68,19 @@
   <data name="SliderLabel_Bluetooth" xml:space="preserve"><value>Bluetooth</value></data>
   <data name="SliderLabel_DampingLevel" xml:space="preserve"><value>Niveau d'amortissement</value></data>
   <data name="SliderLabel_TriggerSpeed" xml:space="preserve"><value>Vitesse de déclenchement</value></data>
-  <data name="Section_Paddles" xml:space="preserve"><value>Palettes</value></data>
-  <data name="Label_LeftPaddle" xml:space="preserve"><value>Palette gauche</value></data>
-  <data name="Label_RightPaddle" xml:space="preserve"><value>Palette droite</value></data>
-  <data name="Label_Combined" xml:space="preserve"><value>Combiné</value></data>
-  <data name="Section_Buttons" xml:space="preserve"><value>Boutons</value></data>
   <data name="Section_PaddleSettings" xml:space="preserve"><value>RÉGLAGES DES PALETTES</value></data>
   <data name="SliderLabel_PaddlesMode" xml:space="preserve"><value>Mode des palettes</value></data>
   <data name="Option_Buttons" xml:space="preserve"><value>Boutons</value></data>
+  <data name="Option_Dpad" xml:space="preserve"><value>Croix directionnelle</value></data>
   <data name="Option_Combined" xml:space="preserve"><value>Combiné</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Séparé</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Point de séparation embrayage</value></data>
-  <data name="Section_InputSettings" xml:space="preserve"><value>Réglages d'entrée</value></data>
-  <data name="SliderLabel_RotaryEncoders" xml:space="preserve"><value>Encodeurs rotatifs</value></data>
   <data name="Option_Knob" xml:space="preserve"><value>Encodeur</value></data>
-  <data name="SliderLabel_Rotary1" xml:space="preserve"><value>Rotatif 1</value></data>
-  <data name="SliderLabel_Rotary2" xml:space="preserve"><value>Rotatif 2</value></data>
-  <data name="SliderLabel_Rotary3" xml:space="preserve"><value>Rotatif 3</value></data>
-  <data name="SliderLabel_Rotary4" xml:space="preserve"><value>Rotatif 4</value></data>
-  <data name="SliderLabel_Rotary5" xml:space="preserve"><value>Rotatif 5</value></data>
-  <data name="SliderLabel_StickAsDpad" xml:space="preserve"><value>Stick comme croix directionnelle</value></data>
+  <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Mode du stick gauche</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Affectation du joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Aucun</value></data>
   <data name="Option_Left" xml:space="preserve"><value>Gauche</value></data>
   <data name="Option_Right" xml:space="preserve"><value>Droite</value></data>
-  <data name="Hint_LedButtonSettingsInDeviceTab" xml:space="preserve"><value>Les réglages des LED et des boutons se trouvent dans l'onglet du périphérique MOZA Wheel sous Périphériques.</value></data>
   <data name="Section_Position" xml:space="preserve"><value>POSITION</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// entrée du frein à main en direct</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Position</value></data>
@@ -129,9 +114,6 @@
   <data name="Section_BrakeCalibration" xml:space="preserve"><value>FREIN · CALIBRATION</value></data>
   <data name="Section_ClutchCalibration" xml:space="preserve"><value>EMBRAYAGE · CALIBRATION</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Ratio des capteurs</value></data>
-  <data name="Hint_AngleSensorVsLoadCell" xml:space="preserve"><value>0 % = capteur d'angle · 100 % = capteur de charge</value></data>
-  <data name="Section_Ab9ActiveShifter" xml:space="preserve"><value>LEVIER ACTIF AB9</value></data>
-  <data name="Status_SearchingForAb9" xml:space="preserve"><value>Recherche de l'AB9…</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>DISPOSITION MÉCANIQUE</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Disposition 1</value></data>
   <data name="Option_Ab9Layout6R1" xml:space="preserve"><value>6+R Disposition 1</value></data>
@@ -161,24 +143,20 @@
   <data name="Option_Brake" xml:space="preserve"><value>Frein</value></data>
   <data name="Option_Clutch" xml:space="preserve"><value>Embrayage</value></data>
   <data name="Section_PedalFeel" xml:space="preserve"><value>RESSENTI DE LA PÉDALE</value></data>
-  <data name="Subtitle_PedalFeel" xml:space="preserve"><value>// détermine le ressenti de la pédale, indépendamment de la courbe de sortie ci-dessous</value></data>
   <data name="SliderLabel_DeadzoneKg" xml:space="preserve"><value>Zone morte (kg)</value></data>
   <data name="SliderLabel_MaxForceKg" xml:space="preserve"><value>Force maximale (kg)</value></data>
-  <data name="Hint_DeadzoneScaleAssumption" xml:space="preserve"><value>Uniquement côté logiciel. La Zone morte et la Force maximale supposent toutes deux une échelle fixe de 0 à 200 kg pour 0-100 % de la course de la pédale, car le signal brut de la pédale n'a pas d'étalonnage de force propre. Force maximale définit où la courbe d'entrée ci-dessous atteint 100 %.</value></data>
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Début / Fin de Course (mm)</value></data>
-  <data name="Hint_TravelRangeMm" xml:space="preserve"><value>Écrit une calibration matérielle réelle (cmdId 0x84/0x85) — rétro-ingénierie à partir de captures Pit House, non confirmé par Moza. Faites glisser les deux nœuds pour définir le début/la fin physique de la course de la pédale, puis vérifiez que cela fonctionne correctement sur votre matériel.</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Rigidité de butée avant</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Rigidité de butée de fin</value></data>
-  <data name="Hint_EndstopStiffness" xml:space="preserve"><value>Écrit une calibration matérielle réelle (cmdId 0xB2) — rétro-ingénierie à partir de captures Pit House, non confirmé par Moza. Définit la dureté ressentie lorsque la pédale atteint le début/la fin de sa course physique.</value></data>
-  <data name="Hint_InputCurveHostOnly" xml:space="preserve"><value>Uniquement côté logiciel : remodèle la position de pédale signalée avant qu'elle n'atteigne le jeu (et la courbe de sortie de Mappage d'entrée Sim ci-dessous). Rien n'est envoyé à l'appareil.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>MAPPAGE D'ENTRÉE SIM</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// mappe le signal de la cellule de charge/pédale vers le jeu, à la manière de Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Seuil maximal (kg)</value></data>
-  <data name="Hint_MaxThresholdReverseEngineered" xml:space="preserve"><value>Rétro-ingénierie à partir d'une capture Pit House (cmdId 0xB3) — non confirmé par Moza. Merci de vérifier que cela fonctionne correctement sur votre matériel.</value></data>
-  <data name="Hint_OutputCurveDragX" xml:space="preserve"><value>Faites glisser un nœud latéralement pour déplacer sa position sur l'axe d'entrée — par exemple, faites glisser le dernier nœud vers la gauche pour atteindre 100 % de sortie avant 100 % d'entrée.</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFETS</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// déclencheurs : ABS sur signal du jeu · Blocage au frein&gt;0,8 · Seuil sur front · Moteur continu</value></data>
   <data name="Section_Abs" xml:space="preserve"><value>ABS</value></data>
+  <data name="Section_TractionControl" xml:space="preserve"><value>Contrôle de traction</value></data>
+  <data name="Section_WheelSpin" xml:space="preserve"><value>Patinage des roues</value></data>
+  <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Changement de vitesse</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Texture de la route</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Activer</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Tester 1 s</value></data>
@@ -190,7 +168,6 @@
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Douceur</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Niveau de déclenchement</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Décroissance de la vibration</value></data>
-  <data name="Label_PedalTrace" xml:space="preserve"><value>Trace de la pédale (5 dernières s)</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// expérimental — peut ne pas être pris en compte par le firmware du mBooster</value></data>
   <data name="Label_ReversedDirection" xml:space="preserve"><value>Direction inversée</value></data>
   <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (brut)</value></data>
@@ -226,10 +203,13 @@
   <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Ère 2024 — (abonnement par URL)</value></data>
   <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Ère 2026 — CSP/KSP</value></data>
   <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto détecte l'ère du firmware du volant depuis sa poignée de main et choisit le protocole correspondant. Ne forcez l'option que si la télémétrie ne fonctionne pas.</value></data>
+  <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Afficher tous les onglets (avancé)</value></data>
+  <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DÉFINITIONS D'APPAREIL</value></data>
+  <data name="Button_RedeployDefinitions" xml:space="preserve"><value>REDÉPLOYER TOUTES LES DÉFINITIONS</value></data>
+  <data name="Status_RedeployedFmt" xml:space="preserve"><value>{0} définitions sur {1} écrites pour le PID {2}. Redémarrez SimHub pour les prendre en compte.</value></data>
   <data name="Section_Reset" xml:space="preserve"><value>RÉINITIALISER</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>EFFACER TOUS LES RÉGLAGES ET PROFILS</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Cela réinitialisera tous les réglages et profils du plugin à leurs valeurs par défaut.</value></data>
-  <data name="Banner_NotWorkingYet" xml:space="preserve"><value>⚠  Ne fonctionne pas encore</value></data>
   <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Le téléversement du tableau de bord est en développement et n'envoie PAS actuellement de fichiers vers le volant.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TÉLÉVERSEMENT DU TABLEAU DE BORD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// envoyer un fichier .mzdash vers le volant connecté</value></data>
@@ -478,7 +458,7 @@
   <data name="Label_LedPlaceholder" xml:space="preserve"><value>LED 01</value></data>
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// cliquez sur un drapeau pour le recolorer</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>DRAPEAU 1</value></data>
-  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>VOLANT ES · INDICATEUR RPM</value></data>
+  <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>INDICATEUR RPM</value></data>
   <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// protocole ES hérité</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Mode indicateur</value></data>
   <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Mode d'affichage</value></data>
@@ -596,6 +576,10 @@ Ouvrez d'abord un tableau de bord dans MOZA Pit House pour ce volant.</value></d
 
 Êtes-vous sûr ?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Effacer tous les paramètres</value></data>
+  <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Redéployer les définitions d'appareil</value></data>
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Cela réécrira les définitions d'appareil SimHub pour tous les volants, dashes et bases MOZA connus, adaptées à la base connectée.
+
+Toute modification manuelle de ces fichiers sera perdue. Continuer ?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Échec de l'exportation : {0}</value></data>
   <data name="Dialog_ReadMzdashFailed" xml:space="preserve"><value>Échec de la lecture du fichier .mzdash :
 {0}</value></data>
@@ -639,9 +623,6 @@ Id : {2}</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Fluide</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immédiate</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Commodos</value></data>
-  <data name="Section_Stalks" xml:space="preserve"><value>Commodos multifonctions</value></data>
-  <data name="Status_SearchingForStalks" xml:space="preserve"><value>Recherche des commodos…</value></data>
-  <data name="Status_StalksConnected" xml:space="preserve"><value>Commodos connectés</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Mode commodo</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Boîte à boutons</value></data>
   <data name="Option_StalkTruckSim" xml:space="preserve"><value>Simu camion (ETS2/ATS)</value></data>
@@ -676,7 +657,8 @@ Id : {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Ce mBooster héberge plusieurs pédales sur une seule connexion. Attribuez chaque axe détecté à une entrée de jeu. L'ordre par défaut suit la disposition Rx/Ry/Rz de Moza (accélérateur/frein/embrayage) — réattribuez ici si une pédale pilote la mauvaise entrée.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Levier</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>RÉGLAGES DU LEVIER</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>LEDS</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// deux LED configurables (SGP)</value></data>
@@ -720,4 +702,10 @@ Id : {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Exporter</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Grondement route</value></data>
+  <data name="Label_AngleSensor" xml:space="preserve"><value>Angle</value></data>
+  <data name="Label_LoadCell" xml:space="preserve"><value>Cellule de Charge</value></data>
+  <data name="Section_PedalFeelSimInput" xml:space="preserve"><value>RESSENTI DE LA PÉDALE &amp; MAPPAGE D'ENTRÉE SIM</value></data>
+  <data name="Section_BrakeFade" xml:space="preserve"><value>Fading des Freins (Expérimental)</value></data>
+  <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Température de Déclenchement (°C)</value></data>
+  <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Expérimental — écrit, tant que c'est actif, les calibrations matérielles réelles de Fin de Course et de Seuil maximal (plus de course et plus de force nécessaires), puis restaure vos valeurs configurées à mesure que les freins refroidissent. Nécessite que ces valeurs soient déjà définies dans Ressenti de la Pédale / Mappage d'Entrée Sim — sans effet sinon.</value></data>
 </root>

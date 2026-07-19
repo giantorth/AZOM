@@ -213,10 +213,13 @@ namespace MozaPlugin.Devices
             _plugin.SaveSettings();
         }
 
-        private void WiStickModeCheck_Click(object sender, RoutedEventArgs e)
+        // Old-protocol stick mode (ES + old-firmware new wheels): 0=Buttons, 1=D-Pad.
+        // Wire value is the 2-byte form 0x0100 for D-Pad, 0 for Buttons.
+        private void WiStickModeOldCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents || _plugin == null || _data == null) return;
-            int val = WiStickModeCheck.IsChecked == true ? 1 : 0;
+            int val = WiStickModeOldCombo.SelectedIndex;
+            if (val < 0) return; // fires during refresh
             _data.WheelStickMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
             _plugin.WriteIfWheelDetected("wheel-stick-mode", val * 256);
@@ -235,11 +238,27 @@ namespace MozaPlugin.Devices
 
         // ── Refresh: pulls _data state into Inputs + Knobs UI ──────────
 
-        private void RefreshInputsAndKnobsSignalMode(bool newWheelDetected)
+        private void RefreshInputsAndKnobsSignalMode(bool newWheelDetected, bool oldWheelDetected)
         {
             if (_data == null) return;
             using (_suppressor.Begin())
             {
+                // Analog-paddle indicators + paddle settings only apply to
+                // new-protocol wheels. The ES (old protocol) has no analog
+                // paddles — hide those cards and let Active Buttons span the row.
+                if (WiLivePaddlesCard != null)
+                {
+                    bool esWheel = oldWheelDetected;
+                    WiLivePaddlesCard.Visibility    = esWheel ? Visibility.Collapsed : Visibility.Visible;
+                    WiPaddleSettingsCard.Visibility = esWheel ? Visibility.Collapsed : Visibility.Visible;
+                    Grid.SetColumn(WiActiveButtonsCard, esWheel ? 0 : 1);
+                    Grid.SetColumnSpan(WiActiveButtonsCard, esWheel ? 2 : 1);
+                    WiActiveButtonsCard.Margin = esWheel
+                        ? new Thickness(0) : new Thickness(7, 0, 0, 0);
+                    // ES RPM indicator mode lives on this main page (the ES has no tabs).
+                    EsIndicatorCard.Visibility = esWheel ? Visibility.Visible : Visibility.Collapsed;
+                }
+
                 if (newWheelDetected)
                 {
                     SetComboSafe(WiPaddlesModeCombo, _data.WheelPaddlesMode);
@@ -267,7 +286,13 @@ namespace MozaPlugin.Devices
                         SetComboSafe(WiKnobModeCombo, _data.WheelKnobMode);
                     }
                     SyncKnobSignalChips();
+                }
 
+                // Left stick mode — shown for any detected wheel. The ES + old
+                // firmware report the 2-byte form (Buttons/D-Pad segmented); newer
+                // firmware reports the 1-byte assignment enum (None/Left/Right).
+                if (newWheelDetected || oldWheelDetected)
+                {
                     if (_data.WheelDualStickSupported)
                     {
                         WiStickModeNewPanel.Visibility = Visibility.Visible;
@@ -280,13 +305,13 @@ namespace MozaPlugin.Devices
                         WiStickModeOldPanel.Visibility = Visibility.Visible;
                         WiStickModeNewPanel.Visibility = Visibility.Collapsed;
                         WiStickModeNotDetected.Visibility = Visibility.Collapsed;
-                        WiStickModeCheck.IsChecked = _data.WheelStickMode != 0;
+                        SetComboSafe(WiStickModeOldCombo, _data.WheelStickMode != 0 ? 1 : 0);
                     }
                 }
                 else
                 {
-                    // No new-protocol wheel detected → show the not-detected hint
-                    // in the Joystick card; collapse both control panels.
+                    // No wheel detected → show the not-detected hint in the
+                    // Joystick card; collapse both control panels.
                     WiStickModeOldPanel.Visibility = Visibility.Collapsed;
                     WiStickModeNewPanel.Visibility = Visibility.Collapsed;
                     WiStickModeNotDetected.Visibility = Visibility.Visible;

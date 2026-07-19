@@ -241,11 +241,16 @@ namespace MozaPlugin.Devices
             if (ok)
             {
                 MozaLog.Info($"[AZOM] Connected to standalone {_desc.CaptureLabelBase} ({_connection.DiscoveredPid} on {_connection.LastPortName})");
-                // A shifter's LED capability is known from its PID (SGP has 2 LEDs,
-                // HGP has none) — stamp it before MarkDetected so the UI shows the LED
-                // section only for the SGP and the detect log reads correctly.
+                // A shifter's model is known from its PID (SGP has 2 LEDs, HGP has
+                // none) — stamp it before MarkDetected so the correct dedicated tab
+                // shows immediately (no probe/timeout needed on this lane) and the
+                // detect log reads correctly.
                 if (_desc.Category == MozaDeviceCategory.Shifter)
+                {
                     _detectionState.ShifterHasLeds = _desc.HasLeds;
+                    _detectionState.ShifterModel = _desc.HasLeds
+                        ? ShifterModelKind.Sgp : ShifterModelKind.Hgp;
+                }
                 // Registry PID classification + an open dedicated port IS proof of
                 // presence on this topology, so show the tab immediately — don't
                 // gate it on a binary ACK this device may never send. issueReads:
@@ -349,6 +354,7 @@ namespace MozaPlugin.Devices
             {
                 _detectionState.ShifterDetected = false;
                 _detectionState.ShifterHasLeds = false;
+                _detectionState.ShifterModel = ShifterModelKind.Unknown;
                 _detectionState.ShifterOwner = null;
             }
         }
