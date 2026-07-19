@@ -6,7 +6,7 @@ namespace MozaPlugin.Devices
     /// probe resolves it: the standalone-USB lane resolves it from the PID at connect
     /// (instant); a base/hub-relayed shifter resolves SGP from its LED-read answer and
     /// HGP from the generic device-type identity probe.</summary>
-    internal enum ShifterModelKind
+    public enum ShifterModelKind
     {
         Unknown = 0,
         Hgp,
@@ -28,15 +28,13 @@ namespace MozaPlugin.Devices
         public volatile bool PedalsDetected;
         public volatile bool HubDetected;
         public volatile bool Ab9Detected;
-        // HGP/SGP passive shifter. ShifterHasLeds distinguishes the SGP (2 config
-        // LEDs) from the HGP (no LEDs) so the SGP LED writes are gated on it.
-        public volatile bool ShifterDetected;
-        public volatile bool ShifterHasLeds;
-        // Positively-identified model, gating the dedicated HGP / SGP tabs. Resolved
-        // from the PID on the standalone lane, or from a probe answer on a relay
-        // (SGP: LED read; HGP: device-type identity probe). Stays Unknown until a
-        // positive answer arrives — the tabs never show on a timeout.
-        public volatile ShifterModelKind ShifterModel = ShifterModelKind.Unknown;
+        // HGP (H-pattern) and SGP (sequential) are INDEPENDENT devices — a user can
+        // run both at once, each on its own USB port (own PID), so they get their own
+        // detection flag + owner + settings. A base/hub relay carries at most one
+        // (single 0x1A bus), resolved to whichever flag by a positive probe answer
+        // (SGP: LED read; HGP: device-type identity probe) — never a timeout.
+        public volatile bool HgpDetected;
+        public volatile bool SgpDetected;
 
         // Which MozaDeviceManager owns each routable peripheral — i.e. the pipe
         // it was detected on. Null = no opinion → callers fall back to the
@@ -48,7 +46,15 @@ namespace MozaPlugin.Devices
         // cross-thread visibility between the two serial read threads and the UI.
         public volatile MozaDeviceManager? PedalsOwner;
         public volatile MozaDeviceManager? HandbrakeOwner;
-        public volatile MozaDeviceManager? ShifterOwner;
+        public volatile MozaDeviceManager? HgpOwner;
+        public volatile MozaDeviceManager? SgpOwner;
+
+        /// <summary>Which shifter model was detected on the given pipe, so relayed
+        /// shifter replies (shared <c>shifter-*</c> command names) route to the right
+        /// device's settings. Unknown before the model resolves.</summary>
+        public ShifterModelKind ShifterModelForOwner(MozaDeviceManager dm) =>
+            ReferenceEquals(HgpOwner, dm) ? ShifterModelKind.Hgp :
+            ReferenceEquals(SgpOwner, dm) ? ShifterModelKind.Sgp : ShifterModelKind.Unknown;
 
         // Which MozaDeviceManager owns the base (wheelbase main/motor controller)
         // — the pipe that answered the base-mcu-temp detection cascade. Normally
@@ -115,12 +121,12 @@ namespace MozaPlugin.Devices
             PedalsDetected = false;
             HubDetected = false;
             Ab9Detected = false;
-            ShifterDetected = false;
-            ShifterHasLeds = false;
-            ShifterModel = ShifterModelKind.Unknown;
+            HgpDetected = false;
+            SgpDetected = false;
             PedalsOwner = null;
             HandbrakeOwner = null;
-            ShifterOwner = null;
+            HgpOwner = null;
+            SgpOwner = null;
             BaseOwner = null;
         }
 

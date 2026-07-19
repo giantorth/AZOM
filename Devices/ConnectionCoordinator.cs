@@ -570,7 +570,7 @@ namespace MozaPlugin.Devices
             if (!_detectionState.HandbrakeDetected)
                 dm.SendPresenceProbe(MozaProtocol.DeviceHandbrake);
             // HGP/SGP shifter behind the hub (dev 0x1A).
-            if (!_detectionState.ShifterDetected)
+            if (!_detectionState.HgpDetected && !_detectionState.SgpDetected)
                 dm.SendPresenceProbe(MozaProtocol.DeviceHPattern);
             // Positive-evidence probe for the broken-base case: while NO wheel has
             // been detected on the primary (base), also probe the wheel over the
@@ -644,7 +644,7 @@ namespace MozaPlugin.Devices
                 else if (deviceId == MozaProtocol.DeviceHandbrake)
                     _hubDeviceProber.MarkHandbrakeDetected();
                 else if (deviceId == MozaProtocol.DeviceHPattern) // == DeviceSequential (0x1A)
-                    _hubDeviceProber.MarkShifterDetected();
+                    _hubDeviceProber.ProbeRelayedShifter();
                 return;
             }
 
@@ -675,9 +675,14 @@ namespace MozaPlugin.Devices
                 return;
 
             _hubManager.PendingResponses?.NoteResponse(r.Name);
-            _data.UpdateFromCommand(r.Name, r.IntValue);
-            if (r.ArrayValue != null)
-                _data.UpdateFromArray(r.Name, r.ArrayValue);
+            // A hub-relayed shifter's values route into whichever model resolved on
+            // this pipe (shared shifter-* command names).
+            if (!_data.TryUpdateShifter(_detectionState.ShifterModelForOwner(_hubManager.DeviceManager), r.Name, r.IntValue, r.ArrayValue))
+            {
+                _data.UpdateFromCommand(r.Name, r.IntValue);
+                if (r.ArrayValue != null)
+                    _data.UpdateFromArray(r.Name, r.ArrayValue);
+            }
             _hubDeviceProber.DetectDevices(r.Name, r.IntValue, r.DeviceId);
         }
 

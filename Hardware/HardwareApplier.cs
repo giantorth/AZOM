@@ -158,7 +158,10 @@ namespace MozaPlugin.Hardware
         // for base-attached peripherals).
         private MozaDeviceManager PedalsManager => _detectionState.PedalsOwner ?? _deviceManager;
         private MozaDeviceManager HandbrakeManager => _detectionState.HandbrakeOwner ?? _deviceManager;
-        private MozaDeviceManager ShifterManager => _detectionState.ShifterOwner ?? _deviceManager;
+        // HGP and SGP are independent devices, each routed to the pipe it was detected
+        // on (each on its own USB port, or one relayed on the base/hub).
+        private MozaDeviceManager HgpManager => _detectionState.HgpOwner ?? _deviceManager;
+        private MozaDeviceManager SgpManager => _detectionState.SgpOwner ?? _deviceManager;
         // Base FFB/motor/ambient writes must target whichever pipe detected the
         // base. Normally that's the primary; after a base→hub primary migration
         // (broken base, wheel on hub) the base lives on a dedicated base-aux pipe,
@@ -737,39 +740,52 @@ namespace MozaPlugin.Hardware
                     dm.WriteFloat($"pedals-clutch-y{i + 1}", profile.PedalsClutchCurve[i]);
         }
 
-        /// <summary>Push HGP/SGP shifter settings. _data is mirrored always; writes
-        /// gated on detection. LED settings (SGP only) are gated on ShifterHasLeds.
-        /// The 2 SGP LEDs ride one 2-byte command [S1,S2] of palette indices 0-7.</summary>
-        public void ApplyShifterToHardware(MozaProfile? profile)
+        // HGP and SGP are independent devices — each applies from its own profile
+        // fields, mirrors into its own _data slot, and writes to its own pipe. _data is
+        // mirrored regardless of detection; writes gate on that model being present.
+        public void ApplyHgpToHardware(MozaProfile? profile)
         {
             if (profile == null) return;
+            var d = _data.ShifterHgp;
+            if (profile.HgpDirection  >= 0) d.Direction  = profile.HgpDirection;
+            if (profile.HgpPaddleSync >= 0) d.PaddleSync = profile.HgpPaddleSync;
+            if (profile.HgpHidMode    >= 0) d.HidMode    = profile.HgpHidMode;
+            if (profile.HgpApplyMode  >= 0) d.ApplyMode  = profile.HgpApplyMode;
 
-            if (profile.ShifterDirection  >= 0) _data.ShifterDirection  = profile.ShifterDirection;
-            if (profile.ShifterPaddleSync >= 0) _data.ShifterPaddleSync = profile.ShifterPaddleSync;
-            if (profile.ShifterHidMode    >= 0) _data.ShifterHidMode    = profile.ShifterHidMode;
-            if (profile.ShifterApplyMode  >= 0) _data.ShifterApplyMode  = profile.ShifterApplyMode;
-            if (profile.ShifterBrightness >= 0) _data.ShifterBrightness = profile.ShifterBrightness;
-            if (profile.ShifterLed1Index  >= 0) _data.ShifterLed1Index  = profile.ShifterLed1Index;
-            if (profile.ShifterLed2Index  >= 0) _data.ShifterLed2Index  = profile.ShifterLed2Index;
+            if (!_detectionState.HgpDetected) return;
+            var dm = HgpManager;
+            if (profile.HgpDirection  >= 0) dm.WriteSetting("shifter-direction", profile.HgpDirection);
+            if (profile.HgpPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.HgpPaddleSync);
+            if (profile.HgpHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.HgpHidMode);
+            if (profile.HgpApplyMode  >= 0) dm.WriteSetting("shifter-apply-mode", profile.HgpApplyMode);
+        }
 
-            if (!_detectionState.ShifterDetected) return;
-            var dm = ShifterManager;
-            if (profile.ShifterDirection  >= 0) dm.WriteSetting("shifter-direction", profile.ShifterDirection);
-            if (profile.ShifterPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.ShifterPaddleSync);
-            if (profile.ShifterHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.ShifterHidMode);
-            if (profile.ShifterApplyMode  >= 0) dm.WriteSetting("shifter-apply-mode", profile.ShifterApplyMode);
-            if (_detectionState.ShifterHasLeds)
-            {
-                if (profile.ShifterBrightness >= 0) dm.WriteSetting("shifter-brightness", profile.ShifterBrightness);
-                // Both LEDs ride one 2-byte command, so only push when BOTH indices
-                // are known — otherwise we'd coerce the unknown LED to index 0 (red)
-                // and clobber it. In the normal flow the pair always travels together
-                // (both set by a read/UI edit, or both -1 on a fresh profile).
-                int s1 = _data.ShifterLed1Index, s2 = _data.ShifterLed2Index;
-                if (s1 >= 0 && s2 >= 0)
-                    dm.WriteArray("shifter-colors",
-                        new byte[] { (byte)Math.Min(7, s1), (byte)Math.Min(7, s2) });
-            }
+        public void ApplySgpToHardware(MozaProfile? profile)
+        {
+            if (profile == null) return;
+            var d = _data.ShifterSgp;
+            if (profile.SgpDirection  >= 0) d.Direction  = profile.SgpDirection;
+            if (profile.SgpPaddleSync >= 0) d.PaddleSync = profile.SgpPaddleSync;
+            if (profile.SgpHidMode    >= 0) d.HidMode    = profile.SgpHidMode;
+            if (profile.SgpApplyMode  >= 0) d.ApplyMode  = profile.SgpApplyMode;
+            if (profile.SgpBrightness >= 0) d.Brightness = profile.SgpBrightness;
+            if (profile.SgpLed1Index  >= 0) d.Led1Index  = profile.SgpLed1Index;
+            if (profile.SgpLed2Index  >= 0) d.Led2Index  = profile.SgpLed2Index;
+
+            if (!_detectionState.SgpDetected) return;
+            var dm = SgpManager;
+            if (profile.SgpDirection  >= 0) dm.WriteSetting("shifter-direction", profile.SgpDirection);
+            if (profile.SgpPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.SgpPaddleSync);
+            if (profile.SgpHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.SgpHidMode);
+            if (profile.SgpApplyMode  >= 0) dm.WriteSetting("shifter-apply-mode", profile.SgpApplyMode);
+            if (profile.SgpBrightness >= 0) dm.WriteSetting("shifter-brightness", profile.SgpBrightness);
+            // Both LEDs ride one 2-byte command, so only push when BOTH indices are
+            // known — otherwise we'd coerce the unknown LED to index 0 (red) and clobber
+            // it. In the normal flow the pair always travels together.
+            int s1 = d.Led1Index, s2 = d.Led2Index;
+            if (s1 >= 0 && s2 >= 0)
+                dm.WriteArray("shifter-colors",
+                    new byte[] { (byte)Math.Min(7, s1), (byte)Math.Min(7, s2) });
         }
 
         /// <summary>
@@ -1016,7 +1032,8 @@ namespace MozaPlugin.Hardware
             ApplyBaseAmbientToHardware(profile);
             ApplyHandbrakeToHardware(profile);
             ApplyPedalsToHardware(profile);
-            ApplyShifterToHardware(profile);
+            ApplyHgpToHardware(profile);
+            ApplySgpToHardware(profile);
             ApplyAb9ToHardware(profile);
             ApplyMBoosterToHardware(profile);
         }
@@ -1169,16 +1186,21 @@ namespace MozaPlugin.Hardware
             if (value < 0) return;
             if (_detectionState.PedalsDetected) PedalsManager.WriteFloat(command, value);
         }
-        public void WriteIfShifterDetected(string command, int value)
+        public void WriteIfHgpDetected(string command, int value)
         {
             if (value < 0) return;
-            if (_detectionState.ShifterDetected) ShifterManager.WriteSetting(command, value);
+            if (_detectionState.HgpDetected) HgpManager.WriteSetting(command, value);
+        }
+        public void WriteIfSgpDetected(string command, int value)
+        {
+            if (value < 0) return;
+            if (_detectionState.SgpDetected) SgpManager.WriteSetting(command, value);
         }
         // The 2 SGP LEDs ride one 2-byte command [S1,S2] (palette indices 0-7); the
-        // UI re-sends both whenever either changes.
-        public void WriteArrayIfShifterDetected(string command, byte[] payload)
+        // UI re-sends both whenever either changes. SGP-only (the HGP has no LEDs).
+        public void WriteArrayIfSgpDetected(string command, byte[] payload)
         {
-            if (_detectionState.ShifterDetected) ShifterManager.WriteArray(command, payload);
+            if (_detectionState.SgpDetected) SgpManager.WriteArray(command, payload);
         }
         public void WriteIfBaseAmbientSupported(string command, int value)
         {

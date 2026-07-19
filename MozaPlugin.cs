@@ -344,8 +344,9 @@ namespace MozaPlugin
         internal void WriteFloatIfHandbrakeDetected(string command, int value) => _hardwareApplier.WriteFloatIfHandbrakeDetected(command, value);
         internal void WriteIfPedalsDetected(string command, int value) => _hardwareApplier.WriteIfPedalsDetected(command, value);
         internal void WriteFloatIfPedalsDetected(string command, int value) => _hardwareApplier.WriteFloatIfPedalsDetected(command, value);
-        internal void WriteIfShifterDetected(string command, int value) => _hardwareApplier.WriteIfShifterDetected(command, value);
-        internal void WriteArrayIfShifterDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfShifterDetected(command, payload);
+        internal void WriteIfHgpDetected(string command, int value) => _hardwareApplier.WriteIfHgpDetected(command, value);
+        internal void WriteIfSgpDetected(string command, int value) => _hardwareApplier.WriteIfSgpDetected(command, value);
+        internal void WriteArrayIfSgpDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfSgpDetected(command, payload);
         internal void WriteIfBaseAmbientSupported(string command, int value) => _hardwareApplier.WriteIfBaseAmbientSupported(command, value);
         internal void WriteColorIfWheelDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfWheelDetected(command, r, g, b);
         internal void WriteColorIfDashDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfDashDetected(command, r, g, b);
@@ -357,7 +358,8 @@ namespace MozaPlugin
         internal void ApplyBaseAmbientToHardware(MozaProfile? profile) => _hardwareApplier.ApplyBaseAmbientToHardware(profile);
         internal void ApplyHandbrakeToHardware(MozaProfile? profile) => _hardwareApplier.ApplyHandbrakeToHardware(profile);
         internal void ApplyPedalsToHardware(MozaProfile? profile) => _hardwareApplier.ApplyPedalsToHardware(profile);
-        internal void ApplyShifterToHardware(MozaProfile? profile) => _hardwareApplier.ApplyShifterToHardware(profile);
+        internal void ApplyHgpToHardware(MozaProfile? profile) => _hardwareApplier.ApplyHgpToHardware(profile);
+        internal void ApplySgpToHardware(MozaProfile? profile) => _hardwareApplier.ApplySgpToHardware(profile);
         internal void ApplyAb9ToHardware(MozaProfile? profile) => _hardwareApplier.ApplyAb9ToHardware(profile);
         internal void ApplyWheelExtensionSettings(MozaWheelExtensionSettings extSettings, string? pageModelPrefix = null) => _hardwareApplier.ApplyWheelExtensionSettings(extSettings, pageModelPrefix);
         /// <summary>
@@ -777,11 +779,10 @@ namespace MozaPlugin
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
-        internal bool IsShifterDetected => DetectionState.ShifterDetected;
-        internal bool IsShifterHasLeds => DetectionState.ShifterHasLeds;
-        // Positive per-model gates for the dedicated HGP / SGP tabs (Unknown → neither).
-        internal bool IsHgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Hgp;
-        internal bool IsSgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Sgp;
+        // Independent per-model gates for the dedicated HGP / SGP tabs — both can be
+        // true at once (a user with both shifters, each on its own USB port).
+        internal bool IsHgpShifterDetected => DetectionState.HgpDetected;
+        internal bool IsSgpShifterDetected => DetectionState.SgpDetected;
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
@@ -3994,7 +3995,7 @@ namespace MozaPlugin
             // HGP/SGP attached to the base's peripheral port (dev 0x1A). A shifter on
             // its own USB port is found by MozaStandalonePeripheralRegistry instead;
             // one behind the Universal Hub answers on the dedicated hub pipe.
-            if (!DetectionState.ShifterDetected)
+            if (!DetectionState.HgpDetected && !DetectionState.SgpDetected)
                 _deviceManager.SendPresenceProbe(MozaProtocol.DeviceHPattern);
             // No hub-port-power poll on the wheelbase connection — a Universal Hub
             // is found by the dedicated hub connection on its own port, never by
@@ -4335,9 +4336,14 @@ namespace MozaPlugin
                 return;
             }
 
-            _data.UpdateFromCommand(r.Name, r.IntValue);
-            if (r.ArrayValue != null)
-                _data.UpdateFromArray(r.Name, r.ArrayValue);
+            // Shifter replies share command names across HGP/SGP, so route a relayed
+            // shifter's values into whichever model was detected on this pipe.
+            if (!_data.TryUpdateShifter(DetectionState.ShifterModelForOwner(_deviceManager), r.Name, r.IntValue, r.ArrayValue))
+            {
+                _data.UpdateFromCommand(r.Name, r.IntValue);
+                if (r.ArrayValue != null)
+                    _data.UpdateFromArray(r.Name, r.ArrayValue);
+            }
 
             // Persist wheel-reported sleep-bundle values so next launch reapplies them.
             _profileCoordinator.SeedSleepBundleFromResponse(r);
@@ -4385,9 +4391,10 @@ namespace MozaPlugin
                 case MozaProtocol.DevicePedals:
                     _deviceProber.MarkPedalsDetected();
                     break;
-                // DeviceHPattern == DeviceSequential (0x1A) — one case covers both.
+                // DeviceHPattern == DeviceSequential (0x1A). A relayed shifter has no
+                // PID, so probe the model resolvers rather than latch a single flag.
                 case MozaProtocol.DeviceHPattern:
-                    _deviceProber.MarkShifterDetected();
+                    _deviceProber.ProbeRelayedShifter();
                     break;
             }
         }

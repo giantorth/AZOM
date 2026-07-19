@@ -619,14 +619,18 @@ namespace MozaPlugin
         public int[]? PedalsBrakeCurve { get; set; }             // [5] values 0-100
         public int[]? PedalsClutchCurve { get; set; }            // [5] values 0-100
 
-        // ===== Shifter settings (HGP/SGP). -1 = untouched. =====
-        public int ShifterDirection { get; set; } = -1;   // 0=Normal, 1=Reversed
-        public int ShifterPaddleSync { get; set; } = -1;  // 1/2
-        public int ShifterHidMode { get; set; } = -1;     // 0/1 game-compat mode
-        public int ShifterApplyMode { get; set; } = -1;   // 0/1
-        public int ShifterBrightness { get; set; } = -1;  // SGP LED brightness 0-10
-        public int ShifterLed1Index { get; set; } = -1;   // SGP LED S1 palette index 0-7
-        public int ShifterLed2Index { get; set; } = -1;   // SGP LED S2 palette index 0-7
+        // ===== Shifter settings (HGP + SGP are independent devices). -1 = untouched. =====
+        public int HgpDirection { get; set; } = -1;   // 0=Normal, 1=Reversed
+        public int HgpPaddleSync { get; set; } = -1;  // 1/2
+        public int HgpHidMode { get; set; } = -1;     // 0/1 game-compat mode
+        public int HgpApplyMode { get; set; } = -1;   // 0/1
+        public int SgpDirection { get; set; } = -1;
+        public int SgpPaddleSync { get; set; } = -1;
+        public int SgpHidMode { get; set; } = -1;
+        public int SgpApplyMode { get; set; } = -1;
+        public int SgpBrightness { get; set; } = -1;  // SGP LED brightness 0-10
+        public int SgpLed1Index { get; set; } = -1;   // SGP LED S1 palette index 0-7
+        public int SgpLed2Index { get; set; } = -1;   // SGP LED S2 palette index 0-7
 
         // ===== Color arrays (packed as R<<16 | G<<8 | B) =====
         public int[]? WheelRpmColors { get; set; }       // [10]
@@ -816,11 +820,13 @@ namespace MozaPlugin
             PedalsBrakeCurve = CloneArray(p.PedalsBrakeCurve);
             PedalsClutchCurve = CloneArray(p.PedalsClutchCurve);
 
-            // Shifter (HGP/SGP)
-            ShifterDirection = p.ShifterDirection; ShifterPaddleSync = p.ShifterPaddleSync;
-            ShifterHidMode = p.ShifterHidMode; ShifterApplyMode = p.ShifterApplyMode;
-            ShifterBrightness = p.ShifterBrightness;
-            ShifterLed1Index = p.ShifterLed1Index; ShifterLed2Index = p.ShifterLed2Index;
+            // Shifter (HGP + SGP, independent)
+            HgpDirection = p.HgpDirection; HgpPaddleSync = p.HgpPaddleSync;
+            HgpHidMode = p.HgpHidMode; HgpApplyMode = p.HgpApplyMode;
+            SgpDirection = p.SgpDirection; SgpPaddleSync = p.SgpPaddleSync;
+            SgpHidMode = p.SgpHidMode; SgpApplyMode = p.SgpApplyMode;
+            SgpBrightness = p.SgpBrightness;
+            SgpLed1Index = p.SgpLed1Index; SgpLed2Index = p.SgpLed2Index;
 
             // Colors (deep copy)
             WheelRpmColors = CloneArray(p.WheelRpmColors);
@@ -1017,12 +1023,14 @@ namespace MozaPlugin
                 PedalsClutchCurve = (int[])data.PedalsClutchCurve.Clone();
             }
 
-            // Shifter (HGP/SGP). Device-read fields, like handbrake/pedals above —
-            // only read on detect (no telemetry drift), so capturing _data is safe.
-            ShifterDirection = data.ShifterDirection; ShifterPaddleSync = data.ShifterPaddleSync;
-            ShifterHidMode = data.ShifterHidMode; ShifterApplyMode = data.ShifterApplyMode;
-            ShifterBrightness = data.ShifterBrightness;
-            ShifterLed1Index = data.ShifterLed1Index; ShifterLed2Index = data.ShifterLed2Index;
+            // Shifter (HGP + SGP, independent). Device-read fields, like handbrake/pedals
+            // above — only read on detect (no telemetry drift), so capturing _data is safe.
+            HgpDirection = data.ShifterHgp.Direction; HgpPaddleSync = data.ShifterHgp.PaddleSync;
+            HgpHidMode = data.ShifterHgp.HidMode; HgpApplyMode = data.ShifterHgp.ApplyMode;
+            SgpDirection = data.ShifterSgp.Direction; SgpPaddleSync = data.ShifterSgp.PaddleSync;
+            SgpHidMode = data.ShifterSgp.HidMode; SgpApplyMode = data.ShifterSgp.ApplyMode;
+            SgpBrightness = data.ShifterSgp.Brightness;
+            SgpLed1Index = data.ShifterSgp.Led1Index; SgpLed2Index = data.ShifterSgp.Led2Index;
 
             // NOTE: wheel-LED / ES-wheel / Dash / Base-ambient / Gearshift / AB9
             // fields are NOT captured here. They are written directly to the

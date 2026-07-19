@@ -198,12 +198,14 @@ namespace MozaPlugin.Devices
             "handbrake-y1", "handbrake-y2", "handbrake-y3", "handbrake-y4", "handbrake-y5",
         };
 
-        // Shifter settings read on the base/hub-relayed path (where HGP-vs-SGP is not
-        // known from a PID, so the LED reads are issued too — an SGP answers and
-        // populates its LEDs, an HGP's LED reads simply sunset). The standalone-USB
-        // lane instead reads a per-model list via StandalonePeripheralDescriptor so a
-        // standalone HGP never issues LED reads at all.
-        internal static readonly string[] ShifterSettingsReadCommands = new[]
+        // Per-model settings read once a relayed shifter's model is resolved (the
+        // standalone lane reads its own per-model list via StandalonePeripheralDescriptor).
+        // The SGP list adds its LED commands; the HGP has none.
+        internal static readonly string[] HgpSettingsReadCommands = new[]
+        {
+            "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode", "shifter-apply-mode",
+        };
+        internal static readonly string[] SgpSettingsReadCommands = new[]
         {
             "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode", "shifter-apply-mode",
             "shifter-brightness", "shifter-colors",
@@ -329,32 +331,48 @@ namespace MozaPlugin.Devices
         /// The standalone-USB lane passes <c>issueReads:false</c> and issues its own
         /// per-model read list (incl. SGP LED commands) from the controller — this
         /// path's list is the common non-LED subset used on a base/hub-relayed pipe.</summary>
-        public void MarkShifterDetected(bool issueReads = true)
+        // HGP and SGP are independent devices — each has its own flag + owner so both
+        // can be attached at once (each on its own USB port). Owner first, then flag
+        // (see MarkHandbrakeDetected). issueReads: relay resolution calls with true so
+        // the resolved model's settings populate; the standalone lane latches at connect
+        // with false and issues its own per-model read list from the controller.
+        public void MarkHgpDetected(bool issueReads = true)
         {
-            if (_detectionState.ShifterDetected) return;
-            // Owner first, then flag (see MarkHandbrakeDetected).
-            _detectionState.ShifterOwner = _deviceManager;
-            _detectionState.ShifterDetected = true;
-            _plugin.ApplyShifterToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-            if (issueReads)
-            {
-                _deviceManager.ReadSettings(ShifterSettingsReadCommands);
-                // Relayed lane: the PID isn't visible, so the model is still Unknown
-                // here. The SGP self-reveals via its LED read (brightness is in the
-                // list above); probe the generic device-type identity so the HGP
-                // resolves from a positive answer too — never a timeout. The
-                // standalone lane already set the model from the PID → skip.
-                if (_detectionState.ShifterModel == ShifterModelKind.Unknown)
-                    _deviceManager.ReadSetting("shifter-device-type");
-            }
-            MozaLog.Info($"[AZOM] Shifter detected (model: {_detectionState.ShifterModel})");
+            if (_detectionState.HgpDetected) return;
+            _detectionState.HgpOwner = _deviceManager;
+            _detectionState.HgpDetected = true;
+            _plugin.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            if (issueReads) _deviceManager.ReadSettings(HgpSettingsReadCommands);
+            MozaLog.Info("[AZOM] HGP shifter detected");
+        }
+
+        public void MarkSgpDetected(bool issueReads = true)
+        {
+            if (_detectionState.SgpDetected) return;
+            _detectionState.SgpOwner = _deviceManager;
+            _detectionState.SgpDetected = true;
+            _plugin.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
+            MozaLog.Info("[AZOM] SGP shifter detected");
+        }
+
+        /// <summary>A base/hub-relayed shifter (single 0x1A bus, no PID) can't be told
+        /// apart at first sight, so probe the two model resolvers: the SGP answers a
+        /// brightness read; the HGP answers the generic device-type identity. Both are
+        /// positive signals — no timeout. No-op once either model is latched.</summary>
+        public void ProbeRelayedShifter()
+        {
+            if (_detectionState.HgpDetected || _detectionState.SgpDetected) return;
+            _deviceManager.ReadSetting("shifter-brightness");
+            _deviceManager.ReadSetting("shifter-device-type");
         }
 
         // The HGP's grp-0x04 device-type reply, awaiting one hardware measurement:
         // read the "Shifter device-type reply = [...]" log line off a base/hub-relayed
         // HGP and set this. null = relayed HGP stays unresolved (its tab hidden) rather
-        // than guess. The standalone lane and the relayed SGP don't need it.
-        private static readonly byte[]? ShifterHgpDeviceType = null;
+        // than guess. The standalone lane (PID) and the relayed SGP (brightness) don't
+        // need it.
+        private static readonly byte[]? HgpDeviceType = null;
 
         /// <summary>Resolve a base/hub-relayed shifter's model from the generic
         /// device-type identity reply. Logs the raw reply so a support bundle reveals
@@ -362,13 +380,13 @@ namespace MozaPlugin.Devices
         /// brightness answer already positively identifies an SGP, so never overrides it.</summary>
         private void ResolveRelayedShifterModelFromDeviceType()
         {
-            var dt = _data.ShifterDeviceType;
+            var dt = _data.RelayShifterDeviceType;
             if (dt == null || dt.Length == 0) return;
             MozaLog.Info($"[AZOM] Shifter device-type reply = [{System.BitConverter.ToString(dt)}] " +
                 "(HGP/SGP identity discriminator; relayed lane)");
-            if (_detectionState.ShifterModel == ShifterModelKind.Sgp) return;
-            if (ShifterHgpDeviceType != null && BytesEqual(dt, ShifterHgpDeviceType))
-                _detectionState.ShifterModel = ShifterModelKind.Hgp;
+            if (_detectionState.SgpDetected) return;
+            if (HgpDeviceType != null && BytesEqual(dt, HgpDeviceType))
+                MarkHgpDetected();
         }
 
         private static bool BytesEqual(byte[] a, byte[] b)
@@ -894,18 +912,17 @@ namespace MozaPlugin.Devices
                     MarkPedalsDetected();
                     break;
 
-                // First shifter response on a base/hub-relayed pipe. On the
-                // standalone-USB lane the controller already latched detection at
-                // connect (this early-returns) and issued its own read list.
+                // First evidence of a base/hub-relayed shifter — probe the model
+                // resolvers. No-op on the standalone lane (already latched by PID).
                 case "shifter-direction":
-                    MarkShifterDetected();
+                    ProbeRelayedShifter();
                     break;
 
                 // Only the SGP answers a brightness read — a positive SGP identification
                 // on a relayed pipe (the standalone lane knows this from the PID instead).
                 case "shifter-brightness":
-                    _detectionState.ShifterHasLeds = true;
-                    _detectionState.ShifterModel = ShifterModelKind.Sgp;
+                    MarkSgpDetected();
+                    _data.UpdateShifter(ShifterModelKind.Sgp, "shifter-brightness", value);
                     break;
 
                 // Generic device-type identity reply from a relayed shifter — the

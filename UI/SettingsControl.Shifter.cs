@@ -3,18 +3,20 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using MozaPlugin.Devices;
 using MozaPlugin.Resources;
 
 namespace MozaPlugin
 {
     /// <summary>
-    /// Settings tabs for the passive HGP (H-pattern) and SGP (sequential) shifters,
-    /// each gated on positive detection of its own device (<see cref="MozaPlugin.IsHgpShifterDetected"/> /
-    /// <see cref="MozaPlugin.IsSgpShifterDetected"/>). Both expose reverse-direction +
-    /// paddle-sync; the SGP additionally has 2 configurable LEDs (fixed 8-colour palette,
-    /// index 0-7) + brightness; the HGP has an H-pattern calibration routine. Config is
-    /// serial-only — gear input stays HID-sourced. Only one shifter is ever connected (a
-    /// single 0x1A slot / single ShifterOwner), so both tabs write the same shifter-* commands.
+    /// Settings tabs for the passive HGP (H-pattern) and SGP (sequential) shifters.
+    /// They are independent devices — a user can run both at once (each on its own USB
+    /// port), so each tab is gated on its own detection (<see cref="MozaPlugin.IsHgpShifterDetected"/> /
+    /// <see cref="MozaPlugin.IsSgpShifterDetected"/>), reads/writes its own device mirror
+    /// (<c>MozaData.ShifterHgp</c> / <c>ShifterSgp</c>), and routes writes to its own pipe.
+    /// Both expose reverse-direction + paddle-sync; the SGP adds 2 configurable LEDs
+    /// (fixed 8-colour palette, index 0-7) + brightness; the HGP has an H-pattern
+    /// calibration routine. Config is serial-only — gear input stays HID-sourced.
     /// </summary>
     public partial class SettingsControl
     {
@@ -41,9 +43,9 @@ namespace MozaPlugin
 
             using (_suppressor.Begin())
             {
-                HgpDirectionCheck.IsChecked = _data?.ShifterDirection == 1;
+                HgpDirectionCheck.IsChecked = _data?.ShifterHgp.Direction == 1;
                 // Paddle-sync wire range is {1,2}: 2 = enabled, 1 = disabled.
-                HgpPaddleSyncCheck.IsChecked = _data?.ShifterPaddleSync == 2;
+                HgpPaddleSyncCheck.IsChecked = _data?.ShifterHgp.PaddleSync == 2;
             }
         }
 
@@ -57,19 +59,20 @@ namespace MozaPlugin
 
             using (_suppressor.Begin())
             {
-                SgpDirectionCheck.IsChecked = _data?.ShifterDirection == 1;
-                SgpPaddleSyncCheck.IsChecked = _data?.ShifterPaddleSync == 2;
+                SgpDirectionCheck.IsChecked = _data?.ShifterSgp.Direction == 1;
+                SgpPaddleSyncCheck.IsChecked = _data?.ShifterSgp.PaddleSync == 2;
 
                 if (_data != null)
                 {
-                    if (_data.ShifterLed1Index >= 0 && _data.ShifterLed1Index < ShifterPaletteRgb.Length)
-                        SgpLed1Combo.SelectedIndex = _data.ShifterLed1Index;
-                    if (_data.ShifterLed2Index >= 0 && _data.ShifterLed2Index < ShifterPaletteRgb.Length)
-                        SgpLed2Combo.SelectedIndex = _data.ShifterLed2Index;
-                    if (_data.ShifterBrightness >= 0)
+                    var s = _data.ShifterSgp;
+                    if (s.Led1Index >= 0 && s.Led1Index < ShifterPaletteRgb.Length)
+                        SgpLed1Combo.SelectedIndex = s.Led1Index;
+                    if (s.Led2Index >= 0 && s.Led2Index < ShifterPaletteRgb.Length)
+                        SgpLed2Combo.SelectedIndex = s.Led2Index;
+                    if (s.Brightness >= 0)
                     {
-                        SgpBrightnessSlider.Value = _data.ShifterBrightness;
-                        SgpBrightnessValue.Text = _data.ShifterBrightness.ToString();
+                        SgpBrightnessSlider.Value = s.Brightness;
+                        SgpBrightnessValue.Text = s.Brightness.ToString();
                     }
                 }
             }
@@ -113,48 +116,52 @@ namespace MozaPlugin
 
         // Handlers follow the handbrake/pedals convention: set _data, write to the
         // device, save. Persistence to the profile is via MozaProfile.CaptureFromCurrent
-        // (shifter fields are device-read + only read on connect, so no drift). The two
-        // tabs' direction/paddle-sync controls target the same shifter-* commands, so
-        // each handler routes through a shared setter.
+        // (shifter fields are device-read + only read on connect, so no drift). HGP and
+        // SGP are separate devices, so each routes to its own mirror + its own pipe.
         private void HgpDirectionCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            SetShifterDirection(HgpDirectionCheck.IsChecked == true);
+            SetShifterDirection(ShifterModelKind.Hgp, HgpDirectionCheck.IsChecked == true);
         }
 
         private void SgpDirectionCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            SetShifterDirection(SgpDirectionCheck.IsChecked == true);
+            SetShifterDirection(ShifterModelKind.Sgp, SgpDirectionCheck.IsChecked == true);
         }
 
-        private void SetShifterDirection(bool on)
+        private void SetShifterDirection(ShifterModelKind model, bool on)
         {
             int v = on ? 1 : 0;
-            if (_data != null) _data.ShifterDirection = v;
-            _plugin.WriteIfShifterDetected("shifter-direction", v);
+            if (_data != null) ShifterStateFor(model).Direction = v;
+            if (model == ShifterModelKind.Hgp) _plugin.WriteIfHgpDetected("shifter-direction", v);
+            else _plugin.WriteIfSgpDetected("shifter-direction", v);
             _plugin.SaveSettings();
         }
 
         private void HgpPaddleSyncCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            SetShifterPaddleSync(HgpPaddleSyncCheck.IsChecked == true);
+            SetShifterPaddleSync(ShifterModelKind.Hgp, HgpPaddleSyncCheck.IsChecked == true);
         }
 
         private void SgpPaddleSyncCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            SetShifterPaddleSync(SgpPaddleSyncCheck.IsChecked == true);
+            SetShifterPaddleSync(ShifterModelKind.Sgp, SgpPaddleSyncCheck.IsChecked == true);
         }
 
-        private void SetShifterPaddleSync(bool on)
+        private void SetShifterPaddleSync(ShifterModelKind model, bool on)
         {
             int v = on ? 2 : 1;   // wire range {1,2}
-            if (_data != null) _data.ShifterPaddleSync = v;
-            _plugin.WriteIfShifterDetected("shifter-paddle-sync", v);
+            if (_data != null) ShifterStateFor(model).PaddleSync = v;
+            if (model == ShifterModelKind.Hgp) _plugin.WriteIfHgpDetected("shifter-paddle-sync", v);
+            else _plugin.WriteIfSgpDetected("shifter-paddle-sync", v);
             _plugin.SaveSettings();
         }
+
+        private MozaData.ShifterState ShifterStateFor(ShifterModelKind model) =>
+            model == ShifterModelKind.Hgp ? _data.ShifterHgp : _data.ShifterSgp;
 
         private void SgpLed1Combo_Changed(object sender, SelectionChangedEventArgs e) => OnShifterColorChanged();
         private void SgpLed2Combo_Changed(object sender, SelectionChangedEventArgs e) => OnShifterColorChanged();
@@ -166,10 +173,10 @@ namespace MozaPlugin
             // re-sends both. If the other combo hasn't been seeded yet (device read
             // still in flight), fall back to its last-known value rather than
             // clobbering that LED with index 0 (red).
-            int s1 = ResolveShifterColor(SgpLed1Combo.SelectedIndex, _data?.ShifterLed1Index ?? -1);
-            int s2 = ResolveShifterColor(SgpLed2Combo.SelectedIndex, _data?.ShifterLed2Index ?? -1);
-            if (_data != null) { _data.ShifterLed1Index = s1; _data.ShifterLed2Index = s2; }
-            _plugin.WriteArrayIfShifterDetected("shifter-colors", new byte[] { (byte)s1, (byte)s2 });
+            int s1 = ResolveShifterColor(SgpLed1Combo.SelectedIndex, _data?.ShifterSgp.Led1Index ?? -1);
+            int s2 = ResolveShifterColor(SgpLed2Combo.SelectedIndex, _data?.ShifterSgp.Led2Index ?? -1);
+            if (_data != null) { _data.ShifterSgp.Led1Index = s1; _data.ShifterSgp.Led2Index = s2; }
+            _plugin.WriteArrayIfSgpDetected("shifter-colors", new byte[] { (byte)s1, (byte)s2 });
             _plugin.SaveSettings();
         }
 
@@ -185,14 +192,14 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int v = (int)Math.Round(e.NewValue);
             SgpBrightnessValue.Text = v.ToString();
-            if (_data != null) _data.ShifterBrightness = v;
-            _plugin.WriteIfShifterDetected("shifter-brightness", v);
+            if (_data != null) _data.ShifterSgp.Brightness = v;
+            _plugin.WriteIfSgpDetected("shifter-brightness", v);
             _plugin.SaveSettings();
         }
 
         private void HgpCalStartButton_Click(object sender, RoutedEventArgs e)
         {
-            _plugin.WriteIfShifterDetected("shifter-cal-start", 1);
+            _plugin.WriteIfHgpDetected("shifter-cal-start", 1);
             if (HgpCalStatus != null)
             {
                 HgpCalStatus.Text = Strings.Subtitle_ShifterCalibrate;
