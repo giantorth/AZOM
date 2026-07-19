@@ -28,6 +28,14 @@ namespace MozaPlugin.Telemetry
         private const int ChunkSlotBase = 18;             // dash lane: slots 18..28
         private const int LaneSlotCount = 11;             // slots 18..28 cleared on stop
         private const int PingSlot = 28;                  // session ping rides the top of the lane
+        private const int SlowLaneEvery = 6;              // slow lane every ~300 ms (~3.3 Hz), matches PitHouse
+
+        // The CM1 splits its field set across two lanes by volatility (matching PitHouse):
+        // fast (group 0x35, full rate) and slow (group 0x36, ~3 Hz session/slow-changing data).
+        private static readonly Cm1FieldDef[] FastFields =
+            System.Array.FindAll(Cm1DashboardCatalog.Fields, f => !f.Slow);
+        private static readonly Cm1FieldDef[] SlowFields =
+            System.Array.FindAll(Cm1DashboardCatalog.Fields, f => f.Slow);
 
         private readonly MozaSerialConnection _connection;
         private readonly Func<string, double> _resolve;
@@ -141,32 +149,44 @@ namespace MozaPlugin.Telemetry
                 if (string.IsNullOrEmpty(prop))
                     return f.Constant.HasValue ? (float)f.Constant.Value : 0f;
                 double raw = resolve != null ? resolve(prop) : 0.0;
-                return (float)(raw * (m?.Scale ?? f.Scale)); // per-field gain override
+                // per-field gain (+ bias for °F unit-variant keys); user Scale overrides the gain
+                return (float)(raw * (m?.Scale ?? f.Scale) + f.Bias);
             }
 
-            // Stream the full flat field set as group-0x35 records, 10 per frame, one
-            // stream slot per chunk (latest-wins → only ever drops a stale copy of the
-            // same chunk, never a different field).
-            var fields = Cm1DashboardCatalog.Fields;
-            int per = Cm1DisplayEmitter.RecordsPerFrame;
-            int chunk = 0;
-            // BuildValueFrame consumes the records synchronously — one reused
-            // list instead of a fresh allocation per chunk per tick.
-            var recs = _chunkScratch;
-            recs.Clear();
-            for (int i = 0; i < fields.Length; i++)
+            // Stream a field array as keyed value frames on `group`, 10 records per chunk, one
+            // stream slot each from slotBase. Returns the first slot after the chunks used, so
+            // the slow lane can start immediately after the fast chunks (disjoint, fixed slots).
+            int StreamFields(Cm1FieldDef[] fields, byte group, int slotBase)
             {
-                recs.Add(new Cm1DisplayEmitter.Record(fields[i].Key, ValueFor(fields[i])));
-                if (recs.Count == per || i == fields.Length - 1)
+                int per = Cm1DisplayEmitter.RecordsPerFrame;
+                var recs = _chunkScratch;
+                recs.Clear();
+                int chunk = 0;
+                for (int i = 0; i < fields.Length; i++)
                 {
-                    int slot = ChunkSlotBase + chunk;
-                    if (slot < PingSlot)
-                        _connection.SendStream((StreamKind)slot,
-                            Cm1DisplayEmitter.BuildValueFrame(Cm1DisplayEmitter.GroupPrimary, recs));
-                    recs.Clear();
-                    chunk++;
+                    recs.Add(new Cm1DisplayEmitter.Record(fields[i].Key, ValueFor(fields[i])));
+                    if (recs.Count == per || i == fields.Length - 1)
+                    {
+                        int slot = slotBase + chunk;
+                        if (slot < PingSlot)
+                            _connection.SendStream((StreamKind)slot,
+                                Cm1DisplayEmitter.BuildValueFrame(group, recs));
+                        recs.Clear();
+                        chunk++;
+                    }
                 }
+                return slotBase + chunk;
             }
+
+            // Stream the field set the way PitHouse does: fast lane (group 0x35) every tick,
+            // slow lane (group 0x36, session/slow-changing fields) at ~3 Hz. 10 records per
+            // frame, one stream slot per chunk (latest-wins → only ever drops a stale copy of
+            // the same chunk, never a different field). Fast chunks occupy slots from
+            // ChunkSlotBase; slow chunks occupy the slots immediately after them (disjoint,
+            // fixed) so the two lanes never alias.
+            int firstSlow = StreamFields(FastFields, Cm1DisplayEmitter.GroupPrimary, ChunkSlotBase);
+            if (_tickCounter % SlowLaneEvery == 0)
+                StreamFields(SlowFields, Cm1DisplayEmitter.GroupSecondary, firstSlow);
 
             _tickCounter++;
         }
