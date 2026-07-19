@@ -468,6 +468,10 @@ namespace MozaPlugin.Protocol
             AddCommand("shifter-paddle-sync", "shifter", 0x51, 0x52, new byte[] { 6 }, 2, "int");   // {1,2}
             // Read-only raw axis (output-x / ShifterTheta).
             AddCommand("shifter-theta",       "shifter", 0x53, 0xFF, new byte[] { 1 }, 2, "int");
+            // Generic device-type identity probe (grp 0x04, same shape as wheel-device-type:
+            // reply `01 02 XX 06`). Fired at a base/hub-relayed shifter to tell HGP from SGP
+            // where the PID isn't visible — a positive identity answer, not a timeout.
+            AddCommand("shifter-device-type", "shifter", 4, 0xFF, new byte[] { }, 0, "array");
             // Calibration (write-only, grp 0x54). Best-effort: present in foxblat
             // serial.yml + SDK ShifterCalibrateStart/Finish, absent from the local
             // parameter DB; gated on detection like handbrake calibration.

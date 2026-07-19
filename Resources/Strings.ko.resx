@@ -656,7 +656,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>이 mBooster는 하나의 연결에 여러 페달을 호스팅합니다. 감지된 각 축을 게임 입력에 할당하세요. 기본 순서는 Moza의 Rx/Ry/Rz 레이아웃(가속/브레이크/클러치)을 따릅니다 — 페달이 잘못된 입력을 구동하면 여기서 다시 매핑하세요.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>시프터</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>시프터 설정</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>LED</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// 구성 가능한 LED 2개 (SGP)</value></data>

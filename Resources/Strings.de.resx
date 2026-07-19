@@ -657,7 +657,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Dieser mBooster hostet mehrere Pedale über eine Verbindung. Weisen Sie jeder erkannten Achse eine Spieleingabe zu. Die Standardreihenfolge folgt Mozas Rx/Ry/Rz-Layout (Gas/Bremse/Kupplung) — hier neu zuordnen, wenn ein Pedal die falsche Eingabe steuert.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Schalthebel</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>SCHALTHEBEL-EINSTELLUNGEN</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>LEDS</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// zwei konfigurierbare LEDs (SGP)</value></data>

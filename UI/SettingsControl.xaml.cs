@@ -221,7 +221,8 @@ namespace MozaPlugin
                 RefreshBaseTab();
                 RefreshHandbrakeTab();
                 RefreshPedalsTab();
-                RefreshShifterTab();
+                RefreshHgpTab();
+                RefreshSgpTab();
                 RefreshHubTab();
                 RefreshAb9Tab();
                 RefreshStalksTab();
@@ -244,7 +245,7 @@ namespace MozaPlugin
         private TabItem[] HideableTabs => new[]
         {
             BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
-            ShifterTab, MBoosterTab, HubTab, StalksTab,
+            HgpTab, SgpTab, MBoosterTab, HubTab, StalksTab,
         };
 
         private void ApplyShowAllTabs()

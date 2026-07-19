@@ -656,7 +656,8 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Αυτό το mBooster φιλοξενεί περισσότερα από ένα πεντάλ σε μία σύνδεση. Αντιστοιχίστε κάθε ανιχνευμένο άξονα σε μια είσοδο παιχνιδιού. Η προεπιλεγμένη σειρά ακολουθεί τη διάταξη Rx/Ry/Rz της Moza (γκάζι/φρένο/συμπλέκτης) — επαναντιστοιχίστε εδώ αν ένα πεντάλ οδηγεί λάθος είσοδο.</value></data>
   <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
-  <data name="TabHeader_Shifter" xml:space="preserve"><value>Λεβιές</value></data>
+  <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
+  <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ ΛΕΒΙΕ</value></data>
   <data name="Section_ShifterLeds" xml:space="preserve"><value>LED</value></data>
   <data name="Subtitle_ShifterLeds" xml:space="preserve"><value>// δύο ρυθμιζόμενα LED (SGP)</value></data>

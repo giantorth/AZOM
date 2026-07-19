@@ -721,7 +721,8 @@ namespace MozaPlugin.Resources
         public static string Hint_MBoosterAxisRoles => Get("Hint_MBoosterAxisRoles");
         public static string Label_EffectsForPedal => Get("Label_EffectsForPedal");
         public static string Note_PassivePedalNoEffects => Get("Note_PassivePedalNoEffects");
-        public static string TabHeader_Shifter => Get("TabHeader_Shifter");
+        public static string TabHeader_ShifterHgp => Get("TabHeader_ShifterHgp");
+        public static string TabHeader_ShifterSgp => Get("TabHeader_ShifterSgp");
         public static string Section_ShifterSettings => Get("Section_ShifterSettings");
         public static string Section_ShifterLeds => Get("Section_ShifterLeds");
         public static string Subtitle_ShifterLeds => Get("Subtitle_ShifterLeds");

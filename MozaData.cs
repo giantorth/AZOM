@@ -415,6 +415,10 @@ namespace MozaPlugin
         public volatile int ShifterLed1Index = -1;   // SGP LED S1 palette index 0-7
         public volatile int ShifterLed2Index = -1;   // SGP LED S2 palette index 0-7
         public volatile int ShifterTheta = -1;       // read-only raw axis (output-x)
+        // Generic device-type identity reply (grp 0x04 → `01 02 XX 06`) from a
+        // base/hub-relayed shifter; used to tell HGP from SGP where the PID isn't
+        // visible. Empty = not read.
+        public volatile byte[] ShifterDeviceType = System.Array.Empty<byte>();
 
         // ===== Hub port power status (-1 = not read yet) =====
         public volatile int HubBasePower = -1;
@@ -746,6 +750,11 @@ namespace MozaPlugin
                     ShifterLed1Index = data[0];
                     ShifterLed2Index = data[1];
                 }
+            }
+            // Relayed shifter device-type identity reply (HGP/SGP discriminator).
+            else if (commandName == "shifter-device-type")
+            {
+                ShifterDeviceType = (byte[])data.Clone();
             }
             // Dash RPM colors
             else if (commandName.StartsWith("dash-rpm-color") && !commandName.Contains("blink"))

@@ -779,6 +779,9 @@ namespace MozaPlugin
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
         internal bool IsShifterDetected => DetectionState.ShifterDetected;
         internal bool IsShifterHasLeds => DetectionState.ShifterHasLeds;
+        // Positive per-model gates for the dedicated HGP / SGP tabs (Unknown → neither).
+        internal bool IsHgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Hgp;
+        internal bool IsSgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Sgp;
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;

@@ -337,9 +337,46 @@ namespace MozaPlugin.Devices
             _detectionState.ShifterDetected = true;
             _plugin.ApplyShifterToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
+            {
                 _deviceManager.ReadSettings(ShifterSettingsReadCommands);
-            MozaLog.Info("[AZOM] Shifter detected" +
-                (_detectionState.ShifterHasLeds ? " (SGP)" : " (HGP)"));
+                // Relayed lane: the PID isn't visible, so the model is still Unknown
+                // here. The SGP self-reveals via its LED read (brightness is in the
+                // list above); probe the generic device-type identity so the HGP
+                // resolves from a positive answer too — never a timeout. The
+                // standalone lane already set the model from the PID → skip.
+                if (_detectionState.ShifterModel == ShifterModelKind.Unknown)
+                    _deviceManager.ReadSetting("shifter-device-type");
+            }
+            MozaLog.Info($"[AZOM] Shifter detected (model: {_detectionState.ShifterModel})");
+        }
+
+        // The HGP's grp-0x04 device-type reply, awaiting one hardware measurement:
+        // read the "Shifter device-type reply = [...]" log line off a base/hub-relayed
+        // HGP and set this. null = relayed HGP stays unresolved (its tab hidden) rather
+        // than guess. The standalone lane and the relayed SGP don't need it.
+        private static readonly byte[]? ShifterHgpDeviceType = null;
+
+        /// <summary>Resolve a base/hub-relayed shifter's model from the generic
+        /// device-type identity reply. Logs the raw reply so a support bundle reveals
+        /// the HGP/SGP discriminator, then latches HGP on a positive match. A prior
+        /// brightness answer already positively identifies an SGP, so never overrides it.</summary>
+        private void ResolveRelayedShifterModelFromDeviceType()
+        {
+            var dt = _data.ShifterDeviceType;
+            if (dt == null || dt.Length == 0) return;
+            MozaLog.Info($"[AZOM] Shifter device-type reply = [{System.BitConverter.ToString(dt)}] " +
+                "(HGP/SGP identity discriminator; relayed lane)");
+            if (_detectionState.ShifterModel == ShifterModelKind.Sgp) return;
+            if (ShifterHgpDeviceType != null && BytesEqual(dt, ShifterHgpDeviceType))
+                _detectionState.ShifterModel = ShifterModelKind.Hgp;
+        }
+
+        private static bool BytesEqual(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+                if (a[i] != b[i]) return false;
+            return true;
         }
 
         /// <summary>
@@ -864,11 +901,17 @@ namespace MozaPlugin.Devices
                     MarkShifterDetected();
                     break;
 
-                // Only the SGP answers a brightness read — its reply is what reveals
-                // LED capability on a relayed pipe (the standalone lane knows this
-                // from the PID instead).
+                // Only the SGP answers a brightness read — a positive SGP identification
+                // on a relayed pipe (the standalone lane knows this from the PID instead).
                 case "shifter-brightness":
                     _detectionState.ShifterHasLeds = true;
+                    _detectionState.ShifterModel = ShifterModelKind.Sgp;
+                    break;
+
+                // Generic device-type identity reply from a relayed shifter — the
+                // positive HGP signal (SGP is already caught by its brightness answer).
+                case "shifter-device-type":
+                    ResolveRelayedShifterModelFromDeviceType();
                     break;
 
                 case "hub-port1-power":

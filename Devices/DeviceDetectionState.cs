@@ -2,6 +2,17 @@ using System.Threading;
 
 namespace MozaPlugin.Devices
 {
+    /// <summary>Positively-identified passive-shifter model. <c>Unknown</c> until a
+    /// probe resolves it: the standalone-USB lane resolves it from the PID at connect
+    /// (instant); a base/hub-relayed shifter resolves SGP from its LED-read answer and
+    /// HGP from the generic device-type identity probe.</summary>
+    internal enum ShifterModelKind
+    {
+        Unknown = 0,
+        Hgp,
+        Sgp,
+    }
+
     /// <summary>
     /// Mutable detection-state bag shared by serial-reader, poll timer, UI, and
     /// telemetry threads. All fields are <c>volatile</c> or accessed via
@@ -18,9 +29,14 @@ namespace MozaPlugin.Devices
         public volatile bool HubDetected;
         public volatile bool Ab9Detected;
         // HGP/SGP passive shifter. ShifterHasLeds distinguishes the SGP (2 config
-        // LEDs) from the HGP (no LEDs) so the UI shows the LED section only for the SGP.
+        // LEDs) from the HGP (no LEDs) so the SGP LED writes are gated on it.
         public volatile bool ShifterDetected;
         public volatile bool ShifterHasLeds;
+        // Positively-identified model, gating the dedicated HGP / SGP tabs. Resolved
+        // from the PID on the standalone lane, or from a probe answer on a relay
+        // (SGP: LED read; HGP: device-type identity probe). Stays Unknown until a
+        // positive answer arrives — the tabs never show on a timeout.
+        public volatile ShifterModelKind ShifterModel = ShifterModelKind.Unknown;
 
         // Which MozaDeviceManager owns each routable peripheral — i.e. the pipe
         // it was detected on. Null = no opinion → callers fall back to the
@@ -101,6 +117,7 @@ namespace MozaPlugin.Devices
             Ab9Detected = false;
             ShifterDetected = false;
             ShifterHasLeds = false;
+            ShifterModel = ShifterModelKind.Unknown;
             PedalsOwner = null;
             HandbrakeOwner = null;
             ShifterOwner = null;
