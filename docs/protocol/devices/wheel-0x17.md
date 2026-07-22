@@ -265,7 +265,7 @@ The contributor's exact channels were game/hub-specific (`ATSRHubMain.Telemetry.
 |---|---|---|---|
 | TyreTemp / TyrePressure | 5 | 4 × 10-bit LSB pack | tyre temp = **°C + 300** (inner & outer groups) |
 | BrakeTemp / Speed / Rpm / Int16 / FuelLaps | 2 | 16-bit **big-endian** | brake = raw °C; fuel-remain-laps = **laps × 100** |
-| Time (lap / gap / session) | 3 | 24-bit BE, ms | **seconds × 1000**; gap = **24-bit sign-magnitude** delta to best (**bit 23 = sign, set when ahead/faster**; low bits = \|ms\|) — verified against an ACC capture, 96% round-trip |
+| Time (lap / gap / session) | 3 | 24-bit BE, ms | **seconds × 1000**; gap = **24-bit sign-magnitude** delta to best — **bit 23 = sign**, low **23 bits** = \|ms\| (data[9] bits 0-6 carry the high magnitude bits, not just a pad). Range reaches **±1640 s+** in a PitHouse capture, so it is **not** limited to ±65 s. Sign convention verified against an ACC capture (96% round-trip) |
 | Int8 / Gear / Temperature / Float8 | 1 | 8-bit | gear = **SimHub gear + 1** (0 = R, 1 = N, 2 = 1st) |
 | GearDrsErs | 1 | gear[0:4] · **ERS mode**[4:6] (2-bit) · **DRS**[6] (1-bit) | ERS mode 0–3, DRS 0/1 |
 | Compact<4,4> | 1 | two 4-bit LSB | |
