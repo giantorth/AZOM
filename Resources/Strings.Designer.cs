@@ -407,6 +407,7 @@ namespace MozaPlugin.Resources
         public static string Label_AlwaysCaptureOnStartup => Get("Label_AlwaysCaptureOnStartup");
         public static string Tooltip_AlwaysCaptureOnStartup => Get("Tooltip_AlwaysCaptureOnStartup");
         public static string Button_ExportBundle => Get("Button_ExportBundle");
+        public static string Tooltip_ExportBundle => Get("Tooltip_ExportBundle");
         public static string Button_CopyCapture => Get("Button_CopyCapture");
         public static string Section_FullDiagReport => Get("Section_FullDiagReport");
         public static string Subtitle_FullDiagReport => Get("Subtitle_FullDiagReport");
@@ -764,5 +765,25 @@ namespace MozaPlugin.Resources
         public static string Label_Import => Get("Label_Import");
         public static string Label_Export => Get("Label_Export");
         public static string Preset_RoadRumble => Get("Preset_RoadRumble");
+        public static string Section_BugReport => Get("Section_BugReport");
+        public static string Subtitle_BugReport => Get("Subtitle_BugReport");
+        public static string Label_BugReportDescription => Get("Label_BugReportDescription");
+        public static string Placeholder_BugReportDescription => Get("Placeholder_BugReportDescription");
+        public static string Label_BugReportContact => Get("Label_BugReportContact");
+        public static string Hint_BugReportConsent => Get("Hint_BugReportConsent");
+        public static string Button_SubmitBugReport => Get("Button_SubmitBugReport");
+        public static string Status_BugReportUploading => Get("Status_BugReportUploading");
+        public static string Status_BugReportSubmitted => Get("Status_BugReportSubmitted");
+        public static string Status_BugReportRateLimited => Get("Status_BugReportRateLimited");
+        public static string Status_BugReportTooLarge => Get("Status_BugReportTooLarge");
+        public static string Status_BugReportFailed => Get("Status_BugReportFailed");
+        public static string Status_BugReportNeedDescription => Get("Status_BugReportNeedDescription");
+        public static string Status_BugReportCooldown => Get("Status_BugReportCooldown");
+        public static string Label_DiagnosticCapture => Get("Label_DiagnosticCapture");
+        public static string Tooltip_DiagnosticCapture => Get("Tooltip_DiagnosticCapture");
+        public static string Status_CaptureOff => Get("Status_CaptureOff");
+        public static string Status_CaptureSegments => Get("Status_CaptureSegments");
+        public static string Word_Frozen => Get("Word_Frozen");
+        public static string Word_Filling => Get("Word_Filling");
     }
 }

@@ -1032,17 +1032,18 @@ namespace MozaPlugin
                     }
                 }
 
-                // Persistent always-capture: ensure capture is on before any device traffic
-                // so it covers the full connect/handshake. EnsureRunning() — not Start() —
-                // so the buffer survives plugin reload on game switches (Start clears the ring).
-                if (_settings.AlwaysCaptureOnStartup)
+                // Diagnostic capture is always on (no user toggle): enable before
+                // any device traffic so the startup segment covers the full
+                // connect/handshake. EnsureRunning() — not Start() — so the
+                // dual-segment ring (and its frozen first-minute) survives the
+                // plugin reload on game switches.
                 {
                     var cap = global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance;
                     bool wasRunning = cap.Enabled;
                     cap.EnsureRunning();
                     MozaLog.Debug(wasRunning
-                        ? $"[AZOM] Serial traffic capture preserved across reload — AlwaysCaptureOnStartup is on ({cap.Count} entries)"
-                        : "[AZOM] Serial traffic capture auto-started — AlwaysCaptureOnStartup is on");
+                        ? $"[AZOM] Diagnostic capture preserved across reload ({cap.Count} frames)"
+                        : "[AZOM] Diagnostic capture enabled (startup + rolling segments)");
                 }
 
                 // Fire-and-forget update check against the GitHub Releases API.
@@ -1623,13 +1624,10 @@ namespace MozaPlugin
                 try { _cm1Driver?.Dispose(); } catch { }
             }
             // File sink always closes on teardown — new file per Init by design.
-            // In-memory ring stays enabled across plugin reload when always-capture is on,
-            // so buffered frames survive game switches (next Init's EnsureRunning is a no-op).
+            // The in-memory ring stays enabled across the plugin reload (capture
+            // is always on) so buffered frames survive game switches — next Init's
+            // EnsureRunning is a no-op.
             try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StopFileSink(); } catch { }
-            if (_settings?.AlwaysCaptureOnStartup != true)
-            {
-                try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.Stop(); } catch { }
-            }
             if (ownConnection)
             {
                 try { _connection?.Dispose(); } catch { }
@@ -2572,13 +2570,9 @@ namespace MozaPlugin
             }
 
             // Release the wire-trace file handle (new file per Init by design).
-            // Keep the in-memory ring enabled across plugin reload when always-capture
-            // is on, so buffered frames survive game switches.
+            // The in-memory ring stays enabled across the plugin reload (capture
+            // is always on) so buffered frames survive game switches.
             try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StopFileSink(); } catch { }
-            if (_settings?.AlwaysCaptureOnStartup != true)
-            {
-                try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.Stop(); } catch { }
-            }
 
             // 5. Cancel paced setting-reads (avoids tasks running past teardown).
             try { _deviceManager?.Dispose(); } catch { }

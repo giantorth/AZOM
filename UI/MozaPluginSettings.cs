@@ -213,10 +213,20 @@ namespace MozaPlugin
         public bool GearshiftVibrateOnNeutral { get; set; } = false;
         public int GearshiftDebounceMs { get; set; } = 500;
 
-        // Persistent: when true, MozaPlugin.Init starts the serial traffic capture
-        // automatically (catches early connect/handshake traffic the user can't normally
-        // arm in time). Stays on across launches until the user toggles it off.
+        // Diagnostic serial capture is always on (no user toggle): the
+        // dual-segment ring (SerialTrafficCapture) keeps the first ~60s of
+        // startup plus a rolling last-N-minutes window in RAM so a bug report
+        // always has the connect/handshake. See MozaPlugin.Init.
+        //
+        // Deprecated capture toggles — kept only so pre-existing settings JSON
+        // still deserializes; no longer read anywhere.
+        public bool DiagnosticCaptureEnabled { get; set; } = true;
         public bool AlwaysCaptureOnStartup { get; set; } = false;
+
+        // Client-side cooldown timestamp for the "Submit bug report" button —
+        // guards against accidental double-submits. Server enforces the real
+        // per-IP rate limits.
+        public DateTime LastBugReportUtc { get; set; }
 
         // Register a Control Mapper IVariantProvider so SimHub can key per-wheel
         // button mappings off (VID, PID, friendly-wheel-name) instead of treating

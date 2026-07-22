@@ -3218,29 +3218,30 @@
                             </ctrl:SectionCard>
                         </Grid>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_SerialTrafficCapture}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_SerialTrafficCapture}"
-                                          Icon="{StaticResource IconDiag}">
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BugReport}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
-                                           Text="{x:Static res:Strings.Hint_CaptureDataInMemory}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Button x:Name="SerialCaptureToggleButton" Content="{x:Static res:Strings.Button_StartCapture}"
-                                            Click="SerialCaptureToggle_Click" MinWidth="120"/>
-                                    <TextBlock x:Name="SerialCaptureStatusText" Text="{x:Static res:Strings.Status_Idle}"
-                                               Style="{StaticResource MutedHintText}" Margin="14,0,0,0"/>
-                                </StackPanel>
-                                <ctrl:OffOnToggle x:Name="AlwaysCaptureOnStartupCheck"
-                                          Content="{x:Static res:Strings.Label_AlwaysCaptureOnStartup}"
-                                          Click="AlwaysCaptureOnStartup_Click"
-                                          Margin="0,0,0,10"
-                                          ToolTip="{x:Static res:Strings.Tooltip_AlwaysCaptureOnStartup}"/>
-                                <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportDescription}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="BugReportDescriptionBox" Style="{StaticResource LfeNameBox}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="2000"
+                                         MinHeight="80" MaxHeight="160"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"
+                                         ToolTip="{x:Static res:Strings.Placeholder_BugReportDescription}"/>
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
+                                <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
+                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
+                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
+                                            Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>
                                     <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
-                                            Click="SerialCaptureExport_Click" IsEnabled="False"/>
-                                    <Button x:Name="SerialCaptureCopyButton" Content="{x:Static res:Strings.Button_CopyCapture}"
-                                            Click="SerialCaptureCopy_Click"
-                                            Margin="8,0,0,0" IsEnabled="False"/>
+                                            Click="SerialCaptureExport_Click" Margin="8,0,0,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
+                                    <TextBlock x:Name="BugReportStatusText" Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
@@ -3541,7 +3542,7 @@
                         <!-- Bandwidth visualization was moved to the Base tab's live header
                              (next to the temperature graph) as a single dual-line sparkline. -->
 
-                        <!-- Serial Traffic Capture moved to the Options tab. -->
+                        <!-- Serial Traffic Capture + Report a problem moved to the Options tab. -->
 
                         <!-- ============ Full Diagnostic Report (expandable) ============ -->
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_FullDiagReport}"

@@ -63,6 +63,32 @@ namespace MozaPlugin
         private volatile string _serialPartA = "";
         private volatile string _serialPartB = "";
 
+        /// <summary>
+        /// Byte sequences that appear verbatim on the wire and identify this
+        /// specific hardware — MCU UIDs (raw wire bytes) and serial-number ASCII.
+        /// <see cref="MozaPlugin.Diagnostics.CaptureRedactor"/> masks any
+        /// occurrence of these inside an uploaded/exported serial capture. Only
+        /// sequences of ≥ 6 bytes are returned so a short value can't
+        /// false-positive against ordinary telemetry bytes.
+        /// </summary>
+        public System.Collections.Generic.IReadOnlyList<byte[]> GetIdentityByteSequences()
+        {
+            var list = new System.Collections.Generic.List<byte[]>();
+            void AddBytes(byte[] b) { if (b != null && b.Length >= 6) list.Add(b); }
+            void AddAscii(string s)
+            {
+                if (!string.IsNullOrEmpty(s) && s.Length >= 6)
+                    list.Add(System.Text.Encoding.ASCII.GetBytes(s));
+            }
+            AddBytes(WheelMcuUid);
+            AddBytes(DisplayMcuUid);
+            AddBytes(BaseMcuUid);
+            AddAscii(_serialPartA);
+            AddAscii(_serialPartB);
+            AddAscii(DisplaySerialNumber);
+            return list;
+        }
+
         // Raw observed reply bytes from group 0x40 cmd 0x28 polls.
         // PitHouse polls 28:00 + 28:01 at ~1 Hz throughout the active phase
         // across all four bridge captures (sim/logs/bridge-20260503-*.jsonl).
