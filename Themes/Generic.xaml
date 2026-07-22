@@ -410,10 +410,25 @@
                               StrokeEndLineCap="Round"
                               Fill="{x:Null}"/>
                         <Canvas IsHitTestVisible="False">
+                            <!-- Third tip dot only makes sense when a Third series is
+                                 actually bound (mBooster/Pedals traces); the two-series
+                                 bandwidth chart never sets ThirdSamples, which left
+                                 ThirdTipX/Y at their (0,0) default and pinned a stray
+                                 dot in the upper-left corner. -->
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding ThirdBrush}"
                                      Canvas.Left="{Binding ThirdTipX, RelativeSource={RelativeSource TemplatedParent}}"
-                                     Canvas.Top="{Binding ThirdTipY, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                     Canvas.Top="{Binding ThirdTipY, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ThirdLineGeometry, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding OutBrush}"
                                      Canvas.Left="{Binding OutTipX, RelativeSource={RelativeSource TemplatedParent}}"

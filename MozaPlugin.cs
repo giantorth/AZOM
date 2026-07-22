@@ -183,6 +183,18 @@ namespace MozaPlugin
         private Timer _pollTimer = null!;
         private Timer _retryTimer = null!;
         private Timer _reconnectTimer = null!;
+        // Base-tab temperature-graph history. Sampled every 500 ms by a
+        // plugin-lifetime timer (independent of the settings panel) so the graph
+        // shows the full 5-minute window the moment the panel opens rather than
+        // starting empty. 600 × 0.5 s = 5 min; the temps themselves refresh on
+        // the 5 s _pollTimer via PollBaseAux, so 500 ms just reproduces the
+        // graph's existing staircase without adding real resolution.
+        private const int TempHistorySamples = 600;
+        private const int TempHistoryIntervalMs = 500;
+        private readonly Diagnostics.TemperatureHistory _tempHistory =
+            new Diagnostics.TemperatureHistory(TempHistorySamples);
+        private Timer _tempHistoryTimer = null!;
+        internal Diagnostics.TemperatureHistory TemperatureHistory => _tempHistory;
         // CAS re-entry guard: a 5 s reconnect tick can outlast its interval
         // (probe fallback ~600 ms/port under Wine, Disconnect joins at 1 s) —
         // overlapping ticks must not run TryConnect* concurrently on a lane.
@@ -1264,6 +1276,15 @@ namespace MozaPlugin
                 _pollTimer.AutoReset = true;
                 _pollTimer.Start();
 
+                // Base-tab temperature-graph history sampler — runs for the
+                // plugin's whole life so the graph shows its full window the
+                // moment the settings panel opens. Reads the temps that the 5 s
+                // _pollTimer refreshes; UI-independent by design.
+                _tempHistoryTimer = new Timer(TempHistoryIntervalMs);
+                _tempHistoryTimer.Elapsed += SampleTemperatureHistory;
+                _tempHistoryTimer.AutoReset = true;
+                _tempHistoryTimer.Start();
+
                 // 250ms < shortest ReadRetryBackoffMs (200) so a dropped probe
                 // gets retried within ~one backoff window.
                 _retryTimer = new Timer(250);
@@ -1518,6 +1539,7 @@ namespace MozaPlugin
         {
             UnhookPowerMode();
             try { _pollTimer?.Stop(); } catch { }
+            try { _tempHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _profileCoordinator?.StopSaveDebounceTimer(); } catch { }
@@ -1637,6 +1659,7 @@ namespace MozaPlugin
             try { _hubManager?.Dispose(); } catch { }
             try { _baseManager?.Dispose(); } catch { }
             try { _pollTimer?.Dispose(); } catch { }
+            try { _tempHistoryTimer?.Dispose(); } catch { }
             try { _retryTimer?.Dispose(); } catch { }
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _profileCoordinator?.DisposeSaveDebounceTimer(); } catch { }
@@ -2392,6 +2415,7 @@ namespace MozaPlugin
             // 1. Stop timers first so no new callbacks fire against disposed state.
             _profileCoordinator?.StopSaveDebounceTimer();
             _pollTimer?.Stop();
+            _tempHistoryTimer?.Stop();
             _retryTimer?.Stop();
             _reconnectTimer?.Stop();
 
@@ -2622,6 +2646,7 @@ namespace MozaPlugin
             // 7. Dispose timers after I/O is gone.
             _profileCoordinator?.DisposeSaveDebounceTimer();
             _pollTimer?.Dispose();
+            _tempHistoryTimer?.Dispose();
             _retryTimer?.Dispose();
             _reconnectTimer?.Dispose();
 
@@ -3834,6 +3859,18 @@ namespace MozaPlugin
                 try { _peripheralRegistry?.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral refresh: {ex.Message}"); }
             }
+        }
+
+        // Background feed for the Base-tab temperature graph's rolling history —
+        // fires on _tempHistoryTimer regardless of whether the settings panel is
+        // open. Cheap: reads three volatile ints + one bool into a ring buffer.
+        private void SampleTemperatureHistory(object sender, ElapsedEventArgs e)
+        {
+            if (IsShuttingDown) return;
+            var data = _data;
+            if (data == null) return;
+            try { _tempHistory.Record(data.McuTemp, data.MosfetTemp, data.MotorTemp, data.IsBaseConnected); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Temp-history sample failed: {ex.Message}"); }
         }
 
         private void PollStatus(object sender, ElapsedEventArgs e)
