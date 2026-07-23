@@ -190,6 +190,16 @@ namespace MozaPlugin.Devices
             // 0 RPM LEDs + 16 dimming-only backlit buttons (no per-button RGB — the
             // wheel ignores the colour bytes, like ES).
             ("W11",     "Lamborghini Revuelto", new WheelModelInfo(0, 16, false, null, 0, hasDisplay: false)),
+            // MOZA × Porsche Mission R (firmware "W05"): screenless, 4 backlit
+            // buttons, no RPM LEDs (button layout per user; same dimming-only
+            // style as the Revuelto). LED count confirmed; refine only if a
+            // capture shows per-button RGB.
+            ("W05",     "× Porsche Mission R", new WheelModelInfo(0, 4, false, null, 0, hasDisplay: false)),
+            // ESSENZA SCV12 (firmware "W06"): display wheel, 10 RPM LEDs in a
+            // 1/8/1 brow arrangement (1-LED brow each side, 8 in the middle —
+            // the same scheme as the 3/10/3 wheels, smaller), no button LEDs.
+            // Per user.
+            ("W06",     "ESSENZA SCV12", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: true, browSegmentSize: 1)),
             ("W13",     "FSR V2",     new WheelModelInfo(16, 10, false, null, 0, hasDisplay: true,  browSegmentSize: 3)),  // firmware reports "W13" for FSR V2
             // FSR V1 display wheel (box name "FSR1"): firmware reports model-name
             // "FSR", hw "RS21-D03-HW FW-C", sw "RS21-D03-MC FW". A DISTINCT, older
