@@ -19,6 +19,8 @@ namespace MozaPlugin.UI
             public string RollingCaptureText = string.Empty;
             public IReadOnlyList<SerialTrafficCapture.Entry>? StartupSnapshot;
             public IReadOnlyList<SerialTrafficCapture.Entry>? RollingSnapshot;
+            // Serialized MozaPluginSettings JSON (may be null if unavailable).
+            public string? SettingsJson;
             // Populated only on the bug-report submit path; null for a local export.
             public string? ReportText;
         }
@@ -97,6 +99,8 @@ namespace MozaPlugin.UI
             manifest.AppendLine("  serial-capture-startup.txt – first ~60s of traffic (connect/handshake), frozen");
             manifest.AppendLine("  serial-capture-rolling.txt – rolling last-N-minutes of traffic");
             manifest.AppendLine("  diagnostics.txt          – snapshot of the Diagnostics tab text");
+            if (!string.IsNullOrEmpty(content.SettingsJson))
+                manifest.AppendLine("  plugin-settings.json     – serialized MozaPluginSettings");
             manifest.AppendLine($"  moza-log.txt             – [AZOM] log lines from MozaLog ring buffer ({logEntryCount} entries)");
             manifest.AppendLine();
             manifest.AppendLine("Hardware identifiers (serial numbers, MCU UIDs) are masked as .. in the capture files.");
@@ -117,6 +121,8 @@ namespace MozaPlugin.UI
                 WriteEntry(zip, "serial-capture-startup.txt", content.StartupCaptureText);
                 WriteEntry(zip, "serial-capture-rolling.txt", content.RollingCaptureText);
                 WriteEntry(zip, "diagnostics.txt", content.DiagnosticsDumpText);
+                if (!string.IsNullOrEmpty(content.SettingsJson))
+                    WriteEntry(zip, "plugin-settings.json", content.SettingsJson);
                 WriteEntry(zip, "moza-log.txt", logText);
             }
         }

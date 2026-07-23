@@ -38,8 +38,22 @@ namespace MozaPlugin
                 RollingCaptureText = includeRolling
                     ? CaptureRedactor.FormatRedacted(rolling, _data)
                     : "(rolling segment omitted to fit the upload size limit)\n",
+                SettingsJson = SerializeSettings(),
                 ReportText = reportText,
             };
+        }
+
+        private string SerializeSettings()
+        {
+            try
+            {
+                return Newtonsoft.Json.JsonConvert.SerializeObject(
+                    _plugin.Settings, Newtonsoft.Json.Formatting.Indented);
+            }
+            catch (Exception ex)
+            {
+                return $"(failed to serialize plugin settings: {ex.Message})";
+            }
         }
 
         private string BuildReportText(string description, string contact, string version, string os, bool rollingOmitted)
