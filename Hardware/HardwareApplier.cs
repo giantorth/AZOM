@@ -473,17 +473,24 @@ namespace MozaPlugin.Hardware
                     WriteColorArray(esRpmColors, "wheel-old-rpm-color", 10);
             }
 
-            // VGS display-rotation mode (0=off, 1=smooth, 2=immediate). Session-0x02
+            // Display-rotation mode (0=off, 1=smooth, 2=immediate). Session-0x02
             // FF property push (kind=5), so it goes through the wheel's main sender,
-            // NOT the group-0x3F device-manager write path. Gated on the model's
-            // rotation-IMU capability so it's never pushed to a non-VGS display wheel.
-            // Fires on every wheel (re)detection and profile switch; the valuable
-            // case is a per-game profile change while connected. On a cold-start
-            // detection the session may not be Active yet and the push is a harmless
-            // no-op — the wheel firmware persists its last rotation mode across
-            // reconnects, so the display is correct regardless.
-            if (model?.SupportsDisplayRotation == true && profile.DashDisplayRotation >= 0)
-                _plugin.TelemetrySender?.SendDashDisplayRotation(profile.DashDisplayRotation);
+            // NOT the group-0x3F device-manager write path. VGS: profile-driven.
+            // Every other display wheel: forced off — rotation can get latched on
+            // in wheel flash by misrouted V0 value frames (kind=5 collision, seen
+            // on W13/FSR V2 under a wrong manual era pick) and these wheels have
+            // no UI anywhere to clear it. Fires on every wheel (re)detection and
+            // profile switch; TelemetrySender.SendSessionInitHandshake covers the
+            // session-init case where this push may predate an Active session.
+            if (model?.SupportsDisplayRotation == true)
+            {
+                if (profile.DashDisplayRotation >= 0)
+                    _plugin.TelemetrySender?.SendDashDisplayRotation(profile.DashDisplayRotation);
+            }
+            else if (model?.HasDisplay == true)
+            {
+                _plugin.TelemetrySender?.SendDashDisplayRotation(0);
+            }
         }
 
         /// <summary>

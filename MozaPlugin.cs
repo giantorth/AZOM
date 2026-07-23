@@ -1449,6 +1449,9 @@ namespace MozaPlugin
                     $"[AZOM] Hot re-negotiation feature flag: " +
                     $"settings={_settings.EnableHotRenegotiation} " +
                     $"sender={_telemetrySender.EnableHotRenegotiation}");
+                // Re-bound on every plugin reload so a reused persistent sender
+                // never holds a closure over a disposed plugin instance.
+                _telemetrySender.WheelModelInfoProvider = () => WheelModelInfo;
                 // Reset the start-request gate when the dashboard pipeline parks
                 // itself (sess=0x09 retry exhaust). Without this clear, the next
                 // wheel hot-swap or user toggle would early-out in

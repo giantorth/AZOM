@@ -237,6 +237,12 @@ namespace MozaPlugin.Telemetry
             set => _hotSwitch.Enabled = value;
         }
 
+        /// <summary>Resolves the connected wheel's model info (null until
+        /// identity resolves). Set by MozaPlugin at sender wiring; used to
+        /// force display rotation off on non-VGS display wheels at session
+        /// init. Only wired on the main wheel sender, never the CM2 sender.</summary>
+        internal Func<Devices.WheelModelInfo?>? WheelModelInfoProvider { get; set; }
+
         // Wheel-reported current dashboard slot — ground truth, parsed from
         // type-04 records on sess=0x02 b2h. See WheelSlotTracker for parsing
         // and docs/protocol/dashboard-upload/wheel-pushed-slot.md.
@@ -2625,6 +2631,17 @@ namespace MozaPlugin.Telemetry
             // comment above and docs/protocol/sessions/session-0x02-ff-init.md
             // for the required body-decode work before re-attempting.
 
+            // Non-VGS display wheels: force the firmware display-rotation
+            // property off. V0 value frames misrouted at a non-V0 wheel (bad
+            // manual era pick) collide with property kind=5 and latch rotation
+            // on in wheel flash; these wheels have no UI anywhere to clear it.
+            var model = WheelModelInfoProvider?.Invoke();
+            if (model != null && model.HasDisplay == true && !model.SupportsDisplayRotation)
+            {
+                SendDashDisplayRotation(0);
+                MozaLog.Debug("[AZOM] Forced display rotation off (non-VGS display wheel)");
+            }
+
             _initHandshakeSession = ResolveFfSession();
             MozaLog.Debug(
                 $"[AZOM] Sent init handshake (kind=2 nonce + kind=7 slot=0) on FF session " +
@@ -2712,13 +2729,14 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Convenience: push the VGS display-rotation mode (0=off, 1=smooth,
+        /// Convenience: push the display-rotation mode (0=off, 1=smooth,
         /// 2=immediate). The wheel senses its own angle with an internal IMU and
         /// counter-rotates the dashboard; this only selects how. Sent once per
         /// change (not periodic), matching PitHouse. Values outside 0..2 are
-        /// clamped. Only VGS-family wheels act on it — see the VGS gate in
+        /// clamped. VGS: profile-driven — see the gate in
         /// <c>HardwareApplier.ApplyWheelToHardware</c> and the VGS-only UI in
-        /// <c>DashboardManagementControl</c>.
+        /// <c>DashboardManagementControl</c>. All other display wheels: forced
+        /// to 0 at session init and detection (no UI).
         /// </summary>
         public void SendDashDisplayRotation(int mode)
         {
