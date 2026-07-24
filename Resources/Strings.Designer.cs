@@ -785,5 +785,24 @@ namespace MozaPlugin.Resources
         public static string Status_CaptureSegments => Get("Status_CaptureSegments");
         public static string Word_Frozen => Get("Word_Frozen");
         public static string Word_Filling => Get("Word_Filling");
+        public static string Section_StalksGameKeys => Get("Section_StalksGameKeys");
+        public static string Label_WiperForwardKey => Get("Label_WiperForwardKey");
+        public static string Label_WiperBackKey => Get("Label_WiperBackKey");
+        public static string Label_LightCycleKey => Get("Label_LightCycleKey");
+        public static string Label_IndicatorLeftKey => Get("Label_IndicatorLeftKey");
+        public static string Label_IndicatorRightKey => Get("Label_IndicatorRightKey");
+        public static string KeyCapture_Prompt => Get("KeyCapture_Prompt");
+        public static string KeyCapture_None => Get("KeyCapture_None");
+        public static string StalkKind_None => Get("StalkKind_None");
+        public static string StalkKind_KeyTap => Get("StalkKind_KeyTap");
+        public static string StalkKind_HeldKey => Get("StalkKind_HeldKey");
+        public static string StalkKind_LatchKey => Get("StalkKind_LatchKey");
+        public static string StalkKind_IndicatorLeft => Get("StalkKind_IndicatorLeft");
+        public static string StalkKind_IndicatorRight => Get("StalkKind_IndicatorRight");
+        public static string StalkKind_IndicatorCancel => Get("StalkKind_IndicatorCancel");
+        public static string StalkKind_WiperSwipe => Get("StalkKind_WiperSwipe");
+        public static string StalkKind_ReleaseHeld => Get("StalkKind_ReleaseHeld");
+        public static string StalkKind_WiperStage => Get("StalkKind_WiperStage");
+        public static string StalkKind_LightStage => Get("StalkKind_LightStage");
     }
 }

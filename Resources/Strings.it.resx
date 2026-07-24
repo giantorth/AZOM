@@ -732,4 +732,23 @@ Id: {2}</value></data>
   <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_StalksGameKeys" xml:space="preserve"><value>Tasti di gioco</value></data>
+  <data name="Label_WiperForwardKey" xml:space="preserve"><value>Tergicristalli avanti</value></data>
+  <data name="Label_WiperBackKey" xml:space="preserve"><value>Tergicristalli indietro</value></data>
+  <data name="Label_LightCycleKey" xml:space="preserve"><value>Ciclo luci</value></data>
+  <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Freccia sinistra</value></data>
+  <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Freccia destra</value></data>
+  <data name="KeyCapture_Prompt" xml:space="preserve"><value>Premi un tasto…</value></data>
+  <data name="KeyCapture_None" xml:space="preserve"><value>(non impostato)</value></data>
+  <data name="StalkKind_None" xml:space="preserve"><value>(nessuna)</value></data>
+  <data name="StalkKind_KeyTap" xml:space="preserve"><value>Pressione tasto</value></data>
+  <data name="StalkKind_HeldKey" xml:space="preserve"><value>Tasto mantenuto</value></data>
+  <data name="StalkKind_LatchKey" xml:space="preserve"><value>Tasto bloccato</value></data>
+  <data name="StalkKind_IndicatorLeft" xml:space="preserve"><value>Freccia: sinistra</value></data>
+  <data name="StalkKind_IndicatorRight" xml:space="preserve"><value>Freccia: destra</value></data>
+  <data name="StalkKind_IndicatorCancel" xml:space="preserve"><value>Freccia: annulla</value></data>
+  <data name="StalkKind_WiperSwipe" xml:space="preserve"><value>Tergicristalli: passata singola</value></data>
+  <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Rilascia tasti tenuti</value></data>
+  <data name="StalkKind_WiperStage" xml:space="preserve"><value>Stadio tergicristalli {0}</value></data>
+  <data name="StalkKind_LightStage" xml:space="preserve"><value>Stadio luci {0}</value></data>
 </root>

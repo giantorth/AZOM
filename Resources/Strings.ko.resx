@@ -728,4 +728,23 @@ Id: {2}</value></data>
   <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_StalksGameKeys" xml:space="preserve"><value>게임 키</value></data>
+  <data name="Label_WiperForwardKey" xml:space="preserve"><value>와이퍼 앞으로</value></data>
+  <data name="Label_WiperBackKey" xml:space="preserve"><value>와이퍼 뒤로</value></data>
+  <data name="Label_LightCycleKey" xml:space="preserve"><value>라이트 순환</value></data>
+  <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>좌측 방향지시등</value></data>
+  <data name="Label_IndicatorRightKey" xml:space="preserve"><value>우측 방향지시등</value></data>
+  <data name="KeyCapture_Prompt" xml:space="preserve"><value>키를 누르세요…</value></data>
+  <data name="KeyCapture_None" xml:space="preserve"><value>(설정 안 됨)</value></data>
+  <data name="StalkKind_None" xml:space="preserve"><value>(없음)</value></data>
+  <data name="StalkKind_KeyTap" xml:space="preserve"><value>키 누르기</value></data>
+  <data name="StalkKind_HeldKey" xml:space="preserve"><value>키 유지</value></data>
+  <data name="StalkKind_LatchKey" xml:space="preserve"><value>키 고정</value></data>
+  <data name="StalkKind_IndicatorLeft" xml:space="preserve"><value>방향지시등: 좌측</value></data>
+  <data name="StalkKind_IndicatorRight" xml:space="preserve"><value>방향지시등: 우측</value></data>
+  <data name="StalkKind_IndicatorCancel" xml:space="preserve"><value>방향지시등: 해제</value></data>
+  <data name="StalkKind_WiperSwipe" xml:space="preserve"><value>와이퍼: 한 번 작동</value></data>
+  <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>유지 중인 키 해제</value></data>
+  <data name="StalkKind_WiperStage" xml:space="preserve"><value>와이퍼 단계 {0}</value></data>
+  <data name="StalkKind_LightStage" xml:space="preserve"><value>라이트 단계 {0}</value></data>
 </root>

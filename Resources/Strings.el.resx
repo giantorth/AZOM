@@ -728,4 +728,23 @@ Id: {2}</value></data>
   <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_StalksGameKeys" xml:space="preserve"><value>Πλήκτρα παιχνιδιού</value></data>
+  <data name="Label_WiperForwardKey" xml:space="preserve"><value>Υαλοκαθαριστήρες εμπρός</value></data>
+  <data name="Label_WiperBackKey" xml:space="preserve"><value>Υαλοκαθαριστήρες πίσω</value></data>
+  <data name="Label_LightCycleKey" xml:space="preserve"><value>Κύκλος φώτων</value></data>
+  <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Φλας αριστερά</value></data>
+  <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Φλας δεξιά</value></data>
+  <data name="KeyCapture_Prompt" xml:space="preserve"><value>Πάτησε ένα πλήκτρο…</value></data>
+  <data name="KeyCapture_None" xml:space="preserve"><value>(δεν ορίστηκε)</value></data>
+  <data name="StalkKind_None" xml:space="preserve"><value>(κανένα)</value></data>
+  <data name="StalkKind_KeyTap" xml:space="preserve"><value>Πάτημα πλήκτρου</value></data>
+  <data name="StalkKind_HeldKey" xml:space="preserve"><value>Κράτημα πλήκτρου</value></data>
+  <data name="StalkKind_LatchKey" xml:space="preserve"><value>Μανδάλωση πλήκτρου</value></data>
+  <data name="StalkKind_IndicatorLeft" xml:space="preserve"><value>Φλας: αριστερά</value></data>
+  <data name="StalkKind_IndicatorRight" xml:space="preserve"><value>Φλας: δεξιά</value></data>
+  <data name="StalkKind_IndicatorCancel" xml:space="preserve"><value>Φλας: ακύρωση</value></data>
+  <data name="StalkKind_WiperSwipe" xml:space="preserve"><value>Υαλοκαθαριστήρες: ένα πέρασμα</value></data>
+  <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Απελευθέρωση κρατημένων πλήκτρων</value></data>
+  <data name="StalkKind_WiperStage" xml:space="preserve"><value>Στάδιο υαλοκαθαριστήρων {0}</value></data>
+  <data name="StalkKind_LightStage" xml:space="preserve"><value>Στάδιο φώτων {0}</value></data>
 </root>

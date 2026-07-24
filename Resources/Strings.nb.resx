@@ -734,4 +734,23 @@ Id: {2}</value></data>
   <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_StalksGameKeys" xml:space="preserve"><value>Spilltaster</value></data>
+  <data name="Label_WiperForwardKey" xml:space="preserve"><value>Viskere frem</value></data>
+  <data name="Label_WiperBackKey" xml:space="preserve"><value>Viskere tilbake</value></data>
+  <data name="Label_LightCycleKey" xml:space="preserve"><value>Lyssyklus</value></data>
+  <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Blinklys venstre</value></data>
+  <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Blinklys høyre</value></data>
+  <data name="KeyCapture_Prompt" xml:space="preserve"><value>Trykk på en tast…</value></data>
+  <data name="KeyCapture_None" xml:space="preserve"><value>(ikke angitt)</value></data>
+  <data name="StalkKind_None" xml:space="preserve"><value>(ingen)</value></data>
+  <data name="StalkKind_KeyTap" xml:space="preserve"><value>Tastetrykk</value></data>
+  <data name="StalkKind_HeldKey" xml:space="preserve"><value>Holdt tast</value></data>
+  <data name="StalkKind_LatchKey" xml:space="preserve"><value>Låst tast</value></data>
+  <data name="StalkKind_IndicatorLeft" xml:space="preserve"><value>Blinklys: venstre</value></data>
+  <data name="StalkKind_IndicatorRight" xml:space="preserve"><value>Blinklys: høyre</value></data>
+  <data name="StalkKind_IndicatorCancel" xml:space="preserve"><value>Blinklys: avbryt</value></data>
+  <data name="StalkKind_WiperSwipe" xml:space="preserve"><value>Viskere: enkelt drag</value></data>
+  <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Slipp holdte taster</value></data>
+  <data name="StalkKind_WiperStage" xml:space="preserve"><value>Viskertrinn {0}</value></data>
+  <data name="StalkKind_LightStage" xml:space="preserve"><value>Lystrinn {0}</value></data>
 </root>

@@ -3031,6 +3031,32 @@
 
                         <!-- Truck-sim key mapping (visible only in truck-sim mode) -->
                         <StackPanel x:Name="StalksTruckSimPanel" Visibility="Collapsed">
+                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_StalksGameKeys}"
+                                              Icon="{StaticResource IconShift}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static res:Strings.Label_WiperForwardKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="0" Grid.Column="1" x:Name="StalksWiperFwdKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static res:Strings.Label_WiperBackKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="1" Grid.Column="1" x:Name="StalksWiperBackKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static res:Strings.Label_LightCycleKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="2" Grid.Column="1" x:Name="StalksLightCycleKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static res:Strings.Label_IndicatorLeftKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="3" Grid.Column="1" x:Name="StalksIndLeftKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{x:Static res:Strings.Label_IndicatorRightKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="4" Grid.Column="1" x:Name="StalksIndRightKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                </Grid>
+                            </ctrl:SectionCard>
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_StalksKeyMapping}"
                                               Subtitle="{x:Static res:Strings.Subtitle_StalksInteractiveMap}"
                                               Icon="{StaticResource IconShift}">
@@ -3048,6 +3074,7 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="72"/>
                                                         <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                                         <Ellipse Width="9" Height="9" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -3068,6 +3095,9 @@
                                                     <ComboBox Grid.Column="1" Margin="4,1"
                                                               ItemsSource="{Binding Options}"
                                                               SelectedItem="{Binding Selected, Mode=TwoWay}"/>
+                                                    <ctrl:KeyCaptureBox Grid.Column="2" Width="120" Margin="4,1"
+                                                                        KeyCode="{Binding KeyCode, Mode=TwoWay}"
+                                                                        Visibility="{Binding ShowsKeyCapture, Converter={StaticResource BoolToVisibility}}"/>
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
