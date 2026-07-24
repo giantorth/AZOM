@@ -19,12 +19,17 @@ namespace MozaPlugin.Devices
     /// frequency; the host sets freq + an amplitude ENVELOPE (intensity shaped by
     /// smoothness: 100 = steady, 0 = full-swing pulse). Frequency is sent
     /// unclamped (the wire encoder saturates the freq field at 200 Hz).
+    ///
+    /// ShakeIt mode: while the "MOZA Wheelbase LFE" ShakeIt haptics device posts
+    /// values (see ShakeIt/), the worker renders those on all three slots instead
+    /// of the plugin channels. See the ShakeIt takeover block below.
     /// </summary>
     internal sealed class BaseLfeEffectWorker : IDisposable
     {
         private const int TickPeriodMs = 20;                    // 50 Hz
         private const double TickPeriodSec = TickPeriodMs / 1000.0;
         private const long FeedStaleMs = 250;                  // feed paused/stopped → silence game-driven effects
+        private const long ShakeItStaleMs = 1000;              // ShakeIt device gone/stalled → fall back to plugin channels
         private const long GearshiftBurstMs = 120;             // per-shift / per-bump burst hold
         // Momentary test-button patterns. Which pattern a slot's Test plays is
         // chosen by the slot's Mode (Engine sweep / ABS pulse / Gearshift bump /
@@ -85,6 +90,26 @@ namespace MozaPlugin.Devices
         }
         private ChannelState _engineSt, _absSt, _gearSt;
 
+        // ── ShakeIt takeover ──────────────────────────────────────────────────
+        // While a "MOZA Wheelbase LFE" ShakeIt haptics device exists in SimHub,
+        // its provider posts the mixed per-oscillator (gain, freq) every SimHub
+        // data tick and the worker renders THOSE instead of the plugin channels
+        // (single wire owner; the plugin's LFE tab effects are suppressed for as
+        // long as the device posts). Immutable snapshot swap — the tick reads the
+        // reference once; freshness expiry covers device removal without Stop().
+        private sealed class ShakeItSnapshot
+        {
+            public readonly double Gain0, Freq0, Gain1, Freq1, Gain2, Freq2;
+            public readonly long Ticks;
+            public ShakeItSnapshot(double g0, double f0, double g1, double f1, double g2, double f2)
+            {
+                Gain0 = g0; Freq0 = f0; Gain1 = g1; Freq1 = f1; Gain2 = g2; Freq2 = f2;
+                Ticks = Stopwatch.GetTimestamp();
+            }
+        }
+        private volatile ShakeItSnapshot? _shakeIt;
+        private long _shakeItStaleTicks;
+
         // Latest sent (carrier freq, amplitude) per slot for the settings scope.
         // Plain reads (viz only — a torn double read is a single invisible frame).
         public double ScopeEngineFreq => _engineSt.ScopeFreq; public double ScopeEngineAmp => _engineSt.ScopeAmp;
@@ -114,6 +139,7 @@ namespace MozaPlugin.Devices
             _stop = false;
             _burstTicks = Stopwatch.Frequency * GearshiftBurstMs / 1000;
             _feedStaleTicks = Stopwatch.Frequency * FeedStaleMs / 1000;
+            _shakeItStaleTicks = Stopwatch.Frequency * ShakeItStaleMs / 1000;
             _thread = new Thread(Loop) { Name = "MozaBaseLfe", IsBackground = true };
             _thread.Start();
         }
@@ -133,6 +159,13 @@ namespace MozaPlugin.Devices
             _latestGameActive = gameActive;
             Interlocked.Exchange(ref _lastFrameTicks, Stopwatch.GetTimestamp());
         }
+
+        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) from the haptics device provider (SimHub data thread).</summary>
+        public void PostShakeItChannels(double gain0, double freq0, double gain1, double freq1, double gain2, double freq2)
+            => _shakeIt = new ShakeItSnapshot(gain0, freq0, gain1, freq1, gain2, freq2);
+
+        /// <summary>Immediate ShakeIt release (device stopped/removed) — next tick falls back to the plugin channels.</summary>
+        public void ClearShakeItChannels() => _shakeIt = null;
 
         // Each slot's Test plays the pattern for that slot's current Mode.
         public void PostEngineTest() => Interlocked.Exchange(ref _engineTestStart, Stopwatch.GetTimestamp());
@@ -163,6 +196,15 @@ namespace MozaPlugin.Devices
             if (_isShuttingDown()) return;
             if (_base == null || !_base.IsConnected || !_detectionState.BaseDetected) return;
             if (!_data.BaseSupportsLfe) { SilenceIfActive(); return; }
+
+            // ShakeIt takeover: fresh provider values own all three slots (test
+            // buttons included — the ShakeIt device page has its own test tools).
+            var shakeIt = _shakeIt;
+            if (shakeIt != null && Stopwatch.GetTimestamp() - shakeIt.Ticks <= _shakeItStaleTicks)
+            {
+                TickShakeIt(shakeIt);
+                return;
+            }
 
             // Feed paused/stopped → game-driven activation goes false (test
             // triggers still fire on their own deadlines).
@@ -333,6 +375,30 @@ namespace MozaPlugin.Devices
         {
             if (st.Active) { _base.SendBaseLfeDisable(id); st.Active = false; st.Phase = 0; }
             st.ScopeAmp = 0; st.ScopeFreq = 0;   // scope: idle ribbon collapses to the floor
+        }
+
+        // ── ShakeIt-driven rendering ──────────────────────────────────────────
+        // Gains arrive final from SimHub's tone mixer (global gain, effect gain,
+        // channel mapping applied) — no envelope shaping here. Channel order:
+        // 0 → engine slot, 1 → ABS slot, 2 → gearshift slot (streamed).
+        private void TickShakeIt(ShakeItSnapshot s)
+        {
+            RenderShakeItSlot(ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine, s.Gain0, s.Freq0,
+                (f, a) => _base.SendBaseLfeEngineStream(playing: true, f, a));
+            RenderShakeItSlot(ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs, s.Gain1, s.Freq1,
+                (f, a) => _base.SendBaseLfeAbsStream(playing: true, f, a));
+            RenderShakeItSlot(ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift, s.Gain2, s.Freq2,
+                (f, a) => _base.SendBaseLfeGearshiftStream(playing: true, f, a));
+        }
+
+        private void RenderShakeItSlot(ref ChannelState st, MozaBaseLfeProtocol.LfeEffect id,
+                                       double gain, double freqHz, Action<double, double> send)
+        {
+            double amp = Clamp01(gain);
+            if (amp < 1e-4 || freqHz <= 0) { DisableIf(ref st, id); return; }
+            send(freqHz, amp);
+            st.Active = true;
+            st.ScopeFreq = freqHz; st.ScopeAmp = amp;
         }
 
         private void SilenceIfActive()

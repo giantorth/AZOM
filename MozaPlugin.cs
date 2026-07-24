@@ -1707,6 +1707,22 @@ namespace MozaPlugin
         public void TriggerBaseLfeAbsTest() { if (_data.BaseSupportsLfe) _baseLfeWorker?.PostAbsTest(); }
         public void TriggerBaseLfeGearshiftTest() { if (_data.BaseSupportsLfe) _baseLfeWorker?.PostGearshiftTest(); }
 
+        // ── ShakeIt haptics bridge (ShakeIt/) ─────────────────────────────────
+        // The provider is constructed by SimHub (generic new()) and reaches the
+        // live plugin through Instance; these forwarders keep the worker the
+        // single wire owner.
+
+        /// <summary>True when the wheelbase can accept ShakeIt-driven LFE frames (drives the haptics device's connected state).</summary>
+        internal bool IsBaseLfeHapticsReady =>
+            _baseLfeWorker != null && _data.BaseSupportsLfe
+            && DetectionState.BaseDetected && _deviceManager?.IsConnected == true;
+
+        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) — from the provider on the SimHub data thread.</summary>
+        internal void PostShakeItLfeChannels(double g0, double f0, double g1, double f1, double g2, double f2)
+            => _baseLfeWorker?.PostShakeItChannels(g0, f0, g1, f1, g2, f2);
+
+        internal void ClearShakeItLfeChannels() => _baseLfeWorker?.ClearShakeItChannels();
+
         /// <summary>Latest (carrier freq Hz, amplitude 0..1) for the 3 LFE slots — drives the settings scope.</summary>
         public (double freq, double amp)[] GetLfeScopeSamples()
         {

@@ -497,6 +497,23 @@ namespace MozaPlugin
             return true;
         }
 
+        // Gearshift slot (wire id 0) as a CONTINUOUS stream — ShakeIt mode only,
+        // where all three oscillator slots are generic tone channels. Period uses
+        // the engine ParamK: no PitHouse capture streams slot 0, but the placeholder
+        // burst period 0x000F equals floor(1000/66.7 Hz), so K=1000 is the
+        // consistent hypothesis (unverified on the wire).
+        public bool SendBaseLfeGearshiftStream(bool playing, double freqHz, double amp01)
+        {
+            if (!_connection.IsConnected) return false;
+            var f = MozaBaseLfeProtocol.BuildFrame(
+                MozaBaseLfeProtocol.LfeEffect.Gearshift, playing,
+                MozaBaseLfeProtocol.EncodePeriod(MozaBaseLfeProtocol.ParamKEngine, freqHz),
+                MozaMBoosterProtocol.EncodeFreq(freqHz),
+                MozaMBoosterProtocol.EncodeAmp(amp01));
+            _connection.SendStream(StreamKind.BaseLfeGearshift, f);
+            return true;
+        }
+
         public bool SendBaseLfeGearshiftBurst(double freqHz, double amp01)
         {
             if (!_connection.IsConnected) return false;
