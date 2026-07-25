@@ -537,6 +537,17 @@ namespace MozaPlugin.Telemetry
             { 18, new byte[] { 0x0c } },
         };
 
+        // Per-index sub-header descriptor (b1,b2) override. b1/b2 are per-DASHBOARD config
+        // descriptors (b2 = a region/feature bitmask), NOT fixed per record type — the same
+        // type carries different b1/b2 on different pages (see docs wheel-0x17.md). The wheel
+        // uses them to accept the record, so they must match PitHouse per page. Dashboard 16's
+        // type-0c uses b1/b2 = 00/00 (from a PitHouse ACC capture of dashboard 16), whereas the
+        // catalog default for type-0c (00/02) matches pages 15/17/18. Extend as pages are verified.
+        private static readonly Dictionary<int, (byte b1, byte b2)> IndexDescriptorOverride = new()
+        {
+            { 16, (0x00, 0x00) },
+        };
+
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
         public static readonly Fsr1Dashboard[] LiveDashboards =
             Dashboards.Where(d => d.IsLive).OrderBy(d => d.RecordType == 0x02 ? 0 : 1)
@@ -560,8 +571,21 @@ namespace MozaPlugin.Telemetry
         {
             if (!IndexToRecordTypes.TryGetValue(index, out var types))
                 return System.Array.Empty<Fsr1Dashboard>();
+            bool hasDesc = IndexDescriptorOverride.TryGetValue(index, out var desc);
             var list = new List<Fsr1Dashboard>(types.Length);
-            foreach (var t in types) { var d = ByType(t); if (d != null) list.Add(d); }
+            foreach (var t in types)
+            {
+                var d = ByType(t);
+                if (d == null) continue;
+                if (hasDesc && !d.IsBackground)
+                    d = new Fsr1Dashboard
+                    {
+                        RecordType = d.RecordType, Key = d.Key, Label = d.Label,
+                        PayloadLen = d.PayloadLen, LiveB1 = desc.b1, LiveB2 = desc.b2,
+                        IsLive = d.IsLive, IsBackground = d.IsBackground, Fields = d.Fields,
+                    };
+                list.Add(d);
+            }
             return list.ToArray();
         }
 
