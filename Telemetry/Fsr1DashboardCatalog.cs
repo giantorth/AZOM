@@ -519,7 +519,7 @@ namespace MozaPlugin.Telemetry
             { 0, new byte[] { 0x01, 0x0d } },   // shows inner+outer tyre temps; primary has inner only
             { 1, new byte[] { 0x02, 0x0d } },   // brake dash also shows tyre temps
             { 2, new byte[] { 0x06, 0x0d } },
-            { 3, new byte[] { 0x0c } },         // timing/gap page: PitHouse streams type-0c only (gap @ data[3-5])
+            { 3, new byte[] { 0x06, 0x0d } },
             { 4, new byte[] { 0x03 } },
             { 5, new byte[] { 0x04 } },
             { 6, new byte[] { 0x04 } },
