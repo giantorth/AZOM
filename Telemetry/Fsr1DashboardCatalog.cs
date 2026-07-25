@@ -532,6 +532,7 @@ namespace MozaPlugin.Telemetry
             { 13, new byte[] { 0x04 } },
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
+            { 16, new byte[] { 0x0c } },        // timing/gap page: PitHouse streams type-0c (ACC dual-capture)
             { 17, new byte[] { 0x11, 0x12, 0x0d } },  // GT style: tyres + totals
             { 18, new byte[] { 0x0c } },
         };
