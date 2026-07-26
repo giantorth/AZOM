@@ -121,8 +121,8 @@ namespace MozaPlugin.UI
                 WriteEntry(zip, "serial-capture-startup.txt", content.StartupCaptureText);
                 WriteEntry(zip, "serial-capture-rolling.txt", content.RollingCaptureText);
                 WriteEntry(zip, "diagnostics.txt", content.DiagnosticsDumpText);
-                if (!string.IsNullOrEmpty(content.SettingsJson))
-                    WriteEntry(zip, "plugin-settings.json", content.SettingsJson);
+                if (content.SettingsJson is string settingsJson && settingsJson.Length != 0)
+                    WriteEntry(zip, "plugin-settings.json", settingsJson);
                 WriteEntry(zip, "moza-log.txt", logText);
             }
         }

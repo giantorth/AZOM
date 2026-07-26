@@ -1728,8 +1728,7 @@ namespace MozaPlugin
                     if (dp == null) return false;
                     foreach (var d in dp.GetDevices())
                     {
-                        var id = d?.DeviceDescriptor?.DeviceTypeID;
-                        if (!string.IsNullOrEmpty(id) &&
+                        if (d?.DeviceDescriptor?.DeviceTypeID is string id && id.Length != 0 &&
                             id.IndexOf(ShakeIt.MozaShakeItDeviceRegistry.WheelbaseDeviceTypeId, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
                     }
