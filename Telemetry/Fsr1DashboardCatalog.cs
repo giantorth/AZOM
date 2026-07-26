@@ -533,7 +533,7 @@ namespace MozaPlugin.Telemetry
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
             { 16, new byte[] { 0x0c } },        // timing/gap page: PitHouse streams type-0c (ACC dual-capture)
-            { 17, new byte[] { 0x11, 0x12, 0x0d } },  // GT style: tyres + totals
+            { 17, new byte[] { 0x11 } },        // GT gap page: PitHouse streams type-0x11 (gap @ data[6-8])
             { 18, new byte[] { 0x0c } },
         };
 
@@ -560,7 +560,7 @@ namespace MozaPlugin.Telemetry
             { 14, (0x02, 0x40) },
             { 15, (0x00, 0x02) },
             { 16, (0x00, 0x00) },
-            { 17, (0x00, 0x02) },
+            { 17, (0x00, 0x40) },   // type-0x11 gap page: PitHouse b1/b2=00/40 (from Dashboard 17 AC capture)
             { 18, (0x00, 0x02) },
         };
 
