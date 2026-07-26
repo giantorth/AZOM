@@ -548,11 +548,11 @@ namespace MozaPlugin.Telemetry
         {
             { 0,  (0x0b, 0x88) },
             { 1,  (0x00, 0x02) },
-            { 2,  (0x05, 0x08) },
-            { 3,  (0x05, 0x08) },
+            { 2,  (0x0d, 0x00) },   // type-06 gap page: PitHouse uses b1/b2=0d/00 for the GAP-showing
+            { 3,  (0x0d, 0x00) },   // config; the FSR1_CM1 b2=08 variant does NOT render the gap field.
             { 4,  (0x27, 0xfe) },
             { 5,  (0x02, 0x40) },
-            { 7,  (0x05, 0x08) },
+            { 7,  (0x0d, 0x00) },   // type-06 gap page (see indices 2/3): match PitHouse's gap config.
             { 9,  (0x27, 0xfe) },
             { 11, (0x00, 0x48) },
             { 12, (0x18, 0x01) },
