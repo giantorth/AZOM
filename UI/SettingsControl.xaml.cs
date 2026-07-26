@@ -417,7 +417,9 @@ namespace MozaPlugin
             // The classic gearshift card stays visible on all firmware (its bump
             // command coexists with the LFE channels); the LFE card is shown
             // additionally, full-width below, only on LFE-capable firmware.
-            bool lfeSupported = _data.BaseSupportsLfe;
+            // Hide the LFE tab while the ShakeIt haptics device is deployed — that
+            // device owns the LFE output, so the two must not both edit the base.
+            bool lfeSupported = _data.BaseSupportsLfe && _plugin?.IsShakeItLfeDeviceDeployed != true;
             BaseLfeTab.Visibility = lfeSupported
                 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             if (lfeSupported)

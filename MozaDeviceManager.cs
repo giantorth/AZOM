@@ -497,20 +497,20 @@ namespace MozaPlugin
             return true;
         }
 
-        // Gearshift slot (wire id 0) as a CONTINUOUS stream — ShakeIt mode only,
-        // where all three oscillator slots are generic tone channels. Period uses
-        // the engine ParamK: no PitHouse capture streams slot 0, but the placeholder
-        // burst period 0x000F equals floor(1000/66.7 Hz), so K=1000 is the
-        // consistent hypothesis (unverified on the wire).
-        public bool SendBaseLfeGearshiftStream(bool playing, double freqHz, double amp01)
+        // The id-0 oscillator as a CONTINUOUS tone (ShakeIt only). The three LFE
+        // slots are identical oscillators — plugin LFE mode happens to drive id 0 as
+        // a one-shot gearshift burst, but nothing stops it streaming like ids 1/2.
+        // Period is a timing hint on a host-modulated tone (per wheelbase-0x13.md);
+        // reuse the engine ParamK so all three continuous tones encode it the same.
+        public bool SendBaseLfeOsc0Stream(bool playing, double freqHz, double amp01)
         {
             if (!_connection.IsConnected) return false;
             var f = MozaBaseLfeProtocol.BuildFrame(
-                MozaBaseLfeProtocol.LfeEffect.Gearshift, playing,
+                MozaBaseLfeProtocol.LfeEffect.Gearshift, playing,   // wire effect id 0
                 MozaBaseLfeProtocol.EncodePeriod(MozaBaseLfeProtocol.ParamKEngine, freqHz),
                 MozaMBoosterProtocol.EncodeFreq(freqHz),
                 MozaMBoosterProtocol.EncodeAmp(amp01));
-            _connection.SendStream(StreamKind.BaseLfeGearshift, f);
+            _connection.SendStream(StreamKind.BaseLfeOsc0, f);
             return true;
         }
 

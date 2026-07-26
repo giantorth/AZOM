@@ -1717,7 +1717,29 @@ namespace MozaPlugin
             _baseLfeWorker != null && _data.BaseSupportsLfe
             && DetectionState.BaseDetected && _deviceManager?.IsConnected == true;
 
-        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) — from the provider on the SimHub data thread.</summary>
+        /// <summary>True when a "MOZA Wheelbase LFE" haptics device instance is deployed in SimHub's device list, regardless of enable/game state — the LFE tab hides while it is, so the two sources can't both edit the base. UI-thread callers only (enumerates SimHub's WPF-owned device collection).</summary>
+        internal bool IsShakeItLfeDeviceDeployed
+        {
+            get
+            {
+                try
+                {
+                    var dp = _pluginManager?.GetPlugin<SimHub.Plugins.Devices.DevicesPlugin>();
+                    if (dp == null) return false;
+                    foreach (var d in dp.GetDevices())
+                    {
+                        var id = d?.DeviceDescriptor?.DeviceTypeID;
+                        if (!string.IsNullOrEmpty(id) &&
+                            id.IndexOf(ShakeIt.MozaShakeItDeviceRegistry.WheelbaseDeviceTypeId, StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                    }
+                    return false;
+                }
+                catch { return false; }
+            }
+        }
+
+        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) for the three summed LFE slots — from the provider on the SimHub data thread.</summary>
         internal void PostShakeItLfeChannels(double g0, double f0, double g1, double f1, double g2, double f2)
             => _baseLfeWorker?.PostShakeItChannels(g0, f0, g1, f1, g2, f2);
 

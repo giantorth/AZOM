@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameReaderCommon.Enums;
@@ -10,12 +11,21 @@ using SimHub.Plugins.Devices;
 namespace MozaPlugin.ShakeIt
 {
     /// <summary>
-    /// ShakeIt Motors channels provider for the wheelbase LFE: exposes the base's
-    /// three summable oscillator slots (cmd 0x2D/0x77, fw >= 1.2.10.10) as ShakeIt
-    /// channels. SimHub's tone mixer calls <see cref="UpdateOutput"/> every data
-    /// tick with the mixed per-channel (gain 0..1, frequency Hz); values are
-    /// forwarded to <see cref="Devices.BaseLfeEffectWorker"/> through
+    /// ShakeIt Motors channels provider for the wheelbase LFE (cmd 0x2D/0x77,
+    /// fw >= 1.2.10.10). The base runs three identical concurrent oscillators
+    /// (wire ids 1/2/0) and sums them in firmware — "engine / ABS / gearshift" are
+    /// just how the plugin's own LFE modes fill them, not distinct hardware. All
+    /// three are exposed as generic ShakeIt channels the user can route effects to.
+    /// SimHub's tone mixer calls <see cref="UpdateOutput"/> every data tick with the
+    /// mixed per-channel (gain 0..1, frequency Hz); values are forwarded to
+    /// <see cref="Devices.BaseLfeEffectWorker"/> through
     /// <see cref="MozaPlugin.Instance"/> so the worker stays the single wire owner.
+    ///
+    /// A NEW effect defaults to ONE enabled output (Oscillator 1). The base sums
+    /// all three slots into one physical actuator, so enabling all three by
+    /// default multiplied the output; the user opts into the others per effect.
+    /// SimHub's <see cref="CreateDefaultActivationFor"/> hook has no channel index,
+    /// so the default is seeded explicitly in <see cref="LoadDefaultPlatformSettings"/>.
     ///
     /// Instantiated by SimHub via the generic new() constraint inside the
     /// reflection-constructed device instance (see <see cref="MozaShakeItDeviceRegistry"/>)
@@ -25,7 +35,7 @@ namespace MozaPlugin.ShakeIt
     public sealed class MozaWheelbaseLfeChannelsProvider : IShakeItChannelsInfoProvider
     {
         // Index order is the wire mapping the worker applies:
-        // 0 → engine slot (id 1), 1 → ABS slot (id 2), 2 → gearshift slot (id 0).
+        // 0 → wire id 1, 1 → wire id 2, 2 → wire id 0. Three identical oscillators.
         private readonly List<ChannelInformation> _channels = new List<ChannelInformation>
         {
             new ChannelInformation { Name = "Oscillator 1" },
@@ -39,8 +49,10 @@ namespace MozaPlugin.ShakeIt
 
         public List<ChannelInformation> GetChannels(MotorsWithFrequencyOutputManagerBase manager) => _channels;
 
+        // Fallback default is OFF; the enabled channel(s) are seeded per new effect
+        // in LoadDefaultPlatformSettings (this hook can't tell which channel it is).
         public ChannelActivation CreateDefaultActivationFor(FFBPlacement placement, MotorsWithFrequencyOutputManagerBase manager)
-            => new ChannelActivation { IsEnabled = true };
+            => new ChannelActivation { IsEnabled = false };
 
         public void LoadDefaultPlatformSettings(EffectsContainerBase effectsContainerBase, ShakeItProfile shakeItProfile)
         {
@@ -48,6 +60,23 @@ namespace MozaPlugin.ShakeIt
             // to mono when the effect supports it (mirrors SimHub's pedal providers).
             if (effectsContainerBase.EffectsAggregates.Any(i => i.Key == "Mono"))
                 effectsContainerBase.AggregationMode = "Mono";
+
+            // Seed the per-placement channel activations so a new effect drives
+            // exactly Oscillator 1. GetSettings<T> returns the same persisted
+            // instance the tone mixer reads, so this write sticks; the dicts are
+            // public so no internal Get() is needed. Seeding every placement keeps
+            // the default correct regardless of which placement the effect emits.
+            var activation = effectsContainerBase.SettingsStore.GetSettings<DeviceChannelActivationSettings>();
+            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            {
+                if (!activation.Channels.TryGetValue(placement, out var pca))
+                {
+                    pca = new PlacementChannelsActivation();
+                    activation.Channels[placement] = pca;
+                }
+                for (int ch = 0; ch < _channels.Count; ch++)
+                    pca.Channels[ch] = new ChannelActivation { IsEnabled = ch == 0 };
+            }
         }
 
         public void UpdateOutput(Dictionary<int, ChannelValue> values)

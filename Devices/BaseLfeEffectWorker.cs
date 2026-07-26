@@ -91,12 +91,13 @@ namespace MozaPlugin.Devices
         private ChannelState _engineSt, _absSt, _gearSt;
 
         // ── ShakeIt takeover ──────────────────────────────────────────────────
-        // While a "MOZA Wheelbase LFE" ShakeIt haptics device exists in SimHub,
-        // its provider posts the mixed per-oscillator (gain, freq) every SimHub
-        // data tick and the worker renders THOSE instead of the plugin channels
-        // (single wire owner; the plugin's LFE tab effects are suppressed for as
-        // long as the device posts). Immutable snapshot swap — the tick reads the
-        // reference once; freshness expiry covers device removal without Stop().
+        // While a "MOZA Wheelbase LFE" ShakeIt haptics device exists in SimHub, its
+        // provider posts the mixed per-oscillator (gain, freq) for all three summed
+        // LFE oscillators every SimHub data tick and the worker renders THOSE
+        // instead of the plugin channels (single wire owner; the plugin's LFE tab
+        // is hidden for as long as the device posts). Immutable snapshot swap — the
+        // tick reads the reference once; freshness expiry covers device removal
+        // without Stop().
         private sealed class ShakeItSnapshot
         {
             public readonly double Gain0, Freq0, Gain1, Freq1, Gain2, Freq2;
@@ -160,7 +161,7 @@ namespace MozaPlugin.Devices
             Interlocked.Exchange(ref _lastFrameTicks, Stopwatch.GetTimestamp());
         }
 
-        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) from the haptics device provider (SimHub data thread).</summary>
+        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) for the three summed LFE slots (SimHub data thread).</summary>
         public void PostShakeItChannels(double gain0, double freq0, double gain1, double freq1, double gain2, double freq2)
             => _shakeIt = new ShakeItSnapshot(gain0, freq0, gain1, freq1, gain2, freq2);
 
@@ -379,8 +380,10 @@ namespace MozaPlugin.Devices
 
         // ── ShakeIt-driven rendering ──────────────────────────────────────────
         // Gains arrive final from SimHub's tone mixer (global gain, effect gain,
-        // channel mapping applied) — no envelope shaping here. Channel order:
-        // 0 → engine slot, 1 → ABS slot, 2 → gearshift slot (streamed).
+        // channel mapping applied) — no envelope shaping here. All three summed
+        // oscillators stream: 0 → id1 (engine slot), 1 → id2 (ABS slot), 2 → id0
+        // (Osc0 slot). A slot with ~zero gain is disabled (one-shot edge), so an
+        // unmapped oscillator stays silent and can't latch a residual tone.
         private void TickShakeIt(ShakeItSnapshot s)
         {
             RenderShakeItSlot(ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine, s.Gain0, s.Freq0,
@@ -388,7 +391,7 @@ namespace MozaPlugin.Devices
             RenderShakeItSlot(ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs, s.Gain1, s.Freq1,
                 (f, a) => _base.SendBaseLfeAbsStream(playing: true, f, a));
             RenderShakeItSlot(ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift, s.Gain2, s.Freq2,
-                (f, a) => _base.SendBaseLfeGearshiftStream(playing: true, f, a));
+                (f, a) => _base.SendBaseLfeOsc0Stream(playing: true, f, a));
         }
 
         private void RenderShakeItSlot(ref ChannelState st, MozaBaseLfeProtocol.LfeEffect id,
