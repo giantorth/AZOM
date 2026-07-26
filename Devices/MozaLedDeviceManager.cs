@@ -212,6 +212,8 @@ namespace MozaPlugin.Devices
         // with SimHub's default; only a subsequent change engages the firmware write.
         // Changes are debounced so a slider drag doesn't spam flash-backed writes.
         private bool _masterBriSeeded;
+        private int _masterBriBaseline = -1;
+        private bool _masterEngaged;
         private int _masterBriRaw = -1;
         private DateTime _masterBriRawUtc = DateTime.MinValue;
         private int _masterBriPublished = -1;
@@ -1075,15 +1077,39 @@ namespace MozaPlugin.Devices
             catch { return; }
             if (cur < 0) cur = 0; else if (cur > 100) cur = 100;
 
-            var now = DateTime.UtcNow;
             if (!_masterBriSeeded)
             {
                 // First sample = baseline; do not write (preserve device brightness).
                 _masterBriSeeded = true;
+                _masterBriBaseline = cur;
                 _masterBriRaw = cur;
                 _masterBriPublished = cur;
                 return;
             }
+            // Stay silent until the user actually moves the slider off its baseline,
+            // so connecting never overwrites the wheel's device-stored brightness.
+            if (!_masterEngaged)
+            {
+                if (cur == _masterBriBaseline) return;
+                _masterEngaged = true;
+            }
+
+            // Old-protocol wheels (ES/ESX): dimming is possible ONLY via the firmware
+            // brightness register, and this Display() path fires in bursts at idle —
+            // too sparse to time a trailing-edge settle here (that lagged the applied
+            // value a whole gesture behind, issue #113). Publish the LIVE value; the
+            // steady 250 ms poll timer in MozaPlugin debounces and writes it, so it
+            // can't depend on Display()/DataUpdate cadence.
+            if (plugin.IsOldWheelDetected)
+            {
+                plugin.WheelLedMasterBrightnessRaw = cur;
+                return;
+            }
+
+            // New-protocol wheels: firmware group brightness is a secondary refinement
+            // (per-frame colour scaling already dims live), so the debounced settled
+            // publish on this thread is sufficient. DataUpdate applies it.
+            var now = DateTime.UtcNow;
             if (cur != _masterBriRaw)
             {
                 _masterBriRaw = cur;

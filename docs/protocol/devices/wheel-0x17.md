@@ -312,7 +312,18 @@ Used by older wheel firmware revisions. Observed in protocol captures and retain
 | old-rpm-color8 | `15 00 07` | 3 | array | |
 | old-rpm-color9 | `15 00 08` | 3 | array | |
 | old-rpm-color10 | `15 00 09` | 3 | array | |
-| old-rpm-brightness | `14 00` | 1 | int | |
+| old-rpm-brightness | `14 00` | 1 | int | **Small field, NOT a 0–100 percentage** — see note below |
+
+**`old-rpm-brightness` value range.** The single payload byte is a small brightness
+count, not a 0–100 percentage. Observed empirically on ES/ESX hardware (issue #113):
+sweeping a host 0–100 value made the RPM bar ramp-and-wrap ~3.3 times, i.e. the field
+has a period of roughly 30 counts (0 = off, ~29 = full, values ≥ ~30 wrap). Exact
+maximum unconfirmed against a PitHouse capture (PitHouse's configurator surfaces this
+as a coarser 1–15 scale). The plugin therefore scales SimHub's 0–100 master brightness
+into `0..29` before writing (`EsBrightnessMax` in `MozaPlugin.cs`), kept just under the
+wrap point so a full slider lands at near-full brightness. Unlike new-protocol wheels,
+old-protocol wheels have no per-frame colour scaling, so this register is the *only* way
+to dim their RPM LEDs.
 
 ### Extended LED Group Architecture (Groups `0x3F` / `0x40`)
 

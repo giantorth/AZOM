@@ -227,6 +227,16 @@ namespace MozaPlugin
         // group brightness (rpm/buttons/knobs) equally via ApplyMasterWheelLedBrightness.
         internal volatile int WheelLedMasterBrightness = -1;
         private int _masterLedBrightnessApplied = -2; // DataUpdate-thread-local change gate
+        // Old-protocol (ES/ESX) master brightness: the LED thread publishes the LIVE
+        // slider value here (0..100, -1 until first moved); the steady 250 ms poll
+        // timer settle-detects + writes wheel-old-rpm-brightness. Old wheels can't use
+        // the DataUpdate path above — it goes quiet at idle (issue #113). Direct
+        // device-manager write on the timer, NOT via HardwareApplier's cfg cache
+        // (that dictionary is data-thread-only / unlocked).
+        internal volatile int WheelLedMasterBrightnessRaw = -1;
+        private int _esMasterBriApplied = -2;         // poll-timer-local change gate
+        private int _esMasterBriCandidate = int.MinValue; // value awaiting settle
+        private int _esMasterBriStableTicks;          // ticks the candidate has held
         private DeviceProber _deviceProber = null!;
         internal DeviceProber DeviceProber => _deviceProber;
         // Peripheral-enumeration prober for the dedicated hub pipe. Shares
@@ -1315,6 +1325,11 @@ namespace MozaPlugin
                     // reads on its own Send (same per-pipe isolation as the hub).
                     try { _peripheralRegistry?.TickRetransmits(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone peripheral retransmit tick failed: {ex.Message}"); }
+                    // Old-protocol (ES/ESX) master LED brightness settle + write. This
+                    // steady tick is the only cadence that survives idle (Display() is
+                    // bursty, DataUpdate goes quiet) — see TickEsMasterBrightness (#113).
+                    try { TickEsMasterBrightness(); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] ES master-brightness tick failed: {ex.Message}"); }
                 };
                 _retryTimer.AutoReset = true;
                 _retryTimer.Start();
@@ -1908,7 +1923,9 @@ namespace MozaPlugin
             // LED driver publishes the settled value into WheelLedMasterBrightness off
             // the LED thread; apply it here (change-gated) so the firmware write runs on
             // the data thread and shares HardwareApplier's per-wheel cfg cache with the
-            // connect/profile brightness path (no fight, no redundant flash).
+            // connect/profile brightness path (no fight, no redundant flash). NEW-protocol
+            // wheels only — ES/ESX (old-protocol) route through TickEsMasterBrightness on
+            // the steady poll timer, since this data thread goes quiet at idle (#113).
             int masterLedBri = WheelLedMasterBrightness;
             if (masterLedBri != _masterLedBrightnessApplied)
             {
@@ -3826,6 +3843,67 @@ namespace MozaPlugin
             bool wanted = !IsShuttingDown && _data != null && _data.IsConnected && IsGameActive;
             mgr.SetExecutionThrottleOptOut(wanted);
             mgr.SetTimerResolution(wanted);
+        }
+
+        // ES/ESX firmware RPM brightness register (0x14 0x00) is a small field, not a
+        // 0..100 percentage: sweeping SimHub's 0..100 master made the bar ramp+wrap
+        // ~3.3 times (issue #113 follow-up), so its period is ~30 counts. Scale the
+        // master into 0..EsBrightnessMax, kept just under the ~30 wrap point so a
+        // full slider lands at near-full brightness without tipping into a wrap.
+        private const int EsBrightnessMax = 29;
+        // SimHub's LED master brightness can churn at startup (day/night brightness-mode
+        // settling as the profile loads); writing each transient to the EEPROM register
+        // flickered the bar. Commit a value only after it has held steady this many
+        // 250 ms ticks (~0.75 s) — absorbs the startup churn and a slider drag alike,
+        // while still landing on the final value since this timer always ticks.
+        private const int EsBrightnessSettleTicks = 3;
+
+        /// <summary>
+        /// Write the ES/ESX master LED brightness, ticked from the steady 250 ms poll
+        /// timer. Old-protocol wheels dim ONLY via the legacy firmware brightness
+        /// register (<c>wheel-old-rpm-brightness</c>, <c>0x14 0x00</c>) — their live RPM
+        /// path sends only an on/off bitmask, so per-frame colour scaling can't dim
+        /// them. The LED thread publishes the live 0..100 slider value into
+        /// <see cref="WheelLedMasterBrightnessRaw"/>; we scale it into the firmware's
+        /// small brightness range and write it whenever the scaled value changes. This
+        /// runs here (not on Display()/DataUpdate) because both go quiet at idle, which
+        /// otherwise lagged the applied value a whole gesture behind the slider. The
+        /// 250 ms tick naturally caps a drag to ~4 writes/sec — no separate debounce
+        /// needed. Direct device-manager write — thread-safe, and deliberately NOT via
+        /// HardwareApplier's data-thread-only cfg cache.
+        /// </summary>
+        private void TickEsMasterBrightness()
+        {
+            if (!IsOldWheelDetected || !_connection.IsConnected) return;
+            int raw = WheelLedMasterBrightnessRaw;
+            if (raw < 0) return;
+            var model = WheelModelInfo;
+            if (model == null || model.RpmLedCount <= 0) return;
+
+            int wire = (int)Math.Round(raw * EsBrightnessMax / 100.0);
+            if (wire < 0) wire = 0; else if (wire > EsBrightnessMax) wire = EsBrightnessMax;
+
+            // Settle: require the scaled value to hold across several ticks before
+            // committing, so a startup transient can't flick the register through a
+            // burst of intermediate values.
+            if (wire != _esMasterBriCandidate)
+            {
+                _esMasterBriCandidate = wire;
+                _esMasterBriStableTicks = 0;
+                return;
+            }
+            if (_esMasterBriStableTicks < EsBrightnessSettleTicks)
+            {
+                _esMasterBriStableTicks++;
+                return;
+            }
+            if (wire == _esMasterBriApplied) return;
+
+            _esMasterBriApplied = wire;
+            // Keep MasterCompensated (LED thread) on the 0..100 master scale.
+            WheelLedMasterBrightness = raw;
+            _data.WheelESRpmBrightness = wire;
+            _deviceManager.WriteSetting("wheel-old-rpm-brightness", wire);
         }
 
         private void ReconnectTick()

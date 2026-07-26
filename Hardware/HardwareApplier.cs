@@ -1533,11 +1533,13 @@ namespace MozaPlugin.Hardware
         /// Called from the data thread when the user moves the master slider (the
         /// wheel LED driver publishes the settled value into
         /// <see cref="MozaPlugin.WheelLedMasterBrightness"/>). Flag brightness lives
-        /// on the Meter sub-device and is out of the wheel LED-group scope; ES
-        /// (old-protocol) wheels use a different command/range and are gated out via
-        /// <c>NewWheelDetected</c>. Change-gated through the same per-wheel cfg cache
-        /// as <c>ApplyWheelToHardware</c>, so a value already on the wheel is not
-        /// re-flashed and this never fights the connect/profile brightness write.
+        /// on the Meter sub-device and is out of the wheel LED-group scope. ES/ESX
+        /// (old-protocol) wheels are handled separately on the steady poll timer
+        /// (<see cref="MozaPlugin"/>) — their only dimmer is the legacy brightness
+        /// register and neither Display() nor DataUpdate ticks at idle, so they can't
+        /// ride this data-thread path (issue #113). Change-gated through the same
+        /// per-wheel cfg cache as <c>ApplyWheelToHardware</c>, so a value already on the
+        /// wheel is not re-flashed and this never fights the connect/profile write.
         /// </summary>
         public void ApplyMasterWheelLedBrightness(int value)
         {
