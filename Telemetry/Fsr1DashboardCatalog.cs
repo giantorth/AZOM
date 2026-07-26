@@ -537,15 +537,31 @@ namespace MozaPlugin.Telemetry
             { 18, new byte[] { 0x0c } },
         };
 
-        // Per-index sub-header descriptor (b1,b2) override. b1/b2 are per-DASHBOARD config
-        // descriptors (b2 = a region/feature bitmask), NOT fixed per record type — the same
-        // type carries different b1/b2 on different pages (see docs wheel-0x17.md). The wheel
-        // uses them to accept the record, so they must match PitHouse per page. Dashboard 16's
-        // type-0c uses b1/b2 = 00/00 (from a PitHouse ACC capture of dashboard 16), whereas the
-        // catalog default for type-0c (00/02) matches pages 15/17/18. Extend as pages are verified.
+        // Per-index sub-header descriptor (b1,b2). b1/b2 are per-DASHBOARD config descriptors
+        // (b2 = a region/feature bitmask), NOT fixed per record type — the same type carries
+        // different b1/b2 on different pages (see docs wheel-0x17.md), and the wheel gates on
+        // them to accept the record, so they must match PitHouse per page. These are ground
+        // truth from PitHouse captures: indices 0-15/17/18 from the multi-dash FSR1_CM1 capture,
+        // index 16 from an ACC capture of that page. Indices 6/8/10 were not in a capture (fall
+        // back to the type default). Applied in ByIndex to the streamed record for that page.
         private static readonly Dictionary<int, (byte b1, byte b2)> IndexDescriptorOverride = new()
         {
+            { 0,  (0x0b, 0x88) },
+            { 1,  (0x00, 0x02) },
+            { 2,  (0x05, 0x08) },
+            { 3,  (0x05, 0x08) },
+            { 4,  (0x27, 0xfe) },
+            { 5,  (0x02, 0x40) },
+            { 7,  (0x05, 0x08) },
+            { 9,  (0x27, 0xfe) },
+            { 11, (0x00, 0x48) },
+            { 12, (0x18, 0x01) },
+            { 13, (0x02, 0x40) },
+            { 14, (0x02, 0x40) },
+            { 15, (0x00, 0x02) },
             { 16, (0x00, 0x00) },
+            { 17, (0x00, 0x02) },
+            { 18, (0x00, 0x02) },
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
