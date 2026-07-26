@@ -398,6 +398,30 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Validates a firmware model-name string per
+        /// docs/how-to-query-device-type.md §5 ("Device-name validation"): reject
+        /// empty names, non-printable bytes, and the known non-device replies
+        /// (OK / BUSY / ERROR / ERR). Gates model-name-driven detection and model
+        /// resolution so a stray status reply can't be mistaken for a wheel.
+        /// </summary>
+        private static bool IsValidWheelModelName(string? name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            foreach (char c in name!)
+                if (c < 0x20 || c > 0x7E) return false;
+            switch (name.ToUpperInvariant())
+            {
+                case "OK":
+                case "BUSY":
+                case "ERROR":
+                case "ERR":
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        /// <summary>
         /// Wheel hot-swap detection by model-name change. Returns true (and triggers
         /// a re-detect) when a different wheel model is now reporting than the one
         /// last seen. Shared by the new-protocol (0x17) and ES (0x18) identity paths.
@@ -601,6 +625,32 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "wheel-model-name":
+                    // A valid model-name reply (the doc's canonical group-0x07
+                    // probe, ProbeWheelDetection) can itself trigger new-protocol
+                    // detection — this covers a wheel that answers the identity
+                    // group but not the telemetry-mode / rpm-value1 groups the
+                    // normal detection cascade keys off. Gated to the new-protocol
+                    // wheel ids (0x17, 0x15); the base (0x13) resolves as
+                    // base-model-name and ES (0x18) as es-wheel-model-name, so
+                    // neither reaches this case. Mirrors the wheel-telemetry-mode
+                    // bring-up minus the model-name read (already in hand).
+                    if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected
+                        && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
+                        && IsValidWheelModelName(_data.WheelModelName))
+                    {
+                        _detectionState.NewWheelDetected = true;
+                        _plugin.NoteWheelDetected();
+                        _deviceManager.LockWheelId(deviceId);
+                        _deviceManager.ReadSetting("wheel-sw-version");
+                        _deviceManager.ReadSetting("wheel-hw-version");
+                        _deviceManager.ReadSetting("wheel-serial-a");
+                        _deviceManager.ReadSetting("wheel-serial-b");
+                        _deviceManager.SendPithouseIdentityProbe(deviceId);
+                        _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
+                        MozaLog.Info($"[AZOM] New-protocol wheel detected via model-name probe on ID {deviceId}");
+                        // Fall through to the resolution block below.
+                    }
+
                     // New-protocol (0x17) wheels resolve here. ES wheels are
                     // handled in the es-wheel-model-name case (their real model
                     // comes from module id 0x18; the locked-id read on ES returns
@@ -608,7 +658,7 @@ namespace MozaPlugin.Devices
                     if (_detectionState.NewWheelDetected)
                     {
                         var currentModel = _data.WheelModelName;
-                        if (string.IsNullOrEmpty(currentModel))
+                        if (!IsValidWheelModelName(currentModel))
                             break;
 
                         if (DetectWheelModelHotSwap(currentModel))
@@ -709,7 +759,7 @@ namespace MozaPlugin.Devices
                         // definition so the ES wheel gets a proper per-wheel page
                         // identity instead of only the generic old-proto device.
                         var esModel = _data.WheelModelName;
-                        if (string.IsNullOrEmpty(esModel))
+                        if (!IsValidWheelModelName(esModel))
                             break;
                         if (DetectWheelModelHotSwap(esModel))
                             break;
