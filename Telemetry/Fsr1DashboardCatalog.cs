@@ -157,10 +157,10 @@ namespace MozaPlugin.Telemetry
                 Add(MakeBits(id, label, _bit, width, prop, fullScale, scale, bias), width);
             /// <summary>Four 10-bit values LSB-packed into 5 bytes (tyre temp / pressure group).
             /// bias = +300 for tyre temps (firmware decodes value−300 for sub-zero headroom).</summary>
-            public Fields Pack10x4(string idPrefix, string labelPrefix, string[] suffix, string[] props, double bias = 0.0)
+            public Fields Pack10x4(string idPrefix, string labelPrefix, string[] suffix, string[] props, double bias = 0.0, double scale = 1.0)
             {
                 for (int i = 0; i < 4; i++)
-                    Bits(idPrefix + suffix[i], labelPrefix + " " + suffix[i], 10, i < props.Length ? props[i] : "", bias: bias);
+                    Bits(idPrefix + suffix[i], labelPrefix + " " + suffix[i], 10, i < props.Length ? props[i] : "", scale: scale, bias: bias);
                 return this;
             }
             /// <summary>GearDrsErs strategy: gear[0:4] · ERS deploy mode[4:6] (2-bit) · DRS[6] (1-bit),
@@ -451,7 +451,7 @@ namespace MozaPlugin.Telemetry
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("lap", "Lap", G + "CurrentLap")
                     .U8("laps", "Lap count", G + "TotalLaps")
-                    .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps)
+                    .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U8("trackT", "Track temp", G + "RoadTemperature")
                     .U8("airT", "Air temp", G + "AirTemperature")
                     .Done(),
@@ -491,7 +491,7 @@ namespace MozaPlugin.Telemetry
                     .U16("btFR", "Brake temp FR", G + "BrakeTemperatureFrontRight")
                     .U16("btRL", "Brake temp RL", G + "BrakeTemperatureRearLeft")
                     .U16("btRR", "Brake temp RR", G + "BrakeTemperatureRearRight")
-                    .Pack10x4("tp", "Tyre pressure", GtTyreCorners, GtPressProps)
+                    .Pack10x4("tp", "Tyre pressure", GtTyreCorners, GtPressProps, scale: 10.0)
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Done(),
             },
@@ -513,7 +513,7 @@ namespace MozaPlugin.Telemetry
                     .U8("tcCut", "TC cut", "")
                     .U8("ecu", "ECU map", G + "EngineMap")
                     .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
-                           ("wipers", "Wipers", ""), ("ign", "Ignition", ""), ("engine", "Engine on", ""), ("tyreType", "Tyre type", ""))
+                           ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("wiperCls", "Wiper class", "")
                     .U8("redline", "Redline reached", "")
                     .Done(),
@@ -541,7 +541,7 @@ namespace MozaPlugin.Telemetry
                 RecordType = 0x12, Key = "type-12", Label = "Dashboard 12 — GT (B)", IsLive = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
-                    .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps)
+                    .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U16("fuelUsed", "Fuel used", "")
                     .U16("fuelAvg", "Fuel avg / lap", "")
                     .U16("fuelRem", "Fuel remaining", G + "Fuel")
@@ -550,7 +550,7 @@ namespace MozaPlugin.Telemetry
                     .Nibbles("tc", "TC level", G + "TCLevel", "ecu", "ECU map", G + "EngineMap")
                     .U8("tcCut", "TC cut", "")
                     .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
-                           ("wipers", "Wipers", ""), ("ign", "Ignition", ""), ("engine", "Engine on", ""), ("tyreType", "Tyre type", ""))
+                           ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("sector", "Sector", G + "CurrentSectorIndex")
                     .U8("redline", "Redline reached", "")
                     .Done(),
