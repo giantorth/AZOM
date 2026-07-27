@@ -532,8 +532,8 @@ namespace MozaPlugin.Telemetry
             { 13, new byte[] { 0x04 } },
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
-            { 16, new byte[] { 0x0c } },        // timing/gap page: PitHouse streams type-0c (ACC dual-capture)
-            { 17, new byte[] { 0x11 } },        // GT gap page: PitHouse streams type-0x11 (gap @ data[6-8])
+            { 16, new byte[] { 0x11 } },        // user "dashboard 17" (Param-6 16): PitHouse type-0x11, gap @ data[6-8]
+            { 17, new byte[] { 0x11, 0x12, 0x0d } },  // Param-6 17: GT default (unverified — no capture yet)
             { 18, new byte[] { 0x0c } },
         };
 
@@ -558,9 +558,9 @@ namespace MozaPlugin.Telemetry
             { 12, (0x18, 0x01) },
             { 13, (0x02, 0x40) },
             { 14, (0x02, 0x40) },
-            { 15, (0x00, 0x02) },
-            { 16, (0x00, 0x00) },
-            { 17, (0x00, 0x40) },   // type-0x11 gap page: PitHouse b1/b2=00/40 (from Dashboard 17 AC capture)
+            { 15, (0x00, 0x00) },   // user "dashboard 16" (Param-6 15): type-0c gap config (ACC dual capture)
+            { 16, (0x00, 0x40) },   // user "dashboard 17" (Param-6 16): type-0x11 gap config (Dashboard 17 AC capture)
+            { 17, (0x00, 0x02) },   // Param-6 17: GT default (unverified)
             { 18, (0x00, 0x02) },
         };
 
