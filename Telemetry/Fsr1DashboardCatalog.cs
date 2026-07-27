@@ -554,8 +554,8 @@ namespace MozaPlugin.Telemetry
             { 5,  (0x02, 0x40) },
             { 7,  (0x0d, 0x00) },   // type-06 gap page (see indices 2/3): match PitHouse's gap config.
             { 9,  (0x27, 0xfe) },
-            { 11, (0x00, 0x48) },
-            { 12, (0x18, 0x01) },
+            { 11, (0x01, 0x80) },   // user "dashboard 12" (Param-6 11): type-09 LIVE-gap config (PitHouse "Dash 12 and 13 assetto corsa" capture; gap @ data[14-16], moving)
+            { 12, (0x0d, 0x80) },   // user "dashboard 13" (Param-6 12): type-0e LIVE-gap config (same capture; gap @ data[5-7], moving). Idle FSR1_CM1 was 18/01.
             { 13, (0x02, 0x40) },
             { 14, (0x02, 0x40) },
             { 15, (0x00, 0x00) },   // user "dashboard 16" (Param-6 15): type-0c gap config (ACC dual capture)
