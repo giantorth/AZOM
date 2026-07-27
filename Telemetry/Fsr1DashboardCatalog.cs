@@ -134,9 +134,9 @@ namespace MozaPlugin.Telemetry
     internal static class Fsr1DashboardCatalog
     {
         // ── Ground-truth field builders ─────────────────────────────────────────
-        // Records are laid out with an auto-advancing cursor (data starts at byte 5), mirroring
-        // PitHouse's FormulaSteeringTelemetryDataPackN classes which concatenate each strategy's
-        // whole-byte output in order. U8/U16/U24 advance whole bytes (big-endian on the wire);
+        // Records are laid out with an auto-advancing cursor (data starts at byte 5), mirroring how
+        // PitHouse concatenates each field's whole-byte output in order on the wire.
+        // U8/U16/U24 advance whole bytes (big-endian on the wire);
         // Bits() advances a sub-byte LSB-first field; Pack10x4() lays a 4×10-bit LSB group
         // (TyreTemperature / TyrePressure strategies = 5 bytes). See docs § Group 0x42.
         private sealed class Fields
@@ -257,16 +257,28 @@ namespace MozaPlugin.Telemetry
             G + "TyrePressureFrontLeft", G + "TyrePressureFrontRight",
             G + "TyrePressureRearLeft", G + "TyrePressureRearRight",
         };
+        // type-0f packs its tyre-temp/pressure 4×10-bit groups in the order RR,RL,FR,FL — reversed
+        // from the FL,FR,RL,RR order the other records use (matches PitHouse's type-0f stream).
+        private static readonly string[] GtTyreCorners = { "RR", "RL", "FR", "FL" };
+        private static readonly string[] OuterTempProps =   // outer tyre surface temp, order RR,RL,FR,FL
+        {
+            G + "TyreTemperatureRearRight", G + "TyreTemperatureRearLeft",
+            G + "TyreTemperatureFrontRight", G + "TyreTemperatureFrontLeft",
+        };
+        private static readonly string[] GtPressProps =     // tyre pressure, order RR,RL,FR,FL
+        {
+            G + "TyrePressureRearRight", G + "TyrePressureRearLeft",
+            G + "TyrePressureFrontRight", G + "TyrePressureFrontLeft",
+        };
         // Tyre-temp 10-bit fields carry a +300 wire bias (firmware decodes value−300 °C).
         private const double TyreTempBias = 300.0;
         // Lap-time 24-bit fields carry the game value in milliseconds (SimHub seconds × 1000).
         private const double MsScale = 1000.0;
 
-        // Ground-truth catalog, derived by decompiling PitHouse's FormulaSteeringTelemetryDataPackN
-        // classes (Pack N = record type 0x0N). Each record is that Pack's exact ordered field list;
-        // strategies fix the encoding: tyre temp / tyre pressure = 4×10-bit LSB packs (5 bytes),
-        // brake temp / speed / rpm / int16 = 16-bit big-endian, lap times = 24-bit BE (ms),
-        // int8 / gear / temp = 8-bit, GearDrsErs / compact bundles = sub-byte LSB. See docs § Group 0x42.
+        // Per-record field layouts, matched byte-for-byte against PitHouse's group-0x42 wire streams.
+        // Encodings: tyre temp / tyre pressure = 4×10-bit LSB packs (5 bytes), brake temp / speed /
+        // rpm / int16 = 16-bit big-endian, lap times = 24-bit BE (ms), int8 / gear / temp = 8-bit,
+        // GearDrsErs / compact bundles = sub-byte LSB. See docs § Group 0x42.
         public static readonly Fsr1Dashboard[] Dashboards =
         {
             new()
@@ -467,6 +479,47 @@ namespace MozaPlugin.Telemetry
             },
             new()
             {
+                // GT dashboard background record: tyre / brake status. Streamed alongside the primary
+                // type-0x11 on the GT page (verified in the "Dashboard 17 AC" capture). Layout: 4×10-bit
+                // outer tyre temp (RR,RL,FR,FL), 4×U16 brake temp (FL,FR,RL,RR), 4×10-bit tyre pressure
+                // (RR,RL,FR,FL), U8 lap = 19 bytes.
+                RecordType = 0x0f, Key = "type-0f", Label = "Dashboard 0F — tyre / brake status", IsLive = true, IsBackground = true,
+                PayloadLen = 24, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new Fields()
+                    .Pack10x4("tto", "Tyre outer", GtTyreCorners, OuterTempProps, TyreTempBias)
+                    .U16("btFL", "Brake temp FL", G + "BrakeTemperatureFrontLeft")
+                    .U16("btFR", "Brake temp FR", G + "BrakeTemperatureFrontRight")
+                    .U16("btRL", "Brake temp RL", G + "BrakeTemperatureRearLeft")
+                    .U16("btRR", "Brake temp RR", G + "BrakeTemperatureRearRight")
+                    .Pack10x4("tp", "Tyre pressure", GtTyreCorners, GtPressProps)
+                    .U8("lap", "Lap", G + "CurrentLap")
+                    .Done(),
+            },
+            new()
+            {
+                // GT dashboard background record: fuel / lights / status. Layout: 2×U24 best/last lap ms,
+                // 3×U16 brake-bias/fuel-remaining/fuel-avg-per-lap, 4×U8 car-count/TC/TC-cut/ECU-map,
+                // 7×1-bit light bundle, 2×U8 wiper-class/redline = 19 bytes.
+                RecordType = 0x10, Key = "type-10", Label = "Dashboard 10 — fuel / lights / status", IsLive = true, IsBackground = true,
+                PayloadLen = 24, LiveB1 = 0x00, LiveB2 = 0x00,
+                Fields = new Fields()
+                    .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
+                    .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
+                    .U16("bias", "Brake bias", G + "BrakeBias")
+                    .U16("fuelRem", "Fuel remaining", G + "Fuel")
+                    .U16("fuelAvg", "Fuel avg / lap", "")
+                    .U8("cars", "Car count", G + "OpponentsCount")
+                    .U8("tc", "TC level", G + "TCLevel")
+                    .U8("tcCut", "TC cut", "")
+                    .U8("ecu", "ECU map", G + "EngineMap")
+                    .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
+                           ("wipers", "Wipers", ""), ("ign", "Ignition", ""), ("engine", "Engine on", ""), ("tyreType", "Tyre type", ""))
+                    .U8("wiperCls", "Wiper class", "")
+                    .U8("redline", "Redline reached", "")
+                    .Done(),
+            },
+            new()
+            {
                 RecordType = 0x11, Key = "type-11", Label = "Dashboard 11 — GT (A)", IsLive = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
                 Fields = new Fields()
@@ -532,7 +585,7 @@ namespace MozaPlugin.Telemetry
             { 13, new byte[] { 0x04 } },
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
-            { 16, new byte[] { 0x11 } },        // user "dashboard 17" (Param-6 16): PitHouse type-0x11, gap @ data[6-8]
+            { 16, new byte[] { 0x11, 0x0f, 0x10 } },  // user "dashboard 17" (Param-6 16): primary type-0x11 (gap) + background type-0f (tyre/brake) + type-10 (fuel/lights) — all 3 verified in the "Dashboard 17 AC" capture
             { 17, new byte[] { 0x11, 0x12, 0x0d } },  // Param-6 17: GT default (unverified — no capture yet)
             { 18, new byte[] { 0x0c } },
         };
