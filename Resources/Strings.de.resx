@@ -121,6 +121,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R Layout 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R Layout 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Sequenziell</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>H-Schaltung</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Schaltungstyp</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>GEFÜHL</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// mechanischer Charakter pro Achse</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Schaltwiderstand</value></data>

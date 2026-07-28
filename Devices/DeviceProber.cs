@@ -968,6 +968,15 @@ namespace MozaPlugin.Devices
                     ProbeRelayedShifter();
                     break;
 
+                // shifter-type (grp 0x51 cmd 0x02). Logged on every connect-time read:
+                // the {0,1} → {H-pattern, sequential} polarity is unconfirmed on real
+                // hardware, so support bundles from healthy and affected shifters are
+                // how it gets pinned down (v1.5.1 flipped some HGPs via this setting).
+                case "shifter-apply-mode":
+                    MozaLog.Info($"[AZOM] Shifter-type (apply-mode) = {value} " +
+                        $"({_detectionState.ShifterModelForOwner(_deviceManager)} lane, dev {deviceId})");
+                    break;
+
                 // Only the SGP answers a brightness read — a positive SGP identification
                 // on a relayed pipe (the standalone lane knows this from the PID instead).
                 case "shifter-brightness":

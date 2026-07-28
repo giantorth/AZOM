@@ -750,6 +750,8 @@ namespace MozaPlugin.Hardware
         // HGP and SGP are independent devices — each applies from its own profile
         // fields, mirrors into its own _data slot, and writes to its own pipe. _data is
         // mirrored regardless of detection; writes gate on that model being present.
+        // shifter-type (apply-mode) is device identity, never profile-applied — the
+        // v1.5.1 shared-profile apply of it is what flipped HGPs into sequential mode.
         public void ApplyHgpToHardware(MozaProfile? profile)
         {
             if (profile == null) return;
@@ -757,14 +759,12 @@ namespace MozaPlugin.Hardware
             if (profile.HgpDirection  >= 0) d.Direction  = profile.HgpDirection;
             if (profile.HgpPaddleSync >= 0) d.PaddleSync = profile.HgpPaddleSync;
             if (profile.HgpHidMode    >= 0) d.HidMode    = profile.HgpHidMode;
-            if (profile.HgpApplyMode  >= 0) d.ApplyMode  = profile.HgpApplyMode;
 
             if (!_detectionState.HgpDetected) return;
             var dm = HgpManager;
             if (profile.HgpDirection  >= 0) dm.WriteSetting("shifter-direction", profile.HgpDirection);
             if (profile.HgpPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.HgpPaddleSync);
             if (profile.HgpHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.HgpHidMode);
-            if (profile.HgpApplyMode  >= 0) dm.WriteSetting("shifter-apply-mode", profile.HgpApplyMode);
         }
 
         public void ApplySgpToHardware(MozaProfile? profile)
@@ -774,7 +774,6 @@ namespace MozaPlugin.Hardware
             if (profile.SgpDirection  >= 0) d.Direction  = profile.SgpDirection;
             if (profile.SgpPaddleSync >= 0) d.PaddleSync = profile.SgpPaddleSync;
             if (profile.SgpHidMode    >= 0) d.HidMode    = profile.SgpHidMode;
-            if (profile.SgpApplyMode  >= 0) d.ApplyMode  = profile.SgpApplyMode;
             if (profile.SgpBrightness >= 0) d.Brightness = profile.SgpBrightness;
             if (profile.SgpLed1Index  >= 0) d.Led1Index  = profile.SgpLed1Index;
             if (profile.SgpLed2Index  >= 0) d.Led2Index  = profile.SgpLed2Index;
@@ -784,7 +783,6 @@ namespace MozaPlugin.Hardware
             if (profile.SgpDirection  >= 0) dm.WriteSetting("shifter-direction", profile.SgpDirection);
             if (profile.SgpPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.SgpPaddleSync);
             if (profile.SgpHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.SgpHidMode);
-            if (profile.SgpApplyMode  >= 0) dm.WriteSetting("shifter-apply-mode", profile.SgpApplyMode);
             if (profile.SgpBrightness >= 0) dm.WriteSetting("shifter-brightness", profile.SgpBrightness);
             // Both LEDs ride one 2-byte command, so only push when BOTH indices are
             // known — otherwise we'd coerce the unknown LED to index 0 (red) and clobber
@@ -1202,6 +1200,16 @@ namespace MozaPlugin.Hardware
         {
             if (value < 0) return;
             if (_detectionState.SgpDetected) SgpManager.WriteSetting(command, value);
+        }
+        // Readback path for the shifter-type repair control: the reply lands in the
+        // per-model mirror, so the tab shows what the device actually stored.
+        public void ReadIfHgpDetected(string command)
+        {
+            if (_detectionState.HgpDetected) HgpManager.ReadSetting(command);
+        }
+        public void ReadIfSgpDetected(string command)
+        {
+            if (_detectionState.SgpDetected) SgpManager.ReadSetting(command);
         }
         // The 2 SGP LEDs ride one 2-byte command [S1,S2] (palette indices 0-7); the
         // UI re-sends both whenever either changes. SGP-only (the HGP has no LEDs).

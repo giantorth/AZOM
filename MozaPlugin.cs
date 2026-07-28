@@ -368,6 +368,8 @@ namespace MozaPlugin
         internal void WriteFloatIfPedalsDetected(string command, int value) => _hardwareApplier.WriteFloatIfPedalsDetected(command, value);
         internal void WriteIfHgpDetected(string command, int value) => _hardwareApplier.WriteIfHgpDetected(command, value);
         internal void WriteIfSgpDetected(string command, int value) => _hardwareApplier.WriteIfSgpDetected(command, value);
+        internal void ReadIfHgpDetected(string command) => _hardwareApplier.ReadIfHgpDetected(command);
+        internal void ReadIfSgpDetected(string command) => _hardwareApplier.ReadIfSgpDetected(command);
         internal void WriteArrayIfSgpDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfSgpDetected(command, payload);
         internal void WriteIfBaseAmbientSupported(string command, int value) => _hardwareApplier.WriteIfBaseAmbientSupported(command, value);
         internal void WriteColorIfWheelDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfWheelDetected(command, r, g, b);

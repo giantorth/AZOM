@@ -121,6 +121,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R Disposition 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R Disposition 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Séquentielle</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>Grille en H</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Type de levier de vitesses</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>TOUCHER</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// caractère mécanique par axe</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Résistance mécanique</value></data>

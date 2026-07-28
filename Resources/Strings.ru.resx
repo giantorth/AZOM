@@ -121,6 +121,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R Схема 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R Схема 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Секвентальная</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>H-образная</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Схема переключения</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>ОЩУЩЕНИЯ</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// механический характер по осям</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Механическое сопротивление</value></data>

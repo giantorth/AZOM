@@ -121,6 +121,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R 레이아웃 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R 레이아웃 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>시퀀셜</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>H패턴</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>시프터 유형</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>조작감</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// 축별 기계적 특성</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>기계적 저항</value></data>

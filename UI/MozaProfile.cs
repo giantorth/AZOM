@@ -620,14 +620,16 @@ namespace MozaPlugin
         public int[]? PedalsClutchCurve { get; set; }            // [5] values 0-100
 
         // ===== Shifter settings (HGP + SGP are independent devices). -1 = untouched. =====
+        // shifter-type (apply-mode, grp 0x52 cmd 0x02) is deliberately NOT profiled:
+        // it flips the device between H-pattern and sequential identity, and profile
+        // apply re-asserting a captured value is how v1.5.1 flipped users' HGPs.
+        // It is device-owned; the UI writes it directly on user action only.
         public int HgpDirection { get; set; } = -1;   // 0=Normal, 1=Reversed
         public int HgpPaddleSync { get; set; } = -1;  // 1/2
         public int HgpHidMode { get; set; } = -1;     // 0/1 game-compat mode
-        public int HgpApplyMode { get; set; } = -1;   // 0/1
         public int SgpDirection { get; set; } = -1;
         public int SgpPaddleSync { get; set; } = -1;
         public int SgpHidMode { get; set; } = -1;
-        public int SgpApplyMode { get; set; } = -1;
         public int SgpBrightness { get; set; } = -1;  // SGP LED brightness 0-10
         public int SgpLed1Index { get; set; } = -1;   // SGP LED S1 palette index 0-7
         public int SgpLed2Index { get; set; } = -1;   // SGP LED S2 palette index 0-7
@@ -822,9 +824,9 @@ namespace MozaPlugin
 
             // Shifter (HGP + SGP, independent)
             HgpDirection = p.HgpDirection; HgpPaddleSync = p.HgpPaddleSync;
-            HgpHidMode = p.HgpHidMode; HgpApplyMode = p.HgpApplyMode;
+            HgpHidMode = p.HgpHidMode;
             SgpDirection = p.SgpDirection; SgpPaddleSync = p.SgpPaddleSync;
-            SgpHidMode = p.SgpHidMode; SgpApplyMode = p.SgpApplyMode;
+            SgpHidMode = p.SgpHidMode;
             SgpBrightness = p.SgpBrightness;
             SgpLed1Index = p.SgpLed1Index; SgpLed2Index = p.SgpLed2Index;
 
@@ -1025,10 +1027,11 @@ namespace MozaPlugin
 
             // Shifter (HGP + SGP, independent). Device-read fields, like handbrake/pedals
             // above — only read on detect (no telemetry drift), so capturing _data is safe.
+            // shifter-type (ApplyMode) is device identity, never captured (see field notes).
             HgpDirection = data.ShifterHgp.Direction; HgpPaddleSync = data.ShifterHgp.PaddleSync;
-            HgpHidMode = data.ShifterHgp.HidMode; HgpApplyMode = data.ShifterHgp.ApplyMode;
+            HgpHidMode = data.ShifterHgp.HidMode;
             SgpDirection = data.ShifterSgp.Direction; SgpPaddleSync = data.ShifterSgp.PaddleSync;
-            SgpHidMode = data.ShifterSgp.HidMode; SgpApplyMode = data.ShifterSgp.ApplyMode;
+            SgpHidMode = data.ShifterSgp.HidMode;
             SgpBrightness = data.ShifterSgp.Brightness;
             SgpLed1Index = data.ShifterSgp.Led1Index; SgpLed2Index = data.ShifterSgp.Led2Index;
 

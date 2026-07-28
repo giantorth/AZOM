@@ -190,6 +190,8 @@ namespace MozaPlugin.Resources
         public static string Option_Ab9Layout7R1 => Get("Option_Ab9Layout7R1");
         public static string Option_Ab9Layout7R2 => Get("Option_Ab9Layout7R2");
         public static string Option_Sequential => Get("Option_Sequential");
+        public static string Option_HPattern => Get("Option_HPattern");
+        public static string Label_ShifterType => Get("Label_ShifterType");
         public static string Section_Feel => Get("Section_Feel");
         public static string Subtitle_PerAxisMechanicalCharacter => Get("Subtitle_PerAxisMechanicalCharacter");
         public static string SliderLabel_MechanicalResistance => Get("SliderLabel_MechanicalResistance");

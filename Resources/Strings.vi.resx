@@ -121,6 +121,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R Bố cục 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R Bố cục 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Tuần tự</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>Kiểu chữ H</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Kiểu cần số</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>CẢM GIÁC</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// đặc tính cơ học theo từng trục</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Lực cản cơ học</value></data>

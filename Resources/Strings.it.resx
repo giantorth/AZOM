@@ -124,6 +124,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>Schema 7+R 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>Schema 7+R 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Sequenziale</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>Schema a H</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Tipo di cambio</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>FEELING</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// carattere meccanico per asse</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Resistenza Meccanica</value></data>
