@@ -2858,13 +2858,6 @@
                                     <TextBlock Text="{x:Static res:Strings.SliderLabel_ShifterPaddleSync}" Style="{StaticResource SliderLabel}"/>
                                     <ctrl:OffOnToggle x:Name="SgpPaddleSyncCheck" VerticalAlignment="Center" Click="SgpPaddleSyncCheck_Click"/>
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.Label_ShifterType}" Style="{StaticResource SliderLabel}"/>
-                                    <ComboBox x:Name="SgpTypeCombo" Width="170" VerticalAlignment="Center" SelectionChanged="SgpTypeCombo_Changed">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_HPattern}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Sequential}"/>
-                                    </ComboBox>
-                                </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
 

@@ -359,10 +359,12 @@ namespace MozaPlugin.Devices
         /// <summary>A base/hub-relayed shifter (single 0x1A bus, no PID) can't be told
         /// apart at first sight, so probe the two model resolvers: the SGP answers a
         /// brightness read; the HGP answers the generic device-type identity. Both are
-        /// positive signals — no timeout. No-op once either model is latched.</summary>
+        /// positive signals — no timeout. No-op once THIS pipe's model is latched — a
+        /// shifter detected elsewhere (e.g. a standalone-USB HGP) says nothing about
+        /// what's behind this base/hub and must not suppress the probe.</summary>
         public void ProbeRelayedShifter()
         {
-            if (_detectionState.HgpDetected || _detectionState.SgpDetected) return;
+            if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
             _deviceManager.ReadSetting("shifter-brightness");
             _deviceManager.ReadSetting("shifter-device-type");
         }
@@ -377,14 +379,15 @@ namespace MozaPlugin.Devices
         /// <summary>Resolve a base/hub-relayed shifter's model from the generic
         /// device-type identity reply. Logs the raw reply so a support bundle reveals
         /// the HGP/SGP discriminator, then latches HGP on a positive match. A prior
-        /// brightness answer already positively identifies an SGP, so never overrides it.</summary>
+        /// brightness answer already positively identifies THIS pipe's SGP, so never
+        /// overrides it (an SGP on another pipe doesn't block resolution here).</summary>
         private void ResolveRelayedShifterModelFromDeviceType()
         {
             var dt = _data.RelayShifterDeviceType;
             if (dt == null || dt.Length == 0) return;
             MozaLog.Info($"[AZOM] Shifter device-type reply = [{System.BitConverter.ToString(dt)}] " +
                 "(HGP/SGP identity discriminator; relayed lane)");
-            if (_detectionState.SgpDetected) return;
+            if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
             if (HgpDeviceType != null && BytesEqual(dt, HgpDeviceType))
                 MarkHgpDetected();
         }

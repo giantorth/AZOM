@@ -369,7 +369,6 @@ namespace MozaPlugin
         internal void WriteIfHgpDetected(string command, int value) => _hardwareApplier.WriteIfHgpDetected(command, value);
         internal void WriteIfSgpDetected(string command, int value) => _hardwareApplier.WriteIfSgpDetected(command, value);
         internal void ReadIfHgpDetected(string command) => _hardwareApplier.ReadIfHgpDetected(command);
-        internal void ReadIfSgpDetected(string command) => _hardwareApplier.ReadIfSgpDetected(command);
         internal void WriteArrayIfSgpDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfSgpDetected(command, payload);
         internal void WriteIfBaseAmbientSupported(string command, int value) => _hardwareApplier.WriteIfBaseAmbientSupported(command, value);
         internal void WriteColorIfWheelDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfWheelDetected(command, r, g, b);
@@ -4145,8 +4144,10 @@ namespace MozaPlugin
                 _deviceManager.SendPresenceProbe(MozaProtocol.DevicePedals);
             // HGP/SGP attached to the base's peripheral port (dev 0x1A). A shifter on
             // its own USB port is found by MozaStandalonePeripheralRegistry instead;
-            // one behind the Universal Hub answers on the dedicated hub pipe.
-            if (!DetectionState.HgpDetected && !DetectionState.SgpDetected)
+            // one behind the Universal Hub answers on the dedicated hub pipe. Gate on
+            // THIS pipe's slot being unresolved — a standalone HGP/SGP elsewhere must
+            // not suppress the base-slot probe (both can be attached at once).
+            if (DetectionState.ShifterModelForOwner(_deviceManager) == Devices.ShifterModelKind.Unknown)
                 _deviceManager.SendPresenceProbe(MozaProtocol.DeviceHPattern);
             // No hub-port-power poll on the wheelbase connection — a Universal Hub
             // is found by the dedicated hub connection on its own port, never by

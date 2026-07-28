@@ -569,8 +569,9 @@ namespace MozaPlugin.Devices
                 dm.SendPresenceProbe(MozaProtocol.DevicePedals);
             if (!_detectionState.HandbrakeDetected)
                 dm.SendPresenceProbe(MozaProtocol.DeviceHandbrake);
-            // HGP/SGP shifter behind the hub (dev 0x1A).
-            if (!_detectionState.HgpDetected && !_detectionState.SgpDetected)
+            // HGP/SGP shifter behind the hub (dev 0x1A). Gated per-pipe — a shifter
+            // detected on another lane must not suppress this slot's probe.
+            if (_detectionState.ShifterModelForOwner(dm) == ShifterModelKind.Unknown)
                 dm.SendPresenceProbe(MozaProtocol.DeviceHPattern);
             // Positive-evidence probe for the broken-base case: while NO wheel has
             // been detected on the primary (base), also probe the wheel over the

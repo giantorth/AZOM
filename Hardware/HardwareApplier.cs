@@ -1201,15 +1201,11 @@ namespace MozaPlugin.Hardware
             if (value < 0) return;
             if (_detectionState.SgpDetected) SgpManager.WriteSetting(command, value);
         }
-        // Readback path for the shifter-type repair control: the reply lands in the
-        // per-model mirror, so the tab shows what the device actually stored.
+        // Readback path for the HGP shifter-type repair control: the reply lands in
+        // the per-model mirror, so the tab shows what the device actually stored.
         public void ReadIfHgpDetected(string command)
         {
             if (_detectionState.HgpDetected) HgpManager.ReadSetting(command);
-        }
-        public void ReadIfSgpDetected(string command)
-        {
-            if (_detectionState.SgpDetected) SgpManager.ReadSetting(command);
         }
         // The 2 SGP LEDs ride one 2-byte command [S1,S2] (palette indices 0-7); the
         // UI re-sends both whenever either changes. SGP-only (the HGP has no LEDs).

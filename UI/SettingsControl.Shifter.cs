@@ -62,7 +62,6 @@ namespace MozaPlugin
             {
                 SgpDirectionCheck.IsChecked = _data?.ShifterSgp.Direction == 1;
                 SgpPaddleSyncCheck.IsChecked = _data?.ShifterSgp.PaddleSync == 2;
-                SgpTypeCombo.SelectedIndex = ShifterTypeIndex(_data?.ShifterSgp.ApplyMode ?? -1);
 
                 if (_data != null)
                 {
@@ -165,42 +164,23 @@ namespace MozaPlugin
         private MozaData.ShifterState ShifterStateFor(ShifterModelKind model) =>
             model == ShifterModelKind.Hgp ? _data.ShifterHgp : _data.ShifterSgp;
 
-        // shifter-type (apply-mode, wire {0,1}; combo order [H-pattern, Sequential]
-        // assumes 0=H — polarity unconfirmed on real hardware, connect-time log has
-        // the raw value). This is the recovery path for HGPs that v1.5.1 flipped
-        // into sequential mode: device-owned, written on user action only, never
-        // profile-applied. A readback follows each write so the combo settles on
-        // what the device actually stored.
+        // shifter-type (apply-mode, wire {0,1}: 0=H-pattern, 1=sequential; confirmed
+        // from a field bundle). HGP-only recovery path for units that v1.5.1 flipped
+        // into sequential mode — device-owned, written on user action only, never
+        // profile-applied; the SGP tab deliberately has no selector. A readback
+        // follows each write so the combo settles on what the device actually stored.
         private static int ShifterTypeIndex(int applyMode) =>
             applyMode == 0 || applyMode == 1 ? applyMode : -1;
 
         private void HgpTypeCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
-            SetShifterType(ShifterModelKind.Hgp, HgpTypeCombo.SelectedIndex);
-        }
-
-        private void SgpTypeCombo_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            SetShifterType(ShifterModelKind.Sgp, SgpTypeCombo.SelectedIndex);
-        }
-
-        private void SetShifterType(ShifterModelKind model, int v)
-        {
+            int v = HgpTypeCombo.SelectedIndex;
             if (v != 0 && v != 1) return;
-            if (_data != null) ShifterStateFor(model).ApplyMode = v;
-            MozaLog.Info($"[AZOM] User set {model} shifter-type (apply-mode) = {v}");
-            if (model == ShifterModelKind.Hgp)
-            {
-                _plugin.WriteIfHgpDetected("shifter-apply-mode", v);
-                _plugin.ReadIfHgpDetected("shifter-apply-mode");
-            }
-            else
-            {
-                _plugin.WriteIfSgpDetected("shifter-apply-mode", v);
-                _plugin.ReadIfSgpDetected("shifter-apply-mode");
-            }
+            if (_data != null) _data.ShifterHgp.ApplyMode = v;
+            MozaLog.Info($"[AZOM] User set Hgp shifter-type (apply-mode) = {v}");
+            _plugin.WriteIfHgpDetected("shifter-apply-mode", v);
+            _plugin.ReadIfHgpDetected("shifter-apply-mode");
         }
 
         private void SgpLed1Combo_Changed(object sender, SelectionChangedEventArgs e) => OnShifterColorChanged();
