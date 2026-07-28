@@ -231,6 +231,10 @@ namespace MozaPlugin.Telemetry
         // maps straight into the 2-bit field. Live delta to session best (signed seconds) for gap fields.
         private const string ErsDeployMode = F1RawStatus + "m_ersDeployMode";
         private const string LiveDelta = "PersistantTrackerPlugin.SessionBestLiveDeltaSeconds";
+        // SimHub predicted/estimated final lap time (projected from session-best pace). Resolves as a
+        // TimeSpan → TotalSeconds (PropertyCoercion), ×MsScale to ms for the 24-bit field. Variants:
+        // _AllTimeBest / _SessionBestSimhub if the user tracks a different reference.
+        private const string EstLapTime = "PersistantTrackerPlugin.EstimatedLapTime_SessionBest";
         // Fuel remaining as laps of range (signed: negative = short). Wire = laps × 100 (verified).
         private const string FuelRemainLaps = F1RawStatus + "m_fuelRemainingLaps";
         // ERS this-lap energy (Joules). Deploy bar shows budget REMAINING = 100 − deployed/40000 (of the
@@ -505,7 +509,7 @@ namespace MozaPlugin.Telemetry
                 Fields = new Fields()
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
-                    .U16("bias", "Brake bias", G + "BrakeBias")
+                    .U16("bias", "Brake bias", G + "BrakeBias", scale: 10.0)
                     .U16("fuelRem", "Fuel remaining", G + "Fuel")
                     .U16("fuelAvg", "Fuel avg / lap", "")
                     .U8("cars", "Car count", G + "OpponentsCount")
@@ -524,7 +528,7 @@ namespace MozaPlugin.Telemetry
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
                 Fields = new Fields()
                     .U24("stl", "Session time left", SessionTimeLeft, MsScale)
-                    .U24("elt", "Estimated lap time", "", MsScale)
+                    .U24("elt", "Estimated lap time", EstLapTime, MsScale)
                     .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("rpm", "RPM", G + "Rpms")
                     .U16("spd", "Speed", G + "SpeedKmh")
