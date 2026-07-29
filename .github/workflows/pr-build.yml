@@ -72,12 +72,20 @@ jobs:
             head_sha="$EVENT_HEAD_SHA"
             base_sha="$EVENT_BASE_SHA"
           fi
+          # Version core from the title when it names one (release PRs are
+          # titled like "v1.6.0"); parsed before truncation so a long title
+          # can't cut the match. Empty means "use the tag-bump fallback".
+          title_version=""
+          if [[ "$pr_title" =~ (^|[^a-zA-Z0-9])v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            title_version="${BASH_REMATCH[2]}"
+          fi
           # The title feeds the release name, which the in-app channel picker
-          # parses ("PR #<N>: <title> (<version>)") — cap it so names stay sane.
+          # parses ("<title> (<version>)") — cap it so names stay sane.
           pr_title="${pr_title:0:80}"
           {
             echo "pr_number=${pr_number}"
             echo "pr_title=${pr_title}"
+            echo "title_version=${title_version}"
             echo "head_sha=${head_sha}"
             echo "base_sha=${base_sha}"
           } >> "$GITHUB_OUTPUT"
@@ -100,15 +108,22 @@ jobs:
         shell: bash
         env:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          TITLE_VERSION: ${{ steps.pr.outputs.title_version }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           BASE_SHA: ${{ steps.pr.outputs.base_sha }}
         run: |
           set -euo pipefail
           short_sha="${HEAD_SHA::7}"
-          latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1)
-          latest_tag=${latest_tag:-v0.0.0}
-          IFS=. read -r MAJ MIN PAT <<<"${latest_tag#v}"
-          next="${MAJ}.${MIN}.$((PAT+1))"
+          # Core from the PR title ("v1.6.0" → 1.6.0) when given, else next
+          # patch after the newest stable tag.
+          if [ -n "$TITLE_VERSION" ]; then
+            next="$TITLE_VERSION"
+          else
+            latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+            latest_tag=${latest_tag:-v0.0.0}
+            IFS=. read -r MAJ MIN PAT <<<"${latest_tag#v}"
+            next="${MAJ}.${MIN}.$((PAT+1))"
+          fi
           pr_version="${next}-pr.${PR_NUMBER}.${short_sha}"
 
           # Markdown bullet list of the PR's commits, newest first, capped to
@@ -130,7 +145,6 @@ jobs:
 
           {
             echo "short_sha=${short_sha}"
-            echo "latest_tag=${latest_tag}"
             echo "pr_version=${pr_version}"
             echo "zip_name=MozaPlugin_pr${PR_NUMBER}_${short_sha}.zip"
             echo "commit_count=${commit_count}"
@@ -165,7 +179,8 @@ jobs:
           target_commitish: ${{ steps.pr.outputs.head_sha }}
           # The in-app channel picker parses this exact shape — see
           # UpdateCheckService.ExtractPrVersionFromName before changing it.
-          name: "PR #${{ steps.pr.outputs.pr_number }}: ${{ steps.pr.outputs.pr_title }} (${{ steps.vars.outputs.pr_version }})"
+          # The PR number lives in the version string and the tag.
+          name: "${{ steps.pr.outputs.pr_title }} (${{ steps.vars.outputs.pr_version }})"
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true

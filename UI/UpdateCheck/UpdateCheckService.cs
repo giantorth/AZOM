@@ -78,7 +78,7 @@ namespace MozaPlugin.UI.UpdateCheck
         public const string StableChannelId = "stable";
 
         // Stable releases are plain vX.Y.Z tags; PR builds are tagged
-        // pr-<N>-<sha7> and named "PR #<N>: <title> (<version>)" by
+        // pr-<N>-<sha7> and named "<title> (<version>)" by
         // .github/workflows/pr-build.yml. The version regex is end-anchored so
         // parentheses inside a PR title can't shift the match.
         private static readonly Regex s_stableTagRx =
@@ -375,8 +375,8 @@ namespace MozaPlugin.UI.UpdateCheck
         }
 
         // Pulls "1.5.3-pr.42.a1b2c3d" out of a release named
-        // "PR #42: <title> (1.5.3-pr.42.a1b2c3d)". Empty when the name doesn't
-        // match — the caller skips that release rather than failing the fetch.
+        // "<title> (1.5.3-pr.42.a1b2c3d)". Empty when the name doesn't match —
+        // the caller skips that release rather than failing the fetch.
         internal static string ExtractPrVersionFromName(string name)
         {
             if (string.IsNullOrEmpty(name)) return "";
@@ -393,6 +393,8 @@ namespace MozaPlugin.UI.UpdateCheck
             string s = name;
             var m = s_prNameVersionRx.Match(s);
             if (m.Success) s = s.Substring(0, m.Index);
+            // Early PR releases were named "PR #<N>: <title> (…)" — tolerate
+            // the legacy prefix.
             string prefix = $"PR #{prNumber}:";
             if (s.StartsWith(prefix, StringComparison.Ordinal)) s = s.Substring(prefix.Length);
             s = s.Trim();
