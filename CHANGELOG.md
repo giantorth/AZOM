@@ -2,25 +2,22 @@
 
 All notable changes to the AZOM plugin are documented here.
 
-## [Unreleased]
-
-### Changed
-
-- **Per-PR development builds.** Dev-branch builds and the rolling `dev-latest` pre-release
-  are retired; CI now publishes a pre-release for every commit pushed to an open pull request
-  (newest 5 kept per PR, all deleted when the PR closes). The release-channel dropdown
-  (About > Updates) lists Stable plus every open PR — pick a PR to track its newest build,
-  and switching back to Stable offers the stable build even from a newer-numbered PR build.
-  Users on the old Development channel are migrated to Stable automatically.
-
-## [1.5.2] - 2026-07-26
+## [1.5.2] - 2026-07-29
 
 ### Added
 
+- **Outdated-firmware warning.** When a current-generation wheel (device ID 0x17/0x15)
+  answers detection like a legacy-protocol wheel — seen on an FSR V2 whose firmware never
+  replied to the telemetry-mode probe — the plugin now shows a banner recommending a wheel
+  and wheelbase firmware update in MOZA Pit House, names the affected wheel once its model
+  resolves, and records the advisory in diagnostics bundles.
 - **CM1 Racing Dash — full default channel map.** The base/hub-bridged CM1 dash's field
   stream is now decoded and mapped: every field ships a default SimHub binding.
 - **HGP and SGP shifters can now be used at the same time.** They're fully independent devices —
-  each with its own detection, tab, and per-profile settingss.
+  each with its own detection, tab, and per-profile settings.
+- **HGP shifter type selector.** The HGP tab lets you switch the shifter between H-pattern
+  and Sequential — for anyone wanting to run sequential-shifting mods — and doubles as the
+  recovery path for shifters flipped by the 1.5.1 bug (see Fixed).
 - **MOZA Stalks truck-sim mode — rebindable keys.** Every key the stalks send is now set with a
   press-a-key capture field: the wiper forward/back and light-cycle keys, both indicator keys
   (previously fixed at P / - / L / [ / ]), and the per-button key assignments (previously a
@@ -47,6 +44,12 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Changed
 
+- **Per-PR development builds.** Dev-branch builds and the rolling `dev-latest` pre-release
+  are retired; CI now publishes a pre-release for every commit pushed to an open pull request
+  (newest 5 kept per PR, all deleted when the PR closes). The release-channel dropdown
+  (About > Updates) lists Stable plus every open PR — pick a PR to track its newest build,
+  and switching back to Stable offers the stable build even from a newer-numbered PR build.
+  Users on the old Development channel are migrated to Stable automatically.
 - **Base-tab temperature graph keeps its history.** MCU/MOSFET/motor temperatures are now
   sampled by a background timer for the plugin's whole lifetime (every 0.5 s) instead of only
   while the settings panel is open, so the graph shows its full rolling window the moment you
@@ -61,6 +64,8 @@ All notable changes to the AZOM plugin are documented here.
   timer. The 0–100 slider is scaled into the firmware's small brightness range (it is not a
   0–100 percentage) so the sweep no longer wraps, and a short settle absorbs the startup
   brightness-mode churn that otherwise flickered the bar. Closes issue #113.
+- **ESX wheel detection.** The ESX reports its firmware model name as "RSX", which the
+  model table never matched; it now resolves to its own device definition and artwork.
 - **Display rotation stuck on for non-VGS display wheels.** Selecting the wrong firmware era
   for the wheel could stream telemetry in a format the wheel misinterprets; Display wheels 
   other than the VGS now get the rotation setting turned off on every connection.
@@ -72,6 +77,18 @@ All notable changes to the AZOM plugin are documented here.
   session-layer silence so the firmware tears it down, then re-closes before opening fresh; the
   DisplayWatchdog also recognizes the wedge and triggers the proven off/on recovery cycle if one
   slips through.
+- **Dead display after a reconnect.** After a port bounce the wheel's session layer can get
+  stuck replaying a stale open-ack; the plugin's single telemetry-session open attempt timed
+  out and the pipeline came up looking active with nothing reaching the display. The open is
+  now retried at ~1 s intervals for up to 10 rounds (matching Pit House), and if the wheel
+  still refuses, the proven off/on recovery cycle runs instead of continuing into a dead lane.
+- **Dead display after power-cycling the wheel mid-session.** Rebooting the wheel while
+  telemetry was running could leave the session the dashboard binds through completely silent
+  while cached state kept every health check green — the display stayed dark until a manual
+  off/on. The DisplayWatchdog now detects the asymmetry (binding session dead while the
+  wheel's other session stays live) and triggers the recovery cycle.
+- **FSR1 default mappings — broad capture-verified correction pass.** Brake bias, the gap
+  fields, the side pages, and the layouts of several built-in dashboards now decode correctly.
 - **A bad FSR1 field mapping can no longer freeze the whole display.** One malformed
   partition/field used to abort the entire send tick, blanking every page until a page
   change; the bad record is now skipped (and logged) while the rest keep streaming, and
