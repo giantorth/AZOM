@@ -624,6 +624,9 @@ namespace MozaPlugin.Resources
         public static string Banner_TelemetryParked_Body => Get("Banner_TelemetryParked_Body");
         public static string Banner_RestartSimHub_Title => Get("Banner_RestartSimHub_Title");
         public static string Banner_RestartSimHub_Body => Get("Banner_RestartSimHub_Body");
+        public static string Banner_WheelFwOutdated_Title => Get("Banner_WheelFwOutdated_Title");
+        public static string Banner_WheelFwOutdated_BodyFmt => Get("Banner_WheelFwOutdated_BodyFmt");
+        public static string Banner_WheelFwOutdated_GenericSubject => Get("Banner_WheelFwOutdated_GenericSubject");
         public static string Banner_ProfileNotAdded_TitleFmt => Get("Banner_ProfileNotAdded_TitleFmt");
         public static string Banner_ProfileNotAddedDash_Body => Get("Banner_ProfileNotAddedDash_Body");
         public static string Banner_ProfileNotAddedBaseAmbient_Body => Get("Banner_ProfileNotAddedBaseAmbient_Body");

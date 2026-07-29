@@ -2244,7 +2244,7 @@ namespace MozaPlugin
             sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState));
             sb.AppendLine();
             sb.AppendLine("=== Display sub-device identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data));

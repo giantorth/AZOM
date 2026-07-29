@@ -749,6 +749,21 @@ namespace MozaPlugin.Devices
                     else
                     {
                         MozaLog.Debug($"[AZOM] Wheel model (mis-routed locked-id read): {_data.WheelModelName}");
+                        // A valid model name from a new-protocol-only id while the
+                        // session is classified old-protocol names the wheel behind
+                        // the firmware advisory (real ES wheels reply here from the
+                        // base id 0x13 with the base/motor name, so they never match).
+                        if (_detectionState.OldWheelDetected
+                            && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
+                            && IsValidWheelModelName(_data.WheelModelName)
+                            && !string.Equals(_detectionState.NewWheelActingOldModel, _data.WheelModelName, StringComparison.Ordinal))
+                        {
+                            _detectionState.NewWheelActingOldModel = _data.WheelModelName;
+                            _detectionState.NewWheelActingOldProtocol = true;
+                            MozaLog.Info(
+                                $"[AZOM] {_data.WheelModelName} is a new-protocol wheel but answered like an " +
+                                "old-protocol one — firmware update recommended");
+                        }
                     }
                     break;
 
@@ -947,6 +962,19 @@ namespace MozaPlugin.Devices
                         // never resolves a model gets no definition — the generic
                         // old-proto fallback was retired (no such wheel reaches it).
                         MozaLog.Info($"[AZOM] Old-protocol wheel detected on ID {deviceId}");
+                        // 0x17/0x15 are new-protocol-only ids — a wheel answering the
+                        // settings group there but classifying old-protocol is a
+                        // current-generation wheel on legacy firmware (seen on W13/FSR
+                        // V2: no telemetry-mode reply, rpm-value1 answers). Surface the
+                        // firmware-update banner; the model name enriches it once the
+                        // wheel-model-name read below answers.
+                        if (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
+                        {
+                            _detectionState.NewWheelActingOldProtocol = true;
+                            MozaLog.Info(
+                                $"[AZOM] Wheel on new-protocol ID {deviceId} classified old-protocol — " +
+                                "firmware update recommended");
+                        }
                         _plugin.StartTelemetryIfReady();
                     }
                     else if (deviceId != _deviceManager.WheelDeviceId)

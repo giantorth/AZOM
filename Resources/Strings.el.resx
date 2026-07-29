@@ -528,6 +528,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Απενεργοποιήστε και ενεργοποιήστε ξανά την τηλεμετρία ταμπλό για επανάληψη.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Επανεκκίνηση SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Αναπτύχθηκαν νέοι ορισμοί συσκευών. Επανεκκινήστε το SimHub για να τους προσθέσετε στις Συσκευές.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Συνιστάται ενημέρωση υλικολογισμικού του τιμονιού</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>Το {0} αποκρίθηκε με το παλαιό πρωτόκολλο, επομένως οι λειτουργίες του τιμονιού είναι περιορισμένες σε αυτήν τη συνεδρία. Ενημερώστε το υλικολογισμικό του τιμονιού και της wheelbase στο MOZA Pit House και έπειτα επανεκκινήστε το SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>συνδεδεμένο τιμόνι</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>Το {0} δεν έχει προστεθεί στο SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ένα ταμπλό MOZA είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Αυτή η βάση τιμονιού έχει λωρίδα LED περιβάλλοντος, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0} για να ελέγξετε τη λωρίδα.</value></data>

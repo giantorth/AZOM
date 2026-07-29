@@ -528,6 +528,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>다시 시도하려면 대시보드 텔레메트리를 껐다가 켜세요.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>SimHub 다시 시작</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>새 장치 정의가 배포되었습니다. SimHub를 다시 시작하여 장치 목록에 추가하세요.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>휠 펌웨어 업데이트 권장</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0}이(가) 구형 프로토콜로 응답하여 이 세션에서는 휠 기능이 제한됩니다. MOZA Pit House에서 휠과 휠베이스 펌웨어를 업데이트한 후 SimHub를 다시 시작하세요.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>연결된 휠</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0}이(가) SimHub에 추가되지 않았습니다</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>MOZA 대시보드가 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>이 휠베이스에는 앰비언트 LED 스트립이 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 스트립을 제어하려면 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>

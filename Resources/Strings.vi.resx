@@ -529,6 +529,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Tắt rồi bật lại telemetry bảng đồng hồ để thử lại.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Khởi động lại SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Đã triển khai các định nghĩa thiết bị mới. Khởi động lại SimHub để thêm chúng trong mục Thiết bị.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Khuyến nghị cập nhật firmware vô-lăng</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} phản hồi bằng giao thức cũ nên các tính năng vô-lăng bị hạn chế trong phiên này. Hãy cập nhật firmware của vô-lăng và wheelbase trong MOZA Pit House, sau đó khởi động lại SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Vô-lăng đang kết nối</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} chưa được thêm trong SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Một bảng đồng hồ MOZA đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Wheelbase này có dải LED môi trường, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0} để điều khiển dải LED.</value></data>

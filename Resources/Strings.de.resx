@@ -529,6 +529,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Schalten Sie die Dashboard-Telemetrie aus und wieder ein, um es erneut zu versuchen.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>SimHub neu starten</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Neue Gerätedefinitionen wurden bereitgestellt. Starten Sie SimHub neu, um sie unter „Geräte“ hinzuzufügen.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Firmware-Update für das Lenkrad empfohlen</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} hat mit dem Legacy-Protokoll geantwortet, daher sind die Lenkrad-Funktionen in dieser Sitzung eingeschränkt. Aktualisieren Sie die Firmware von Lenkrad und Wheelbase in MOZA Pit House und starten Sie SimHub anschließend neu.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Das verbundene Lenkrad</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} in SimHub nicht hinzugefügt</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ein MOZA-Dashboard ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Diese Wheelbase hat einen Ambient-LED-Streifen, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}, um den Streifen anzusteuern.</value></data>

@@ -534,6 +534,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Slå dashbordtelemetri av og på for å prøve på nytt.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Start SimHub på nytt</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Nye enhetsdefinisjoner ble distribuert. Start SimHub på nytt for å legge dem til under Enheter.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Fastvareoppdatering for rattet anbefales</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} svarte med den eldre protokollen, så rattfunksjonene er begrenset i denne økten. Oppdater fastvaren til rattet og wheelbasen i MOZA Pit House, og start deretter SimHub på nytt.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Det tilkoblede rattet</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} er ikke lagt til i SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Et MOZA-dashbord er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Denne wheelbasen har en ambient LED-stripe, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0} for å styre stripen.</value></data>

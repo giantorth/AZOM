@@ -529,6 +529,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Désactivez puis réactivez la télémétrie du tableau de bord pour réessayer.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Redémarrer SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>De nouvelles définitions de périphériques ont été déployées. Redémarrez SimHub pour les ajouter sous Périphériques.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Mise à jour du firmware du volant recommandée</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} a répondu avec l'ancien protocole ; les fonctions du volant sont donc limitées pour cette session. Mettez à jour le firmware du volant et de la wheelbase dans MOZA Pit House, puis redémarrez SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Le volant connecté</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} non ajouté dans SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Un tableau de bord MOZA est connecté, mais le périphérique n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Cette base possède un bandeau LED d'ambiance, mais « {0} » n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0} pour piloter le bandeau.</value></data>

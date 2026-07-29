@@ -529,6 +529,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>关闭再开启仪表盘遥测以重试。</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>重启 SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>已部署新的设备定义。请重启 SimHub 以在“设备”中添加它们。</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>建议更新方向盘固件</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} 使用旧版协议响应，本次会话中方向盘功能受限。请在 MOZA Pit House 中更新方向盘和基座固件，然后重启 SimHub。</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>已连接的方向盘</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} 尚未在 SimHub 中添加</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>已连接 MOZA 仪表盘，但该设备尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>此底座带有氛围 LED 灯带，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0} 以驱动灯带。</value></data>

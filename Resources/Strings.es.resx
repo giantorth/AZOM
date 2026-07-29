@@ -534,6 +534,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Desactive y vuelva a activar la telemetría del panel para reintentar.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Reiniciar SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Se implementaron nuevas definiciones de dispositivos. Reinicie SimHub para añadirlas en Dispositivos.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Se recomienda actualizar el firmware del volante</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} respondió usando el protocolo antiguo, por lo que las funciones del volante están limitadas en esta sesión. Actualice el firmware del volante y de la wheelbase en MOZA Pit House y, después, reinicie SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>El volante conectado</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} no se ha añadido en SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Hay un panel MOZA conectado, pero el dispositivo no se ha añadido en SimHub. Abra Dispositivos &gt; Añadir dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Esta base tiene una tira LED ambiental, pero «{0}» no se ha añadido en SimHub. Abra Dispositivos &gt; Añadir dispositivo &gt; {0} para controlar la tira.</value></data>

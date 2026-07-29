@@ -532,6 +532,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Disattiva e riattiva la telemetria del cruscotto per riprovare.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Riavvia SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Sono state distribuite nuove definizioni di dispositivi. Riavvia SimHub per aggiungerle in Dispositivi.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Consigliato aggiornamento firmware del volante</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} ha risposto con il protocollo legacy, quindi le funzioni del volante sono limitate in questa sessione. Aggiorna il firmware del volante e della wheelbase in MOZA Pit House, poi riavvia SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Il volante collegato</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} non aggiunto in SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Un cruscotto MOZA è collegato, ma il dispositivo non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Questa base ha una striscia LED ambientale, ma «{0}» non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0} per controllare la striscia.</value></data>

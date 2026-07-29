@@ -76,6 +76,15 @@ namespace MozaPlugin.Devices
         public volatile string LastKnownWheelModel = "";
         public int WheelPollMisses;
 
+        // Flips true when a wheel on a new-protocol-only id (0x17/0x15) ends up
+        // classified old-protocol — a current-generation wheel answering like a
+        // legacy one, which points at outdated firmware. Drives the
+        // firmware-update banner (StatusHintKind.WheelFirmwareOutdated).
+        public volatile bool NewWheelActingOldProtocol;
+        // Model name behind the advisory once a valid group-0x07 reply names it
+        // (e.g. "W13"). Empty until then; the banner falls back to generic wording.
+        public volatile string NewWheelActingOldModel = "";
+
         // Bit g set => wheel LED group g present. Accessed via Interlocked.
         private int _wheelLedGroupMask;
 
@@ -123,6 +132,8 @@ namespace MozaPlugin.Devices
             Ab9Detected = false;
             HgpDetected = false;
             SgpDetected = false;
+            NewWheelActingOldProtocol = false;
+            NewWheelActingOldModel = "";
             PedalsOwner = null;
             HandbrakeOwner = null;
             HgpOwner = null;
@@ -143,6 +154,8 @@ namespace MozaPlugin.Devices
             Group3ColorsRead = false;
             WheelPollMisses = 0;
             LastKnownWheelModel = "";
+            NewWheelActingOldProtocol = false;
+            NewWheelActingOldModel = "";
         }
     }
 }

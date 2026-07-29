@@ -555,6 +555,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Toggle dashboard telemetry off and on to retry.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Restart SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>New device definitions were deployed. Restart SimHub to add them under Devices.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Wheel firmware update recommended</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} responded using the legacy protocol, so wheel features are limited this session. Update the wheel and wheelbase firmware in MOZA Pit House, then restart SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>The connected wheel</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} not added in SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>A MOZA dashboard is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>This wheelbase has an ambient LED strip, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0} to drive the strip.</value></data>
