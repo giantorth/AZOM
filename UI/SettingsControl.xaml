@@ -2371,6 +2371,41 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
+                            <Expander Header="{x:Static res:Strings.Section_GForce}" IsExpanded="False" Margin="0,0,0,10">
+                                <StackPanel Margin="8,4">
+                                    <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_GForceExperimental}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <ctrl:OffOnToggle x:Name="MBoosterGForceEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterGForceEnable_Changed" Unchecked="MBoosterGForceEnable_Changed"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterGForceTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterGForceTestToggle_Changed" Unchecked="MBoosterGForceTestToggle_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxTravelMm}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterGForceMaxTravel" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="15" TickFrequency="0.5" ValueChanged="MBoosterGForceMaxTravel_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterGForceMaxTravelValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterGForceMaxTravel}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="10"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ResponseSpeedPct}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterGForceResponseSpeed" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterGForceResponseSpeed_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterGForceResponseSpeedValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterGForceResponseSpeed}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
 
                             </StackPanel><!-- MBoosterEffectsCardsPanel -->
 

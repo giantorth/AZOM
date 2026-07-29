@@ -88,6 +88,7 @@ namespace MozaPlugin.Devices
         private EffectState _threshold;
         private EffectState _engine;
         private EffectState _roadTexture;
+        private EffectState _gforce;
         private bool _thresholdLatched; // hysteresis flag for the Threshold effect (doc § 4)
         // Debounce countdown for the Gear Shift effect, decremented each
         // tick by TickPeriodSec — separate from EffectState.ElapsedSec
@@ -140,6 +141,7 @@ namespace MozaPlugin.Devices
         private volatile bool _roadTextureTestSustained;
         private volatile bool _lockupTestSustained;
         private volatile bool _thresholdTestSustained;
+        private volatile bool _gforceTestSustained;
 
         // Custom effects' sustained Test toggles — same semantics as the five
         // built-ins above (runs indefinitely, live-tracks Frequency/Intensity,
@@ -267,6 +269,7 @@ namespace MozaPlugin.Devices
             public double SmoothnessRequest01; // 0..1, ABS (user-set); Traction Control/Wheel Spin fix this at 1
             public double RoadTextureRoughness01; // 0..1, Road-Texture-only: live suspension-derived intensity scale
             public double ThresholdDecayRequest01; // 0..1, Threshold-only: sustain-decay depth
+            public double GForceSigned01; // -1..1, G-Force-only: live longitudinal-G fraction (+ accel, - brake)
         }
 
         public MBoosterEffectWorker(
@@ -359,6 +362,9 @@ namespace MozaPlugin.Devices
         /// <summary>Turn Threshold's sustained test toggle on/off. See <see cref="_thresholdTestSustained"/>.</summary>
         public void SetThresholdTestSustained(bool on) => _thresholdTestSustained = on;
 
+        /// <summary>Turn G-Force's sustained test toggle on/off. See <see cref="_gforceTestSustained"/>.</summary>
+        public void SetGForceTestSustained(bool on) => _gforceTestSustained = on;
+
         /// <summary>Turn Brake Fade's sustained test toggle on/off. See <see cref="_brakeFadeTestActive"/>.</summary>
         public void SetBrakeFadeTestSustained(bool on) => _brakeFadeTestActive = on;
 
@@ -438,6 +444,7 @@ namespace MozaPlugin.Devices
                 UpdateLockupRequest(effects, brakeSignal, snap, ref _lockup);
                 UpdateThresholdRequest(effects, brakeSignal, snap, ref _threshold);
                 UpdateRoadTextureRequest(effects, snap, ref _roadTexture);
+                UpdateGForceRequest(effects, snap, ref _gforce);
 
                 // --- Apply per-effect activation edges + emit motor frame ------
                 //
@@ -464,6 +471,13 @@ namespace MozaPlugin.Devices
                 // threshold pulse that lands in the same tick as a bump always
                 // wins instead of being masked by it.
                 ProcessRoadTextureEffect(effects, ref _roadTexture);
+                // G-Force — same ambient tier as Engine/Road Texture (before
+                // the wheel-slip cues) so a lockup/ABS/TC/wheel-spin/
+                // threshold/gear-shift pulse always wins if it lands in the
+                // same tick, matching every other continuous effect's
+                // priority. Its own frame shape is unrelated to any of the
+                // others' (see ProcessGForceEffect).
+                ProcessGForceEffect(effects, ref _gforce);
                 // Custom (NCalc) effects — Experimental. Placed in the ambient
                 // tier (after Engine/Road Texture, before the wheel-slip cues) so
                 // a user-authored effect can override built-in ambient vibration
@@ -1100,6 +1114,42 @@ namespace MozaPlugin.Devices
             st.IntensityRequest = envelope > 0.01 ? 1 : 0;
         }
 
+        // How many G reads as "100 %" commanded travel. Not a Pit House
+        // control — its own "Test" demo always commands the full configured
+        // Max Travel regardless of any G reading, so this mapping is the
+        // plugin's own choice (Experimental). 1.0G covers hard braking/
+        // acceleration in most sim content without the effect maxing out on
+        // every firm stop.
+        private const double GForceFullScaleG = 1.0;
+        // Test-toggle demo cadence — mirrors Pit House's own alternating
+        // "Test" cycle (~0.6-0.7s per phase in capture) so the user can feel
+        // both directions, not a wire-protocol requirement.
+        private const double GForceTestPhaseSec = 0.6;
+
+        private void UpdateGForceRequest(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, ref EffectState st)
+        {
+            if (_gforceTestSustained)
+            {
+                st.ElapsedSec += TickPeriodSec;
+                double cycle = st.ElapsedSec % (GForceTestPhaseSec * 2);
+                st.GForceSigned01 = cycle < GForceTestPhaseSec ? 1.0 : -1.0;
+                st.IntensityRequest = 1;
+                return;
+            }
+
+            bool active = effects?.GForce != null && effects.GForce.Enabled && snap.GameRunning;
+            if (!active)
+            {
+                st.IntensityRequest = 0;
+                st.GForceSigned01 = 0;
+                return;
+            }
+
+            double signed = snap.LongitudinalG / GForceFullScaleG;
+            st.GForceSigned01 = Math.Max(-1.0, Math.Min(1.0, signed));
+            st.IntensityRequest = 1;
+        }
+
         // Brake Fade — NOT a vibration effect. Dynamically rewrites TWO real
         // hardware calibrations in lockstep as brake temp climbs past
         // BrakeFadeOnsetC, using the SAME ramp01 fraction for both so they
@@ -1317,6 +1367,52 @@ namespace MozaPlugin.Devices
             ushort smoothnessRaw = MozaMBoosterProtocol.EncodeRoadTextureLevel(effects?.RoadTexture?.SmoothnessPct ?? 0);
 
             var frame = MozaMBoosterProtocol.BuildRoadTextureFrame(true, intensityRaw, smoothnessRaw, noiseRaw, TargetDevice);
+            SendMotor(frame);
+        }
+
+        /// <summary>
+        /// G-Force (Inertial Pedal Feel) — Experimental. NOT a vibration
+        /// effect: unlike every other Process* method here, this holds
+        /// enable=1 continuously while active and streams a live directional
+        /// TRAVEL OFFSET target every tick (see
+        /// MozaMBoosterProtocol.BuildGForceFrame) rather than synthesizing a
+        /// waveform. <see cref="EffectState.GForceSigned01"/> (computed in
+        /// UpdateGForceRequest, -1..1) selects which of the wire's two
+        /// offset slots carries the magnitude — positive (accelerating)
+        /// pushes the forward slot, negative (braking) the backward slot —
+        /// scaled by the user's MaxTravelMm against the wire's fixed 15mm
+        /// full-scale range. ResponseSpeedPct is sent unshaped every frame;
+        /// the firmware does the actual ramping, not this worker.
+        /// </summary>
+        private void ProcessGForceEffect(IMBoosterEffects? effects, ref EffectState st)
+        {
+            const MBoosterEffectId id = MBoosterEffectId.GForce;
+            bool wantActive = st.IntensityRequest > 0;
+
+            if (!wantActive)
+            {
+                if (st.Active)
+                {
+                    _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice));
+                    st.Active = false;
+                }
+                return;
+            }
+            st.Active = true;
+
+            var gforce = effects?.GForce;
+            double maxTravelMm = Math.Max(0, gforce?.MaxTravelMm ?? 0);
+            double responseSpeedPct = Clamp01((gforce?.ResponseSpeedPct ?? 0) / 100.0);
+
+            double travelFraction01 = Clamp01(Math.Abs(st.GForceSigned01))
+                * (maxTravelMm / MBoosterUiConstants.GForceMaxTravelMaxMm);
+
+            ushort responseRaw = MozaMBoosterProtocol.EncodeAmp(responseSpeedPct);
+            ushort magnitudeRaw = MozaMBoosterProtocol.EncodeAmp(travelFraction01);
+            ushort forwardRaw = st.GForceSigned01 >= 0 ? magnitudeRaw : (ushort)0;
+            ushort backwardRaw = st.GForceSigned01 < 0 ? magnitudeRaw : (ushort)0;
+
+            var frame = MozaMBoosterProtocol.BuildGForceFrame(true, responseRaw, forwardRaw, backwardRaw, TargetDevice);
             SendMotor(frame);
         }
 

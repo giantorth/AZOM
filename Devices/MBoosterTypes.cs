@@ -92,6 +92,22 @@ namespace MozaPlugin.Devices
         // .ProcessCustomEffect — so the frequency range matches Engine's.
         public const float CustomEffectFreqMinHz = 5f;
         public const float CustomEffectFreqMaxHz = 200f;
+
+        // G-Force (Inertial Pedal Feel) — Max Pedal Travel slider bounds,
+        // matching Pit House's own "Max Pedal Travelment" control exactly
+        // (0-15mm — reverse-engineered from capture, see
+        // MozaMBoosterProtocol.BuildGForceFrame). This is also the wire
+        // protocol's fixed full-scale denominator: the encoded travel
+        // fraction is always relative to 15mm, not to some other range.
+        public const float GForceMaxTravelMinMm = 0f;
+        public const float GForceMaxTravelMaxMm = 15f;
+
+        // G-Force's Response Speed slider bounds, matching Pit House's own
+        // control exactly (0-100%). Sent to the firmware every frame — it's
+        // not host-side smoothing, the device itself ramps toward the
+        // commanded offset at this rate.
+        public const float GForceResponseSpeedMinPct = 0f;
+        public const float GForceResponseSpeedMaxPct = 100f;
     }
 
     /// <summary>
@@ -197,6 +213,22 @@ namespace MozaPlugin.Devices
         // matches the wheelbase's own GearshiftDebounceMs default.
         public int DebounceMs { get; set; } = 500;
 
+        // G-Force-only (Experimental), millimeters (MBoosterUiConstants
+        // .GForceMaxTravelMinMm/MaxMm) — how far the pedal pushes at 100%
+        // commanded G, matching Pit House's own "Max Pedal Travelment"
+        // slider exactly. Sent every frame as a fraction of the wire's
+        // fixed 15mm full scale — see MBoosterEffectWorker.ProcessGForceEffect
+        // and MozaMBoosterProtocol.BuildGForceFrame.
+        public float MaxTravelMm { get; set; } = 10f;
+
+        // G-Force-only (Experimental), 0..100 (MBoosterUiConstants
+        // .GForceResponseSpeedMinPct/MaxPct) — how fast the firmware ramps
+        // the pedal toward the newly commanded offset, matching Pit House's
+        // own "Response Speed" slider exactly. Unlike every other
+        // Intensity/Frequency knob this isn't host-side shaping — the raw
+        // percentage is sent straight to the device every frame.
+        public int ResponseSpeedPct { get; set; } = 50;
+
         public MBoosterEffectSettings Clone() =>
             new MBoosterEffectSettings
             {
@@ -209,6 +241,8 @@ namespace MozaPlugin.Devices
                 BrakeFadeOnsetC = BrakeFadeOnsetC,
                 VibrateOnNeutral = VibrateOnNeutral,
                 DebounceMs = DebounceMs,
+                MaxTravelMm = MaxTravelMm,
+                ResponseSpeedPct = ResponseSpeedPct,
             };
     }
 
@@ -286,6 +320,7 @@ namespace MozaPlugin.Devices
         MBoosterEffectSettings TractionControl { get; set; }
         MBoosterEffectSettings WheelSpin { get; set; }
         MBoosterEffectSettings GearShift { get; set; }
+        MBoosterEffectSettings GForce { get; set; }
         System.Collections.Generic.List<MBoosterCustomEffect> CustomEffects { get; set; }
     }
 
@@ -360,6 +395,7 @@ namespace MozaPlugin.Devices
         public MBoosterEffectSettings TractionControl { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
         public MBoosterEffectSettings WheelSpin { get; set; } = new MBoosterEffectSettings { FrequencyHz = 30 };
         public MBoosterEffectSettings GearShift { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
+        public MBoosterEffectSettings GForce { get; set; } = new MBoosterEffectSettings { MaxTravelMm = 10, ResponseSpeedPct = 50 };
         public List<MBoosterCustomEffect> CustomEffects { get; set; } = new List<MBoosterCustomEffect>();
 
         public MBoosterPedalSettings Clone() =>
@@ -387,6 +423,7 @@ namespace MozaPlugin.Devices
                 TractionControl = TractionControl?.Clone() ?? new MBoosterEffectSettings(),
                 WheelSpin = WheelSpin?.Clone() ?? new MBoosterEffectSettings(),
                 GearShift = GearShift?.Clone() ?? new MBoosterEffectSettings(),
+                GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
                 CustomEffects = CustomEffects?.Select(c => c.Clone()).ToList() ?? new List<MBoosterCustomEffect>(),
             };
     }
@@ -452,6 +489,15 @@ namespace MozaPlugin.Devices
         // Traction Control/Wheel Spin (no verified wire effect type of its
         // own — see MBoosterEffectWorker.ProcessGearShiftEffect).
         public MBoosterEffectSettings GearShift { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
+        // G-Force (Inertial Pedal Feel) — Experimental. NOT a vibration
+        // effect: a sustained, directional pedal travel offset scaled by
+        // live longitudinal G (MBoosterTelemetrySnapshot.LongitudinalG),
+        // reverse-engineered from real Pit House "Test" captures (see
+        // docs/protocol/devices/mbooster.md "G-Force"). MaxTravelMm and
+        // ResponseSpeedPct mirror Pit House's own two sliders exactly; see
+        // MBoosterEffectWorker.UpdateGForceRequest/ProcessGForceEffect and
+        // MozaMBoosterProtocol.BuildGForceFrame.
+        public MBoosterEffectSettings GForce { get; set; } = new MBoosterEffectSettings { MaxTravelMm = 10, ResponseSpeedPct = 50 };
         // FrequencyHz defaults to 55 — the exact value from the "known-good"
         // real Pit House capture (docs/protocol/devices/mbooster.md:
         // "Lockup on, 55 Hz, start of ramp").
@@ -625,6 +671,7 @@ namespace MozaPlugin.Devices
                 TractionControl = TractionControl?.Clone() ?? new MBoosterEffectSettings(),
                 WheelSpin = WheelSpin?.Clone() ?? new MBoosterEffectSettings(),
                 GearShift = GearShift?.Clone() ?? new MBoosterEffectSettings(),
+                GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
                 Engine = Engine?.Clone() ?? new MBoosterEffectSettings(),
@@ -679,6 +726,13 @@ namespace MozaPlugin.Devices
         // this is a proxy for road-surface roughness used by Road Texture.
         // See docs/protocol/devices/mbooster.md "Road Texture".
         public readonly double SuspensionHeaveG;
+        // Longitudinal chassis acceleration, in G — SimHub's
+        // StatusDataBase.AccelerationSurge (nullable; 0 when a game doesn't
+        // report it). Positive = accelerating, negative = braking. Drives
+        // the G-Force (Inertial Pedal Feel) effect — see
+        // MBoosterEffectWorker.UpdateGForceRequest and
+        // docs/protocol/devices/mbooster.md "G-Force".
+        public readonly double LongitudinalG;
         // Peak brake temperature across all 4 corners, normalized to
         // Celsius regardless of the game's reported TemperatureUnit —
         // sourced from StatusDataBase.BrakesTemperatureMax (nullable; 0
@@ -710,7 +764,7 @@ namespace MozaPlugin.Devices
         public MBoosterTelemetrySnapshot(
             bool gameRunning, double rpm, double maxRpm, double idleRpm, double brake, double throttle,
             bool absActive, bool tcActive,
-            double vehicleSpeedMs, double avgWheelSpeedMs, double suspensionHeaveG,
+            double vehicleSpeedMs, double avgWheelSpeedMs, double suspensionHeaveG, double longitudinalG,
             double brakeTempC, int gearShiftSeq, bool gearIsNeutral)
         {
             GameRunning = gameRunning;
@@ -724,12 +778,13 @@ namespace MozaPlugin.Devices
             VehicleSpeedMs = vehicleSpeedMs;
             AvgWheelSpeedMs = avgWheelSpeedMs;
             SuspensionHeaveG = suspensionHeaveG;
+            LongitudinalG = longitudinalG;
             BrakeTempC = brakeTempC;
             GearShiftSeq = gearShiftSeq;
             GearIsNeutral = gearIsNeutral;
         }
 
         public static readonly MBoosterTelemetrySnapshot Empty =
-            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, 0, 0, 0, 0, false);
+            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, 0, 0, 0, 0, 0, false);
     }
 }

@@ -183,6 +183,8 @@ namespace MozaPlugin
                 CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterBrakeFadeTestToggle?.IsChecked == true)
                 CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
+            if (MBoosterGForceTestToggle?.IsChecked == true)
+                CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
             StopAllCustomEffectTests();
             // SDK CoAP server fires RecentRequestAppended on its receive
             // thread; unsubscribe so a torn-down SettingsControl can be GC'd
@@ -2890,6 +2892,8 @@ namespace MozaPlugin
                 CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterBrakeFadeTestToggle.IsChecked == true)
                 CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
+            if (MBoosterGForceTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
             StopAllCustomEffectTests();
             _mboosterSelectedIdentity = identity;
             _mboosterEffectPedalIndex = axisIndex;
@@ -3102,6 +3106,12 @@ namespace MozaPlugin
             MBoosterRoadTextureSmoothness.Value = fx?.RoadTexture?.SmoothnessPct ?? 50;
             SetValueText(MBoosterRoadTextureSmoothnessValue, (fx?.RoadTexture?.SmoothnessPct ?? 50).ToString());
             MBoosterRoadTextureTestToggle.IsChecked = false;
+            MBoosterGForceEnable.IsChecked = fx?.GForce?.Enabled ?? false;
+            MBoosterGForceMaxTravel.Value = fx?.GForce?.MaxTravelMm ?? 10;
+            SetValueText(MBoosterGForceMaxTravelValue, MBoosterGForceMaxTravel.Value.ToString("0.#"));
+            MBoosterGForceResponseSpeed.Value = fx?.GForce?.ResponseSpeedPct ?? 50;
+            SetValueText(MBoosterGForceResponseSpeedValue, (fx?.GForce?.ResponseSpeedPct ?? 50).ToString());
+            MBoosterGForceTestToggle.IsChecked = false;
         }
 
         /// <summary>Seed the Calibration, Sim Input Mapping and Pedal Feel controls
@@ -3848,6 +3858,50 @@ namespace MozaPlugin
         {
             if (_suppressEvents) return;
             CurrentMBoosterController()?.SetBrakeFadeTestActive(MBoosterBrakeFadeTestToggle.IsChecked == true);
+        }
+
+        private void MBoosterGForceEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GForce ??= new MBoosterEffectSettings()).Enabled = MBoosterGForceEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        // 0-15mm, half-mm steps (matches Pit House's own "Max Pedal
+        // Travelment" slider) — see MBoosterEffectSettings.MaxTravelMm.
+        private void MBoosterGForceMaxTravel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            double v = Math.Round(e.NewValue * 2) / 2.0;
+            v = Math.Max(MBoosterUiConstants.GForceMaxTravelMinMm, Math.Min(MBoosterUiConstants.GForceMaxTravelMaxMm, v));
+            MBoosterGForceMaxTravelValue.Text = v.ToString("0.#");
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GForce ??= new MBoosterEffectSettings()).MaxTravelMm = (float)v;
+            _plugin.SaveSettings();
+        }
+        // 0-100% — sent to the firmware unshaped every frame (it does the
+        // actual ramping, not the plugin) — see
+        // MBoosterEffectSettings.ResponseSpeedPct.
+        private void MBoosterGForceResponseSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterGForceResponseSpeedValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GForce ??= new MBoosterEffectSettings()).ResponseSpeedPct = v;
+            _plugin.SaveSettings();
+        }
+        // Sustained test toggle — alternates the commanded travel offset
+        // forward/backward, mirroring Pit House's own "Test" demo (bypasses
+        // Enabled and the game-running gate). See
+        // MBoosterDeviceController.SetGForceTestActive.
+        private void MBoosterGForceTestToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            CurrentMBoosterController()?.SetGForceTestActive(MBoosterGForceTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
         }
 
         // ===== Calibration (experimental) ===================================

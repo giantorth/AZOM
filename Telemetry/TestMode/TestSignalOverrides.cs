@@ -279,6 +279,13 @@ namespace MozaPlugin.Telemetry.TestMode
             // multi-second sweep like the other orientation signals above
             // wouldn't exercise that in any recognizable way.
             Add("AccelerationHeave", TestSignal.Sweep(-0.6, 0.6, periodMs: 700));
+            // Slow sweep through +/-1G — mBooster's G-Force (Inertial Pedal
+            // Feel) effect scales its travel offset by AccelerationSurge
+            // (see docs/protocol/devices/mbooster.md "G-Force"); a multi-
+            // second period lets the pedal's forward/backward push be felt
+            // distinctly rather than blurring together like Road Texture's
+            // fast bump signal.
+            Add("AccelerationSurge", TestSignal.Sweep(-1.0, 1.0, periodMs: 3000));
 
             // --- Spotter / radar / coordinates ---
             Add("SpotterCarLeft",         TestSignal.Toggle(stepMs: 5000));

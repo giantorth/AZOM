@@ -930,6 +930,21 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Continuously alternates G-Force's commanded travel offset
+        /// forward/backward at the currently configured Max Travel/Response
+        /// Speed while <paramref name="on"/> is true, bypassing Enabled and
+        /// the game-running gate — mirrors Pit House's own "Test" demo. See
+        /// <see cref="SetEngineTestActive"/> for the analogous Engine
+        /// toggle; same live-tracking and always-allow-off semantics apply
+        /// here.
+        /// </summary>
+        public void SetGForceTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetGForceTestSustained(on);
+        }
+
+        /// <summary>
         /// Continuously runs Lockup — substituting live brake position for
         /// the wheel-slip detection heuristic (which needs vehicle speed),
         /// same as the old 1s test pulse did — at its currently configured

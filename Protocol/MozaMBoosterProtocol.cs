@@ -20,6 +20,13 @@ namespace MozaPlugin.Protocol
         // with this effect type. Uses a materially different payload shape
         // from the other four — see BuildRoadTextureFrame.
         RoadTexture = 9,
+        // G-Force (Inertial Pedal Feel) — reverse-engineered from four real
+        // Pit House "Test" USB captures at different Max Travel/Response
+        // Speed settings (see docs/protocol/devices/mbooster.md "G-Force").
+        // Not a vibration waveform at all: a sustained, directional TRAVEL
+        // OFFSET target the firmware moves the pedal to and holds — see
+        // BuildGForceFrame.
+        GForce = 6,
     }
 
     /// <summary>
@@ -157,6 +164,57 @@ namespace MozaPlugin.Protocol
             frame[10] = (byte)(noiseRaw & 0xFF);
             frame[11] = (byte)(intensityRaw >> 8);
             frame[12] = (byte)(intensityRaw & 0xFF);
+            frame[13] = MozaProtocol.CalculateWireChecksum(frame, 13);
+            return frame;
+        }
+
+        /// <summary>
+        /// Build the motor-write frame for the G-Force (Inertial Pedal Feel)
+        /// effect — effect type 6, a genuinely different mechanism from
+        /// every other mBooster effect: not a vibration waveform, but a
+        /// sustained, directional TRAVEL OFFSET target the firmware moves
+        /// the pedal to and holds, at a firmware-side ramp rate set by
+        /// <paramref name="responseSpeedRaw"/>. Reverse-engineered from four
+        /// real Pit House "Test" captures at different Max Travel/Response
+        /// Speed settings (see docs/protocol/devices/mbooster.md "G-Force"):
+        /// <pre>
+        /// 7e  09  24  12   b1  06  EN   RH  RL   FH  FL   BH  BL   CK
+        ///                  │   │   │    └─┴─response speed u16 BE
+        ///                  │   │   │              └─┴─forward offset u16 BE
+        ///                  │   │   │                         └─┴─backward offset u16 BE
+        ///                  │   │   └ enable (0 = off, 1 = on)
+        ///                  │   └ effect type (6 = G-Force)
+        ///                  └ cmd id (0xb1)
+        /// </pre>
+        /// Exactly one of forward/backward is non-zero at a time in every
+        /// observed capture (the other is 0x0000) — Pit House's own "Test"
+        /// alternates between the two on a fixed cadence to demonstrate both
+        /// directions; a live effect instead holds enable=1 continuously and
+        /// updates whichever slot matches the sign of live longitudinal G
+        /// every tick (see MBoosterEffectWorker.ProcessGForceEffect). Both
+        /// value fields share <see cref="EncodeAmp"/>'s exact
+        /// "round(frac01*65535)" formula, verified against 4 data points
+        /// each: response speed 100%/50%/15% -> 0xFFFF/0x7FFF/0x2666 (exact);
+        /// travel 15mm/10mm/2.5mm (against the wire's fixed 15mm full-scale
+        /// range — see MBoosterUiConstants.GForceMaxTravelMaxMm) ->
+        /// 0xFFFF/0xAAAA/0x2AAA (exact).
+        /// </summary>
+        public static byte[] BuildGForceFrame(bool enable, ushort responseSpeedRaw, ushort forwardRaw, ushort backwardRaw, byte device = DeviceMotor)
+        {
+            var frame = new byte[14];
+            frame[0]  = MozaProtocol.MessageStart;
+            frame[1]  = MotorPayloadLen;
+            frame[2]  = GroupMotorWrite;
+            frame[3]  = device;
+            frame[4]  = CmdMotorWrite;
+            frame[5]  = (byte)MBoosterEffectId.GForce;
+            frame[6]  = enable ? (byte)1 : (byte)0;
+            frame[7]  = (byte)(responseSpeedRaw >> 8);
+            frame[8]  = (byte)(responseSpeedRaw & 0xFF);
+            frame[9]  = (byte)(forwardRaw >> 8);
+            frame[10] = (byte)(forwardRaw & 0xFF);
+            frame[11] = (byte)(backwardRaw >> 8);
+            frame[12] = (byte)(backwardRaw & 0xFF);
             frame[13] = MozaProtocol.CalculateWireChecksum(frame, 13);
             return frame;
         }

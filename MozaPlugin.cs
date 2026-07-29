@@ -1945,6 +1945,14 @@ namespace MozaPlugin
                 // road-surface roughness. Nullable — 0 for games that don't
                 // report it, same fail-soft style as the rest of this block.
                 double suspensionHeaveG = nd?.AccelerationHeave ?? 0.0;
+                // Longitudinal chassis acceleration, in G — SimHub's
+                // StatusDataBase.AccelerationSurge (= AccelerationX), same
+                // family/convention as AccelerationHeave above. Positive =
+                // accelerating, negative = braking/decelerating. Drives the
+                // G-Force (Inertial Pedal Feel) effect — see
+                // MBoosterEffectWorker.UpdateGForceRequest. Nullable — 0 for
+                // games that don't report it.
+                double longitudinalG = nd?.AccelerationSurge ?? 0.0;
                 // Brake Fade's temperature signal — peak across all 4
                 // corners (any one wheel overheating should trigger the
                 // warning, not just the average). BrakesTemperatureMax is
@@ -1995,6 +2003,7 @@ namespace MozaPlugin
                     vehicleSpeedMs: vehicleMs,
                     avgWheelSpeedMs: avgWheelMs,
                     suspensionHeaveG: suspensionHeaveG,
+                    longitudinalG: longitudinalG,
                     brakeTempC: brakeTempC,
                     gearShiftSeq: _mboosterShiftSeq,
                     gearIsNeutral: gearIsNeutral);
