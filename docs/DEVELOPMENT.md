@@ -83,9 +83,9 @@ Notes:
 
 ### CI/CD
 
-- **Build**: Every push to `main` and every PR is built automatically via GitHub Actions.
-- **Dev pre-release**: Every push to `dev` builds a Release and publishes a GitHub pre-release (a per-commit `dev-<sha>` tag plus a rolling `dev-latest` tag) — this is where active-development builds come from.
-- **Release**: Pushing a `v*` tag (e.g., `v0.2.0`) builds a Release, generates a changelog, and publishes a GitHub Release with the DLL (device definitions are embedded in the DLL).
+- **Build**: Pushes to `main`/`dev` plus fork and draft PRs are compile-checked via GitHub Actions (same-repo non-draft PRs skip this — they get the full PR build below).
+- **PR pre-releases**: Every commit pushed to an open same-repo PR builds a Release and publishes a GitHub pre-release tagged `pr-<N>-<sha7>` (version `X.Y.Z-pr.<N>.<sha7>`, asset `MozaPlugin_pr<N>_<sha7>.zip`) — this is where active-development builds come from. The newest 5 builds per PR are kept; closing or merging the PR deletes all of them (`pr-cleanup.yml`). The in-app updater lists each open PR as a selectable release channel. Bot-created PRs (SimHub bumps) don't trigger `pull_request` workflows — build those via the `PR Build` workflow's manual dispatch with the PR number.
+- **Release**: Pushing a `v*` tag (e.g., `v0.2.0`) builds a Release and publishes a GitHub Release with the DLL (device definitions are embedded in the DLL). It also repoints the legacy `dev-latest` tag at the new stable so plugins still on the retired dev channel get offered the upgrade out.
 - **SimHub dependency updates**: A daily workflow checks for new SimHub releases and creates a PR to update `libs/SimHub/`.
 
 ## Repository Map
@@ -456,6 +456,6 @@ The canonical wire reference is [`docs/protocol/`](protocol/). Load-bearing fact
 
 - **NuGet:** `Microsoft.NETFramework.ReferenceAssemblies.net48`, `Newtonsoft.Json`, `log4net`.
 - **Runtime (Windows only):** `Microsoft.Win32.Registry` (in `mscorlib`) — used by `MozaPortDiscovery`. The serial-probe fallback consults the registry per port and is hard-disableable via `DisableSerialProbeFallback`.
-- **SimHub DLLs** (`libs/SimHub/`, reference-only, not packaged): `SimHub.Plugins.dll`, `GameReaderCommon.dll`, `SimHub.Logging.dll`, `SerialDash.dll`, `BA63Driver.dll`, `HidSharp.dll`. A daily GitHub Actions workflow creates PRs when new SimHub versions release.
+- **SimHub DLLs** (`libs/SimHub/`, reference-only, not packaged): `SimHub.Plugins.dll`, `GameReaderCommon.dll`, `SimHub.Logging.dll`, `SerialDash.dll`, `BA63Driver.dll`, `HidSharp.dll`. A daily GitHub Actions workflow creates PRs when new SimHub versions release (those bot PRs don't trigger the PR Build workflow — dispatch it manually with the PR number if you need a test build).
 
 **Important:** the SimHub DLLs in `libs/SimHub/` must match the runtime SimHub version — the PluginSdk ships older DLLs missing newer interface members, causing `TypeLoadException` at runtime. Always update from an actual SimHub installation.

@@ -213,7 +213,7 @@ namespace MozaPlugin.UI
 
             string url = MozaPlugin.Instance?.Settings?.LastSeenReleaseUrl ?? "";
             if (string.IsNullOrEmpty(url))
-                url = "https://github.com/giantorth/moza-simhub-plugin/releases";
+                url = "https://github.com/giantorth/AZOM/releases";
             OpenExternalUrl(url);
         }
 

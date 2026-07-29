@@ -374,7 +374,6 @@ namespace MozaPlugin.Resources
         public static string Label_CheckForUpdates => Get("Label_CheckForUpdates");
         public static string Label_ReleaseChannel => Get("Label_ReleaseChannel");
         public static string Option_ReleaseChannelStable => Get("Option_ReleaseChannelStable");
-        public static string Option_ReleaseChannelDev => Get("Option_ReleaseChannelDev");
         public static string Button_CheckNow => Get("Button_CheckNow");
         public static string Status_UpdateNeverChecked => Get("Status_UpdateNeverChecked");
         public static string Status_UpdateChecking => Get("Status_UpdateChecking");
@@ -806,5 +805,7 @@ namespace MozaPlugin.Resources
         public static string StalkKind_ReleaseHeld => Get("StalkKind_ReleaseHeld");
         public static string StalkKind_WiperStage => Get("StalkKind_WiperStage");
         public static string StalkKind_LightStage => Get("StalkKind_LightStage");
+        public static string Option_ReleaseChannelPr => Get("Option_ReleaseChannelPr");
+        public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
     }
 }

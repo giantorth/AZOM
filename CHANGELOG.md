@@ -1,6 +1,94 @@
 # Changelog
 
-All notable changes to the AZOM MOZA SimHub plugin are documented here.
+All notable changes to the AZOM plugin are documented here.
+
+## [Unreleased]
+
+### Changed
+
+- **Per-PR development builds.** Dev-branch builds and the rolling `dev-latest` pre-release
+  are retired; CI now publishes a pre-release for every commit pushed to an open pull request
+  (newest 5 kept per PR, all deleted when the PR closes). The release-channel dropdown
+  (About > Updates) lists Stable plus every open PR — pick a PR to track its newest build,
+  and switching back to Stable offers the stable build even from a newer-numbered PR build.
+  Users on the old Development channel are migrated to Stable automatically.
+
+## [1.5.2] - 2026-07-26
+
+### Added
+
+- **CM1 Racing Dash — full default channel map.** The base/hub-bridged CM1 dash's field
+  stream is now decoded and mapped: every field ships a default SimHub binding.
+- **HGP and SGP shifters can now be used at the same time.** They're fully independent devices —
+  each with its own detection, tab, and per-profile settingss.
+- **MOZA Stalks truck-sim mode — rebindable keys.** Every key the stalks send is now set with a
+  press-a-key capture field: the wiper forward/back and light-cycle keys, both indicator keys
+  (previously fixed at P / - / L / [ / ]), and the per-button key assignments (previously a
+  fixed preset list). Captured keys are stored as layout-independent scan codes and displayed
+  using your keyboard layout's own key names, so international layouts can bind any key.
+- **Wheelbase LFE as a SimHub ShakeIt device (prototype).** A new "MOZA Wheelbase LFE
+  haptics" device in SimHub's Devices list exposes the base's three summed LFE oscillators
+  as ShakeIt Motors channels, so any ShakeIt effect can be routed to the wheelbase through
+  SimHub's full effects editor. Automatically hides legacy LFE tab when the new device is 
+  used.
+- **"Report a problem" — built-in bug reporting (About tab).** Describe the issue (with an
+  optional contact) and the plugin uploads the report together with a diagnostics bundle —
+  diagnostics snapshot, startup and rolling serial captures (hardware identifiers masked),
+  the plugin log, and the plugin's settings — and hands back a ticket ID. Oversized bundles
+  drop the rolling capture segment to fit the upload cap. The local diagnostics ZIP export
+  gains the same settings file.
+- **AB9 mechanical layout — SimHub property and actions.** `AZOM.Ab9Layout` shows the current
+  layout on dashboards/StreamDeck (and `AZOM.Ab9Connected` reports shifter presence), while new
+  bindable actions change it on the fly: `AZOM.Ab9LayoutNext` / `AZOM.Ab9LayoutPrev` cycle the
+  six layouts, and `AZOM.Ab9Layout5R1` … `AZOM.Ab9LayoutSequential` jump straight to one.
+  Closes issue #112.
+- **MOZA × Porsche Mission R and ESSENZA SCV12 wheels recognized.** The two wheels now get 
+  correct LED handling and product images.
+
+### Changed
+
+- **Base-tab temperature graph keeps its history.** MCU/MOSFET/motor temperatures are now
+  sampled by a background timer for the plugin's whole lifetime (every 0.5 s) instead of only
+  while the settings panel is open, so the graph shows its full rolling window the moment you
+  open the Base tab.
+
+### Fixed
+
+- **ES / ESX RPM LED brightness now follows the master brightness slider.** The Global
+  Brightness slider under Devices → Moza ES → LEDs had no effect (except full-off at 0):
+  old-protocol wheels dim only via a firmware register the master path never wrote, and both
+  of SimHub's fast callbacks go quiet at idle, so the write is driven from the steady poll
+  timer. The 0–100 slider is scaled into the firmware's small brightness range (it is not a
+  0–100 percentage) so the sweep no longer wraps, and a short settle absorbs the startup
+  brightness-mode churn that otherwise flickered the bar. Closes issue #113.
+- **Display rotation stuck on for non-VGS display wheels.** Selecting the wrong firmware era
+  for the wheel could stream telemetry in a format the wheel misinterprets; Display wheels 
+  other than the VGS now get the rotation setting turned off on every connection.
+- **Unresponsive display fix — the "stale-session wedge."** If a prior
+  SimHub instance exited with the wheel session still open, the wheel would keep acking
+  everything the new instance sent while never re-engaging the display (no session device-init,
+  no dashboard list, no slot report), leaving the dash dead indefinitely. Cold start now detects
+  that a session-close was acked (the wheel still held a stale session), holds ~11 s of
+  session-layer silence so the firmware tears it down, then re-closes before opening fresh; the
+  DisplayWatchdog also recognizes the wedge and triggers the proven off/on recovery cycle if one
+  slips through.
+- **A bad FSR1 field mapping can no longer freeze the whole display.** One malformed
+  partition/field used to abort the entire send tick, blanking every page until a page
+  change; the bad record is now skipped (and logged) while the rest keep streaming, and
+  field writes are bounds-guarded.
+- **1.5.1 could flip an HGP shifter into sequential mode.** 1.5.1 kept one shared set of
+  shifter profile fields and one shifter "owner", so with an SGP in the picture (attached
+  alongside the HGP, or used earlier under the same profile) profile apply could write the
+  SGP's shifter-type at the HGP — the shifter stores it, so the HGP then acts as a
+  sequential shifter even outside SimHub, and MOZA's own software does not put it back.
+  The plugin no longer captures or profile-applies shifter-type at all, and the HGP
+  tab gains a **Shifter type** selector (H-pattern / Sequential) that writes the device
+  directly with a read-back — the recovery path for affected HGPs. The value each
+  shifter reports is also logged on every connect.
+- **A shifter on its own USB port no longer hides one behind the base or hub.** The
+  relayed-shifter probe (dev `0x1A`) stopped as soon as any shifter was detected anywhere,
+  so a standalone HGP suppressed detection of an SGP plugged into the wheelbase; the probe
+  and its model resolvers are now gated per pipe.
 
 ## [1.5.1] - 2026-07-18
 
@@ -526,6 +614,7 @@ First release that can drive the wheel's built-in dashboards (requires the match
 - Initial development: wheelbase control and build pipeline, per-wheel profiles, first device
   definitions, RPM range settings, blink colors, and the first telemetry/dashboard init attempts.
 
+[1.5.2]: https://github.com/giantorth/AZOM/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/giantorth/AZOM/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/giantorth/AZOM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/giantorth/AZOM/compare/v1.3.0...v1.4.0

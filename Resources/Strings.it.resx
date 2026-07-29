@@ -286,7 +286,6 @@
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Controlla aggiornamenti automaticamente</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Canale di rilascio</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stabile</value></data>
-  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Sviluppo</value></data>
   <data name="Button_CheckNow" xml:space="preserve"><value>Controlla ora</value></data>
   <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Mai verificato</value></data>
   <data name="Status_UpdateChecking" xml:space="preserve"><value>Verifica in corso…</value></data>
@@ -753,4 +752,6 @@ Id: {2}</value></data>
   <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Rilascia tasti tenuti</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Stadio tergicristalli {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Stadio luci {0}</value></data>
+  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
+  <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR chiusa — passato a Stabile</value></data>
 </root>

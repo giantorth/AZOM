@@ -283,7 +283,6 @@
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Tự động kiểm tra cập nhật</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Kênh phát hành</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Ổn định</value></data>
-  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Phát triển</value></data>
   <data name="Button_CheckNow" xml:space="preserve"><value>Kiểm tra ngay</value></data>
   <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Chưa từng kiểm tra</value></data>
   <data name="Status_UpdateChecking" xml:space="preserve"><value>Đang kiểm tra…</value></data>
@@ -750,4 +749,6 @@ Id: {2}</value></data>
   <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Nhả các phím đang giữ</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Cấp gạt mưa {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Cấp đèn {0}</value></data>
+  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
+  <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
 </root>

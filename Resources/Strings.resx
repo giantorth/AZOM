@@ -309,7 +309,6 @@
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Check for updates automatically</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Release channel</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stable</value></data>
-  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Development</value></data>
   <data name="Button_CheckNow" xml:space="preserve"><value>Check now</value></data>
   <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Never checked</value></data>
   <data name="Status_UpdateChecking" xml:space="preserve"><value>Checking…</value></data>
@@ -757,4 +756,6 @@ Id: {2}</value></data>
   <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Release held keys</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Wiper stage {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Light stage {0}</value></data>
+  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
+  <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR closed — switched to Stable</value></data>
 </root>

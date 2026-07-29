@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - "**.cs"
       - "**.csproj"
@@ -23,6 +23,12 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
+    # Same-repo non-draft PRs already get a full build from pr-build.yml —
+    # skip the duplicate compile. Forks and drafts keep this gate.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      github.event.pull_request.draft == true
 
     steps:
       - name: Checkout

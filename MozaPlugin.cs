@@ -1006,6 +1006,24 @@ namespace MozaPlugin
                 if (_settings.ProfileStore == null)
                     _settings.ProfileStore = new MozaProfileStore();
 
+                // Migrate the legacy Stable/Dev update channel enum to the
+                // channel-id scheme. The dev channel is gone (dev-latest is no
+                // longer published), so prior Dev users land on Stable with a
+                // clean cache — their LastSeen* referenced dev-latest artifacts.
+                if (string.IsNullOrEmpty(_settings.UpdateChannelId))
+                {
+                    _settings.UpdateChannelId = UpdateCheckService.StableChannelId;
+                    if (_settings.UpdateChannel == UpdateChannel.Dev)
+                    {
+                        _settings.UpdateChannel = UpdateChannel.Stable;
+                        _settings.LastSeenLatestVersion = "";
+                        _settings.LastSeenReleaseUrl = "";
+                        _settings.LastSeenAssetUrl = "";
+                        _settings.LastSeenReleaseNotes = "";
+                        _settings.LastSkippedVersion = "";
+                    }
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
@@ -2967,16 +2985,12 @@ namespace MozaPlugin
             {
                 if (_settings == null || !_settings.UpdateCheckEnabled) return;
                 if (s_updateCheckStarted) return;
-                // The dev channel tracks the rolling 'dev-latest' tag, so a
-                // version cached in a prior session can't be trusted across a
-                // restart: its 7-char SHA differs from any freshly-installed
-                // build, which the dev comparator reads as "newer" and paints a
-                // phantom "update available" banner. Re-check dev on every
-                // launch (still once per process via s_updateCheckStarted) so
-                // the cache re-syncs to the live dev-latest. Stable versions are
-                // SHA-stable and directly comparable, so they keep the 24h
-                // throttle.
-                if (_settings.UpdateChannel != UpdateChannel.Dev
+                // A PR channel tracks a moving head — a version cached in a
+                // prior session may be stale, and the tracked PR may have
+                // closed since. Re-check PR channels on every launch (still
+                // once per process via s_updateCheckStarted); stable versions
+                // are directly comparable and keep the 24h throttle.
+                if (!UpdateCheckService.TryParsePrChannelId(_settings.UpdateChannelId, out _)
                     && DateTime.UtcNow - _settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
                 {
                     MozaLog.Debug("[UpdateCheck] skipped — last check less than 24h ago");
@@ -2984,29 +2998,62 @@ namespace MozaPlugin
                 }
                 s_updateCheckStarted = true;
 
-                var channel = _settings.UpdateChannel;
+                var channelId = _settings.UpdateChannelId;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        var result = await UpdateCheckService
-                            .CheckAsync(channel, CancellationToken.None)
+                        var fetch = await UpdateCheckService
+                            .FetchSnapshotAsync(CancellationToken.None)
                             .ConfigureAwait(false);
                         _settings.LastUpdateCheckUtc = DateTime.UtcNow;
 
-                        if (result.Success && !string.IsNullOrEmpty(result.LatestVersion))
+                        if (fetch.Snapshot != null)
                         {
-                            _settings.LastSeenLatestVersion = result.LatestVersion;
-                            _settings.LastSeenReleaseUrl = result.ReleaseUrl;
-                            _settings.LastSeenAssetUrl = result.AssetUrl;
-                            _settings.LastSeenReleaseNotes = result.ReleaseNotes;
-                            MozaLog.Debug(
-                                $"[UpdateCheck] {channel}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
+                            var snap = fetch.Snapshot;
+                            var result = UpdateCheckService.ResolveChannel(
+                                snap, channelId, out bool channelFound);
+                            if (!channelFound)
+                            {
+                                // Tracked PR closed/merged and its builds were
+                                // cleaned up — fall back to stable.
+                                MozaLog.Info(
+                                    $"[UpdateCheck] channel {channelId} is gone; falling back to stable");
+                                channelId = UpdateCheckService.StableChannelId;
+                                _settings.UpdateChannelId = channelId;
+                                _settings.UpdateChannelLabel = "";
+                                _settings.LastSkippedVersion = "";
+                                result = UpdateCheckService.ResolveChannel(
+                                    snap, channelId, out _);
+                            }
+                            else if (UpdateCheckService.TryParsePrChannelId(channelId, out int prNumber))
+                            {
+                                // PR titles drift; keep the offline label current.
+                                foreach (var ch in snap.PrChannels)
+                                {
+                                    if (ch.Number == prNumber)
+                                    {
+                                        _settings.UpdateChannelLabel = string.Format(
+                                            Strings.Option_ReleaseChannelPr, ch.Number, ch.Title);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (result.Success && !string.IsNullOrEmpty(result.LatestVersion))
+                            {
+                                _settings.LastSeenLatestVersion = result.LatestVersion;
+                                _settings.LastSeenReleaseUrl = result.ReleaseUrl;
+                                _settings.LastSeenAssetUrl = result.AssetUrl;
+                                _settings.LastSeenReleaseNotes = result.ReleaseNotes;
+                                MozaLog.Debug(
+                                    $"[UpdateCheck] {channelId}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
+                            }
                         }
-                        else if (!result.Success)
+                        else
                         {
                             MozaLog.Debug(
-                                $"[UpdateCheck] {channel} failed: {result.ErrorKind} {result.ErrorMessage}");
+                                $"[UpdateCheck] {channelId} failed: {fetch.ErrorKind} {fetch.ErrorMessage}");
                         }
 
                         try { this.SaveCommonSettings("MozaPluginSettings", _settings); }

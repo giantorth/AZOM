@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -13,7 +15,7 @@ namespace MozaPlugin.UI.UpdateCheck
     {
         None = 0,
         Network,    // DNS, socket, timeout, TLS
-        Http,       // non-2xx (excluding 404 on dev-latest, which is "no release yet")
+        Http,       // non-2xx
         Parse,      // JSON malformed or missing required fields
         Cancelled,
     }
@@ -60,17 +62,31 @@ namespace MozaPlugin.UI.UpdateCheck
     }
 
     /// <summary>
-    /// Queries the GitHub Releases API for the latest stable or dev release of
-    /// this plugin, parses the response, and exposes a SemVer comparator used
-    /// by the banner-rendering code to decide whether the running build is out
-    /// of date.
+    /// Queries the GitHub Releases API, parses the list into an
+    /// <see cref="UpdateSnapshot"/> (newest stable + one channel per open PR
+    /// with builds), and exposes the comparator the banner-rendering code uses
+    /// to decide whether the running build is out of date.
     /// </summary>
     public static class UpdateCheckService
     {
         private const string RepoOwner = "giantorth";
-        private const string RepoName = "moza-simhub-plugin";
-        private const string DevTag = "dev-latest";
+        private const string RepoName = "AZOM"; // repo renamed from moza-simhub-plugin
         private const int TimeoutSeconds = 10;
+
+        /// <summary>Channel id of the stable release stream. PR channels are
+        /// "pr/&lt;N&gt;" (see <see cref="PrChannelId"/>).</summary>
+        public const string StableChannelId = "stable";
+
+        // Stable releases are plain vX.Y.Z tags; PR builds are tagged
+        // pr-<N>-<sha7> and named "PR #<N>: <title> (<version>)" by
+        // .github/workflows/pr-build.yml. The version regex is end-anchored so
+        // parentheses inside a PR title can't shift the match.
+        private static readonly Regex s_stableTagRx =
+            new Regex(@"^v\d+\.\d+\.\d+$", RegexOptions.Compiled);
+        private static readonly Regex s_prTagRx =
+            new Regex(@"^pr-(\d+)-([0-9a-f]{7,40})$", RegexOptions.Compiled);
+        private static readonly Regex s_prNameVersionRx =
+            new Regex(@"\((\d+\.\d+\.\d+-pr\.\d+\.[0-9a-f]+)\)\s*$", RegexOptions.Compiled);
 
         // Single-instance HttpClient lives for the lifetime of the plugin
         // AppDomain. SimHub keeps the AppDomain alive across plugin reloads,
@@ -124,15 +140,164 @@ namespace MozaPlugin.UI.UpdateCheck
             s_http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         }
 
-        public static async Task<UpdateCheckResult> CheckAsync(
-            UpdateChannel channel, CancellationToken ct)
-        {
-            string url = channel == UpdateChannel.Dev
-                ? $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/tags/{DevTag}"
-                : $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+        // ----- Channel ids -----
 
+        public static string PrChannelId(int prNumber) => "pr/" + prNumber;
+
+        public static bool TryParsePrChannelId(string? channelId, out int prNumber)
+        {
+            prNumber = 0;
+            return channelId != null
+                && channelId.StartsWith("pr/", StringComparison.Ordinal)
+                && int.TryParse(channelId.Substring(3), out prNumber)
+                && prNumber > 0;
+        }
+
+        // ----- Snapshot fetch + cache -----
+
+        private static UpdateSnapshot? s_snapshot;
+
+        /// <summary>
+        /// Most recent successfully fetched snapshot (null before the first
+        /// fetch this process). Shared by the startup check, manual checks and
+        /// the channel dropdown so one API call serves all surfaces.
+        /// </summary>
+        public static UpdateSnapshot? CachedSnapshot => Volatile.Read(ref s_snapshot);
+
+        /// <summary>
+        /// Fetches the release list and parses it into a snapshot: newest
+        /// stable release + newest build per open PR. Caches on success.
+        /// </summary>
+        public static async Task<SnapshotFetchResult> FetchSnapshotAsync(CancellationToken ct)
+        {
+            string listUrl =
+                $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases?per_page=100";
+            var page = await HttpGetAsync(listUrl, ct).ConfigureAwait(false);
+            if (page.Body == null)
+                return SnapshotFetchResult.Fail(page.ErrorKind, page.ErrorMessage);
+
+            ReleaseEntry? stable = null;
+            var prChannels = new Dictionary<int, PrChannel>();
+            try
+            {
+                foreach (var token in JArray.Parse(page.Body))
+                {
+                    if (token is not JObject rel) continue;
+                    if ((bool?)rel["draft"] == true) continue;
+                    string tag = (string?)rel["tag_name"] ?? "";
+                    string name = (string?)rel["name"] ?? "";
+
+                    if (s_stableTagRx.IsMatch(tag) && (bool?)rel["prerelease"] != true)
+                    {
+                        // Max by SemVer, not list order — the API sorts by
+                        // creation time, which a re-published tag can skew.
+                        var entry = MakeEntry(rel, tag, StripLeadingV(tag));
+                        if (stable == null || CompareSemVer(entry.Version, stable.Version) > 0)
+                            stable = entry;
+                        continue;
+                    }
+
+                    var m = s_prTagRx.Match(tag);
+                    if (!m.Success) continue; // legacy dev-* tags, hand-cut tags
+                    string version = ExtractPrVersionFromName(name);
+                    if (version.Length == 0) continue; // renamed by hand — skip, don't fail
+                    int prNumber = int.Parse(m.Groups[1].Value);
+                    var prEntry = MakeEntry(rel, tag, version);
+                    if (!prChannels.TryGetValue(prNumber, out var existing)
+                        || prEntry.PublishedAtUtc > existing.Newest.PublishedAtUtc)
+                    {
+                        prChannels[prNumber] = new PrChannel(
+                            prNumber, ExtractPrTitleFromName(name, prNumber), prEntry);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return SnapshotFetchResult.Fail(UpdateCheckErrorKind.Parse, ex.Message);
+            }
+
+            if (stable == null)
+            {
+                // A page full of prereleases could push every stable off page 1
+                // — ask for the canonical latest directly. Null (e.g. 404 on a
+                // repo with no stable release yet) is a valid snapshot state.
+                stable = await FetchLatestStableAsync(ct).ConfigureAwait(false);
+            }
+
+            var snapshot = new UpdateSnapshot(
+                stable,
+                prChannels.Values.OrderBy(c => c.Number).ToList(),
+                DateTime.UtcNow);
+            Volatile.Write(ref s_snapshot, snapshot);
+            return SnapshotFetchResult.Ok(snapshot);
+        }
+
+        private static async Task<ReleaseEntry?> FetchLatestStableAsync(CancellationToken ct)
+        {
+            string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+            var resp = await HttpGetAsync(url, ct).ConfigureAwait(false);
+            if (resp.Body == null) return null;
+            try
+            {
+                var rel = JObject.Parse(resp.Body);
+                string tag = (string?)rel["tag_name"] ?? "";
+                if (!s_stableTagRx.IsMatch(tag)) return null;
+                return MakeEntry(rel, tag, StripLeadingV(tag));
+            }
+            catch { return null; }
+        }
+
+        private static ReleaseEntry MakeEntry(JObject rel, string tag, string version)
+        {
+            DateTime published =
+                ((DateTime?)rel["published_at"])?.ToUniversalTime() ?? DateTime.MinValue;
+            return new ReleaseEntry(
+                tag,
+                version,
+                (string?)rel["html_url"] ?? "",
+                (string?)rel["body"] ?? "",
+                ExtractAssetUrl(rel),
+                published);
+        }
+
+        /// <summary>
+        /// Maps the selected channel onto the flat result shape the persist +
+        /// banner pipeline consumes. <paramref name="channelFound"/> is false
+        /// when a PR channel has no builds left (PR closed/merged and its
+        /// releases cleaned up) — callers fall back to stable.
+        /// </summary>
+        public static UpdateCheckResult ResolveChannel(
+            UpdateSnapshot snapshot, string? channelId, out bool channelFound)
+        {
+            channelFound = true;
+            if (TryParsePrChannelId(channelId, out int prNumber))
+            {
+                foreach (var ch in snapshot.PrChannels)
+                {
+                    if (ch.Number != prNumber) continue;
+                    var e = ch.Newest;
+                    return UpdateCheckResult.Ok(e.Version, e.HtmlUrl, e.Notes, e.AssetUrl);
+                }
+                channelFound = false;
+                return UpdateCheckResult.NoReleaseAvailable();
+            }
+
+            var st = snapshot.Stable;
+            return st == null
+                ? UpdateCheckResult.NoReleaseAvailable()
+                : UpdateCheckResult.Ok(st.Version, st.HtmlUrl, st.Notes, st.AssetUrl);
+        }
+
+        private sealed class HttpTextResult
+        {
+            public string? Body;
+            public UpdateCheckErrorKind ErrorKind;
+            public string ErrorMessage = "";
+        }
+
+        private static async Task<HttpTextResult> HttpGetAsync(string url, CancellationToken ct)
+        {
             HttpResponseMessage? resp = null;
-            string body;
             try
             {
                 resp = await s_http.GetAsync(url, ct).ConfigureAwait(false);
@@ -142,73 +307,53 @@ namespace MozaPlugin.UI.UpdateCheck
                 // Genuine cancel from the caller — distinguish from a timeout
                 // (which also surfaces as Task/OperationCanceledException on
                 // .NET Framework's HttpClient) by checking the token state.
-                return UpdateCheckResult.Fail(UpdateCheckErrorKind.Cancelled, "");
+                return new HttpTextResult { ErrorKind = UpdateCheckErrorKind.Cancelled };
             }
             catch (OperationCanceledException)
             {
                 // .NET Framework HttpClient maps timeouts to a cancelled task
                 // whose token is not the one the caller passed in.
-                return UpdateCheckResult.Fail(UpdateCheckErrorKind.Network, "timeout");
-            }
-            catch (HttpRequestException ex)
-            {
-                return UpdateCheckResult.Fail(UpdateCheckErrorKind.Network, ex.Message);
+                return new HttpTextResult
+                {
+                    ErrorKind = UpdateCheckErrorKind.Network,
+                    ErrorMessage = "timeout",
+                };
             }
             catch (Exception ex)
             {
-                return UpdateCheckResult.Fail(UpdateCheckErrorKind.Network, ex.Message);
+                return new HttpTextResult
+                {
+                    ErrorKind = UpdateCheckErrorKind.Network,
+                    ErrorMessage = ex.Message,
+                };
             }
 
             try
             {
-                if ((int)resp.StatusCode == 404 && channel == UpdateChannel.Dev)
-                {
-                    // No dev-latest tag yet — not an error, just nothing to compare against.
-                    return UpdateCheckResult.NoReleaseAvailable();
-                }
                 if (!resp.IsSuccessStatusCode)
                 {
-                    return UpdateCheckResult.Fail(
-                        UpdateCheckErrorKind.Http,
-                        $"HTTP {(int)resp.StatusCode}");
+                    return new HttpTextResult
+                    {
+                        ErrorKind = UpdateCheckErrorKind.Http,
+                        ErrorMessage = $"HTTP {(int)resp.StatusCode}",
+                    };
                 }
-                body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                string body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                return new HttpTextResult { Body = body };
             }
             finally
             {
                 resp?.Dispose();
             }
-
-            try
-            {
-                var json = JObject.Parse(body);
-                string tagName = (string?)json["tag_name"] ?? "";
-                string name = (string?)json["name"] ?? "";
-                string htmlUrl = (string?)json["html_url"] ?? "";
-                string notes = (string?)json["body"] ?? "";
-                string assetUrl = ExtractAssetUrl(json);
-
-                string version = ExtractVersion(channel, tagName, name);
-                if (string.IsNullOrEmpty(version))
-                {
-                    return UpdateCheckResult.Fail(
-                        UpdateCheckErrorKind.Parse,
-                        "could not extract version from response");
-                }
-                return UpdateCheckResult.Ok(version, htmlUrl, notes, assetUrl);
-            }
-            catch (Exception ex)
-            {
-                return UpdateCheckResult.Fail(UpdateCheckErrorKind.Parse, ex.Message);
-            }
         }
 
         // Pull the browser_download_url for the first ZIP asset that looks
-        // like our plugin bundle. Both stable (`MozaPlugin_v0.9.2.zip`) and
-        // dev (`MozaPlugin_dev.zip`) follow the `MozaPlugin*.zip` pattern,
-        // so a startswith+endswith match handles both. Returns "" if no
-        // matching asset is found — the caller treats absent asset URL as
-        // "in-app install unavailable, fall back to release-notes link".
+        // like our plugin bundle. Both stable (`MozaPlugin_v1.5.1.zip`) and
+        // PR builds (`MozaPlugin_pr42_a1b2c3d.zip`) follow the
+        // `MozaPlugin*.zip` pattern, so a startswith+endswith match handles
+        // both. Returns "" if no matching asset is found — the caller treats
+        // absent asset URL as "in-app install unavailable, fall back to
+        // release-notes link".
         internal static string ExtractAssetUrl(JObject json)
         {
             try
@@ -229,36 +374,29 @@ namespace MozaPlugin.UI.UpdateCheck
             return "";
         }
 
-        // Stable: tag_name is "v1.2.3" → "1.2.3".
-        // Dev: tag_name is the literal "dev-latest" (a moving tag); the
-        //      release `name` is "dev-latest (0.0.1-dev.<sha>)", so we pull
-        //      the inner version from the parenthesised portion.
-        internal static string ExtractVersion(UpdateChannel channel, string tagName, string name)
+        // Pulls "1.5.3-pr.42.a1b2c3d" out of a release named
+        // "PR #42: <title> (1.5.3-pr.42.a1b2c3d)". Empty when the name doesn't
+        // match — the caller skips that release rather than failing the fetch.
+        internal static string ExtractPrVersionFromName(string name)
         {
-            if (channel == UpdateChannel.Stable)
-            {
-                return StripLeadingV(tagName);
-            }
+            if (string.IsNullOrEmpty(name)) return "";
+            var m = s_prNameVersionRx.Match(name);
+            return m.Success ? m.Groups[1].Value : "";
+        }
 
-            // Dev path — try the parenthesised name first.
-            if (!string.IsNullOrEmpty(name))
-            {
-                var m = Regex.Match(name, @"\(([^)]+)\)");
-                if (m.Success)
-                {
-                    string inner = m.Groups[1].Value.Trim();
-                    if (!string.IsNullOrEmpty(inner)) return StripLeadingV(inner);
-                }
-            }
-
-            // Fall back to tag_name. If the tag is literally "dev-latest",
-            // we have nothing comparable; return empty so the caller treats
-            // it as "no release available".
-            if (!string.IsNullOrEmpty(tagName) && tagName != DevTag)
-            {
-                return StripLeadingV(tagName);
-            }
-            return "";
+        // Pulls the PR title out of the same name shape; falls back to "#<N>"
+        // when the name was edited out of recognition.
+        internal static string ExtractPrTitleFromName(string name, int prNumber)
+        {
+            string fallback = "#" + prNumber;
+            if (string.IsNullOrEmpty(name)) return fallback;
+            string s = name;
+            var m = s_prNameVersionRx.Match(s);
+            if (m.Success) s = s.Substring(0, m.Index);
+            string prefix = $"PR #{prNumber}:";
+            if (s.StartsWith(prefix, StringComparison.Ordinal)) s = s.Substring(prefix.Length);
+            s = s.Trim();
+            return s.Length > 0 ? s : fallback;
         }
 
         private static string StripLeadingV(string s)
@@ -270,85 +408,38 @@ namespace MozaPlugin.UI.UpdateCheck
 
         /// <summary>
         /// Decide whether <paramref name="latest"/> represents a build the
-        /// user should be offered as an update over <paramref name="current"/>.
-        /// SemVer ordering alone is wrong for the dev channel: two dev builds
-        /// in the same stable cycle share the MAJ.MIN.PAT core (the workflow
-        /// stamps "<i>next</i>-dev.&lt;sha&gt;" where <i>next</i> only bumps
-        /// when a new stable is tagged), so SemVer falls through to comparing
-        /// the 7-char git SHA as an alphanumeric prerelease identifier — a
-        /// near-random ordering that hides ~half of newer dev builds.
-        ///
-        /// The dev-latest GitHub tag is a rolling pointer reset on every push
-        /// to dev (see .github/workflows/dev-build.yml), so any dev-formatted
-        /// remote version whose SHA differs from the running one is, by
-        /// construction, newer. We special-case that here and otherwise defer
-        /// to spec-correct SemVer comparison.
+        /// user should be offered over <paramref name="current"/> on the
+        /// selected channel. A PR channel tracks a moving head, so any
+        /// differing build is an update — a newer commit, or the target build
+        /// right after a channel switch. On stable, a running prerelease build
+        /// (a PR/dev build whose channel the user left) is offered the stable
+        /// release even though its numeric core is lower — that downgrade is
+        /// the point of switching back. Stable-on-stable only ever moves
+        /// forward, by spec-correct SemVer.
         /// </summary>
         public static bool IsUpdateAvailable(
-            string latest, string current, UpdateChannel channel)
+            string latest, string current, string? channelId)
         {
             if (string.IsNullOrEmpty(latest)) return false;
             if (string.IsNullOrEmpty(current)) return true;
 
-            if (channel == UpdateChannel.Dev
-                && TryParseDevBuildSha(latest, out int[]? coreL, out string shaL)
-                && TryParseDevBuildSha(current, out int[]? coreC, out string shaC)
-                && coreL![0] == coreC![0]
-                && coreL[1] == coreC[1]
-                && coreL[2] == coreC[2]
-                && !string.Equals(shaL, shaC, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            if (TryParsePrChannelId(channelId, out _))
+                return !string.Equals(latest, current, StringComparison.Ordinal);
+
+            if (HasPrereleaseTag(current))
+                return !string.Equals(latest, current, StringComparison.Ordinal);
 
             return CompareSemVer(latest, current) > 0;
         }
 
-        // Returns true when `version` matches the CI dev-build shape
-        // "MAJ.MIN.PAT-dev.<sha>" (any optional +build metadata stripped).
-        // The SHA portion may be any non-empty token after "dev."; we keep it
-        // lenient so a future commit-hash length change doesn't silently
-        // disable the dev-channel comparison override.
-        internal static bool TryParseDevBuildSha(
-            string version, out int[]? core, out string sha)
+        // True when the version carries a SemVer prerelease part ("-…", any
+        // "+build" metadata ignored) — i.e. the running DLL came from a PR
+        // build (or a legacy dev build) rather than a stable tag.
+        internal static bool HasPrereleaseTag(string version)
         {
-            core = null;
-            sha = "";
-            if (string.IsNullOrEmpty(version)) return false;
-
-            // Drop +build metadata per SemVer §10 before parsing.
             int plus = version.IndexOf('+');
             string v = plus >= 0 ? version.Substring(0, plus) : version;
-
-            int dash = v.IndexOf('-');
-            if (dash < 0) return false;
-
-            string coreStr = v.Substring(0, dash);
-            string pre = v.Substring(dash + 1);
-
-            // Prerelease must start with "dev." and have a non-empty tail.
-            const string devPrefix = "dev.";
-            if (!pre.StartsWith(devPrefix, StringComparison.Ordinal)) return false;
-            string shaPart = pre.Substring(devPrefix.Length);
-            if (string.IsNullOrEmpty(shaPart)) return false;
-            // A SemVer prerelease can have more dot-separated identifiers
-            // after the SHA in principle; treat the next segment, if any, as
-            // belonging to the SHA identifier so we don't accidentally match
-            // unrelated formats. The CI never emits a second identifier.
-            int nextDot = shaPart.IndexOf('.');
-            if (nextDot >= 0) return false;
-
-            var parts = coreStr.Split('.');
-            if (parts.Length < 3) return false;
-            var parsed = new int[3];
-            for (int i = 0; i < 3; i++)
-            {
-                if (!int.TryParse(parts[i], out parsed[i])) return false;
-            }
-
-            core = parsed;
-            sha = shaPart;
-            return true;
+            return v.IndexOf('-') >= 0;
         }
 
         /// <summary>

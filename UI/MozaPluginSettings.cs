@@ -285,10 +285,20 @@ namespace MozaPlugin
         // UI/UpdateCheck/UpdateCheckService.cs for the wire details.
         public bool UpdateCheckEnabled { get; set; } = true;
 
-        // Release stream the checker follows. Stable = /releases/latest,
-        // Dev = /releases/tags/dev-latest. Persisted as int so JSON shape
-        // matches the existing enum convention.
+        // Legacy Stable/Dev enum, superseded by UpdateChannelId. Kept so an
+        // older build reading a newer settings blob still gets a valid value;
+        // always written as Stable (the dev channel no longer exists).
         public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
+
+        // Release stream the checker follows: "stable", or "pr/<N>" to track
+        // the newest per-commit build of an open pull request. Empty means
+        // not migrated yet — MozaPlugin.Init resolves it to "stable".
+        public string UpdateChannelId { get; set; } = "";
+
+        // Display label of the selected PR channel (e.g. "PR #42: Fix …") so
+        // the channel picker can render the selection before the release list
+        // has been fetched this session. Empty for the stable channel.
+        public string UpdateChannelLabel { get; set; } = "";
 
         // Version the user clicked "Skip this version" on — the banner stays
         // hidden as long as the latest published version still equals this

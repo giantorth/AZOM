@@ -47,7 +47,7 @@ namespace MozaPlugin
                 using (_suppressor.Begin())
                 {
                     UpdateCheckEnabledToggle.IsChecked = s.UpdateCheckEnabled;
-                    UpdateChannelCombo.SelectedIndex = (int)s.UpdateChannel;
+                    RepopulateChannelCombo();
                 }
 
                 RefreshUpdateNotifications();
@@ -458,7 +458,7 @@ namespace MozaPlugin
             {
                 string url = _plugin?.Settings?.LastSeenReleaseUrl ?? "";
                 if (string.IsNullOrEmpty(url))
-                    url = "https://github.com/giantorth/moza-simhub-plugin/releases";
+                    url = "https://github.com/giantorth/AZOM/releases";
                 OpenExternalUrl(url);
                 return;
             }
@@ -505,20 +505,113 @@ namespace MozaPlugin
             RefreshUpdateNotifications();
         }
 
+        // Rebuilds the channel picker: Stable + one entry per open PR from the
+        // cached release snapshot. Selection keys off the persisted channel id
+        // (item Tag), so a snapshot refresh can't silently move the user onto
+        // a different channel.
+        private void RepopulateChannelCombo()
+        {
+            if (UpdateChannelCombo == null) return;
+            var s = _plugin?.Settings;
+            string selectedId = s?.UpdateChannelId ?? "";
+            if (selectedId.Length == 0) selectedId = UpdateCheckService.StableChannelId;
+
+            using (_suppressor.Begin())
+            {
+                UpdateChannelCombo.Items.Clear();
+                UpdateChannelCombo.Items.Add(new ComboBoxItem
+                {
+                    Content = Strings.Option_ReleaseChannelStable,
+                    Tag = UpdateCheckService.StableChannelId,
+                });
+
+                bool selectedPresent = selectedId == UpdateCheckService.StableChannelId;
+                var snap = UpdateCheckService.CachedSnapshot;
+                if (snap != null)
+                {
+                    foreach (var ch in snap.PrChannels)
+                    {
+                        UpdateChannelCombo.Items.Add(new ComboBoxItem
+                        {
+                            Content = string.Format(
+                                Strings.Option_ReleaseChannelPr, ch.Number, ch.Title),
+                            Tag = ch.ChannelId,
+                        });
+                        if (ch.ChannelId == selectedId) selectedPresent = true;
+                    }
+                }
+                if (!selectedPresent)
+                {
+                    // Selected PR channel isn't in the snapshot (offline, or
+                    // nothing fetched yet this session) — keep the selection
+                    // visible via the persisted label.
+                    UpdateChannelCombo.Items.Add(new ComboBoxItem
+                    {
+                        Content = string.IsNullOrEmpty(s?.UpdateChannelLabel)
+                            ? selectedId
+                            : s!.UpdateChannelLabel,
+                        Tag = selectedId,
+                    });
+                }
+
+                foreach (var item in UpdateChannelCombo.Items)
+                {
+                    if (item is ComboBoxItem cbi
+                        && string.Equals(cbi.Tag as string, selectedId, StringComparison.Ordinal))
+                    {
+                        UpdateChannelCombo.SelectedItem = cbi;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Refresh the PR-channel list when the picker opens, at most once per
+        // 5 minutes (every check also refreshes the shared snapshot).
+        private bool _channelListRefreshInFlight;
+
+        private async void UpdateChannelCombo_DropDownOpened(object sender, EventArgs e)
+        {
+            if (_channelListRefreshInFlight) return;
+            var snap = UpdateCheckService.CachedSnapshot;
+            if (snap != null && DateTime.UtcNow - snap.FetchedUtc < TimeSpan.FromMinutes(5))
+                return;
+
+            _channelListRefreshInFlight = true;
+            try
+            {
+                var fetch = await Task.Run(
+                    () => UpdateCheckService.FetchSnapshotAsync(CancellationToken.None))
+                    .ConfigureAwait(true);
+                if (fetch.Snapshot != null) RepopulateChannelCombo();
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[UpdateBanner] channel list refresh failed: {ex.Message}");
+            }
+            finally
+            {
+                _channelListRefreshInFlight = false;
+            }
+        }
+
         private void UpdateChannelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
             var s = _plugin?.Settings;
             if (s == null || UpdateChannelCombo == null) return;
-            int idx = UpdateChannelCombo.SelectedIndex;
-            if (idx < 0) return;
-            var picked = idx == (int)UpdateChannel.Dev ? UpdateChannel.Dev : UpdateChannel.Stable;
-            if (picked == s.UpdateChannel) return;
+            var item = UpdateChannelCombo.SelectedItem as ComboBoxItem;
+            string? channelId = item?.Tag as string;
+            if (string.IsNullOrEmpty(channelId)) return;
+            if (string.Equals(channelId, s.UpdateChannelId, StringComparison.Ordinal)) return;
 
-            s.UpdateChannel = picked;
-            // Channel switch invalidates the cached "last seen" — what was the
-            // newest stable release isn't necessarily comparable to the newest
-            // dev build (and vice versa). Clear so the next check repopulates.
+            s.UpdateChannelId = channelId!;
+            s.UpdateChannelLabel = channelId == UpdateCheckService.StableChannelId
+                ? ""
+                : item?.Content as string ?? "";
+            // Channel switch invalidates the cached "last seen" — releases on
+            // one channel aren't comparable to another's. Clear so the next
+            // check repopulates.
             s.LastSeenLatestVersion = "";
             s.LastSeenReleaseUrl = "";
             s.LastSeenAssetUrl = "";
@@ -526,9 +619,17 @@ namespace MozaPlugin
             s.LastSkippedVersion = "";
             try { _plugin!.PersistSettings(); } catch { }
             RefreshUpdateNotifications();
+            // Fetch + offer the selected channel's build right away rather
+            // than on the next launch.
+            _ = RunManualCheckAsync();
         }
 
         private async void UpdateCheckNow_Click(object sender, RoutedEventArgs e)
+            => await RunManualCheckAsync();
+
+        // Shared by the Check-now button and a channel switch (which wants
+        // the selected channel's build offered immediately).
+        private async Task RunManualCheckAsync()
         {
             if (_plugin?.Settings == null || UpdateCheckNowButton == null) return;
             var s = _plugin.Settings;
@@ -548,11 +649,11 @@ namespace MozaPlugin
             if (UpdateLastCheckedText != null)
                 UpdateLastCheckedText.Text = Strings.Status_UpdateChecking;
 
-            UpdateCheckResult result;
+            SnapshotFetchResult fetch;
             try
             {
-                result = await Task.Run(
-                    () => UpdateCheckService.CheckAsync(s.UpdateChannel, ct),
+                fetch = await Task.Run(
+                    () => UpdateCheckService.FetchSnapshotAsync(ct),
                     ct).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
@@ -573,8 +674,23 @@ namespace MozaPlugin
             // manual check.
             s.LastUpdateCheckUtc = DateTime.UtcNow;
 
-            if (result.Success)
+            if (fetch.Snapshot != null)
             {
+                var result = UpdateCheckService.ResolveChannel(
+                    fetch.Snapshot, s.UpdateChannelId, out bool channelFound);
+                bool channelGone = !channelFound;
+                if (channelGone)
+                {
+                    // Tracked PR closed/merged and its builds were cleaned up
+                    // — fall back to stable.
+                    s.UpdateChannelId = UpdateCheckService.StableChannelId;
+                    s.UpdateChannelLabel = "";
+                    s.LastSkippedVersion = "";
+                    result = UpdateCheckService.ResolveChannel(
+                        fetch.Snapshot, s.UpdateChannelId, out _);
+                }
+                RepopulateChannelCombo();
+
                 if (!string.IsNullOrEmpty(result.LatestVersion))
                 {
                     s.LastSeenLatestVersion = result.LatestVersion;
@@ -582,25 +698,32 @@ namespace MozaPlugin
                     s.LastSeenAssetUrl = result.AssetUrl;
                     s.LastSeenReleaseNotes = result.ReleaseNotes;
                 }
-                // result.Success with empty LatestVersion = 404 on dev-latest
-                // (no dev release published yet). Leave cached values alone
-                // so a previous stable-channel result doesn't get erased.
+                // Empty LatestVersion = the channel resolves to nothing right
+                // now (repo without a stable release). Leave cached values
+                // alone rather than erasing a previous result.
 
                 try { _plugin.PersistSettings(); } catch { }
                 RefreshUpdateNotifications();
 
                 if (UpdateLastCheckedText != null)
                 {
-                    // Show explicit "up to date" when there's no newer version
-                    // available; otherwise show the timestamp.
-                    string current = DiagnosticsTextBuilder.GetPluginVersion();
-                    bool upToDate = string.IsNullOrEmpty(result.LatestVersion)
-                        || !UpdateCheckService.IsUpdateAvailable(
-                            result.LatestVersion, current, s.UpdateChannel);
-                    if (upToDate)
-                        UpdateLastCheckedText.Text = Strings.Status_UpdateUpToDate;
+                    if (channelGone)
+                    {
+                        UpdateLastCheckedText.Text = Strings.Status_UpdatePrChannelGone;
+                    }
                     else
-                        RefreshLastCheckedText();
+                    {
+                        // Show explicit "up to date" when there's no newer
+                        // version available; otherwise show the timestamp.
+                        string current = DiagnosticsTextBuilder.GetPluginVersion();
+                        bool upToDate = string.IsNullOrEmpty(result.LatestVersion)
+                            || !UpdateCheckService.IsUpdateAvailable(
+                                result.LatestVersion, current, s.UpdateChannelId);
+                        if (upToDate)
+                            UpdateLastCheckedText.Text = Strings.Status_UpdateUpToDate;
+                        else
+                            RefreshLastCheckedText();
+                    }
                 }
             }
             else
@@ -608,7 +731,7 @@ namespace MozaPlugin
                 try { _plugin.PersistSettings(); } catch { }
                 if (UpdateLastCheckedText != null)
                 {
-                    switch (result.ErrorKind)
+                    switch (fetch.ErrorKind)
                     {
                         case UpdateCheckErrorKind.Http:
                             UpdateLastCheckedText.Text = Strings.Status_UpdateFailedHttp;
