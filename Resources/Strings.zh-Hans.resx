@@ -149,6 +149,11 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>前限位硬度</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>后限位硬度</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>模拟一种独立于游戏输出的摩擦力。</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>分段阻尼</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>独立于游戏输出的阻尼力,按踏板行程分段设置</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>模拟一种独立于游戏内输出的阻尼力。踏板行程被划分为多个分段,每段都有可调范围和各自的自然阻尼。拖动分隔线可调整分段大小;在分段内拖动可设置该分段的阻尼量。</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>踩下时</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>松开时</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>模拟输入映射</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// 将传感器/踏板信号映射到游戏,Pit House 风格</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>最大阈值(kg)</value></data>
