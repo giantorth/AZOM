@@ -119,8 +119,11 @@ namespace MozaPlugin
         /// <summary>True while the underlying serial pipe is open.</summary>
         public bool IsConnected => _connection.IsConnected;
 
-        // Valid wheel device IDs to try (23, 21, 19)
-        private static readonly byte[] WheelIdCandidates = { 23, 21, 19 };
+        // Valid wheel device IDs to try: 0x17 (DeviceWheel), 0x15 (DeviceWheel15)
+        // and 0x13 (DeviceBase, the old-protocol / ES bus). 0x15 and 0x17 are two
+        // of the three wheel-identity ids in docs/how-to-query-device-type.md.
+        private static readonly byte[] WheelIdCandidates =
+            { MozaProtocol.DeviceWheel, MozaProtocol.DeviceWheel15, MozaProtocol.DeviceBase };
 
         /// <summary>
         /// Send the PitHouse-style wheel identity probe sequence that the existing
@@ -259,6 +262,14 @@ namespace MozaPlugin
                 ReadSettingForDevice("wheel-telemetry-mode", id);
                 ReadSettingForDevice("wheel-rpm-value1", id);
             }
+
+            // docs/how-to-query-device-type.md's canonical probe: the model-name
+            // group (0x07). Catches a new-protocol wheel that answers the identity
+            // group but not the telemetry-mode / rpm-value settings groups. Only
+            // the new-protocol wheel ids (0x17, 0x15); the base (0x13) answers this
+            // as base-model-name and ES (0x18) via es-wheel-model-name.
+            ReadSettingForDevice("wheel-model-name", MozaProtocol.DeviceWheel);
+            ReadSettingForDevice("wheel-model-name", MozaProtocol.DeviceWheel15);
         }
 
         /// <summary>
@@ -494,6 +505,23 @@ namespace MozaPlugin
                 MozaMBoosterProtocol.EncodeFreq(freqHz),
                 MozaMBoosterProtocol.EncodeAmp(amp01));
             _connection.SendStream(StreamKind.BaseLfeAbs, f);
+            return true;
+        }
+
+        // The id-0 oscillator as a CONTINUOUS tone (ShakeIt only). The three LFE
+        // slots are identical oscillators — plugin LFE mode happens to drive id 0 as
+        // a one-shot gearshift burst, but nothing stops it streaming like ids 1/2.
+        // Period is a timing hint on a host-modulated tone (per wheelbase-0x13.md);
+        // reuse the engine ParamK so all three continuous tones encode it the same.
+        public bool SendBaseLfeOsc0Stream(bool playing, double freqHz, double amp01)
+        {
+            if (!_connection.IsConnected) return false;
+            var f = MozaBaseLfeProtocol.BuildFrame(
+                MozaBaseLfeProtocol.LfeEffect.Gearshift, playing,   // wire effect id 0
+                MozaBaseLfeProtocol.EncodePeriod(MozaBaseLfeProtocol.ParamKEngine, freqHz),
+                MozaMBoosterProtocol.EncodeFreq(freqHz),
+                MozaMBoosterProtocol.EncodeAmp(amp01));
+            _connection.SendStream(StreamKind.BaseLfeOsc0, f);
             return true;
         }
 

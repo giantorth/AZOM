@@ -37,10 +37,10 @@ namespace MozaPlugin.Devices
         /// shifter descriptors set a per-model list so the tab reflects the device's
         /// stored values on connect (the SGP list includes its LED commands).</summary>
         public string[]? SettingsReadCommands { get; }
-        /// <summary>True for the SGP (2 configurable LEDs); false for the HGP. Stamped
-        /// into <c>DeviceDetectionState.ShifterHasLeds</c> so the UI shows the LED
-        /// section only for the SGP.</summary>
-        public bool HasLeds { get; }
+        /// <summary>Which shifter model this descriptor is (Hgp / Sgp), or Unknown for
+        /// non-shifter peripherals. Routes this lane's <c>shifter-*</c> replies into the
+        /// right per-device mirror; the SGP is the one with LEDs.</summary>
+        public ShifterModelKind ShifterModel { get; }
 
         public StandalonePeripheralDescriptor(
             MozaDeviceCategory category,
@@ -52,7 +52,7 @@ namespace MozaPlugin.Devices
             Action<DeviceProber, bool> markDetected,
             Func<DeviceDetectionState, bool> isDetected,
             string[]? settingsReadCommands = null,
-            bool hasLeds = false)
+            ShifterModelKind shifterModel = ShifterModelKind.Unknown)
         {
             Category = category;
             PidFilter = pidFilter ?? throw new ArgumentNullException(nameof(pidFilter));
@@ -63,7 +63,7 @@ namespace MozaPlugin.Devices
             MarkDetected = markDetected ?? throw new ArgumentNullException(nameof(markDetected));
             IsDetected = isDetected ?? throw new ArgumentNullException(nameof(isDetected));
             SettingsReadCommands = settingsReadCommands;
-            HasLeds = hasLeds;
+            ShifterModel = shifterModel;
         }
 
         // Directly-USB-attached peripherals with a config surface. Pedals/handbrake
@@ -107,10 +107,10 @@ namespace MozaPlugin.Devices
                 MozaProtocol.DeviceHPattern,
                 "shifter-",
                 "shifter",
-                (prober, issueReads) => prober.MarkShifterDetected(issueReads),
-                s => s.ShifterDetected,
+                (prober, issueReads) => prober.MarkHgpDetected(issueReads),
+                s => s.HgpDetected,
                 ShifterCommonReads,
-                hasLeds: false);
+                shifterModel: ShifterModelKind.Hgp);
 
         // SGP: sequential shifter with 2 configurable LEDs.
         public static readonly StandalonePeripheralDescriptor Sgp =
@@ -121,10 +121,10 @@ namespace MozaPlugin.Devices
                 MozaProtocol.DeviceSequential,
                 "shifter-",
                 "shifter",
-                (prober, issueReads) => prober.MarkShifterDetected(issueReads),
-                s => s.ShifterDetected,
+                (prober, issueReads) => prober.MarkSgpDetected(issueReads),
+                s => s.SgpDetected,
                 ShifterSgpReads,
-                hasLeds: true);
+                shifterModel: ShifterModelKind.Sgp);
 
         /// <summary>Descriptor for a discovered port's category + PID, or null if
         /// unsupported. HGP and SGP share category <c>Shifter</c> and are disambiguated
@@ -241,16 +241,9 @@ namespace MozaPlugin.Devices
             if (ok)
             {
                 MozaLog.Info($"[AZOM] Connected to standalone {_desc.CaptureLabelBase} ({_connection.DiscoveredPid} on {_connection.LastPortName})");
-                // A shifter's model is known from its PID (SGP has 2 LEDs, HGP has
-                // none) — stamp it before MarkDetected so the correct dedicated tab
-                // shows immediately (no probe/timeout needed on this lane) and the
-                // detect log reads correctly.
-                if (_desc.Category == MozaDeviceCategory.Shifter)
-                {
-                    _detectionState.ShifterHasLeds = _desc.HasLeds;
-                    _detectionState.ShifterModel = _desc.HasLeds
-                        ? ShifterModelKind.Sgp : ShifterModelKind.Hgp;
-                }
+                // A shifter's model is known from its PID (the descriptor is Hgp or Sgp),
+                // so MarkDetected below flips the correct per-model flag/owner directly —
+                // the right dedicated tab shows immediately, no probe/timeout on this lane.
                 // Registry PID classification + an open dedicated port IS proof of
                 // presence on this topology, so show the tab immediately — don't
                 // gate it on a binary ACK this device may never send. issueReads:
@@ -332,9 +325,14 @@ namespace MozaPlugin.Devices
                 return;
 
             _pending.NoteResponse(r.Name);
-            _data.UpdateFromCommand(r.Name, r.IntValue);
-            if (r.ArrayValue != null)
-                _data.UpdateFromArray(r.Name, r.ArrayValue);
+            // Shifter replies route into this lane's per-model mirror (this descriptor
+            // knows whether it's the HGP or SGP); everything else uses the shared model.
+            if (!_data.TryUpdateShifter(_desc.ShifterModel, r.Name, r.IntValue, r.ArrayValue))
+            {
+                _data.UpdateFromCommand(r.Name, r.IntValue);
+                if (r.ArrayValue != null)
+                    _data.UpdateFromArray(r.Name, r.ArrayValue);
+            }
             _prober.DetectDevices(r.Name, r.IntValue, r.DeviceId);
         }
 
@@ -350,12 +348,15 @@ namespace MozaPlugin.Devices
                 _detectionState.HandbrakeDetected = false;
                 _detectionState.HandbrakeOwner = null;
             }
-            if (ReferenceEquals(_detectionState.ShifterOwner, _deviceManager))
+            if (ReferenceEquals(_detectionState.HgpOwner, _deviceManager))
             {
-                _detectionState.ShifterDetected = false;
-                _detectionState.ShifterHasLeds = false;
-                _detectionState.ShifterModel = ShifterModelKind.Unknown;
-                _detectionState.ShifterOwner = null;
+                _detectionState.HgpDetected = false;
+                _detectionState.HgpOwner = null;
+            }
+            if (ReferenceEquals(_detectionState.SgpOwner, _deviceManager))
+            {
+                _detectionState.SgpDetected = false;
+                _detectionState.SgpOwner = null;
             }
         }
 

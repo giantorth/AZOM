@@ -169,7 +169,7 @@ namespace MozaPlugin.UI
             return sb.ToString().TrimEnd();
         }
 
-        public static string BuildWheelIdentity(MozaData d)
+        public static string BuildWheelIdentity(MozaData d, Devices.DeviceDetectionState? detection = null)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"Model:          {Blank(d.WheelModelName)}");
@@ -183,6 +183,11 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Capabilities:   {Hex(d.WheelCapabilities)}");
             sb.AppendLine($"MCU UID:        {RedactBytes(d.WheelMcuUid)}");
             sb.Append    ($"Identity-11:    {Hex(d.WheelIdentity11)}");
+            if (detection?.NewWheelActingOldProtocol == true)
+            {
+                sb.AppendLine();
+                sb.Append("FW advisory:    new-protocol wheel answered as old-protocol — firmware update recommended");
+            }
             return sb.ToString();
         }
 

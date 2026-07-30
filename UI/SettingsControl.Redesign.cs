@@ -24,8 +24,8 @@ namespace MozaPlugin
     public partial class SettingsControl
     {
         // ---- Bandwidth sparkline state (600 samples = 5 min @ 500ms tick,
-        // matches TemperatureSamples so both graphs on the Base tab share the
-        // same horizontal timescale). ----
+        // matches the temperature history window so both graphs on the Base tab
+        // share the same horizontal timescale). ----
         private const int BandwidthSamples = 600;
         private readonly ObservableCollection<double> _bwInSamples = new ObservableCollection<double>();
         private readonly ObservableCollection<double> _bwOutSamples = new ObservableCollection<double>();
@@ -38,22 +38,11 @@ namespace MozaPlugin
         private long _bwSessionIn;
         private long _bwSessionOut;
 
-        // ---- Temperature-graph sample buffers. The main refresh timer
-        // (RefreshBaseTab → UpdateRedesignLiveDisplays) pushes samples at
-        // 500 ms; 600 samples × 0.5 s = 5 minutes of rolling history.
-        // (Bandwidth sparkline keeps its shorter window; temps trend slowly
-        // enough to justify a longer view.) ----
-        private const int TemperatureSamples = 600;
-        private readonly ObservableCollection<double> _mcuTempSamples = new ObservableCollection<double>();
-        private readonly ObservableCollection<double> _mosfetTempSamples = new ObservableCollection<double>();
-        private readonly ObservableCollection<double> _motorTempSamples = new ObservableCollection<double>();
-
-        // Peak temps observed since plugin launch, stored as raw 100×°C ints
-        // so unit toggling (°C↔°F) still displays correctly via ConvertTemp.
-        // -1 sentinel = "never seen a live sample yet" → display blank.
-        private int _mcuTempMaxRaw = -1;
-        private int _mosfetTempMaxRaw = -1;
-        private int _motorTempMaxRaw = -1;
+        // Temperature-graph history + session peaks live on MozaPlugin
+        // (_plugin.TemperatureHistory), sampled by a plugin-lifetime background
+        // timer so the graph shows its full window the moment this panel opens
+        // rather than only accumulating while the panel is loaded. This class
+        // just renders snapshots of that buffer; it owns no temp buffers itself.
 
         // ---- mBooster Effects card pedal-trace sparkline. Pushed from
         // UpdateMBoosterCurveMarkers, which already runs at 30 Hz (same
@@ -156,19 +145,11 @@ namespace MozaPlugin
                     _bwOutSamples.Add(0);
                 }
 
-                // Temperature graph: prime the three rolling buffers + bind.
-                if (TemperatureGraphViz != null)
-                {
-                    TemperatureGraphViz.McuSamples    = _mcuTempSamples;
-                    TemperatureGraphViz.MosfetSamples = _mosfetTempSamples;
-                    TemperatureGraphViz.MotorSamples  = _motorTempSamples;
-                }
-                for (int i = 0; i < TemperatureSamples; i++)
-                {
-                    _mcuTempSamples.Add(0);
-                    _mosfetTempSamples.Add(0);
-                    _motorTempSamples.Add(0);
-                }
+                // Temperature graph reads from the plugin-lifetime history buffer
+                // (kept warm in the background). Seed it once now so the full
+                // window is visible immediately on open; the refresh tick then
+                // re-syncs it every 500 ms.
+                UpdateTemperatureDisplays();
 
                 // mBooster Effects card pedal trace: three series, fixed
                 // 0-100% scale (MaxValue set in XAML) — In=Brake, Out=Throttle,
@@ -294,30 +275,7 @@ namespace MozaPlugin
         {
             try
             {
-                bool has = _data.IsBaseConnected;
-                string unit = _data.UseFahrenheit ? "°F" : "°C";
-
-                // Convert each raw temp to the display unit, push onto the
-                // rolling buffer, and update the legend text. When the base is
-                // disconnected the legend reads "—" but the buffer still slides
-                // (zeros) so the graph trails off to baseline.
-                double mcu = has ? ConvertTemp(_data.McuTemp) : 0;
-                double mosfet = has ? ConvertTemp(_data.MosfetTemp) : 0;
-                double motor = has ? ConvertTemp(_data.MotorTemp) : 0;
-
-                PushTemperatureSample(_mcuTempSamples, mcu);
-                PushTemperatureSample(_mosfetTempSamples, mosfet);
-                PushTemperatureSample(_motorTempSamples, motor);
-
-                // Track session-peak per sensor (raw value, so unit-toggle works).
-                if (has)
-                {
-                    if (_data.McuTemp > _mcuTempMaxRaw) _mcuTempMaxRaw = _data.McuTemp;
-                    if (_data.MosfetTemp > _mosfetTempMaxRaw) _mosfetTempMaxRaw = _data.MosfetTemp;
-                    if (_data.MotorTemp > _motorTempMaxRaw) _motorTempMaxRaw = _data.MotorTemp;
-                }
-
-                RenderRankedTempLegend(mcu, mosfet, motor, has, unit);
+                UpdateTemperatureDisplays();
 
                 if (SteeringArcViz != null)
                 {
@@ -337,10 +295,41 @@ namespace MozaPlugin
             }
         }
 
-        private static void PushTemperatureSample(ObservableCollection<double> series, double value)
+        // Push the current legend readings + the background history window into
+        // the temp graph. Called every refresh tick and once at init (so the
+        // full window shows the instant the panel opens). The graph is fed fresh
+        // display-unit arrays each call so a °C/°F toggle reflows the whole
+        // window, not just samples taken after the toggle. Disconnected samples
+        // render as 0 (the graph's no-data sentinel, filtered from auto-scale).
+        private void UpdateTemperatureDisplays()
         {
-            series.Add(value);
-            while (series.Count > TemperatureSamples) series.RemoveAt(0);
+            bool has = _data.IsBaseConnected;
+            string unit = _data.UseFahrenheit ? "°F" : "°C";
+
+            double mcu = has ? ConvertTemp(_data.McuTemp) : 0;
+            double mosfet = has ? ConvertTemp(_data.MosfetTemp) : 0;
+            double motor = has ? ConvertTemp(_data.MotorTemp) : 0;
+
+            var hist = _plugin.TemperatureHistory?.Take();
+            if (hist != null && TemperatureGraphViz != null)
+            {
+                TemperatureGraphViz.McuSamples    = ToDisplayTemps(hist.Mcu, hist.Connected);
+                TemperatureGraphViz.MosfetSamples = ToDisplayTemps(hist.Mosfet, hist.Connected);
+                TemperatureGraphViz.MotorSamples  = ToDisplayTemps(hist.Motor, hist.Connected);
+            }
+
+            RenderRankedTempLegend(mcu, mosfet, motor, has, unit,
+                hist?.McuMaxRaw ?? -1, hist?.MosfetMaxRaw ?? -1, hist?.MotorMaxRaw ?? -1);
+        }
+
+        // Raw 100×°C history → display-unit doubles; disconnected samples become
+        // 0 so the graph drops them to baseline instead of drawing a stale line.
+        private double[] ToDisplayTemps(int[] raw, bool[] connected)
+        {
+            var outArr = new double[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+                outArr[i] = connected[i] ? ConvertTemp(raw[i]) : 0.0;
+            return outArr;
         }
 
         // Repopulate the 3 named temp-legend rows sorted top→bottom by current
@@ -348,7 +337,8 @@ namespace MozaPlugin
         // Motor=green — match their graph line). Each row shows: dot, name,
         // "{cur} {unit}", "max {peak} {unit}".
         private static readonly string[] _emptyDash = { "—" };
-        private void RenderRankedTempLegend(double mcu, double mosfet, double motor, bool has, string unit)
+        private void RenderRankedTempLegend(double mcu, double mosfet, double motor, bool has, string unit,
+            int mcuMaxRaw, int mosfetMaxRaw, int motorMaxRaw)
         {
             if (TempLegendRow1 == null) return; // legacy XAML — nothing to do
 
@@ -358,9 +348,9 @@ namespace MozaPlugin
 
             var entries = new[]
             {
-                (name: Strings.Brand_Mcu,    cur: mcu,    maxRaw: _mcuTempMaxRaw,    brush: red),
-                (name: Strings.Brand_Mosfet, cur: mosfet, maxRaw: _mosfetTempMaxRaw, brush: cyan),
-                (name: Strings.Brand_Motor,  cur: motor,  maxRaw: _motorTempMaxRaw,  brush: green),
+                (name: Strings.Brand_Mcu,    cur: mcu,    maxRaw: mcuMaxRaw,    brush: red),
+                (name: Strings.Brand_Mosfet, cur: mosfet, maxRaw: mosfetMaxRaw, brush: cyan),
+                (name: Strings.Brand_Motor,  cur: motor,  maxRaw: motorMaxRaw,  brush: green),
             };
             // OrderByDescending is stable — components with equal temps (e.g. all
             // zero when disconnected) keep declaration order so rows don't jitter.

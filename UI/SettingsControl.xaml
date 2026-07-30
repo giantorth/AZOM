@@ -2810,6 +2810,13 @@
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_ShifterPaddleSync}" Style="{StaticResource SliderLabel}"/>
                                         <ctrl:OffOnToggle x:Name="HgpPaddleSyncCheck" VerticalAlignment="Center" Click="HgpPaddleSyncCheck_Click"/>
                                     </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.Label_ShifterType}" Style="{StaticResource SliderLabel}"/>
+                                        <ComboBox x:Name="HgpTypeCombo" Width="170" VerticalAlignment="Center" SelectionChanged="HgpTypeCombo_Changed">
+                                            <ComboBoxItem Content="{x:Static res:Strings.Option_HPattern}"/>
+                                            <ComboBoxItem Content="{x:Static res:Strings.Option_Sequential}"/>
+                                        </ComboBox>
+                                    </StackPanel>
                                 </StackPanel>
                             </ctrl:SectionCard>
 
@@ -3031,6 +3038,32 @@
 
                         <!-- Truck-sim key mapping (visible only in truck-sim mode) -->
                         <StackPanel x:Name="StalksTruckSimPanel" Visibility="Collapsed">
+                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_StalksGameKeys}"
+                                              Icon="{StaticResource IconShift}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static res:Strings.Label_WiperForwardKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="0" Grid.Column="1" x:Name="StalksWiperFwdKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static res:Strings.Label_WiperBackKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="1" Grid.Column="1" x:Name="StalksWiperBackKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static res:Strings.Label_LightCycleKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="2" Grid.Column="1" x:Name="StalksLightCycleKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static res:Strings.Label_IndicatorLeftKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="3" Grid.Column="1" x:Name="StalksIndLeftKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{x:Static res:Strings.Label_IndicatorRightKey}" Style="{StaticResource SliderLabel}" Margin="0,4"/>
+                                    <ctrl:KeyCaptureBox Grid.Row="4" Grid.Column="1" x:Name="StalksIndRightKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
+                                </Grid>
+                            </ctrl:SectionCard>
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_StalksKeyMapping}"
                                               Subtitle="{x:Static res:Strings.Subtitle_StalksInteractiveMap}"
                                               Icon="{StaticResource IconShift}">
@@ -3048,6 +3081,7 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="72"/>
                                                         <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                                         <Ellipse Width="9" Height="9" Margin="0,0,6,0" VerticalAlignment="Center">
@@ -3068,6 +3102,9 @@
                                                     <ComboBox Grid.Column="1" Margin="4,1"
                                                               ItemsSource="{Binding Options}"
                                                               SelectedItem="{Binding Selected, Mode=TwoWay}"/>
+                                                    <ctrl:KeyCaptureBox Grid.Column="2" Width="120" Margin="4,1"
+                                                                        KeyCode="{Binding KeyCode, Mode=TwoWay}"
+                                                                        Visibility="{Binding ShowsKeyCapture, Converter={StaticResource BoolToVisibility}}"/>
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -3218,29 +3255,30 @@
                             </ctrl:SectionCard>
                         </Grid>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_SerialTrafficCapture}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_SerialTrafficCapture}"
-                                          Icon="{StaticResource IconDiag}">
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BugReport}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
-                                           Text="{x:Static res:Strings.Hint_CaptureDataInMemory}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Button x:Name="SerialCaptureToggleButton" Content="{x:Static res:Strings.Button_StartCapture}"
-                                            Click="SerialCaptureToggle_Click" MinWidth="120"/>
-                                    <TextBlock x:Name="SerialCaptureStatusText" Text="{x:Static res:Strings.Status_Idle}"
-                                               Style="{StaticResource MutedHintText}" Margin="14,0,0,0"/>
-                                </StackPanel>
-                                <ctrl:OffOnToggle x:Name="AlwaysCaptureOnStartupCheck"
-                                          Content="{x:Static res:Strings.Label_AlwaysCaptureOnStartup}"
-                                          Click="AlwaysCaptureOnStartup_Click"
-                                          Margin="0,0,0,10"
-                                          ToolTip="{x:Static res:Strings.Tooltip_AlwaysCaptureOnStartup}"/>
-                                <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportDescription}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="BugReportDescriptionBox" Style="{StaticResource LfeNameBox}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="2000"
+                                         MinHeight="80" MaxHeight="160"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"
+                                         ToolTip="{x:Static res:Strings.Placeholder_BugReportDescription}"/>
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
+                                <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
+                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
+                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
+                                            Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>
                                     <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
-                                            Click="SerialCaptureExport_Click" IsEnabled="False"/>
-                                    <Button x:Name="SerialCaptureCopyButton" Content="{x:Static res:Strings.Button_CopyCapture}"
-                                            Click="SerialCaptureCopy_Click"
-                                            Margin="8,0,0,0" IsEnabled="False"/>
+                                            Click="SerialCaptureExport_Click" Margin="8,0,0,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
+                                    <TextBlock x:Name="BugReportStatusText" Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
@@ -3521,10 +3559,8 @@
                                                Margin="0,0,10,0"/>
                                     <ComboBox x:Name="UpdateChannelCombo"
                                               MinWidth="160"
-                                              SelectionChanged="UpdateChannelCombo_SelectionChanged">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_ReleaseChannelStable}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_ReleaseChannelDev}"/>
-                                    </ComboBox>
+                                              SelectionChanged="UpdateChannelCombo_SelectionChanged"
+                                              DropDownOpened="UpdateChannelCombo_DropDownOpened"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button x:Name="UpdateCheckNowButton"
@@ -3541,7 +3577,7 @@
                         <!-- Bandwidth visualization was moved to the Base tab's live header
                              (next to the temperature graph) as a single dual-line sparkline. -->
 
-                        <!-- Serial Traffic Capture moved to the Options tab. -->
+                        <!-- Serial Traffic Capture + Report a problem moved to the Options tab. -->
 
                         <!-- ============ Full Diagnostic Report (expandable) ============ -->
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_FullDiagReport}"

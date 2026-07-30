@@ -442,6 +442,37 @@ namespace MozaPlugin.Telemetry.Watchdog
                 // catalog-bound display is not a restart-worthy failure: genuine
                 // non-establishment is the no-catalog check above, and genuine
                 // rejection is the wheel-CLOSE-storm backstop.
+                //
+                // EXCEPTION — the stale-session wedge (CS-Pro bundle 2026-07-21):
+                // catalog healthy on the tier-def session, but sess=0x02/0x09
+                // survived STALE from a prior host instance, so the wheel never
+                // emits ANY engagement record — no 0x09 device-init (ever), no
+                // configJson state, no slot report — while acking everything we
+                // send. None of the other triggers can fire (no wheel CLOSEs,
+                // END echoed fine), and the plugin sat Phase=Active/LastFailure=
+                // None for 10.5 min until a manual telemetry off/on. Distinguish
+                // it from the slow radar bind, which device-inits 0x09 within
+                // ~1 s and pushes its list (~40 s) INSIDE the s09 retry budget:
+                // here the wheel never device-inited 0x09 across the whole
+                // ~55 s budget, never pushed a live list, and never reported a
+                // slot. Restart = the empirically-proven off/on cycle (Stop →
+                // 11 s silence → fresh opens engaged in <2 s in that bundle);
+                // RecoveryDispatcher caps it and parks with the power-cycle hint.
+                bool s09BudgetSpent = _s09RetryRounds >= S09RetryMaxRounds;
+                bool wheelNeverDeviceInit09 = !_sender.WheelReadyObserved;
+                bool noLiveList =
+                    (_sender.ConfigJson?.LiveState?.ConfigJsonList?.Count ?? 0) == 0;
+                bool slotNeverReported = _sender.WheelReportedSlot < 0;
+                if (_sender.DisplayDetected
+                    && s09BudgetSpent && wheelNeverDeviceInit09
+                    && noLiveList && slotNeverReported)
+                {
+                    return (true,
+                        "catalog present but the display never engaged: no configJson state, " +
+                        $"sess=0x09 never device-initiated across {S09RetryMaxRounds} nudge rounds, " +
+                        "no live dashboard list, no slot report — stale-session wedge " +
+                        "(wheel session state survived from a prior host instance)");
+                }
                 return (false, "");
             }
 
@@ -705,7 +736,9 @@ namespace MozaPlugin.Telemetry.Watchdog
             // engagement verdict (see EvaluateEngagement Context B); engagement is
             // catalog + configJson establishment.
             bool engaged = catalog > 0 && state;
-            return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip})";
+            return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip} " +
+                   $"s09devinit={(_sender.WheelReadyObserved ? "yes" : "no")} " +
+                   $"s09rounds={_s09RetryRounds}/{S09RetryMaxRounds})";
         }
 
         // ───── Helpers ────────────────────────────────────────────────────

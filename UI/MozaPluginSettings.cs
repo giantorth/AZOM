@@ -213,10 +213,20 @@ namespace MozaPlugin
         public bool GearshiftVibrateOnNeutral { get; set; } = false;
         public int GearshiftDebounceMs { get; set; } = 500;
 
-        // Persistent: when true, MozaPlugin.Init starts the serial traffic capture
-        // automatically (catches early connect/handshake traffic the user can't normally
-        // arm in time). Stays on across launches until the user toggles it off.
+        // Diagnostic serial capture is always on (no user toggle): the
+        // dual-segment ring (SerialTrafficCapture) keeps the first ~60s of
+        // startup plus a rolling last-N-minutes window in RAM so a bug report
+        // always has the connect/handshake. See MozaPlugin.Init.
+        //
+        // Deprecated capture toggles — kept only so pre-existing settings JSON
+        // still deserializes; no longer read anywhere.
+        public bool DiagnosticCaptureEnabled { get; set; } = true;
         public bool AlwaysCaptureOnStartup { get; set; } = false;
+
+        // Client-side cooldown timestamp for the "Submit bug report" button —
+        // guards against accidental double-submits. Server enforces the real
+        // per-IP rate limits.
+        public DateTime LastBugReportUtc { get; set; }
 
         // Register a Control Mapper IVariantProvider so SimHub can key per-wheel
         // button mappings off (VID, PID, friendly-wheel-name) instead of treating
@@ -275,10 +285,20 @@ namespace MozaPlugin
         // UI/UpdateCheck/UpdateCheckService.cs for the wire details.
         public bool UpdateCheckEnabled { get; set; } = true;
 
-        // Release stream the checker follows. Stable = /releases/latest,
-        // Dev = /releases/tags/dev-latest. Persisted as int so JSON shape
-        // matches the existing enum convention.
+        // Legacy Stable/Dev enum, superseded by UpdateChannelId. Kept so an
+        // older build reading a newer settings blob still gets a valid value;
+        // always written as Stable (the dev channel no longer exists).
         public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
+
+        // Release stream the checker follows: "stable", or "pr/<N>" to track
+        // the newest per-commit build of an open pull request. Empty means
+        // not migrated yet — MozaPlugin.Init resolves it to "stable".
+        public string UpdateChannelId { get; set; } = "";
+
+        // Display label of the selected PR channel (e.g. "PR #42: Fix …") so
+        // the channel picker can render the selection before the release list
+        // has been fetched this session. Empty for the stable channel.
+        public string UpdateChannelLabel { get; set; } = "";
 
         // Version the user clicked "Skip this version" on — the banner stays
         // hidden as long as the latest published version still equals this

@@ -135,6 +135,16 @@ namespace MozaPlugin.Protocol
         public static bool IsStalksPid(string? pid)    => Categorize(pid) == MozaDeviceCategory.Stalks;
         public static bool IsStalksPid(ushort pid)     => Categorize(pid) == MozaDeviceCategory.Stalks;
 
+        /// <summary>All registered PIDs of one category, ascending (e.g. the wheelbase set for ShakeIt device detection).</summary>
+        public static IReadOnlyList<ushort> PidsForCategory(MozaDeviceCategory category)
+        {
+            var list = new List<ushort>();
+            foreach (var kv in Inventory)
+                if (kv.Value.Category == category) list.Add(kv.Key);
+            list.Sort();
+            return list;
+        }
+
         /// <summary>True iff the PID is registered in the inventory. Use this to gate "unknown PID" fallback paths.</summary>
         public static bool IsKnownMozaPid(string? pid)
         {

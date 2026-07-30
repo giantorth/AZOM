@@ -121,6 +121,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R Layout 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R Layout 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Sequenziell</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>H-Schaltung</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Schaltungstyp</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>GEFÜHL</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// mechanischer Charakter pro Achse</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Schaltwiderstand</value></data>
@@ -281,7 +283,6 @@
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Automatisch nach Updates suchen</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Release-Kanal</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stabil</value></data>
-  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Entwicklung</value></data>
   <data name="Button_CheckNow" xml:space="preserve"><value>Jetzt prüfen</value></data>
   <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Noch nie geprüft</value></data>
   <data name="Status_UpdateChecking" xml:space="preserve"><value>Wird geprüft…</value></data>
@@ -528,6 +529,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Schalten Sie die Dashboard-Telemetrie aus und wieder ein, um es erneut zu versuchen.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>SimHub neu starten</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>Neue Gerätedefinitionen wurden bereitgestellt. Starten Sie SimHub neu, um sie unter „Geräte“ hinzuzufügen.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Firmware-Update für das Lenkrad empfohlen</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} hat mit dem Legacy-Protokoll geantwortet, daher sind die Lenkrad-Funktionen in dieser Sitzung eingeschränkt. Aktualisieren Sie die Firmware von Lenkrad und Wheelbase in MOZA Pit House und starten Sie SimHub anschließend neu.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Das verbundene Lenkrad</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} in SimHub nicht hinzugefügt</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ein MOZA-Dashboard ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Diese Wheelbase hat einen Ambient-LED-Streifen, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}, um den Streifen anzusteuern.</value></data>
@@ -708,4 +712,46 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsfading (Experimentell)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Einsatztemperatur (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimentell — schreibt während der Aktivierung die echten Hardware-Kalibrierungen für Wegende und Max. Schwellenwert (mehr Pedalweg und mehr Kraft erforderlich) und stellt Ihre konfigurierten Werte wieder her, sobald die Bremsen abkühlen. Setzt voraus, dass diese bereits unter Pedalgefühl / Sim-Eingabezuordnung eingestellt sind — sonst ohne Wirkung.</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_StalksGameKeys" xml:space="preserve"><value>Spieltasten</value></data>
+  <data name="Label_WiperForwardKey" xml:space="preserve"><value>Wischer vorwärts</value></data>
+  <data name="Label_WiperBackKey" xml:space="preserve"><value>Wischer zurück</value></data>
+  <data name="Label_LightCycleKey" xml:space="preserve"><value>Lichtzyklus</value></data>
+  <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Blinker links</value></data>
+  <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Blinker rechts</value></data>
+  <data name="KeyCapture_Prompt" xml:space="preserve"><value>Taste drücken…</value></data>
+  <data name="KeyCapture_None" xml:space="preserve"><value>(nicht belegt)</value></data>
+  <data name="StalkKind_None" xml:space="preserve"><value>(keine)</value></data>
+  <data name="StalkKind_KeyTap" xml:space="preserve"><value>Tastendruck</value></data>
+  <data name="StalkKind_HeldKey" xml:space="preserve"><value>Taste halten</value></data>
+  <data name="StalkKind_LatchKey" xml:space="preserve"><value>Taste einrasten</value></data>
+  <data name="StalkKind_IndicatorLeft" xml:space="preserve"><value>Blinker: links</value></data>
+  <data name="StalkKind_IndicatorRight" xml:space="preserve"><value>Blinker: rechts</value></data>
+  <data name="StalkKind_IndicatorCancel" xml:space="preserve"><value>Blinker: aus</value></data>
+  <data name="StalkKind_WiperSwipe" xml:space="preserve"><value>Wischer: Einzelwischen</value></data>
+  <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Gehaltene Tasten loslassen</value></data>
+  <data name="StalkKind_WiperStage" xml:space="preserve"><value>Wischerstufe {0}</value></data>
+  <data name="StalkKind_LightStage" xml:space="preserve"><value>Lichtstufe {0}</value></data>
+  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
+  <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
 </root>

@@ -79,12 +79,15 @@ namespace MozaPlugin.Protocol
 
         // ── Wheelbase LFE lanes (absolute slots 41+) ─────────────────────────
         // Host-rendered wheelbase low-frequency effects (cmd 0x2D/0x77) on the
-        // BASE primary connection. Engine (continuous while driving) and ABS
-        // (while ABS active) can be live simultaneously, so they get separate
-        // latest-wins lanes and never coalesce into one another. Gearshift is a
-        // discrete burst → the paced one-shot FIFO, so it needs no lane.
-        BaseLfeEngine = 41,
-        BaseLfeAbs = 42,
+        // BASE primary connection. The base runs three identical concurrent
+        // oscillators (wire effect ids 1/2/0) and sums them; each needs its own
+        // latest-wins lane so all three can stream at once without coalescing.
+        // The plugin's own LFE mode drives ids 1/2 continuously (engine/ABS) and
+        // id 0 as a one-shot gearshift burst on the FIFO; the ShakeIt haptics
+        // device drives all three as continuous tones, so id 0 gets Osc0 here.
+        BaseLfeEngine = 41,   // wire id 1
+        BaseLfeAbs = 42,      // wire id 2
+        BaseLfeOsc0 = 43,     // wire id 0 (continuous-tone lane; ShakeIt only)
     }
 
     /// <summary>Device family targeted by the serial probe fallback (registry-empty case).</summary>
@@ -132,12 +135,13 @@ namespace MozaPlugin.Protocol
         //   29..40 — LED lanes (CM2 dash RPM colours + bitmask + flag colours). Wheel
         //            live LED writes are NOT here — they stay on the paced one-shot
         //            FIFO (the rim drops unpaced bursts). See the LED StreamKind members.
-        //   41..42 — wheelbase LFE lanes (engine + ABS host-rendered effect streams).
+        //   41..43 — wheelbase LFE lanes (the three summed host-rendered oscillator
+        //            streams: engine id1, ABS id2, Osc0 id0).
         // A CM2 on its own USB connection runs at base 0 on THAT connection, so the
         // second block is only used when two pipelines share one connection.
         // NOTE: keep this >= (highest StreamKind + 1). The static ctor below
         // asserts the regions are disjoint and fit.
-        private const int StreamSlotCount = 43;
+        private const int StreamSlotCount = 44;
 
         // Startup slot-layout invariant: the LED lanes (29+) must not alias the
         // wheel value pipeline (0..10), AB9/mBooster (11..17), or the CM2 second
@@ -153,7 +157,7 @@ namespace MozaPlugin.Protocol
                 "LED stream slots must start after the CM2 value pipeline (18..28)");
             System.Diagnostics.Debug.Assert(ledLast < StreamSlotCount,
                 "StreamSlotCount too small for the LED stream slots");
-            const int lfeLast = (int)StreamKind.BaseLfeAbs;      // 42 (highest slot overall)
+            const int lfeLast = (int)StreamKind.BaseLfeOsc0;     // 43 (highest slot overall)
             System.Diagnostics.Debug.Assert(lfeLast > ledLast,
                 "wheelbase LFE stream slots must start after the LED lanes");
             System.Diagnostics.Debug.Assert(lfeLast < StreamSlotCount,

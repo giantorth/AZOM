@@ -20,6 +20,7 @@ using SimHub.Plugins.OutputPlugins.EditorControls;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
+using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
 
 namespace MozaPlugin
 {
@@ -75,15 +76,6 @@ namespace MozaPlugin
                 // in RefreshBaseTab for why the constructor copy was removed.
                 DisableSerialProbeFallbackCheck.IsChecked = plugin.Settings.DisableSerialProbeFallback;
                 DisableAb9DetectionCheck.IsChecked = plugin.Settings.DisableAb9Detection;
-                AlwaysCaptureOnStartupCheck.IsChecked = plugin.Settings.AlwaysCaptureOnStartup;
-                // Reflect any in-flight capture (auto-started by MozaPlugin.Init when
-                // AlwaysCaptureOnStartup is on) so the user sees Stop instead of a stale
-                // Start button when they open the Diagnostics tab.
-                if (SerialTrafficCapture.Instance.Enabled)
-                {
-                    SerialCaptureToggleButton.Content = "Stop capture";
-                    SerialCaptureStatusText.Text = Strings.Status_CapturingClickStop;
-                }
             }
 
             InitProfilesTab();
@@ -425,7 +417,9 @@ namespace MozaPlugin
             // The classic gearshift card stays visible on all firmware (its bump
             // command coexists with the LFE channels); the LFE card is shown
             // additionally, full-width below, only on LFE-capable firmware.
-            bool lfeSupported = _data.BaseSupportsLfe;
+            // Hide the LFE tab while the ShakeIt haptics device is deployed — that
+            // device owns the LFE output, so the two must not both edit the base.
+            bool lfeSupported = _data.BaseSupportsLfe && _plugin?.IsShakeItLfeDeviceDeployed != true;
             BaseLfeTab.Visibility = lfeSupported
                 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             if (lfeSupported)
@@ -2250,7 +2244,7 @@ namespace MozaPlugin
             sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState));
             sb.AppendLine();
             sb.AppendLine("=== Display sub-device identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data));
@@ -2281,58 +2275,13 @@ namespace MozaPlugin
             return sb.ToString();
         }
 
-        // ── Serial traffic capture ───────────────────────────────────────
-        // Last buffer rendered to text on Stop. Held so Export and Copy
-        // operate on the same snapshot regardless of how long the user
-        // takes to click them; cleared on next Start.
-        private string? _serialCaptureRendered;
-        private System.Collections.Generic.IReadOnlyList<SerialTrafficCapture.Entry>? _serialCaptureSnapshot;
-
-        private void SerialCaptureToggle_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            var cap = SerialTrafficCapture.Instance;
-            if (!cap.Enabled)
-            {
-                cap.Start();
-                _serialCaptureRendered = null;
-                _serialCaptureSnapshot = null;
-                SerialCaptureToggleButton.Content = "Stop capture";
-                SerialCaptureExportButton.IsEnabled = false;
-                SerialCaptureCopyButton.IsEnabled = false;
-                SerialCaptureStatusText.Text = Strings.Status_CapturingOpenTab;
-                return;
-            }
-
-            var snap = cap.Stop();
-            _serialCaptureSnapshot = snap;
-            _serialCaptureRendered = SerialTrafficCapture.Format(snap);
-            SerialCaptureToggleButton.Content = "Start capture";
-            SerialCaptureStatusText.Text = string.Format(Strings.Status_CaptureStopped, snap.Count);
-            SerialCaptureExportButton.IsEnabled = true;
-            SerialCaptureCopyButton.IsEnabled = snap.Count > 0;
-        }
-
-        private void SerialCaptureCopy_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(_serialCaptureRendered)) return;
-            try { System.Windows.Clipboard.SetText(_serialCaptureRendered); }
-            catch { /* clipboard contested; ignore */ }
-        }
-
-        private void AlwaysCaptureOnStartup_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            _plugin.Settings.AlwaysCaptureOnStartup = AlwaysCaptureOnStartupCheck.IsChecked == true;
-            _plugin.SaveSettings();
-        }
+        // ── Diagnostics bundle export ────────────────────────────────────
+        // Capture is always-on (dual-segment ring in SerialTrafficCapture). The
+        // "Export bundle" button (in the Report-a-problem card) saves the same
+        // bundle locally; BuildBundleContent lives in SettingsControl.BugReport.cs.
 
         private void SerialCaptureExport_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            // Refuse export while capture is still running — user request: only
-            // surface data after Stop. The button is disabled in that state too,
-            // but guard here in case of a race.
-            if (SerialTrafficCapture.Instance.Enabled) return;
-
             var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
             var modelSlug = DiagnosticsBundleWriter.BuildWheelModelFilenameSlug(_data?.WheelModelName);
             var prefix = string.IsNullOrEmpty(modelSlug) ? "" : modelSlug + "-";
@@ -2348,9 +2297,8 @@ namespace MozaPlugin
 
             try
             {
-                var captureText = _serialCaptureRendered ?? "(no capture buffer — click Start, exercise the device, then Stop)\n";
-                DiagnosticsBundleWriter.Write(dlg.FileName, BuildDiagnosticsDump(), captureText, _serialCaptureSnapshot);
-                SerialCaptureStatusText.Text = string.Format(Strings.Status_ExportedTo, dlg.FileName);
+                DiagnosticsBundleWriter.Write(dlg.FileName, BuildBundleContent(reportText: null));
+                BugReportStatusText.Text = string.Format(Strings.Status_ExportedTo, dlg.FileName);
             }
             catch (Exception ex)
             {

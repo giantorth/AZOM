@@ -198,12 +198,14 @@ namespace MozaPlugin.Devices
             "handbrake-y1", "handbrake-y2", "handbrake-y3", "handbrake-y4", "handbrake-y5",
         };
 
-        // Shifter settings read on the base/hub-relayed path (where HGP-vs-SGP is not
-        // known from a PID, so the LED reads are issued too — an SGP answers and
-        // populates its LEDs, an HGP's LED reads simply sunset). The standalone-USB
-        // lane instead reads a per-model list via StandalonePeripheralDescriptor so a
-        // standalone HGP never issues LED reads at all.
-        internal static readonly string[] ShifterSettingsReadCommands = new[]
+        // Per-model settings read once a relayed shifter's model is resolved (the
+        // standalone lane reads its own per-model list via StandalonePeripheralDescriptor).
+        // The SGP list adds its LED commands; the HGP has none.
+        internal static readonly string[] HgpSettingsReadCommands = new[]
+        {
+            "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode", "shifter-apply-mode",
+        };
+        internal static readonly string[] SgpSettingsReadCommands = new[]
         {
             "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode", "shifter-apply-mode",
             "shifter-brightness", "shifter-colors",
@@ -329,46 +331,65 @@ namespace MozaPlugin.Devices
         /// The standalone-USB lane passes <c>issueReads:false</c> and issues its own
         /// per-model read list (incl. SGP LED commands) from the controller — this
         /// path's list is the common non-LED subset used on a base/hub-relayed pipe.</summary>
-        public void MarkShifterDetected(bool issueReads = true)
+        // HGP and SGP are independent devices — each has its own flag + owner so both
+        // can be attached at once (each on its own USB port). Owner first, then flag
+        // (see MarkHandbrakeDetected). issueReads: relay resolution calls with true so
+        // the resolved model's settings populate; the standalone lane latches at connect
+        // with false and issues its own per-model read list from the controller.
+        public void MarkHgpDetected(bool issueReads = true)
         {
-            if (_detectionState.ShifterDetected) return;
-            // Owner first, then flag (see MarkHandbrakeDetected).
-            _detectionState.ShifterOwner = _deviceManager;
-            _detectionState.ShifterDetected = true;
-            _plugin.ApplyShifterToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-            if (issueReads)
-            {
-                _deviceManager.ReadSettings(ShifterSettingsReadCommands);
-                // Relayed lane: the PID isn't visible, so the model is still Unknown
-                // here. The SGP self-reveals via its LED read (brightness is in the
-                // list above); probe the generic device-type identity so the HGP
-                // resolves from a positive answer too — never a timeout. The
-                // standalone lane already set the model from the PID → skip.
-                if (_detectionState.ShifterModel == ShifterModelKind.Unknown)
-                    _deviceManager.ReadSetting("shifter-device-type");
-            }
-            MozaLog.Info($"[AZOM] Shifter detected (model: {_detectionState.ShifterModel})");
+            if (_detectionState.HgpDetected) return;
+            _detectionState.HgpOwner = _deviceManager;
+            _detectionState.HgpDetected = true;
+            _plugin.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            if (issueReads) _deviceManager.ReadSettings(HgpSettingsReadCommands);
+            MozaLog.Info("[AZOM] HGP shifter detected");
+        }
+
+        public void MarkSgpDetected(bool issueReads = true)
+        {
+            if (_detectionState.SgpDetected) return;
+            _detectionState.SgpOwner = _deviceManager;
+            _detectionState.SgpDetected = true;
+            _plugin.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
+            MozaLog.Info("[AZOM] SGP shifter detected");
+        }
+
+        /// <summary>A base/hub-relayed shifter (single 0x1A bus, no PID) can't be told
+        /// apart at first sight, so probe the two model resolvers: the SGP answers a
+        /// brightness read; the HGP answers the generic device-type identity. Both are
+        /// positive signals — no timeout. No-op once THIS pipe's model is latched — a
+        /// shifter detected elsewhere (e.g. a standalone-USB HGP) says nothing about
+        /// what's behind this base/hub and must not suppress the probe.</summary>
+        public void ProbeRelayedShifter()
+        {
+            if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
+            _deviceManager.ReadSetting("shifter-brightness");
+            _deviceManager.ReadSetting("shifter-device-type");
         }
 
         // The HGP's grp-0x04 device-type reply, awaiting one hardware measurement:
         // read the "Shifter device-type reply = [...]" log line off a base/hub-relayed
         // HGP and set this. null = relayed HGP stays unresolved (its tab hidden) rather
-        // than guess. The standalone lane and the relayed SGP don't need it.
-        private static readonly byte[]? ShifterHgpDeviceType = null;
+        // than guess. The standalone lane (PID) and the relayed SGP (brightness) don't
+        // need it.
+        private static readonly byte[]? HgpDeviceType = null;
 
         /// <summary>Resolve a base/hub-relayed shifter's model from the generic
         /// device-type identity reply. Logs the raw reply so a support bundle reveals
         /// the HGP/SGP discriminator, then latches HGP on a positive match. A prior
-        /// brightness answer already positively identifies an SGP, so never overrides it.</summary>
+        /// brightness answer already positively identifies THIS pipe's SGP, so never
+        /// overrides it (an SGP on another pipe doesn't block resolution here).</summary>
         private void ResolveRelayedShifterModelFromDeviceType()
         {
-            var dt = _data.ShifterDeviceType;
+            var dt = _data.RelayShifterDeviceType;
             if (dt == null || dt.Length == 0) return;
             MozaLog.Info($"[AZOM] Shifter device-type reply = [{System.BitConverter.ToString(dt)}] " +
                 "(HGP/SGP identity discriminator; relayed lane)");
-            if (_detectionState.ShifterModel == ShifterModelKind.Sgp) return;
-            if (ShifterHgpDeviceType != null && BytesEqual(dt, ShifterHgpDeviceType))
-                _detectionState.ShifterModel = ShifterModelKind.Hgp;
+            if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
+            if (HgpDeviceType != null && BytesEqual(dt, HgpDeviceType))
+                MarkHgpDetected();
         }
 
         private static bool BytesEqual(byte[] a, byte[] b)
@@ -377,6 +398,30 @@ namespace MozaPlugin.Devices
             for (int i = 0; i < a.Length; i++)
                 if (a[i] != b[i]) return false;
             return true;
+        }
+
+        /// <summary>
+        /// Validates a firmware model-name string per
+        /// docs/how-to-query-device-type.md §5 ("Device-name validation"): reject
+        /// empty names, non-printable bytes, and the known non-device replies
+        /// (OK / BUSY / ERROR / ERR). Gates model-name-driven detection and model
+        /// resolution so a stray status reply can't be mistaken for a wheel.
+        /// </summary>
+        private static bool IsValidWheelModelName(string? name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            foreach (char c in name!)
+                if (c < 0x20 || c > 0x7E) return false;
+            switch (name.ToUpperInvariant())
+            {
+                case "OK":
+                case "BUSY":
+                case "ERROR":
+                case "ERR":
+                    return false;
+                default:
+                    return true;
+            }
         }
 
         /// <summary>
@@ -583,6 +628,32 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "wheel-model-name":
+                    // A valid model-name reply (the doc's canonical group-0x07
+                    // probe, ProbeWheelDetection) can itself trigger new-protocol
+                    // detection — this covers a wheel that answers the identity
+                    // group but not the telemetry-mode / rpm-value1 groups the
+                    // normal detection cascade keys off. Gated to the new-protocol
+                    // wheel ids (0x17, 0x15); the base (0x13) resolves as
+                    // base-model-name and ES (0x18) as es-wheel-model-name, so
+                    // neither reaches this case. Mirrors the wheel-telemetry-mode
+                    // bring-up minus the model-name read (already in hand).
+                    if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected
+                        && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
+                        && IsValidWheelModelName(_data.WheelModelName))
+                    {
+                        _detectionState.NewWheelDetected = true;
+                        _plugin.NoteWheelDetected();
+                        _deviceManager.LockWheelId(deviceId);
+                        _deviceManager.ReadSetting("wheel-sw-version");
+                        _deviceManager.ReadSetting("wheel-hw-version");
+                        _deviceManager.ReadSetting("wheel-serial-a");
+                        _deviceManager.ReadSetting("wheel-serial-b");
+                        _deviceManager.SendPithouseIdentityProbe(deviceId);
+                        _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
+                        MozaLog.Info($"[AZOM] New-protocol wheel detected via model-name probe on ID {deviceId}");
+                        // Fall through to the resolution block below.
+                    }
+
                     // New-protocol (0x17) wheels resolve here. ES wheels are
                     // handled in the es-wheel-model-name case (their real model
                     // comes from module id 0x18; the locked-id read on ES returns
@@ -590,7 +661,7 @@ namespace MozaPlugin.Devices
                     if (_detectionState.NewWheelDetected)
                     {
                         var currentModel = _data.WheelModelName;
-                        if (string.IsNullOrEmpty(currentModel))
+                        if (!IsValidWheelModelName(currentModel))
                             break;
 
                         if (DetectWheelModelHotSwap(currentModel))
@@ -678,6 +749,21 @@ namespace MozaPlugin.Devices
                     else
                     {
                         MozaLog.Debug($"[AZOM] Wheel model (mis-routed locked-id read): {_data.WheelModelName}");
+                        // A valid model name from a new-protocol-only id while the
+                        // session is classified old-protocol names the wheel behind
+                        // the firmware advisory (real ES wheels reply here from the
+                        // base id 0x13 with the base/motor name, so they never match).
+                        if (_detectionState.OldWheelDetected
+                            && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
+                            && IsValidWheelModelName(_data.WheelModelName)
+                            && !string.Equals(_detectionState.NewWheelActingOldModel, _data.WheelModelName, StringComparison.Ordinal))
+                        {
+                            _detectionState.NewWheelActingOldModel = _data.WheelModelName;
+                            _detectionState.NewWheelActingOldProtocol = true;
+                            MozaLog.Info(
+                                $"[AZOM] {_data.WheelModelName} is a new-protocol wheel but answered like an " +
+                                "old-protocol one — firmware update recommended");
+                        }
                     }
                     break;
 
@@ -691,7 +777,7 @@ namespace MozaPlugin.Devices
                         // definition so the ES wheel gets a proper per-wheel page
                         // identity instead of only the generic old-proto device.
                         var esModel = _data.WheelModelName;
-                        if (string.IsNullOrEmpty(esModel))
+                        if (!IsValidWheelModelName(esModel))
                             break;
                         if (DetectWheelModelHotSwap(esModel))
                             break;
@@ -876,6 +962,19 @@ namespace MozaPlugin.Devices
                         // never resolves a model gets no definition — the generic
                         // old-proto fallback was retired (no such wheel reaches it).
                         MozaLog.Info($"[AZOM] Old-protocol wheel detected on ID {deviceId}");
+                        // 0x17/0x15 are new-protocol-only ids — a wheel answering the
+                        // settings group there but classifying old-protocol is a
+                        // current-generation wheel on legacy firmware (seen on W13/FSR
+                        // V2: no telemetry-mode reply, rpm-value1 answers). Surface the
+                        // firmware-update banner; the model name enriches it once the
+                        // wheel-model-name read below answers.
+                        if (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
+                        {
+                            _detectionState.NewWheelActingOldProtocol = true;
+                            MozaLog.Info(
+                                $"[AZOM] Wheel on new-protocol ID {deviceId} classified old-protocol — " +
+                                "firmware update recommended");
+                        }
                         _plugin.StartTelemetryIfReady();
                     }
                     else if (deviceId != _deviceManager.WheelDeviceId)
@@ -894,18 +993,26 @@ namespace MozaPlugin.Devices
                     MarkPedalsDetected();
                     break;
 
-                // First shifter response on a base/hub-relayed pipe. On the
-                // standalone-USB lane the controller already latched detection at
-                // connect (this early-returns) and issued its own read list.
+                // First evidence of a base/hub-relayed shifter — probe the model
+                // resolvers. No-op on the standalone lane (already latched by PID).
                 case "shifter-direction":
-                    MarkShifterDetected();
+                    ProbeRelayedShifter();
+                    break;
+
+                // shifter-type (grp 0x51 cmd 0x02). Logged on every connect-time read:
+                // the {0,1} → {H-pattern, sequential} polarity is unconfirmed on real
+                // hardware, so support bundles from healthy and affected shifters are
+                // how it gets pinned down (v1.5.1 flipped some HGPs via this setting).
+                case "shifter-apply-mode":
+                    MozaLog.Info($"[AZOM] Shifter-type (apply-mode) = {value} " +
+                        $"({_detectionState.ShifterModelForOwner(_deviceManager)} lane, dev {deviceId})");
                     break;
 
                 // Only the SGP answers a brightness read — a positive SGP identification
                 // on a relayed pipe (the standalone lane knows this from the PID instead).
                 case "shifter-brightness":
-                    _detectionState.ShifterHasLeds = true;
-                    _detectionState.ShifterModel = ShifterModelKind.Sgp;
+                    MarkSgpDetected();
+                    _data.UpdateShifter(ShifterModelKind.Sgp, "shifter-brightness", value);
                     break;
 
                 // Generic device-type identity reply from a relayed shifter — the

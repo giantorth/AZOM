@@ -112,6 +112,15 @@ namespace MozaPlugin.Protocol
             if (deviceHint == null && deviceId == MozaProtocol.DeviceEsWheel)
                 deviceHint = "es-wheel";
 
+            // dev 0x15 / 0x17 (DeviceWheel) → "wheel" so the wheel's identity
+            // probes (groups 2/4/5/6/7/8/9/15/17) resolve deterministically
+            // against the wheel-* bucket instead of by command-registration order.
+            // docs/how-to-query-device-type.md treats 0x15/0x17/0x18 as the three
+            // wheel-identity device ids; 0x18 maps to es-wheel just above.
+            if (deviceHint == null
+                && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15))
+                deviceHint = "wheel";
+
             // dev 0x1A → "shifter" so a base/hub-relayed shifter's identity probes
             // (esp. the group-0x04 device-type reply, which shares its response group
             // with wheel-*/es-wheel-*) resolve against the shifter-* bucket instead of

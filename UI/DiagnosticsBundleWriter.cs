@@ -8,9 +8,23 @@ using MozaPlugin.Diagnostics;
 
 namespace MozaPlugin.UI
 {
-    /// <summary>Writes a diagnostics bundle ZIP via tmp-rename (atomic — no partial files).</summary>
+    /// <summary>Writes a diagnostics bundle ZIP — to disk (atomic tmp-rename) or to a byte[] for upload.</summary>
     internal static class DiagnosticsBundleWriter
     {
+        /// <summary>Everything that goes into a bundle. Capture text is already redacted by the caller.</summary>
+        internal sealed class BundleContent
+        {
+            public string DiagnosticsDumpText = string.Empty;
+            public string StartupCaptureText = string.Empty;
+            public string RollingCaptureText = string.Empty;
+            public IReadOnlyList<SerialTrafficCapture.Entry>? StartupSnapshot;
+            public IReadOnlyList<SerialTrafficCapture.Entry>? RollingSnapshot;
+            // Serialized MozaPluginSettings JSON (may be null if unavailable).
+            public string? SettingsJson;
+            // Populated only on the bug-report submit path; null for a local export.
+            public string? ReportText;
+        }
+
         /// <summary>
         /// Build a filesystem-safe slug from a wheel's firmware model name for
         /// use as a filename prefix on diagnostics bundles. Returns "" when no
@@ -34,13 +48,37 @@ namespace MozaPlugin.UI
 
         /// <summary>
         /// Write the bundle to <paramref name="zipPath"/>. Atomic via sibling
-        /// .tmp file + rename. Caller supplies the already-rendered text bodies.
+        /// .tmp file + rename so a mid-write failure never leaves a partial zip
+        /// at the user-visible path.
         /// </summary>
-        public static void Write(
-            string zipPath,
-            string diagnosticsDumpText,
-            string serialCaptureText,
-            IReadOnlyList<SerialTrafficCapture.Entry>? captureSnapshot)
+        public static void Write(string zipPath, BundleContent content)
+        {
+            string tmpPath = zipPath + ".tmp";
+            try
+            {
+                using (var fs = new FileStream(tmpPath, FileMode.Create, FileAccess.Write))
+                    WriteZip(fs, content);
+                if (File.Exists(zipPath)) File.Delete(zipPath);
+                File.Move(tmpPath, zipPath);
+            }
+            catch
+            {
+                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+                throw;
+            }
+        }
+
+        /// <summary>Build the bundle entirely in memory (for upload — no temp file, no disk churn).</summary>
+        public static byte[] BuildBundleBytes(BundleContent content)
+        {
+            using (var ms = new MemoryStream())
+            {
+                WriteZip(ms, content);
+                return ms.ToArray();
+            }
+        }
+
+        private static void WriteZip(Stream dest, BundleContent content)
         {
             // [AZOM] log lines come from MozaLog's in-process ring buffer — every
             // plugin call site goes through that wrapper, so the snapshot is
@@ -48,7 +86,6 @@ namespace MozaPlugin.UI
             string logText = MozaLog.Snapshot();
             int logEntryCount = MozaLog.Count;
 
-            // Header — quick idea of what's in the bundle and when it was made.
             var manifest = new StringBuilder();
             manifest.AppendLine("AZOM diagnostics bundle");
             manifest.AppendLine($"Created (local):     {DateTime.Now:yyyy-MM-dd HH:mm:ss zzz}");
@@ -57,41 +94,36 @@ namespace MozaPlugin.UI
             manifest.AppendLine($"CLR:                 {Environment.Version}");
             manifest.AppendLine();
             manifest.AppendLine("Files:");
-            manifest.AppendLine("  serial-capture.txt   – TX/RX frames captured between Start/Stop (timestamps in local time)");
-            manifest.AppendLine("  diagnostics.txt      – snapshot of the Diagnostics tab text");
-            manifest.AppendLine($"  moza-log.txt         – [AZOM] log lines from MozaLog ring buffer ({logEntryCount} entries)");
+            if (content.ReportText != null)
+                manifest.AppendLine("  report.txt               – user's problem description + contact");
+            manifest.AppendLine("  serial-capture-startup.txt – first ~60s of traffic (connect/handshake), frozen");
+            manifest.AppendLine("  serial-capture-rolling.txt – rolling last-N-minutes of traffic");
+            manifest.AppendLine("  diagnostics.txt          – snapshot of the Diagnostics tab text");
+            if (!string.IsNullOrEmpty(content.SettingsJson))
+                manifest.AppendLine("  plugin-settings.json     – serialized MozaPluginSettings");
+            manifest.AppendLine($"  moza-log.txt             – [AZOM] log lines from MozaLog ring buffer ({logEntryCount} entries)");
+            manifest.AppendLine();
+            manifest.AppendLine("Hardware identifiers (serial numbers, MCU UIDs) are masked as .. in the capture files.");
             manifest.AppendLine();
             manifest.AppendLine("Capture summary:");
-            if (captureSnapshot != null)
-            {
-                manifest.AppendLine($"  Started (UTC):     {SerialTrafficCapture.Instance.StartedAtUtc:yyyy-MM-dd HH:mm:ss}");
-                manifest.AppendLine($"  Frames:            {captureSnapshot.Count}");
-            }
-            else
-            {
-                manifest.AppendLine("  (no capture buffer was active when this bundle was produced)");
-            }
+            var startedUtc = SerialTrafficCapture.Instance.StartedAtUtc;
+            manifest.AppendLine(startedUtc == default
+                ? "  Started:           (capture clock not started)"
+                : $"  Started (UTC):     {startedUtc:yyyy-MM-dd HH:mm:ss}");
+            manifest.AppendLine($"  Startup frames:    {content.StartupSnapshot?.Count ?? 0}");
+            manifest.AppendLine($"  Rolling frames:    {content.RollingSnapshot?.Count ?? 0}");
 
-            // Tmp-rename so a mid-write failure doesn't leave a partial zip
-            // at the user-visible path.
-            string tmpPath = zipPath + ".tmp";
-            try
+            using (var zip = new ZipArchive(dest, ZipArchiveMode.Create, leaveOpen: true))
             {
-                using (var fs = new FileStream(tmpPath, FileMode.Create, FileAccess.Write))
-                using (var zip = new ZipArchive(fs, ZipArchiveMode.Create))
-                {
-                    WriteEntry(zip, "manifest.txt", manifest.ToString());
-                    WriteEntry(zip, "serial-capture.txt", serialCaptureText);
-                    WriteEntry(zip, "diagnostics.txt", diagnosticsDumpText);
-                    WriteEntry(zip, "moza-log.txt", logText);
-                }
-                if (File.Exists(zipPath)) File.Delete(zipPath);
-                File.Move(tmpPath, zipPath);
-            }
-            catch
-            {
-                try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
-                throw;
+                WriteEntry(zip, "manifest.txt", manifest.ToString());
+                if (content.ReportText != null)
+                    WriteEntry(zip, "report.txt", content.ReportText);
+                WriteEntry(zip, "serial-capture-startup.txt", content.StartupCaptureText);
+                WriteEntry(zip, "serial-capture-rolling.txt", content.RollingCaptureText);
+                WriteEntry(zip, "diagnostics.txt", content.DiagnosticsDumpText);
+                if (content.SettingsJson is string settingsJson && settingsJson.Length != 0)
+                    WriteEntry(zip, "plugin-settings.json", settingsJson);
+                WriteEntry(zip, "moza-log.txt", logText);
             }
         }
 

@@ -164,9 +164,14 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Known wheel models, ordered longest prefix first for correct disambiguation.
-        /// Model names are 16-byte null-padded ASCII strings from the wheel firmware
-        /// (group 0x07, command 0x01). Examples: "GS V2P", "CS V2.1", "VGS".
-        /// FriendlyName is used for the SimHub device profile display name.
+        /// Model names are 16-byte null-padded ASCII strings from the wheel firmware,
+        /// read via the model-name query (group 0x07, command 0x01) documented in
+        /// docs/how-to-query-device-type.md — the wheel replies with a 22-byte frame
+        /// whose bytes 6..21 are the ASCII identifier. Examples: "GS V2P", "CS V2.1",
+        /// "VGS". FriendlyName is used for the SimHub device profile display name.
+        /// Matching is StartsWith(prefix, OrdinalIgnoreCase), longest-first, so a
+        /// firmware string carrying a trailing suffix still resolves to its
+        /// registered prefix.
         /// </summary>
         internal static readonly (string Prefix, string FriendlyName, WheelModelInfo Info)[] KnownModels =
         {
@@ -190,6 +195,15 @@ namespace MozaPlugin.Devices
             // 0 RPM LEDs + 16 dimming-only backlit buttons (no per-button RGB — the
             // wheel ignores the colour bytes, like ES).
             ("W11",     "Lamborghini Revuelto", new WheelModelInfo(0, 16, false, null, 0, hasDisplay: false)),
+            // MOZA × Porsche Mission R (firmware "W05"): display wheel, 4 backlit
+            // buttons, no RPM LEDs (per user). Buttons are dimming-only backlit
+            // (like the Revuelto/ES, no per-button RGB).
+            ("W05",     "× Porsche Mission R", new WheelModelInfo(0, 4, false, null, 0, hasDisplay: true)),
+            // ESSENZA SCV12 (firmware "W06"): display wheel, 10 RPM LEDs in a
+            // 1/8/1 brow arrangement (1-LED brow each side, 8 in the middle —
+            // the same scheme as the 3/10/3 wheels, smaller), no button LEDs.
+            // Per user.
+            ("W06",     "ESSENZA SCV12", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: true, browSegmentSize: 1)),
             ("W13",     "FSR V2",     new WheelModelInfo(16, 10, false, null, 0, hasDisplay: true,  browSegmentSize: 3)),  // firmware reports "W13" for FSR V2
             // FSR V1 display wheel (box name "FSR1"): firmware reports model-name
             // "FSR", hw "RS21-D03-HW FW-C", sw "RS21-D03-MC FW". A DISTINCT, older
@@ -213,6 +227,19 @@ namespace MozaPlugin.Devices
             // per user. RPM/button counts should be confirmed against a real RS V2
             // and tightened in a follow-up.
             ("RS V2",   "RS V2",      new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
+            // RS round / D-shape family (docs/how-to-query-device-type.md). Added
+            // with CONSERVATIVE defaults per user: 10 RGB RPM LEDs, screenless
+            // (hasDisplay:false), sleep-light off (safe for an unmeasured rim), no
+            // button LEDs claimed. Button-LED count and whether these are old- or
+            // new-protocol are UNCONFIRMED — no capture or hardware read yet. Tighten
+            // RpmLedCount/ButtonLedCount, and add usesLegacyRpmTelemetry, once a real
+            // rim is measured. No thumbnail art embedded yet. Distinct FriendlyNames
+            // keep each as its own device; none is a StartsWith-prefix of another or
+            // of "RS V2" / "RSX", so ordering among them is free.
+            ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             // Original CS (predecessor to CS V2 / CS V2.1) — firmware reports the
             // bare prefix "CS" with no version suffix. 10 RGB RPM LEDs, no button
             // / flag / knob LEDs, no display. Must come after "CS V2.1" so the
@@ -221,12 +248,18 @@ namespace MozaPlugin.Devices
             // this wheel triggers a Table 8 read-fail storm in its firmware that
             // makes it intermittently unresponsive.
             ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, usesLegacyRpmTelemetry: true)),
-            // ESX — variant of the ES entry wheel; same old-protocol topology
-            // (wheelbase module at internal id 0x18, firmware model-name "ESX") and
-            // the same capabilities as the ES. Listed BEFORE "ES" so the longer
-            // prefix matches first (else an ESX wheel would resolve to the ES entry
-            // via StartsWith). GUID is UUID-v5 auto-generated; art is ESX.png.
-            ("ESX",     "ESX",        new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            // ESX wheel — the entry rim's ESX variant; same old-protocol topology
+            // (wheelbase module at internal id 0x18) and the same capabilities as
+            // the ES. Per docs/how-to-query-device-type.md the firmware reports
+            // "RSX" — "ESX" is NOT a real identifier — so the PREFIX is "RSX" while
+            // the FriendlyName stays "ESX" (device "MOZA ESX", art keyed to
+            // Thumbnails/RSX.png = the ESX image). "RSX" does not start with "ES",
+            // so it can never collide with the ES entry below. The doc's other ESX
+            // strings ("ES UART", "ESX UART") only appear over a direct-UART link
+            // the plugin doesn't use; over the wheelbase they'd resolve to the "ES"
+            // entry (identical 10-RPM / screenless layout). GUID is UUID-v5
+            // auto-generated from "RSX"; 10 RGB RPM LEDs, no button LEDs.
+            ("RSX",     "ESX",        new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
             // ES — MOZA's entry wheel, integrated into the wheelbase as a module at
             // internal id 0x18 (firmware model-name "ES", hw "RS21-D05-HW SM-C").
             // Old-protocol RPM only: 10 RGB RPM LEDs driven via the wheel-old-rpm-*

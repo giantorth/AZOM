@@ -1,0 +1,286 @@
+name: PR Build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "**.cs"
+      - "**.csproj"
+      - "**.sln"
+      - "**.xaml"
+      - "**.resx"
+      - "libs/**"
+      - "DeviceTemplates/**"
+      - "Resources/**"
+  # Escape hatch for PRs opened with GITHUB_TOKEN (the SimHub-bump bot):
+  # those never fire pull_request workflows, so build them by hand.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to build"
+        required: true
+
+concurrency:
+  group: pr-build-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    # Fork PRs run with a read-only token and no secrets — they must never
+    # reach the release step (build.yml still compile-gates them). Drafts
+    # build on the ready_for_review transition.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.draft == false)
+
+    steps:
+      - name: Resolve PR context
+        id: pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_PR_TITLE: ${{ github.event.pull_request.title }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            info=$(gh pr view "$INPUT_PR" --repo "$GITHUB_REPOSITORY" \
+              --json number,title,state,isDraft,headRefOid,baseRefOid,headRepository,headRepositoryOwner)
+            state=$(jq -r '.state' <<<"$info")
+            draft=$(jq -r '.isDraft' <<<"$info")
+            head_repo=$(jq -r '.headRepositoryOwner.login + "/" + .headRepository.name' <<<"$info")
+            if [ "$state" != "OPEN" ] || [ "$draft" = "true" ] \
+               || [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+              echo "::error::PR #${INPUT_PR} is not an open, non-draft, same-repo PR"
+              exit 1
+            fi
+            pr_number=$(jq -r '.number' <<<"$info")
+            pr_title=$(jq -r '.title' <<<"$info")
+            head_sha=$(jq -r '.headRefOid' <<<"$info")
+            base_sha=$(jq -r '.baseRefOid' <<<"$info")
+          else
+            pr_number="$EVENT_PR_NUMBER"
+            pr_title="$EVENT_PR_TITLE"
+            head_sha="$EVENT_HEAD_SHA"
+            base_sha="$EVENT_BASE_SHA"
+          fi
+          # Version core from the title when it names one (release PRs are
+          # titled like "v1.6.0"); parsed before truncation so a long title
+          # can't cut the match. Empty means "use the tag-bump fallback".
+          title_version=""
+          if [[ "$pr_title" =~ (^|[^a-zA-Z0-9])v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            title_version="${BASH_REMATCH[2]}"
+          fi
+          # The title feeds the release name, which the in-app channel picker
+          # parses ("<title> (<version>)") — cap it so names stay sane.
+          pr_title="${pr_title:0:80}"
+          {
+            echo "pr_number=${pr_number}"
+            echo "pr_title=${pr_title}"
+            echo "title_version=${title_version}"
+            echo "head_sha=${head_sha}"
+            echo "base_sha=${base_sha}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Build the PR head, not the synthetic merge commit — the release
+          # tag must point at a real commit and the artifact must match it.
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Compute PR build version
+        id: vars
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          TITLE_VERSION: ${{ steps.pr.outputs.title_version }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          short_sha="${HEAD_SHA::7}"
+          # Core from the PR title ("v1.6.0" → 1.6.0) when given, else next
+          # patch after the newest stable tag.
+          if [ -n "$TITLE_VERSION" ]; then
+            next="$TITLE_VERSION"
+          else
+            latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+            latest_tag=${latest_tag:-v0.0.0}
+            IFS=. read -r MAJ MIN PAT <<<"${latest_tag#v}"
+            next="${MAJ}.${MIN}.$((PAT+1))"
+          fi
+          pr_version="${next}-pr.${PR_NUMBER}.${short_sha}"
+
+          # Markdown bullet list of the PR's commits, newest first, capped to
+          # keep the Discord embed under its 4096-char description limit.
+          # base_sha can be stale after a base-branch merge — fall back to the
+          # head commit alone rather than failing the build.
+          if commit_count=$(git rev-list --count "${BASE_SHA}..${HEAD_SHA}" 2>/dev/null); then
+            commit_list=$(git log "${BASE_SHA}..${HEAD_SHA}" \
+              --max-count=15 \
+              --pretty=format:"- [\`%h\`](https://github.com/${GITHUB_REPOSITORY}/commit/%H) — %s")
+          else
+            commit_count=1
+            commit_list=$(git log "${HEAD_SHA}" --max-count=1 \
+              --pretty=format:"- [\`%h\`](https://github.com/${GITHUB_REPOSITORY}/commit/%H) — %s")
+          fi
+          if [ "$commit_count" -gt 15 ]; then
+            commit_list="${commit_list}"$'\n'"- … and $((commit_count - 15)) more"
+          fi
+
+          {
+            echo "short_sha=${short_sha}"
+            echo "pr_version=${pr_version}"
+            echo "zip_name=MozaPlugin_pr${PR_NUMBER}_${short_sha}.zip"
+            echo "commit_count=${commit_count}"
+            echo "build_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "commit_list<<COMMIT_LIST_EOF"
+            echo "$commit_list"
+            echo "COMMIT_LIST_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build plugin DLL
+        run: dotnet build -c Release --no-restore /p:Version=${{ steps.vars.outputs.pr_version }}
+
+      - name: Stage and zip release files
+        shell: pwsh
+        env:
+          ZIP_NAME: ${{ steps.vars.outputs.zip_name }}
+        run: |
+          $staging = "staging"
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+          Copy-Item ./bin/x86/Release/MozaPlugin.dll $staging/
+          # Localized resources are embedded in MozaPlugin.dll — single-file
+          # deployment, no satellite-folder bundling needed. See release.yml.
+          Compress-Archive -Path ./staging/* -DestinationPath ./$env:ZIP_NAME
+
+      - name: Publish PR pre-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: pr-${{ steps.pr.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
+          target_commitish: ${{ steps.pr.outputs.head_sha }}
+          # The in-app channel picker parses this exact shape — see
+          # UpdateCheckService.ExtractPrVersionFromName before changing it.
+          # The PR number lives in the version string and the tag.
+          name: "${{ steps.pr.outputs.pr_title }} (${{ steps.vars.outputs.pr_version }})"
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
+          files: ${{ steps.vars.outputs.zip_name }}
+          body: |
+            **Pre-release PR build — expect possible bugs.**
+
+            **PR:** [#${{ steps.pr.outputs.pr_number }} — ${{ steps.pr.outputs.pr_title }}](https://github.com/${{ github.repository }}/pull/${{ steps.pr.outputs.pr_number }})
+            **Version:** `${{ steps.vars.outputs.pr_version }}` (${{ steps.vars.outputs.build_timestamp }})
+            **Commits in this PR: `${{ steps.vars.outputs.commit_count }}`**
+            ${{ steps.vars.outputs.commit_list }}
+
+            **Diff:** https://github.com/${{ github.repository }}/compare/${{ steps.pr.outputs.base_sha }}...${{ steps.pr.outputs.head_sha }}
+
+      - name: Notify Discord
+        if: success()
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          SHORT_SHA: ${{ steps.vars.outputs.short_sha }}
+          PR_VERSION: ${{ steps.vars.outputs.pr_version }}
+          COMMIT_COUNT: ${{ steps.vars.outputs.commit_count }}
+          COMMIT_LIST: ${{ steps.vars.outputs.commit_list }}
+          BUILT: ${{ steps.vars.outputs.build_timestamp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+            echo "DISCORD_WEBHOOK_URL not set; skipping notification."
+            exit 0
+          fi
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/pr-${PR_NUMBER}-${SHORT_SHA}"
+          pr_url="https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}"
+          # Build the payload entirely inside jq so every interpolated value is
+          # JSON-encoded safely. -a forces ASCII-only output so any non-ASCII
+          # character (e.g. em-dash) is emitted as \uXXXX, eliminating any risk
+          # of mis-encoded UTF-8 bytes on the Windows runner. Unicode-safe
+          # slicing keeps us under Discord's embed limits (title 256 chars,
+          # description 4096 chars).
+          payload_file=$(mktemp)
+          jq -an \
+            --arg pr_number    "$PR_NUMBER" \
+            --arg pr_title     "$PR_TITLE" \
+            --arg pr_version   "$PR_VERSION" \
+            --arg commit_count "$COMMIT_COUNT" \
+            --arg commit_list  "$COMMIT_LIST" \
+            --arg built        "$BUILT" \
+            --arg release_url  "$release_url" \
+            --arg pr_url       "$pr_url" \
+            '{
+              embeds: [{
+                title: (("Moza SimHub Plugin — PR #" + $pr_number + " (" + $pr_version + ")")[0:250]),
+                url: $release_url,
+                description: ((
+                  "**[" + $pr_title + "](" + $pr_url + ")**\n" +
+                  "**Commits in this PR (" + $commit_count + "):**\n" +
+                  $commit_list +
+                  "\n[Download release](" + $release_url + ")"
+                )[0:4090]),
+                color: 3447003
+              }]
+            }' > "$payload_file"
+          # Strip any leading UTF-8 BOM (some Windows tooling adds one) and any
+          # CR bytes — both are rejected by Discord's JSON parser.
+          python -c "import sys, pathlib; p=pathlib.Path(sys.argv[1]); b=p.read_bytes(); b=b.lstrip(b'\xef\xbb\xbf').replace(b'\r', b''); p.write_bytes(b)" "$payload_file"
+          response_file=$(mktemp)
+          http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -X POST --data-binary "@$payload_file" "$DISCORD_WEBHOOK_URL") || http_code="000"
+          if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Discord notification sent (HTTP $http_code)."
+          else
+            echo "::warning::Discord notification failed (HTTP $http_code)"
+            echo "Payload bytes ($(wc -c < "$payload_file")):"
+            cat "$payload_file"
+            echo
+            echo "Response body:"
+            cat "$response_file" || true
+            echo
+          fi
+          rm -f "$response_file" "$payload_file"
+
+      - name: Prune old builds for this PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep the newest 5 builds per PR — enough history to step back a
+          # few commits, while bounding the release list to the single page
+          # the in-app updater fetches. Close/merge deletes the rest
+          # (pr-cleanup.yml).
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 500 \
+            --json tagName,publishedAt \
+            --jq "[.[] | select(.tagName | test(\"^pr-${PR_NUMBER}-[0-9a-f]{7}\$\"))] | sort_by(.publishedAt) | reverse | .[5:] | .[].tagName" \
+          | while read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "Pruning $tag — keeping newest 5 builds for PR #${PR_NUMBER}"
+              gh release delete "$tag" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+            done

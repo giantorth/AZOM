@@ -789,6 +789,173 @@ DeviceDriver.Display(
 
 **LED pipeline event:** `PluginManager.OnLedsUpdate` is an `internal static event` that fires after LED data is computed each frame. Not accessible from plugins without reflection. The `ILedDeviceManager.Display()` injection is the supported path.
 
+## ShakeIt V3 — Custom Haptic Output Devices
+
+How a plugin surfaces a proprietary-protocol device (wheelbase LFE channel, pedal vibration motors) as a ShakeIt output. Verified by decompiling `SimHub.Plugins.dll` **9.11.21** with ilspycmd (`ilspycmd -o <dir> -p libs/SimHub/SimHub.Plugins.dll -r libs/SimHub`). Namespace root is `SimHub.Plugins.DataPlugins.ShakeItV3` (**DataPlugins**, not OutputPlugins). Type/member names survive SimHub's obfuscation pass in this version, but they are not a public API contract — re-verify on SimHub updates.
+
+### Architecture
+
+One generic base plugin, two concrete plugins:
+
+- `ShakeITV3PluginBase<T, SettingsType>` — public abstract, `where T : IOutputManager`.
+- `ShakeITMotorsV3Plugin : ShakeITV3PluginBase<VibrationOutputManager, …>` — `[PluginName("ShakeIt Motors")]`.
+- `ShakeITBSV3Plugin : ShakeITV3PluginBase<SoundOutputManager, …>` — `[PluginName("ShakeIt Bass Shakers")]`.
+
+Per-frame flow (`ShakeITV3PluginBase.DataUpdate`, SimHub data thread, once per game-data tick):
+
+1. Each `EffectsContainerBase` in the current per-game profile runs `ProcessEffects(data, …)`.
+2. `currentProfile.CollectEffectiveEffects(EffectsCollected)` gathers active `EffectOutput`s.
+3. Single handoff to the output layer: `settings.CurrentOutputManager.EffectUpdate(gameRunning, currentGain, EffectsCollected)` — `currentGain` is the profile global gain 0–100 (0 when muted).
+
+The 10 Hz `DispatcherTimer` in the base is **UI preview only** (runs while the settings control is visible); all real output happens on the data-update tick. Effect *containers* are discovered by assembly scanning (`PluginFinder.GetResolver(…, typeof(EffectsContainerBase))`, filtered by `[ShakeItContainerMetadata]` + `OutputMode`/`DeviceTarget`), so custom effect types are third-party-extensible — that is the effect side, distinct from the output-device side below.
+
+Two output-layer concepts that are easy to confuse:
+
+- **`OutputBase`** (public abstract) — the *per-effect-container* output config: channel mapping, `ExportProperty`, `PropertyName`, `DisableOutput`. Not a device.
+- **`IOutputManager`** / **`IDeviceOutputManager`** (public interfaces) — the device subsystem: `int EffectUpdate(bool gameinrace, double globalGain, IList<EffectOutput> effectOutputs)`, `IsConnected`, settings controls.
+
+### The built-in output lists are closed
+
+- **ShakeIt Motors** (`VibrationOutputManager`): the device list is a **fixed 11-element array literal** (Arduino, Fanatec, ForceFeel, GameTrix ×2, HSR, Simagic ×2, Conspit, ThreeDRap, VNM) and `AllocateOutput` is a hardcoded if/else chain keyed on a closed `DeviceType` enum. No "custom serial/UDP" member, no registry to append to. Injecting here would require runtime patching — don't.
+- **ShakeIt Bass Shakers** (`SoundOutputManager`): FMOD audio only. It does not implement `IDeviceOutputManager` and has **no non-audio hook** — a serial device cannot participate short of presenting itself to the OS as an audio output. Use the Motors path.
+
+### The extension surface: device-hosted "Haptics" devices
+
+The supported path — how Simagic / Simsonn / Simucube / Conspit / Interhaptics pedals and rumble kits appear in ShakeIt. A device registered in SimHub's **Devices** section carries a full embedded ShakeIt Motors instance as a "Haptics" composite; its device settings page *is* the ShakeIt effects editor (per-game profiles, effect→channel mapping, controls).
+
+**Discovery** (`SimHub.Plugins.Devices.DevicesPlugin.GetDeviceDescriptors`):
+
+```csharp
+foreach (Type plugin in PluginFinder.GetResolver("DevicesPlugin", typeof(IDeviceDescriptorsRegistry)).GetPlugins())
+    foreach (DeviceDescriptor device2 in ((IDeviceDescriptorsRegistry)Activator.CreateInstance(plugin)).GetDevices())
+        list.Add(device2);
+```
+
+`IDeviceDescriptorsRegistry` is **public** (`IEnumerable<DeviceDescriptor> GetDevices()`), and the resolver metadata-scans **all DLLs** including third-party plugins — the same mechanism that discovers `IDeviceExtensionFilter`. A public parameterless-constructible implementer in the plugin assembly is picked up automatically.
+
+**`DeviceDescriptor`** (public) — key settable members: `string DeviceTypeID` (unique GUID, duplicates throw), `string Name`, `string Brand`, `int MaximumInstances` (must be > 0), `Func<DeviceInstance> Factory`, `List<USBRequest> DetectionDescriptors` (`new USBRequest(vid, pid)`, decimal ints — drives USB auto-detection), `Func<bool> Available`, `IEnumerable<Type> RequiredPlugins`.
+
+**Built-in registry example** (`SimHub.Plugins.Devices.Regisry.SimsonnDevicesRegistry` — note SimHub's misspelled namespace):
+
+```csharp
+yield return new DeviceDescriptor
+{
+    DeviceTypeID = "BF62F95F-…", MaximumInstances = 5, Brand = Brands.BrandSimsonn,
+    Name = "Simsonn VAM / VAM Pro (…)",
+    Factory = () => new ShakeItV3DeviceInstance<MotorsWithFrequencyOutputManager,
+        ShakeitSettingsMotorsWithFrequencyOutputManagerBase<MotorsWithFrequencyOutputManager,
+            SimsonnWithFrequencyChannelsSettingsProvider>>(),
+    DetectionDescriptors = new List<USBRequest> { new USBRequest(56829, 24593), … }
+};
+```
+
+Everything vendor-specific is the innermost provider type; the rest is SimHub's generic machinery.
+
+**`ShakeItV3DeviceInstance<TOutputManager, TSettings>`** (**internal**, `: CompositableDeviceInstance`, `CompositeCode/CompositeLabel = "Haptics"`) is thin glue (~100 lines, every member type public):
+
+- Hosts a public `ShakeITV3PluginDevice<TOutputManager, TSettings>` created with `fromDevice: true`.
+- `DataUpdate` forwards to the hosted plugin's `DataUpdate(pluginManager, ref data, ShouldBeRunning())`.
+- `GetSettingsControls()` yields `ShakeItV3SettingsEffectsProfile` ("Effects"), `ShakeItDeviceControlsUI` ("Controls"), then the output manager's own controls — all public types.
+- `SetSettings`/`LoadDefaultSettings` construct the hosted plugin on the WPF dispatcher; `GetSettings` serializes `Settings` to `JToken`.
+- `GetDeviceState()` returns `Connected` only when `Output.IsConnected` — the provider's `IsConnected` drives the Devices-page connection state.
+
+### Value handoff — the MotorsWithFrequency path
+
+`MotorsOutputManagerBase` (public abstract, implements `IDeviceOutputManager`): `IsConnected => ShakeItChannelsInfoProvider?.IsConnected ?? false`; `AllowPropertiesExport => false`. `MotorsWithFrequencyOutputManagerBase` (public abstract) adds `OutputMode.MotorsWithFrequency` and turns each `EffectOutput` into a cached `IAudioRenderer`, then calls:
+
+```csharp
+protected abstract void UpdateOutput(bool gameinrace, double globalGain,
+    IList<EffectOutput> effectOutputs, List<IAudioRenderer> renderers);
+```
+
+The **internal** concrete `MotorsWithFrequencyOutputManager` implements the tone mixer (~50 lines): per tone-renderer it builds `GenericTone { Frequency, Gain = globalGain/100 × toneGain × containerEffectiveGain/100, IsPrehemptive, TargetChannel }` for every enabled channel of the effect's placement, drops zero-gain tones, lets preemptive tones suppress all others, then groups by channel:
+
+```csharp
+// per channel: Gain = max(tone gains); Frequency = gain²-weighted average of tone frequencies
+ShakeItChannelsInfoProvider.UpdateOutput(Dictionary<int, ChannelValue> values);
+
+public class ChannelValue { public double Gain; public double Frequency; }   // Gain 0–1, Frequency Hz
+```
+
+Channel indices follow the order of `GetChannels()`. The provider interface (**public**) is the piece a plugin implements:
+
+```csharp
+public interface IShakeItChannelsInfoProvider   // SimHub.Plugins.DataPlugins.ShakeItV3.Device
+{
+    string DefaultSettingsKey { get; }
+    bool IsConnected { get; }
+    List<ChannelInformation> GetChannels(MotorsWithFrequencyOutputManagerBase manager);  // ChannelInformation = { string Name }
+    ChannelActivation CreateDefaultActivationFor(FFBPlacement placement, MotorsWithFrequencyOutputManagerBase manager);
+    void LoadDefaultPlatformSettings(EffectsContainerBase effectsContainerBase, ShakeItProfile shakeItProfile);
+    void UpdateOutput(Dictionary<int, ChannelValue> values);   // the per-tick sink
+    void Stop();
+    FrequencyRange HardwareFrequencyRange();                   // ctor (int min, int max, bool hasFrequency) — ShakeIt clamps tones to it
+    void SetSettings(ShakeItSettings shakeItSettings);
+    IEnumerable<DeviceSettingControl> GetSettingsControls();
+}
+```
+
+`MotorsWithFrequencyChannelsSettingsProvider<TSettings>` (public) is a reusable provider base, but it is welded to `IUSBGenericManagerSerial<MotorStates>` hardware managers (the Simagic-family pedal transports) — for a proprietary transport, implement `IShakeItChannelsInfoProvider` directly. `InterhapticsOutputManager` (public) is the cleanest all-public manager example (pushes tones to a named-pipe sink).
+
+**Threading and construction caveats:**
+
+- `UpdateOutput` arrives on **SimHub's data-update thread** every game tick (~60 Hz game-dependent). Serial writes from it must be non-blocking (coalescing stream slots, never a blocking port write).
+- The output manager is instantiated by SimHub via `Activator.CreateInstance<T>()` (`ShakeItSettings<T>.CreateOutputManager`), and the provider via `new()` — **no constructor injection**. A provider reaches live plugin state (connection, detection flags) through a static/singleton bridge.
+- Device-hosted instances (`FromDevice == true`) never export properties (see below) and skip the main plugin's left-nav UI — everything lives on the device page.
+
+### Two integration approaches
+
+**A — all public, zero reflection:** subclass `MotorsWithFrequencyOutputManagerBase` (copy the ~50-line tone mixer or model on `InterhapticsOutputManager`), pair it with plain `ShakeItDeviceSettings<T>`, and write a public clone of `ShakeItV3DeviceInstance` (its body is all-public types). Register via `IDeviceDescriptorsRegistry`. More copied code, immune to internal renames except at the interface level.
+
+**B — reflection shortcut, maximum reuse:** implement only `IShakeItChannelsInfoProvider` (public, `new()`-constructible) and Activator-construct the internal generic so SimHub's mixer + channel-mapping UI are reused verbatim:
+
+```csharp
+var asm = typeof(SimHub.Plugins.Devices.DeviceDescriptor).Assembly;
+var mgr = asm.GetType("SimHub.Plugins.DataPlugins.ShakeItV3.Device.MotorsWithFrequency.MotorsWithFrequencyOutputManager");
+var settings = asm.GetType("SimHub.Plugins.DataPlugins.ShakeItV3.Device.ShakeitSettingsMotorsWithFrequencyOutputManagerBase`2")
+    .MakeGenericType(mgr, typeof(MyChannelsProvider));
+var inst = asm.GetType("SimHub.Plugins.DataPlugins.ShakeItV3.Device.ShakeItV3DeviceInstance`2")
+    .MakeGenericType(mgr, settings);
+Factory = () => (DeviceInstance)Activator.CreateInstance(inst, nonPublic: true);
+```
+
+Only two internal type names are load-bearing (`ShakeItV3DeviceInstance<,>`, `MotorsWithFrequencyOutputManager`) — far less surface than the Control Mapper reflection chain, but still version-fragile: guard every step and fail soft.
+
+### Accessibility map
+
+| Type | Accessibility |
+|------|---------------|
+| `IDeviceDescriptorsRegistry`, `DeviceDescriptor` (+`Factory`), `USBRequest` | public |
+| `DeviceInstance`, `CompositableDeviceInstance`, `DeviceSettingControl` | public |
+| `ShakeITV3PluginBase<,>`, `ShakeITV3PluginDevice<,>`, `ShakeItDeviceSettings<T>`, `ShakeitSettingsMotorsWithFrequencyOutputManagerBase<,>` | public |
+| `IOutputManager`, `IDeviceOutputManager`, `IOutput`, `OutputManagerBase<>`, `OutputBase` | public |
+| `MotorsOutputManagerBase`, `MotorsWithFrequencyOutputManagerBase` | public abstract |
+| `IShakeItChannelsInfoProvider`, `IChannelsSettingsProvider`, `ChannelValue`, `ChannelInformation`, `FrequencyRange` | public |
+| `MotorsWithFrequencyChannelsSettingsProvider<>` (USB-serial-welded), `InterhapticsOutputManager` | public |
+| `ShakeItV3SettingsEffectsProfile`, `ShakeItDeviceControlsUI` | public |
+| `ShakeItV3DeviceInstance<,>`, `MotorsWithFrequencyOutputManager`, `BasicMotorsDeviceOutputManager` | **internal** |
+| `VibrationOutputManager` device list, `DeviceType` enum, `SoundOutputManager` | closed — not extensible |
+
+### Read-only alternative: exported effect properties
+
+`ShakeITV3PluginBase.ExportProperties` attaches per-effect delegates when `!FromDevice` (main plugins only — `AllowPropertiesExport` is true for `VibrationOutputManager`/`SoundOutputManager`, false for device-hosted managers). For each **enabled** container whose output has **`ExportProperty` checked** and a non-empty **`PropertyName`**:
+
+```csharp
+"Export." + i.Output.PropertyName + "." + j.Placement   // value: () => j.LastOutput
+```
+
+attached via `AttachDelegate(name, GetType(), func)`, so the full readable names are `ShakeITMotorsV3Plugin.Export.<PropertyName>.<Placement>` and `ShakeITBSV3Plugin.Export.<PropertyName>.<Placement>` (`<Placement>` is the effect's `FFBPlacement`, e.g. `FrontLeft`; value is the effect's `LastOutput` level, 0–100). `GlobalGain` and `IsMuted` are exported per plugin as well. Pollable via `PluginManager.GetPropertyValue` or usable directly in any NCalc formula field — a zero-integration bridge at the cost of per-effect user setup, level-only (no frequency), and no channel mapping.
+
+### Device Builder: no haptics feature
+
+The `.shdd`/`.shdp` Device Builder feature set is definitively LEDs + Screen only:
+
+```csharp
+[Flags] public enum DescriptorFeatures { None = 0, Screen = 2, LEDs = 4 }   // …Registry.DescriptorBuilder
+```
+
+There is no Motors/Haptics feature block, so a declarative template device can never appear in ShakeIt — haptics devices must be code-registered via `IDeviceDescriptorsRegistry`, as separate device entries from any template-based LED/dash definitions the plugin also ships.
+
 ## Control Mapper Variant Providers
 
 SimHub's Control Mapper supports a "variant" concept — a per-attached-wheel string that lets the same DirectInput controller track different button-mapping bundles. Fanatec and Simucube ship built-in providers (`FanatecVariantProvider`, `SimucubeVariantProvider`); the registration surface for third-party providers is **not public** and requires reflection. The IL findings below come from `SimHub.Plugins.dll` version `1.0.9631.22016`.

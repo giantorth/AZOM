@@ -183,6 +183,18 @@ namespace MozaPlugin
         private Timer _pollTimer = null!;
         private Timer _retryTimer = null!;
         private Timer _reconnectTimer = null!;
+        // Base-tab temperature-graph history. Sampled every 500 ms by a
+        // plugin-lifetime timer (independent of the settings panel) so the graph
+        // shows the full 5-minute window the moment the panel opens rather than
+        // starting empty. 600 × 0.5 s = 5 min; the temps themselves refresh on
+        // the 5 s _pollTimer via PollBaseAux, so 500 ms just reproduces the
+        // graph's existing staircase without adding real resolution.
+        private const int TempHistorySamples = 600;
+        private const int TempHistoryIntervalMs = 500;
+        private readonly Diagnostics.TemperatureHistory _tempHistory =
+            new Diagnostics.TemperatureHistory(TempHistorySamples);
+        private Timer _tempHistoryTimer = null!;
+        internal Diagnostics.TemperatureHistory TemperatureHistory => _tempHistory;
         // CAS re-entry guard: a 5 s reconnect tick can outlast its interval
         // (probe fallback ~600 ms/port under Wine, Disconnect joins at 1 s) —
         // overlapping ticks must not run TryConnect* concurrently on a lane.
@@ -215,6 +227,16 @@ namespace MozaPlugin
         // group brightness (rpm/buttons/knobs) equally via ApplyMasterWheelLedBrightness.
         internal volatile int WheelLedMasterBrightness = -1;
         private int _masterLedBrightnessApplied = -2; // DataUpdate-thread-local change gate
+        // Old-protocol (ES/ESX) master brightness: the LED thread publishes the LIVE
+        // slider value here (0..100, -1 until first moved); the steady 250 ms poll
+        // timer settle-detects + writes wheel-old-rpm-brightness. Old wheels can't use
+        // the DataUpdate path above — it goes quiet at idle (issue #113). Direct
+        // device-manager write on the timer, NOT via HardwareApplier's cfg cache
+        // (that dictionary is data-thread-only / unlocked).
+        internal volatile int WheelLedMasterBrightnessRaw = -1;
+        private int _esMasterBriApplied = -2;         // poll-timer-local change gate
+        private int _esMasterBriCandidate = int.MinValue; // value awaiting settle
+        private int _esMasterBriStableTicks;          // ticks the candidate has held
         private DeviceProber _deviceProber = null!;
         internal DeviceProber DeviceProber => _deviceProber;
         // Peripheral-enumeration prober for the dedicated hub pipe. Shares
@@ -344,8 +366,10 @@ namespace MozaPlugin
         internal void WriteFloatIfHandbrakeDetected(string command, int value) => _hardwareApplier.WriteFloatIfHandbrakeDetected(command, value);
         internal void WriteIfPedalsDetected(string command, int value) => _hardwareApplier.WriteIfPedalsDetected(command, value);
         internal void WriteFloatIfPedalsDetected(string command, int value) => _hardwareApplier.WriteFloatIfPedalsDetected(command, value);
-        internal void WriteIfShifterDetected(string command, int value) => _hardwareApplier.WriteIfShifterDetected(command, value);
-        internal void WriteArrayIfShifterDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfShifterDetected(command, payload);
+        internal void WriteIfHgpDetected(string command, int value) => _hardwareApplier.WriteIfHgpDetected(command, value);
+        internal void WriteIfSgpDetected(string command, int value) => _hardwareApplier.WriteIfSgpDetected(command, value);
+        internal void ReadIfHgpDetected(string command) => _hardwareApplier.ReadIfHgpDetected(command);
+        internal void WriteArrayIfSgpDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfSgpDetected(command, payload);
         internal void WriteIfBaseAmbientSupported(string command, int value) => _hardwareApplier.WriteIfBaseAmbientSupported(command, value);
         internal void WriteColorIfWheelDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfWheelDetected(command, r, g, b);
         internal void WriteColorIfDashDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfDashDetected(command, r, g, b);
@@ -357,7 +381,8 @@ namespace MozaPlugin
         internal void ApplyBaseAmbientToHardware(MozaProfile? profile) => _hardwareApplier.ApplyBaseAmbientToHardware(profile);
         internal void ApplyHandbrakeToHardware(MozaProfile? profile) => _hardwareApplier.ApplyHandbrakeToHardware(profile);
         internal void ApplyPedalsToHardware(MozaProfile? profile) => _hardwareApplier.ApplyPedalsToHardware(profile);
-        internal void ApplyShifterToHardware(MozaProfile? profile) => _hardwareApplier.ApplyShifterToHardware(profile);
+        internal void ApplyHgpToHardware(MozaProfile? profile) => _hardwareApplier.ApplyHgpToHardware(profile);
+        internal void ApplySgpToHardware(MozaProfile? profile) => _hardwareApplier.ApplySgpToHardware(profile);
         internal void ApplyAb9ToHardware(MozaProfile? profile) => _hardwareApplier.ApplyAb9ToHardware(profile);
         internal void ApplyWheelExtensionSettings(MozaWheelExtensionSettings extSettings, string? pageModelPrefix = null) => _hardwareApplier.ApplyWheelExtensionSettings(extSettings, pageModelPrefix);
         /// <summary>
@@ -777,11 +802,10 @@ namespace MozaPlugin
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
-        internal bool IsShifterDetected => DetectionState.ShifterDetected;
-        internal bool IsShifterHasLeds => DetectionState.ShifterHasLeds;
-        // Positive per-model gates for the dedicated HGP / SGP tabs (Unknown → neither).
-        internal bool IsHgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Hgp;
-        internal bool IsSgpShifterDetected => DetectionState.ShifterModel == Devices.ShifterModelKind.Sgp;
+        // Independent per-model gates for the dedicated HGP / SGP tabs — both can be
+        // true at once (a user with both shifters, each on its own USB port).
+        internal bool IsHgpShifterDetected => DetectionState.HgpDetected;
+        internal bool IsSgpShifterDetected => DetectionState.SgpDetected;
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
@@ -982,6 +1006,24 @@ namespace MozaPlugin
                 if (_settings.ProfileStore == null)
                     _settings.ProfileStore = new MozaProfileStore();
 
+                // Migrate the legacy Stable/Dev update channel enum to the
+                // channel-id scheme. The dev channel is gone (dev-latest is no
+                // longer published), so prior Dev users land on Stable with a
+                // clean cache — their LastSeen* referenced dev-latest artifacts.
+                if (string.IsNullOrEmpty(_settings.UpdateChannelId))
+                {
+                    _settings.UpdateChannelId = UpdateCheckService.StableChannelId;
+                    if (_settings.UpdateChannel == UpdateChannel.Dev)
+                    {
+                        _settings.UpdateChannel = UpdateChannel.Stable;
+                        _settings.LastSeenLatestVersion = "";
+                        _settings.LastSeenReleaseUrl = "";
+                        _settings.LastSeenAssetUrl = "";
+                        _settings.LastSeenReleaseNotes = "";
+                        _settings.LastSkippedVersion = "";
+                    }
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
@@ -1019,17 +1061,18 @@ namespace MozaPlugin
                     }
                 }
 
-                // Persistent always-capture: ensure capture is on before any device traffic
-                // so it covers the full connect/handshake. EnsureRunning() — not Start() —
-                // so the buffer survives plugin reload on game switches (Start clears the ring).
-                if (_settings.AlwaysCaptureOnStartup)
+                // Diagnostic capture is always on (no user toggle): enable before
+                // any device traffic so the startup segment covers the full
+                // connect/handshake. EnsureRunning() — not Start() — so the
+                // dual-segment ring (and its frozen first-minute) survives the
+                // plugin reload on game switches.
                 {
                     var cap = global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance;
                     bool wasRunning = cap.Enabled;
                     cap.EnsureRunning();
                     MozaLog.Debug(wasRunning
-                        ? $"[AZOM] Serial traffic capture preserved across reload — AlwaysCaptureOnStartup is on ({cap.Count} entries)"
-                        : "[AZOM] Serial traffic capture auto-started — AlwaysCaptureOnStartup is on");
+                        ? $"[AZOM] Diagnostic capture preserved across reload ({cap.Count} frames)"
+                        : "[AZOM] Diagnostic capture enabled (startup + rolling segments)");
                 }
 
                 // Fire-and-forget update check against the GitHub Releases API.
@@ -1263,6 +1306,15 @@ namespace MozaPlugin
                 _pollTimer.AutoReset = true;
                 _pollTimer.Start();
 
+                // Base-tab temperature-graph history sampler — runs for the
+                // plugin's whole life so the graph shows its full window the
+                // moment the settings panel opens. Reads the temps that the 5 s
+                // _pollTimer refreshes; UI-independent by design.
+                _tempHistoryTimer = new Timer(TempHistoryIntervalMs);
+                _tempHistoryTimer.Elapsed += SampleTemperatureHistory;
+                _tempHistoryTimer.AutoReset = true;
+                _tempHistoryTimer.Start();
+
                 // 250ms < shortest ReadRetryBackoffMs (200) so a dropped probe
                 // gets retried within ~one backoff window.
                 _retryTimer = new Timer(250);
@@ -1292,6 +1344,11 @@ namespace MozaPlugin
                     // reads on its own Send (same per-pipe isolation as the hub).
                     try { _peripheralRegistry?.TickRetransmits(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone peripheral retransmit tick failed: {ex.Message}"); }
+                    // Old-protocol (ES/ESX) master LED brightness settle + write. This
+                    // steady tick is the only cadence that survives idle (Display() is
+                    // bursty, DataUpdate goes quiet) — see TickEsMasterBrightness (#113).
+                    try { TickEsMasterBrightness(); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] ES master-brightness tick failed: {ex.Message}"); }
                 };
                 _retryTimer.AutoReset = true;
                 _retryTimer.Start();
@@ -1426,6 +1483,9 @@ namespace MozaPlugin
                     $"[AZOM] Hot re-negotiation feature flag: " +
                     $"settings={_settings.EnableHotRenegotiation} " +
                     $"sender={_telemetrySender.EnableHotRenegotiation}");
+                // Re-bound on every plugin reload so a reused persistent sender
+                // never holds a closure over a disposed plugin instance.
+                _telemetrySender.WheelModelInfoProvider = () => WheelModelInfo;
                 // Reset the start-request gate when the dashboard pipeline parks
                 // itself (sess=0x09 retry exhaust). Without this clear, the next
                 // wheel hot-swap or user toggle would early-out in
@@ -1517,6 +1577,7 @@ namespace MozaPlugin
         {
             UnhookPowerMode();
             try { _pollTimer?.Stop(); } catch { }
+            try { _tempHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _profileCoordinator?.StopSaveDebounceTimer(); } catch { }
@@ -1600,13 +1661,10 @@ namespace MozaPlugin
                 try { _cm1Driver?.Dispose(); } catch { }
             }
             // File sink always closes on teardown — new file per Init by design.
-            // In-memory ring stays enabled across plugin reload when always-capture is on,
-            // so buffered frames survive game switches (next Init's EnsureRunning is a no-op).
+            // The in-memory ring stays enabled across the plugin reload (capture
+            // is always on) so buffered frames survive game switches — next Init's
+            // EnsureRunning is a no-op.
             try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StopFileSink(); } catch { }
-            if (_settings?.AlwaysCaptureOnStartup != true)
-            {
-                try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.Stop(); } catch { }
-            }
             if (ownConnection)
             {
                 try { _connection?.Dispose(); } catch { }
@@ -1636,6 +1694,7 @@ namespace MozaPlugin
             try { _hubManager?.Dispose(); } catch { }
             try { _baseManager?.Dispose(); } catch { }
             try { _pollTimer?.Dispose(); } catch { }
+            try { _tempHistoryTimer?.Dispose(); } catch { }
             try { _retryTimer?.Dispose(); } catch { }
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _profileCoordinator?.DisposeSaveDebounceTimer(); } catch { }
@@ -1681,6 +1740,43 @@ namespace MozaPlugin
         public void TriggerBaseLfeEngineTest() { if (_data.BaseSupportsLfe) _baseLfeWorker?.PostEngineTest(); }
         public void TriggerBaseLfeAbsTest() { if (_data.BaseSupportsLfe) _baseLfeWorker?.PostAbsTest(); }
         public void TriggerBaseLfeGearshiftTest() { if (_data.BaseSupportsLfe) _baseLfeWorker?.PostGearshiftTest(); }
+
+        // ── ShakeIt haptics bridge (ShakeIt/) ─────────────────────────────────
+        // The provider is constructed by SimHub (generic new()) and reaches the
+        // live plugin through Instance; these forwarders keep the worker the
+        // single wire owner.
+
+        /// <summary>True when the wheelbase can accept ShakeIt-driven LFE frames (drives the haptics device's connected state).</summary>
+        internal bool IsBaseLfeHapticsReady =>
+            _baseLfeWorker != null && _data.BaseSupportsLfe
+            && DetectionState.BaseDetected && _deviceManager?.IsConnected == true;
+
+        /// <summary>True when a "MOZA Wheelbase LFE" haptics device instance is deployed in SimHub's device list, regardless of enable/game state — the LFE tab hides while it is, so the two sources can't both edit the base. UI-thread callers only (enumerates SimHub's WPF-owned device collection).</summary>
+        internal bool IsShakeItLfeDeviceDeployed
+        {
+            get
+            {
+                try
+                {
+                    var dp = _pluginManager?.GetPlugin<SimHub.Plugins.Devices.DevicesPlugin>();
+                    if (dp == null) return false;
+                    foreach (var d in dp.GetDevices())
+                    {
+                        if (d?.DeviceDescriptor?.DeviceTypeID is string id && id.Length != 0 &&
+                            id.IndexOf(ShakeIt.MozaShakeItDeviceRegistry.WheelbaseDeviceTypeId, StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                    }
+                    return false;
+                }
+                catch { return false; }
+            }
+        }
+
+        /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) for the three summed LFE slots — from the provider on the SimHub data thread.</summary>
+        internal void PostShakeItLfeChannels(double g0, double f0, double g1, double f1, double g2, double f2)
+            => _baseLfeWorker?.PostShakeItChannels(g0, f0, g1, f1, g2, f2);
+
+        internal void ClearShakeItLfeChannels() => _baseLfeWorker?.ClearShakeItChannels();
 
         /// <summary>Latest (carrier freq Hz, amplitude 0..1) for the 3 LFE slots — drives the settings scope.</summary>
         public (double freq, double amp)[] GetLfeScopeSamples()
@@ -1846,7 +1942,9 @@ namespace MozaPlugin
             // LED driver publishes the settled value into WheelLedMasterBrightness off
             // the LED thread; apply it here (change-gated) so the firmware write runs on
             // the data thread and shares HardwareApplier's per-wheel cfg cache with the
-            // connect/profile brightness path (no fight, no redundant flash).
+            // connect/profile brightness path (no fight, no redundant flash). NEW-protocol
+            // wheels only — ES/ESX (old-protocol) route through TickEsMasterBrightness on
+            // the steady poll timer, since this data thread goes quiet at idle (#113).
             int masterLedBri = WheelLedMasterBrightness;
             if (masterLedBri != _masterLedBrightnessApplied)
             {
@@ -2391,6 +2489,7 @@ namespace MozaPlugin
             // 1. Stop timers first so no new callbacks fire against disposed state.
             _profileCoordinator?.StopSaveDebounceTimer();
             _pollTimer?.Stop();
+            _tempHistoryTimer?.Stop();
             _retryTimer?.Stop();
             _reconnectTimer?.Stop();
 
@@ -2547,13 +2646,9 @@ namespace MozaPlugin
             }
 
             // Release the wire-trace file handle (new file per Init by design).
-            // Keep the in-memory ring enabled across plugin reload when always-capture
-            // is on, so buffered frames survive game switches.
+            // The in-memory ring stays enabled across the plugin reload (capture
+            // is always on) so buffered frames survive game switches.
             try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StopFileSink(); } catch { }
-            if (_settings?.AlwaysCaptureOnStartup != true)
-            {
-                try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.Stop(); } catch { }
-            }
 
             // 5. Cancel paced setting-reads (avoids tasks running past teardown).
             try { _deviceManager?.Dispose(); } catch { }
@@ -2621,6 +2716,7 @@ namespace MozaPlugin
             // 7. Dispose timers after I/O is gone.
             _profileCoordinator?.DisposeSaveDebounceTimer();
             _pollTimer?.Dispose();
+            _tempHistoryTimer?.Dispose();
             _retryTimer?.Dispose();
             _reconnectTimer?.Dispose();
 
@@ -2889,16 +2985,12 @@ namespace MozaPlugin
             {
                 if (_settings == null || !_settings.UpdateCheckEnabled) return;
                 if (s_updateCheckStarted) return;
-                // The dev channel tracks the rolling 'dev-latest' tag, so a
-                // version cached in a prior session can't be trusted across a
-                // restart: its 7-char SHA differs from any freshly-installed
-                // build, which the dev comparator reads as "newer" and paints a
-                // phantom "update available" banner. Re-check dev on every
-                // launch (still once per process via s_updateCheckStarted) so
-                // the cache re-syncs to the live dev-latest. Stable versions are
-                // SHA-stable and directly comparable, so they keep the 24h
-                // throttle.
-                if (_settings.UpdateChannel != UpdateChannel.Dev
+                // A PR channel tracks a moving head — a version cached in a
+                // prior session may be stale, and the tracked PR may have
+                // closed since. Re-check PR channels on every launch (still
+                // once per process via s_updateCheckStarted); stable versions
+                // are directly comparable and keep the 24h throttle.
+                if (!UpdateCheckService.TryParsePrChannelId(_settings.UpdateChannelId, out _)
                     && DateTime.UtcNow - _settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
                 {
                     MozaLog.Debug("[UpdateCheck] skipped — last check less than 24h ago");
@@ -2906,29 +2998,62 @@ namespace MozaPlugin
                 }
                 s_updateCheckStarted = true;
 
-                var channel = _settings.UpdateChannel;
+                var channelId = _settings.UpdateChannelId;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        var result = await UpdateCheckService
-                            .CheckAsync(channel, CancellationToken.None)
+                        var fetch = await UpdateCheckService
+                            .FetchSnapshotAsync(CancellationToken.None)
                             .ConfigureAwait(false);
                         _settings.LastUpdateCheckUtc = DateTime.UtcNow;
 
-                        if (result.Success && !string.IsNullOrEmpty(result.LatestVersion))
+                        if (fetch.Snapshot != null)
                         {
-                            _settings.LastSeenLatestVersion = result.LatestVersion;
-                            _settings.LastSeenReleaseUrl = result.ReleaseUrl;
-                            _settings.LastSeenAssetUrl = result.AssetUrl;
-                            _settings.LastSeenReleaseNotes = result.ReleaseNotes;
-                            MozaLog.Debug(
-                                $"[UpdateCheck] {channel}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
+                            var snap = fetch.Snapshot;
+                            var result = UpdateCheckService.ResolveChannel(
+                                snap, channelId, out bool channelFound);
+                            if (!channelFound)
+                            {
+                                // Tracked PR closed/merged and its builds were
+                                // cleaned up — fall back to stable.
+                                MozaLog.Info(
+                                    $"[UpdateCheck] channel {channelId} is gone; falling back to stable");
+                                channelId = UpdateCheckService.StableChannelId;
+                                _settings.UpdateChannelId = channelId;
+                                _settings.UpdateChannelLabel = "";
+                                _settings.LastSkippedVersion = "";
+                                result = UpdateCheckService.ResolveChannel(
+                                    snap, channelId, out _);
+                            }
+                            else if (UpdateCheckService.TryParsePrChannelId(channelId, out int prNumber))
+                            {
+                                // PR titles drift; keep the offline label current.
+                                foreach (var ch in snap.PrChannels)
+                                {
+                                    if (ch.Number == prNumber)
+                                    {
+                                        _settings.UpdateChannelLabel = string.Format(
+                                            Strings.Option_ReleaseChannelPr, ch.Number, ch.Title);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (result.Success && !string.IsNullOrEmpty(result.LatestVersion))
+                            {
+                                _settings.LastSeenLatestVersion = result.LatestVersion;
+                                _settings.LastSeenReleaseUrl = result.ReleaseUrl;
+                                _settings.LastSeenAssetUrl = result.AssetUrl;
+                                _settings.LastSeenReleaseNotes = result.ReleaseNotes;
+                                MozaLog.Debug(
+                                    $"[UpdateCheck] {channelId}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
+                            }
                         }
-                        else if (!result.Success)
+                        else
                         {
                             MozaLog.Debug(
-                                $"[UpdateCheck] {channel} failed: {result.ErrorKind} {result.ErrorMessage}");
+                                $"[UpdateCheck] {channelId} failed: {fetch.ErrorKind} {fetch.ErrorMessage}");
                         }
 
                         try { this.SaveCommonSettings("MozaPluginSettings", _settings); }
@@ -3768,6 +3893,67 @@ namespace MozaPlugin
             mgr.SetTimerResolution(wanted);
         }
 
+        // ES/ESX firmware RPM brightness register (0x14 0x00) is a small field, not a
+        // 0..100 percentage: sweeping SimHub's 0..100 master made the bar ramp+wrap
+        // ~3.3 times (issue #113 follow-up), so its period is ~30 counts. Scale the
+        // master into 0..EsBrightnessMax, kept just under the ~30 wrap point so a
+        // full slider lands at near-full brightness without tipping into a wrap.
+        private const int EsBrightnessMax = 29;
+        // SimHub's LED master brightness can churn at startup (day/night brightness-mode
+        // settling as the profile loads); writing each transient to the EEPROM register
+        // flickered the bar. Commit a value only after it has held steady this many
+        // 250 ms ticks (~0.75 s) — absorbs the startup churn and a slider drag alike,
+        // while still landing on the final value since this timer always ticks.
+        private const int EsBrightnessSettleTicks = 3;
+
+        /// <summary>
+        /// Write the ES/ESX master LED brightness, ticked from the steady 250 ms poll
+        /// timer. Old-protocol wheels dim ONLY via the legacy firmware brightness
+        /// register (<c>wheel-old-rpm-brightness</c>, <c>0x14 0x00</c>) — their live RPM
+        /// path sends only an on/off bitmask, so per-frame colour scaling can't dim
+        /// them. The LED thread publishes the live 0..100 slider value into
+        /// <see cref="WheelLedMasterBrightnessRaw"/>; we scale it into the firmware's
+        /// small brightness range and write it whenever the scaled value changes. This
+        /// runs here (not on Display()/DataUpdate) because both go quiet at idle, which
+        /// otherwise lagged the applied value a whole gesture behind the slider. The
+        /// 250 ms tick naturally caps a drag to ~4 writes/sec — no separate debounce
+        /// needed. Direct device-manager write — thread-safe, and deliberately NOT via
+        /// HardwareApplier's data-thread-only cfg cache.
+        /// </summary>
+        private void TickEsMasterBrightness()
+        {
+            if (!IsOldWheelDetected || !_connection.IsConnected) return;
+            int raw = WheelLedMasterBrightnessRaw;
+            if (raw < 0) return;
+            var model = WheelModelInfo;
+            if (model == null || model.RpmLedCount <= 0) return;
+
+            int wire = (int)Math.Round(raw * EsBrightnessMax / 100.0);
+            if (wire < 0) wire = 0; else if (wire > EsBrightnessMax) wire = EsBrightnessMax;
+
+            // Settle: require the scaled value to hold across several ticks before
+            // committing, so a startup transient can't flick the register through a
+            // burst of intermediate values.
+            if (wire != _esMasterBriCandidate)
+            {
+                _esMasterBriCandidate = wire;
+                _esMasterBriStableTicks = 0;
+                return;
+            }
+            if (_esMasterBriStableTicks < EsBrightnessSettleTicks)
+            {
+                _esMasterBriStableTicks++;
+                return;
+            }
+            if (wire == _esMasterBriApplied) return;
+
+            _esMasterBriApplied = wire;
+            // Keep MasterCompensated (LED thread) on the 0..100 master scale.
+            WheelLedMasterBrightness = raw;
+            _data.WheelESRpmBrightness = wire;
+            _deviceManager.WriteSetting("wheel-old-rpm-brightness", wire);
+        }
+
         private void ReconnectTick()
         {
             if (!_connection.IsConnected)
@@ -3833,6 +4019,18 @@ namespace MozaPlugin
                 try { _peripheralRegistry?.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral refresh: {ex.Message}"); }
             }
+        }
+
+        // Background feed for the Base-tab temperature graph's rolling history —
+        // fires on _tempHistoryTimer regardless of whether the settings panel is
+        // open. Cheap: reads three volatile ints + one bool into a ring buffer.
+        private void SampleTemperatureHistory(object sender, ElapsedEventArgs e)
+        {
+            if (IsShuttingDown) return;
+            var data = _data;
+            if (data == null) return;
+            try { _tempHistory.Record(data.McuTemp, data.MosfetTemp, data.MotorTemp, data.IsBaseConnected); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Temp-history sample failed: {ex.Message}"); }
         }
 
         private void PollStatus(object sender, ElapsedEventArgs e)
@@ -3993,8 +4191,10 @@ namespace MozaPlugin
                 _deviceManager.SendPresenceProbe(MozaProtocol.DevicePedals);
             // HGP/SGP attached to the base's peripheral port (dev 0x1A). A shifter on
             // its own USB port is found by MozaStandalonePeripheralRegistry instead;
-            // one behind the Universal Hub answers on the dedicated hub pipe.
-            if (!DetectionState.ShifterDetected)
+            // one behind the Universal Hub answers on the dedicated hub pipe. Gate on
+            // THIS pipe's slot being unresolved — a standalone HGP/SGP elsewhere must
+            // not suppress the base-slot probe (both can be attached at once).
+            if (DetectionState.ShifterModelForOwner(_deviceManager) == Devices.ShifterModelKind.Unknown)
                 _deviceManager.SendPresenceProbe(MozaProtocol.DeviceHPattern);
             // No hub-port-power poll on the wheelbase connection — a Universal Hub
             // is found by the dedicated hub connection on its own port, never by
@@ -4335,9 +4535,14 @@ namespace MozaPlugin
                 return;
             }
 
-            _data.UpdateFromCommand(r.Name, r.IntValue);
-            if (r.ArrayValue != null)
-                _data.UpdateFromArray(r.Name, r.ArrayValue);
+            // Shifter replies share command names across HGP/SGP, so route a relayed
+            // shifter's values into whichever model was detected on this pipe.
+            if (!_data.TryUpdateShifter(DetectionState.ShifterModelForOwner(_deviceManager), r.Name, r.IntValue, r.ArrayValue))
+            {
+                _data.UpdateFromCommand(r.Name, r.IntValue);
+                if (r.ArrayValue != null)
+                    _data.UpdateFromArray(r.Name, r.ArrayValue);
+            }
 
             // Persist wheel-reported sleep-bundle values so next launch reapplies them.
             _profileCoordinator.SeedSleepBundleFromResponse(r);
@@ -4385,9 +4590,10 @@ namespace MozaPlugin
                 case MozaProtocol.DevicePedals:
                     _deviceProber.MarkPedalsDetected();
                     break;
-                // DeviceHPattern == DeviceSequential (0x1A) — one case covers both.
+                // DeviceHPattern == DeviceSequential (0x1A). A relayed shifter has no
+                // PID, so probe the model resolvers rather than latch a single flag.
                 case MozaProtocol.DeviceHPattern:
-                    _deviceProber.MarkShifterDetected();
+                    _deviceProber.ProbeRelayedShifter();
                     break;
             }
         }
