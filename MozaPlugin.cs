@@ -2352,6 +2352,36 @@ namespace MozaPlugin
                     controller.SendIntWrite("mbooster-brake-friction-1", frictionRaw, dev);
                     wroteAnyCalibration = true;
                 }
+                // Segmented Damping (both "When Pressed" and "When
+                // Released" — see cfg.SegmentedDamping). One wire command
+                // carries the whole feature's state at once, so a fresh
+                // profile with no override on EITHER side still sends
+                // nothing here (guarded like every other calibration write
+                // above); once ANY field on either side is set, the frame
+                // is filled out using factory defaults for whichever side
+                // still has no override.
+                var sd = cfg.SegmentedDamping;
+                if (sd != null && (sd.Divider1Pressed >= 0 || sd.Divider2Pressed >= 0
+                    || sd.Seg1Pressed >= 0 || sd.Seg2Pressed >= 0 || sd.Seg3Pressed >= 0
+                    || sd.Divider1Released >= 0 || sd.Divider2Released >= 0
+                    || sd.Seg1Released >= 0 || sd.Seg2Released >= 0 || sd.Seg3Released >= 0))
+                {
+                    var c = global::MozaPlugin.Devices.MBoosterUiConstants.SegDampSegDefaultPct;
+                    var frame = global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
+                        sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
+                        sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
+                        sd.Divider1Released >= 0 ? sd.Divider1Released : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
+                        sd.Divider2Released >= 0 ? sd.Divider2Released : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
+                        sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : c,
+                        sd.Seg1Released >= 0 ? sd.Seg1Released : c,
+                        sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : c,
+                        sd.Seg2Released >= 0 ? sd.Seg2Released : c,
+                        sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : c,
+                        sd.Seg3Released >= 0 ? sd.Seg3Released : c,
+                        dev);
+                    controller.SendOneShot(frame);
+                    wroteAnyCalibration = true;
+                }
                 if (role == global::MozaPlugin.Devices.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0)

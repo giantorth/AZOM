@@ -430,6 +430,105 @@ namespace MozaPlugin.Protocol
             return raw * 100.0 / 65535.0;
         }
 
+        /// <summary>Segmented Damping cmdId (0xB7). See <see cref="BuildSegmentedDampingFrame"/>.</summary>
+        public const byte CmdSegmentedDamping = 0xb7;
+        /// <summary>Segmented Damping payload length: cmd byte + 10 x 2-byte fields = 21 (0x15).</summary>
+        public const byte SegmentedDampingPayloadLen = 0x15;
+
+        /// <summary>
+        /// Same 0-100% encoding as <see cref="EncodeFrictionPct"/>
+        /// (<c>raw = round(pct * 65535 / 100)</c>) — kept as its own named
+        /// pair since it serves a structurally different command
+        /// (Segmented Damping's fixed 10-field frame vs Natural Friction's
+        /// prefix+selector commands), matching this file's convention of a
+        /// dedicated Encode/Decode pair per reverse-engineered feature.
+        /// </summary>
+        public static int EncodeSegmentedDampingPct(double pct)
+        {
+            if (double.IsNaN(pct) || pct <= 0) return 0;
+            double raw = Math.Round(pct * 65535.0 / 100.0);
+            if (raw <= 0) return 0;
+            if (raw >= 0xFFFF) return 0xFFFF;
+            return (int)raw;
+        }
+
+        /// <summary>Inverse of <see cref="EncodeSegmentedDampingPct"/>.</summary>
+        public static double DecodeSegmentedDampingPct(int raw)
+        {
+            if (raw <= 0) return 0;
+            return raw * 100.0 / 65535.0;
+        }
+
+        /// <summary>
+        /// Build the write frame for Segmented Damping — cmdId 0xB7,
+        /// reverse-engineered from real Pit House USB captures (see
+        /// docs/protocol/devices/mbooster.md "Segmented Damping"). ONE
+        /// fixed 21-byte payload carries the ENTIRE feature's state —
+        /// both "When Pressed" and "When Released" — as 10 big-endian
+        /// u16 fields in this exact order:
+        /// <pre>
+        /// 7e  15  24  12   b7  D1PH D1PL D2PH D2PL  D1RH D1RL D2RH D2RL
+        ///                  │   └──┴─Div1Pressed  └──┴─Div2Pressed
+        ///                  │        └──┴─Div1Released    └──┴─Div2Released
+        ///                  └ cmd id (0xb7)
+        ///     S1PH S1PL S1RH S1RL  S2PH S2PL S2RH S2RL  S3PH S3PL S3RH S3RL  CK
+        ///     └──┴─Seg1Pressed └──┴─Seg1Released
+        ///               └──┴─Seg2Pressed └──┴─Seg2Released
+        ///                         └──┴─Seg3Pressed └──┴─Seg3Released
+        /// </pre>
+        /// Every capture write resent the WHOLE frame — including fields
+        /// unrelated to whatever the user was actually dragging in that
+        /// capture — confirming this is always a full snapshot, never a
+        /// partial update. Each field's IDENTITY is independently verified
+        /// against its own isolated capture's 0/25/50/.../100%-style sweep
+        /// (e.g. Seg2Pressed's raw values track its capture's 0/22/57/100%
+        /// points closely — 0x0000/0x3852/0x91ec/0xffff). The two DIVIDER
+        /// fields per pair (typed values) landed exactly on
+        /// round(pct*65535/100) every time; the SEGMENT (Y-axis, mouse-
+        /// dragged) values are consistently within ~1 raw unit of that
+        /// formula rather than exact — expected, since a drag lands on
+        /// whatever pixel row the mouse happened to stop at (e.g. ~57.002%),
+        /// not a clean typed percentage; the filename's round numbers are
+        /// approximate labels, not exact wire values. All 10 fields share
+        /// <see cref="EncodeSegmentedDampingPct"/>.
+        /// </summary>
+        public static byte[] BuildSegmentedDampingFrame(
+            double div1Pressed, double div2Pressed, double div1Released, double div2Released,
+            double seg1Pressed, double seg1Released,
+            double seg2Pressed, double seg2Released,
+            double seg3Pressed, double seg3Released,
+            byte device = DeviceMotor)
+        {
+            var frame = new byte[26]; // 7e + len + group + device + 21 payload + checksum
+            frame[0] = MozaProtocol.MessageStart;
+            frame[1] = SegmentedDampingPayloadLen;
+            frame[2] = GroupMotorWrite;
+            frame[3] = device;
+            frame[4] = CmdSegmentedDamping;
+
+            ushort[] fields =
+            {
+                (ushort)EncodeSegmentedDampingPct(div1Pressed),
+                (ushort)EncodeSegmentedDampingPct(div2Pressed),
+                (ushort)EncodeSegmentedDampingPct(div1Released),
+                (ushort)EncodeSegmentedDampingPct(div2Released),
+                (ushort)EncodeSegmentedDampingPct(seg1Pressed),
+                (ushort)EncodeSegmentedDampingPct(seg1Released),
+                (ushort)EncodeSegmentedDampingPct(seg2Pressed),
+                (ushort)EncodeSegmentedDampingPct(seg2Released),
+                (ushort)EncodeSegmentedDampingPct(seg3Pressed),
+                (ushort)EncodeSegmentedDampingPct(seg3Released),
+            };
+            int off = 5;
+            foreach (var f in fields)
+            {
+                frame[off++] = (byte)(f >> 8);
+                frame[off++] = (byte)(f & 0xFF);
+            }
+            frame[25] = MozaProtocol.CalculateWireChecksum(frame, 25);
+            return frame;
+        }
+
         /// <summary>
         /// Pit House Road Texture Intensity/Smoothness encoding — reverse-
         /// engineered from two real Pit House USB captures, one per

@@ -3170,6 +3170,19 @@ namespace MozaPlugin
             float nf = fx?.NaturalFrictionPct ?? -1;
             MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
             SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
+
+            var sd = fx?.SegmentedDamping;
+            MBoosterSegDampPressedPlot.Divider1 = (sd?.Divider1Pressed ?? -1) >= 0 ? sd!.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct;
+            MBoosterSegDampPressedPlot.Divider2 = (sd?.Divider2Pressed ?? -1) >= 0 ? sd!.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct;
+            MBoosterSegDampPressedPlot.Seg1Value = (sd?.Seg1Pressed ?? -1) >= 0 ? sd!.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampPressedPlot.Seg2Value = (sd?.Seg2Pressed ?? -1) >= 0 ? sd!.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampPressedPlot.Seg3Value = (sd?.Seg3Pressed ?? -1) >= 0 ? sd!.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
+
+            MBoosterSegDampReleasedPlot.Divider1 = (sd?.Divider1Released ?? -1) >= 0 ? sd!.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct;
+            MBoosterSegDampReleasedPlot.Divider2 = (sd?.Divider2Released ?? -1) >= 0 ? sd!.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct;
+            MBoosterSegDampReleasedPlot.Seg1Value = (sd?.Seg1Released ?? -1) >= 0 ? sd!.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampReleasedPlot.Seg2Value = (sd?.Seg2Released ?? -1) >= 0 ? sd!.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampReleasedPlot.Seg3Value = (sd?.Seg3Released ?? -1) >= 0 ? sd!.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct;
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()
@@ -4284,6 +4297,82 @@ namespace MozaPlugin
                 // control specifically, applied on the same-root-cause theory.
                 controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             });
+
+        // Segmented Damping — "When Pressed". Reverse-engineered from real
+        // Pit House USB captures (see docs/protocol/devices/mbooster.md
+        // "Segmented Damping"): a SINGLE wire command (cmdId 0xB7) carries
+        // the entire feature's state — both "When Pressed" and "When
+        // Released" — as one 10-field snapshot, so every edit here must
+        // resend all 10 fields, not just the ones this plot owns. The
+        // "*Released" fields have no UI yet; they're sent using Pit
+        // House's own factory defaults (or whatever was last saved) until
+        // "When Released" gets its own plot.
+        private void MBoosterSegDampPressedPlot_ValuesChanged(object sender, EventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            var sd = s.SegmentedDamping ??= new MBoosterSegmentedDampingSettings();
+            sd.Divider1Pressed = (float)MBoosterSegDampPressedPlot.Divider1;
+            sd.Divider2Pressed = (float)MBoosterSegDampPressedPlot.Divider2;
+            sd.Seg1Pressed = (float)MBoosterSegDampPressedPlot.Seg1Value;
+            sd.Seg2Pressed = (float)MBoosterSegDampPressedPlot.Seg2Value;
+            sd.Seg3Pressed = (float)MBoosterSegDampPressedPlot.Seg3Value;
+            PushSegmentedDamping(s, sd);
+        }
+
+        // Segmented Damping — "When Released". Same shared wire command as
+        // "When Pressed" (see that handler and docs/protocol/devices/
+        // mbooster.md "Segmented Damping") — every edit here ALSO resends
+        // the current Pressed fields alongside the updated Released ones,
+        // since the frame is always a whole-feature snapshot.
+        private void MBoosterSegDampReleasedPlot_ValuesChanged(object sender, EventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            var sd = s.SegmentedDamping ??= new MBoosterSegmentedDampingSettings();
+            sd.Divider1Released = (float)MBoosterSegDampReleasedPlot.Divider1;
+            sd.Divider2Released = (float)MBoosterSegDampReleasedPlot.Divider2;
+            sd.Seg1Released = (float)MBoosterSegDampReleasedPlot.Seg1Value;
+            sd.Seg2Released = (float)MBoosterSegDampReleasedPlot.Seg2Value;
+            sd.Seg3Released = (float)MBoosterSegDampReleasedPlot.Seg3Value;
+            PushSegmentedDamping(s, sd);
+        }
+
+        /// <summary>
+        /// Save + send the ONE Segmented Damping wire frame (cmdId 0xB7)
+        /// covering both "When Pressed" and "When Released" — shared by
+        /// both plots' change handlers since either one touching its own
+        /// half still has to resend the other half's current values (the
+        /// wire command has no partial-update form). Not-yet-set fields
+        /// (-1 sentinel) fall back to Pit House's own factory defaults, same
+        /// as <see cref="MozaPlugin.ApplyMBoosterToHardware"/> does on connect.
+        /// </summary>
+        private void PushSegmentedDamping(IMBoosterPedalConfig s, MBoosterSegmentedDampingSettings sd)
+        {
+            _plugin.SaveSettings();
+
+            var controller = CurrentMBoosterController();
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            var frame = global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
+                sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
+                sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
+                sd.Divider1Released >= 0 ? sd.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
+                sd.Divider2Released >= 0 ? sd.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
+                sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg1Released >= 0 ? sd.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                dev);
+            controller?.SendOneShot(frame);
+            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+            // and MBoosterDeviceController.PushCurve7Resync; untested for this
+            // control specifically, applied on the same-root-cause theory.
+            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+        }
 
         private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)
         {

@@ -872,6 +872,82 @@ when off and restores the last slider value when on. See
 "not yet set / no override" sentinel convention as
 `EndstopFrontStiffness`/`EndstopEndStiffness`.
 
+**Segmented Damping** (labeled "SEGMENTED DAMPING" with its own card, two
+plots — "When Pressed" and "When Released") is Pit House's "simulate a
+damping force independent of in-game output, dividing pedal travel into
+multiple segments with adjustable range and its own natural damping": an
+X/Y plot (`MozaControls.MozaSegmentedBarEditor`, a new control — no
+bar-chart control existed anywhere in this app before) where the X axis
+is 0-100% pedal travel and the Y axis is 0-100% damping. Two draggable
+vertical dividers split the plot into 3 segments, each with its own
+independently draggable damping bar. Reverse-engineered from 11 real
+Pit House USB captures — 6 for "When Pressed" (2 isolating one divider
+drag each, 3 isolating one segment's Y-drag each, 1 toggling the feature
+off/on) and 5 for "When Released" (2 divider, 3 segment) — cross-checked
+against each other to decode the wire shape (see below).
+
+All 6 "When Pressed" captures write the **same single command** — cmdId
+`0xB7`, group 36 (write, same `GroupMotorWrite` group the vibration
+effects use)/35 (read, unused by any capture — this command isn't part
+of `RequestCalibrationReads`' fixed read-burst list) — with a **fixed
+21-byte payload**: the cmd byte followed by 10 big-endian `u16` fields,
+each `raw = round(pct * 65535 / 100)` (`MozaMBoosterProtocol
+.EncodeSegmentedDampingPct`/`DecodeSegmentedDampingPct`). Cross-checking
+the "When Pressed" captures against the "When Released" ones (which
+exist on disk as `pedal-feel-damping-released-*.pcapng`) revealed the
+full field order — critically, **every write resends all 10 fields**,
+including ones unrelated to whatever the user was actually dragging in
+that particular capture, proving this is always a whole-feature
+snapshot, never a partial update:
+
+```
+cmd=0xB7  Div1Pressed  Div2Pressed  Div1Released  Div2Released
+          Seg1Pressed  Seg1Released  Seg2Pressed  Seg2Released  Seg3Pressed  Seg3Released
+```
+
+Each field's identity is proven by which one varies in lockstep with its
+own isolated capture's filename sweep — e.g. `pedal-feel-damping-
+pressed-segment2-0-22-57-100.pcapng` is the only capture where the
+Seg2Pressed field moves, tracking 0/22/57/100% closely. The two DIVIDER
+fields per pair land exactly on `round(pct*65535/100)` (typed/exact
+values); the SEGMENT (Y-axis, mouse-dragged) fields are only ever within
+about 1 raw unit of that formula — expected, since a drag lands on
+whatever pixel row the mouse stopped at (e.g. ~57.002%, not a clean
+57%), not the filename's rounded label. See
+`MozaMBoosterProtocol.BuildSegmentedDampingFrame`.
+
+This also confirms "When Pressed" and "When Released" are genuinely
+**independent** — separate divider pairs, not a shared X axis with two
+Y curves — since each side's divider/segment captures never moved the
+other side's fields. A recurring, untouched baseline across 5+
+independent capture sessions gives confident factory defaults: Divider1/
+2 Pressed = 33%/67%, Divider1/2 Released = 20%/70%
+(`MBoosterUiConstants.SegDampDivider*DefaultPct`); the very first
+capture (the toggle test) shows all-zero segment values, so 0% (no
+extra damping) is the default there too
+(`MBoosterUiConstants.SegDampSegDefaultPct`).
+
+Divider bounds are Pit House's own and asymmetric per divider — Divider1
+∈ [10%, 80%], Divider2 ∈ [20%, 90%] — with a 10% minimum gap enforced
+between them (`MBoosterUiConstants.SegDampDivider1MinPct`/`MaxPct`,
+`SegDampDivider2MinPct`/`MaxPct`, `SegDampDividerMinGapPct`), confirmed
+directly from the two divider-sweep captures' filenames (e.g.
+`divider-one-10-34-60-80` sweeps from its 10% floor up to 80%, its
+ceiling). Both "When Pressed" and "When Released" have their own plot
+(`MBoosterSegmentedDampingSettings.Divider1Pressed`/`Divider2Pressed`/
+`Seg1Pressed`/`Seg2Pressed`/`Seg3Pressed` wired to
+`MBoosterSegDampPressedPlot_ValuesChanged`; the `*Released` counterparts
+wired to `MBoosterSegDampReleasedPlot_ValuesChanged`). Since the wire
+command has no partial-update form, both handlers funnel through one
+shared `SettingsControl.PushSegmentedDamping` that always resends all 10
+fields — editing a divider on the Released plot still re-sends whatever
+the Pressed plot currently holds, and vice versa. `-1` = "not yet set /
+no override", same sentinel convention as every other Pedal Feel
+calibration; a fresh profile writes nothing until the user drags a
+divider or a segment on EITHER plot, at which point any still-unset
+field on the OTHER plot is filled from the factory defaults above rather
+than left blank (the wire frame has no concept of "not sent" per field).
+
 The same card also has two force-based sliders, both host-side only and
 both applied in `MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce`, which
 runs *before* `EvaluateInputCurve`:

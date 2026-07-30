@@ -209,6 +209,20 @@
     </Style>
 
     <!-- ============================================================ -->
+    <!-- MozaSegmentedBarEditor                                        -->
+    <!-- ============================================================ -->
+    <!-- Shared template lives in MozaTheme.xaml (same split as
+         MozaCurveEditor/MozaRangeSlider above) — this is just the unkeyed
+         default style WPF auto-applies to every MozaSegmentedBarEditor
+         instance. -->
+
+    <Style TargetType="{x:Type controls:MozaSegmentedBarEditor}">
+        <Setter Property="MinHeight" Value="180"/>
+        <Setter Property="AccentBrush" Value="{StaticResource CyanBrush}"/>
+        <Setter Property="Template" Value="{StaticResource MozaSegmentedBarEditorTemplate}"/>
+    </Style>
+
+    <!-- ============================================================ -->
     <!-- SteeringArc                                                   -->
     <!-- ============================================================ -->
 

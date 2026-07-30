@@ -221,6 +221,11 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_EndstopFrontStiffness => Get("SliderLabel_EndstopFrontStiffness");
         public static string SliderLabel_EndstopEndStiffness => Get("SliderLabel_EndstopEndStiffness");
         public static string Hint_NaturalFrictionPedalFeel => Get("Hint_NaturalFrictionPedalFeel");
+        public static string Section_SegmentedDamping => Get("Section_SegmentedDamping");
+        public static string Subtitle_SegmentedDamping => Get("Subtitle_SegmentedDamping");
+        public static string Hint_SegmentedDampingExperimental => Get("Hint_SegmentedDampingExperimental");
+        public static string Section_SegmentedDampingPressed => Get("Section_SegmentedDampingPressed");
+        public static string Section_SegmentedDampingReleased => Get("Section_SegmentedDampingReleased");
         public static string Section_SimInputMapping => Get("Section_SimInputMapping");
         public static string Subtitle_SimInputMapping => Get("Subtitle_SimInputMapping");
         public static string SliderLabel_MaxThresholdKg => Get("SliderLabel_MaxThresholdKg");

@@ -161,6 +161,11 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Front Limit Stiffness</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>End Limit Stiffness</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simulate a frictional force that is independent of the game output.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>SEGMENTED DAMPING</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Damping force independent of game output, per pedal-travel segment</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simulate a damping force independent of in-game output. Pedal travel is divided into multiple segments, each with an adjustable range and its own natural damping. Drag a divider to resize a segment; drag inside a segment to set its damping amount.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>When Pressed</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>When Released</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM INPUT MAPPING</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Max Threshold (kg)</value></data>

@@ -1032,6 +1032,110 @@
     </ControlTemplate>
 
     <!-- ============================================================ -->
+    <!-- MozaSegmentedBarEditor                                        -->
+    <!-- ============================================================ -->
+    <!-- Segmented Damping (mBooster Pedal Feel) — see
+         MozaSegmentedBarEditor.cs. Two draggable vertical dividers (same
+         visual language as MozaRangeSlider's thumbs: dark-filled circle,
+         accent border + glow, value shown inside) split the plot into 3
+         segments, each a bar drawn from the bottom (0%) up to that
+         segment's damping value. -->
+    <ControlTemplate x:Key="MozaSegmentedBarEditorTemplate" TargetType="{x:Type controls:MozaSegmentedBarEditor}">
+        <Border Background="{StaticResource BgDeepBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="0"
+                SnapsToDevicePixels="True">
+            <Canvas x:Name="PART_Canvas" Background="Transparent" ClipToBounds="True">
+                <!-- Plot area outline -->
+                <Path Stroke="{StaticResource BorderBrush}" StrokeThickness="1"
+                      Data="{Binding PlotBackgroundRect, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <!-- Segment bars -->
+                <Path Fill="{TemplateBinding AccentBrush}" Opacity="0.55"
+                      Data="{Binding Seg1Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <Path Fill="{TemplateBinding AccentBrush}" Opacity="0.55"
+                      Data="{Binding Seg2Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <Path Fill="{TemplateBinding AccentBrush}" Opacity="0.55"
+                      Data="{Binding Seg3Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <!-- Per-segment value labels, floating just above each bar's
+                     current height — Seg*LabelLeft/Top are pre-centered in
+                     the code-behind (same technique as MozaRangeSlider's
+                     thumbs), since a fixed-width Border is the only way to
+                     center a WPF element via Canvas.Left without measuring
+                     the TextBlock's rendered width. -->
+                <Border Width="34" Height="18" CornerRadius="4" Background="#CC1E242A"
+                        IsHitTestVisible="False"
+                        Canvas.Left="{Binding Seg1LabelLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Seg1LabelTop, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Seg1Label, RelativeSource={RelativeSource TemplatedParent}}"
+                               Style="{StaticResource KvKeyText}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="34" Height="18" CornerRadius="4" Background="#CC1E242A"
+                        IsHitTestVisible="False"
+                        Canvas.Left="{Binding Seg2LabelLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Seg2LabelTop, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Seg2Label, RelativeSource={RelativeSource TemplatedParent}}"
+                               Style="{StaticResource KvKeyText}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="34" Height="18" CornerRadius="4" Background="#CC1E242A"
+                        IsHitTestVisible="False"
+                        Canvas.Left="{Binding Seg3LabelLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Seg3LabelTop, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Seg3Label, RelativeSource={RelativeSource TemplatedParent}}"
+                               Style="{StaticResource KvKeyText}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <!-- Divider 1 -->
+                <Line X1="{Binding Divider1X, RelativeSource={RelativeSource TemplatedParent}}"
+                      X2="{Binding Divider1X, RelativeSource={RelativeSource TemplatedParent}}"
+                      Y1="{Binding DividerTop, RelativeSource={RelativeSource TemplatedParent}}"
+                      Y2="{Binding DividerBottom, RelativeSource={RelativeSource TemplatedParent}}"
+                      Stroke="{TemplateBinding AccentBrush}" StrokeThickness="2" StrokeDashArray="3 2"/>
+                <Border Width="30" Height="20" CornerRadius="10"
+                        Background="#FF1E242A"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        Effect="{StaticResource CyanGlowSoftEffect}"
+                        Canvas.Left="{Binding Divider1HandleLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding DividerTop, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Divider1Label, RelativeSource={RelativeSource TemplatedParent}}"
+                               FontFamily="{StaticResource FontMono}" FontSize="9"
+                               Foreground="{TemplateBinding AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+                </Border>
+                <!-- Divider 2 -->
+                <Line X1="{Binding Divider2X, RelativeSource={RelativeSource TemplatedParent}}"
+                      X2="{Binding Divider2X, RelativeSource={RelativeSource TemplatedParent}}"
+                      Y1="{Binding DividerTop, RelativeSource={RelativeSource TemplatedParent}}"
+                      Y2="{Binding DividerBottom, RelativeSource={RelativeSource TemplatedParent}}"
+                      Stroke="{TemplateBinding AccentBrush}" StrokeThickness="2" StrokeDashArray="3 2"/>
+                <Border Width="30" Height="20" CornerRadius="10"
+                        Background="#FF1E242A"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        Effect="{StaticResource CyanGlowSoftEffect}"
+                        Canvas.Left="{Binding Divider2HandleLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding DividerTop, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Divider2Label, RelativeSource={RelativeSource TemplatedParent}}"
+                               FontFamily="{StaticResource FontMono}" FontSize="9"
+                               Foreground="{TemplateBinding AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+                </Border>
+                <!-- X-axis (pedal travel) reference labels -->
+                <TextBlock Text="0%" Style="{StaticResource KvKeyText}"
+                           Canvas.Left="{Binding EdgePad, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Bottom="2"/>
+                <TextBlock Text="100%" Style="{StaticResource KvKeyText}"
+                           Canvas.Right="{Binding EdgePad, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Bottom="2"/>
+            </Canvas>
+        </Border>
+    </ControlTemplate>
+
+    <!-- ============================================================ -->
     <!-- Editable slider value box                                     -->
     <!-- ============================================================ -->
     <!-- Read-only-looking value box that reveals editable chrome on

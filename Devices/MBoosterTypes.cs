@@ -108,6 +108,32 @@ namespace MozaPlugin.Devices
         // commanded offset at this rate.
         public const float GForceResponseSpeedMinPct = 0f;
         public const float GForceResponseSpeedMaxPct = 100f;
+
+        // Segmented Damping — divider bounds per Pit House's own UI (each
+        // divider has its OWN independent min/max, unlike a plain dual-
+        // thumb range): Divider1 stays within [10, 80], Divider2 within
+        // [20, 90], and the two may never be adjusted within 10% of each
+        // other. Shared by both "When Pressed" and "When Released" (each
+        // has its own independent pair of dividers, same bounds). See
+        // MozaControls.MozaSegmentedBarEditor and
+        // docs/protocol/devices/mbooster.md "Segmented Damping".
+        public const float SegDampDivider1MinPct = 10f;
+        public const float SegDampDivider1MaxPct = 80f;
+        public const float SegDampDivider2MinPct = 20f;
+        public const float SegDampDivider2MaxPct = 90f;
+        public const float SegDampDividerMinGapPct = 10f;
+
+        // Factory defaults, reverse-engineered from a recurring untouched
+        // baseline across multiple independent captures (5+ sessions each
+        // for Pressed and Released) — used as the fallback whenever a
+        // MBoosterSegmentedDampingSettings field is still the -1 "not set"
+        // sentinel, so a fresh profile displays a sensible starting layout
+        // without writing anything until the user actually drags a control.
+        public const float SegDampDivider1PressedDefaultPct = 33f;
+        public const float SegDampDivider2PressedDefaultPct = 67f;
+        public const float SegDampDivider1ReleasedDefaultPct = 20f;
+        public const float SegDampDivider2ReleasedDefaultPct = 70f;
+        public const float SegDampSegDefaultPct = 0f;
     }
 
     /// <summary>
@@ -247,6 +273,64 @@ namespace MozaPlugin.Devices
     }
 
     /// <summary>
+    /// Segmented Damping (Pedal Feel) — Pit House's "simulate a damping
+    /// force independent of in-game output, dividing pedal travel into
+    /// multiple segments with adjustable range and its own natural
+    /// damping" feature. Reverse-engineered from real Pit House USB
+    /// captures (see docs/protocol/devices/mbooster.md "Segmented
+    /// Damping"): ONE wire command (cmdId 0xB7) carries the ENTIRE
+    /// feature's state — both the "When Pressed" and "When Released"
+    /// curves — as 10 fields in a fixed order, sent as a whole snapshot
+    /// on every edit to any one of them (see
+    /// MozaMBoosterProtocol.BuildSegmentedDampingFrame). Only "When
+    /// Pressed" has a UI so far; the "*Released" fields are placeholders
+    /// (Pit House's own factory defaults, reverse-engineered from a
+    /// recurring untouched baseline across multiple captures) sent as
+    /// part of every write until "When Released" gets its own UI.
+    /// -1 = "not yet set / no override", same sentinel convention as
+    /// EndstopFrontStiffness/NaturalFrictionPct — a fresh profile writes
+    /// nothing until the user actually drags a divider or segment.
+    /// </summary>
+    public sealed class MBoosterSegmentedDampingSettings
+    {
+        // Two dividers split 0-100% pedal travel into 3 segments. Bounds
+        // and the 10% minimum gap between them are Pit House's own
+        // (MBoosterUiConstants.SegDampDivider1Min/Max etc.) — Divider1 and
+        // Divider2 are independent from their *Released counterparts
+        // below (confirmed from capture: dragging one pair's dividers
+        // never changed the other pair's wire field).
+        public float Divider1Pressed { get; set; } = -1;
+        public float Divider2Pressed { get; set; } = -1;
+        // Damping amount (0-100%) applied within each of the 3 segments
+        // while the pedal is being pressed.
+        public float Seg1Pressed { get; set; } = -1;
+        public float Seg2Pressed { get; set; } = -1;
+        public float Seg3Pressed { get; set; } = -1;
+
+        // "When Released" — same shape, no UI yet (see class summary).
+        public float Divider1Released { get; set; } = -1;
+        public float Divider2Released { get; set; } = -1;
+        public float Seg1Released { get; set; } = -1;
+        public float Seg2Released { get; set; } = -1;
+        public float Seg3Released { get; set; } = -1;
+
+        public MBoosterSegmentedDampingSettings Clone() =>
+            new MBoosterSegmentedDampingSettings
+            {
+                Divider1Pressed = Divider1Pressed,
+                Divider2Pressed = Divider2Pressed,
+                Seg1Pressed = Seg1Pressed,
+                Seg2Pressed = Seg2Pressed,
+                Seg3Pressed = Seg3Pressed,
+                Divider1Released = Divider1Released,
+                Divider2Released = Divider2Released,
+                Seg1Released = Seg1Released,
+                Seg2Released = Seg2Released,
+                Seg3Released = Seg3Released,
+            };
+    }
+
+    /// <summary>
     /// One user-created, formula-driven vibration effect (Experimental —
     /// see docs/protocol/devices/mbooster.md "Custom Effects"). Unlike the
     /// five built-in effects, there is no protocol-verified wire effect
@@ -353,6 +437,7 @@ namespace MozaPlugin.Devices
         float EndstopFrontStiffness { get; set; }
         float EndstopEndStiffness { get; set; }
         float NaturalFrictionPct { get; set; }
+        MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
     }
 
     /// <summary>
@@ -387,6 +472,7 @@ namespace MozaPlugin.Devices
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
         public float NaturalFrictionPct { get; set; } = -1;
+        public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
         public MBoosterEffectSettings Abs { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
@@ -418,6 +504,7 @@ namespace MozaPlugin.Devices
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
+                SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
@@ -671,6 +758,11 @@ namespace MozaPlugin.Devices
         // overwrites whatever value is already on the device.
         public float NaturalFrictionPct { get; set; } = -1;
 
+        // Segmented Damping (Pit House-style) — see
+        // MBoosterSegmentedDampingSettings and
+        // docs/protocol/devices/mbooster.md "Segmented Damping".
+        public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
+
         // Friendly display label the user can edit (defaults to "mBooster"
         // with a serial-tail fallback). Survives reconnects with the dict key.
         public string DisplayName { get; set; } = "";
@@ -710,6 +802,7 @@ namespace MozaPlugin.Devices
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
+                SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 DisplayName = DisplayName,
             };
         }

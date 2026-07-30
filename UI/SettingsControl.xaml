@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              xmlns:ctrl="clr-namespace:MozaControls"
+             xmlns:devices="clr-namespace:MozaPlugin.Devices"
              xmlns:ui="clr-namespace:MozaPlugin.UI"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
              Padding="0"
@@ -2006,6 +2007,31 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
+                            </ctrl:SectionCard>
+                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_SegmentedDamping}"
+                                              Subtitle="{x:Static res:Strings.Subtitle_SegmentedDamping}"
+                                              Icon="{StaticResource IconDamper}"
+                                              IsCollapsible="True">
+                                <StackPanel>
+                                    <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
+                                    <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
+                                                                  ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
+                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  ValuesChanged="MBoosterSegDampPressedPlot_ValuesChanged"/>
+                                    <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingReleased}" Style="{StaticResource SectionTitleText}" Margin="0,16,0,12"/>
+                                    <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampReleasedPlot" Height="220" Margin="0,0,0,4"
+                                                                  ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
+                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  ValuesChanged="MBoosterSegDampReleasedPlot_ValuesChanged"/>
+                                </StackPanel>
                             </ctrl:SectionCard>
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_Effects}"
                                               Subtitle="{x:Static res:Strings.Subtitle_EffectsTriggers}"
