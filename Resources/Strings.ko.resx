@@ -148,6 +148,7 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>이동 시작/종료 (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>프론트 리밋 강성</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>엔드 리밋 강성</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>게임 출력과 무관한 마찰력을 시뮬레이션합니다.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>시뮬레이션 입력 매핑</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// 로드셀/페달 신호를 게임에 매핑 (핏하우스 방식)</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>최대 임계값 (kg)</value></data>

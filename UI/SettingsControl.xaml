@@ -1895,6 +1895,19 @@
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="200"/>
                                         </Grid>
+                                        <Grid Margin="0,4" ToolTip="{x:Static res:Strings.Hint_NaturalFrictionPedalFeel}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_NaturalFriction}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="MBoosterNaturalFrictionSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterNaturalFrictionSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="MBoosterNaturalFrictionValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=MBoosterNaturalFrictionSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="0"/>
+                                        </Grid>
                                         <!-- Data-store sliders, driven by MBoosterInputCurveEditor -->
                                         <StackPanel Visibility="Collapsed">
                                             <Slider x:Name="MBoosterInputY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY1Slider_ValueChanged"/>

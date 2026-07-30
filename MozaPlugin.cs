@@ -2345,6 +2345,13 @@ namespace MozaPlugin
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopEndStiffness), dev);
                     wroteAnyCalibration = true;
                 }
+                if (cfg.NaturalFrictionPct >= 0)
+                {
+                    int frictionRaw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.NaturalFrictionPct);
+                    controller.SendIntWrite("mbooster-brake-friction-0", frictionRaw, dev);
+                    controller.SendIntWrite("mbooster-brake-friction-1", frictionRaw, dev);
+                    wroteAnyCalibration = true;
+                }
                 if (role == global::MozaPlugin.Devices.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0)

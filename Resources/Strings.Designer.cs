@@ -220,6 +220,7 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_TravelRangeMm => Get("SliderLabel_TravelRangeMm");
         public static string SliderLabel_EndstopFrontStiffness => Get("SliderLabel_EndstopFrontStiffness");
         public static string SliderLabel_EndstopEndStiffness => Get("SliderLabel_EndstopEndStiffness");
+        public static string Hint_NaturalFrictionPedalFeel => Get("Hint_NaturalFrictionPedalFeel");
         public static string Section_SimInputMapping => Get("Section_SimInputMapping");
         public static string Subtitle_SimInputMapping => Get("Subtitle_SimInputMapping");
         public static string SliderLabel_MaxThresholdKg => Get("SliderLabel_MaxThresholdKg");

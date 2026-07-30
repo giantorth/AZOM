@@ -148,6 +148,7 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Αρχή / Τέλος Διαδρομής (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Σκληρότητα εμπρός ορίου</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Σκληρότητα τελικού ορίου</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Προσομοιώνει μια δύναμη τριβής ανεξάρτητη από την έξοδο του παιχνιδιού.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>ΑΝΤΙΣΤΟΙΧΙΣΗ ΕΙΣΟΔΟΥ ΠΡΟΣΟΜΟΙΩΣΗΣ</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// αντιστοίχιση σήματος κυψέλης φόρτισης/πεντάλ στο παιχνίδι, στυλ Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Μέγιστο κατώφλι (kg)</value></data>

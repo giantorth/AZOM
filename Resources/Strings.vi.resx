@@ -148,6 +148,7 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Bắt đầu / Kết thúc Hành trình (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Độ cứng giới hạn đầu</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Độ cứng giới hạn cuối</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Mô phỏng một lực ma sát độc lập với đầu ra của game.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>ÁNH XẠ ĐẦU VÀO SIM</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// ánh xạ tín hiệu loadcell/bàn đạp vào game, theo kiểu Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Ngưỡng tối đa (kg)</value></data>

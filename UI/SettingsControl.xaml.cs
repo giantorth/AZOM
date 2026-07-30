@@ -3167,6 +3167,9 @@ namespace MozaPlugin
             SetValueText(MBoosterDeadzoneValue, (fx?.DeadzoneKg ?? 0).ToString("F1"));
             MBoosterMaxForceSlider.Value = fx?.MaxForceKg ?? 200;
             SetValueText(MBoosterMaxForceValue, (fx?.MaxForceKg ?? 200).ToString("F0"));
+            float nf = fx?.NaturalFrictionPct ?? -1;
+            MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
+            SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()
@@ -4247,6 +4250,35 @@ namespace MozaPlugin
                 byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
                 controller?.SendIntWrite("mbooster-brake-endstop-end",
                     global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
+                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+                // and MBoosterDeviceController.PushCurve7Resync; untested for this
+                // control specifically, applied on the same-root-cause theory.
+                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+            });
+
+        // Natural Friction (0-100%) — simulates a frictional force
+        // independent of game output. Reverse-engineered from two real Pit
+        // House USB captures (a toggle on/off, and a 0/25/50/75/100% slider
+        // sweep — see docs/protocol/devices/mbooster.md "Pedal Feel"): wire
+        // cmdId 0xAE, sharing the same "prefix bytes + selector" shape as
+        // End Stop Stiffness (0xB2). Every capture write sent BOTH
+        // selectors with the IDENTICAL value in the same burst, so this
+        // control always writes mbooster-brake-friction-0 and -1 together
+        // rather than exposing them as separate sliders. There is no
+        // separate wire enable bit — the capture's toggle-off write simply
+        // sent raw 0 (confirmed via the firmware's own debug log echoing
+        // it as fixed-point 0.0).
+        private void MBoosterNaturalFrictionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+            OnIntSliderChanged(e.NewValue, MBoosterNaturalFrictionValue, "", v =>
+            {
+                var s = CurrentMBoosterEffectTarget();
+                if (s == null) return;
+                s.NaturalFrictionPct = v;
+                var controller = CurrentMBoosterController();
+                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+                int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(v);
+                controller?.SendIntWrite("mbooster-brake-friction-0", raw, dev);
+                controller?.SendIntWrite("mbooster-brake-friction-1", raw, dev);
                 // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
                 // and MBoosterDeviceController.PushCurve7Resync; untested for this
                 // control specifically, applied on the same-root-cause theory.

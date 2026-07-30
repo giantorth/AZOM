@@ -352,6 +352,7 @@ namespace MozaPlugin.Devices
         float TravelEndMm { get; set; }
         float EndstopFrontStiffness { get; set; }
         float EndstopEndStiffness { get; set; }
+        float NaturalFrictionPct { get; set; }
     }
 
     /// <summary>
@@ -385,6 +386,7 @@ namespace MozaPlugin.Devices
         public float TravelEndMm { get; set; } = -1;
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
+        public float NaturalFrictionPct { get; set; } = -1;
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
         public MBoosterEffectSettings Abs { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
@@ -415,6 +417,7 @@ namespace MozaPlugin.Devices
                 TravelEndMm = TravelEndMm,
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
+                NaturalFrictionPct = NaturalFrictionPct,
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
@@ -654,6 +657,20 @@ namespace MozaPlugin.Devices
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
 
+        // Natural Friction (Pit House-style), 0-100%. Real hardware write
+        // (not host-side-only like Deadzone/MaxForce) — reverse-engineered
+        // from two real Pit House USB captures (a toggle on/off, and a
+        // 0/25/50/75/100% slider sweep): wire commands
+        // mbooster-brake-friction-0/-1 (cmdId 0xAE with a selector byte,
+        // always written together with the same value), 2-byte int, fixed
+        // 0-100% scale over 0-65535 — see
+        // MozaMBoosterProtocol.EncodeFrictionPct/DecodeFrictionPct and
+        // docs/protocol/devices/mbooster.md "Pedal Feel". -1 = "not yet set
+        // / no override", same sentinel convention as
+        // TravelStartMm/EndstopFrontStiffness, so a fresh profile never
+        // overwrites whatever value is already on the device.
+        public float NaturalFrictionPct { get; set; } = -1;
+
         // Friendly display label the user can edit (defaults to "mBooster"
         // with a serial-tail fallback). Survives reconnects with the dict key.
         public string DisplayName { get; set; } = "";
@@ -692,6 +709,7 @@ namespace MozaPlugin.Devices
                 TravelEndMm = TravelEndMm,
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
+                NaturalFrictionPct = NaturalFrictionPct,
                 DisplayName = DisplayName,
             };
         }

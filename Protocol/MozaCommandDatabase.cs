@@ -603,6 +603,19 @@ namespace MozaPlugin.Protocol
             // docs/protocol/devices/mbooster.md "Pedal Feel".
             AddCommand("mbooster-brake-endstop-front", "mbooster", 35, 36, new byte[] { 0xB2, 0x00, 0x00 }, 2, "int");
             AddCommand("mbooster-brake-endstop-end",   "mbooster", 35, 36, new byte[] { 0xB2, 0x00, 0x01 }, 2, "int");
+            // Natural Friction (0-100%) — reverse-engineered from two real
+            // Pit House USB captures (a toggle on/off, and a 0/25/50/75/100%
+            // slider sweep). Same "prefix bytes + selector" shape as End
+            // Stop Stiffness above: ONE cmdId (0xAE) with a fixed 0x00 byte
+            // and a selector byte (0x00/0x01) before the 2-byte value — but
+            // unlike Endstop's independent front/end values, every capture
+            // write sent BOTH selectors with the IDENTICAL value in the same
+            // burst, so these two are always written together, never
+            // independently. raw = round(pct * 65535 / 100), matching
+            // MozaMBoosterProtocol.EncodeFrictionPct. See
+            // docs/protocol/devices/mbooster.md "Pedal Feel".
+            AddCommand("mbooster-brake-friction-0", "mbooster", 35, 36, new byte[] { 0xAE, 0x00, 0x00 }, 2, "int");
+            AddCommand("mbooster-brake-friction-1", "mbooster", 35, 36, new byte[] { 0xAE, 0x00, 0x01 }, 2, "int");
             // 5-point output curves per pedal (4-byte float, read 35 / write 36)
             AddCommand("mbooster-throttle-y1", "mbooster", 35, 36, new byte[] { 14 }, 4, "float");
             AddCommand("mbooster-throttle-y2", "mbooster", 35, 36, new byte[] { 15 }, 4, "float");

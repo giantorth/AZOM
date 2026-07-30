@@ -401,6 +401,36 @@ namespace MozaPlugin.Protocol
         }
 
         /// <summary>
+        /// Pit House "Natural Friction" encoding — reverse-engineered from
+        /// two real Pit House USB captures (wire commands
+        /// <c>mbooster-brake-friction-0</c>/<c>-1</c>, cmdId 0xAE with a
+        /// selector byte; see docs/protocol/devices/mbooster.md "Pedal
+        /// Feel"). Fixed 0-100% scale over the 0-65535 range: <c>raw =
+        /// round(pct * 65535 / 100)</c>. Verified against a 0/25/50/75/100%
+        /// sweep (0x0000/0x4000/0x8000/0xbfff/0xffff, all exact) and cross-
+        /// checked against the firmware's own debug log in a second capture,
+        /// which echoed the disabled write as fixed-point 0.0 and the
+        /// enabled write (slider at 100%) as fixed-point 1.0 — confirming
+        /// there is no separate wire enable bit; turning the feature off
+        /// just writes raw 0.
+        /// </summary>
+        public static int EncodeFrictionPct(double pct)
+        {
+            if (double.IsNaN(pct) || pct <= 0) return 0;
+            double raw = Math.Round(pct * 65535.0 / 100.0);
+            if (raw <= 0) return 0;
+            if (raw >= 0xFFFF) return 0xFFFF;
+            return (int)raw;
+        }
+
+        /// <summary>Inverse of <see cref="EncodeFrictionPct"/>.</summary>
+        public static double DecodeFrictionPct(int raw)
+        {
+            if (raw <= 0) return 0;
+            return raw * 100.0 / 65535.0;
+        }
+
+        /// <summary>
         /// Pit House Road Texture Intensity/Smoothness encoding — reverse-
         /// engineered from two real Pit House USB captures, one per
         /// parameter (each isolating stepped drags to 25/50/75/100%). Both

@@ -848,6 +848,30 @@ which is why `EncodeEndstopStiffness` explicitly uses
 that every other `Encode*` helper here implicitly relies on. Same `-1`
 sentinel convention as `TravelStartMm`/`TravelEndMm`.
 
+**Natural Friction** (`NaturalFrictionPct`, 0–100%, labeled "Natural
+Friction" — simulates a frictional force independent of game output) is
+another genuine hardware write, reverse-engineered from two real Pit
+House USB captures: one toggling the setting off/on, and one dragging the
+slider through 0/25/50/75/100%. Same "prefix bytes + selector" shape as
+End Stop Stiffness above — ONE cmdId (`0xAE`) with a fixed `0x00` byte and
+a selector byte (`0x00`/`0x01`) before the 2-byte value
+(`mbooster-brake-friction-0`/`-1` in the command database) — but unlike
+Endstop's independent front/end values, every capture write sent **both**
+selectors with the identical value in the same burst, so the UI always
+writes them together rather than exposing two sliders. Fixed 0–100% scale
+over 0–65535: `raw = round(pct * 65535 / 100)` — the 0/25/50/75/100%
+sweep matched exactly (`0x0000`/`0x4000`/`0x8000`/`0xbfff`/`0xffff`). The
+toggle capture cross-checks this: the mBooster's own firmware debug log
+(carried in the response stream as ASCII, `param_manage.c` write-confirm
+lines) echoed the disabled write as `Table 2, Param 32 Written: 0
+0.00000` and the enabled write (slider left at 100%) as `Param 32
+Written: 1073741824` (`2^30`, i.e. fixed-point `1.0`) — confirming there
+is **no separate wire enable bit**; Pit House's toggle just writes raw 0
+when off and restores the last slider value when on. See
+`MozaMBoosterProtocol.EncodeFrictionPct`/`DecodeFrictionPct`. Same `-1`
+"not yet set / no override" sentinel convention as
+`EndstopFrontStiffness`/`EndstopEndStiffness`.
+
 The same card also has two force-based sliders, both host-side only and
 both applied in `MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce`, which
 runs *before* `EvaluateInputCurve`:

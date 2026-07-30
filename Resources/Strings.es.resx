@@ -153,6 +153,7 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Inicio / Fin del Recorrido (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Rigidez del límite frontal</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Rigidez del límite final</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simula una fuerza de fricción independiente de la salida del juego.</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>MAPEO DE ENTRADA DE SIMULACIÓN</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// mapea la señal de la celda de carga/pedal al juego, al estilo Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Umbral máximo (kg)</value></data>
