@@ -13,6 +13,7 @@ the full identity probe order.
 | `CS V2.1` | CS V2 | (no integrated screen) | `01 02 26 00` | `vgs-to-cs-wheel.ndjson` |
 | `W17` | CS Pro | 16 RPM LEDs (single series), 8 button LEDs, no flag LEDs, 4 knobs | n/a | physical hardware inspection |
 | `FSR` | FSR **V1** display wheel (box "FSR1") | integrated display; 10 RPM LEDs, 10 light-up buttons (group `0x3F` live telemetry observed) | not captured | `usb-capture/fsr1/FSR1 with game.pcapng` |
+| `RS Leather # W00` | RS V2 | 10 RPM LEDs, 10 button LEDs (owner-confirmed), no flag LEDs, screenless | not captured | live serial capture, user diagnostics bundle 2026-07-30 (VPV9RA4Z) |
 | `Display` | Display sub-device (inside VGS-class wheels) | n/a | `01 02 00 00` | wrapped 0x43 probe; see [`display-sub-device.md`](display-sub-device.md) |
 
 Full identity reply for the `FSR` wheel (USB capture `usb-capture/fsr1/FSR1 with game.pcapng`,
@@ -28,6 +29,19 @@ firmware and different `0x07/01` replies: FSR V1 reports model-name **`FSR`** (h
 device as `W13`. The FSR V1 also uses a wholly different telemetry transport (group
 `0x42` display push — see [`../devices/wheel-0x17.md`](../devices/wheel-0x17.md) §
 Group 0x42), whereas the W13/FSR V2 uses the standard tier-definition path.
+
+Full identity reply for the **RS V2** wheel (live serial capture, user diagnostics
+bundle 2026-07-30 `VPV9RA4Z`, wheel `0x17` → `0x71`): model-name (`0x07/01`)
+`RS Leather # W00`, hw-version (`0x08/01`) `RS21-W00-HW SM-C`, hw-revision
+(`0x08/02`) `U-V02`, sw-version (`0x0F/01`) `RS21-D00-MC SW`, dev-type (`0x04`)
+`01 02 09 07`, serial present. New-protocol, screenless, `sub_device_count=0`.
+
+The `# W00` suffix follows the `<product> # <module-code>` convention seen on
+other modules (`HB # S01`, `R5 Black # MOT-1`) — the code matches the `RS21-W00`
+hw string. The name is exactly 16 characters, filling the `0x07/01` field with no
+null padding; whether a continuation exists in `0x07/02` is unconfirmed (the
+plugin never queries it). The owner confirms the wheel is functionally identical
+to the RS V2 — `WheelModelInfo` maps this string to the "RS V2" profile.
 
 ### Assumed from device naming (unverified)
 

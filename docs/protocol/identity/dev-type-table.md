@@ -8,6 +8,7 @@
 | CSP | `06 06` (DT_2 not `0x04`!) | 2026-04 capture — sim default `01:02:04:06` was wrong for CSP |
 | KS | `05 06` | live probe |
 | KSP | `07 07` | 2026-04-26 re-extract from `usb-capture/ksp/putOnWheelAndOpenPitHouse.pcapng` grp=0x84 reply. Earlier sim default `01:02:05:06` (copied from KS) made PitHouse name-match W18 → KS Pro briefly, then demote on dev_type read because `05 06` matches the non-Pro KS profile |
+| RS V2 | `09 07` | live serial capture, user diagnostics bundle 2026-07-30 (VPV9RA4Z); model-name `RS Leather # W00`, hw `RS21-W00-HW SM-C` |
 | ES | `12 08` (earlier capture) / `10 09` (R5+ES, 2026-06-12) | live probe — see note |
 
 > **ES dev-type note (2026-06-12).** A live R5 base + ES wheel returned dev-type

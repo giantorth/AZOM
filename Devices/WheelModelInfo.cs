@@ -222,11 +222,16 @@ namespace MozaPlugin.Devices
             // kind=5 push). Verified from VGS PitHouse captures.
             ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true)),
             ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
-            // RS V2 referenced in Telemetry/EraPolicy.cs:187 but not yet measured.
-            // LED dimensions are best-guess from the Default profile; HasDisplay=false
-            // per user. RPM/button counts should be confirmed against a real RS V2
-            // and tightened in a follow-up.
-            ("RS V2",   "RS V2",      new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
+            // RS V2: 10 RPM + 10 button LEDs (owner-confirmed, 2026-07-30),
+            // screenless. Real RS V2 firmware self-reports the 16-byte string
+            // "RS Leather # W00" (hw "RS21-W00-HW SM-C", dev-type 01 02 09 07),
+            // so the "RS Leather # W00" entry carries the same profile under the
+            // same "RS V2" FriendlyName/device dir — the GS V2P / bare-"GS"
+            // pattern. The "RS Leather # W00" entry must be listed ahead of the
+            // "RS Leather" rim entry below: "RS Leather" is a StartsWith-prefix
+            // of it and would otherwise win the scan.
+            ("RS V2",   "RS V2",      new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            ("RS Leather # W00", "RS V2", new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
             // RS round / D-shape family (docs/how-to-query-device-type.md). Added
             // with CONSERVATIVE defaults per user: 10 RGB RPM LEDs, screenless
             // (hasDisplay:false), sleep-light off (safe for an unmeasured rim), no
@@ -235,7 +240,9 @@ namespace MozaPlugin.Devices
             // RpmLedCount/ButtonLedCount, and add usesLegacyRpmTelemetry, once a real
             // rim is measured. No thumbnail art embedded yet. Distinct FriendlyNames
             // keep each as its own device; none is a StartsWith-prefix of another or
-            // of "RS V2" / "RSX", so ordering among them is free.
+            // of "RS V2" / "RSX", so ordering among them is free — but "RS Leather"
+            // IS a prefix of the real RS V2's "RS Leather # W00" reply, so that
+            // longer entry above must stay ahead of this block.
             ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
