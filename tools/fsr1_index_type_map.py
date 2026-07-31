@@ -70,19 +70,20 @@ def main() -> int:
                 else:
                     last_type = t; run = 1
                 if run >= STEADY:
-                    idx_types[cur_idx][t] += 1
+                    b1 = frame[5] if len(frame) > 6 else 0
+                    b2 = frame[6] if len(frame) > 6 else 0
+                    idx_types[cur_idx][(t, b1, b2)] += 1
         if n and n % 200000 == 0:
             print(f"... {n} frames, indices seen: {sorted(idx_types)}", file=sys.stderr)
     _dump(idx_types, idx_order)
     return 0
 
 def _dump(idx_types, idx_order):
-    print("\n=== FSR1 page index -> streamed record type(s) (ground truth) ===")
+    print("\n=== FSR1 page index -> (record type, B1, B2) (ground truth) ===")
     for idx in sorted(idx_types):
         tallies = idx_types[idx].most_common()
-        shown = "  ".join(f"0x{t:02x}:{c}" for t, c in tallies)
-        primary = [f"0x{t:02x}" for t, c in tallies if c > 0.02 * tallies[0][1]]
-        print(f"  index {idx:2d} -> {{ {', '.join(primary)} }}    (counts: {shown})")
+        shown = "  ".join(f"0x{t:02x}(B1={b1:02x} B2={b2:02x}):{c}" for (t, b1, b2), c in tallies)
+        print(f"  index {idx:2d}: {shown}")
 
 if __name__ == "__main__":
     raise SystemExit(main())
