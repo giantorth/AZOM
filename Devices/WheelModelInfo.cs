@@ -222,24 +222,23 @@ namespace MozaPlugin.Devices
             // kind=5 push). Verified from VGS PitHouse captures.
             ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true)),
             ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
-            // RS V2 referenced in Telemetry/EraPolicy.cs:187 but not yet measured.
-            // LED dimensions are best-guess from the Default profile; HasDisplay=false
-            // per user. RPM/button counts should be confirmed against a real RS V2
-            // and tightened in a follow-up.
-            ("RS V2",   "RS V2",      new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
-            // RS round / D-shape family (docs/how-to-query-device-type.md). Added
-            // with CONSERVATIVE defaults per user: 10 RGB RPM LEDs, screenless
-            // (hasDisplay:false), sleep-light off (safe for an unmeasured rim), no
-            // button LEDs claimed. Button-LED count and whether these are old- or
-            // new-protocol are UNCONFIRMED — no capture or hardware read yet. Tighten
-            // RpmLedCount/ButtonLedCount, and add usesLegacyRpmTelemetry, once a real
-            // rim is measured. No thumbnail art embedded yet. Distinct FriendlyNames
-            // keep each as its own device; none is a StartsWith-prefix of another or
-            // of "RS V2" / "RSX", so ordering among them is free.
-            ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            // RS V2: 10 RPM + 10 button LEDs (owner-confirmed, 2026-07-30),
+            // screenless. The real RS V2 self-reports "RS Leather # W00"
+            // (hw "RS21-W00-HW SM-C", dev-type 01 02 09 07) and resolves via
+            // the "RS Leather" rim entry below; this prefix stays for firmware
+            // that reports the literal product name.
+            ("RS V2",   "RS V2",      new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            // RS round / D-shape family (MOZA-sourced names): 10 RGB RPM +
+            // 10 button LEDs, screenless, sleep-light off (safe default for
+            // unmeasured rims). The real RS V2 reports "RS Leather # W00"
+            // ("# W00" = hw module code, tolerated by the StartsWith match) and
+            // resolves via the "RS Leather" prefix — new-protocol, 10/10
+            // owner-confirmed 2026-07-30; the other rims are assumed to share
+            // the layout. No thumbnail art embedded yet.
+            ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             // Original CS (predecessor to CS V2 / CS V2.1) — firmware reports the
             // bare prefix "CS" with no version suffix. 10 RGB RPM LEDs, no button
             // / flag / knob LEDs, no display. Must come after "CS V2.1" so the
