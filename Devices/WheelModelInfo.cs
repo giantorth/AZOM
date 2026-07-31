@@ -365,8 +365,11 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Get the friendly display name for a model prefix. Returns the prefix itself
-        /// for unknown models.
+        /// Get the friendly display name for a model prefix. For unknown models
+        /// returns the prefix itself, minus any " # &lt;module-code&gt;" firmware
+        /// suffix ("RS Leather # W00", "HB # S01") — the code is wire plumbing,
+        /// not part of the product name. The full string stays the identity key
+        /// (GUID, thumbnail); only the display name is trimmed.
         /// </summary>
         public static string GetFriendlyName(string modelPrefix)
         {
@@ -376,6 +379,13 @@ namespace MozaPlugin.Devices
                     return friendlyName;
             }
 
+            int hash = string.IsNullOrEmpty(modelPrefix) ? -1 : modelPrefix.IndexOf('#');
+            if (hash > 0)
+            {
+                var trimmed = modelPrefix.Substring(0, hash).TrimEnd();
+                if (trimmed.Length > 0)
+                    return trimmed;
+            }
             return modelPrefix;
         }
 

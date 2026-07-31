@@ -9,7 +9,8 @@ All notable changes to the AZOM plugin are documented here.
 - **RS V2 wheel detection.** RS V2 firmware reports the model string "RS Leather # W00",
   which matched the RS Leather Round rim profile (no button LEDs) and hid the button-LED
   controls. The wheel is now detected as an RS V2. The RS V2 button-LED count is also
-  corrected from 14 to 10.
+  corrected from 14 to 10. Unrecognized wheel models no longer carry the firmware's
+  "# code" suffix in their SimHub device name.
 
 ## [1.5.2] - 2026-07-29
 
