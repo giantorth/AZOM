@@ -657,7 +657,11 @@ namespace MozaPlugin.Devices
         /// Walk all devices in enumeration order and assign each device's
         /// position to the matching <c>MozaData</c> field if its role is set.
         /// First-wins on collision (later devices with the same role are
-        /// ignored). Devices with Role=Disabled contribute nothing.
+        /// ignored). Devices with Role=Disabled contribute nothing. Axes the
+        /// "PD Linked" diagnostic reports as having no pedal are skipped —
+        /// the HID exposes 3 axes regardless of how many pedals are wired,
+        /// and a phantom axis's role claim would otherwise first-wins a real
+        /// pedal's role with a frozen 0 position.
         /// </summary>
         private readonly HashSet<string> _unmatchedHidLogged =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -695,10 +699,12 @@ namespace MozaPlugin.Devices
                 {
                     var c = _order[i];
                     var s = _settingsLookup(c.Identity);
+                    var connected = c.ConnectedAxes;
                     int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
                     if (axisCount > MBoosterDeviceController.MaxAxes) axisCount = MBoosterDeviceController.MaxAxes;
                     for (int a = 0; a < axisCount; a++)
                     {
+                        if (connected != null && (a >= connected.Length || !connected[a])) continue;
                         var role = ResolveAxisRole(s, a, axisCount);
                         if (role == MBoosterRole.Disabled) continue;
                         // MozaData position fields are int (0..100, the same scale

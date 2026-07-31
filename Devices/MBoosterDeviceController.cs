@@ -231,15 +231,18 @@ namespace MozaPlugin.Devices
         /// axis-index-to-device-id mapping only applies when that axis index
         /// corresponds to a real separate physical unit, not to wherever a
         /// lone pedal's data happens to land in the report descriptor.
-        /// Chain-ness is taken from <see cref="SubDeviceCount"/> (the presence
-        /// read, known at connect) OR the parsed <see cref="ConnectedAxes"/>,
-        /// whichever already shows more than one motor: the device streams the
-        /// "PD Linked:[T x B y C z]" diagnostic seconds after connect — and
-        /// sometimes first as an unparseable short form ("PD Linked: 1") — so
-        /// gating solely on ConnectedAxes collapses a real chain onto the
-        /// master 0x12 for that whole window (brake effects then fire from the
-        /// throttle motor). Confirmed on hardware: the device ids are
-        /// role-based (0x12 throttle / 0x1d brake / 0x1e clutch).
+        /// Chain-ness comes from the parsed <see cref="ConnectedAxes"/> once
+        /// the "PD Linked:[T x B y C z]" diagnostic has arrived — it is the
+        /// only signal that can tell a chain from a lone pedal: a confirmed
+        /// STANDALONE unit reports presence [00 02] (SubDeviceCount 2), the
+        /// same bytes as a 2-pedal chain, so the presence read cannot
+        /// distinguish the two. <see cref="SubDeviceCount"/> only bridges the
+        /// window before the diagnostic lands (it streams seconds after
+        /// connect — and sometimes first as an unparseable short form
+        /// ("PD Linked: 1")), so a real chain isn't collapsed onto the master
+        /// 0x12 for that window (brake effects would fire from the throttle
+        /// motor). Confirmed on hardware: the device ids are role-based
+        /// (0x12 throttle / 0x1d brake / 0x1e clutch).
         /// </summary>
         public byte MotorDeviceForCurrentAxis(int axisIndex)
         {
@@ -247,7 +250,7 @@ namespace MozaPlugin.Devices
             int connectedCount = 0;
             if (connected != null)
                 foreach (var b in connected) if (b) connectedCount++;
-            bool isChain = connectedCount > 1 || SubDeviceCount > 1;
+            bool isChain = connected != null ? connectedCount > 1 : SubDeviceCount > 1;
             return isChain ? MotorDeviceForAxis(axisIndex) : MozaProtocol.DeviceMain;
         }
 
@@ -323,9 +326,14 @@ namespace MozaPlugin.Devices
         /// default (min 0 / max 100) for the roles it doesn't have. So each
         /// device's role is simply the single register that is NOT the default
         /// — e.g. host 0x12 reads brake 16/99 (the rest 0/100) → Brake; chained
-        /// 0x1d reads throttle 3/99 (the rest 0/100) → Throttle. A device with
-        /// zero or more than one configured register is left unmapped (routes
-        /// by axis index), so this never routes worse than before.
+        /// 0x1d reads throttle 3/99 (the rest 0/100) → Throttle. Roles
+        /// <see cref="ConnectedAxes"/> reports as having no pedal are excluded
+        /// from the fingerprint: the host retains stale calibration for
+        /// detached pedals (a confirmed standalone brake also read back a
+        /// non-default throttle register), which would otherwise make it count
+        /// as ambiguous. A device with zero or more than one configured
+        /// register is left unmapped (routes by axis index), so this never
+        /// routes worse than before.
         /// </summary>
         private void RecomputeChainRoleMap()
         {
@@ -336,6 +344,7 @@ namespace MozaPlugin.Devices
                 foreach (var kv in _deviceCalib)
                     devices.Add(new KeyValuePair<byte, int[]>(kv.Key, (int[])kv.Value.Clone()));
             }
+            var connected = _connectedAxes; // role-indexed [T,B,C]; null until PD Linked
 
             var roleToDev = new Dictionary<int, byte>();
             var conflict = new HashSet<int>();
@@ -347,10 +356,14 @@ namespace MozaPlugin.Devices
                 if (!full) continue;
 
                 // The one register that isn't the 0..100 unconfigured default
-                // names this device's own pedal.
+                // names this device's own pedal. Registers for roles with no
+                // physically-connected pedal are stale — skip them.
                 int role = -1, count = 0;
                 for (int r = 0; r < 3; r++)
+                {
+                    if (connected != null && (r >= connected.Length || !connected[r])) continue;
                     if (!(c[r * 2] == 0 && c[r * 2 + 1] == 100)) { role = r; count++; }
+                }
                 if (count != 1) continue; // uncalibrated / ambiguous — leave to fallback
 
                 if (roleToDev.TryGetValue(role, out var existing) && existing != kv.Key)
@@ -544,6 +557,9 @@ namespace MozaPlugin.Devices
                 {
                     _connectedAxes = new[] { t == 1, b == 1, c == 1 };
                     MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} connected pedals: T={t == 1} B={b == 1} C={c == 1}");
+                    // Connectivity narrows which roles the calibration
+                    // fingerprint may consider — re-derive with it known.
+                    RecomputeChainRoleMap();
                 }
             }
 
