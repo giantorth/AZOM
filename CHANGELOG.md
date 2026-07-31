@@ -2,7 +2,7 @@
 
 All notable changes to the AZOM plugin are documented here.
 
-## [Unreleased]
+## [1.5.3] - 2026-07-30
 
 ### Fixed
 
@@ -11,6 +11,14 @@ All notable changes to the AZOM plugin are documented here.
   reports "RS Leather # W00", which resolves to the RS Leather Round profile that
   previously claimed no button LEDs. The RS V2 profile's count is also corrected
   from 14 to 10.
+- **Standalone mBooster pedals are no longer mistaken for a chain.** A lone unit reports
+  the same presence bytes as a two-pedal chain, which could route its effects to the wrong
+  motor address; stale calibration the host keeps for detached pedals could also leave the
+  unit's role unresolved, and an empty HID axis could claim a role ahead of the real pedal,
+  pinning that input at 0. Chain detection, role resolution, and axis-to-input mapping now
+  follow the device's own connected-pedal diagnostic.
+- **Unknown wheel names.** Unrecognized wheel models no longer carry the firmware's
+  "# code" module suffix (e.g. "# W00") in their SimHub device name.
 
 ## [1.5.2] - 2026-07-29
 
@@ -641,6 +649,7 @@ First release that can drive the wheel's built-in dashboards (requires the match
 - Initial development: wheelbase control and build pipeline, per-wheel profiles, first device
   definitions, RPM range settings, blink colors, and the first telemetry/dashboard init attempts.
 
+[1.5.3]: https://github.com/giantorth/AZOM/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/giantorth/AZOM/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/giantorth/AZOM/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/giantorth/AZOM/compare/v1.4.0...v1.5.0
