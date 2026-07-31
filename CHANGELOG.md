@@ -2,6 +2,16 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **RS wheel button LEDs.** The RS rim profiles (Leather/Alcantara, Round/D-Shape) now
+  carry 10 button LEDs, restoring the button-LED controls for the RS V2 — its firmware
+  reports "RS Leather # W00", which resolves to the RS Leather Round profile that
+  previously claimed no button LEDs. The RS V2 profile's count is also corrected
+  from 14 to 10.
+
 ## [1.5.2] - 2026-07-29
 
 ### Added
