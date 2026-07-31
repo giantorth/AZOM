@@ -75,6 +75,16 @@ namespace MozaPlugin.Telemetry.Watchdog
         // (sess=0x01); 20 s leaves headroom past legitimate quiet.
         private const int S02StallThresholdMs = 20_000;
         private const int S01StallThresholdMs = 20_000;
+        // Binding-channel death (Context C): the resolved tier-def session has
+        // carried NO inbound for this long while the mirror session stayed
+        // demonstrably alive. Healthy cadence on the tier-def session is ~4 s
+        // keepalives, so 120 s is ~30 missed periods — far past any legitimate
+        // idle gap, small next to the 27 min the 2026-07-24 wedge sat unseen.
+        private const int TierDefSessionDeadThresholdMs = 120_000;
+        // The corroborating mirror session must have inbound at least this
+        // fresh, so a dead cable / vanished port (both sessions quiet) can
+        // never fire this rule — that is the connection layer's job.
+        private const int MirrorSessionFreshMs = 30_000;
         // Don't trust inbound-bytes liveness on mgmt while a wheel-initiated
         // CLOSE is recent — the close is the wheel rejecting the session.
         private const int S01PostCloseSettleMs = 15_000;
@@ -423,6 +433,53 @@ namespace MozaPlugin.Telemetry.Watchdog
             // Context A — engagement establishment.
             if (_sender.CatalogCount <= 0)
                 return (true, $"no channel catalog past {EngagementGraceMs} ms grace");
+
+            // Context C — binding-channel liveness (wheel-side session reset).
+            // CS-Pro bundle 2026-07-24: the wheel was power-cycled while the
+            // sender sat Active. The rebooted wheel kept sess=0x02 chatty (1 Hz
+            // END records, all acked by us) but the tier-def session (0x01)
+            // carried ZERO inbound — no data, no fc:00 acks — for 27 minutes.
+            // Every content check above stayed green off CACHES from the
+            // pre-reboot engagement (ConfigJson LastState survives Stop/Start,
+            // WheelReportedSlot survives until hot-swap), so no verdict ever
+            // fired and the display stayed dead until a manual toggle. The
+            // discriminator is liveness asymmetry: the session our subscription
+            // binds through is stone dead while the mirror session proves the
+            // wheel (and the wire) alive. Healthy wheels keepalive the tier-def
+            // session every ~4 s; the radar slow-bind streams catalog there.
+            // Both-quiet (cable pull, port gone) is excluded by the mirror
+            // freshness requirement — that failure belongs to the connection
+            // layer. Keyed on ResolveTierDefSession() so Form-A (tier-def on
+            // 0x01) and Form-B (tier-def on 0x02) wheels both watch the right
+            // lane; when mgmt and flag resolve to the SAME session the two
+            // stamps coincide and the rule can never fire (safe fallback).
+            {
+                byte tierDefSes = _sender.ResolveTierDefSession();
+                bool tierDefIsFlag = tierDefSes == _sender.FlagByte
+                    && _sender.FlagByte != _sender.MgmtPort;
+                long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
+                long s02 = Interlocked.Read(ref _session02LastInboundUtcTicks);
+                long deadStamp = tierDefIsFlag ? s02 : s01;
+                long aliveStamp = tierDefIsFlag ? s01 : s02;
+                // Never-seen inbound this Start cycle counts from Active entry.
+                long deadAgeMs = deadStamp != 0
+                    ? (nowUtc - deadStamp) / TimeSpan.TicksPerMillisecond
+                    : Environment.TickCount - _activeStateEnteredTickCount;
+                long aliveAgeMs = aliveStamp != 0
+                    ? (nowUtc - aliveStamp) / TimeSpan.TicksPerMillisecond
+                    : long.MaxValue;
+                if (deadAgeMs >= TierDefSessionDeadThresholdMs
+                    && aliveAgeMs <= MirrorSessionFreshMs)
+                {
+                    byte mirrorSes = tierDefIsFlag ? _sender.MgmtPort : _sender.FlagByte;
+                    return (true,
+                        $"binding channel dead: no inbound on tier-def session 0x{tierDefSes:X2} " +
+                        $"for {deadAgeMs / 1000}s while sess=0x{mirrorSes:X2} stayed live " +
+                        $"(inbound {aliveAgeMs / 1000}s ago) — wheel-side session reset " +
+                        "(power-cycle / hot-swap) that cached state and catalog masked");
+                }
+            }
+
             if (!_sender.ConfigJsonHasLastState)
             {
                 // The catalog is present (checked above): the display has already
@@ -736,9 +793,16 @@ namespace MozaPlugin.Telemetry.Watchdog
             // engagement verdict (see EvaluateEngagement Context B); engagement is
             // catalog + configJson establishment.
             bool engaged = catalog > 0 && state;
+            long nowUtc = DateTime.UtcNow.Ticks;
+            long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
+            long s02 = Interlocked.Read(ref _session02LastInboundUtcTicks);
+            string age(long stamp) => stamp == 0
+                ? "never"
+                : $"{(nowUtc - stamp) / TimeSpan.TicksPerSecond}s";
             return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip} " +
                    $"s09devinit={(_sender.WheelReadyObserved ? "yes" : "no")} " +
-                   $"s09rounds={_s09RetryRounds}/{S09RetryMaxRounds})";
+                   $"s09rounds={_s09RetryRounds}/{S09RetryMaxRounds} " +
+                   $"s01inbound={age(s01)} s02inbound={age(s02)})";
         }
 
         // ───── Helpers ────────────────────────────────────────────────────
