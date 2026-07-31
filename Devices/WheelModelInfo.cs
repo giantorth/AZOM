@@ -223,30 +223,22 @@ namespace MozaPlugin.Devices
             ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true)),
             ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
             // RS V2: 10 RPM + 10 button LEDs (owner-confirmed, 2026-07-30),
-            // screenless. Real RS V2 firmware self-reports the 16-byte string
-            // "RS Leather # W00" (hw "RS21-W00-HW SM-C", dev-type 01 02 09 07),
-            // so the "RS Leather # W00" entry carries the same profile under the
-            // same "RS V2" FriendlyName/device dir — the GS V2P / bare-"GS"
-            // pattern. The "RS Leather # W00" entry must be listed ahead of the
-            // "RS Leather" rim entry below: "RS Leather" is a StartsWith-prefix
-            // of it and would otherwise win the scan.
+            // screenless. The real RS V2 self-reports "RS Leather # W00"
+            // (hw "RS21-W00-HW SM-C", dev-type 01 02 09 07) and resolves via
+            // the "RS Leather" rim entry below; this prefix stays for firmware
+            // that reports the literal product name.
             ("RS V2",   "RS V2",      new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
-            ("RS Leather # W00", "RS V2", new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
-            // RS round / D-shape family (docs/how-to-query-device-type.md). Added
-            // with CONSERVATIVE defaults per user: 10 RGB RPM LEDs, screenless
-            // (hasDisplay:false), sleep-light off (safe for an unmeasured rim), no
-            // button LEDs claimed. Button-LED count and whether these are old- or
-            // new-protocol are UNCONFIRMED — no capture or hardware read yet. Tighten
-            // RpmLedCount/ButtonLedCount, and add usesLegacyRpmTelemetry, once a real
-            // rim is measured. No thumbnail art embedded yet. Distinct FriendlyNames
-            // keep each as its own device; none is a StartsWith-prefix of another or
-            // of "RS V2" / "RSX", so ordering among them is free — but "RS Leather"
-            // IS a prefix of the real RS V2's "RS Leather # W00" reply, so that
-            // longer entry above must stay ahead of this block.
-            ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 0, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            // RS round / D-shape family (MOZA-sourced names): 10 RGB RPM +
+            // 10 button LEDs, screenless, sleep-light off (safe default for
+            // unmeasured rims). The real RS V2 reports "RS Leather # W00"
+            // ("# W00" = hw module code, tolerated by the StartsWith match) and
+            // resolves via the "RS Leather" prefix — new-protocol, 10/10
+            // owner-confirmed 2026-07-30; the other rims are assumed to share
+            // the layout. No thumbnail art embedded yet.
+            ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             // Original CS (predecessor to CS V2 / CS V2.1) — firmware reports the
             // bare prefix "CS" with no version suffix. 10 RGB RPM LEDs, no button
             // / flag / knob LEDs, no display. Must come after "CS V2.1" so the
@@ -365,11 +357,8 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Get the friendly display name for a model prefix. For unknown models
-        /// returns the prefix itself, minus any " # &lt;module-code&gt;" firmware
-        /// suffix ("RS Leather # W00", "HB # S01") — the code is wire plumbing,
-        /// not part of the product name. The full string stays the identity key
-        /// (GUID, thumbnail); only the display name is trimmed.
+        /// Get the friendly display name for a model prefix. Returns the prefix itself
+        /// for unknown models.
         /// </summary>
         public static string GetFriendlyName(string modelPrefix)
         {
@@ -379,13 +368,6 @@ namespace MozaPlugin.Devices
                     return friendlyName;
             }
 
-            int hash = string.IsNullOrEmpty(modelPrefix) ? -1 : modelPrefix.IndexOf('#');
-            if (hash > 0)
-            {
-                var trimmed = modelPrefix.Substring(0, hash).TrimEnd();
-                if (trimmed.Length > 0)
-                    return trimmed;
-            }
             return modelPrefix;
         }
 

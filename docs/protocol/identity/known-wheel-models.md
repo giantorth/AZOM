@@ -41,7 +41,8 @@ other modules (`HB # S01`, `R5 Black # MOT-1`) — the code matches the `RS21-W0
 hw string. The name is exactly 16 characters, filling the `0x07/01` field with no
 null padding; whether a continuation exists in `0x07/02` is unconfirmed (the
 plugin never queries it). The owner confirms the wheel is functionally identical
-to the RS V2 — `WheelModelInfo` maps this string to the "RS V2" profile.
+to the RS V2 — `WheelModelInfo` resolves it via the `RS Leather` prefix
+(RS Leather Round profile, 10 RPM / 10 button LEDs).
 
 ### Assumed from device naming (unverified)
 
