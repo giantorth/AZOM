@@ -3722,7 +3722,7 @@ namespace MozaPlugin
         /// <summary>Inbound from the dashboard connection — same command-parse path as
         /// the wheelbase. (The telemetry inbound dispatcher follows the sender's
         /// Rebind, so dashboard session frames reach it once the sender is bound here.)</summary>
-        private void OnDashboardMessageReceived(byte[] data) => OnMessageReceived(data);
+        private void OnDashboardMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: true);
 
         /// <summary>Dashboard USB unplugged — pause the sender so the next tick rebinds
         /// it back to the wheelbase (and the base-bridged 0x14 path takes over if present).</summary>
@@ -4308,7 +4308,13 @@ namespace MozaPlugin
 
         internal volatile int _unmatched;
 
-        private void OnMessageReceived(byte[] data)
+        private void OnMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: false);
+
+        // fromDashboard: frame arrived on the standalone-USB dashboard pipe (CM2 on
+        // its own port) rather than the wheelbase pipe. Both pipes share this handler
+        // and both tag their own main MCU as raw 0x21, so device id alone can't tell
+        // the R5 base from a standalone CM2.
+        private void OnMessageReceived(byte[] data, bool fromDashboard)
         {
             // Shutdown guard: serial reader may deliver frames after End() begins.
             if (IsShuttingDown) return;
@@ -4366,15 +4372,20 @@ namespace MozaPlugin
                 if (rawDeviceId == 0x41 && DashIsCm1)
                     _fsr1Cm1Mapping.TryFollowCm1DashboardLog(text);
                 // CM2 meter heartbeat vocabulary identifies its firmware era (LED
-                // command family) — see DetectCm2LedFirmwareEra.
-                if (rawDeviceId == 0x41 && !DashIsCm1)
+                // command family) — see DetectCm2LedFirmwareEra. A base-bridged CM2
+                // logs as the dash sub-device (raw 0x41) on the wheelbase pipe; a
+                // standalone-USB CM2 logs as its own main MCU (raw 0x21) on the
+                // dashboard pipe.
+                if ((rawDeviceId == 0x41 && !DashIsCm1) || (fromDashboard && rawDeviceId == 0x21))
                     DetectCm2LedFirmwareEra(text);
                 // The main bridge logs steering-wheel (rim) attach/detach edges
                 // here as "steer_connected <N>" / "Gpw Wheel Disconnected". A rim
                 // pull is NOT a USB/serial disconnect, so the poll-miss hot-swap
                 // path never fires — this is the only signal that tears down the
                 // stale cached identity/catalog. See TryHandleWheelConnectionLog.
-                if (rawDeviceId == 0x21)
+                // Wheelbase pipe only: a standalone CM2's 0x21 logs are the dash's
+                // own MCU, not the main bridge.
+                if (rawDeviceId == 0x21 && !fromDashboard)
                     TryHandleWheelConnectionLog(text);
                 if (MozaLog.WireDebugEnabled)
                     MozaLog.Debug(
