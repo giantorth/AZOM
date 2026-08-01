@@ -434,25 +434,25 @@ namespace MozaPlugin.Telemetry.Watchdog
             if (_sender.CatalogCount <= 0)
                 return (true, $"no channel catalog past {EngagementGraceMs} ms grace");
 
-            // Context C — binding-channel liveness (wheel-side session reset).
-            // CS-Pro bundle 2026-07-24: the wheel was power-cycled while the
-            // sender sat Active. The rebooted wheel kept sess=0x02 chatty (1 Hz
-            // END records, all acked by us) but the tier-def session (0x01)
-            // carried ZERO inbound — no data, no fc:00 acks — for 27 minutes.
-            // Every content check above stayed green off CACHES from the
-            // pre-reboot engagement (ConfigJson LastState survives Stop/Start,
-            // WheelReportedSlot survives until hot-swap), so no verdict ever
-            // fired and the display stayed dead until a manual toggle. The
-            // discriminator is liveness asymmetry: the session our subscription
-            // binds through is stone dead while the mirror session proves the
-            // wheel (and the wire) alive. Healthy wheels keepalive the tier-def
-            // session every ~4 s; the radar slow-bind streams catalog there.
-            // Both-quiet (cable pull, port gone) is excluded by the mirror
-            // freshness requirement — that failure belongs to the connection
-            // layer. Keyed on ResolveTierDefSession() so Form-A (tier-def on
-            // 0x01) and Form-B (tier-def on 0x02) wheels both watch the right
-            // lane; when mgmt and flag resolve to the SAME session the two
-            // stamps coincide and the rule can never fire (safe fallback).
+            // Context C — binding-channel liveness (binding dead under a green
+            // dashboard). Fires when the resolved tier-def session has carried
+            // ZERO inbound past the threshold while the mirror session proves
+            // the wheel and wire alive. Two confirmed true positives:
+            //   • 2026-07-24: wheel power-cycled under an Active sender — 0x01
+            //     dead 27 min, 0x02 chatty, every content check green off
+            //     caches, display dead until a manual toggle.
+            //   • 2026-07-31/08-01: HOT-path game switch drops the value feed —
+            //     the wheel ECHOES the kind=4 (slot change is not data binding!)
+            //     then 0x01 goes silent ~10 s later and the dash sits dead.
+            //     With this rule armed the restart recovered it at +2 min every
+            //     time; with it warn-only (08-01) the drop was permanent.
+            // History: briefly downgraded to warn-only on 2026-07-31 after
+            // misreading the kind=4 echo as proof of a working display — the
+            // "false positive" wasn't one. A genuinely bound display keeps the
+            // tier-def session's inbound stamp fresh (13 min of healthy play
+            // between fires, zero re-fires); do not neuter this again without a
+            // confirmed healthy-display fire. Both-quiet (cable pull) stays
+            // excluded via the mirror freshness gate — connection layer's job.
             {
                 byte tierDefSes = _sender.ResolveTierDefSession();
                 bool tierDefIsFlag = tierDefSes == _sender.FlagByte
@@ -475,8 +475,8 @@ namespace MozaPlugin.Telemetry.Watchdog
                     return (true,
                         $"binding channel dead: no inbound on tier-def session 0x{tierDefSes:X2} " +
                         $"for {deadAgeMs / 1000}s while sess=0x{mirrorSes:X2} stayed live " +
-                        $"(inbound {aliveAgeMs / 1000}s ago) — wheel-side session reset " +
-                        "(power-cycle / hot-swap) that cached state and catalog masked");
+                        $"(inbound {aliveAgeMs / 1000}s ago) — binding lost under a green dashboard " +
+                        "(wheel reboot, or the post-game-switch value-feed drop)");
                 }
             }
 
