@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 400% = 最大增益</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>力反馈输出曲线</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 拖动 5 个节点以调整响应</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>平直</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>衰减</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>线性</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 曲线</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>指数</value></data>
@@ -754,4 +752,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>灯光挡位 {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
 </root>

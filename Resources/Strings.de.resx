@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 400 % = max. Boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB-AUSGABEKURVE</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// die 5 Knoten ziehen, um den Verlauf zu formen</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>FLACH</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>ABSENKUNG</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S-KURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENTIELL</value></data>
@@ -754,4 +752,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Lichtstufe {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
 </root>

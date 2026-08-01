@@ -3125,6 +3125,7 @@ namespace MozaPlugin
                 DetectionState.DashDetected = false;
                 DetectionState.BaseAmbientLedSupported = false;
                 DetectionState.BaseAmbientProbed = false;
+                DetectionState.BaseEq10Probed = false;
                 _data.BaseModelName = "";
                 DetectionState.NewWheelDetected = false;
                 DetectionState.OldWheelDetected = false;

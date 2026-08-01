@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 400% = μέγιστη ενίσχυση</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// σύρετε τους 5 κόμβους για να διαμορφώσετε την απόκριση</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>ΕΠΙΠΕΔΟ</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>FALLOFF</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>ΓΡΑΜΜΙΚΟ</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S CURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>ΕΚΘΕΤΙΚΟ</value></data>
@@ -753,4 +751,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Στάδιο φώτων {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
 </root>

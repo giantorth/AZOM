@@ -57,8 +57,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 400 % = maks boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB-UTGANGSKURVE</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// dra de 5 nodene for å forme responsen</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>FLAT</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>FALLOFF</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEÆR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S-KURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EKSPONENTIELL</value></data>
@@ -759,4 +757,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Lystrinn {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR lukket — byttet til Stabil</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
 </root>

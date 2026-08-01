@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 400% = tăng tối đa</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// kéo 5 điểm nút để định hình phản hồi</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>BẰNG PHẲNG</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>SUY GIẢM</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>TUYẾN TÍNH</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>ĐƯỜNG CONG S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>HÀM MŨ</value></data>
@@ -754,4 +752,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Cấp đèn {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
 </root>

@@ -27,7 +27,16 @@ namespace MozaPlugin.Devices
             "main-get-ble-mode",
             "base-equalizer1", "base-equalizer2", "base-equalizer3",
             "base-equalizer4", "base-equalizer5", "base-equalizer6",
+            "base-road-sensitivity",
             "base-ffb-curve-y1", "base-ffb-curve-y2", "base-ffb-curve-y3", "base-ffb-curve-y4", "base-ffb-curve-y5",
+        };
+
+        // 10-band EQ additions — read only after the base-fw-version reply
+        // confirms support (old firmware never answers these; reading them in
+        // the main sweep would burn PendingResponseTracker retry budget).
+        internal static readonly string[] BaseEq10ReadCommands = new[]
+        {
+            "base-equalizer7", "base-equalizer8", "base-equalizer9", "base-equalizer10",
         };
 
         /// <summary>
@@ -579,6 +588,21 @@ namespace MozaPlugin.Devices
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         MozaLog.Info(
                             $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}')");
+                    }
+                    break;
+
+                case "base-fw-version":
+                    // The reply's packed version is always positive (major byte
+                    // < 0x80), so it clears the value guard above. Deferred
+                    // equalizer7-10 apply+read: the main base sweep runs before
+                    // the firmware version is known, and old firmware never
+                    // answers these registers. Writes queue before reads so the
+                    // read-backs reflect the profile values just applied.
+                    if (_data.BaseSupportsEq10 && !_detectionState.BaseEq10Probed)
+                    {
+                        _detectionState.BaseEq10Probed = true;
+                        _plugin.ApplyBaseToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _deviceManager.ReadSettings(BaseEq10ReadCommands);
                     }
                     break;
 
