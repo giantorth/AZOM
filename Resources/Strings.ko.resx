@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 400% = 최대 부스트</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB 출력 커브</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 5개의 노드를 드래그하여 응답 곡선 조정</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>플랫</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>폴오프</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>리니어</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 커브</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>지수</value></data>
@@ -753,4 +751,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>라이트 단계 {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
 </root>

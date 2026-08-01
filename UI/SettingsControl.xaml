@@ -810,16 +810,33 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
+                            <ctrl:SectionCard x:Name="FfbEqCard" Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
                                               Subtitle="{x:Static res:Strings.Subtitle_FfbEqualizer}"
                                               Icon="{StaticResource IconEq}" Margin="0,0,7,14">
                                 <StackPanel>
                                     <ctrl:MozaCurveEditor x:Name="FfbEqualizer"
                                                           Style="{StaticResource MozaEqualizerLineStyle}"
                                                           Height="280"/>
+                                    <!-- 10-band variant (fw >= 1.2.10.10) — ApplyEqBandMode swaps
+                                         the two editors' Visibility on the refresh tick. -->
+                                    <ctrl:MozaCurveEditor x:Name="FfbEqualizer10"
+                                                          Style="{StaticResource MozaEqualizerLineStyle10}"
+                                                          Height="280" Visibility="Collapsed"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <Button Content="{x:Static res:Strings.Button_Flat}" Margin="0,0,8,0" Click="FfbEqPreset_Flat"/>
-                                        <Button Content="{x:Static res:Strings.Button_Falloff}" Click="FfbEqPreset_Falloff"/>
+                                        <TextBlock Text="{x:Static res:Strings.Label_EqSensitivity}"
+                                                   Style="{StaticResource KvKeyText}"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Button Content="0"  Tag="0"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="1"  Tag="1"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="2"  Tag="2"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="3"  Tag="3"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="4"  Tag="4"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="5"  Tag="5"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="6"  Tag="6"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="7"  Tag="7"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="8"  Tag="8"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="9"  Tag="9"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
+                                        <Button Content="10" Tag="10" MinWidth="30" Click="EqSensitivity_Click"/>
                                     </StackPanel>
                                 </StackPanel>
                             </ctrl:SectionCard>
@@ -858,6 +875,14 @@
                             <TextBox x:Name="Eq5Value" Text="100%"/>
                             <Slider x:Name="Eq6Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq6Slider_ValueChanged"/>
                             <TextBox x:Name="Eq6Value" Text="100%"/>
+                            <Slider x:Name="Eq7Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq7Slider_ValueChanged"/>
+                            <TextBox x:Name="Eq7Value" Text="100%"/>
+                            <Slider x:Name="Eq8Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq8Slider_ValueChanged"/>
+                            <TextBox x:Name="Eq8Value" Text="100%"/>
+                            <Slider x:Name="Eq9Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq9Slider_ValueChanged"/>
+                            <TextBox x:Name="Eq9Value" Text="100%"/>
+                            <Slider x:Name="Eq10Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq10Slider_ValueChanged"/>
+                            <TextBox x:Name="Eq10Value" Text="100%"/>
                             <Slider x:Name="FfbCurveX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveX1Slider_ValueChanged"/>
                             <TextBox x:Name="FfbCurveX1Value" Text="20"/>
                             <Slider x:Name="FfbCurveX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveX2Slider_ValueChanged"/>

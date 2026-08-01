@@ -900,6 +900,9 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.TempStrategy,       v => profile.TempStrategy       = v,
                   () => _data.TempStrategy,         v => _data.TempStrategy         = v,
                   "base-temp-strategy");
+            Apply(() => profile.RoadSensitivity,    v => profile.RoadSensitivity    = v,
+                  () => _data.RoadSensitivity,      v => _data.RoadSensitivity      = v,
+                  "base-road-sensitivity");
 
             // Local helper — does seed + mirror + write in one pass. Closes
             // over `profile` and `_data` via the enclosing scope so callers
@@ -944,6 +947,15 @@ namespace MozaPlugin.Hardware
             ApplyEq(profile.Equalizer4, v => _data.Equalizer4 = v, "base-equalizer4");
             ApplyEq(profile.Equalizer5, v => _data.Equalizer5 = v, "base-equalizer5");
             ApplyEq(profile.Equalizer6, v => _data.Equalizer6 = v, "base-equalizer6");
+            // Bands 7-10 exist only on 10-band firmware — old bases must never
+            // see cmds 0x32..0x35.
+            if (_data.BaseSupportsEq10)
+            {
+                ApplyEq(profile.Equalizer7,  v => _data.Equalizer7  = v, "base-equalizer7");
+                ApplyEq(profile.Equalizer8,  v => _data.Equalizer8  = v, "base-equalizer8");
+                ApplyEq(profile.Equalizer9,  v => _data.Equalizer9  = v, "base-equalizer9");
+                ApplyEq(profile.Equalizer10, v => _data.Equalizer10 = v, "base-equalizer10");
+            }
 
             // FFB Curve X/Y values: mirror always; write when live.
             if (profile.FfbCurveX1 >= 0) _data.FfbCurveX1 = profile.FfbCurveX1;

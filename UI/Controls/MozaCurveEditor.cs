@@ -9,20 +9,22 @@ namespace MozaControls
 {
     /// <summary>
     /// Draggable-node line graph. Used for the 5-point output curves on the
-    /// Base / Handbrake / Pedals tabs, and (with the MozaEqualizerLineStyle in
-    /// Themes/Generic.xaml) for the 6-band FFB equalizer.
+    /// Base / Handbrake / Pedals tabs, and (with the MozaEqualizerLineStyle
+    /// variants in Themes/MozaTheme.xaml) for the 6/10-band FFB equalizer.
     ///
     /// Renders a cubic Catmull-Rom spline through fixed X positions. The
-    /// Y1..Y6 DPs are intended to bind two-way to the underlying
+    /// Y1..Y10 DPs are intended to bind two-way to the underlying
     /// FfbCurveYNSlider.Value / EqNSlider.Value etc., so existing slider
     /// ValueChanged handlers continue to fire and MozaProfile persistence is
     /// unchanged.
     ///
-    /// The control has two configurations:
+    /// Configurations in use:
     ///   * 5-node curve (default): NodeCount=5, YMin=0, YMax=100, no reference
     ///     line, nodes at X=20/40/60/80/100% of plot width.
     ///   * 6-node EQ: NodeCount=6, YMin=0, YMax=400, ReferenceLineY=100, nodes
     ///     evenly spaced at column centres (1/12..11/12 of plot width).
+    ///   * 10-node EQ: NodeCount=10, YMax=500, LastNodeYMax=100 (the 100 Hz
+    ///     band keeps its 0-100% cap).
     /// </summary>
     public class MozaCurveEditor : Control
     {
@@ -33,13 +35,17 @@ namespace MozaControls
                 new FrameworkPropertyMetadata(typeof(MozaCurveEditor)));
         }
 
-        // -------- Y values (one per node, up to 6) --------
+        // -------- Y values (one per node, up to 10) --------
         public static readonly DependencyProperty Y1Property = RegisterY(nameof(Y1), 20);
         public static readonly DependencyProperty Y2Property = RegisterY(nameof(Y2), 40);
         public static readonly DependencyProperty Y3Property = RegisterY(nameof(Y3), 60);
         public static readonly DependencyProperty Y4Property = RegisterY(nameof(Y4), 80);
         public static readonly DependencyProperty Y5Property = RegisterY(nameof(Y5), 100);
         public static readonly DependencyProperty Y6Property = RegisterY(nameof(Y6), 100);
+        public static readonly DependencyProperty Y7Property = RegisterY(nameof(Y7), 100);
+        public static readonly DependencyProperty Y8Property = RegisterY(nameof(Y8), 100);
+        public static readonly DependencyProperty Y9Property = RegisterY(nameof(Y9), 100);
+        public static readonly DependencyProperty Y10Property = RegisterY(nameof(Y10), 100);
 
         private static DependencyProperty RegisterY(string name, double dflt)
             => DependencyProperty.Register(name, typeof(double), typeof(MozaCurveEditor),
@@ -53,6 +59,10 @@ namespace MozaControls
         public double Y4 { get => (double)GetValue(Y4Property); set => SetValue(Y4Property, value); }
         public double Y5 { get => (double)GetValue(Y5Property); set => SetValue(Y5Property, value); }
         public double Y6 { get => (double)GetValue(Y6Property); set => SetValue(Y6Property, value); }
+        public double Y7 { get => (double)GetValue(Y7Property); set => SetValue(Y7Property, value); }
+        public double Y8 { get => (double)GetValue(Y8Property); set => SetValue(Y8Property, value); }
+        public double Y9 { get => (double)GetValue(Y9Property); set => SetValue(Y9Property, value); }
+        public double Y10 { get => (double)GetValue(Y10Property); set => SetValue(Y10Property, value); }
 
         // -------- X values (data-space 0..100, only meaningful when
         // AllowHorizontalDrag is true — 5-node curves only, no X6). Defaults
@@ -101,6 +111,14 @@ namespace MozaControls
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool LockLastNodeX { get => (bool)GetValue(LockLastNodeXProperty); set => SetValue(LockLastNodeXProperty, value); }
+
+        // Per-node Y cap for the LAST node only (NaN = disabled) — the 10-band
+        // EQ's 100 Hz band stays 0-100% while every other band runs to YMax=500.
+        public static readonly DependencyProperty LastNodeYMaxProperty =
+            DependencyProperty.Register(nameof(LastNodeYMax), typeof(double), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public double LastNodeYMax { get => (double)GetValue(LastNodeYMaxProperty); set => SetValue(LastNodeYMaxProperty, value); }
 
         // -------- Configuration DPs --------
 
@@ -243,29 +261,30 @@ namespace MozaControls
         public static readonly DependencyProperty LiveMarkerTopProperty = LiveMarkerTopKey.DependencyProperty;
         public double LiveMarkerTop => (double)GetValue(LiveMarkerTopProperty);
 
-        // 6 node centre positions exposed individually for Canvas-positioned ellipses
-        private static readonly DependencyPropertyKey[] NodeXKeys = new DependencyPropertyKey[6];
-        private static readonly DependencyPropertyKey[] NodeYKeys = new DependencyPropertyKey[6];
-        public static readonly DependencyProperty[] NodeXProperties = new DependencyProperty[6];
-        public static readonly DependencyProperty[] NodeYProperties = new DependencyProperty[6];
+        // 10 node centre positions exposed individually for Canvas-positioned ellipses
+        private static readonly DependencyPropertyKey[] NodeXKeys = new DependencyPropertyKey[10];
+        private static readonly DependencyPropertyKey[] NodeYKeys = new DependencyPropertyKey[10];
+        public static readonly DependencyProperty[] NodeXProperties = new DependencyProperty[10];
+        public static readonly DependencyProperty[] NodeYProperties = new DependencyProperty[10];
 
-        // 6 X-axis label Canvas.Left positions (already offset by -LabelWidth/2)
-        private static readonly DependencyPropertyKey[] TickLabelXKeys = new DependencyPropertyKey[6];
-        public static readonly DependencyProperty[] TickLabelXProperties = new DependencyProperty[6];
+        // 10 X-axis label Canvas.Left positions (already offset by -LabelWidth/2)
+        private static readonly DependencyPropertyKey[] TickLabelXKeys = new DependencyPropertyKey[10];
+        public static readonly DependencyProperty[] TickLabelXProperties = new DependencyProperty[10];
 
-        // 6 X-axis label visibility flags (controls whether the slot has a string)
-        private static readonly DependencyPropertyKey[] XAxisLabelKeys = new DependencyPropertyKey[6];
-        public static readonly DependencyProperty[] XAxisLabelProperties = new DependencyProperty[6];
+        // 10 X-axis label visibility flags (controls whether the slot has a string)
+        private static readonly DependencyPropertyKey[] XAxisLabelKeys = new DependencyPropertyKey[10];
+        public static readonly DependencyProperty[] XAxisLabelProperties = new DependencyProperty[10];
 
-        // 6 in-circle value labels (stringified current Y value, integer)
-        private static readonly DependencyPropertyKey[] NodeValueKeys = new DependencyPropertyKey[6];
-        public static readonly DependencyProperty[] NodeValueProperties = new DependencyProperty[6];
+        // 10 in-circle value labels (stringified current Y value, integer)
+        private static readonly DependencyPropertyKey[] NodeValueKeys = new DependencyPropertyKey[10];
+        public static readonly DependencyProperty[] NodeValueProperties = new DependencyProperty[10];
 
-        // 5 Y-axis labels (text + Canvas.Top position)
-        private static readonly DependencyPropertyKey[] YAxisLabelKeys = new DependencyPropertyKey[5];
-        public static readonly DependencyProperty[] YAxisLabelProperties = new DependencyProperty[5];
-        private static readonly DependencyPropertyKey[] YLabelYKeys = new DependencyPropertyKey[5];
-        public static readonly DependencyProperty[] YLabelYProperties = new DependencyProperty[5];
+        // Y-axis labels (text + Canvas.Top position) — 5 slots for the classic
+        // ranges, 6 for the 10-band EQ's 0-500-in-100s axis.
+        private static readonly DependencyPropertyKey[] YAxisLabelKeys = new DependencyPropertyKey[6];
+        public static readonly DependencyProperty[] YAxisLabelProperties = new DependencyProperty[6];
+        private static readonly DependencyPropertyKey[] YLabelYKeys = new DependencyPropertyKey[6];
+        public static readonly DependencyProperty[] YLabelYProperties = new DependencyProperty[6];
 
         // Single shared DPs for label container positioning
         private static readonly DependencyPropertyKey XLabelCanvasTopKey =
@@ -282,7 +301,7 @@ namespace MozaControls
 
         static void RegisterPerSlotProps()
         {
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 10; i++)
             {
                 NodeXKeys[i] = DependencyProperty.RegisterReadOnly($"Node{i + 1}X", typeof(double),
                     typeof(MozaCurveEditor), new PropertyMetadata(0.0));
@@ -303,14 +322,14 @@ namespace MozaControls
                     typeof(MozaCurveEditor), new PropertyMetadata(string.Empty));
                 NodeValueProperties[i] = NodeValueKeys[i].DependencyProperty;
             }
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 6; i++)
             {
                 YAxisLabelKeys[i] = DependencyProperty.RegisterReadOnly($"YAxisLabel{i}", typeof(string),
                     typeof(MozaCurveEditor), new PropertyMetadata(string.Empty));
                 YAxisLabelProperties[i] = YAxisLabelKeys[i].DependencyProperty;
 
                 YLabelYKeys[i] = DependencyProperty.RegisterReadOnly($"YLabel{i}Y", typeof(double),
-                    typeof(MozaCurveEditor), new PropertyMetadata(0.0));
+                    typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
                 YLabelYProperties[i] = YLabelYKeys[i].DependencyProperty;
             }
         }
@@ -337,6 +356,14 @@ namespace MozaControls
         public double Node5Y => (double)GetValue(NodeYProperties[4]);
         public double Node6X => (double)GetValue(NodeXProperties[5]);
         public double Node6Y => (double)GetValue(NodeYProperties[5]);
+        public double Node7X => (double)GetValue(NodeXProperties[6]);
+        public double Node7Y => (double)GetValue(NodeYProperties[6]);
+        public double Node8X => (double)GetValue(NodeXProperties[7]);
+        public double Node8Y => (double)GetValue(NodeYProperties[7]);
+        public double Node9X => (double)GetValue(NodeXProperties[8]);
+        public double Node9Y => (double)GetValue(NodeYProperties[8]);
+        public double Node10X => (double)GetValue(NodeXProperties[9]);
+        public double Node10Y => (double)GetValue(NodeYProperties[9]);
 
         public double TickLabel0X => (double)GetValue(TickLabelXProperties[0]);
         public double TickLabel1X => (double)GetValue(TickLabelXProperties[1]);
@@ -344,6 +371,10 @@ namespace MozaControls
         public double TickLabel3X => (double)GetValue(TickLabelXProperties[3]);
         public double TickLabel4X => (double)GetValue(TickLabelXProperties[4]);
         public double TickLabel5X => (double)GetValue(TickLabelXProperties[5]);
+        public double TickLabel6X => (double)GetValue(TickLabelXProperties[6]);
+        public double TickLabel7X => (double)GetValue(TickLabelXProperties[7]);
+        public double TickLabel8X => (double)GetValue(TickLabelXProperties[8]);
+        public double TickLabel9X => (double)GetValue(TickLabelXProperties[9]);
 
         public string XAxisLabel0 => (string)GetValue(XAxisLabelProperties[0]);
         public string XAxisLabel1 => (string)GetValue(XAxisLabelProperties[1]);
@@ -351,6 +382,10 @@ namespace MozaControls
         public string XAxisLabel3 => (string)GetValue(XAxisLabelProperties[3]);
         public string XAxisLabel4 => (string)GetValue(XAxisLabelProperties[4]);
         public string XAxisLabel5 => (string)GetValue(XAxisLabelProperties[5]);
+        public string XAxisLabel6 => (string)GetValue(XAxisLabelProperties[6]);
+        public string XAxisLabel7 => (string)GetValue(XAxisLabelProperties[7]);
+        public string XAxisLabel8 => (string)GetValue(XAxisLabelProperties[8]);
+        public string XAxisLabel9 => (string)GetValue(XAxisLabelProperties[9]);
 
         public string Node1Value => (string)GetValue(NodeValueProperties[0]);
         public string Node2Value => (string)GetValue(NodeValueProperties[1]);
@@ -358,18 +393,24 @@ namespace MozaControls
         public string Node4Value => (string)GetValue(NodeValueProperties[3]);
         public string Node5Value => (string)GetValue(NodeValueProperties[4]);
         public string Node6Value => (string)GetValue(NodeValueProperties[5]);
+        public string Node7Value => (string)GetValue(NodeValueProperties[6]);
+        public string Node8Value => (string)GetValue(NodeValueProperties[7]);
+        public string Node9Value => (string)GetValue(NodeValueProperties[8]);
+        public string Node10Value => (string)GetValue(NodeValueProperties[9]);
 
         public string YAxisLabel0 => (string)GetValue(YAxisLabelProperties[0]);
         public string YAxisLabel1 => (string)GetValue(YAxisLabelProperties[1]);
         public string YAxisLabel2 => (string)GetValue(YAxisLabelProperties[2]);
         public string YAxisLabel3 => (string)GetValue(YAxisLabelProperties[3]);
         public string YAxisLabel4 => (string)GetValue(YAxisLabelProperties[4]);
+        public string YAxisLabel5 => (string)GetValue(YAxisLabelProperties[5]);
 
         public double YLabel0Y => (double)GetValue(YLabelYProperties[0]);
         public double YLabel1Y => (double)GetValue(YLabelYProperties[1]);
         public double YLabel2Y => (double)GetValue(YLabelYProperties[2]);
         public double YLabel3Y => (double)GetValue(YLabelYProperties[3]);
         public double YLabel4Y => (double)GetValue(YLabelYProperties[4]);
+        public double YLabel5Y => (double)GetValue(YLabelYProperties[5]);
 
         // -------- Layout constants --------
         private const double PadLeft = 36;
@@ -486,6 +527,8 @@ namespace MozaControls
             double y01 = (h - PadBottom - p.Y) / plotH;
             double range = Math.Max(1, YMax - YMin);
             double v = Math.Max(YMin, Math.Min(YMax, Math.Round(YMin + y01 * range)));
+            if (!double.IsNaN(LastNodeYMax) && _dragNode == ClampedNodeCount() - 1)
+                v = Math.Min(v, LastNodeYMax);
             SetY(_dragNode, v);
 
             // Horizontal drag (output curve only — see AllowHorizontalDrag).
@@ -520,6 +563,10 @@ namespace MozaControls
                 case 3: Y4 = v; break;
                 case 4: Y5 = v; break;
                 case 5: Y6 = v; break;
+                case 6: Y7 = v; break;
+                case 7: Y8 = v; break;
+                case 8: Y9 = v; break;
+                case 9: Y10 = v; break;
             }
         }
 
@@ -554,7 +601,7 @@ namespace MozaControls
         {
             int n = NodeCount;
             if (n < 5) return 5;
-            if (n > 6) return 6;
+            if (n > 10) return 10;
             return n;
         }
 
@@ -613,7 +660,7 @@ namespace MozaControls
                     for (int i = 0; i < nodeCount; i++) nodeFracs[i] = (2.0 * i + 1) / (2.0 * nodeCount);
                 }
             }
-            double[] ys = { Y1, Y2, Y3, Y4, Y5, Y6 };
+            double[] ys = { Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10 };
             double range = Math.Max(1, YMax - YMin);
 
             // ---- Node pixel positions + in-circle value strings ----
@@ -623,6 +670,8 @@ namespace MozaControls
                 double frac = Math.Max(0, Math.Min(1, nodeFracs[i]));
                 double x = PadLeft + frac * plotW;
                 double yClamped = Math.Max(YMin, Math.Min(YMax, ys[i]));
+                if (!double.IsNaN(LastNodeYMax) && i == nodeCount - 1)
+                    yClamped = Math.Min(yClamped, LastNodeYMax);
                 double y = PadTop + (1 - (yClamped - YMin) / range) * plotH;
                 pts[i] = new Point(x, y);
                 // Canvas.Left/Top are top-left corner — back the centre off by
@@ -633,7 +682,7 @@ namespace MozaControls
             }
             // Park unused node slots well off-canvas (also clears any stale
             // value string the template might still display).
-            for (int i = nodeCount; i < 6; i++)
+            for (int i = nodeCount; i < 10; i++)
             {
                 SetValue(NodeXKeys[i], -10000.0);
                 SetValue(NodeYKeys[i], -10000.0);
@@ -749,7 +798,7 @@ namespace MozaControls
             // ---- X-axis labels ----
             double[] labelFracs = ParseFractions(XLabelFractions, new[] { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 });
             string[] xLabels = ParseLabels(XAxisLabels);
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 10; i++)
             {
                 if (i < labelFracs.Length && i < xLabels.Length && !string.IsNullOrEmpty(xLabels[i]))
                 {
@@ -768,14 +817,24 @@ namespace MozaControls
             }
             SetValue(XLabelCanvasTopKey, PadTop + plotH + XLabelTopOffset);
 
-            // ---- Y-axis labels (always 5 evenly spaced, top=YMax to bottom=YMin) ----
+            // ---- Y-axis labels (evenly spaced, top=YMax to bottom=YMin; 5
+            // slots for the classic styles, 6 when the style supplies six) ----
             string[] yLabels = ParseLabels(YAxisLabels);
-            for (int i = 0; i < 5; i++)
+            int yCount = Math.Min(Math.Max(yLabels.Length, 5), 6);
+            for (int i = 0; i < 6; i++)
             {
-                double frac = i / 4.0; // 0, 0.25, 0.5, 0.75, 1.0
-                double yPix = PadTop + frac * plotH - 8; // 8 ≈ half line-height
-                SetValue(YLabelYKeys[i], yPix);
-                SetValue(YAxisLabelKeys[i], i < yLabels.Length ? yLabels[i] : string.Empty);
+                if (i < yCount)
+                {
+                    double frac = (double)i / (yCount - 1);
+                    double yPix = PadTop + frac * plotH - 8; // 8 ≈ half line-height
+                    SetValue(YLabelYKeys[i], yPix);
+                    SetValue(YAxisLabelKeys[i], i < yLabels.Length ? yLabels[i] : string.Empty);
+                }
+                else
+                {
+                    SetValue(YLabelYKeys[i], -10000.0);
+                    SetValue(YAxisLabelKeys[i], string.Empty);
+                }
             }
             SetValue(YLabelCanvasLeftKey, 6.0); // matches existing left padding of 6
         }

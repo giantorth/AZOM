@@ -119,8 +119,6 @@ namespace MozaPlugin.Resources
         public static string Subtitle_FfbEqualizer => Get("Subtitle_FfbEqualizer");
         public static string Section_FfbOutputCurve => Get("Section_FfbOutputCurve");
         public static string Subtitle_FfbOutputCurve => Get("Subtitle_FfbOutputCurve");
-        public static string Button_Flat => Get("Button_Flat");
-        public static string Button_Falloff => Get("Button_Falloff");
         public static string Button_Linear => Get("Button_Linear");
         public static string Button_SCurve => Get("Button_SCurve");
         public static string Button_Exponential => Get("Button_Exponential");
@@ -810,5 +808,7 @@ namespace MozaPlugin.Resources
         public static string StalkKind_LightStage => Get("StalkKind_LightStage");
         public static string Option_ReleaseChannelPr => Get("Option_ReleaseChannelPr");
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
+        public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
+        public static string Label_EqSensitivity => Get("Label_EqSensitivity");
     }
 }

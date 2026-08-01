@@ -425,6 +425,11 @@ namespace MozaPlugin
             if (lfeSupported)
                 SeedBaseLfeControls(gsProfile?.BaseLfe);
 
+            // FFB EQ band mode (6 legacy bands vs 10-band fw >= 1.2.10.10) —
+            // re-evaluated each tick like the LFE gate above.
+            bool eq10 = _data.BaseSupportsEq10;
+            ApplyEqBandMode(eq10);
+
             double spd = _data.Speed / 10.0;
             SpeedSlider.Value = Clamp(spd, 0, 200);
             SetValueText(SpeedValue, $"{spd:F0}%");
@@ -462,13 +467,24 @@ namespace MozaPlugin
             LedStatusCheck.IsChecked = _data.LedStatus != 0;
             BluetoothCheck.IsChecked = _data.BleMode == 0;
 
-            // FFB Equalizer (0-400% where 100% is default/flat)
-            SetSliderRaw(Eq1Slider, Eq1Value, _data.Equalizer1, 0, 400, "%");
-            SetSliderRaw(Eq2Slider, Eq2Value, _data.Equalizer2, 0, 400, "%");
-            SetSliderRaw(Eq3Slider, Eq3Value, _data.Equalizer3, 0, 400, "%");
-            SetSliderRaw(Eq4Slider, Eq4Value, _data.Equalizer4, 0, 400, "%");
-            SetSliderRaw(Eq5Slider, Eq5Value, _data.Equalizer5, 0, 400, "%");
-            SetSliderRaw(Eq6Slider, Eq6Value, _data.Equalizer6, 0, 400, "%");
+            // FFB Equalizer (100% = flat). Ranges depend on the band mode:
+            // legacy 0-400 on all six; 10-band fw is 0-500 except the 100 Hz
+            // band (Eq6), which keeps its 0-100 cap. SetSliderRaw clamps, so
+            // the ranges are load-bearing.
+            int eqHi = eq10 ? 500 : 400;
+            SetSliderRaw(Eq1Slider, Eq1Value, _data.Equalizer1, 0, eqHi, "%");
+            SetSliderRaw(Eq2Slider, Eq2Value, _data.Equalizer2, 0, eqHi, "%");
+            SetSliderRaw(Eq3Slider, Eq3Value, _data.Equalizer3, 0, eqHi, "%");
+            SetSliderRaw(Eq4Slider, Eq4Value, _data.Equalizer4, 0, eqHi, "%");
+            SetSliderRaw(Eq5Slider, Eq5Value, _data.Equalizer5, 0, eqHi, "%");
+            SetSliderRaw(Eq6Slider, Eq6Value, _data.Equalizer6, 0, eq10 ? 100 : 400, "%");
+            if (eq10)
+            {
+                SetSliderRaw(Eq7Slider, Eq7Value, _data.Equalizer7, 0, 500, "%");
+                SetSliderRaw(Eq8Slider, Eq8Value, _data.Equalizer8, 0, 500, "%");
+                SetSliderRaw(Eq9Slider, Eq9Value, _data.Equalizer9, 0, 500, "%");
+                SetSliderRaw(Eq10Slider, Eq10Value, _data.Equalizer10, 0, 500, "%");
+            }
 
             // FFB Curve — X1..X4 are the draggable input positions of points 1-4
             // (point 5 fixed at input=100%); Y1..Y5 the output values.
@@ -1656,7 +1672,9 @@ namespace MozaPlugin
 
         private static readonly string[] EqCommands = {
             "base-equalizer1", "base-equalizer2", "base-equalizer3",
-            "base-equalizer4", "base-equalizer5", "base-equalizer6"
+            "base-equalizer4", "base-equalizer5", "base-equalizer6",
+            "base-equalizer7", "base-equalizer8", "base-equalizer9",
+            "base-equalizer10"
         };
 
         private void Eq1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq1Value, "%", v => { _data.Equalizer1 = v; _plugin.WriteIfBaseConnected(EqCommands[0], v); });
@@ -1665,14 +1683,53 @@ namespace MozaPlugin
         private void Eq4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq4Value, "%", v => { _data.Equalizer4 = v; _plugin.WriteIfBaseConnected(EqCommands[3], v); });
         private void Eq5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq5Value, "%", v => { _data.Equalizer5 = v; _plugin.WriteIfBaseConnected(EqCommands[4], v); });
         private void Eq6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq6Value, "%", v => { _data.Equalizer6 = v; _plugin.WriteIfBaseConnected(EqCommands[5], v); });
+        private void Eq7Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq7Value, "%", v => { _data.Equalizer7 = v; _plugin.WriteIfBaseConnected(EqCommands[6], v); });
+        private void Eq8Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq8Value, "%", v => { _data.Equalizer8 = v; _plugin.WriteIfBaseConnected(EqCommands[7], v); });
+        private void Eq9Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq9Value, "%", v => { _data.Equalizer9 = v; _plugin.WriteIfBaseConnected(EqCommands[8], v); });
+        private void Eq10Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq10Value, "%", v => { _data.Equalizer10 = v; _plugin.WriteIfBaseConnected(EqCommands[9], v); });
 
-        // Presets for the 6-band FFB equalizer. Bands are 10/15/25/40/60/100 Hz.
-        private static readonly int[][] FfbEqPresets =
-        {
-            new[] { 100, 100, 100, 100, 100, 100 }, // FLAT (neutral, 100% gain on every band)
-            new[] { 100, 100,  90,  70,  40,  20 }, // FALLOFF (steep cut from 40 Hz upward)
+        // 10-band mappings in FREQUENCY order (5/10/15/25/30/40/50/60/80/100 Hz)
+        // — the new registers interleave. Keep in sync with the FfbEqualizer10
+        // slider binding in SettingsControl.Redesign.cs.
+        private static readonly string[] Eq10Commands = {
+            "base-equalizer1", "base-equalizer7", "base-equalizer2",
+            "base-equalizer3", "base-equalizer8", "base-equalizer4",
+            "base-equalizer9", "base-equalizer5", "base-equalizer10",
+            "base-equalizer6"
         };
+        private Slider[] Eq10Sliders() => new[] {
+            Eq1Slider, Eq7Slider, Eq2Slider, Eq3Slider, Eq8Slider,
+            Eq4Slider, Eq9Slider, Eq5Slider, Eq10Slider, Eq6Slider };
+        private TextBox[] Eq10Labels() => new[] {
+            Eq1Value, Eq7Value, Eq2Value, Eq3Value, Eq8Value,
+            Eq4Value, Eq9Value, Eq5Value, Eq10Value, Eq6Value };
+        private Action<int>[] Eq10DataSetters() => new Action<int>[] {
+            v => _data.Equalizer1 = v, v => _data.Equalizer7 = v,
+            v => _data.Equalizer2 = v, v => _data.Equalizer3 = v,
+            v => _data.Equalizer8 = v, v => _data.Equalizer4 = v,
+            v => _data.Equalizer9 = v, v => _data.Equalizer5 = v,
+            v => _data.Equalizer10 = v, v => _data.Equalizer6 = v };
 
+        // Swap the EQ card between the 6-band and 10-band presentations. Runs
+        // inside the refresh tick's suppressor, so the slider Maximum coercion
+        // on a mode flip never reaches the device-write path.
+        private bool? _eq10ModeApplied;
+        private void ApplyEqBandMode(bool eq10)
+        {
+            if (_eq10ModeApplied == eq10) return;
+            _eq10ModeApplied = eq10;
+            FfbEqualizer.Visibility = eq10 ? Visibility.Collapsed : Visibility.Visible;
+            FfbEqualizer10.Visibility = eq10 ? Visibility.Visible : Visibility.Collapsed;
+            Eq1Slider.Maximum = eq10 ? 500 : 400;
+            Eq2Slider.Maximum = eq10 ? 500 : 400;
+            Eq3Slider.Maximum = eq10 ? 500 : 400;
+            Eq4Slider.Maximum = eq10 ? 500 : 400;
+            Eq5Slider.Maximum = eq10 ? 500 : 400;
+            Eq6Slider.Maximum = eq10 ? 100 : 400;
+            FfbEqCard.Subtitle = eq10 ? Strings.Subtitle_FfbEqualizer10 : Strings.Subtitle_FfbEqualizer;
+        }
+
+        // Apply a 6-band value set (10/15/25/40/60/100 Hz register order).
         private void ApplyFfbEqPreset(int[] p)
         {
             using (_suppressor.Begin())
@@ -1689,8 +1746,72 @@ namespace MozaPlugin
             _plugin.SaveSettings();
         }
 
-        private void FfbEqPreset_Flat(object s, RoutedEventArgs e)    => ApplyFfbEqPreset(FfbEqPresets[0]);
-        private void FfbEqPreset_Falloff(object s, RoutedEventArgs e) => ApplyFfbEqPreset(FfbEqPresets[1]);
+        private void ApplyFfbEqPreset10(int[] p)
+        {
+            var sliders = Eq10Sliders();
+            var labels = Eq10Labels();
+            var setters = Eq10DataSetters();
+            using (_suppressor.Begin())
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    sliders[i].Value = p[i];
+                    labels[i].Text = $"{p[i]}%";
+                    setters[i](p[i]);
+                }
+            }
+            for (int i = 0; i < 10; i++)
+                _plugin.WriteIfBaseConnected(Eq10Commands[i], p[i]);
+            _plugin.SaveSettings();
+        }
+
+        // PitHouse "sensitivity" presets 0..10 — one-shot macros writing
+        // road-sensitivity (0x0C = 10 + 4*N) plus a canned EQ curve; no
+        // dedicated sensitivity register exists, so the buttons are momentary.
+        // Values in frequency order 5/10/15/25/30/40/50/60/80/100 Hz. On
+        // legacy firmware only the six old registers are written (columns
+        // via Eq6FreqColumns) — the four new bands are skipped.
+        private static readonly int[][] EqSensitivityPresets =
+        {
+            new[] { 100, 100,  30,  10,   0,   0,   0,   0,   0,   0 },
+            new[] { 100, 100,  60,  20,  10,   0,   0,   0,   0,   0 },
+            new[] { 100, 100,  70,  40,  30,  10,   0,   0,   0,   0 },
+            new[] { 100, 100,  80,  50,  40,  20,  10,  10,   0,   0 },
+            new[] { 100, 100,  90,  60,  50,  30,  20,  20,  10,   0 },
+            new[] { 100, 100, 100,  70,  60,  40,  30,  30,  10,   0 },
+            new[] { 100, 100, 100,  90,  80,  50,  40,  40,  20,   0 },
+            new[] { 100, 100, 100, 100,  90,  60,  60,  60,  40,   0 },
+            new[] { 100, 100, 100, 100,  90,  80,  80,  80,  60,   0 },
+            new[] { 100, 100, 100, 100, 100, 100, 100, 100,  80,   0 },
+            new[] { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 },
+        };
+
+        // Frequency-order columns carried by the legacy registers Eq1..Eq6
+        // (5/15/25/40/60/100 Hz).
+        private static readonly int[] Eq6FreqColumns = { 0, 2, 3, 5, 7, 9 };
+
+        private void EqSensitivity_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is Button b) || !int.TryParse(b.Tag as string, out int n)
+                || n < 0 || n > 10)
+                return;
+
+            int sensitivity = 10 + 4 * n;
+            _data.RoadSensitivity = sensitivity;
+            _plugin.WriteIfBaseConnected("base-road-sensitivity", sensitivity);
+
+            int[] p = EqSensitivityPresets[n];
+            if (_data.BaseSupportsEq10)
+            {
+                ApplyFfbEqPreset10(p);
+            }
+            else
+            {
+                var six = new int[6];
+                for (int i = 0; i < 6; i++) six[i] = p[Eq6FreqColumns[i]];
+                ApplyFfbEqPreset(six);
+            }
+        }
 
         // ===== FFB Curve handlers =====
 

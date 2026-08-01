@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// gain par bande · 100 % = neutre · 400 % = boost max</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>COURBE DE SORTIE FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// déplacez les 5 nœuds pour façonner la réponse</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>PLATE</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>DÉCROISSANCE</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINÉAIRE</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>COURBE S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENTIELLE</value></data>
@@ -754,4 +752,6 @@ Id : {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Niveau de feux {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR fermée — retour à Stable</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// gain par bande · 100 % = neutre · 500 % = boost max</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILITÉ</value></data>
 </root>

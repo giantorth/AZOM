@@ -446,6 +446,7 @@ namespace MozaPlugin.Devices
             _detectionState.BaseDetected = false;
             _detectionState.BaseAmbientLedSupported = false;
             _detectionState.BaseAmbientProbed = false;
+            _detectionState.BaseEq10Probed = false;
             _detectionState.BaseOwner = null;
             _data.BaseSettingsRead = false;
             try { _plugin.PendingResponses.Clear(); } catch { }
@@ -740,6 +741,7 @@ namespace MozaPlugin.Devices
             _detectionState.BaseDetected = false;
             _detectionState.BaseAmbientLedSupported = false;
             _detectionState.BaseAmbientProbed = false;
+            _detectionState.BaseEq10Probed = false;
             _data.IsBaseConnected = false;
             _data.BaseSettingsRead = false;
             var baseDm = _baseManager?.DeviceManager;

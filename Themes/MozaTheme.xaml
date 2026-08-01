@@ -786,7 +786,7 @@
                          Visibility="{Binding LiveMarkerVisible, RelativeSource={RelativeSource TemplatedParent}}"
                          Canvas.Left="{Binding LiveMarkerLeft, RelativeSource={RelativeSource TemplatedParent}}"
                          Canvas.Top="{Binding LiveMarkerTop, RelativeSource={RelativeSource TemplatedParent}}"/>
-                <!-- Up to 6 draggable nodes. Each Border is a circle (CornerRadius=
+                <!-- Up to 10 draggable nodes. Each Border is a circle (CornerRadius=
                      half of Width/Height) with an opaque background so the spline
                      visually terminates at the circle edge, and a centred TextBlock
                      showing the current Y value. Unused slots are parked off-canvas
@@ -864,6 +864,54 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsHitTestVisible="False"/>
                 </Border>
+                <Border Width="28" Height="28" CornerRadius="14"
+                        Background="#FF1E242A"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        Effect="{StaticResource CyanGlowSoftEffect}"
+                        Canvas.Left="{Binding Node7X, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Node7Y, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Node7Value, RelativeSource={RelativeSource TemplatedParent}}"
+                               FontFamily="{StaticResource FontMono}" FontSize="11"
+                               Foreground="{TemplateBinding AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14"
+                        Background="#FF1E242A"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        Effect="{StaticResource CyanGlowSoftEffect}"
+                        Canvas.Left="{Binding Node8X, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Node8Y, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Node8Value, RelativeSource={RelativeSource TemplatedParent}}"
+                               FontFamily="{StaticResource FontMono}" FontSize="11"
+                               Foreground="{TemplateBinding AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14"
+                        Background="#FF1E242A"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        Effect="{StaticResource CyanGlowSoftEffect}"
+                        Canvas.Left="{Binding Node9X, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Node9Y, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Node9Value, RelativeSource={RelativeSource TemplatedParent}}"
+                               FontFamily="{StaticResource FontMono}" FontSize="11"
+                               Foreground="{TemplateBinding AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+                </Border>
+                <Border Width="28" Height="28" CornerRadius="14"
+                        Background="#FF1E242A"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        Effect="{StaticResource CyanGlowSoftEffect}"
+                        Canvas.Left="{Binding Node10X, RelativeSource={RelativeSource TemplatedParent}}"
+                        Canvas.Top="{Binding Node10Y, RelativeSource={RelativeSource TemplatedParent}}">
+                    <TextBlock Text="{Binding Node10Value, RelativeSource={RelativeSource TemplatedParent}}"
+                               FontFamily="{StaticResource FontMono}" FontSize="11"
+                               Foreground="{TemplateBinding AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+                </Border>
 
                 <!-- Y-axis labels -->
                 <TextBlock Text="{Binding YAxisLabel0, RelativeSource={RelativeSource TemplatedParent}}"
@@ -886,6 +934,10 @@
                            Style="{StaticResource KvKeyText}" TextAlignment="Right" Width="26"
                            Canvas.Left="{Binding YLabelCanvasLeft, RelativeSource={RelativeSource TemplatedParent}}"
                            Canvas.Top="{Binding YLabel4Y, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <TextBlock Text="{Binding YAxisLabel5, RelativeSource={RelativeSource TemplatedParent}}"
+                           Style="{StaticResource KvKeyText}" TextAlignment="Right" Width="26"
+                           Canvas.Left="{Binding YLabelCanvasLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding YLabel5Y, RelativeSource={RelativeSource TemplatedParent}}"/>
 
                 <!-- X-axis labels -->
                 <TextBlock Text="{Binding XAxisLabel0, RelativeSource={RelativeSource TemplatedParent}}"
@@ -912,6 +964,22 @@
                            Style="{StaticResource KvKeyText}" TextAlignment="Center" Width="32"
                            Canvas.Left="{Binding TickLabel5X, RelativeSource={RelativeSource TemplatedParent}}"
                            Canvas.Top="{Binding XLabelCanvasTop, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <TextBlock Text="{Binding XAxisLabel6, RelativeSource={RelativeSource TemplatedParent}}"
+                           Style="{StaticResource KvKeyText}" TextAlignment="Center" Width="32"
+                           Canvas.Left="{Binding TickLabel6X, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding XLabelCanvasTop, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <TextBlock Text="{Binding XAxisLabel7, RelativeSource={RelativeSource TemplatedParent}}"
+                           Style="{StaticResource KvKeyText}" TextAlignment="Center" Width="32"
+                           Canvas.Left="{Binding TickLabel7X, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding XLabelCanvasTop, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <TextBlock Text="{Binding XAxisLabel8, RelativeSource={RelativeSource TemplatedParent}}"
+                           Style="{StaticResource KvKeyText}" TextAlignment="Center" Width="32"
+                           Canvas.Left="{Binding TickLabel8X, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding XLabelCanvasTop, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <TextBlock Text="{Binding XAxisLabel9, RelativeSource={RelativeSource TemplatedParent}}"
+                           Style="{StaticResource KvKeyText}" TextAlignment="Center" Width="32"
+                           Canvas.Left="{Binding TickLabel9X, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding XLabelCanvasTop, RelativeSource={RelativeSource TemplatedParent}}"/>
             </Canvas>
         </Border>
     </ControlTemplate>
@@ -934,6 +1002,25 @@
         <Setter Property="XLabelFractions" Value="0.04,0.224,0.408,0.592,0.776,0.96"/>
         <Setter Property="XAxisLabels"     Value="10Hz,15Hz,25Hz,40Hz,60Hz,100Hz"/>
         <Setter Property="YAxisLabels"     Value="400,300,200,100,0"/>
+        <Setter Property="Template" Value="{StaticResource MozaCurveEditorTemplate}"/>
+    </Style>
+
+    <!-- 10-band EQ variant (base fw >= 1.2.10.10): 5-100 Hz labels, 0-500%
+         range, 100 Hz band capped at 100% via LastNodeYMax. -->
+    <Style x:Key="MozaEqualizerLineStyle10" TargetType="{x:Type controls:MozaCurveEditor}">
+        <Setter Property="MinHeight" Value="200"/>
+        <Setter Property="AccentBrush" Value="{StaticResource CyanBrush}"/>
+        <Setter Property="NodeCount" Value="10"/>
+        <Setter Property="YMin" Value="0"/>
+        <Setter Property="YMax" Value="500"/>
+        <Setter Property="LastNodeYMax" Value="100"/>
+        <Setter Property="ReferenceLineY" Value="100"/>
+        <Setter Property="AnchorAtOrigin" Value="False"/>
+        <Setter Property="ShowIdentityLine" Value="False"/>
+        <Setter Property="NodeXFractions"  Value="0.04,0.142,0.244,0.347,0.449,0.551,0.653,0.756,0.858,0.96"/>
+        <Setter Property="XLabelFractions" Value="0.04,0.142,0.244,0.347,0.449,0.551,0.653,0.756,0.858,0.96"/>
+        <Setter Property="XAxisLabels"     Value="5Hz,10Hz,15Hz,25Hz,30Hz,40Hz,50Hz,60Hz,80Hz,100Hz"/>
+        <Setter Property="YAxisLabels"     Value="500,400,300,200,100,0"/>
         <Setter Property="Template" Value="{StaticResource MozaCurveEditorTemplate}"/>
     </Style>
 
