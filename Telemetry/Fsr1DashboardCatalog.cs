@@ -435,7 +435,7 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x0c, Key = "type-0c", Label = "Dashboard 0C — timing / RPM", IsLive = true,
-                PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x02,
+                PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
@@ -463,7 +463,7 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — race info", IsLive = true,
-                PayloadLen = 24, LiveB1 = 0x0e, LiveB2 = 0x01,
+                PayloadLen = 24, LiveB1 = 0x08, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
@@ -510,7 +510,7 @@ namespace MozaPlugin.Telemetry
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U16("bias", "Brake bias", G + "BrakeBias", scale: 10.0)
-                    .U16("fuelRem", "Fuel remaining", G + "Fuel")
+                    .U16("fuelRem", "Fuel remaining", G + "Fuel", scale: 100.0)
                     .U16("fuelAvg", "Fuel avg / lap", "")
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("tc", "TC level", G + "TCLevel")
@@ -525,7 +525,7 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x11, Key = "type-11", Label = "Dashboard 11 — GT (A)", IsLive = true,
-                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("stl", "Session time left", SessionTimeLeft, MsScale)
                     .U24("elt", "Estimated lap time", EstLapTime, MsScale)
@@ -548,7 +548,7 @@ namespace MozaPlugin.Telemetry
                     .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U16("fuelUsed", "Fuel used", "")
                     .U16("fuelAvg", "Fuel avg / lap", "")
-                    .U16("fuelRem", "Fuel remaining", G + "Fuel")
+                    .U16("fuelRem", "Fuel remaining", G + "Fuel", scale: 100.0)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Nibbles("tc", "TC level", G + "TCLevel", "ecu", "ECU map", G + "EngineMap")
@@ -601,24 +601,14 @@ namespace MozaPlugin.Telemetry
         // truth from PitHouse captures: indices 0-15/17/18 from the multi-dash FSR1_CM1 capture,
         // index 16 from an ACC capture of that page. Indices 6/8/10 were not in a capture (fall
         // back to the type default). Applied in ByIndex to the streamed record for that page.
+        // Per-index sub-header (b1/b2) override — intentionally EMPTY. Earlier entries were extracted
+        // from per-session header bytes (FSR1_CM1 idle cycle + individual ACC captures) that turned out
+        // to be leftover/session-specific, not per-page config (values like 0x27fe, 0x0b88 are not valid
+        // descriptors). A clean PitHouse F1-2020 "all dashboards" capture emits the record's canonical
+        // per-type header — which the record's own LiveB1/LiveB2 defaults now match — so we just use
+        // those. Keep the dict + mechanism for any genuinely per-index descriptor found later.
         private static readonly Dictionary<int, (byte b1, byte b2)> IndexDescriptorOverride = new()
         {
-            { 0,  (0x0b, 0x88) },
-            { 1,  (0x00, 0x02) },
-            { 2,  (0x0d, 0x00) },   // type-06 gap page: PitHouse uses b1/b2=0d/00 for the GAP-showing
-            { 3,  (0x0d, 0x00) },   // config; the FSR1_CM1 b2=08 variant does NOT render the gap field.
-            { 4,  (0x27, 0xfe) },
-            { 5,  (0x02, 0x40) },
-            { 7,  (0x0d, 0x00) },   // type-06 gap page (see indices 2/3): match PitHouse's gap config.
-            { 9,  (0x27, 0xfe) },
-            { 11, (0x01, 0x80) },   // user "dashboard 12" (Param-6 11): type-09 LIVE-gap config (PitHouse "Dash 12 and 13 assetto corsa" capture; gap @ data[14-16], moving)
-            { 12, (0x0d, 0x80) },   // user "dashboard 13" (Param-6 12): type-0e LIVE-gap config (same capture; gap @ data[5-7], moving). Idle FSR1_CM1 was 18/01.
-            { 13, (0x02, 0x40) },
-            { 14, (0x02, 0x40) },
-            { 15, (0x00, 0x00) },   // user "dashboard 16" (Param-6 15): type-0c gap config (ACC dual capture)
-            { 16, (0x00, 0x40) },   // user "dashboard 17" (Param-6 16): type-0x11 gap config (Dashboard 17 AC capture)
-            { 17, (0x00, 0x02) },   // Param-6 17: GT default (unverified)
-            { 18, (0x00, 0x02) },
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
