@@ -227,9 +227,13 @@ namespace MozaPlugin.Telemetry
         // suffix 01,02,03,04); our group order is FL,FR,RL,RR → suffix 03,04,01,02.
         private const string F1Raw = "DataCorePlugin.GameRawData.PacketCarTelemetryData.m_carTelemetryData01.";
         private const string F1RawStatus = "DataCorePlugin.GameRawData.PacketCarStatusData.m_carStatusData01.";
+        // Player-extracted car status root. m_carStatusData01 is array SLOT 0, not the player;
+        // the ERS members under it also fail to resolve on some SimHub builds (F1 2020 bundle
+        // 2026-07-30), so the ERS channels bind here instead.
+        private const string F1RawPlayerStatus = "DataCorePlugin.GameRawData.PlayerCarStatusData.";
         // ERS deploy mode 0–3 (3 = overtake) drives the firmware's OVERTAKE highlight; the game value
         // maps straight into the 2-bit field. Live delta to session best (signed seconds) for gap fields.
-        private const string ErsDeployMode = F1RawStatus + "m_ersDeployMode";
+        private const string ErsDeployMode = F1RawPlayerStatus + "m_ersDeployMode";
         private const string LiveDelta = "PersistantTrackerPlugin.SessionBestLiveDeltaSeconds";
         // SimHub predicted/estimated final lap time (projected from session-best pace). Resolves as a
         // TimeSpan → TotalSeconds (PropertyCoercion), ×MsScale to ms for the 24-bit field. Variants:
@@ -240,10 +244,12 @@ namespace MozaPlugin.Telemetry
         // ERS this-lap energy (Joules). Deploy bar shows budget REMAINING = 100 − deployed/40000 (of the
         // 4 MJ deploy cap; verified clean). Harvest bar = harvested/20000 (of the 2 MJ MGU-K cap; the
         // capture's harvest data was sparse so the scale is approximate — tune on-wheel if needed).
-        private const string ErsDeployedThisLap = F1RawStatus + "m_ersDeployedThisLap";
-        private const string ErsHarvestedThisLap = F1RawStatus + "m_ersHarvestedThisLapMGUK";
+        private const string ErsDeployedThisLap = F1RawPlayerStatus + "m_ersDeployedThisLap";
+        private const string ErsHarvestedThisLap = F1RawPlayerStatus + "m_ersHarvestedThisLapMGUK";
         // Fuel mix / class 0–3 (lean/standard/rich/max).
         private const string FuelMix = F1RawStatus + "m_fuelMix";
+        // SimHub's computed fuel consumption (litres/lap); sent ×100 like fuelRem.
+        private const string FuelPerLap = "DataCorePlugin.Computed.Fuel_LitersPerLap";
         // Session time remaining (seconds → ms via MsScale) for the GT session clock.
         private const string SessionTimeLeft = "DataCorePlugin.GameRawData.PacketSessionData.m_sessionTimeLeft";
         private static readonly string[] InnerTempProps =
@@ -324,10 +330,11 @@ namespace MozaPlugin.Telemetry
                 PayloadLen = 19, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U16("spd", "Speed", G + "SpeedKmh")
-                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft")
-                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight")
-                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft")
-                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight")
+                    // Wear gauges show REMAINING %; SimHub TyreWear* is % worn → wire = 100 − x.
+                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft", bias: 100.0, scale: -1.0)
+                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight", bias: 100.0, scale: -1.0)
+                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft", bias: 100.0, scale: -1.0)
+                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight", bias: 100.0, scale: -1.0)
                     .U8("wwFL", "Wing wear FL", "")
                     .U8("wwFR", "Wing wear FR", "")
                     .U8("wwR", "Wing wear R", "")
@@ -363,10 +370,11 @@ namespace MozaPlugin.Telemetry
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
                     .U16("spd", "Speed", G + "SpeedKmh")
-                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft")
-                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight")
-                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft")
-                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight")
+                    // Wear gauges show REMAINING %; SimHub TyreWear* is % worn → wire = 100 − x.
+                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft", bias: 100.0, scale: -1.0)
+                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight", bias: 100.0, scale: -1.0)
+                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft", bias: 100.0, scale: -1.0)
+                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight", bias: 100.0, scale: -1.0)
                     .U8("pos", "Position", G + "Position")
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("lap", "Lap", G + "CurrentLap")
@@ -450,8 +458,10 @@ namespace MozaPlugin.Telemetry
                 RecordType = 0x0d, Key = "type-0d", Label = "Tyre / status cache", IsLive = true, IsBackground = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
-                    .Pack10x4("tti", "Tyre inner", Corners, InnerTempProps, TyreTempBias)
+                    // Outer pack FIRST (data[5-9]), inner second — the wheel renders them in
+                    // this order (tester-verified on the brake dash; type-08 is the reverse).
                     .Pack10x4("tto", "Tyre outer", Corners, SurfaceTempProps, TyreTempBias)
+                    .Pack10x4("tti", "Tyre inner", Corners, InnerTempProps, TyreTempBias)
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("lap", "Lap", G + "CurrentLap")
                     .U8("laps", "Lap count", G + "TotalLaps")
@@ -474,7 +484,7 @@ namespace MozaPlugin.Telemetry
                     .U8("fuel", "Fuel remaining", G + "Fuel")
                     .U8("tc", "TC level", G + "TCLevel")
                     .U8("abs", "ABS level", G + "ABSLevel")
-                    .U8("boost", "Boost", "")
+                    .U8("boost", "Boost", G + "TurboPressure")
                     .U8("ecu", "ECU map", G + "EngineMap")
                     .U8("tc2", "TC2", "")
                     .U8("fuelClass", "Fuel mix", FuelMix)
@@ -511,10 +521,10 @@ namespace MozaPlugin.Telemetry
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U16("bias", "Brake bias", G + "BrakeBias", scale: 10.0)
                     .U16("fuelRem", "Fuel remaining", G + "Fuel", scale: 100.0)
-                    .U16("fuelAvg", "Fuel avg / lap", "")
+                    .U16("fuelAvg", "Fuel avg / lap", FuelPerLap, scale: 100.0)
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("tc", "TC level", G + "TCLevel")
-                    .U8("tcCut", "TC cut", "")
+                    .U8("tcCut", "TC-R", "")   // on-wheel gauge is labelled TC-R
                     .U8("ecu", "ECU map", G + "EngineMap")
                     .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
                            ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
@@ -547,12 +557,12 @@ namespace MozaPlugin.Telemetry
                 Fields = new Fields()
                     .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U16("fuelUsed", "Fuel used", "")
-                    .U16("fuelAvg", "Fuel avg / lap", "")
+                    .U16("fuelAvg", "Fuel avg / lap", FuelPerLap, scale: 100.0)
                     .U16("fuelRem", "Fuel remaining", G + "Fuel", scale: 100.0)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Nibbles("tc", "TC level", G + "TCLevel", "ecu", "ECU map", G + "EngineMap")
-                    .U8("tcCut", "TC cut", "")
+                    .U8("tcCut", "TC-R", "")   // on-wheel gauge is labelled TC-R
                     .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
                            ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("sector", "Sector", G + "CurrentSectorIndex")
