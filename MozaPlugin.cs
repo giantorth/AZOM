@@ -205,6 +205,11 @@ namespace MozaPlugin
         // double-fires the resume handler) across the game-switch reload if not
         // detached. See OnPowerModeChanged.
         private int _powerModeHooked;
+        // ComportScanner.Instance.CanBeScanned is likewise a process-wide event
+        // on a static singleton — detach on End()/CleanupPartialInit or the
+        // game-switch reload leaks this instance and stacks handlers. See
+        // OnArduinoPortCanBeScanned.
+        private int _arduinoScanHooked;
         // Hub detection belongs ONLY to the dedicated hub connection (_hubManager),
         // which probes for a Universal Hub on the hub's OWN port and skips the
         // wheelbase port. The base/wheelbase connection must NEVER emit hub calls
@@ -1255,6 +1260,23 @@ namespace MozaPlugin
                     MozaLog.Debug($"[AZOM] PowerModeChanged hook unavailable: {ex.Message}");
                 }
 
+                // Keep SimHub's Arduino auto-scan off MOZA ports. The scanner asks
+                // subscribers before opening each candidate port (CanBeScanned);
+                // without a veto it holds the wheelbase CDC port for two full scan
+                // passes on startup (~25 s observed) while our probes fail against
+                // the busy port, and its 19200-baud Arduino hello is garbage from
+                // the wheelbase's point of view. Static singleton event ⇒
+                // unsubscribe in End()/CleanupPartialInit (see _arduinoScanHooked).
+                try
+                {
+                    SerialDash.ComportScanner.Instance.CanBeScanned += OnArduinoPortCanBeScanned;
+                    Interlocked.Exchange(ref _arduinoScanHooked, 1);
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Debug($"[AZOM] Arduino-scan veto hook unavailable: {ex.Message}");
+                }
+
                 // AB9 engine-vibration worker — tick gates on connection/detection state.
                 _ab9Worker = new Ab9EngineVibrationWorker(
                     _ab9Manager,
@@ -1576,6 +1598,7 @@ namespace MozaPlugin
         private void CleanupPartialInit()
         {
             UnhookPowerMode();
+            UnhookArduinoScanVeto();
             try { _pollTimer?.Stop(); } catch { }
             try { _tempHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
@@ -2616,6 +2639,7 @@ namespace MozaPlugin
             //    PowerModeChanged is static — detach first so a resume mid-teardown can't
             //    schedule a ForceReconnect against tearing-down state.
             UnhookPowerMode();
+            UnhookArduinoScanVeto();
             try
             {
                 if (_connection != null)
@@ -3788,6 +3812,59 @@ namespace MozaPlugin
             {
                 try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] PowerModeChanged unhook: {ex.Message}"); }
+            }
+        }
+
+        // SimHub's Arduino scanner (ComportScanner) asks subscribers before
+        // opening each candidate COM port. Mark MOZA ports busy so it skips
+        // them. Runs on the scanner's Parallel.ForEach workers — keep it cheap
+        // and throw-proof.
+        private void OnArduinoPortCanBeScanned(object? sender, SerialDash.SerialDashController.ScanArgs e)
+        {
+            try
+            {
+                string? port = e?.ComPort;
+                if (string.IsNullOrEmpty(port)) return;
+                string? claim = DescribeMozaPortClaim(port!);
+                if (claim == null) return;
+                e!.PortIsBusy = true;
+                e.BusyReason = claim;
+                MozaLog.Debug($"[AZOM] Vetoed SimHub Arduino scan of {port} ({claim})");
+            }
+            catch { /* never break SimHub's scanner */ }
+        }
+
+        // A port is ours when a plugin connection holds it, the registry
+        // classifies it as a MOZA composite (Windows), or it matches one of the
+        // per-lane persisted last-good ports — the only identity available under
+        // Wine/Proton, where the registry walk is empty.
+        private string? DescribeMozaPortClaim(string port)
+        {
+            if (MozaSerialConnection.IsPortHeld(port))
+                return "MOZA (in use)";
+            if (MozaPortDiscovery.Instance.TryGetByPort(port, out var info))
+                return $"MOZA {MozaUsbIds.Describe(info.Pid)}";
+            var s = _settings;
+            if (s != null)
+            {
+                bool Match(string saved) =>
+                    !string.IsNullOrEmpty(saved)
+                    && string.Equals(saved, port, StringComparison.OrdinalIgnoreCase);
+                if (Match(s.LastWheelbasePort) || Match(s.LastAb9Port)
+                    || Match(s.LastDashboardPort) || Match(s.LastHubPort)
+                    || Match(s.LastBaseAuxPort))
+                    return "MOZA (last known port)";
+            }
+            return null;
+        }
+
+        // Mirror of UnhookPowerMode for the Arduino-scan veto subscription.
+        private void UnhookArduinoScanVeto()
+        {
+            if (Interlocked.Exchange(ref _arduinoScanHooked, 0) == 1)
+            {
+                try { SerialDash.ComportScanner.Instance.CanBeScanned -= OnArduinoPortCanBeScanned; }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Arduino-scan veto unhook: {ex.Message}"); }
             }
         }
 

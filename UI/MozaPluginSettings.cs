@@ -120,8 +120,8 @@ namespace MozaPlugin
         // Connection enabled (persisted toggle)
         public bool ConnectionEnabled { get; set; } = true;
 
-        // Last successful COM port — seeded into MozaSerialConnection on startup
-        // to skip re-probing. Empty = no saved port.
+        // Last successful COM port per device lane — seeded into that lane's
+        // MozaSerialConnection on startup to skip re-probing. Empty = no saved port.
         public string LastWheelbasePort { get; set; } = "";
         public string LastAb9Port { get; set; } = "";
         public string LastDashboardPort { get; set; } = "";
