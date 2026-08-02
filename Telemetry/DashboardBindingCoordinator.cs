@@ -918,6 +918,33 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        /// <summary>
+        /// The dash-page equivalent of <see cref="SetTelemetryEnabled"/>: flips the
+        /// CM2/CM1-scoped flag and starts/stops that pipeline. The dash lane is
+        /// reachable with no wheel attached, so this must not route through the
+        /// wheel-page flag (whose setter no-ops without a wheel).
+        /// </summary>
+        public void SetDashTelemetryEnabled(bool enabled)
+        {
+            _plugin.ActiveDashTelemetryEnabled = enabled;
+            _plugin.SaveSettings();
+            if (enabled)
+            {
+                // Explicit re-enable clears any prior park / restart budget, same
+                // rationale as the wheel path.
+                _plugin.Cm2Sender?.Recovery.Reset();
+                ApplyTelemetrySettings(); // → EnsureCm2Pipeline
+                _plugin.StartTelemetryIfReady();
+            }
+            else
+            {
+                // Stop directly: EnsureCm2Pipeline's teardown is debounced 12 s, so
+                // an explicit off must not wait it out.
+                try { _plugin.Cm2Sender?.Stop(); } catch { }
+                if (_plugin._cm1Driver?.IsRunning == true) { try { _plugin._cm1Driver.Stop(); } catch { } }
+            }
+        }
+
         /// <summary>Start the telemetry sender when preconditions are met. Dispatched off the read thread.</summary>
         public void StartTelemetryIfReady()
         {

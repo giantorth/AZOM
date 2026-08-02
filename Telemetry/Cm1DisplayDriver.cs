@@ -125,7 +125,7 @@ namespace MozaPlugin.Telemetry
             // Telemetry disabled by the user: ping only, no value stream. The test
             // pattern overrides this so the dash can be verified with no game running.
             bool testMode = plugin?.DashboardTestPatternActive ?? false;
-            if (!(plugin?.ActiveTelemetryEnabled ?? false) && !testMode) { _tickCounter++; return; }
+            if (!(plugin?.ActiveDashTelemetryEnabled ?? false) && !testMode) { _tickCounter++; return; }
 
             // Host-initiated dashboard switch (group-0x32/0x81 → dev 0x14).
             int pending = plugin?.TakePendingCm1Select() ?? -1;

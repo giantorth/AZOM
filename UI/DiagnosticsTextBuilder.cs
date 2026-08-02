@@ -274,6 +274,13 @@ namespace MozaPlugin.UI
             sb.AppendLine($"CM2 present:       {cm2Present}{(cm2Present ? $" (dev 0x{plugin!.Cm2TargetDeviceId:X2})" : "")}");
             sb.Append    ($"Main target dev:   {targetDesc}");
 
+            // The dash pipeline's own enable gate + whether a wheel page backs it.
+            // An unstarted lane below is almost always this line reading false.
+            sb.AppendLine();
+            sb.Append(
+                $"Dash telem enable: {plugin?.ActiveDashTelemetryEnabled ?? false} " +
+                $"(wheel page {(plugin?.GetCurrentWheelPageGuid().HasValue == true ? "resolved" : "unresolved")})");
+
             // Dedicated CM2 lane (the _cm2Sender). DECOUPLED: present whenever a CM2
             // is attached (bus or USB), regardless of the wheel — the CM2 is ALWAYS
             // driven by this dedicated sender now. The MAIN line above stays on the
@@ -286,6 +293,11 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 dash lane:     {cm2.TargetDescription} on {cm2.ConnectionRef?.CaptureLabel} pipe " +
                     $"(frames={cm2.FramesSent}, {cm2.Phase})");
+            }
+            else if (cm2Present)
+            {
+                sb.AppendLine();
+                sb.Append("CM2 dash lane:     (not started)");
             }
 
             // Dash LED driver (SimHub effects → CM2 bitmask/colour bridge).

@@ -81,7 +81,10 @@ namespace MozaPlugin.Telemetry
             // was never identified.) The MAIN sender is now always wheel-only;
             // ApplyTelemetrySettings guarantees it never targets a CM2 device, so the
             // two senders can never collide on 0x12/0x14.
-            bool want = _plugin.ActiveTelemetryEnabled && (busCm2 || usbCm2);
+            // Dash-scoped enable, NOT the wheel's: a hub-only / dash-only rig resolves
+            // no wheel page GUID, which pinned ActiveTelemetryEnabled false forever and
+            // left a standalone-USB CM2 permanently dark (bundle JJV3D910).
+            bool want = _plugin.ActiveDashTelemetryEnabled && (busCm2 || usbCm2);
 
             if (!want)
             {
@@ -301,7 +304,7 @@ namespace MozaPlugin.Telemetry
             if (_plugin._cm1Driver == null) return;
             bool busDash = _detectionState.DashDetected && !_plugin.DashboardUsbConnected
                            && _plugin.Connection?.IsConnected == true;
-            if (_plugin.ActiveTelemetryEnabled && _plugin.DashIsCm1 && busDash)
+            if (_plugin.ActiveDashTelemetryEnabled && _plugin.DashIsCm1 && busDash)
             {
                 if (!_plugin._cm1Driver.IsRunning) _plugin._cm1Driver.Start();
             }

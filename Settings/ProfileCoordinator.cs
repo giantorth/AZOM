@@ -371,6 +371,38 @@ namespace MozaPlugin.Settings
             }
         }
 
+        /// <summary>
+        /// True iff dashboard telemetry is enabled for the CM2/CM1 dash pipeline.
+        /// A dash is not a wheel: a hub-only or dash-only rig resolves no wheel page
+        /// GUID, so <see cref="ActiveTelemetryEnabled"/> reads false and its setter
+        /// no-ops there — never gate the dash pipeline on it.
+        ///
+        /// Resolution order: explicit entry under <see cref="MozaPlugin.Cm2PageGuid"/>
+        /// (user toggled it on the dash page) → the wheel page's resolved value while
+        /// a wheel IS identified (one shared toggle for wheel+dash rigs) → the install
+        /// default. Dict-missing is "no opinion", never a hard off.
+        /// </summary>
+        internal bool ActiveDashTelemetryEnabled
+        {
+            get
+            {
+                var s = _plugin.Settings;
+                if (s?.WheelTelemetryEnabledByPageGuid == null) return false;
+                if (s.WheelTelemetryEnabledByPageGuid.TryGetValue(MozaPlugin.Cm2PageGuid, out var v))
+                    return v;
+                if (_plugin.GetCurrentWheelPageGuid().HasValue) return ActiveTelemetryEnabled;
+                return s.TelemetryEnabledDefaultForNewWheels;
+            }
+            set
+            {
+                var s = _plugin.Settings;
+                if (s == null) return;
+                if (s.WheelTelemetryEnabledByPageGuid == null)
+                    s.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
+                s.WheelTelemetryEnabledByPageGuid[MozaPlugin.Cm2PageGuid] = value;
+            }
+        }
+
         /// <summary>Active wheel's dashboard profile name (cache key / builtin name). "" when unset.</summary>
         internal string ActiveTelemetryProfileName
         {

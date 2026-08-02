@@ -459,10 +459,18 @@ namespace MozaPlugin
             MozaLog.Debug($"[AZOM] AB9 layout → {Ab9LayoutLabel(mode)} via action");
         }
 
-        // Flip dashboard telemetry for the active wheel page. No-op when no wheel
-        // page is identified (ActiveTelemetryEnabled set is a no-op there).
+        // Flip dashboard telemetry for the active wheel page. With no wheel identified
+        // the wheel-page flag is unwritable, so target the dash pipeline instead —
+        // otherwise the action does nothing at all on a hub-only / dash-only rig.
         private void ToggleDashboardTelemetry()
         {
+            if (!_plugin.GetCurrentWheelPageGuid().HasValue)
+            {
+                bool dashOn = !_plugin.ActiveDashTelemetryEnabled;
+                _plugin.SetDashTelemetryEnabled(dashOn);
+                MozaLog.Debug($"[AZOM] Dash telemetry → {(dashOn ? "on" : "off")} via action (no wheel)");
+                return;
+            }
             bool turningOn = !_plugin.ActiveTelemetryEnabled;
             _plugin.SetTelemetryEnabled(turningOn);
             MozaLog.Debug($"[AZOM] Dashboard telemetry → {(turningOn ? "on" : "off")} via action");

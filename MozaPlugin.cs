@@ -328,6 +328,7 @@ namespace MozaPlugin
         internal void OnDashboardSwitched(uint slot) => _dashboardBindingCoordinator.OnDashboardSwitched(slot);
         internal void OnDashboardSwitched() => _dashboardBindingCoordinator.OnDashboardSwitched();
         internal void SetTelemetryEnabled(bool enabled) => _dashboardBindingCoordinator.SetTelemetryEnabled(enabled);
+        internal void SetDashTelemetryEnabled(bool enabled) => _dashboardBindingCoordinator.SetDashTelemetryEnabled(enabled);
         internal void StartTelemetryIfReady()
         {
             // FSR V1 screen runs on its own driver (independent of the tier-def
@@ -4763,6 +4764,13 @@ namespace MozaPlugin
         {
             get => _profileCoordinator.ActiveTelemetryEnabled;
             set => _profileCoordinator.ActiveTelemetryEnabled = value;
+        }
+        /// <summary>Telemetry-enable for the CM2/CM1 dash pipeline — resolvable with
+        /// no wheel attached, unlike <see cref="ActiveTelemetryEnabled"/>.</summary>
+        internal bool ActiveDashTelemetryEnabled
+        {
+            get => _profileCoordinator.ActiveDashTelemetryEnabled;
+            set => _profileCoordinator.ActiveDashTelemetryEnabled = value;
         }
         internal string ActiveTelemetryProfileName
         {
