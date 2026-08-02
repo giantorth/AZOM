@@ -695,11 +695,24 @@ namespace MozaPlugin.Devices
                 {
                     var c = _order[i];
                     var s = _settingsLookup(c.Identity);
-                    int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
-                    if (axisCount > MBoosterDeviceController.MaxAxes) axisCount = MBoosterDeviceController.MaxAxes;
-                    for (int a = 0; a < axisCount; a++)
+                    int rawAxisCount = c.AxisCount > 0 ? c.AxisCount : 1;
+                    if (rawAxisCount > MBoosterDeviceController.MaxAxes) rawAxisCount = MBoosterDeviceController.MaxAxes;
+
+                    // Resolve roles against how many axes are ACTUALLY wired,
+                    // not the raw HID axis count — a chain-capable hub's report
+                    // descriptor exposes all 3 GenericDesktop axes even when
+                    // only one pedal is physically plugged in, so raw AxisCount
+                    // can't tell a real chain from a single connected pedal.
+                    // Getting this wrong silently overrides that pedal's own
+                    // Role with the axis-order default (see IsAxisConnected).
+                    int connectedAxisCount = 0;
+                    for (int a = 0; a < rawAxisCount; a++)
+                        if (c.IsAxisConnected(a)) connectedAxisCount++;
+
+                    for (int a = 0; a < rawAxisCount; a++)
                     {
-                        var role = ResolveAxisRole(s, a, axisCount);
+                        if (!c.IsAxisConnected(a)) continue;
+                        var role = ResolveAxisRole(s, a, connectedAxisCount);
                         if (role == MBoosterRole.Disabled) continue;
                         // MozaData position fields are int (0..100, the same scale
                         // the existing HID reader writes). Round explicitly.

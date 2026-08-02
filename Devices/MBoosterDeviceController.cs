@@ -252,6 +252,32 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Whether HID axis <paramref name="axisIndex"/> is a genuinely wired
+        /// pedal rather than an unused GenericDesktop usage a chain-capable
+        /// hub's report descriptor always exposes (Rx/Ry/Rz) regardless of how
+        /// many pedals are actually plugged in. Trusts the parsed "PD Linked"
+        /// diagnostic (<see cref="ConnectedAxes"/>) once it arrives; before
+        /// that, treats every axis as real if <see cref="SubDeviceCount"/>
+        /// already confirmed a multi-motor chain at connect, else assumes only
+        /// axis 0 is wired. Same convention <see cref="MBoosterEffectWorker"/>
+        /// uses to gate its own per-pedal tick — callers that resolve a HID
+        /// axis's role (see <see cref="MozaMBoosterRegistry.ResolveAxisRole"/>)
+        /// need this too: raw <see cref="AxisCount"/> alone can't tell a real
+        /// chain from a single connected pedal on a chain-capable hub, so
+        /// using it directly silently overrides that pedal's own configured
+        /// Role with the axis-order default (Throttle/Brake/Clutch by index).
+        /// </summary>
+        public bool IsAxisConnected(int axisIndex)
+        {
+            var connected = _connectedAxes;
+            if (connected != null)
+                return axisIndex < connected.Length && connected[axisIndex];
+            if (SubDeviceCount > 1)
+                return axisIndex < Math.Max(1, AxisCount);
+            return axisIndex == 0;
+        }
+
+        /// <summary>
         /// The motor device id for a pedal ROLE (0=Throttle,1=Brake,2=Clutch),
         /// using the calibration-derived chain map (see
         /// <see cref="RecomputeChainRoleMap"/>) so effects reach the physical

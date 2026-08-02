@@ -2731,26 +2731,18 @@ namespace MozaPlugin
                     {
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(c.Identity);
                         int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
-                        var connected = c.ConnectedAxes;
                         string deviceLabel = BuildMBoosterComboLabel(c);
 
                         // Which axes are ACTUALLY wired. The HID interface
                         // commonly reports 3 axes (Rx/Ry/Rz) regardless of how
-                        // many pedals are physically connected — ConnectedAxes
-                        // (from the "PD Linked" firmware diagnostic) is the
-                        // only way to tell which are real. Until that
-                        // diagnostic arrives (null), assume only axis 0 is
-                        // real: the common case is a standalone single pedal,
-                        // and a genuine chain's extra axes appear as soon as
-                        // the diagnostic confirms them, instead of showing
-                        // phantom pedals from the very first refresh.
+                        // many pedals are physically connected — IsAxisConnected
+                        // (from the "PD Linked" firmware diagnostic, or the
+                        // SubDeviceCount/axis-0 fallback before it arrives) is
+                        // the only way to tell which are real.
                         var connectedAxes = new List<int>();
                         for (int axis = 0; axis < axisCount && axis < MBoosterDeviceController.MaxAxes; axis++)
                         {
-                            bool axisKnownConnected = connected != null && axis < connected.Length
-                                ? connected[axis]
-                                : axis == 0;
-                            if (axisKnownConnected) connectedAxes.Add(axis);
+                            if (c.IsAxisConnected(axis)) connectedAxes.Add(axis);
                         }
 
                         // Only label rows "— Pedal N" when this device genuinely
@@ -2764,7 +2756,12 @@ namespace MozaPlugin
                             string label = multiplePedals
                                 ? $"{deviceLabel} — {string.Format(Strings.Label_PedalAxis, shown)}"
                                 : deviceLabel;
-                            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, axisCount);
+                            // Resolve against the CONNECTED axis count, not the
+                            // raw HID axis count — a chain-capable hub exposes
+                            // all 3 GenericDesktop axes even with only one pedal
+                            // plugged in, so raw axisCount would silently override
+                            // that pedal's own Role with the axis-order default.
+                            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, connectedAxes.Count);
                             bool isSelected = string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                                 && axis == _mboosterEffectPedalIndex;
                             _mboosterDeviceRows.Add(new MBoosterDeviceRow(c.Identity, axis, label, isSelected, role,
@@ -2780,7 +2777,12 @@ namespace MozaPlugin
                         var rowController = registry.FindByIdentity(row.Identity);
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(row.Identity);
                         int axisCount = rowController != null && rowController.AxisCount > 0 ? rowController.AxisCount : 1;
-                        row.RoleIndex = (int)global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, axisCount);
+                        if (axisCount > MBoosterDeviceController.MaxAxes) axisCount = MBoosterDeviceController.MaxAxes;
+                        int connectedAxisCount = 0;
+                        if (rowController != null)
+                            for (int axis = 0; axis < axisCount; axis++)
+                                if (rowController.IsAxisConnected(axis)) connectedAxisCount++;
+                        row.RoleIndex = (int)global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, connectedAxisCount);
                         row.IsSelected = string.Equals(row.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                             && row.AxisIndex == _mboosterEffectPedalIndex;
                         // DisplayName is per-profile like every other mBooster
