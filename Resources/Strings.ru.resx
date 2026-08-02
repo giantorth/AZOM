@@ -737,6 +737,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Цикл света</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Левый поворотник</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Правый поворотник</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Поворотники</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Минимальное время поворотника (с)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Нажмите клавишу…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(не задано)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(нет)</value></data>

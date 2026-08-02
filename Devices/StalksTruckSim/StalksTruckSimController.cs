@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace MozaPlugin.Devices.StalksTruckSim
 {
@@ -31,10 +32,18 @@ namespace MozaPlugin.Devices.StalksTruckSim
         private int _lightStage;
         private int _activeIndicator; // 0 none, 1 left, 2 right
 
+        // Deferred indicator cancel (guarded by _lock). The lever springs back the
+        // instant it is let go, which is not a request to stop signalling — so a
+        // cancel arriving before the minimum blink time is served by the timer instead.
+        private long _indicatorOnTicks;
+        private int _pendingCancelSide;
+        private readonly Timer _cancelTimer;
+
         public StalksTruckSimController()
         {
             // Only inject keys when a truck game is the foreground window.
             _kb.SetForegroundProcesses("eurotrucks2", "amtrucks");
+            _cancelTimer = new Timer(OnCancelTimer, null, Timeout.Infinite, Timeout.Infinite);
         }
 
         private bool Active => _truckSimEnabled && _truckGameRunning;
@@ -50,16 +59,21 @@ namespace MozaPlugin.Devices.StalksTruckSim
                 _kb.GapMs = Math.Max(0, _cfg.KeyGapMs);
             }
             _truckSimEnabled = mode == StalkMode.TruckSim;
-            if (mode != StalkMode.TruckSim) { _kb.ReleaseAll(); _kb.Flush(); }
+            if (mode != StalkMode.TruckSim) { ResetIndicator(); _kb.ReleaseAll(); _kb.Flush(); }
         }
 
         /// <summary>Push the current game context each DataUpdate tick.</summary>
         public void SetGameContext(string gameName, bool gameRunning)
         {
             bool truck = gameRunning && IsTruckSimGame(gameName);
+            bool wasTruck = _truckGameRunning;
             _truckGameRunning = truck;
             if (!truck)
             {
+                // The blinker tracker models the game's own state, which is gone with
+                // the game — unlike the wiper/light stages below, it is reset here.
+                // Only on the edge: this runs at DataUpdate rate.
+                if (wasTruck) ResetIndicator();
                 _kb.ReleaseAll();
                 _kb.Flush();
             }
@@ -120,10 +134,10 @@ namespace MozaPlugin.Devices.StalksTruckSim
                     ConvergeLight(action.Stage, cfg);
                     break;
                 case StalkActionKind.IndicatorLeft:
-                    Indicate(cfg.IndicatorLeftKey, side: 1);
+                    Indicate(cfg, side: 1);
                     break;
                 case StalkActionKind.IndicatorRight:
-                    Indicate(cfg.IndicatorRightKey, side: 2);
+                    Indicate(cfg, side: 2);
                     break;
                 case StalkActionKind.IndicatorCancel:
                     CancelIndicator(cfg);
@@ -140,23 +154,119 @@ namespace MozaPlugin.Devices.StalksTruckSim
         }
 
         // Turn-signal: tap the side's key and remember it so a later neutral press
-        // (IndicatorCancel) can re-tap it to toggle the blinker off.
-        private void Indicate(string key, int side)
+        // (IndicatorCancel) can re-tap it to toggle the blinker off. The in-game key
+        // is a toggle, so a side that is already lit is switched off instead, and
+        // swapping sides switches the old one off before the new one on.
+        private void Indicate(StalkTruckSimSettings cfg, int side)
         {
-            lock (_lock) _activeIndicator = side;
+            string key = SideKey(cfg, side);
+            string? turnOffFirst = null;
+            bool turnOn;
+            lock (_lock)
+            {
+                ClearPendingCancel();
+                turnOn = _activeIndicator != side;
+                if (_activeIndicator != 0 && _activeIndicator != side)
+                    turnOffFirst = SideKey(cfg, _activeIndicator);
+                _activeIndicator = turnOn ? side : 0;
+                if (turnOn) _indicatorOnTicks = DateTime.UtcNow.Ticks;
+            }
+            if (turnOffFirst != null) _kb.Tap(turnOffFirst);
             _kb.Tap(key);
         }
 
+        // Lever back at neutral. Cancel now only once the blinker has been lit for the
+        // configured minimum; otherwise hand the cancel to the timer so a quick flick
+        // still signals for a few seconds (matching Pit House).
         private void CancelIndicator(StalkTruckSimSettings cfg)
         {
             string? key = null;
             lock (_lock)
             {
-                if (_activeIndicator == 1) key = cfg.IndicatorLeftKey;
-                else if (_activeIndicator == 2) key = cfg.IndicatorRightKey;
+                ClearPendingCancel();
+                if (_activeIndicator == 0) return;
+
+                long remainMs = RemainingBlinkMs(cfg);
+                if (remainMs > 0)
+                {
+                    _pendingCancelSide = _activeIndicator;
+                    try { _cancelTimer.Change(remainMs, Timeout.Infinite); }
+                    catch (ObjectDisposedException) { _pendingCancelSide = 0; }
+                    return;
+                }
+
+                key = SideKey(cfg, _activeIndicator);
                 _activeIndicator = 0;
             }
-            if (key != null) _kb.Tap(key);
+            _kb.Tap(key);
+        }
+
+        // Minimum blink time is up — send the cancel the neutral position deferred.
+        private void OnCancelTimer(object? _)
+        {
+            StalkTruckSimSettings cfg;
+            int side;
+            lock (_lock)
+            {
+                side = _pendingCancelSide;
+                cfg = _cfg;
+                if (side == 0 || _activeIndicator != side) return;
+
+                // A callback armed for an earlier turn-on can win the race against a
+                // re-flick that restamped the clock; re-check and re-arm rather than
+                // cutting the new blink short.
+                long remainMs = RemainingBlinkMs(cfg);
+                if (remainMs > 0)
+                {
+                    try { _cancelTimer.Change(remainMs, Timeout.Infinite); }
+                    catch (ObjectDisposedException) { _pendingCancelSide = 0; }
+                    return;
+                }
+            }
+
+            // The foreground query is a process lookup — never held under _lock.
+            bool deliver = Active && _kb.IsGameForeground();
+            lock (_lock)
+            {
+                if (_pendingCancelSide != side || _activeIndicator != side) return;
+                _pendingCancelSide = 0;
+                // Not foreground: the key would be dropped, so leave the blinker
+                // tracked as lit — the next lever flick then still resolves to the
+                // right tap instead of desyncing.
+                if (!deliver) return;
+                _activeIndicator = 0;
+            }
+            _kb.Tap(SideKey(cfg, side));
+        }
+
+        /// <summary>Milliseconds left of the minimum blink time, 0 once it is up.
+        /// Caller holds <see cref="_lock"/>.</summary>
+        private long RemainingBlinkMs(StalkTruckSimSettings cfg)
+        {
+            long minMs = Math.Max(0, cfg.IndicatorMinBlinkSeconds) * 1000L;
+            long litMs = (DateTime.UtcNow.Ticks - _indicatorOnTicks) / TimeSpan.TicksPerMillisecond;
+            return Math.Max(0, minMs - litMs);
+        }
+
+        private static string SideKey(StalkTruckSimSettings cfg, int side)
+            => side == 1 ? cfg.IndicatorLeftKey : cfg.IndicatorRightKey;
+
+        /// <summary>Drop any armed cancel. Caller holds <see cref="_lock"/>.</summary>
+        private void ClearPendingCancel()
+        {
+            _pendingCancelSide = 0;
+            try { _cancelTimer.Change(Timeout.Infinite, Timeout.Infinite); }
+            catch (ObjectDisposedException) { }
+        }
+
+        /// <summary>Forget the tracked blinker and any armed cancel.</summary>
+        private void ResetIndicator()
+        {
+            lock (_lock)
+            {
+                ClearPendingCancel();
+                _activeIndicator = 0;
+            }
         }
 
         private void ConvergeWiper(int target, StalkTruckSimSettings cfg)
@@ -216,6 +326,7 @@ namespace MozaPlugin.Devices.StalksTruckSim
 
         public void Dispose()
         {
+            try { _cancelTimer.Dispose(); } catch { }
             try { _kb.Dispose(); } catch { }
         }
     }

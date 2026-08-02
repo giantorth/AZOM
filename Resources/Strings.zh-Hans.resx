@@ -737,6 +737,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>灯光循环</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>左转向灯</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>右转向灯</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>转向灯</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>最短转向灯时间 (秒)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>请按下按键…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>（未设置）</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>（无）</value></data>

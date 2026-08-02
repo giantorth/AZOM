@@ -611,6 +611,11 @@ namespace MozaPlugin
         public string IndicatorLeftKey { get; set; } = "[";
         public string IndicatorRightKey { get; set; } = "]";
 
+        /// <summary>How long the blinker stays lit after it is switched on, in seconds.
+        /// A neutral-position cancel that lands sooner is deferred until the time is up,
+        /// so a quick flick of the lever still signals. 0 = cancel immediately.</summary>
+        public int IndicatorMinBlinkSeconds { get; set; } = 3;
+
         // Stage models.
         public int WiperStageCount { get; set; } = 4;
         public bool WiperForwardWraps { get; set; } = false;   // ETS2 wiper key does not wrap
@@ -629,6 +634,7 @@ namespace MozaPlugin
                 LightCycleKey = LightCycleKey,
                 IndicatorLeftKey = IndicatorLeftKey,
                 IndicatorRightKey = IndicatorRightKey,
+                IndicatorMinBlinkSeconds = IndicatorMinBlinkSeconds,
                 WiperStageCount = WiperStageCount,
                 WiperForwardWraps = WiperForwardWraps,
                 LightStageCount = LightStageCount,
@@ -652,6 +658,7 @@ namespace MozaPlugin
             LightCycleKey = "L";
             IndicatorLeftKey = "[";
             IndicatorRightKey = "]";
+            IndicatorMinBlinkSeconds = 3;
             WiperStageCount = 4;
             WiperForwardWraps = false;
             LightStageCount = 3;

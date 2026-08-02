@@ -736,6 +736,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Κύκλος φώτων</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Φλας αριστερά</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Φλας δεξιά</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Φλας</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Ελάχιστος χρόνος φλας (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Πάτησε ένα πλήκτρο…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(δεν ορίστηκε)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(κανένα)</value></data>

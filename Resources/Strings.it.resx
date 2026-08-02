@@ -740,6 +740,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Ciclo luci</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Freccia sinistra</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Freccia destra</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Frecce</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Durata minima freccia (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Premi un tasto…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(non impostato)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(nessuna)</value></data>

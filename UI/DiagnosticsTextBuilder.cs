@@ -169,6 +169,59 @@ namespace MozaPlugin.UI
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>Multi-Function Stalks state + the truck-sim button map. The map is
+        /// what turns a "stalk behaves wrong in ETS2" report into a diagnosis, and the
+        /// seen-index list shows which physical lever positions the device reports.</summary>
+        public static string BuildStalks(MozaPlugin plugin, MozaData d)
+        {
+            if (!d.IsStalksConnected && d.StalksButtonCount == 0)
+                return "(no MOZA Stalks detected — HID-only device, VID 0x346E PID 0x0024)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Connected:      {d.IsStalksConnected}");
+            sb.AppendLine($"Buttons seen:   {d.StalksButtonCount} (highest index reported + 1)");
+
+            var pressed = new System.Collections.Generic.List<string>();
+            var states = d.StalksButtonStates;
+            for (int i = 0; i < states.Length; i++)
+                if (states[i]) pressed.Add((i + 1).ToString());
+            sb.AppendLine($"Pressed now:    {(pressed.Count == 0 ? "(none)" : string.Join(", ", pressed))}  (btn numbers)");
+
+            var s = plugin?.Settings;
+            var cfg = s?.StalksTruckSim;
+            sb.AppendLine($"Mode:           {(s == null ? "—" : s.StalksMode.ToString())}");
+            if (cfg == null) return sb.ToString().TrimEnd();
+
+            sb.AppendLine(
+                $"Keys:           wiperFwd='{cfg.WiperForwardKey}' wiperBack='{cfg.WiperBackKey}' " +
+                $"lightCycle='{cfg.LightCycleKey}' indL='{cfg.IndicatorLeftKey}' indR='{cfg.IndicatorRightKey}'");
+            sb.AppendLine(
+                $"Stages:         wipers={cfg.WiperStageCount} (wrap={cfg.WiperForwardWraps}) " +
+                $"lights={cfg.LightStageCount}  minBlink={cfg.IndicatorMinBlinkSeconds}s  " +
+                $"keyHold={cfg.KeyHoldMs}ms gap={cfg.KeyGapMs}ms");
+
+            var map = cfg.ButtonActions;
+            if (map == null || map.Count == 0)
+            {
+                sb.AppendLine("Map:            (no buttons mapped)");
+                return sb.ToString().TrimEnd();
+            }
+            sb.AppendLine($"Map:            {map.Count} button(s)");
+            var indices = new System.Collections.Generic.List<int>(map.Keys);
+            indices.Sort();
+            foreach (int i in indices)
+            {
+                var a = map[i];
+                if (a == null) continue;
+                string extra =
+                    a.Kind == Devices.StalksTruckSim.StalkActionKind.WiperStage ||
+                    a.Kind == Devices.StalksTruckSim.StalkActionKind.LightStage ? $" stage={a.Stage}"
+                    : string.IsNullOrEmpty(a.Key) ? "" : $" key='{a.Key}'";
+                sb.AppendLine($"  btn{i + 1,-3} (idx {i,2})  {a.Kind}{extra}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
         public static string BuildWheelIdentity(MozaData d, Devices.DeviceDetectionState? detection = null)
         {
             var sb = new StringBuilder();

@@ -793,6 +793,8 @@ namespace MozaPlugin.Resources
         public static string Label_LightCycleKey => Get("Label_LightCycleKey");
         public static string Label_IndicatorLeftKey => Get("Label_IndicatorLeftKey");
         public static string Label_IndicatorRightKey => Get("Label_IndicatorRightKey");
+        public static string Section_StalksIndicators => Get("Section_StalksIndicators");
+        public static string SliderLabel_IndicatorMinBlink => Get("SliderLabel_IndicatorMinBlink");
         public static string KeyCapture_Prompt => Get("KeyCapture_Prompt");
         public static string KeyCapture_None => Get("KeyCapture_None");
         public static string StalkKind_None => Get("StalkKind_None");

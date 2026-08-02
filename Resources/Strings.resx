@@ -744,6 +744,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Light cycle</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Indicator left</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Indicator right</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Indicators</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Minimum blinker time (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Press a key…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(not set)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(none)</value></data>

@@ -3089,6 +3089,21 @@
                                     <ctrl:KeyCaptureBox Grid.Row="4" Grid.Column="1" x:Name="StalksIndRightKeyBox" Width="140" Margin="0,4" HorizontalAlignment="Left" KeyChanged="StalksGameKey_Changed"/>
                                 </Grid>
                             </ctrl:SectionCard>
+                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_StalksIndicators}"
+                                              Icon="{StaticResource IconShift}">
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_IndicatorMinBlink}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="StalksIndMinBlinkSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="StalksIndMinBlinkSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="StalksIndMinBlinkValue" Style="{StaticResource SliderValueEditBox}"
+                                             Tag="{Binding ElementName=StalksIndMinBlinkSlider}"
+                                             KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus" Text="3"/>
+                                </Grid>
+                            </ctrl:SectionCard>
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_StalksKeyMapping}"
                                               Subtitle="{x:Static res:Strings.Subtitle_StalksInteractiveMap}"
                                               Icon="{StaticResource IconShift}">

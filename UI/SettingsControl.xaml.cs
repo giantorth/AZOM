@@ -2364,6 +2364,9 @@ namespace MozaPlugin
             sb.AppendLine("=== mBooster pedals ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin));
             sb.AppendLine();
+            sb.AppendLine("=== Stalks ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildStalks(_plugin, _data));
+            sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState));
             sb.AppendLine();
