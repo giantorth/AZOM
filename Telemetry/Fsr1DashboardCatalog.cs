@@ -335,9 +335,11 @@ namespace MozaPlugin.Telemetry
                     .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight", bias: 100.0, scale: -1.0)
                     .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft", bias: 100.0, scale: -1.0)
                     .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight", bias: 100.0, scale: -1.0)
-                    .U8("wwFL", "Wing wear FL", "")
-                    .U8("wwFR", "Wing wear FR", "")
-                    .U8("wwR", "Wing wear R", "")
+                    // Wing boxes seed from SimHub's generic damage zones (AC: 1=front, 2=rear);
+                    // same remaining-% convention as the tyre boxes.
+                    .U8("wwFL", "Wing wear FL", G + "CarDamage1", bias: 100.0, scale: -1.0)
+                    .U8("wwFR", "Wing wear FR", G + "CarDamage1", bias: 100.0, scale: -1.0)
+                    .U8("wwR", "Wing wear R", G + "CarDamage2", bias: 100.0, scale: -1.0)
                     .U8("engWear", "Engine wear", "")
                     .U8("gbxWear", "Gearbox wear", "")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
