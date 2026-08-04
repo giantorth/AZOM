@@ -193,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB 감지</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>시리얼 프로브 폴백 비활성화 (고급)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>플러그인이 잘못된 장치와 통신하는 경우에만 필요합니다.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>AB9 액티브 시프터 감지 비활성화</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>AB9 재연결 프로브를 건너뜁니다.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 감지 비활성화 (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 재연결 프로브를 건너뜁니다.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>연결 시 대시보드 업로드</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>휠에서 대시보드 다운로드</value></data>

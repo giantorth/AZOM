@@ -19,6 +19,26 @@ AB9 enumerates as its **own** Moza composite USB device (VID `0x346E` PID `0x100
 
 Address-disambiguation (only Moza devs in capture): wheelbase OUTs target dev IDs 0x13/0x14/0x15/0x17/0x19/0x1A/0x1B/0x1E (full sub-bus). AB9 OUTs target only `Main/Hub (0x12)` — confirms AB9 has its own internal "Main" with no sub-devices.
 
+### AB6 sibling — PID `0x1002` (2026-08-03; device confirmed, protocol unverified)
+
+A user diagnostics bundle (`2026-08-03_CS-Pro_1.5.3_HBNKHSF5`) enumerated a second active shifter alongside an R21 (`0x0000`). The device identifies itself in its HID product string, so the PID↔model mapping is confirmed:
+
+```
+COM6  VID 0x346E  PID 0x1002   HID product string: "MOZA AB6 FFB Base"
+```
+
+HID descriptor: 8 GenericDesktop axes (`0x30`..`0x37`) + 128 buttons — the same generic MOZA composite descriptor the wheelbases report, so it carries no model information.
+
+**There is no AB6 wire capture.** The reporter had `DisableAb9Detection` set, so `TryConnectAb9()` never ran and the port was never opened — their bundle contains 18,759 frames, all labelled `wheelbase`, and zero bytes on COM6. `0x1002` is registered in category `Ab9` and driven by the shared lane on the **assumption** of protocol parity with the AB9. Everything below (groups `0x1E`/`0x1F`/`0x20`, dev `0x12`, the FFB alloc handshake, the engine-vibration stream set) is AB9-measured and unverified on an AB6.
+
+Open questions the first AB6 capture should settle:
+
+- **Gate count / valid layout bytes.** `HardwareApplier.ApplyAb9ToHardware` fires on the detection rising edge and unconditionally sends `ab9.Mode`, which defaults to `SevenPlusR_L1` (`0x06`). If the AB6 has fewer gates this pushes an invalid layout. The plugin has no per-model layout gating — deliberately, since guessing the gate count would be inventing hardware behaviour.
+- **Whether the identity cascade answers at all.** If the AB6 does not reply to the group-`0x09` probe with a `0x89` response, `Ab9Detected` never latches, the tab stays hidden and no FFB init is sent — the failure is silent, not a crash.
+- **Whether the AB9-calibrated magnitudes carry over**: `EngineVibIntensityFullScale` `0x1996`, `EnginePulseAmpFullScale` `0x2328`, `MaxGearShiftIntensityRaw` `0x332C`, and `Ab9EngineVibrationWorker.FreqTickHz`.
+
+Because the lane opens the port with `CaptureLabel = "ab9"`, any bundle from an AB6 owner with detection enabled now contains that capture.
+
 ### Shifter mode set — `Group 0x1F → dev 0x12, cmd 0xD300`
 
 Six mode-change events at 5/10/15/20/25/30 s in the shifter-mode capture, each one 8-byte CDC OUT frame on the AB9:

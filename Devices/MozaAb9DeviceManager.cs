@@ -46,10 +46,13 @@ namespace MozaPlugin.Devices
     }
 
     /// <summary>
-    /// Wraps a dedicated <see cref="MozaSerialConnection"/> for the AB9 active shifter
-    /// (VID 0x346E, PID 0x1000). Owns the connection lifecycle, identity probe,
-    /// mode/slider writes, and stored-state read-back. Independent of the wheelbase
-    /// connection so both can run side-by-side.
+    /// Wraps a dedicated <see cref="MozaSerialConnection"/> for the active shifter
+    /// (VID 0x346E — AB9 PID 0x1000, AB6 PID 0x1002; one shared lane, so with both
+    /// attached only the first-enumerated one is claimed). Owns the connection
+    /// lifecycle, identity probe, mode/slider writes, and stored-state read-back.
+    /// Independent of the wheelbase connection so both can run side-by-side.
+    /// AB6 protocol parity with the AB9 is assumed, not captured — see
+    /// docs/protocol/devices/ab9-shifter.md § AB6 sibling.
     /// </summary>
     public class MozaAb9DeviceManager : IDisposable
     {
@@ -78,10 +81,18 @@ namespace MozaPlugin.Devices
         private readonly MozaSerialConnection _connection;
         private volatile bool _detected;
         private volatile bool _ffbInitSent;
+        // Resolved once per successful open. MarkDetected runs on the serial read
+        // thread while DiscoveredPid is written on the reconnect-timer thread, and
+        // it's a plain auto-property — reading it from there can observe a stale
+        // null and log the wrong model.
+        private volatile string _modelName = "AB9/AB6";
 
         public bool Detected => _detected;
         public bool IsConnected => _connection.IsConnected;
         public MozaSerialConnection Connection => _connection;
+        /// <summary>"AB9", "AB6", or the family label when the PID is unknown
+        /// (probe-based discovery under Wine/Proton).</summary>
+        public string ModelName => _modelName;
 
         public event Action<byte[]>? MessageReceived
         {
@@ -137,7 +148,10 @@ namespace MozaPlugin.Devices
             if (_connection.IsConnected) return true;
             bool ok = _connection.Connect();
             if (ok)
-                MozaLog.Info("[AZOM/AB9] Connected to AB9 shifter");
+            {
+                _modelName = MozaUsbIds.ActiveShifterShortName(_connection.DiscoveredPid);
+                MozaLog.Info($"[AZOM/AB9] Connected to {_modelName} active shifter");
+            }
             return ok;
         }
 
@@ -158,7 +172,7 @@ namespace MozaPlugin.Devices
         {
             if (_detected) return;
             _detected = true;
-            MozaLog.Debug("[AZOM/AB9] AB9 active shifter detected");
+            MozaLog.Debug($"[AZOM/AB9] {_modelName} active shifter detected");
         }
 
         /// <summary>

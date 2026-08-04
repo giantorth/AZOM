@@ -193,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>PHÁT HIỆN USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Tắt dò cổng serial dự phòng (nâng cao)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Chỉ cần thiết khi plugin giao tiếp với thiết bị không đúng.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Tắt phát hiện cần số chủ động AB9</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Bỏ qua bước dò kết nối lại AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Tắt phát hiện cần số chủ động (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Bỏ qua bước dò kết nối lại cần số chủ động.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRY BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Tải lên bảng điều khiển khi kết nối</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Tải bảng điều khiển từ vô lăng</value></data>

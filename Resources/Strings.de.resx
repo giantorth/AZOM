@@ -193,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB-ERKENNUNG</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Serielles Probe-Fallback deaktivieren (erweitert)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Nur erforderlich, wenn das Plugin mit einem falschen Gerät kommuniziert.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Erkennung des AB9-Aktivschalthebels deaktivieren</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Überspringt das AB9-Reconnect-Probe.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Erkennung des Aktivschalthebels deaktivieren (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Überspringt die Reconnect-Probe des Aktivschalthebels.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRIE</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Dashboard beim Verbinden hochladen</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Dashboards vom Lenkrad herunterladen</value></data>

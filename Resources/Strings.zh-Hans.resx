@@ -193,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB 检测</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>禁用串口探测回退(高级)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>仅在插件与错误设备通信时需要启用。</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>禁用 AB9 主动排挡杆检测</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>跳过 AB9 重连探测。</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>禁用主动排挡杆检测 (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>跳过主动排挡杆重连探测。</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>仪表盘遥测</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>连接时上传仪表盘</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>从方向盘下载仪表盘</value></data>

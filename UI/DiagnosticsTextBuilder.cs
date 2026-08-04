@@ -76,9 +76,22 @@ namespace MozaPlugin.UI
             string wheelbasePort = plugin.Connection?.LastPortName ?? "";
             sb.Append("Assignments:    Wheelbase ");
             sb.Append(string.IsNullOrEmpty(wheelbasePort) ? "(disconnected)" : "→ " + wheelbasePort);
-            string ab9Port = plugin.Ab9Manager?.Connection?.LastPortName ?? "";
-            sb.Append("  |  AB9 ");
-            sb.Append(string.IsNullOrEmpty(ab9Port) ? "(disconnected)" : "→ " + ab9Port);
+            // AB9/AB6 share one lane. LastPortName survives Disconnect, so gate on
+            // IsConnected like the Hub / Base(aux) lines below — otherwise this
+            // prints a port for a shifter that was unplugged. A user-disabled lane
+            // reads as such rather than as "disconnected": that setting is the
+            // single most common reason an active shifter never appears.
+            var ab9Conn = plugin.Ab9Manager?.Connection;
+            bool ab9Connected = ab9Conn?.IsConnected == true;
+            string ab9Port = ab9Connected ? ab9Conn!.LastPortName ?? "" : "";
+            sb.Append("  |  ");
+            sb.Append(ab9Connected
+                ? Protocol.MozaUsbIds.ActiveShifterShortName(ab9Conn!.DiscoveredPid)
+                : "AB9/AB6");
+            sb.Append(' ');
+            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
+                      : plugin.Settings?.DisableAb9Detection == true ? "(detection disabled)"
+                      : "(disconnected)");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");

@@ -193,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>DÉTECTION USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Désactiver la sonde série de secours (avancé)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>À activer uniquement si le plugin communique avec un mauvais périphérique.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Désactiver la détection du levier actif AB9</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Ignorer la sonde de reconnexion AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Désactiver la détection du levier actif (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Ignorer la sonde de reconnexion du levier actif.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TÉLÉMÉTRIE DU TABLEAU DE BORD</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Téléverser le tableau de bord à la connexion</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Télécharger les tableaux de bord depuis le volant</value></data>

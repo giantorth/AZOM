@@ -193,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>ОБНАРУЖЕНИЕ USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Отключить резервное последовательное зондирование (расширенное)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Нужно, только если плагин обращается к неверному устройству.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Отключить обнаружение активной кулисы AB9</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Пропустить зондирование переподключения AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Отключить обнаружение активной кулисы (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Пропустить зондирование переподключения активной кулисы.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ТЕЛЕМЕТРИЯ ПАНЕЛИ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Загружать панель при подключении</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Скачивать панели с руля</value></data>

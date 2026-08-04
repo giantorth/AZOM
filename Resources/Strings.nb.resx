@@ -198,8 +198,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB-DETEKSJON</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Deaktiver seriell-probe-fallback (avansert)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Trengs bare hvis pluginen snakker med feil enhet.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Deaktiver AB9-active-shifter-deteksjon</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Hopp over AB9-reconnect-probe.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Deaktiver active-shifter-deteksjon (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Hopp over active-shifter-reconnect-probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRI</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Last opp dashboard ved tilkobling</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Last ned dashboard fra rattet</value></data>

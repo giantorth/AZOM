@@ -2456,6 +2456,17 @@ namespace MozaPlugin
 
             Ab9Tab.Visibility = (connected || detected)
                 ? Visibility.Visible : Visibility.Collapsed;
+
+            // AB9 and AB6 share this lane, so the header names whichever answered.
+            // Only derive it while the lane is live: DiscoveredPid is never cleared
+            // on Disconnect, so an unplugged AB6 would otherwise keep labelling the
+            // tab after an AB9 is plugged in. The x:Static default resolves once, so
+            // the neutral branch has to restore it explicitly.
+            Ab9Tab.Header = (connected || detected)
+                ? global::MozaPlugin.Protocol.MozaUsbIds.ActiveShifterShortName(
+                      _plugin.Ab9Manager.Connection.DiscoveredPid)
+                : (object)Strings.TabHeader_Ab9Shifter;
+
             if (!connected && !detected) return;
 
             // Re-seed the controls from the active profile every refresh tick so

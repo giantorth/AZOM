@@ -218,7 +218,7 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        /// <summary>Open the AB9 shifter's dedicated CDC port (PID 0x1000) and probe identity.</summary>
+        /// <summary>Open the active shifter's dedicated CDC port (AB9 0x1000 / AB6 0x1002) and probe identity.</summary>
         internal void TryConnectAb9()
         {
             if (_ab9Manager == null) return;

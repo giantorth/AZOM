@@ -198,8 +198,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>DETECCIÓN USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Desactivar sondeo serial de respaldo (avanzado)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Solo necesario si el plugin se comunica con un dispositivo incorrecto.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Desactivar la detección de la palanca activa AB9</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Omite el sondeo de reconexión del AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Desactivar la detección de la palanca activa (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Omite el sondeo de reconexión de la palanca activa.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRÍA DEL TABLERO</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Subir tablero al conectar</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Descargar tableros desde el volante</value></data>
