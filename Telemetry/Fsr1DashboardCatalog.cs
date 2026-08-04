@@ -193,6 +193,18 @@ namespace MozaPlugin.Telemetry
                 _bit += 8;
                 return this;
             }
+            /// <summary>GT light/flag bundle: 2-bit light stage at [0:2] (0=off, 1=low beam,
+            /// 2=high beam — one field, not two beam bits; tester box-verified), then 1-bit
+            /// flags from bit 2.</summary>
+            public Fields LightStageFlags(params (string id, string label, string prop)[] flags)
+            {
+                int b = _bit;
+                _list.Add(MakeBits("lightStage", "Light stage", b, 2, "", fullScale: 2));
+                for (int i = 0; i < flags.Length; i++)
+                    _list.Add(MakeBits(flags[i].id, flags[i].label, b + 2 + i, 1, flags[i].prop));
+                _bit += 8;
+                return this;
+            }
             public Fsr1FieldDef[] Done() => _list.ToArray();
         }
 
@@ -267,18 +279,14 @@ namespace MozaPlugin.Telemetry
             G + "TyrePressureFrontLeft", G + "TyrePressureFrontRight",
             G + "TyrePressureRearLeft", G + "TyrePressureRearRight",
         };
-        // type-0f packs its tyre-temp/pressure 4×10-bit groups in the order RR,RL,FR,FL — reversed
-        // from the FL,FR,RL,RR order the other records use (matches PitHouse's type-0f stream).
+        // type-0f packs its tyre-TEMP 4×10-bit group in the order RR,RL,FR,FL (capture decode);
+        // its PRESSURE pack is normal FL,FR,RL,RR (tester box-verified — the RR,RL,FR,FL guess
+        // rendered diagonally crossed).
         private static readonly string[] GtTyreCorners = { "RR", "RL", "FR", "FL" };
         private static readonly string[] OuterTempProps =   // outer tyre surface temp, order RR,RL,FR,FL
         {
             G + "TyreTemperatureRearRight", G + "TyreTemperatureRearLeft",
             G + "TyreTemperatureFrontRight", G + "TyreTemperatureFrontLeft",
-        };
-        private static readonly string[] GtPressProps =     // tyre pressure, order RR,RL,FR,FL
-        {
-            G + "TyrePressureRearRight", G + "TyrePressureRearLeft",
-            G + "TyrePressureFrontRight", G + "TyrePressureFrontLeft",
         };
         // Tyre-temp 10-bit fields carry a +300 wire bias (firmware decodes value−300 °C).
         private const double TyreTempBias = 300.0;
@@ -497,8 +505,9 @@ namespace MozaPlugin.Telemetry
             {
                 // GT dashboard background record: tyre / brake status. Streamed alongside the primary
                 // type-0x11 on the GT page (verified in the "Dashboard 17 AC" capture). Layout: 4×10-bit
-                // outer tyre temp (RR,RL,FR,FL), 4×U16 brake temp (FL,FR,RL,RR), 4×10-bit tyre pressure
-                // (RR,RL,FR,FL), U8 lap = 19 bytes.
+                // outer tyre temp (RR,RL,FR,FL per capture decode), 4×U16 brake temp (FL,FR,RL,RR),
+                // 4×10-bit tyre pressure (FL,FR,RL,RR — tester box-verified; the capture-decode
+                // RR,RL,FR,FL guess rendered diagonally crossed), U8 lap = 19 bytes.
                 RecordType = 0x0f, Key = "type-0f", Label = "Dashboard 0F — tyre / brake status", IsLive = true, IsBackground = true,
                 PayloadLen = 24, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
@@ -507,7 +516,7 @@ namespace MozaPlugin.Telemetry
                     .U16("btFR", "Brake temp FR", G + "BrakeTemperatureFrontRight")
                     .U16("btRL", "Brake temp RL", G + "BrakeTemperatureRearLeft")
                     .U16("btRR", "Brake temp RR", G + "BrakeTemperatureRearRight")
-                    .Pack10x4("tp", "Tyre pressure", GtTyreCorners, GtPressProps, scale: 10.0)
+                    .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Done(),
             },
@@ -528,8 +537,8 @@ namespace MozaPlugin.Telemetry
                     .U8("tc", "TC level", G + "TCLevel")
                     .U8("tcCut", "TC-R", "")   // on-wheel gauge is labelled TC-R
                     .U8("ecu", "ECU map", G + "EngineMap")
-                    .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
-                           ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
+                    .LightStageFlags(("rain", "Rain light", ""), ("wipers", "Wipers", ""),
+                           ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("wiperCls", "Wiper class", "")
                     .U8("redline", "Redline reached", "")
                     .Done(),
@@ -565,8 +574,8 @@ namespace MozaPlugin.Telemetry
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Nibbles("tc", "TC level", G + "TCLevel", "ecu", "ECU map", G + "EngineMap")
                     .U8("tcCut", "TC-R", "")   // on-wheel gauge is labelled TC-R
-                    .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
-                           ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
+                    .LightStageFlags(("rain", "Rain light", ""), ("wipers", "Wipers", ""),
+                           ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("sector", "Sector", G + "CurrentSectorIndex")
                     .U8("redline", "Redline reached", "")
                     .Done(),
