@@ -38,14 +38,10 @@ namespace MozaPlugin.Telemetry
             return profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var m) ? m : null;
         }
 
-        /// <summary>Resolve one FSR1 field's user mapping, or null to use the catalog default.
-        /// A synthetic split field returns its inline mapping (it carries an explicit span and
-        /// is never stored in the catalog-override dict).</summary>
+        /// <summary>Resolve one FSR1 field's user mapping, or null to use the catalog default.</summary>
         internal Fsr1FieldMapping? GetFsr1FieldMapping(string recordKey, string fieldId)
         {
             if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return null;
-            var syn = FindSynthetic(recordKey, fieldId);
-            if (syn != null) return syn.Mapping;
             var m = GetActiveFsr1Mappings();
             if (m == null) return null;
             return m.TryGetValue(recordKey, out var inner)
@@ -53,19 +49,16 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>True when a mapping carries no opinion at all — empty property and no
-        /// boundary/encoding/gain override — so it should be pruned rather than stored
+        /// gain override — so it should be pruned rather than stored
         /// (dict-missing ≠ explicit-off: a default-only entry must not bloat the profile).</summary>
         private static bool IsDefaultFsr1Mapping(Fsr1FieldMapping? m) =>
             m == null
             || (string.IsNullOrEmpty((m.Property ?? "").Trim())
-                && m.StartOffset == null && m.EndOffset == null
-                && m.LittleEndian == null && m.Scale == null && m.Bias == null
-                && m.StartBit == null && m.BitWidth == null && m.MsbFirst == null
-                && !m.Hidden);
+                && m.Scale == null && m.Bias == null);
 
         /// <summary>
         /// Persist (or clear) an FSR1 dashboard field assignment (property + input scale +
-        /// boundary/encoding/gain overrides). A default-only mapping (see
+        /// gain overrides). A default-only mapping (see
         /// <see cref="IsDefaultFsr1Mapping"/>) removes the override so the field reverts to
         /// the catalog default. Tidies empty dicts and saves settings. The mapping is cloned
         /// so the stored copy is not aliased to a live UI row.
@@ -73,20 +66,6 @@ namespace MozaPlugin.Telemetry
         internal void SetFsr1FieldMapping(string recordKey, string fieldId, Fsr1FieldMapping? mapping)
         {
             if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return;
-
-            // Synthetic split field: replace its inline mapping (never prune — a synthetic
-            // always owns an explicit byte span). Preserve the span if the caller omitted it.
-            var syn = FindSynthetic(recordKey, fieldId);
-            if (syn != null)
-            {
-                var newMap = (mapping ?? new Fsr1FieldMapping()).Clone();
-                if (newMap.StartOffset == null) newMap.StartOffset = syn.Mapping?.StartOffset;
-                if (newMap.EndOffset == null) newMap.EndOffset = syn.Mapping?.EndOffset;
-                newMap.Property = (newMap.Property ?? "").Trim();
-                syn.Mapping = newMap;
-                _plugin.SaveSettings();
-                return;
-            }
 
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
             if (profile == null) return;
@@ -128,293 +107,8 @@ namespace MozaPlugin.Telemetry
             _plugin.SaveSettings();
         }
 
-        // ── FSR V1 synthetic split fields ───────────────────────────────────
-        // A user "split" carves a new sub-span out of an existing field; the resulting
-        // field is net-new (not in the static catalog) and gets its own channel mapping,
-        // stored inline in Fsr1SyntheticField.Mapping (always with an explicit byte span).
-        // Get/SetFsr1FieldMapping above are synthetic-aware so the divider editor and the
-        // value/scale editors keep working without per-call branching.
-
-        private static readonly List<Fsr1SyntheticField> _emptySynthetic = new List<Fsr1SyntheticField>();
-
-        /// <summary>The synthetic split fields on <paramref name="recordKey"/> for the current
-        /// wheel page (live list; empty when none). Read-only callers must not mutate it.</summary>
-        internal List<Fsr1SyntheticField> GetSyntheticFields(string recordKey)
-        {
-            if (string.IsNullOrEmpty(recordKey)) return _emptySynthetic;
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Fsr1SyntheticFields == null) return _emptySynthetic;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return _emptySynthetic;
-            if (profile.Fsr1SyntheticFields.TryGetValue(g.Value, out var mid) && mid != null
-                && mid.TryGetValue(recordKey, out var list) && list != null)
-                return list;
-            return _emptySynthetic;
-        }
-
-        private Fsr1SyntheticField? FindSynthetic(string recordKey, string fieldId)
-        {
-            foreach (var s in GetSyntheticFields(recordKey))
-                if (s != null && s.FieldId == fieldId) return s;
-            return null;
-        }
-
-        /// <summary>Next free synthetic field id on the record (e.g. "split1", "split2").</summary>
-        internal string NextSyntheticFieldId(string recordKey)
-        {
-            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var s in GetSyntheticFields(recordKey))
-                if (s != null) ids.Add(s.FieldId);
-            int n = 1;
-            while (ids.Contains("split" + n)) n++;
-            return "split" + n;
-        }
-
-        /// <summary>
-        /// Split the field <paramref name="fieldId"/> on <paramref name="recordKey"/> at its
-        /// midpoint: the original keeps the low bytes <c>[s, s+⌊w/2⌋-1]</c>, a new synthetic
-        /// field takes the high bytes <c>[s+⌊w/2⌋, e]</c> with its own (empty) channel. Requires
-        /// the field be ≥ 2 bytes wide. Returns false if it can't be split. The record stays a
-        /// gapless partition. Works on a catalog OR a synthetic parent.
-        /// </summary>
-        internal bool SplitFsr1Field(string recordKey, string fieldId)
-        {
-            var span = ResolveFieldSpan(recordKey, fieldId);
-            if (span == null) return false;
-            int s = span.Value.start, e = span.Value.end;
-            int w = e - s + 1;
-            if (w < 2) return false;
-            int half = w / 2;                 // floor
-            int parentEnd = s + half - 1;
-            int synthStart = s + half;
-            int synthEnd = e;
-
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile == null) return false;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return false;
-
-            // 1. Shrink the parent to the low bytes (catalog → boundary override; synthetic → inline).
-            WriteFieldSpan(recordKey, fieldId, s, parentEnd);
-
-            // 2. Add the synthetic owning the high bytes, with its own empty channel mapping.
-            string newId = NextSyntheticFieldId(recordKey);
-            var list = GetOrCreateSyntheticList(profile, g.Value, recordKey);
-            list.Add(new Fsr1SyntheticField
-            {
-                FieldId = newId,
-                Label = "Split " + newId,
-                Mapping = new Fsr1FieldMapping { StartOffset = synthStart, EndOffset = synthEnd },
-            });
-            _plugin.SaveSettings();
-            return true;
-        }
-
-        /// <summary>
-        /// Convert a field into two SUB-BYTE / bit-packed fields by halving its bit range: the
-        /// original keeps the leading bits, a new synthetic takes the trailing bits (each a packed
-        /// field that may share a byte). Requires ≥ 2 bits. This is the bit-granular sibling of
-        /// <see cref="SplitFsr1Field"/> — it flips the record into bit mode so the two halves can
-        /// share the middle byte the wheel actually packs. Users then step each half's bit width /
-        /// offset and probe to land the real split.
-        /// </summary>
-        internal bool BitSplitFsr1Field(string recordKey, string fieldId)
-        {
-            var b = ResolveFieldBitSpan(recordKey, fieldId);
-            if (b == null) return false;
-            int bo = b.Value.bitOffset, bw = b.Value.bitWidth;
-            if (bw < 2) return false;
-            int half = bw / 2;
-
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile == null) return false;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return false;
-
-            // 1. Shrink the parent to the leading bits (now an explicit packed field).
-            WriteFieldBitSpan(recordKey, fieldId, bo, half);
-
-            // 2. Add the synthetic owning the trailing bits, with its own empty channel.
-            string newId = NextSyntheticFieldId(recordKey);
-            int synthBo = bo + half, synthBw = bw - half;
-            var list = GetOrCreateSyntheticList(profile, g.Value, recordKey);
-            list.Add(new Fsr1SyntheticField
-            {
-                FieldId = newId,
-                Label = "Bits " + newId,
-                Mapping = new Fsr1FieldMapping
-                {
-                    StartOffset = synthBo >> 3,
-                    EndOffset = (synthBo + synthBw - 1) >> 3,
-                    StartBit = synthBo & 7,
-                    BitWidth = synthBw,
-                },
-            });
-            _plugin.SaveSettings();
-            return true;
-        }
-
-        /// <summary>
-        /// Remove a synthetic split field, reclaiming its bytes into an adjacent field so the
-        /// record stays a gapless partition: absorb into the left neighbour if the merged width
-        /// ≤ 3, else the right neighbour, else return false (caller surfaces "shrink an adjacent
-        /// field first"). Only synthetic fields can be removed.
-        /// </summary>
-        internal bool RemoveFsr1Split(string recordKey, string fieldId)
-        {
-            if (FindSynthetic(recordKey, fieldId) == null) return false;
-            if (IsFieldPacked(recordKey, fieldId)) return RemovePackedSplit(recordKey, fieldId);
-            var span = ResolveFieldSpan(recordKey, fieldId);
-            if (span == null) return false;
-            int s = span.Value.start, e = span.Value.end;
-
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return false;
-
-            // Resolve neighbours across catalog/synthetic via the composed field list.
-            string? leftId = null, rightId = null;
-            int leftStart = 0, rightEnd = 0;
-            foreach (var f in Fsr1FieldComposer.FieldsFor(_plugin, dash))
-            {
-                if (f.FieldId == fieldId) continue;
-                var fs = ResolveFieldSpan(recordKey, f.FieldId);
-                if (fs == null) continue;
-                if (fs.Value.end == s - 1) { leftId = f.FieldId; leftStart = fs.Value.start; }
-                if (fs.Value.start == e + 1) { rightId = f.FieldId; rightEnd = fs.Value.end; }
-            }
-
-            if (leftId != null && (e - leftStart + 1) <= 3)
-                WriteFieldSpan(recordKey, leftId, leftStart, e);
-            else if (rightId != null && (rightEnd - s + 1) <= 3)
-                WriteFieldSpan(recordKey, rightId, s, rightEnd);
-            else
-                return false;   // neither neighbour can absorb the freed bytes
-
-            RemoveSynthetic(recordKey, fieldId);
-            _plugin.SaveSettings();
-            return true;
-        }
-
-        /// <summary>
-        /// Merge the field <paramref name="fieldId"/> with its immediate neighbour (next =
-        /// the field starting at this one's end+1; prev = the field ending at this one's
-        /// start-1) into a single wider field — the inverse of <see cref="SplitFsr1Field"/>.
-        /// This field grows to span both; the neighbour is removed (synthetic → deleted,
-        /// catalog → hidden). Fails if there is no neighbour on that side or the combined
-        /// width would exceed 3. The record stays a gapless partition.
-        /// </summary>
-        internal bool MergeFsr1Field(string recordKey, string fieldId, bool mergeNext)
-        {
-            if (IsFieldPacked(recordKey, fieldId)) return MergePackedField(recordKey, fieldId, mergeNext);
-            var span = ResolveFieldSpan(recordKey, fieldId);
-            if (span == null) return false;
-            int s = span.Value.start, e = span.Value.end;
-
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return false;
-
-            // Find the adjacent neighbour by span across the composed catalog+synthetic set.
-            string? nbId = null; int nbStart = 0, nbEnd = 0;
-            foreach (var f in Fsr1FieldComposer.FieldsFor(_plugin, dash))
-            {
-                if (f.FieldId == fieldId) continue;
-                var fs = ResolveFieldSpan(recordKey, f.FieldId);
-                if (fs == null) continue;
-                if (mergeNext && fs.Value.start == e + 1) { nbId = f.FieldId; nbStart = fs.Value.start; nbEnd = fs.Value.end; break; }
-                if (!mergeNext && fs.Value.end == s - 1) { nbId = f.FieldId; nbStart = fs.Value.start; nbEnd = fs.Value.end; break; }
-            }
-            if (nbId == null) return false;                     // record edge — nothing to merge into
-
-            int newStart = mergeNext ? s : nbStart;
-            int newEnd = mergeNext ? nbEnd : e;
-            if (newEnd - newStart + 1 > 3) return false;        // combined field would exceed u24
-
-            // Grow this field over both spans, then drop the neighbour.
-            WriteFieldSpan(recordKey, fieldId, newStart, newEnd);
-            if (FindSynthetic(recordKey, nbId) != null) RemoveSynthetic(recordKey, nbId);
-            else HideCatalogField(recordKey, nbId);
-            _plugin.SaveSettings();
-            return true;
-        }
-
-        // Merge a packed field with its nearest neighbour on the requested side into one wider
-        // packed field, absorbing any spare bits between them. Combined ≤ 24 bits. The neighbour
-        // is removed (synthetic → deleted, catalog → hidden). Bit-granular sibling of the byte merge.
-        private bool MergePackedField(string recordKey, string fieldId, bool mergeNext)
-        {
-            var b = ResolveFieldBitSpan(recordKey, fieldId);
-            if (b == null) return false;
-            int bo = b.Value.bitOffset, be = bo + b.Value.bitWidth;   // be = end-exclusive
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return false;
-
-            string? nbId = null; int nbBo = 0, nbBe = 0;
-            foreach (var f in Fsr1FieldComposer.FieldsFor(_plugin, dash))
-            {
-                if (f.FieldId == fieldId) continue;
-                var fs = ResolveFieldBitSpan(recordKey, f.FieldId);
-                if (fs == null) continue;
-                int fbo = fs.Value.bitOffset, fbe = fbo + fs.Value.bitWidth;
-                if (mergeNext && fbo >= be) { if (nbId == null || fbo < nbBo) { nbId = f.FieldId; nbBo = fbo; nbBe = fbe; } }
-                else if (!mergeNext && fbe <= bo) { if (nbId == null || fbe > nbBe) { nbId = f.FieldId; nbBo = fbo; nbBe = fbe; } }
-            }
-            if (nbId == null) return false;                           // record edge — nothing to merge into
-
-            int newBo = System.Math.Min(bo, nbBo);
-            int newBe = System.Math.Max(be, nbBe);
-            if (newBe - newBo > 24) return false;                     // combined field would exceed u24
-
-            WriteFieldBitSpan(recordKey, fieldId, newBo, newBe - newBo);
-            if (FindSynthetic(recordKey, nbId) != null) RemoveSynthetic(recordKey, nbId);
-            else HideCatalogField(recordKey, nbId);
-            _plugin.SaveSettings();
-            return true;
-        }
-
-        // Remove a packed synthetic, handing its bits (and any spare gap) to the nearest
-        // neighbour — preferring the left/parent it was split from — so nothing goes stray.
-        private bool RemovePackedSplit(string recordKey, string fieldId)
-        {
-            var b = ResolveFieldBitSpan(recordKey, fieldId);
-            if (b == null) return false;
-            int bo = b.Value.bitOffset, be = bo + b.Value.bitWidth;
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return false;
-
-            string? leftId = null; int leftBo = 0, leftBe = 0;
-            string? rightId = null; int rightBo = 0, rightBe = 0;
-            foreach (var f in Fsr1FieldComposer.FieldsFor(_plugin, dash))
-            {
-                if (f.FieldId == fieldId) continue;
-                var fs = ResolveFieldBitSpan(recordKey, f.FieldId);
-                if (fs == null) continue;
-                int fbo = fs.Value.bitOffset, fbe = fbo + fs.Value.bitWidth;
-                if (fbe <= bo && (leftId == null || fbe > leftBe)) { leftId = f.FieldId; leftBo = fbo; leftBe = fbe; }
-                if (fbo >= be && (rightId == null || fbo < rightBo)) { rightId = f.FieldId; rightBo = fbo; rightBe = fbe; }
-            }
-            if (leftId != null && (be - leftBo) <= 24)
-                WriteFieldBitSpan(recordKey, leftId, leftBo, be - leftBo);
-            else if (rightId != null && (rightBe - bo) <= 24)
-                WriteFieldBitSpan(recordKey, rightId, bo, rightBe - bo);
-            // else: no neighbour can absorb — the bits become spare (benign); still remove.
-
-            RemoveSynthetic(recordKey, fieldId);
-            _plugin.SaveSettings();
-            return true;
-        }
-
-        /// <summary>Mark a catalog field hidden (merged away) via a persisted override so the
-        /// composer skips it. Reset-to-defaults clears it. Synthetics are removed, not hidden.</summary>
-        private void HideCatalogField(string recordKey, string fieldId)
-        {
-            var m = GetFsr1FieldMapping(recordKey, fieldId)?.Clone() ?? new Fsr1FieldMapping();
-            m.Hidden = true;
-            SetFsr1FieldMapping(recordKey, fieldId, m);
-        }
-
-        /// <summary>Drop ALL per-field overrides on a record (including hidden/merged flags) so
-        /// it reverts to the catalog layout. Used by reset-to-defaults alongside
-        /// <see cref="ClearSyntheticFields"/>.</summary>
+        /// <summary>Drop ALL per-field overrides on a record so it reverts to the
+        /// catalog defaults. Used by reset-to-defaults.</summary>
         internal void ClearFsr1FieldOverrides(string recordKey)
         {
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
@@ -427,143 +121,6 @@ namespace MozaPlugin.Telemetry
                 if (mid.Count == 0) profile.Fsr1DashboardMappings.Remove(g.Value);
                 _plugin.SaveSettings();
             }
-        }
-
-        /// <summary>Remove all synthetic split fields on a record (reset-to-defaults).</summary>
-        internal void ClearSyntheticFields(string recordKey)
-        {
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Fsr1SyntheticFields == null) return;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return;
-            if (profile.Fsr1SyntheticFields.TryGetValue(g.Value, out var mid) && mid != null
-                && mid.Remove(recordKey))
-            {
-                if (mid.Count == 0) profile.Fsr1SyntheticFields.Remove(g.Value);
-                _plugin.SaveSettings();
-            }
-        }
-
-        // Resolve a field's effective byte span through the SAME gapless partition the driver
-        // emits and the editor shows — so split/merge math operates on the live tiled layout,
-        // not the raw override (which can differ once the partition reapportions bytes).
-        private (int start, int end, int payloadLen)? ResolveFieldSpan(string recordKey, string fieldId)
-        {
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return null;
-            foreach (var slot in Fsr1DashboardCatalog.ResolvePartition(_plugin, dash))
-                if (slot.Field.FieldId == fieldId)
-                    return (slot.ByteStart, slot.ByteEnd, dash.PayloadLen);
-            return null;
-        }
-
-        // Pin a field's byte span. Synthetic → inline mapping; catalog → deviation-only
-        // boundary override (offsets equal to the catalog default are nulled so they prune).
-        private void WriteFieldSpan(string recordKey, string fieldId, int newStart, int newEnd)
-        {
-            var syn = FindSynthetic(recordKey, fieldId);
-            if (syn != null)
-            {
-                syn.Mapping ??= new Fsr1FieldMapping();
-                syn.Mapping.StartOffset = newStart;
-                syn.Mapping.EndOffset = newEnd;
-                _plugin.SaveSettings();
-                return;
-            }
-
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            Fsr1FieldDef? def = null;
-            if (dash != null)
-                foreach (var f in dash.Fields)
-                    if (f.FieldId == fieldId) { def = f; break; }
-            int defStart = def != null && def.Offsets.Length > 0 ? def.Offsets[0] : newStart;
-            int defEnd = def != null && def.Offsets.Length > 0 ? def.Offsets[def.Offsets.Length - 1] : newEnd;
-
-            var existing = GetFsr1FieldMapping(recordKey, fieldId);
-            var map = existing?.Clone() ?? new Fsr1FieldMapping();
-            map.StartOffset = newStart == defStart ? (int?)null : newStart;
-            map.EndOffset = newEnd == defEnd ? (int?)null : newEnd;
-            SetFsr1FieldMapping(recordKey, fieldId, map);
-        }
-
-        // Resolve a field's effective BIT span through the same partition the driver emits
-        // (works for byte-aligned fields too — they resolve to a byte-multiple bit span).
-        private (int bitOffset, int bitWidth, int recordBits)? ResolveFieldBitSpan(string recordKey, string fieldId)
-        {
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return null;
-            foreach (var slot in Fsr1DashboardCatalog.ResolvePartition(_plugin, dash))
-                if (slot.Field.FieldId == fieldId)
-                    return (slot.BitOffset, slot.BitWidth, dash.PayloadLen * 8);
-            return null;
-        }
-
-        // Pin a field's BIT span (packed). Synthetic → inline mapping; catalog → override. A bit
-        // field always deviates from the byte-aligned catalog default, so StartBit/BitWidth are
-        // always written (never nulled) — that keeps the record in bit mode and the field un-pruned.
-        private void WriteFieldBitSpan(string recordKey, string fieldId, int bitOffset, int bitWidth)
-        {
-            int byteStart = bitOffset >> 3;
-            int startBit = bitOffset & 7;
-            int byteEnd = (bitOffset + bitWidth - 1) >> 3;
-            var syn = FindSynthetic(recordKey, fieldId);
-            if (syn != null)
-            {
-                syn.Mapping ??= new Fsr1FieldMapping();
-                syn.Mapping.StartOffset = byteStart;
-                syn.Mapping.EndOffset = byteEnd;
-                syn.Mapping.StartBit = startBit;
-                syn.Mapping.BitWidth = bitWidth;
-                _plugin.SaveSettings();
-                return;
-            }
-            var existing = GetFsr1FieldMapping(recordKey, fieldId);
-            var map = existing?.Clone() ?? new Fsr1FieldMapping();
-            map.StartOffset = byteStart;
-            map.EndOffset = byteEnd;
-            map.StartBit = startBit;
-            map.BitWidth = bitWidth;
-            SetFsr1FieldMapping(recordKey, fieldId, map);
-        }
-
-        /// <summary>True when the field carries a sub-byte / bit-packed override.</summary>
-        internal bool IsFieldPacked(string recordKey, string fieldId)
-        {
-            var m = GetFsr1FieldMapping(recordKey, fieldId);
-            return m != null && (m.StartBit != null || m.BitWidth != null);
-        }
-
-        private void RemoveSynthetic(string recordKey, string fieldId)
-        {
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Fsr1SyntheticFields == null) return;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return;
-            if (profile.Fsr1SyntheticFields.TryGetValue(g.Value, out var mid) && mid != null
-                && mid.TryGetValue(recordKey, out var list) && list != null)
-            {
-                list.RemoveAll(x => x != null && x.FieldId == fieldId);
-                if (list.Count == 0) mid.Remove(recordKey);
-                if (mid.Count == 0) profile.Fsr1SyntheticFields.Remove(g.Value);
-            }
-        }
-
-        private static List<Fsr1SyntheticField> GetOrCreateSyntheticList(
-            MozaProfile profile, Guid g, string recordKey)
-        {
-            if (profile.Fsr1SyntheticFields == null)
-                profile.Fsr1SyntheticFields = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
-            if (!profile.Fsr1SyntheticFields.TryGetValue(g, out var mid) || mid == null)
-            {
-                mid = new Dictionary<string, List<Fsr1SyntheticField>>(StringComparer.OrdinalIgnoreCase);
-                profile.Fsr1SyntheticFields[g] = mid;
-            }
-            if (!mid.TryGetValue(recordKey, out var list) || list == null)
-            {
-                list = new List<Fsr1SyntheticField>();
-                mid[recordKey] = list;
-            }
-            return list;
         }
 
         // ── FSR V1 active dashboard/page index (0..18) ──────────────────────

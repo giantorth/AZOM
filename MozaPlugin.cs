@@ -3349,10 +3349,9 @@ namespace MozaPlugin
             if (p == null) return null;
             var dash = Telemetry.Fsr1DashboardCatalog.ByKey(p.RecordKey);
             if (dash == null) return null;
-            // Resolve through the SAME gapless partition the driver emits — so the lit span
-            // matches the wire exactly, and synthetic split fields (absent from dash.Fields)
-            // are found too. Using the raw override here diverged from the tiled output.
-            foreach (var slot in Telemetry.Fsr1DashboardCatalog.ResolvePartition(this, dash))
+            // Resolve through the SAME partition the driver emits so the lit span
+            // matches the wire exactly.
+            foreach (var slot in Telemetry.Fsr1DashboardCatalog.ResolvePartition(dash))
                 if (slot.Field.FieldId == p.FieldId)
                     return (dash.RecordType, slot.ByteStart, slot.ByteEnd,
                             !slot.IsByteAligned, slot.BitOffset, slot.BitWidth, slot.MsbFirst);
@@ -4740,15 +4739,15 @@ namespace MozaPlugin
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
 
-        // FSR1 synthetic split fields (net-new fields carved out of a catalog field).
-        internal System.Collections.Generic.List<Fsr1SyntheticField> GetSyntheticFields(string recordKey) => _fsr1Cm1Mapping.GetSyntheticFields(recordKey);
-        internal bool SplitFsr1Field(string recordKey, string fieldId) => _fsr1Cm1Mapping.SplitFsr1Field(recordKey, fieldId);
-        internal bool BitSplitFsr1Field(string recordKey, string fieldId) => _fsr1Cm1Mapping.BitSplitFsr1Field(recordKey, fieldId);
-        internal bool RemoveFsr1Split(string recordKey, string fieldId) => _fsr1Cm1Mapping.RemoveFsr1Split(recordKey, fieldId);
-        internal bool MergeFsr1Field(string recordKey, string fieldId, bool mergeNext) => _fsr1Cm1Mapping.MergeFsr1Field(recordKey, fieldId, mergeNext);
-        internal void ClearSyntheticFields(string recordKey) => _fsr1Cm1Mapping.ClearSyntheticFields(recordKey);
         internal void ClearFsr1FieldOverrides(string recordKey) => _fsr1Cm1Mapping.ClearFsr1FieldOverrides(recordKey);
-        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId) => Fsr1FieldComposer.FindField(this, recordKey, fieldId);
+        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId)
+        {
+            var dash = Telemetry.Fsr1DashboardCatalog.ByKey(recordKey);
+            if (dash == null || string.IsNullOrEmpty(fieldId)) return null;
+            foreach (var f in dash.Fields)
+                if (f.FieldId == fieldId) return f;
+            return null;
+        }
 
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId) => _fsr1Cm1Mapping.GetCm1FieldMapping(fieldId);
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);

@@ -254,7 +254,7 @@ namespace MozaPlugin.Telemetry
                     {
                         // Overlay the ramp on just this field's bits over the live record, so the
                         // byte it shares with a neighbour keeps the neighbour's real value visible.
-                        var live = Fsr1DashboardCatalog.ResolvePartition(plugin, dash);
+                        var live = Fsr1DashboardCatalog.ResolvePartition(dash);
                         return Fsr1DisplayEmitter.BuildBitProbeRecord(dash, live, slot => ValueForSlot(dash, slot),
                             fp.bitOffset, fp.bitWidth, probeValue, fp.msbFirst);
                     }
@@ -263,9 +263,8 @@ namespace MozaPlugin.Telemetry
                 if (probe)
                     return Fsr1DisplayEmitter.BuildProbeRecord(
                         dash, dash.RecordType == probeType ? probeOff : -1, probeValue);
-                // Resolve the gapless partition (catalog + synthetic splits, broken configs
-                // auto-repaired) and pack each slot's value — never a gap/overlap on the wire.
-                var partition = Fsr1DashboardCatalog.ResolvePartition(plugin, dash);
+                // Pack each catalog slot's value — never a gap/overlap on the wire.
+                var partition = Fsr1DashboardCatalog.ResolvePartition(dash);
                 return Fsr1DisplayEmitter.BuildRecord(dash, partition, slot => ValueForSlot(dash, slot));
             }
 
@@ -288,7 +287,7 @@ namespace MozaPlugin.Telemetry
             // (independent of probe/test — the panel shows actual data, not the probe pattern).
             Fsr1VizRecord BuildVizRecord(Fsr1Dashboard dash)
             {
-                var partition = Fsr1DashboardCatalog.ResolvePartition(plugin, dash);
+                var partition = Fsr1DashboardCatalog.ResolvePartition(dash);
                 var frame = Fsr1DisplayEmitter.BuildRecord(dash, partition, slot => ValueForSlot(dash, slot));
                 var vfields = new List<Fsr1VizField>(partition.Count);
                 foreach (var slot in partition)
@@ -302,9 +301,8 @@ namespace MozaPlugin.Telemetry
                         bytes[o - start] = (idx >= 0 && idx < frame.Length) ? frame[idx] : (byte)0;
                     }
                     long value = ValueForSlot(dash, slot);
-                    bool synth = Fsr1FieldComposer.IsSynthetic(plugin, dash.Key, f.FieldId);
                     string encStr = slot.IsByteAligned ? slot.Enc.ToString() : $"{slot.BitWidth}b.{slot.BitOffset & 7}";
-                    vfields.Add(new Fsr1VizField(f.Label, start, end, encStr, value, bytes, synth,
+                    vfields.Add(new Fsr1VizField(f.Label, start, end, encStr, value, bytes,
                         slot.IsByteAligned ? -1 : slot.BitOffset, slot.IsByteAligned ? 0 : slot.BitWidth));
                 }
                 vfields.Sort((a, b) => a.Start.CompareTo(b.Start));

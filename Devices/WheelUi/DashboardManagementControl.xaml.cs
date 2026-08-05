@@ -986,19 +986,14 @@ namespace MozaPlugin.Devices.WheelUi
                 return;
             }
 
-            // FSR V1: per active record, drop the synthetic split fields AND every catalog
-            // override (boundary/scale/property + any hidden/merged flag) so the record reverts
-            // to the pristine catalog partition. Clearing the whole override dict per record
-            // (not row-by-row) is what unhides merged-away fields — those rows aren't present.
+            // FSR V1: per active record, drop every field override (channel/scale/bias)
+            // so the record reverts to the catalog defaults.
             if (!IsCm2Target && _plugin.IsFsr1DisplayWheel)
             {
                 var clearedRecords = new HashSet<string>();
                 foreach (var row in _channelRows)
                     if (row.IsFsr1 && !string.IsNullOrEmpty(row.RecordKey) && clearedRecords.Add(row.RecordKey))
-                    {
-                        _plugin.ClearSyntheticFields(row.RecordKey);
                         _plugin.ClearFsr1FieldOverrides(row.RecordKey);
-                    }
                 PopulateChannelMappingList();
                 TelemetryMappingStatus.Text = $"Reset to defaults at {DateTime.Now:HH:mm:ss}";
                 return;
@@ -1103,120 +1098,6 @@ namespace MozaPlugin.Devices.WheelUi
             }
         }
 
-        // ── FSR1 boundary stepper handlers (coupled-divider model) ─────────
-        // Each ◀/▶ button passes its bound row via Tag. A divider step moves the byte
-        // shared with an adjacent field: the row's *Minus/*Plus mutates BOTH this field and
-        // the neighbour and returns the neighbour. The Start/End mutation goes through
-        // SetSpan (UI-only), so the code-behind owns persistence here — persist both sides,
-        // refresh every sibling's stepper guards (widths rippled), and re-arm the probe on
-        // the edited row so the lit span follows its new edges.
-
-        private void FieldStartMinus_Click(object sender, RoutedEventArgs e) => StepDivider(sender, r => r.StartMinus());
-        private void FieldStartPlus_Click(object sender, RoutedEventArgs e) => StepDivider(sender, r => r.StartPlus());
-        private void FieldEndMinus_Click(object sender, RoutedEventArgs e) => StepDivider(sender, r => r.EndMinus());
-        private void FieldEndPlus_Click(object sender, RoutedEventArgs e) => StepDivider(sender, r => r.EndPlus());
-
-        private void StepDivider(object sender, Func<ChannelMappingRow, ChannelMappingRow?> step)
-        {
-            if (_plugin == null) return;
-            if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
-            if (!row.IsFsr1 || string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
-
-            var neighbour = step(row);
-            if (neighbour == null) return;  // guard rejected the move
-
-            // Persist BOTH sides: each is a deviation-only mapping, so a side back at its
-            // catalog default prunes to nothing.
-            _plugin.SetFsr1FieldMapping(row.RecordKey, row.FieldId, BuildFsr1MappingFromRow(row));
-            _plugin.SetFsr1FieldMapping(neighbour.RecordKey, neighbour.FieldId, BuildFsr1MappingFromRow(neighbour));
-            RefreshRecordGuards(row.RecordKey);
-            // Re-arm AFTER persist: Fsr1FieldProbeTarget() resolves the span from the stored
-            // override, so the lit box(es) track the new edges.
-            _plugin.SetFsr1FieldProbe(row.RecordKey, row.FieldId);
-            TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
-        }
-
-        // A divider move changes both fields' widths, which can flip the stepper guards on
-        // rows beyond the immediate pair (a neighbour's Can* depends on the other side's
-        // width). Re-raise layout state on every FSR1 row of the same record — cheap (~10
-        // rows) and idempotent. Start/End are ignored by the persist listener, so this
-        // refresh never re-persists.
-        private void RefreshRecordGuards(string recordKey)
-        {
-            foreach (var r in _channelRows)
-                if (r.IsFsr1 && r.RecordKey == recordKey)
-                    r.RaiseLayoutChanged();
-        }
-
-        // ── FSR1 bit-packed steppers (INDEPENDENT — move only this field's bit run) ──────
-        private void FieldBitOffsetMinus_Click(object sender, RoutedEventArgs e) =>
-            StepBit(sender, r => { if (r.CanBitOffsetMinus) r.SetBitSpan(r.BitOffset - 1, r.BitWidth); });
-        private void FieldBitOffsetPlus_Click(object sender, RoutedEventArgs e) =>
-            StepBit(sender, r => { if (r.CanBitOffsetPlus) r.SetBitSpan(r.BitOffset + 1, r.BitWidth); });
-        private void FieldBitWidthMinus_Click(object sender, RoutedEventArgs e) =>
-            StepBit(sender, r => { if (r.CanBitWidthMinus) r.SetBitSpan(r.BitOffset, r.BitWidth - 1); });
-        private void FieldBitWidthPlus_Click(object sender, RoutedEventArgs e) =>
-            StepBit(sender, r => { if (r.CanBitWidthPlus) r.SetBitSpan(r.BitOffset, r.BitWidth + 1); });
-
-        private void StepBit(object sender, Action<ChannelMappingRow> step)
-        {
-            if (_plugin == null) return;
-            if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
-            if (!row.IsFsr1 || !row.IsBitPacked || string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
-
-            int beforeOff = row.BitOffset, beforeW = row.BitWidth;
-            step(row);
-            if (row.BitOffset == beforeOff && row.BitWidth == beforeW) return;  // guard rejected the step
-
-            _plugin.SetFsr1FieldMapping(row.RecordKey, row.FieldId, BuildFsr1MappingFromRow(row));
-            RefreshRecordBitBounds(row.RecordKey);           // re-fence neighbours + sync resolved geometry
-            _plugin.SetFsr1FieldProbe(row.RecordKey, row.FieldId);   // re-arm on the new bit run
-            TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
-        }
-
-        // After a bit step, the freed/consumed bits shift a neighbour's room, so recompute every
-        // row's bit bounds from the authoritative partition (includes anchors + push/clamp repair)
-        // and re-raise guards — keeps the editor open for rapid stepping (no list rebuild).
-        private void RefreshRecordBitBounds(string recordKey)
-        {
-            var dash = Telemetry.Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null || _plugin == null) { RefreshRecordGuards(recordKey); return; }
-            var slots = Telemetry.Fsr1DashboardCatalog.ResolvePartition(_plugin, dash);
-            for (int i = 0; i < slots.Count; i++)
-            {
-                int lower = i > 0 ? slots[i - 1].BitOffset + slots[i - 1].BitWidth : 5 * 8;
-                int upper = i < slots.Count - 1 ? slots[i + 1].BitOffset : dash.PayloadLen * 8;
-                var s = slots[i];
-                foreach (var r in _channelRows)
-                    if (r.IsFsr1 && r.RecordKey == recordKey && r.FieldId == s.Field.FieldId)
-                    {
-                        r.LowerBitBound = lower;
-                        r.UpperBitBound = upper;
-                        r.IsBitPacked = !s.IsByteAligned;
-                        r.BitOffset = s.BitOffset;
-                        r.BitWidth = s.BitWidth;
-                        r.SetSpan(s.ByteStart, s.ByteEnd);   // sync byte view + raise all layout state
-                    }
-            }
-        }
-
-        // Convert an FSR1 field into two sub-byte / bit-packed fields sharing a byte — the packing
-        // the wheel uses for tyre/brake temps. Halves the bit range; each half is then bit-stepped
-        // and probed to land the real split. The editor closes on repopulate; release the probe.
-        private void FieldBitSplit_Click(object sender, RoutedEventArgs e)
-        {
-            if (_plugin == null) return;
-            if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
-            if (!row.IsFsr1 || string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
-
-            _plugin.ClearFsr1FieldProbe();
-            bool ok = _plugin.BitSplitFsr1Field(row.RecordKey, row.FieldId);
-            PopulateChannelMappingList();
-            TelemetryMappingStatus.Text = ok
-                ? $"Bit-split at {DateTime.Now:HH:mm:ss}"
-                : "Cannot bit-split — field is only 1 bit wide";
-        }
-
         // Revert one field to its catalog default: clear the stored override and
         // re-seed the row's editor state from the catalog so the steppers reset.
         private void FieldReset_Click(object sender, RoutedEventArgs e)
@@ -1243,60 +1124,6 @@ namespace MozaPlugin.Devices.WheelUi
             TelemetryMappingStatus.Text = $"Reset field at {DateTime.Now:HH:mm:ss}";
         }
 
-        // Split an FSR1 field ≥ 2 bytes at its midpoint: the parent keeps the low bytes,
-        // a net-new synthetic field takes the high bytes and gets its own channel mapping.
-        // Both edges remain adjustable with the ◀/▶ steppers; persisted in the profile.
-        private void FieldSplit_Click(object sender, RoutedEventArgs e)
-        {
-            if (_plugin == null) return;
-            if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
-            if (!row.IsFsr1 || string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
-
-            // The editor (and its field-probe) closes on repopulate; release the probe now.
-            _plugin.ClearFsr1FieldProbe();
-            bool ok = _plugin.SplitFsr1Field(row.RecordKey, row.FieldId);
-            PopulateChannelMappingList();
-            TelemetryMappingStatus.Text = ok
-                ? $"Split field at {DateTime.Now:HH:mm:ss}"
-                : "Cannot split — field is only 1 byte wide";
-        }
-
-        // Merge a synthetic split back: its bytes are absorbed into an adjacent field and the
-        // synthetic is removed. Fails (status explains) when no neighbour can grow to ≤ 3 bytes.
-        private void FieldRemoveSplit_Click(object sender, RoutedEventArgs e)
-        {
-            if (_plugin == null) return;
-            if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
-            if (!row.IsFsr1 || string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
-
-            _plugin.ClearFsr1FieldProbe();
-            bool ok = _plugin.RemoveFsr1Split(row.RecordKey, row.FieldId);
-            PopulateChannelMappingList();
-            TelemetryMappingStatus.Text = ok
-                ? $"Merged split back at {DateTime.Now:HH:mm:ss}"
-                : "Cannot merge — shrink an adjacent field first";
-        }
-
-        // Merge this field with its previous/next neighbour into one wider field (≤ 3 bytes) —
-        // the inverse of Split. Lets users build a u16/u24 where the catalog has 1-byte slots
-        // the divider steppers can't combine. The neighbour is removed (synthetic) or hidden
-        // (catalog); reset-to-defaults restores it.
-        private void FieldMergePrev_Click(object sender, RoutedEventArgs e) => MergeField(sender, mergeNext: false);
-        private void FieldMergeNext_Click(object sender, RoutedEventArgs e) => MergeField(sender, mergeNext: true);
-
-        private void MergeField(object sender, bool mergeNext)
-        {
-            if (_plugin == null) return;
-            if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
-            if (!row.IsFsr1 || string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
-
-            _plugin.ClearFsr1FieldProbe();
-            bool ok = _plugin.MergeFsr1Field(row.RecordKey, row.FieldId, mergeNext);
-            PopulateChannelMappingList();
-            TelemetryMappingStatus.Text = ok
-                ? $"Merged {(mergeNext ? "with next" : "with previous")} at {DateTime.Now:HH:mm:ss}"
-                : "Cannot merge — no neighbour, or combined field would exceed 3 bytes";
-        }
 
         private void FocusInlineFilter(ChannelMappingRow row)
         {
@@ -1333,26 +1160,17 @@ namespace MozaPlugin.Devices.WheelUi
             if (sender is not ChannelMappingRow row) return;
 
             // FSR V1 dashboard fields persist to the dedicated per-field store
-            // (property + input scale + endianness/gain overrides). React to those bound
-            // inputs; build a deviation-only mapping (defaults stay unpersisted). Start/End
-            // are NOT here — divider steps are owned by the stepper handlers (StepDivider),
-            // which persist both sides of the move; reacting to them here would double-persist
-            // and re-arm the probe on whichever neighbour's SetSpan rippled. LittleEndian
-            // affects only this row, so it persists + re-arms the probe through this path.
+            // (property + input scale + gain overrides). Build a deviation-only
+            // mapping (defaults stay unpersisted).
             if (row.IsFsr1)
             {
-                bool endianFlipped = e.PropertyName == nameof(ChannelMappingRow.LittleEndian);
                 if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)
                     && e.PropertyName != nameof(ChannelMappingRow.InMin)
                     && e.PropertyName != nameof(ChannelMappingRow.InMax)
                     && e.PropertyName != nameof(ChannelMappingRow.Scale)
-                    && e.PropertyName != nameof(ChannelMappingRow.Bias)
-                    && !endianFlipped) return;
+                    && e.PropertyName != nameof(ChannelMappingRow.Bias)) return;
                 if (string.IsNullOrEmpty(row.RecordKey) || string.IsNullOrEmpty(row.FieldId)) return;
                 _plugin.SetFsr1FieldMapping(row.RecordKey, row.FieldId, BuildFsr1MappingFromRow(row));
-                // Persist BEFORE re-arming: Fsr1FieldProbeTarget() resolves the span from
-                // the just-stored override, so the lit box follows the new endianness.
-                if (endianFlipped) _plugin.SetFsr1FieldProbe(row.RecordKey, row.FieldId);
                 TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
                 return;
             }
@@ -1378,63 +1196,16 @@ namespace MozaPlugin.Devices.WheelUi
             TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
         }
 
-        // Build a deviation-only FSR1 field mapping from a UI row: each nullable
-        // boundary/encoding/gain override is set ONLY when it differs from the catalog
-        // default, so an unedited field prunes to nothing (dict-missing ≠ explicit-off).
+        // Build a deviation-only FSR1 field mapping from a UI row: the gain overrides
+        // are set ONLY when they differ from unity, so an unedited field prunes to
+        // nothing (dict-missing ≠ explicit-off). Geometry is catalog-fixed.
         private static Fsr1FieldMapping BuildFsr1MappingFromRow(ChannelMappingRow row)
         {
-            // Bit-packed field: persist explicit bit geometry (StartBit/BitWidth). A bit field
-            // always deviates from the byte-aligned catalog default, so it never prunes and keeps
-            // the record in bit mode. Same shape for a synthetic or a catalog-field-turned-packed.
-            if (row.IsBitPacked)
-            {
-                return new Fsr1FieldMapping
-                {
-                    Property = (row.SimHubProperty ?? "").Trim(),
-                    InMin = row.InMin,
-                    InMax = row.InMax,
-                    StartOffset = row.BitOffset >> 3,
-                    EndOffset = (row.BitOffset + row.BitWidth - 1) >> 3,
-                    StartBit = row.BitOffset & 7,
-                    BitWidth = row.BitWidth,
-                    Scale = row.Scale != 1.0 ? row.Scale : (double?)null,
-                    Bias = row.Bias != 0.0 ? row.Bias : (double?)null,
-                };
-            }
-
-            // Synthetic split fields exist only in the profile — there is no catalog default
-            // to deviate from, so always persist an explicit, full span (never prunes). The
-            // endianness flag is meaningful only at width 2; gain prunes to null at unity.
-            if (row.IsSynthetic)
-            {
-                return new Fsr1FieldMapping
-                {
-                    Property = (row.SimHubProperty ?? "").Trim(),
-                    InMin = row.InMin,
-                    InMax = row.InMax,
-                    StartOffset = row.Start,
-                    EndOffset = row.End,
-                    LittleEndian = row.Width == 2 ? row.LittleEndian : (bool?)null,
-                    Scale = row.Scale != 1.0 ? row.Scale : (double?)null,
-                    Bias = row.Bias != 0.0 ? row.Bias : (double?)null,
-                };
-            }
-
-            var def = FindFsr1FieldDef(row.RecordKey, row.FieldId);
-            int defStart = def != null && def.Offsets.Length > 0 ? def.Offsets[0] : 5;
-            int defEnd = def != null && def.Offsets.Length > 0 ? def.Offsets[def.Offsets.Length - 1] : defStart;
-            bool defLE = def != null && def.Encoding == Fsr1Encoding.U16_LE;
-
             return new Fsr1FieldMapping
             {
                 Property = (row.SimHubProperty ?? "").Trim(),
                 InMin = row.InMin,
                 InMax = row.InMax,
-                StartOffset = row.Start != defStart ? row.Start : (int?)null,
-                EndOffset = row.End != defEnd ? row.End : (int?)null,
-                // Endianness only resolves at width 2; persist only when it both applies
-                // and deviates, so a U8/U24 field never carries a stray LE flag.
-                LittleEndian = (row.Width == 2 && row.LittleEndian != defLE) ? row.LittleEndian : (bool?)null,
                 Scale = row.Scale != 1.0 ? row.Scale : (double?)null,
                 Bias = row.Bias != 0.0 ? row.Bias : (double?)null,
             };
@@ -1447,16 +1218,6 @@ namespace MozaPlugin.Devices.WheelUi
             var f = Telemetry.Cm1DashboardCatalog.ByFieldId(row.FieldId);
             double defScale = f?.Scale ?? 1.0;
             return row.Scale != defScale ? row.Scale : (double?)null;
-        }
-
-        private static Fsr1FieldDef? FindFsr1FieldDef(string recordKey, string fieldId)
-        {
-            if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return null;
-            var dash = Telemetry.Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null) return null;
-            foreach (var f in dash.Fields)
-                if (f.FieldId == fieldId) return f;
-            return null;
         }
 
         private void PopulateChannelMappingList()
