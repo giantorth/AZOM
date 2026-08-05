@@ -112,7 +112,7 @@ Notes:
 | `Sdk/` | Third-party SDK emulation: CoAP server (`MozaSdkCoapServer`), `CoapStubManager` (PitHouse-impersonation child process), `PitHouseUdp/` control server, CBOR codec. `CoapStub/` (separate console project) is the stub executable |
 | `Diagnostics/` | `MozaLog` (ring-buffered log wrapper), `SerialTrafficCapture` (frame ring + JSONL wire-trace sink), `SessionRetransmitter`, `FirmwareDebugLog` |
 | `ControlMapper/` | SimHub Control Mapper variant-provider integration — see [`docs/controlmapper.md`](controlmapper.md) |
-| `Resources/` | i18n: `Strings.resx` + 9 locale variants, hand-edited `Strings.Designer.cs`, `LanguageResolver` |
+| `Resources/` | i18n: `Strings.resx` + 11 locale variants, hand-edited `Strings.Designer.cs`, `LanguageResolver` |
 | `DeviceTemplates/` | Embedded SimHub Device Builder `device.json` definitions, deployed lazily on first detection; `Thumbnails/` holds the product renders (per-wheel + CM2 dash) deployed alongside them as `thumbnail.png` sidecars |
 | `Data/` | `Telemetry.json` — 400+ channel definitions (URL, compression, package_level, default `simhub_property`/`simhub_scale`) |
 | `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`) |
@@ -372,7 +372,7 @@ The FSR V1 (model-name `FSR`, hw `RS21-D03*`) uses a fundamentally different tra
 
 ### Internationalization (i18n)
 
-User-visible strings live in `Resources/Strings.resx` (English neutral/master) plus per-culture variants for de, el, es, fr, it, ko, nb, ru, vi, and zh-Hans. XAML uses `{x:Static res:Strings.<Key>}`; C# uses `MozaPlugin.Resources.Strings.<Key>`. The strongly-typed accessor `Resources/Strings.Designer.cs` is hand-edited (one line per key), not generated.
+User-visible strings live in `Resources/Strings.resx` (English neutral/master) plus per-culture variants for de, el, es, fr, it, ko, nb, pt, ru, vi, and zh-Hans. XAML uses `{x:Static res:Strings.<Key>}`; C# uses `MozaPlugin.Resources.Strings.<Key>`. The strongly-typed accessor `Resources/Strings.Designer.cs` is hand-edited (one line per key), not generated.
 
 **Single-DLL deployment.** Every locale is embedded directly inside `MozaPlugin.dll` — no satellite assemblies. The csproj sets `<WithCulture>false</WithCulture>` per non-neutral resx with explicit `ManifestResourceName` keys; `Strings.Designer.cs` builds a BCP-47-keyed `ResourceManager` dictionary and `Get(key)` walks `Thread.CurrentUICulture`'s parent chain (passing `InvariantCulture` to each `GetString` so no satellite lookup happens), falling back to English.
 
