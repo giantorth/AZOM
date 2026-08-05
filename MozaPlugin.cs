@@ -2385,9 +2385,16 @@ namespace MozaPlugin
             // Pedal 0 (master) keeps its calibration in the flat fields (the
             // existing UI); the additional chained pedals (axes 1+) store theirs
             // in s.Pedals[axis]. An unconfigured pedal (all -1 / null) writes
-            // nothing.
+            // nothing. Once connectivity is known, phantom axes (no pedal
+            // wired) are skipped, and a lane's sole connected pedal falls back
+            // to the flat fields when it has no per-pedal entry — see
+            // MBoosterDeviceController.SoleConnectedAxis.
+            var connectedAxes = controller.ConnectedAxes;
+            int soleAxis = controller.SoleConnectedAxis();
             for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBoosterDeviceController.MaxAxes; axis++)
             {
+                if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
+                    continue;
                 var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, axis, axisCount);
                 string? prefix =
                     role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? "throttle"
@@ -2401,6 +2408,7 @@ namespace MozaPlugin
                 global::MozaPlugin.Devices.IMBoosterPedalConfig cfg;
                 if (axis == 0) cfg = s;
                 else if (s.Pedals != null && s.Pedals.TryGetValue(axis, out var p) && p != null) cfg = p;
+                else if (axis == soleAxis) cfg = s;
                 else continue;
 
                 bool wroteAnyCalibration = false;

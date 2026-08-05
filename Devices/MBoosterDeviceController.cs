@@ -541,18 +541,26 @@ namespace MozaPlugin.Devices
             string ascii = sb.ToString().Trim();
             if (ascii.Length == 0) return;
             if (ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) < 0 &&
+                ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("pedal is connected", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) < 0)
                 return;
             lock (_diagLinesLogged) { if (!_diagLinesLogged.Add(ascii)) return; }
             MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} diag: {ascii}");
 
-            // "PD Linked:[T 0 B 1 C 1]" — 1 = that pedal slot is physically
-            // connected. Slots map to axis index 0/1/2 (throttle/brake/clutch),
-            // the same order the HID axes (Rx/Ry/Rz) sort into.
-            if (ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) >= 0)
+            // "PD Linked:[T 0 B 1 C 1]" — or, on newer firmware (device-type
+            // 01-02-07-05, support bundle 2026-07-30), the long form "Pedals
+            // connected state: [throttle 0 brake 1 clutch 0]". 1 = that pedal
+            // slot is physically connected. Slots map to axis index 0/1/2
+            // (throttle/brake/clutch), the same order the HID axes (Rx/Ry/Rz)
+            // sort into.
+            bool shortForm = ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool longForm = !shortForm && ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (shortForm || longForm)
             {
-                int t = FlagAfter(ascii, 'T'), b = FlagAfter(ascii, 'B'), c = FlagAfter(ascii, 'C');
+                int t = shortForm ? FlagAfter(ascii, 'T') : WordFlagAfter(ascii, "throttle");
+                int b = shortForm ? FlagAfter(ascii, 'B') : WordFlagAfter(ascii, "brake");
+                int c = shortForm ? FlagAfter(ascii, 'C') : WordFlagAfter(ascii, "clutch");
                 if (t >= 0 && b >= 0 && c >= 0)
                 {
                     _connectedAxes = new[] { t == 1, b == 1, c == 1 };
@@ -599,6 +607,39 @@ namespace MozaPlugin.Devices
                 return -1;
             }
             return -1;
+        }
+
+        /// <summary>Digit (0/1) shortly after the first case-insensitive
+        /// <paramref name="word"/> in a long-form "Pedals connected state:
+        /// [throttle 0 brake 1 clutch 0]" line; -1 if absent.</summary>
+        private static int WordFlagAfter(string s, string word)
+        {
+            int i = s.IndexOf(word, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return -1;
+            int after = i + word.Length;
+            for (int j = after; j < s.Length && j <= after + 3; j++)
+                if (s[j] == '0' || s[j] == '1') return s[j] - '0';
+            return -1;
+        }
+
+        /// <summary>
+        /// Axis index of this lane's SOLE connected pedal, or -1 when
+        /// connectivity is unknown or more than one pedal is wired. A
+        /// standalone unit's sole pedal commonly reports on a non-zero HID
+        /// axis, but its config historically lives in the lane's flat
+        /// settings fields — the only row the UI shows before connectivity is
+        /// known. The worker / UI / HID-shaping paths use this to fall back
+        /// to the flat fields for that pedal when it has no per-pedal entry,
+        /// so learning the real axis doesn't orphan the existing config.
+        /// </summary>
+        public int SoleConnectedAxis()
+        {
+            var connected = _connectedAxes;
+            if (connected == null) return -1;
+            int sole = -1, count = 0;
+            for (int i = 0; i < connected.Length; i++)
+                if (connected[i]) { sole = i; count++; }
+            return count == 1 ? sole : -1;
         }
 
         /// <summary>Short identity slug for capture labels / log lines — last 8 chars of instance id.</summary>

@@ -3094,7 +3094,12 @@ namespace MozaPlugin
 
         /// <summary>The full per-pedal config the settings sections edit — the
         /// master's flat fields for pedal 0, else the chained pedal's per-pedal
-        /// entry (created on demand so edits persist). Null if no device
+        /// entry (created on demand so edits persist). A lane whose SOLE
+        /// connected pedal is this (non-zero) axis with no per-pedal entry
+        /// edits the flat fields instead (and never creates the entry): that's
+        /// where the config landed while the UI still showed the axis-0 row,
+        /// and creating an empty entry here would orphan it — see
+        /// MBoosterDeviceController.SoleConnectedAxis. Null if no device
         /// selected. Covers effects + calibration + sim input + pedal feel.</summary>
         private IMBoosterPedalConfig? CurrentMBoosterEffectTarget()
         {
@@ -3103,6 +3108,8 @@ namespace MozaPlugin
             if (_mboosterEffectPedalIndex <= 0) return s;
             if (!s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p))
             {
+                if (CurrentMBoosterController()?.SoleConnectedAxis() == _mboosterEffectPedalIndex)
+                    return s;
                 // Copy-on-write: publish a NEW dictionary via atomic reference
                 // swap rather than mutating in place, so the 50 Hz effect worker
                 // threads reading s.Pedals never see a dictionary mid-resize.
@@ -3114,13 +3121,19 @@ namespace MozaPlugin
 
         /// <summary>The per-pedal config for the selected pedal WITHOUT creating a
         /// missing entry — used when seeding controls so merely viewing a chained
-        /// pedal doesn't persist an empty entry. Falls back to master defaults.</summary>
+        /// pedal doesn't persist an empty entry. Falls back to master defaults.
+        /// Same sole-connected-pedal flat-fields fallback as
+        /// <see cref="CurrentMBoosterEffectTarget"/> so seeding shows the config
+        /// that pedal actually runs with.</summary>
         private IMBoosterPedalConfig? PeekMBoosterEffectTarget()
         {
             var s = CurrentMBoosterSettings();
             if (s == null) return null;
             if (_mboosterEffectPedalIndex <= 0) return s;
-            return s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p) ? p : null;
+            if (s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p)) return p;
+            if (CurrentMBoosterController()?.SoleConnectedAxis() == _mboosterEffectPedalIndex)
+                return s;
+            return null;
         }
 
         /// <summary>Seed the eight vibration-effect cards' controls from one

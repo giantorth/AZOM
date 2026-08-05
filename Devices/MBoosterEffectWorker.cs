@@ -227,6 +227,11 @@ namespace MozaPlugin.Devices
             // safe to read from this worker thread without a lock.
             var pedals = lane?.Pedals;
             if (pedals != null && pedals.TryGetValue(_pedalAxisIndex, out var p)) return p;
+            // A standalone unit's sole pedal on a non-zero axis: its config
+            // may live in the lane's flat fields (configured on the axis-0
+            // row before connectivity was known) — see
+            // MBoosterDeviceController.SoleConnectedAxis.
+            if (_device.SoleConnectedAxis() == _pedalAxisIndex) return lane;
             return null;
         }
 

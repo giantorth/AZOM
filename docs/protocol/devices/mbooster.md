@@ -42,6 +42,53 @@ two ways:
 | Baud rate       | 115200                                      |
 | Stable identity | USB device instance segment from the registry walk; fallback to the device instance ID surfaced by `HidDevice.DevicePath` — see `MBoosterDeviceController.Identity` |
 
+## Chain topology & connectivity diagnostics
+
+A lane's motor/config device ids are role-based: `0x12` (host) throttle,
+`0x1d` brake, `0x1e` clutch — but only when more than one pedal is
+genuinely wired. A **standalone unit's sole pedal always lives at `0x12`**
+regardless of which HID axis it reports on (confirmed on two units,
+support bundles 2026-07-30: every response frame across both came from
+`0x12`; `0x1d`/`0x1e` never acked anything).
+
+**The presence read (`mbooster-presence`) carries no chain information.**
+Three distinct topologies all returned raw `[00 02]`: a confirmed
+standalone 3-axis unit, a standalone 4-axis unit, and the 2-pedal-chain
+capture that originally suggested the last byte was a sub-device count.
+The only reliable connectivity source is the group-`0x0E` firmware
+diagnostic stream, which the device re-emits about once a minute in one
+of two dialects:
+
+| | Short form (device-type `01-02-00-08`, 3 HID axes) | Long form (device-type `01-02-07-05`, 4 HID axes) |
+|---|---|---|
+| Connectivity | `PD Linked:[T 0 B 1 C 0]` | `Pedals connected state: [throttle 0 brake 1 clutch 0]` |
+| Per-pedal type | `Brake pedal is connected, type: active pedal` / `Throttle pedal is not connected !` | same |
+| Sensor dir | `Sensor Dir:[T 1 B -1 C -1]` | `Sensor direction: [throttle 1 brake -1 clutch -1]` |
+| Output dir | `OP Dir:[T 0 B 0 C 0]` | `Output direction: [throttle 0 brake 0 clutch 0]` |
+| Pot angles | `T-PD:[min … max … angle …]` | `Throttle calibrate theta:[min … max … angle …]` |
+
+`MBoosterDeviceController.LogPedalDiagnosticIfRelevant` parses both
+connectivity forms into `ConnectedAxes` (authoritative for chain-ness
+once received; the presence read only bridges the window before it) and
+the per-pedal type lines into `AxisTypes` (active = has a motor,
+passive = no motor).
+
+The HID interface exposes 3–4 axes regardless of how many pedals are
+wired, and a sole pedal reports on its **role's** axis (brake → Ry =
+axis 1), not axis 0. The host `0x12` retains calibration registers for
+detached pedals (a standalone brake read back a non-default throttle
+register), so the calibration fingerprint that maps roles to chained
+motor ids must only consider roles the connectivity diagnostic reports
+as wired — see `MBoosterDeviceController.RecomputeChainRoleMap`.
+
+An mBooster can also be wired **behind** an SRP control box (plugged in
+as the box's brake pedal). It then never enumerates on USB — the only
+trace is the box's own `0x0E` stream relaying
+`src=0x91: Pedals connected state: [throttle 0 brake 1 clutch 0]` — and
+there is no CDC lane to its motor, so effects are impossible in that
+wiring. The supported hookup is the mBooster directly on USB (PID
+`0x0008`) with other pedals chained into it.
+
 ## Frame shapes
 
 mBooster uses the same Moza wire framing as the wheelbase

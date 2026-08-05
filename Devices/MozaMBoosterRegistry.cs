@@ -310,7 +310,11 @@ namespace MozaPlugin.Devices
             if (axisIndex > 0)
             {
                 var pedals = laneSettings?.Pedals;
-                cfg = (pedals != null && pedals.TryGetValue(axisIndex, out var pp)) ? pp : null;
+                if (pedals != null && pedals.TryGetValue(axisIndex, out var pp)) cfg = pp;
+                // Sole-connected-pedal fallback: a standalone unit's pedal on
+                // a non-zero axis may keep its config in the flat fields —
+                // see MBoosterDeviceController.SoleConnectedAxis.
+                else cfg = c.SoleConnectedAxis() == axisIndex ? laneSettings : null;
             }
 
             double posPct = pos01 * 100.0;
