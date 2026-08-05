@@ -1203,6 +1203,13 @@ namespace MozaPlugin.Hardware
             if (value < 0) return;
             if (_detectionState.BaseDetected) BaseManager.WriteFloat(command, value);
         }
+        // Readback path for base settings the firmware may clamp (e.g. the
+        // rotation-limit floor probe): the reply lands in _data, so the UI
+        // shows what the base actually stored rather than what was written.
+        public void ReadIfBaseConnected(string command)
+        {
+            if (_detectionState.BaseDetected) BaseManager.ReadSetting(command);
+        }
         public void WriteIfHandbrakeDetected(string command, int value)
         {
             if (value < 0) return;

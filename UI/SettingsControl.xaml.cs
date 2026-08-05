@@ -36,6 +36,14 @@ namespace MozaPlugin
         private readonly MozaData _data;
         private readonly DispatcherTimer _refreshTimer;
         private readonly DispatcherTimer _steeringAngleTimer;
+        // Rotation-limit readback: the slider floor (60°) sits below PitHouse's
+        // 90°, and firmware clamps silently — measured floor 60° on tested
+        // base, other firmware may differ. After the last slider tick re-read
+        // the stored value and log write vs. device truth. Two-phase one-shot:
+        // debounce → issue reads, then one more tick to log the settled reply.
+        private readonly DispatcherTimer _rotationReadbackTimer;
+        private bool _rotationReadbackLogPhase;
+        private int _rotationLastWrittenDeg;
         private readonly EventSuppressor _suppressor = new EventSuppressor();
         private bool _suppressEvents => _suppressor.Suppressed;
 
@@ -113,6 +121,9 @@ namespace MozaPlugin
             };
             _steeringAngleTimer.Tick += OnSteeringAngleTick;
 
+            _rotationReadbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            _rotationReadbackTimer.Tick += OnRotationReadbackTick;
+
             Loaded   += OnLoadedStartTimers;
             Unloaded += OnUnloadedStopTimers;
 
@@ -150,6 +161,7 @@ namespace MozaPlugin
             // SettingsControl + _plugin/_data graph per cycle until process exit.
             _refreshTimer.Stop();
             _steeringAngleTimer.Stop();
+            _rotationReadbackTimer.Stop();
             _bandwidthTimer?.Stop();
             UnsubscribeStalks();
             // Closing the settings panel takes the sustained Engine/ABS/
@@ -363,8 +375,11 @@ namespace MozaPlugin
             MotorTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.MotorTemp):F0} {tempUnit}" : "--";
 
             // Reverse expression: *2 (raw → display degrees)
+            // Floor 60° = measured firmware clamp (PitHouse stops at 90°);
+            // must stay even — the wire's half-degree raw makes odd degrees
+            // unrepresentable — and matched to the XAML slider Minimum.
             double rot = _data.Limit * 2.0;
-            RotationSlider.Value = Clamp(rot, 90, 2700);
+            RotationSlider.Value = Clamp(rot, 60, 2700);
             SetValueText(RotationValue, $"{rot:F0}°");
 
             double ffb = _data.FfbStrength / 10.0;
@@ -528,6 +543,36 @@ namespace MozaPlugin
                 $"active profile='{profile?.Name ?? "(none)"}', " +
                 $"profile.Limit={profile?.Limit.ToString() ?? "n/a"}, " +
                 $"baseConnected={_data.IsBaseConnected}");
+
+            // Restart the readback debounce so it fires once, after the last
+            // tick of a drag.
+            _rotationLastWrittenDeg = deg;
+            _rotationReadbackLogPhase = false;
+            _rotationReadbackTimer.Stop();
+            _rotationReadbackTimer.Interval = TimeSpan.FromMilliseconds(400);
+            _rotationReadbackTimer.Start();
+        }
+
+        private void OnRotationReadbackTick(object? sender, EventArgs e)
+        {
+            if (!_rotationReadbackLogPhase)
+            {
+                // Phase 1: ask the base what it actually stored. The replies
+                // land in _data.Limit/_data.MaxAngle and the refresh tick
+                // snaps the slider to device truth.
+                _plugin.ReadIfBaseConnected("base-limit");
+                _plugin.ReadIfBaseConnected("base-max-angle");
+                _rotationReadbackLogPhase = true;
+                _rotationReadbackTimer.Interval = TimeSpan.FromMilliseconds(500);
+                return;
+            }
+
+            _rotationReadbackTimer.Stop();
+            int reportedDeg = _data.Limit * 2;
+            if (reportedDeg == _rotationLastWrittenDeg)
+                MozaLog.Debug($"[AZOM] Rotation readback: device kept {reportedDeg}°");
+            else
+                MozaLog.Info($"[AZOM] Rotation readback: wrote {_rotationLastWrittenDeg}°, device reports {reportedDeg}° (firmware clamp)");
         }
 
         private void FfbStrengthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

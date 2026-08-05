@@ -520,7 +520,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_WheelRotationAngle}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="RotationSlider" Style="{StaticResource SettingSlider}" Minimum="90" Maximum="2700" TickFrequency="10" SmallChange="10" LargeChange="10" IsSnapToTickEnabled="True" ValueChanged="RotationSlider_ValueChanged"/>
+                                        <Slider Grid.Column="1" x:Name="RotationSlider" Style="{StaticResource SettingSlider}" Minimum="60" Maximum="2700" TickFrequency="10" SmallChange="10" LargeChange="10" IsSnapToTickEnabled="True" ValueChanged="RotationSlider_ValueChanged"/>
                                         <TextBox Grid.Column="2" x:Name="RotationValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=RotationSlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"

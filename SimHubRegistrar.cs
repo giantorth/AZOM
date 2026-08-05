@@ -353,7 +353,7 @@ namespace MozaPlugin
         {
             var data = _plugin.Data;
             if (data == null) return;
-            int deg = ClampStep(data.Limit * 2, deltaDeg, 90, 2700);
+            int deg = ClampStep(data.Limit * 2, deltaDeg, 60, 2700);
             int raw = deg / 2;
             data.Limit = raw;
             data.MaxAngle = raw;
