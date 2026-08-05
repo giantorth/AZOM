@@ -394,6 +394,26 @@ namespace MozaPlugin.Hardware
                             _deviceManager.WriteSetting($"wheel-knob-signal-mode{fwIdx}", sm);
                     }
                 }
+                // Paddle input mode + the combined-mode clutch split point —
+                // overlay-only, per-(profile x wheel-page). Re-pushed here for the
+                // same reason as the knob signal modes above: the wheel firmware
+                // persists a single value, and newer firmware silently drops the
+                // readback (see WheelOverride's "Inputs" comment), so a per-game —
+                // or per-WHEEL — pick only reaches the rim if we re-assert it.
+                // Without this a mode that landed on the wrong rim stayed there,
+                // since nothing ever rewrote the right one.
+                // No capability gate: DeviceProber.NewWheelCoreReadCommands already
+                // reads these from every new-protocol wheel model-blind ("paddles/
+                // clutch/stick exist on every new-protocol wheel"), and this block
+                // is new-protocol-gated. The cfg cache is keyed on the wheel's MCU
+                // UID (SyncWheelCfgCache), so each rim re-asserts its own value on
+                // attach instead of dedup'ing against the previous rim's write.
+                // Wire form is 1/2/3 while the overlay stores the 0/1/2 display
+                // form — hence the +1, matching the UI handler.
+                if (paddles >= 0 && WheelCfgChanged("wheel-paddles-mode", paddles))
+                    _deviceManager.WriteSetting("wheel-paddles-mode", paddles + 1);
+                if (clutchPoint >= 0 && WheelCfgChanged("wheel-clutch-point", clutchPoint))
+                    _deviceManager.WriteSetting("wheel-clutch-point", clutchPoint);
                 if (idleEffect >= 0 && idleSpeed >= 0 && hasRpm && hasIdleLed
                         && WheelCfgChanged("wheel-telemetry-idle-interval", ((long)idleEffect << 32) | (uint)idleSpeed))
                     _deviceManager.WriteArray("wheel-telemetry-idle-interval",
