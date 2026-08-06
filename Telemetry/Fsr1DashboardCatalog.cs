@@ -621,21 +621,17 @@ namespace MozaPlugin.Telemetry
             { 18, new byte[] { 0x0c } },
         };
 
-        // Per-index sub-header descriptor (b1,b2). b1/b2 are per-DASHBOARD config descriptors
-        // (b2 = a region/feature bitmask), NOT fixed per record type — the same type carries
-        // different b1/b2 on different pages (see docs wheel-0x17.md), and the wheel gates on
-        // them to accept the record, so they must match PitHouse per page. These are ground
-        // truth from PitHouse captures: indices 0-15/17/18 from the multi-dash FSR1_CM1 capture,
-        // index 16 from an ACC capture of that page. Indices 6/8/10 were not in a capture (fall
-        // back to the type default). Applied in ByIndex to the streamed record for that page.
-        // Per-index sub-header (b1/b2) override — intentionally EMPTY. Earlier entries were extracted
-        // from per-session header bytes (FSR1_CM1 idle cycle + individual ACC captures) that turned out
-        // to be leftover/session-specific, not per-page config (values like 0x27fe, 0x0b88 are not valid
-        // descriptors). A clean PitHouse F1-2020 "all dashboards" capture emits the record's canonical
-        // per-type header — which the record's own LiveB1/LiveB2 defaults now match — so we just use
-        // those. Keep the dict + mechanism for any genuinely per-index descriptor found later.
+        // Per-index sub-header (b1/b2) override — CAPTURE-PROVEN entries only. The 2026-08
+        // cleanup emptied this dict (earlier values like 0x27fe/0x0b88 were session leftovers),
+        // but the "Dash 12 and 13 assetto corsa" PitHouse capture shows sustained page-specific
+        // headers on the GT timing pages (5204×0e all b1=0d/b2=80 on page 12; 09 at 01/80 on
+        // page 11) — the wheel gates records on b1/b2, and streaming the per-type default
+        // header on these pages is the prime suspect in the 2026-08-05 display-wedge capture.
+        // Non-background records only; anything absent falls back to the type's LiveB1/LiveB2.
         private static readonly Dictionary<int, (byte b1, byte b2)> IndexDescriptorOverride = new()
         {
+            { 11, (0x01, 0x80) },   // type-09 on user dash 12 ("Dash 12 and 13 AC" capture)
+            { 12, (0x0d, 0x80) },   // type-0e on user dash 13 (same capture, 5204 frames)
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
