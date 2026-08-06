@@ -120,6 +120,18 @@ namespace MozaPlugin
         // Connection enabled (persisted toggle)
         public bool ConnectionEnabled { get; set; } = true;
 
+        // Last-known physical pedal connectivity per mBooster lane, indexed
+        // [throttle, brake, clutch] and keyed like the per-profile device
+        // settings ("mbooster:<serial>" once interrogated, transport instance
+        // id before/alongside). Seeds a freshly created controller's
+        // ConnectedAxes so phantom-axis protection and correct routing are
+        // armed from the first HID event, instead of waiting up to a minute
+        // for the device's next PD-Linked broadcast — a window every plugin
+        // restart used to reopen. The live diagnostic still overwrites the
+        // seed when it arrives.
+        public Dictionary<string, bool[]> MBoosterKnownPedals { get; set; }
+            = new Dictionary<string, bool[]>(StringComparer.OrdinalIgnoreCase);
+
         // Last successful COM port per device lane — seeded into that lane's
         // MozaSerialConnection on startup to skip re-probing. Empty = no saved port.
         public string LastWheelbasePort { get; set; } = "";

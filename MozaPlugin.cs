@@ -1306,7 +1306,9 @@ namespace MozaPlugin
                     isShuttingDown: () => IsShuttingDown,
                     onDeviceDetectedEdge: OnMBoosterDeviceDetected,
                     customEffectFormulaEvaluator: CreateHapticsFormulaResolver(),
-                    onSerialResolved: OnMBoosterSerialResolved);
+                    onSerialResolved: OnMBoosterSerialResolved,
+                    connectivitySeedLookup: LookupMBoosterKnownPedals,
+                    onConnectivityResolved: OnMBoosterConnectivityResolved);
                 // Initial walk so any mBooster plugged in BEFORE SimHub launched
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.
@@ -1621,6 +1623,7 @@ namespace MozaPlugin
             // Dispose every mBooster controller — same reason: stop workers
             // before the connections they own get torn down.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
+            try { DisposeRoutedMBoosterProbes(); } catch { }
             // Dispose every standalone-peripheral connection (drops ownership +
             // closes each dedicated pipe).
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
@@ -2319,9 +2322,237 @@ namespace MozaPlugin
             {
                 var settings = GetOrCreateMBoosterSettings(identity); // resolves + migrates current profile
                 var controller = _mboosterRegistry?.FindByIdentity(identity);
-                if (controller != null) ApplyMBoosterToHardware(controller, settings);
+                if (controller != null)
+                {
+                    // Replug on a NEW port: the transport-identity connectivity
+                    // seed missed at controller creation, but the serial-keyed
+                    // cache entry can seed now — still well ahead of the
+                    // device's own once-a-minute broadcast. No-op if live
+                    // connectivity already arrived.
+                    controller.SeedConnectedAxes(LookupMBoosterKnownPedals(identity));
+                    ApplyMBoosterToHardware(controller, settings);
+                }
             }
             catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] serial re-key for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
+        }
+
+        /// <summary>Persisted last-known pedal connectivity for a lane —
+        /// checked under the serial key when the identity has been re-keyed,
+        /// falling back to the transport identity (the cache is written under
+        /// both). Null when never seen.</summary>
+        private bool[]? LookupMBoosterKnownPedals(string identity)
+        {
+            var cache = _settings?.MBoosterKnownPedals;
+            if (cache == null || string.IsNullOrEmpty(identity)) return null;
+            string key = _mboosterSerialByIdentity.TryGetValue(identity, out var serialKey) ? serialKey : identity;
+            lock (_mboosterSettingsLock)
+            {
+                if (cache.TryGetValue(key, out var v) && v != null) return v;
+                return cache.TryGetValue(identity, out v) ? v : null;
+            }
+        }
+
+        /// <summary>
+        /// Live connectivity parsed from the device's own diagnostic. Persist
+        /// it (under both the serial key and the transport identity, so the
+        /// next controller can be seeded before the serial is re-interrogated)
+        /// and heal provably-stale role assignments: a role held by an axis
+        /// the device says has NO pedal, duplicating a role held by a wired
+        /// axis, can only be a leftover from before connectivity was known —
+        /// it first-wins the real pedal out of the merge on any build without
+        /// the phantom-axis guard, and blanks it during the unseeded window
+        /// otherwise. Healed across ALL profiles: the proof is physical
+        /// (device-reported wiring), not a per-profile preference. Runs on the
+        /// connection read thread, at most once per distinct diagnostic line
+        /// per session.
+        /// </summary>
+        private void OnMBoosterConnectivityResolved(string identity, bool[] connected)
+        {
+            if (IsShuttingDown || string.IsNullOrEmpty(identity) || connected == null || connected.Length == 0) return;
+            try
+            {
+                bool changed = false;
+                string? serialKey = _mboosterSerialByIdentity.TryGetValue(identity, out var sk) ? sk : null;
+                lock (_mboosterSettingsLock)
+                {
+                    var cache = _settings?.MBoosterKnownPedals;
+                    if (cache != null)
+                    {
+                        changed |= StoreKnownPedals(cache, identity, connected);
+                        if (serialKey != null) changed |= StoreKnownPedals(cache, serialKey, connected);
+                    }
+
+                    var profiles = _settings?.ProfileStore?.Profiles;
+                    if (profiles != null)
+                    {
+                        foreach (var profile in profiles)
+                        {
+                            var dict = profile?.MBoosterSettings;
+                            if (dict == null) continue;
+                            foreach (var key in new[] { serialKey, identity })
+                            {
+                                if (key == null || !dict.TryGetValue(key, out var s) || s == null) continue;
+                                changed |= HealMBoosterAxisRoles(
+                                    s, connected, profile!.Name ?? "?", MBoosterDeviceController.ShortIdentity(identity));
+                            }
+                        }
+                    }
+                }
+                if (changed) SaveSettings();
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] connectivity persist/heal for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
+        }
+
+        private static bool StoreKnownPedals(Dictionary<string, bool[]> cache, string key, bool[] connected)
+        {
+            if (cache.TryGetValue(key, out var old) && old != null && old.SequenceEqual(connected)) return false;
+            cache[key] = (bool[])connected.Clone();
+            return true;
+        }
+
+        // One routed-mBooster probe/lane per owning pipe (base and hub each
+        // count separately). An entry persists for the session once created —
+        // as a registered lane when the pedal device identified as an
+        // mBooster, or as a retired negative when it turned out to be plain
+        // SGP pedals (prevents a re-probe loop; a hookup change mid-session
+        // needs a plugin restart to be picked up).
+        private readonly object _routedMBoosterLock = new object();
+        private readonly Dictionary<MozaDeviceManager, MBoosterDeviceController> _routedMBoosterProbes =
+            new Dictionary<MozaDeviceManager, MBoosterDeviceController>();
+        private readonly Dictionary<MozaDeviceManager, int> _routedMBoosterProbeAttempts =
+            new Dictionary<MozaDeviceManager, int>();
+        // 5 s reconnect-timer cadence × 24 = give a silent pedal device two
+        // minutes of identity re-bursts before writing it off for the session.
+        private const int RoutedMBoosterProbeMaxAttempts = 24;
+
+        /// <summary>
+        /// A pedal sub-device was detected on a base/hub pipe — it may be an
+        /// mBooster on the RJ45 pedal port rather than plain SGP pedals. Spin
+        /// up a ROUTED controller against the pipe's shared connection (dev
+        /// 0x19) and interrogate its identity; registration with the registry
+        /// happens only when the model-name read confirms an mBooster (both
+        /// device families answer the same identity groups at 0x19, so the
+        /// model string is the discriminator). Reads-only until then.
+        /// </summary>
+        internal void ProbeRoutedMBooster(MozaDeviceManager owner)
+        {
+            if (IsShuttingDown || owner == null || _mboosterRegistry == null) return;
+            lock (_routedMBoosterLock)
+            {
+                if (_routedMBoosterProbes.ContainsKey(owner)) return;
+                string port = owner.Connection?.LastPortName ?? "";
+                string identity = "routedpedals:" + (string.IsNullOrEmpty(port) ? "pipe" : port);
+                var c = new MBoosterDeviceController(
+                    identity,
+                    owner.Connection!,
+                    MozaProtocol.DevicePedals,
+                    portLabel: string.IsNullOrEmpty(port) ? "via base" : $"via {port}",
+                    settingsLookup: () => GetOrCreateMBoosterSettings(identity),
+                    isShuttingDown: () => IsShuttingDown,
+                    customEffectFormulaEvaluator: CreateHapticsFormulaResolver());
+                c.ModelNameResolved += name => OnRoutedMBoosterModelResolved(c, name);
+                _routedMBoosterProbes[owner] = c;
+                _routedMBoosterProbeAttempts[owner] = 1;
+                c.SendIdentityReads();
+            }
+        }
+
+        /// <summary>Re-burst identity reads for probes that never got a model
+        /// answer (frame lost / pipe busy at detect time). Runs from the 5 s
+        /// reconnect timer; capped so silent non-mBooster pedals don't get
+        /// probed forever.</summary>
+        private void NudgeRoutedMBoosterProbes()
+        {
+            if (IsShuttingDown) return;
+            List<MBoosterDeviceController>? pending = null;
+            lock (_routedMBoosterLock)
+            {
+                foreach (var kv in _routedMBoosterProbes)
+                {
+                    var c = kv.Value;
+                    if (c == null || !string.IsNullOrEmpty(c.ModelName) || !c.IsConnected) continue;
+                    if (!_routedMBoosterProbeAttempts.TryGetValue(kv.Key, out int n)) n = 0;
+                    if (n >= RoutedMBoosterProbeMaxAttempts) continue;
+                    _routedMBoosterProbeAttempts[kv.Key] = n + 1;
+                    (pending ??= new List<MBoosterDeviceController>()).Add(c);
+                }
+            }
+            if (pending == null) return;
+            foreach (var c in pending)
+            {
+                try { c.SendIdentityReads(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed identity re-burst: {ex.Message}"); }
+            }
+        }
+
+        /// <summary>Teardown for routed probes/lanes — registered lanes are
+        /// disposed by the registry too, but Dispose latches so the double
+        /// call is harmless; unresolved probes are only reachable from here.
+        /// Routed Dispose never touches the shared base/hub pipe itself.</summary>
+        private void DisposeRoutedMBoosterProbes()
+        {
+            List<MBoosterDeviceController> all;
+            lock (_routedMBoosterLock)
+            {
+                all = new List<MBoosterDeviceController>(_routedMBoosterProbes.Values);
+                _routedMBoosterProbes.Clear();
+                _routedMBoosterProbeAttempts.Clear();
+            }
+            foreach (var c in all)
+            {
+                try { c?.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe dispose: {ex.Message}"); }
+            }
+        }
+
+        private void OnRoutedMBoosterModelResolved(MBoosterDeviceController c, string model)
+        {
+            if (IsShuttingDown || c == null) return;
+            try
+            {
+                if (!string.IsNullOrEmpty(model) && model.IndexOf("mBooster", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    MozaLog.Info($"[AZOM/mBooster] mBooster identified on the pedal port ({c.PortName}) — registering routed lane (dev 0x{c.HostDeviceId:x2})");
+                    _mboosterRegistry?.AddRoutedLane(c);
+                }
+                else
+                {
+                    // Plain SGP pedals (or another non-mBooster pedal device) —
+                    // retire the probe. Dispose skips the motor disable frames
+                    // when the model never identified as an mBooster.
+                    MozaLog.Debug($"[AZOM/mBooster] pedal sub-device ({c.PortName}) is '{model}', not an mBooster — routed probe retired");
+                    try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Probe dispose: {ex.Message}"); }
+                }
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] routed model resolution: {ex.Message}"); }
+        }
+
+        /// <summary>One heal pass over a single profile's device entry — the
+        /// conclusive-only rule from <see cref="OnMBoosterConnectivityResolved"/>.</summary>
+        private static bool HealMBoosterAxisRoles(MBoosterDeviceSettings s, bool[] connected, string profileName, string shortId)
+        {
+            var roles = s.AxisRoles;
+            if (roles == null) return false;
+            bool changed = false;
+            for (int a = 0; a < roles.Length; a++)
+            {
+                bool aConnected = a < connected.Length && connected[a];
+                if (aConnected || roles[a] == global::MozaPlugin.Devices.MBoosterRole.Disabled) continue;
+                for (int b = 0; b < roles.Length; b++)
+                {
+                    if (b == a || roles[b] != roles[a]) continue;
+                    if (b < connected.Length && connected[b])
+                    {
+                        MozaLog.Info(
+                            $"[AZOM/mBooster] {shortId}: cleared stale '{roles[a]}' role from axis {a} " +
+                            $"in profile '{profileName}' — the device reports no pedal wired there and " +
+                            $"the wired pedal on axis {b} holds that role");
+                        roles[a] = global::MozaPlugin.Devices.MBoosterRole.Disabled;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return changed;
         }
 
         /// <summary>
@@ -2549,6 +2780,7 @@ namespace MozaPlugin
             // each connection. Must happen before MozaData is torn down so the
             // position-merge path (which writes to _data) doesn't race.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
+            try { DisposeRoutedMBoosterProbes(); } catch { }
             // Standalone pedals/handbrake connections — close before MozaData
             // teardown so the response path (which writes to _data) can't race.
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
@@ -4088,6 +4320,10 @@ namespace MozaPlugin
             // Slice I: reconnect-timer mBooster Refresh re-enabled.
             try { _mboosterRegistry?.Refresh(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Refresh: {ex.Message}"); }
+            // Routed-mBooster identity probes that lost their reply get a
+            // re-burst on the same cadence (capped — see the method).
+            try { NudgeRoutedMBoosterProbes(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe nudge: {ex.Message}"); }
 
             // Standalone pedals/handbrake on their own ports (registry-
             // only, same Wine guard as the other dedicated lanes).

@@ -119,6 +119,11 @@ namespace MozaPlugin
         /// <summary>True while the underlying serial pipe is open.</summary>
         public bool IsConnected => _connection.IsConnected;
 
+        /// <summary>The underlying serial pipe — shared with ROUTED sub-device
+        /// lanes (e.g. an mBooster on this pipe's pedal port, dev 0x19), which
+        /// send/subscribe on it but never manage its lifecycle.</summary>
+        public MozaSerialConnection Connection => _connection;
+
         // Valid wheel device IDs to try: 0x17 (DeviceWheel), 0x15 (DeviceWheel15)
         // and 0x13 (DeviceBase, the old-protocol / ES bus). 0x15 and 0x17 are two
         // of the three wheel-identity ids in docs/how-to-query-device-type.md.

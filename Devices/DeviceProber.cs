@@ -333,6 +333,12 @@ namespace MozaPlugin.Devices
             if (issueReads)
                 _deviceManager.ReadSettings(PedalsSettingsReadCommands);
             MozaLog.Info("[AZOM] Pedals detected");
+            // The pedal device on this pipe may be an mBooster (RJ45 hookup
+            // instead of USB) — probe its identity at dev 0x19 and, if it is
+            // one, a routed mBooster lane gets registered over this pipe.
+            // Pit House fully supports this topology; routing is by sub-device
+            // id, same as any other relayed peripheral.
+            _plugin.ProbeRoutedMBooster(_deviceManager);
         }
 
         /// <summary>First-sight detection cascade for the HGP/SGP shifter.

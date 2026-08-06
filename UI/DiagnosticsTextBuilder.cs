@@ -119,15 +119,24 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
-        public static string BuildMBoosterDevices(MozaPlugin plugin)
+        public static string BuildMBoosterDevices(MozaPlugin plugin, MozaData data)
         {
             var registry = plugin.MBoosterRegistry;
             if (registry == null || registry.Devices.Count == 0)
-                return "(no mBooster pedals detected — registry-only discovery; requires VID 0x346E PID 0x0008 in Windows USB enum)";
+                return "(no mBooster pedals detected — USB discovery needs VID 0x346E PID 0x0008 in the Windows USB enum; " +
+                       "a unit on a wheelbase/hub pedal port registers as a routed lane once dev 0x19 answers the model probe)";
 
             var sb = new StringBuilder();
             var devs = registry.Devices;
             sb.AppendLine($"Discovered:     {devs.Count} mBooster device(s)");
+            // Merged (post role-merge) positions — what the trace graph and the
+            // game-facing properties actually receive. "max seen" proves whether
+            // pedal input ever flowed through the merge this session, settling
+            // "the graph never moved" vs "nobody pressed during capture".
+            var (maxT, maxB, maxC) = registry.MaxMergedPositionsSeen;
+            sb.AppendLine(
+                $"Merged pos:     T={data.ThrottlePosition} B={data.BrakePosition} C={data.ClutchPosition}" +
+                $"  (max seen this session: T={maxT} B={maxB} C={maxC})");
             for (int i = 0; i < devs.Count; i++)
             {
                 var d = devs[i];
