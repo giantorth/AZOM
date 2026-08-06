@@ -220,8 +220,6 @@ namespace MozaPlugin
         private PluginManager _pluginManager = null!;
         private SimHubPropertyResolver _propertyResolver = null!;
         internal SimHubPropertyResolver PropertyResolver => _propertyResolver;
-        private int _headProbeTick;   // diagnostic heading-probe pacing
-        private int _headProbeCount;
         private HardwareApplier _hardwareApplier = null!;
         internal HardwareApplier HardwareApplier => _hardwareApplier;
         // SimHub's shared/master LED-brightness slider (0..100), published by the
@@ -1922,15 +1920,6 @@ namespace MozaPlugin
             // Feed the truck-sim stalk controller the current game context so it can
             // gate keyboard output to a running ETS2/ATS session.
             try { _stalksController?.SetGameContext(pluginManager.GameName, data.GameRunning); } catch { }
-            // Heading probe (diagnostic): dump SimHub heading/radar/spotter props a
-            // handful of times while a game runs so we can identify AC's live heading
-            // source for the radar preamble. Self-limits to ~20 logs (~once/sec).
-            if (data.GameRunning && _headProbeCount < 20 && ++_headProbeTick >= 60)
-            {
-                _headProbeTick = 0;
-                _headProbeCount++;
-                try { _propertyResolver?.LogHeadingProbe(); } catch { }
-            }
             // Keep the process responsive in the background (EcoQoS opt-out + 1 ms timer)
             // the moment a game is active. Idempotent; the PollStatus backstop handles
             // release if DataUpdate goes quiet on game exit.
