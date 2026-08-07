@@ -4739,17 +4739,17 @@ namespace MozaPlugin
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
 
-        /// <summary>Push FSR1 display brightness (group-0x32 00/80 write+commit pair,
-        /// 0–100). The wheel PERSISTS it to EEPROM (Table 7 Param 5), so call only from
-        /// committed user input — never periodically or as a connect-time re-apply.</summary>
+        /// <summary>Queue an FSR1 display-brightness push (group-0x32 00/80 write+commit
+        /// pair, 0–100). The wheel PERSISTS it to EEPROM (Table 7 Param 5); the driver
+        /// emits it behind the shared Table-7 write gate (≥2 s between writes, latest
+        /// value wins, same-value repeats dropped) — back-to-back commits preceded the
+        /// 2026-08-06 param-store wedges.</summary>
         internal void SendFsr1DisplayBrightness(int percent)
         {
-            var conn = _connection;
-            if (conn == null || !conn.IsConnected || !IsFsr1DisplayWheel) return;
-            foreach (var f in Telemetry.Fsr1DisplayEmitter.BuildBrightness(percent))
-                conn.Send(f);
-            MozaLog.Info($"[AZOM] FSR1 display brightness → {percent}%");
+            if (!IsFsr1DisplayWheel) return;
+            _fsr1Cm1Mapping.QueueFsr1Brightness(percent);
         }
+        internal int TakePendingFsr1Brightness() => _fsr1Cm1Mapping.TakePendingFsr1Brightness();
 
         internal void ClearFsr1FieldOverrides(string recordKey) => _fsr1Cm1Mapping.ClearFsr1FieldOverrides(recordKey);
         internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId)

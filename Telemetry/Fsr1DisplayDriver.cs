@@ -46,9 +46,15 @@ namespace MozaPlugin.Telemetry
         private volatile bool _gameRunning;
         private int _tickCounter;
         private int _lastStreamedIndex = -1;
-        // Select-emit rate limit (see Tick): every select = a wheel EEPROM write.
-        private const int SelectMinIntervalMs = 300;
-        private int _lastSelectEmitMs = Environment.TickCount - SelectMinIntervalMs;
+        // Table-7 EEPROM write gate (see Tick): selects (Param 6) and display brightness
+        // (Param 5) are both PERSISTED by the wheel, and back-to-back commits preceded
+        // every observed param-store wedge (2026-08-06 crash bundles — two brightness
+        // commits 700 ms apart, storage wedged ~35 s later). 1 s sits above that crash
+        // pair with margin while staying at click cadence; the wheel's own combo-cycle
+        // writes at ~0.5 s intervals without wedging, so 1 s host writes have headroom.
+        // The gate only delays CONSECUTIVE writes — a lone click emits immediately.
+        private const int ParamWriteMinIntervalMs = 1000;
+        private int _lastParamWriteMs = Environment.TickCount - ParamWriteMinIntervalMs;
 
         // One-time-per-process guard for the catalog gapless self-check (runs on first Start).
         private static bool s_partitionsValidated;
@@ -158,21 +164,31 @@ namespace MozaPlugin.Telemetry
             var resolve = _resolve;
             long testNowMs = testMode ? DashboardTestPattern.NowMs() : 0;
 
-            // Host-initiated dashboard switch: emit the group-0x32/0x81 select command.
-            // Only when actually driving the wheel — in viz-only mode the pending select
-            // stays queued so it fires once telemetry resumes. EEPROM rate limit: every
-            // select the wheel receives is a Table-7 Param-6 EEPROM write, so hold the
-            // drain for ≥300 ms after the previous emit — the pending slot keeps only
-            // the LATEST target, so a spun cycle-dashboard encoder coalesces to one
-            // write at the final page instead of one per detent.
+            // Host-initiated Table-7 param writes (dashboard select / display brightness):
+            // only when actually driving the wheel — in viz-only mode pendings stay queued
+            // so they fire once telemetry resumes. Both are wheel EEPROM writes, so at most
+            // ONE goes out per gate window; the pending slots keep only the LATEST value,
+            // so a spun cycle-dashboard encoder or a dragged brightness slider coalesces to
+            // a single write instead of one per detent/step.
             if (streamLive && plugin != null
-                && unchecked(Environment.TickCount - _lastSelectEmitMs) >= SelectMinIntervalMs)
+                && unchecked(Environment.TickCount - _lastParamWriteMs) >= ParamWriteMinIntervalMs)
             {
                 int pending = plugin.TakePendingFsr1Select();
                 if (pending >= 0)
                 {
                     _connection.Send(Fsr1DisplayEmitter.BuildSelect(pending));
-                    _lastSelectEmitMs = Environment.TickCount;
+                    _lastParamWriteMs = Environment.TickCount;
+                }
+                else
+                {
+                    int bright = plugin.TakePendingFsr1Brightness();
+                    if (bright >= 0)
+                    {
+                        foreach (var f in Fsr1DisplayEmitter.BuildBrightness(bright))
+                            _connection.Send(f);
+                        _lastParamWriteMs = Environment.TickCount;
+                        MozaLog.Info($"[AZOM] FSR1 display brightness → {bright}%");
+                    }
                 }
             }
 

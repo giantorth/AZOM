@@ -193,6 +193,32 @@ namespace MozaPlugin.Telemetry
         /// <summary>Sender drains the pending user-select index (or -1). One-shot.</summary>
         internal int TakePendingFsr1Select() => Interlocked.Exchange(ref _fsr1PendingSelect, -1);
 
+        // Pending display-brightness percent (-1 = none). Same pattern as the pending
+        // select: the slot holds only the LATEST value so a slider drag coalesces to a
+        // single wheel EEPROM write (Table 7 Param 5), drained by the driver behind the
+        // shared Table-7 write gate.
+        private int _fsr1PendingBrightness = -1;
+        private int _fsr1LastSentBrightness = -1;
+
+        /// <summary>Queue an FSR1 display-brightness push (0–100). Same-value repeats
+        /// are dropped so a slider returning to its start writes nothing.</summary>
+        internal void QueueFsr1Brightness(int percent)
+        {
+            if (percent < 0) percent = 0;
+            if (percent > 100) percent = 100;
+            if (percent == _fsr1LastSentBrightness) return;
+            Interlocked.Exchange(ref _fsr1PendingBrightness, percent);
+        }
+
+        /// <summary>Driver drains the pending brightness (or -1). One-shot; records the
+        /// drained value as last-sent for the same-value dedupe.</summary>
+        internal int TakePendingFsr1Brightness()
+        {
+            int v = Interlocked.Exchange(ref _fsr1PendingBrightness, -1);
+            if (v >= 0) _fsr1LastSentBrightness = v;
+            return v;
+        }
+
         /// <summary>Record a wheel-reported active index parsed from the Param 6 log
         /// (wheel self-switch); follows without re-commanding the wheel.</summary>
         internal void NoteFsr1WheelIndex(int index)
