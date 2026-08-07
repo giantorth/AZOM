@@ -559,7 +559,10 @@ namespace MozaPlugin.Hardware
             // keyed on presence, not on the retired "main sender drives the CM2"
             // predicate, so a CM2 alongside a DISPLAY wheel (which the old predicate
             // excluded) now also gets its meter config.
-            bool isCm2 = _plugin.IsCm2Present;
+            // Excluded once the discriminator confirms the bridged dash is a CM1: the
+            // cm2-* group-0x32 block below (normal/rpm-group mode, thresholds, the 16
+            // stored colours) addresses CM2 meter registers a CM1 doesn't implement.
+            bool isCm2 = _plugin.IsCm2Present && !_plugin.DashIsCm1;
 
             if (profile.DashRpmBrightness   >= 0) _deviceManager.WriteSetting("dash-rpm-brightness", profile.DashRpmBrightness);
             if (profile.DashFlagsBrightness >= 0) _deviceManager.WriteSetting("dash-flags-brightness", profile.DashFlagsBrightness);

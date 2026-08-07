@@ -303,6 +303,35 @@ namespace MozaPlugin.UI
                 $"Dash telem enable: {plugin?.ActiveDashTelemetryEnabled ?? false} " +
                 $"(wheel page {(plugin?.GetCurrentWheelPageGuid().HasValue == true ? "resolved" : "unresolved")})");
 
+            // CM1-vs-CM2 classification of a BRIDGED dash (a USB 0x0025 dash is always a
+            // real CM2, so the line is omitted there). Reports the evidence, not a guess:
+            // only the CM1-exclusive 0x8E param-read answer latches CM1, and only a
+            // tier-def catalog proves CM2 — a dash showing neither stays undecided and is
+            // re-probed. "undecided" with probes climbing and ans=no is the normal
+            // steady state for a real CM2 whose catalog hasn't arrived yet.
+            if (plugin != null && plugin.IsCm2Present && !dashUsb)
+            {
+                var dd = plugin.DualDisplay;
+                int catalog = plugin._cm2Sender?.CatalogCount ?? 0;
+                string cls;
+                if (plugin.DashIsCm1)
+                    cls = $"CM1 (latched, driver {(plugin.IsCm1DriverRunning ? "running" : "stopped")})";
+                else if (catalog > 0)
+                    cls = $"CM2 (catalog={catalog})";
+                else if (dd == null)
+                    cls = "undecided (coordinator not wired yet)";
+                else
+                {
+                    var forSpan = dd.DiscriminatingFor;
+                    cls = $"undecided (0x8E ans={(dd.DashParamReadAnswered ? "yes" : "no")}, " +
+                          $"probes={dd.Cm1ProbeCount}, " +
+                          $"deciding {(forSpan.HasValue ? $"{forSpan.Value.TotalSeconds:F0}s" : "not started")}, " +
+                          $"catalog=0)";
+                }
+                sb.AppendLine();
+                sb.Append($"Dash class:        {cls}");
+            }
+
             // Dedicated CM2 lane (the _cm2Sender). DECOUPLED: present whenever a CM2
             // is attached (bus or USB), regardless of the wheel — the CM2 is ALWAYS
             // driven by this dedicated sender now. The MAIN line above stays on the

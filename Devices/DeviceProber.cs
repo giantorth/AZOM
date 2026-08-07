@@ -275,19 +275,21 @@ namespace MozaPlugin.Devices
             if (_detectionState.DashDetected) return;
             _detectionState.DashDetected = true;
 
-            // CM2 reached through the wheelbase is the meter at 0x14 (0x12 is
-            // the base main). PitHouse cm2.pcapng drives this CM2's session +
-            // telemetry on 0x14. Deploy the CM2 profile and probe display
-            // identity at 0x14.
-            bool cm2BehindBase = _plugin.IsCm2BehindBaseCandidate;
-            if (cm2BehindBase)
+            // A dash reached through the primary pipe (base or hub) is the meter at
+            // 0x14 (0x12 is the base main). PitHouse cm2.pcapng drives this CM2's
+            // session + telemetry on 0x14. Deploy the CM2 profile PROVISIONALLY and
+            // probe display identity at 0x14 — the class (CM2 vs CM1) isn't known
+            // yet; DualDisplayCoordinator.TickCm1Discriminator decides, and swaps the
+            // definition via LatchDashAsCm1 if this turns out to be a CM1.
+            bool bridgedDash = _plugin.IsCm2BehindBaseCandidate;
+            if (bridgedDash)
                 _deviceManager.SendDisplayProbe(MozaProtocol.DeviceDash);
 
             if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                 _plugin.DeviceDefinitionDeployed = true;
             _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
-            MozaLog.Info(cm2BehindBase
-                ? "[AZOM] Dashboard detected (CM2 on wheelbase bus — deployed CM2 profile, probing display identity at 0x14)"
+            MozaLog.Info(bridgedDash
+                ? "[AZOM] Dashboard detected (bridged dash at 0x14 — provisionally deployed the CM2 profile, probing display identity)"
                 : "[AZOM] Dashboard detected");
 
             // DECOUPLED: a bus CM2 is driven by the dedicated _cm2Sender, never the
@@ -879,14 +881,20 @@ namespace MozaPlugin.Devices
                     if (!string.IsNullOrEmpty(_data.DisplayModelName))
                     {
                         MozaLog.Debug($"[AZOM] Display model: {_data.DisplayModelName}");
-                        // CM2-on-base confirmed by display identity. The CM2 itself is
+                        // Bridged CM2 confirmed by display identity. The CM2 itself is
                         // driven by the dedicated _cm2Sender at 0x14 (EnsureCm2Pipeline,
                         // already running) — NOT the main sender. This block only
                         // re-asserts the CM2 meter LED config now that the dash is
                         // confirmed and the profile is loaded.
-                        if (_plugin.IsCm2BehindBaseCandidate)
+                        //
+                        // Skipped for a discriminated CM1: the DeployDashboard below
+                        // would re-write the speculative CM2 definition that
+                        // LatchDashAsCm1 deleted (any later display re-probe resurrects
+                        // the wrong device entry), and the cm2-* meter registers the
+                        // re-assert pushes don't exist on a CM1.
+                        if (_plugin.IsCm2BehindBaseCandidate && !_plugin.DashIsCm1)
                         {
-                            MozaLog.Info($"[AZOM] CM2-on-base display confirmed: {_data.DisplayModelName} — re-asserting CM2 meter config");
+                            MozaLog.Info($"[AZOM] Bridged CM2 display confirmed: {_data.DisplayModelName} — re-asserting CM2 meter config");
                             if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
                             // Push the CM2 meter LED config (modes/thresholds/colors,

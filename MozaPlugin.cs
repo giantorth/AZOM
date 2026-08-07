@@ -628,17 +628,24 @@ namespace MozaPlugin
             DetectionState.DashDetected || IsStandaloneDashboardUsbConnection;
 
         /// <summary>
-        /// True when a CM2 is present at all — on its own USB cable OR bridged through
-        /// the wheelbase — independent of whether a wheel (and what kind) is attached.
-        /// This is the "a CM2 exists, so manage it" predicate, distinct from the
+        /// True when a dash is present at all — on its own USB cable OR bridged through
+        /// the primary pipe — independent of whether a wheel (and what kind) is attached.
+        /// This is the "a dash exists, so manage it" predicate, distinct from the
         /// retired "should the MAIN sender drive the CM2" routing question: the CM2 is
         /// always driven by the dedicated <see cref="_cm2Sender"/> now. Used for UI tab
         /// visibility, CM2 meter-config gating, and diagnostics.
+        ///
+        /// The bridge is whatever owns the primary pipe — a wheelbase OR a Universal Hub.
+        /// This deliberately does NOT require <c>BaseDetected</c>: that clause predated
+        /// hub-only support and made a hub-bridged dash invisible to every consumer here,
+        /// which collapsed the dash page's Dashboard tab (its telemetry-enable toggle with
+        /// it) on a hub-only rig — bundle MGXWJ3YH. A bridged dash of unknown class may
+        /// still turn out to be a CM1; <see cref="DashIsCm1"/> is the discriminated answer
+        /// and gates the CM2-specific meter config.
         /// </summary>
         internal bool IsCm2Present =>
             DashboardUsbConnected
             || (_connection?.IsConnected == true
-                && DetectionState.BaseDetected
                 && DetectionState.DashDetected);
 
         /// <summary>
@@ -651,12 +658,13 @@ namespace MozaPlugin
             DashboardUsbConnected ? MozaProtocol.DeviceMain : MozaProtocol.DeviceDash;
 
         /// <summary>
-        /// A CM2 (external display) wired through the wheelbase bus (dash sub-device
-        /// at 0x14), as opposed to a standalone-USB CM2. DECOUPLED: this is now a pure
-        /// "bus CM2 present" predicate — independent of the wheel's screen — since the
+        /// An external display wired through the primary pipe — base OR hub — as the dash
+        /// sub-device at 0x14, rather than a standalone-USB CM2. DECOUPLED: this is a pure
+        /// "bus dash present" predicate — independent of the wheel's screen — since the
         /// CM2 is always driven by the dedicated <see cref="_cm2Sender"/> regardless of
         /// the wheel. Used by detection (probe the dash at 0x14) and the CM2 meter-config
         /// re-assert. Equivalent to <c>IsCm2Present &amp;&amp; !DashboardUsbConnected</c>.
+        /// Says nothing about CM2-vs-CM1 — that is <see cref="DashIsCm1"/>'s answer.
         /// </summary>
         internal bool IsCm2BehindBaseCandidate =>
             IsCm2Present && !DashboardUsbConnected;
@@ -3652,6 +3660,13 @@ namespace MozaPlugin
         /// (connected FSR1 wheel). The tier-def sender never goes Active for an FSR1,
         /// so the dashboard UI gates the selector/status on this instead.</summary>
         internal bool IsFsr1DriverRunning => _fsr1Driver?.IsRunning ?? false;
+
+        /// <summary>True when the CM1 standalone group-0x35 display driver is running.</summary>
+        internal bool IsCm1DriverRunning => _cm1Driver?.IsRunning ?? false;
+
+        /// <summary>The dual-display coordinator, for the diagnostics bundle to read the
+        /// CM1/CM2 discrimination state. Null before Init wires it.</summary>
+        internal Telemetry.DualDisplayCoordinator? DualDisplay => _dualDisplay;
 
         /// <summary>True when the wheel's OWN screen is driven by the tier-def
         /// <see cref="_telemetrySender"/> (a display wheel like W17/W18) rather than

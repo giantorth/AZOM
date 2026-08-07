@@ -224,15 +224,14 @@ namespace MozaPlugin.Telemetry
                 // Fresh start: allow the saved-dashboard re-assert to fire once the
                 // CM2 advertises its dashboard list (PollStatus → TickCm2DashboardReassert).
                 _cm2ReassertAttempted = false;
-                // Stamp the start so TickCm1Discriminator can time the catalog-wait.
-                _cm2StartUtc = DateTime.UtcNow;
-                // Re-stamped when the sender reaches Active (the discriminator times
+                // Re-anchored once this sender reaches Active (the discriminator times
                 // its CM1 decision from there, not from start — cold-start is long).
-                _cm2ActiveUtc = DateTime.MinValue;
+                _discriminateSinceUtc = DateTime.MinValue;
                 // Fresh discrimination cycle — clear the param-read flag so a stale
                 // CM1 answer can't fast-latch a newly-attached CM2.
                 _dashParamReadAnswered = false;
                 _lastCm1ProbeUtc = DateTime.MinValue;
+                _cm1ProbeCount = 0;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try { cm2.Start(); }
@@ -276,18 +275,20 @@ namespace MozaPlugin.Telemetry
             _plugin.OnCm2DashboardSwitched((uint)slot);
         }
 
-        // CM1 discriminator: when did the tier-def _cm2Sender start streaming? Used to
-        // time the catalog-wait before declaring a bridged dash a CM1.
-        private DateTime _cm2StartUtc = DateTime.MinValue;
-        // When the _cm2Sender first reached Active (cold-start done). The CM1 decision
-        // is timed from here: a CM1 advertises no catalog AND emits no value frames,
-        // so timing from FramesSent>0 (which never happens) wedged the discriminator.
-        private DateTime _cm2ActiveUtc = DateTime.MinValue;
+        // CM1 discriminator anchor: when the dash became decidable — the _cm2Sender
+        // reached Active (cold-start done), or, when no tier-def sender is running for
+        // this dash at all, the first tick that saw the bus dash. The CM1 decision is
+        // timed from here: a CM1 advertises no catalog AND emits no value frames, so
+        // timing from FramesSent>0 (which never happens) wedged the discriminator.
+        private DateTime _discriminateSinceUtc = DateTime.MinValue;
         // Set when the dash answers the group-0x0E param-read probe with a 0x8E
         // reply (MozaPlugin.OnMessageReceived) — the CM1-exclusive positive signal a
         // tier-def CM2 never produces. The SOLE basis for latching CM1.
         private volatile bool _dashParamReadAnswered;
         private DateTime _lastCm1ProbeUtc = DateTime.MinValue;
+        // Probes issued in the current discrimination cycle — diagnostics only
+        // (DiagnosticsTextBuilder's "Dash class:" line); never a decision input.
+        private int _cm1ProbeCount;
         // Settle window after the positive 0x8E answer before latching CM1, long
         // enough that a slow tier-def CM2's catalog still arrives first and wins via
         // the CatalogCount check.
@@ -296,6 +297,18 @@ namespace MozaPlugin.Telemetry
         /// <summary>Serial-read-thread hook: the dash answered the group-0x0E
         /// param-read probe with a 0x8E reply.</summary>
         internal void NoteDashParamReadAnswered() => _dashParamReadAnswered = true;
+
+        // ===== Discriminator state, for the diagnostics bundle =====
+        /// <summary>True once the bridged dash answered the CM1-exclusive 0x8E
+        /// param-read probe.</summary>
+        internal bool DashParamReadAnswered => _dashParamReadAnswered;
+        /// <summary>Param-read probes issued in the current discrimination cycle.</summary>
+        internal int Cm1ProbeCount => _cm1ProbeCount;
+        /// <summary>How long the bridged dash has been decidable-but-unclassified, or
+        /// null before the anchor is stamped (no dash, or sender still cold-starting).</summary>
+        internal TimeSpan? DiscriminatingFor =>
+            _discriminateSinceUtc == DateTime.MinValue
+                ? (TimeSpan?)null : DateTime.UtcNow - _discriminateSinceUtc;
 
         /// <summary>Start (or stop) the CM1 group-0x35 driver for a confirmed CM1 dash.
         /// Mirrors <see cref="StartFsr1DriverIfNeeded"/>.</summary>
@@ -316,41 +329,69 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>
         /// PollStatus hook: decide whether a bus-bridged dash is a CM1 (group-0x35)
-        /// rather than a tier-def CM2, using only POSITIVE evidence. While the dash
-        /// is unclassified the tier-def _cm2Sender runs (engagement watchdog
-        /// suppressed) and we probe the CM1-exclusive group-0x0E param register ~1 Hz.
-        /// Two mutually-exclusive outcomes: a tier-def catalog arrives → real CM2,
-        /// drop the suppress flag; or the dash answers the probe with a 0x8E reply →
-        /// latch DashIsCm1, tear down the _cm2Sender, hand off to the CM1 driver.
-        /// Mere absence of a catalog NEVER latches CM1 (see body).
+        /// rather than a tier-def CM2, using only POSITIVE evidence — by probing the
+        /// CM1-exclusive group-0x0E param register ~1 Hz. Two mutually-exclusive
+        /// outcomes: a tier-def catalog arrives → real CM2, drop the engagement-watchdog
+        /// suppress flag; or the dash answers the probe with a 0x8E reply → latch
+        /// DashIsCm1, tear down any _cm2Sender, hand off to the CM1 driver. Mere absence
+        /// of a catalog NEVER latches CM1 (see body).
+        ///
+        /// The decision is anchored on the BUS DASH's own presence, not on a running
+        /// pipeline. A live tier-def _cm2Sender only accelerates it (its CatalogCount is
+        /// the "real CM2" fast path) — it is not a precondition. Gating identification on
+        /// the sender made classification depend on the dash telemetry-enable, so a
+        /// hub-only / wheel-less rig (which never starts that sender by default) never
+        /// probed and left a CM1 permanently wearing the speculative CM2 device
+        /// definition MarkDashDetected wrote (bundle MGXWJ3YH).
         /// </summary>
         internal void TickCm1Discriminator()
         {
             if (_plugin.DashIsCm1) { StartCm1DriverIfNeeded(); return; }
 
-            var cm2 = _plugin._cm2Sender;
-            if (cm2 == null || !cm2.Enabled) return;
-
             // CM1 only applies to a bus-bridged dash; a USB dash (0x0025) is a real CM2.
             bool busCm2 = _detectionState.DashDetected && !_plugin.DashboardUsbConnected
                           && _plugin.Connection?.IsConnected == true;
-            if (!busCm2) return;
-
-            if (cm2.CatalogCount > 0)
+            if (!busCm2)
             {
-                // Real tier-def CM2 — stop suppressing its engagement watchdog.
-                if (cm2.SuppressDisplayWatchdog) cm2.SuppressDisplayWatchdog = false;
+                // No bridged dash to classify. Drop the cycle so a detach/re-attach
+                // starts clean and a stale 0x8E answer can't latch the next dash —
+                // self-healing here rather than in every DashDetected=false path.
+                _discriminateSinceUtc = DateTime.MinValue;
+                _dashParamReadAnswered = false;
+                _lastCm1ProbeUtc = DateTime.MinValue;
+                _cm1ProbeCount = 0;
                 return;
             }
 
-            // Wait for the sender to finish cold-start (reach Active) before deciding,
-            // then time from there. A CM1 advertises no catalog and emits no value
-            // frames, so the old `FramesSent == 0` gate never released and the
-            // discriminator stayed wedged here forever — the CM1 never engaged.
-            if (!cm2.IsActive) return;
-            if (_cm2ActiveUtc == DateTime.MinValue) _cm2ActiveUtc = DateTime.UtcNow;
+            var cm2 = _plugin._cm2Sender;
+            if (cm2 != null && cm2.Enabled)
+            {
+                if (cm2.CatalogCount > 0)
+                {
+                    // Real tier-def CM2 — stop suppressing its engagement watchdog.
+                    if (cm2.SuppressDisplayWatchdog) cm2.SuppressDisplayWatchdog = false;
+                    return;
+                }
 
-            var elapsed = DateTime.UtcNow - _cm2ActiveUtc;
+                // Wait for the sender to finish cold-start (reach Active) before deciding,
+                // then time from there. A CM1 advertises no catalog and emits no value
+                // frames, so the old `FramesSent == 0` gate never released and the
+                // discriminator stayed wedged here forever — the CM1 never engaged.
+                if (!cm2.IsActive) return;
+            }
+            else if (cm2 != null && cm2.StartInProgress)
+            {
+                // A start waiting out its pre-open silence gate is still _state==Idle
+                // (so !Enabled): let it reach Active and decide via CatalogCount rather
+                // than anchoring the clock underneath an in-flight cold-start.
+                return;
+            }
+            // else: no tier-def sender for this dash and none in flight (the dash lane is
+            // disabled, or this rig has no wheel). Classify from the probe alone.
+
+            if (_discriminateSinceUtc == DateTime.MinValue) _discriminateSinceUtc = DateTime.UtcNow;
+
+            var elapsed = DateTime.UtcNow - _discriminateSinceUtc;
 
             // CM1 is latched ONLY on the POSITIVE signal: the dash answered the
             // group-0x0E param-read probe with a 0x8E reply (_dashParamReadAnswered).
@@ -374,6 +415,7 @@ namespace MozaPlugin.Telemetry
                 if ((DateTime.UtcNow - _lastCm1ProbeUtc).TotalMilliseconds >= 1000)
                 {
                     _lastCm1ProbeUtc = DateTime.UtcNow;
+                    _cm1ProbeCount++;
                     try { _plugin.DeviceManager.SendCm1ParamProbe(); } catch { }
                 }
                 return;

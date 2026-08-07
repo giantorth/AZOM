@@ -379,8 +379,17 @@ namespace MozaPlugin.Settings
         ///
         /// Resolution order: explicit entry under <see cref="MozaPlugin.Cm2PageGuid"/>
         /// (user toggled it on the dash page) → the wheel page's resolved value while
-        /// a wheel IS identified (one shared toggle for wheel+dash rigs) → the install
-        /// default. Dict-missing is "no opinion", never a hard off.
+        /// a wheel IS identified (one shared toggle for wheel+dash rigs, install default
+        /// included) → on. Dict-missing is "no opinion", never a hard off.
+        ///
+        /// The final "on" is deliberate: with no wheel identified there is no wheel
+        /// setting to inherit and <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/>
+        /// is not a signal about a dash (it is keyed on wheels, and reads false for every
+        /// pre-existing install). Falling through to it left a hub-only / dash-only rig
+        /// with its only display dark AND — because the dash pipeline is what used to
+        /// drive the CM1 discriminator — with its CM1 stuck wearing the speculative CM2
+        /// device definition (bundle MGXWJ3YH). A dash on a wheel-less rig IS the display,
+        /// so it streams unless the user says otherwise on the dash page.
         /// </summary>
         internal bool ActiveDashTelemetryEnabled
         {
@@ -391,7 +400,7 @@ namespace MozaPlugin.Settings
                 if (s.WheelTelemetryEnabledByPageGuid.TryGetValue(MozaPlugin.Cm2PageGuid, out var v))
                     return v;
                 if (_plugin.GetCurrentWheelPageGuid().HasValue) return ActiveTelemetryEnabled;
-                return s.TelemetryEnabledDefaultForNewWheels;
+                return true;
             }
             set
             {
