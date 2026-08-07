@@ -120,6 +120,7 @@ namespace MozaPlugin.Devices
                     // (possibly different) wheel — the diagnostics tab should
                     // only show what THIS connection has produced.
                     _plugin.FirmwareDebugLogForDiagnostics.Clear();
+                    _plugin.DeviceLogForDiagnostics.Clear();
                     MozaLog.Info("[AZOM] Connected to MOZA device");
                     MarkStandaloneDashboardDetectedFromUsb("serial connect");
                     // Base temps/state are dev-0x13 reads the base main controller

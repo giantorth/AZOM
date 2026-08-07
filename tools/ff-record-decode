@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""Decode FF property records off the session layer, in either capture format.
+
+Why this exists alongside `bridge-decode-ff-init`: that tool reassembles each
+(direction, session) stream without seq-deduping retransmits, so its walk
+desyncs after the first big multi-chunk record and it reports only a fraction
+of what is there (~20 records vs 2090 on bridge-20260731-064830.jsonl). It also
+slices each body as `size` bytes starting at offset 13, which over-reads 4 bytes
+into the next record — visible as a spurious `ff <size> 00 00` tail on its
+sample dumps. This tool fixes both.
+
+FF record layout (canonical spec: docs/protocol/sessions/session-0x02-ff-init.md):
+
+    [0xFF] [size:u32 LE] [inner_crc:u32 LE] [kind:u32 LE] [value: size-4 bytes]
+
+`size` counts the 4-byte kind prefix, so the record is `size + 9` wire bytes and
+the value is `size - 4`. `inner_crc` is `zlib.crc32(kind ‖ value)`; validating it
+is what makes scanning a stream that also carries catalog TLV records safe, since
+0xFF bytes occur inside those too.
+
+Also decodes the kind=14 device-log payload:
+
+    [reserved:4] [zlib( [count:u32 BE] + count × ([byteLen:u32 BE][UTF-16BE]) )]
+
+Usage:
+    tools/ff-record-decode <capture.jsonl>                    # inventory
+    tools/ff-record-decode <capture.jsonl> --kind 14 --log    # dump log lines
+    tools/ff-record-decode <capture.jsonl> --kind 15          # receipts
+    tools/ff-record-decode <capture.jsonl> -d h2b -s 0x01
+"""
+from __future__ import annotations
+
+import argparse
+import struct
+import sys
+import zlib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from moza_bridge import load_bridge, resolve_bridge  # noqa: E402
+
+KIND_NAMES = {
+    1: "dash_brightness",
+    2: "init_nonce",
+    4: "DASH_SWITCH",
+    5: "display_rotation",
+    7: "init_enum",
+    8: "init_catalog_a",
+    9: "periodic",
+    10: "dash_standby / wheel_init_a",
+    11: "init_catalog_b",
+    14: "device_log (request h2b / payload b2h)",
+    15: "device_log_receipt",
+    16: "wheel_init_b",
+}
+
+# A backward seq step at least this large reads as the device restarting its
+# outbound counter rather than retransmitting. Mirrors FfRecordStream.
+SEQ_RESTART_GAP = 256
+MAX_RECORD_SIZE = 64 * 1024
+
+
+def scan_stream(frames, session, direction):
+    """Faithful port of Telemetry/Sessions/FfRecordStream: append each chunk,
+    drain complete CRC-valid records, compact.
+
+    Draining INCREMENTALLY (rather than concatenating the whole capture and
+    scanning once) is not an optimisation — it is required for correctness.
+    The device restarts its outbound seq counter on session reopen, and a
+    restart drops the in-progress buffer; records already extracted before that
+    point must survive. Scanning only at the end loses every record preceding
+    the last restart (21 vs 1606 on bridge-20260731-064830.jsonl).
+    """
+    buf = bytearray()
+    scan_at = 0
+    highest = -1
+    recs, rejects, total_bytes = [], 0, 0
+
+    def drain():
+        nonlocal scan_at, rejects
+        n = len(buf)
+        while scan_at < n:
+            at = scan_at
+            while at < n and buf[at] != 0xFF:
+                at += 1
+            if at >= n:
+                scan_at = n
+                return
+            if n - at < 13:
+                scan_at = at
+                return
+            size = struct.unpack_from('<I', buf, at + 1)[0]
+            if size < 4 or size > MAX_RECORD_SIZE:
+                scan_at = at + 1
+                continue
+            total = 9 + size
+            if n - at < total:
+                scan_at = at            # park; wait for more chunks
+                return
+            kv = bytes(buf[at + 9:at + 9 + size])
+            if zlib.crc32(kv) != struct.unpack_from('<I', buf, at + 5)[0]:
+                rejects += 1
+                scan_at = at + 1
+                continue
+            recs.append((struct.unpack_from('<I', kv, 0)[0], kv[4:]))
+            scan_at = at + total
+
+    for f in frames:
+        if not f.is_session_data or f.dir != direction:
+            continue
+        if f.sess_id != session or f.sess_type != 0x01:
+            continue
+        d = f.sess_data
+        if not d or len(d) <= 4:
+            continue
+        # Per-chunk CRC32 trailer must validate BEFORE the seq is consumed —
+        # otherwise a corrupt chunk's seq is burned and the device's retransmit
+        # of it is discarded as a duplicate.
+        body = d[:-4]
+        if zlib.crc32(body) != struct.unpack_from('<I', d, len(body))[0]:
+            continue
+        seq = f.sess_seq
+        if seq <= highest:
+            if highest - seq < SEQ_RESTART_GAP:
+                continue                 # retransmit
+            del buf[:]                   # device restarted its seq counter
+            scan_at = 0
+        elif highest >= 0 and seq - highest >= SEQ_RESTART_GAP:
+            del buf[:]                   # chunks lost; buffer no longer contiguous
+            scan_at = 0
+        highest = seq
+        buf += body
+        total_bytes += len(body)
+        drain()
+        if scan_at >= 8192:              # compact
+            del buf[:scan_at]
+            scan_at = 0
+
+    return recs, rejects, total_bytes
+
+
+def decode_device_log(value):
+    """Return (lines, note). lines is None when the payload doesn't decode."""
+    if len(value) <= 4:
+        return None, "too short to be a payload"
+    inflated = None
+    for skip in (4, 0, 6):
+        if len(value) <= skip:
+            continue
+        try:
+            inflated = zlib.decompress(value[skip:])
+            break
+        except zlib.error:
+            continue
+    if inflated is None:
+        return None, "zlib inflate failed"
+    if len(inflated) < 4:
+        return None, "inflated payload too short"
+
+    count = struct.unpack_from('>I', inflated, 0)[0]
+    pos, lines = 4, []
+    for _ in range(count):
+        if pos + 4 > len(inflated):
+            return lines, f"TRUNCATED header at {pos}/{len(inflated)}"
+        blen = struct.unpack_from('>I', inflated, pos)[0]
+        pos += 4
+        if blen & 1 or pos + blen > len(inflated):
+            return lines, f"desync at {pos} (byteLen={blen})"
+        lines.append(inflated[pos:pos + blen].decode('utf-16-be', 'replace'))
+        pos += blen
+    return lines, f"count={count} consumed={pos}/{len(inflated)}"
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("capture", nargs="?", default=None,
+                    help="capture path or 'latest' (default: latest)")
+    ap.add_argument("--session", "-s", action="append", type=lambda x: int(x, 0),
+                    help="session id to scan (repeatable; default 0x01 and 0x02)")
+    ap.add_argument("--direction", "-d", choices=("h2b", "b2h", "both"),
+                    default="both")
+    ap.add_argument("--kind", "-k", action="append", type=lambda x: int(x, 0),
+                    help="only report these kinds (repeatable)")
+    ap.add_argument("--log", action="store_true",
+                    help="decode kind=14 payloads and print their log lines")
+    ap.add_argument("--max", type=int, default=3,
+                    help="max payloads to dump per stream with --log (default 3)")
+    args = ap.parse_args()
+
+    path = resolve_bridge(args.capture)
+    frames = load_bridge(path)
+    print(f"{path.name}: {len(frames)} frames\n")
+
+    sessions = args.session or [0x01, 0x02]
+    directions = ("h2b", "b2h") if args.direction == "both" else (args.direction,)
+    grand_recs = grand_rejects = 0
+
+    for direction in directions:
+        for session in sessions:
+            recs, rejects, nbytes = scan_stream(frames, session, direction)
+            if not nbytes:
+                continue
+            grand_recs += len(recs)
+            grand_rejects += rejects
+
+            kinds = {}
+            for k, _ in recs:
+                kinds[k] = kinds.get(k, 0) + 1
+            print(f"{direction} sess=0x{session:02x}: {nbytes}B stream, "
+                  f"{len(recs)} CRC-valid records, {rejects} false sentinels")
+            for k in sorted(kinds):
+                print(f"    kind={k:<3} {KIND_NAMES.get(k,'?'):<38} ×{kinds[k]}")
+
+            wanted = set(args.kind) if args.kind else None
+            scalars, dumped = {}, 0
+            for k, value in recs:
+                if wanted is not None and k not in wanted:
+                    continue
+                if len(value) == 4:
+                    n = struct.unpack_from('<I', value, 0)[0]
+                    scalars.setdefault(k, {})
+                    scalars[k][n] = scalars[k].get(n, 0) + 1
+                elif k == 14 and args.log and dumped < args.max:
+                    dumped += 1
+                    lines, note = decode_device_log(value)
+                    print(f"    --- kind=14 payload {len(value)}B: {note}")
+                    for line in (lines or []):
+                        print(f"        {line}")
+            for k in sorted(scalars):
+                print(f"    kind={k} u32 values: {dict(sorted(scalars[k].items()))}")
+            print()
+
+    print(f"TOTAL: {grand_recs} CRC-valid records, {grand_rejects} false sentinels")
+
+
+if __name__ == "__main__":
+    main()

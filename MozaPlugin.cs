@@ -161,6 +161,15 @@ namespace MozaPlugin
         internal global::MozaPlugin.Diagnostics.FirmwareDebugLog FirmwareDebugLogForDiagnostics
             => _firmwareDebugLog;
 
+        // Wheel-display application log, pulled over the session layer (FF
+        // kind=14 request / kind=15 receipt) by TelemetrySender's slow path.
+        // Distinct source from the group-0x0E ring above: that is base/wheel
+        // MCU chatter, this is the display's own MOZADash logger.
+        private readonly global::MozaPlugin.Diagnostics.DeviceLogStore _deviceLog
+            = new global::MozaPlugin.Diagnostics.DeviceLogStore();
+        internal global::MozaPlugin.Diagnostics.DeviceLogStore DeviceLogForDiagnostics
+            => _deviceLog;
+
         // Third-party SDK (CoAP-over-UDP) emulation server + name-impersonation
         // stub process. Both are gated on Settings.SdkEmulationEnabled and
         // require a plugin restart to toggle (no runtime enable/disable —

@@ -22,6 +22,9 @@ namespace MozaPlugin.UI
             public IReadOnlyList<SerialTrafficCapture.Entry>? RollingSnapshot;
             // Serialized MozaPluginSettings JSON (may be null if unavailable).
             public string? SettingsJson;
+            // Wheel-display application log pulled over the session layer.
+            // Empty when nothing has been pulled (or the pull is disabled).
+            public string DeviceLogText = string.Empty;
             // Populated only on the bug-report submit path; null for a local export.
             public string? ReportText;
         }
@@ -107,6 +110,8 @@ namespace MozaPlugin.UI
             if (!string.IsNullOrEmpty(content.SettingsJson))
                 manifest.AppendLine("  plugin-settings.json     – serialized MozaPluginSettings");
             manifest.AppendLine($"  moza-log.txt             – [AZOM] log lines from MozaLog ring buffer ({logEntryCount} entries)");
+            if (content.DeviceLogText.Length != 0)
+                manifest.AppendLine("  device-display-log.txt   – wheel display's own application log (session FF kind=14 pull)");
             if (uploadLogText.Length != 0)
                 manifest.AppendLine("  upload-log.txt           – bug-report upload attempts + failure detail");
             manifest.AppendLine();
@@ -131,6 +136,8 @@ namespace MozaPlugin.UI
                 if (content.SettingsJson is string settingsJson && settingsJson.Length != 0)
                     WriteEntry(zip, "plugin-settings.json", settingsJson);
                 WriteEntry(zip, "moza-log.txt", logText);
+                if (content.DeviceLogText.Length != 0)
+                    WriteEntry(zip, "device-display-log.txt", content.DeviceLogText);
                 if (uploadLogText.Length != 0)
                     WriteEntry(zip, "upload-log.txt", uploadLogText);
             }

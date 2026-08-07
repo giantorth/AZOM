@@ -259,6 +259,11 @@ namespace MozaPlugin
         // frame-rate debug logging on the serial read thread.
         public bool VerboseWireDebugLog { get; set; } = true;
 
+        // ~1/min pull of the wheel display's own log via session FF kind=14,
+        // acked with kind=15 (which clears those lines on the device). No UI —
+        // flip to false in MozaPluginSettings.json to stop the pull entirely.
+        public bool EnableDeviceLogPull { get; set; } = true;
+
         // Radar (patch/ri*, OpponentCount, PlayerIndex) + track-map
         // (patch/Location*) channels. Code-only toggle — not serialized, no UI.
         // Shipping enabled: the radar/track-map feature is staying on (no

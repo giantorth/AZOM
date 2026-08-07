@@ -2441,6 +2441,9 @@ namespace MozaPlugin
             sb.AppendLine();
             sb.AppendLine("=== Firmware debug (wire group 0x0E) ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildFirmwareDebug(_plugin));
+            sb.AppendLine();
+            sb.AppendLine("=== Device display log (session FF kind=14) ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDeviceLog(_plugin));
             return sb.ToString();
         }
 

@@ -671,6 +671,53 @@ namespace MozaPlugin.UI
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>Render the wheel display's own application log, pulled over
+        /// the session layer (FF kind=14 request / kind=15 receipt) and held in
+        /// <see cref="Diagnostics.DeviceLogStore"/>. Distinct from
+        /// <see cref="BuildFirmwareDebug"/>, which shows the base/wheel MCU
+        /// group-0x0E chatter. Lines carry their own device-side timestamp, so
+        /// the host receive time is only shown to order them.</summary>
+        public static string BuildDeviceLog(MozaPlugin plugin)
+        {
+            var log = plugin.DeviceLogForDiagnostics;
+            var entries = log.Snapshot();
+            bool enabled = plugin.Settings?.EnableDeviceLogPull ?? false;
+
+            var sb = new StringBuilder();
+            if (!enabled)
+                return "(device log pull disabled via EnableDeviceLogPull)";
+
+            // Pull counters first, so "no lines" is diagnosable without a wire
+            // trace: requests=0 means we never asked, requests>0 payloads=0
+            // means the display isn't answering.
+            string pull = plugin.TelemetrySender?.DeviceLogPullStatus;
+            if (pull != null) sb.AppendLine($"Pull: {pull}");
+            var cm2 = plugin._cm2Sender?.DeviceLogPullStatus;
+            if (cm2 != null) sb.AppendLine($"Pull: {cm2}");
+
+            if (entries.Length == 0)
+            {
+                sb.Append("(no device log lines yet; the display is polled at connect and every 60 s)");
+                return sb.ToString();
+            }
+
+            sb.AppendLine($"Lines: {entries.Length} shown / {log.TotalRecorded} recorded");
+            // Newest first, matching the firmware-debug section.
+            // Redacted here as well as in the bundle's own device-display-log.txt:
+            // this text is written to the bundle as diagnostics.txt and uploaded
+            // on the bug-report path, so masking only the dedicated entry would
+            // leak the same identifiers out of the other one.
+            var data = plugin.Data;
+            int limit = Math.Min(entries.Length, 200);
+            for (int i = entries.Length - 1; i >= entries.Length - limit; i--)
+            {
+                var e = entries[i];
+                string ts = e.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss");
+                sb.AppendLine($"  {ts} [{e.Source,-5}] {Diagnostics.CaptureRedactor.RedactText(e.Text, data)}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
         public static string BuildSubscriptionResponse(MozaPlugin plugin)
         {
             var chunks = plugin.SubscriptionResponseForDiagnostics;

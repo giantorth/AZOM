@@ -73,8 +73,29 @@ namespace MozaPlugin
                     ? CaptureRedactor.FormatRedacted(rolling, _data)
                     : "(rolling segment omitted to fit the upload size limit)\n",
                 SettingsJson = SerializeSettings(),
+                DeviceLogText = BuildDeviceLogFile(),
                 ReportText = reportText,
             };
+        }
+
+        /// <summary>Full device-display-log ring, oldest-first, for the bundle's
+        /// own entry. The diagnostics dump caps its render at the most recent
+        /// 200 lines; this is the whole buffer, with hardware identifiers
+        /// masked the same way the capture files are.</summary>
+        private string BuildDeviceLogFile()
+        {
+            var entries = _plugin?.DeviceLogForDiagnostics?.Snapshot();
+            if (entries == null || entries.Length == 0) return string.Empty;
+            var sb = new StringBuilder(entries.Length * 96);
+            sb.Append("# host receive time (local) | source | display application log (hardware identifiers masked as ..)\n");
+            foreach (var e in entries)
+            {
+                sb.Append(e.ReceivedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
+                sb.Append(" [").Append(e.Source).Append("] ");
+                sb.Append(CaptureRedactor.RedactText(e.Text, _data));
+                sb.Append('\n');
+            }
+            return sb.ToString();
         }
 
         private string SerializeSettings()
