@@ -138,19 +138,22 @@ def resolve_log(arg: Optional[str] = None) -> Path:
     raise FileNotFoundError(f"No sim log matching '{arg}' in {SIM_LOG_DIR}")
 
 
+# Labels for the default 1..6 effect allocation. The second byte is a
+# session-assigned effect index, so a capture whose alloc order differs shifts
+# these — see docs/protocol/devices/ab9-shifter.md.
 SUB_NAMES = {
     (0x07, -1): "ffb-alloc",
     (0x0E, -1): "ffb-init",
     (0x13, -1): "ffb-commit",
-    (0x0A, 0x01): "vib-config",
+    (0x0A, 0x01): "shift-rumble-mag",
     (0x0A, 0x05): "vib-stream",
     (0x0B, 0x02): "engine-pulse-on",
     (0x0B, 0x03): "engine-pulse-off",
-    (0x0D, 0x02): "trigger-2",
-    (0x0D, 0x03): "trigger-3",
-    (0x0D, 0x05): "trigger-5",
-    (0x08, 0x04): "low-rate-4",
-    (0x08, 0x06): "low-rate-6",
+    (0x0D, 0x02): "start-pulse-on",
+    (0x0D, 0x03): "start-pulse-off",
+    (0x0D, 0x05): "start-vib",
+    (0x08, 0x04): "engage-force-mag",
+    (0x08, 0x06): "neutral-force-mag",
 }
 
 
