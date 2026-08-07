@@ -282,11 +282,11 @@ namespace MozaPlugin.Devices
     /// feature's state — both the "When Pressed" and "When Released"
     /// curves — as 10 fields in a fixed order, sent as a whole snapshot
     /// on every edit to any one of them (see
-    /// MozaMBoosterProtocol.BuildSegmentedDampingFrame). Only "When
-    /// Pressed" has a UI so far; the "*Released" fields are placeholders
-    /// (Pit House's own factory defaults, reverse-engineered from a
-    /// recurring untouched baseline across multiple captures) sent as
-    /// part of every write until "When Released" gets its own UI.
+    /// MozaMBoosterProtocol.BuildSegmentedDampingFrame). Both "When
+    /// Pressed" and "When Released" have their own UI plot; unset fields
+    /// fall back to Pit House's own factory defaults (reverse-engineered
+    /// from a recurring untouched baseline across multiple captures)
+    /// until the user actually edits them.
     /// -1 = "not yet set / no override", same sentinel convention as
     /// EndstopFrontStiffness/NaturalFrictionPct — a fresh profile writes
     /// nothing until the user actually drags a divider or segment.
@@ -307,7 +307,7 @@ namespace MozaPlugin.Devices
         public float Seg2Pressed { get; set; } = -1;
         public float Seg3Pressed { get; set; } = -1;
 
-        // "When Released" — same shape, no UI yet (see class summary).
+        // "When Released" — same shape, own UI plot (see class summary).
         public float Divider1Released { get; set; } = -1;
         public float Divider2Released { get; set; } = -1;
         public float Seg1Released { get; set; } = -1;
