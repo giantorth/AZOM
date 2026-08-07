@@ -150,6 +150,16 @@ namespace MozaPlugin.Hardware
             return true;
         }
 
+        /// <summary>Prime the write cache with the base's READ-BACK value (add-only, never
+        /// overwrites a recorded write). With the cache primed, the first apply of a session
+        /// skips every param the base already holds — the base persists its settings, so a
+        /// fresh SimHub session re-writing an unchanged profile was pure parameter-store
+        /// wear (observed as the full Table-5 "Written" burst on every connect).</summary>
+        private void BaseCfgPrime(string key, long deviceValue)
+        {
+            if (!s_baseCfgCache.ContainsKey(key)) s_baseCfgCache[key] = deviceValue;
+        }
+
         // Resolve the pipe that owns pedals / handbrake. Pedals or a handbrake
         // can be attached to the base OR to a dedicated Universal Hub pipe, so
         // settings reads and calibration writes must target whichever connection
@@ -909,6 +919,10 @@ namespace MozaPlugin.Hardware
                 Func<int> dataGet,    Action<int> dataSet,
                 params string[] commands)
             {
+                // Device-read value (valid only once the settings read sweep populated
+                // _data) — captured BEFORE the mirror below overwrites it. Primes the
+                // write cache so an unchanged profile writes nothing (write-on-diff).
+                int deviceVal = _data.BaseSettingsRead ? dataGet() : -1;
                 int val = profileGet();
                 if (val < 0)
                 {
@@ -924,8 +938,11 @@ namespace MozaPlugin.Hardware
                 dataSet(val);
                 if (_detectionState.BaseDetected)
                     foreach (var cmd in commands)
+                    {
+                        if (deviceVal >= 0) BaseCfgPrime(cmd, deviceVal);
                         if (BaseCfgChanged(cmd, val))
                             BaseManager.WriteSetting(cmd, val);
+                    }
             }
 
             // FFB Equalizer (sentinel = -1000): mirror always, write when live.
