@@ -638,10 +638,15 @@ namespace MozaPlugin.Devices.WheelUi
                 return;
             }
             if (val > 100) val = 100;
-            // allowZero: true — slider-to-zero is deliberate user intent; other call sites suppress 0.
-            // ActiveSender (not the hardcoded main sender): on the CM2 device page this
-            // routes to the _cm2Sender that drives the CM2 screen (decoupled).
-            ActiveSender?.SendDashDisplayBrightness(val, allowZero: true);
+            // FSR1 wheel display: brightness is a group-0x32 EEPROM param write, not
+            // a session property — route to the dedicated pair (debounced = committed).
+            if (!IsCm2Target && _plugin.IsFsr1DisplayWheel)
+                _plugin.SendFsr1DisplayBrightness(val);
+            else
+                // allowZero: true — slider-to-zero is deliberate user intent; other call sites suppress 0.
+                // ActiveSender (not the hardcoded main sender): on the CM2 device page this
+                // routes to the _cm2Sender that drives the CM2 screen (decoupled).
+                ActiveSender?.SendDashDisplayBrightness(val, allowZero: true);
             _plugin.SaveSettings();
         }
 

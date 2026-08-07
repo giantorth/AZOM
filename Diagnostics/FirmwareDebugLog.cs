@@ -48,6 +48,18 @@ namespace MozaPlugin.Diagnostics
         private readonly object _gate = new object();
         private long _totalReceived;
 
+        // ── Wheel param-store fault tracking ────────────────────────────────
+        // A wedged wheel parameter subsystem logs "Table Id N, ParamAddr M:
+        // Failed to Write" (retried ~1 Hz by the firmware, forever) and
+        // wholesale "Table N: Failed to Read Parameter M" sweeps. The display's
+        // config lives in those tables, so this state = dark display until the
+        // wheel is power-cycled (2026-08-06 FSR1 crash bundles). Count both so
+        // diagnostics can name the fault instead of showing a mystery.
+        private long _paramWriteFails;
+        private long _paramReadFails;
+        private DateTime _firstParamFailUtc;
+        private DateTime _lastParamFailUtc;
+
         /// <summary>
         /// Record a firmware-debug frame. <paramref name="rawDeviceId"/> is the
         /// nibble-swapped device byte from the wire (0x21 main bridge,
@@ -69,7 +81,30 @@ namespace MozaPlugin.Diagnostics
                 while (_entries.Count > MaxEntries)
                     _entries.RemoveFirst();
                 _totalReceived++;
+                // Wheel (0x71) param-store failures. "Failed to Wri" matches the
+                // write-fail line even when the firmware splits it across frames
+                // ("…Failed to Wri" + "te").
+                if (rawDeviceId == 0x71 && text != null)
+                {
+                    bool w = text.Contains("Failed to Wri");
+                    bool r = !w && text.Contains("Failed to Read Parameter");
+                    if (w || r)
+                    {
+                        if (w) _paramWriteFails++; else _paramReadFails++;
+                        if (_firstParamFailUtc == default) _firstParamFailUtc = entry.TimestampUtc;
+                        _lastParamFailUtc = entry.TimestampUtc;
+                    }
+                }
             }
+        }
+
+        /// <summary>Wheel param-store fault summary: (write-fail count, read-fail
+        /// count, first seen, last seen). Counts are connection-lifetime (cleared
+        /// with <see cref="Clear"/>). Zero counts = no fault observed.</summary>
+        public (long writeFails, long readFails, DateTime firstUtc, DateTime lastUtc) ParamFaultSnapshot()
+        {
+            lock (_gate)
+                return (_paramWriteFails, _paramReadFails, _firstParamFailUtc, _lastParamFailUtc);
         }
 
         /// <summary>Number of entries currently held in the ring buffer.</summary>
@@ -108,6 +143,10 @@ namespace MozaPlugin.Diagnostics
             {
                 _entries.Clear();
                 _totalReceived = 0;
+                _paramWriteFails = 0;
+                _paramReadFails = 0;
+                _firstParamFailUtc = default;
+                _lastParamFailUtc = default;
             }
         }
 

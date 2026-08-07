@@ -533,6 +533,14 @@ namespace MozaPlugin.UI
 
             var sb = new StringBuilder();
             sb.AppendLine($"Recent frames: {entries.Length} shown / {log.TotalReceived} total received");
+            // Param-store fault line: ≥5 failures = the wedge signature (a healthy
+            // wheel logs none; one-off lines during init are below the threshold).
+            var (wf, rf, firstUtc, lastUtc) = log.ParamFaultSnapshot();
+            if (wf + rf >= 5)
+                sb.AppendLine(
+                    $"PARAM-STORE FAULT: {wf} failed writes / {rf} failed reads " +
+                    $"({firstUtc.ToLocalTime():HH:mm:ss}–{lastUtc.ToLocalTime():HH:mm:ss}) — " +
+                    "wheel parameter storage is wedged; power-cycle the wheel to recover the display");
             // Render newest first so the most recent activity is at the top
             // of the section (and the oldest, least relevant lines slide off
             // the visible area first on long scrolls). Limit to last 64 so a

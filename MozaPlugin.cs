@@ -4739,6 +4739,18 @@ namespace MozaPlugin
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
 
+        /// <summary>Push FSR1 display brightness (group-0x32 00/80 write+commit pair,
+        /// 0–100). The wheel PERSISTS it to EEPROM (Table 7 Param 5), so call only from
+        /// committed user input — never periodically or as a connect-time re-apply.</summary>
+        internal void SendFsr1DisplayBrightness(int percent)
+        {
+            var conn = _connection;
+            if (conn == null || !conn.IsConnected || !IsFsr1DisplayWheel) return;
+            foreach (var f in Telemetry.Fsr1DisplayEmitter.BuildBrightness(percent))
+                conn.Send(f);
+            MozaLog.Info($"[AZOM] FSR1 display brightness → {percent}%");
+        }
+
         internal void ClearFsr1FieldOverrides(string recordKey) => _fsr1Cm1Mapping.ClearFsr1FieldOverrides(recordKey);
         internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId)
         {

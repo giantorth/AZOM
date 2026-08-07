@@ -218,6 +218,10 @@ off:  0    1    2    3  4   5  6   7  8   9 10  11 12  13 14  15  16  17
 
 `g32/81` is sent **only at switch time** — the single-dashboard gameplay run (`FSR1 with game`) contains zero `g32/81` frames; it just streams the active type. The 19 index positions map **many-to-one** onto the live record types (pages within a dashboard share a layout).
 
+**Group `0x32` is a persistent-parameter write group, and writes hit wheel EEPROM.** Beyond the `0x81` select (→ Table 7 Param 6), **display brightness** is `cmd 0x00` (write) + `cmd 0x80` (commit), big-endian u32 percent `0..100` — the wheel echoes `Table 7, Param 5 Written: <N>` ("brightness changes" capture, 2026-08-06). The value survives power cycles, so hosts must NOT re-apply it on connect or push it periodically — every select/brightness frame is an EEPROM write. The plugin emits brightness only on the debounced slider commit and dedupes/rate-limits selects (skip when already on the target page; ≥300 ms between emits).
+
+**Param-store wedge (failure mode, 2026-08-06 crash bundles).** The wheel's parameter subsystem can wedge: every param read fails (`Table N: Failed to Read Parameter M` sweeps across Tables 2/3/7) and a pending Table 7 Param 6 write retries ~1 Hz forever (`Table Id 7, ParamAddr 6: Failed to Write`, often split across two `0x0E` frames). The comm MCU keeps answering (polls, logs, identity) but the **display goes dark and stays dark until the wheel is power-cycled** — host reconnects don't help. No host command sustains the loop (zero `g32` traffic during the wedge); the retry is firmware-internal. The plugin detects the signature from the `0x0E` log and surfaces a PARAM-STORE FAULT line in diagnostics.
+
 **Full index→type map — verified.** Built by correlating every `g32/81` select + `Param 6` log with the `0x42` record type(s) streamed until the next switch, across `All dashboards`, `Moza FSR1 dashboard change`, `FS1 multiple changes`, `GT Style`, and the manual-change captures (`tools/` ad-hoc windowed correlation):
 
 | index | type | index | type | index | type |

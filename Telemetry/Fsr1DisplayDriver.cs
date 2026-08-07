@@ -46,6 +46,9 @@ namespace MozaPlugin.Telemetry
         private volatile bool _gameRunning;
         private int _tickCounter;
         private int _lastStreamedIndex = -1;
+        // Select-emit rate limit (see Tick): every select = a wheel EEPROM write.
+        private const int SelectMinIntervalMs = 300;
+        private int _lastSelectEmitMs = Environment.TickCount - SelectMinIntervalMs;
 
         // One-time-per-process guard for the catalog gapless self-check (runs on first Start).
         private static bool s_partitionsValidated;
@@ -157,10 +160,21 @@ namespace MozaPlugin.Telemetry
 
             // Host-initiated dashboard switch: emit the group-0x32/0x81 select command.
             // Only when actually driving the wheel — in viz-only mode the pending select
-            // stays queued so it fires once telemetry resumes.
-            int pending = streamLive ? (plugin?.TakePendingFsr1Select() ?? -1) : -1;
-            if (pending >= 0)
-                _connection.Send(Fsr1DisplayEmitter.BuildSelect(pending));
+            // stays queued so it fires once telemetry resumes. EEPROM rate limit: every
+            // select the wheel receives is a Table-7 Param-6 EEPROM write, so hold the
+            // drain for ≥300 ms after the previous emit — the pending slot keeps only
+            // the LATEST target, so a spun cycle-dashboard encoder coalesces to one
+            // write at the final page instead of one per detent.
+            if (streamLive && plugin != null
+                && unchecked(Environment.TickCount - _lastSelectEmitMs) >= SelectMinIntervalMs)
+            {
+                int pending = plugin.TakePendingFsr1Select();
+                if (pending >= 0)
+                {
+                    _connection.Send(Fsr1DisplayEmitter.BuildSelect(pending));
+                    _lastSelectEmitMs = Environment.TickCount;
+                }
+            }
 
             // Resolve a field's value, applying the user override's Scale/Bias gain and
             // the resolved encoding's output ceiling (so an overridden byte width re-clamps).

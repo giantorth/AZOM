@@ -168,16 +168,21 @@ namespace MozaPlugin.Telemetry
             if (index < 0) index = 0;
             if (index > Fsr1DisplayEmitter.MaxDashboardIndex)
                 index = Fsr1DisplayEmitter.MaxDashboardIndex;
+            bool changed = true;   // unknown wheel/settings → can't dedupe, emit
             var g = _plugin.GetCurrentWheelPageGuid();
             if (g.HasValue && _plugin.Settings != null)
             {
                 if (_plugin.Settings.Fsr1ActiveDashboardByWheelGuid == null)
                     _plugin.Settings.Fsr1ActiveDashboardByWheelGuid = new Dictionary<Guid, int>();
-                bool changed = !_plugin.Settings.Fsr1ActiveDashboardByWheelGuid.TryGetValue(g.Value, out var prev) || prev != index;
+                changed = !_plugin.Settings.Fsr1ActiveDashboardByWheelGuid.TryGetValue(g.Value, out var prev) || prev != index;
                 _plugin.Settings.Fsr1ActiveDashboardByWheelGuid[g.Value] = index;
                 if (changed && !sendToWheel) _plugin.SaveSettings(); // host path saves after queuing below
             }
-            if (sendToWheel)
+            // Dedupe: the wheel PERSISTS the index to EEPROM (Table 7 Param 6) on every
+            // select, so a re-pick of the page it is already on must not hit the wire.
+            // The stored index tracks wheel self-switches (Param-6 log follow), so it is
+            // an accurate mirror of the wheel's current page.
+            if (sendToWheel && changed)
             {
                 Interlocked.Exchange(ref _fsr1PendingSelect, index);
                 _plugin.SaveSettings();
