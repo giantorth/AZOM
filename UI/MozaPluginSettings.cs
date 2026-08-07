@@ -448,8 +448,12 @@ namespace MozaPlugin
         // in WheelTelemetryEnabledByPageGuid yet (dict-missing = "no opinion"). Fresh
         // installs set this true via the ReadCommonSettings create-if-not-found factory
         // so new users get dashboard telemetry on out of the box; existing users'
-        // on-disk JSON lacks the field, so it deserializes to false and their
-        // never-toggled wheels stay off, preserving prior behavior.
+        // on-disk JSON lacks the field, so it deserializes to false.
+        //
+        // Only consulted for SCREENLESS and unknown-model wheels now — a wheel that
+        // has a display defaults to on regardless of this flag. Being install-scoped,
+        // it left every pre-existing install's newly-attached display wheel dark
+        // (see ProfileCoordinator.ActiveTelemetryEnabled).
         public bool TelemetryEnabledDefaultForNewWheels { get; set; } = false;
 
         // Per-wheel-page firmware-era pick. Keyed by SimHub page GUID, stored as int

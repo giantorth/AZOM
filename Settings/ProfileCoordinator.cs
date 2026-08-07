@@ -345,10 +345,19 @@ namespace MozaPlugin.Settings
         /// <summary>
         /// True iff telemetry is enabled for the current wheel page. Per-wheel-page
         /// (shared across profiles); reads return false when wheel not identified.
-        /// When the wheel is identified but has no explicit entry yet, falls back to
-        /// <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/> (true
-        /// for fresh installs, false for existing users) — dict-missing is "no
-        /// opinion", resolved to the install default, not a hard off.
+        ///
+        /// Dict-missing is "no opinion", never a hard off. A wheel with a SCREEN
+        /// resolves that to on — it exists to show a dashboard, so it streams until
+        /// the user says otherwise, matching <see cref="ActiveDashTelemetryEnabled"/>.
+        /// Screenless and unknown models fall back to
+        /// <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/>.
+        ///
+        /// That install-wide flag alone was not enough: it is only set true by the
+        /// ReadCommonSettings create-if-not-found factory, so every settings file
+        /// written before it existed resolves false — and a user who later attaches a
+        /// NEW display wheel gets a silently dark dashboard with no banner and no log
+        /// line (bundle NZW8W197, KS Pro on a pre-existing install). The default has
+        /// to be scoped to the wheel, not the install.
         /// </summary>
         internal bool ActiveTelemetryEnabled
         {
@@ -358,6 +367,11 @@ namespace MozaPlugin.Settings
                 if (!g.HasValue || _plugin.Settings?.WheelTelemetryEnabledByPageGuid == null) return false;
                 if (_plugin.Settings.WheelTelemetryEnabledByPageGuid.TryGetValue(g.Value, out var v))
                     return v;
+                // IsFsr1DisplayWheel is load-bearing: FSR V1 carries hasDisplay:false
+                // in WheelModelInfo (its screen rides the group-0x42 Fsr1DisplayDriver,
+                // not the tier-def sender) yet that driver gates on this same property.
+                if (_plugin.WheelModelInfo?.HasDisplay == true || _plugin.IsFsr1DisplayWheel)
+                    return true;
                 return _plugin.Settings.TelemetryEnabledDefaultForNewWheels;
             }
             set

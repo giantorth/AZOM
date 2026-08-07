@@ -527,7 +527,11 @@ namespace MozaPlugin.UI
                         sb.AppendLine($"    {errs.RecentResyncSamples[i]}");
                 }
             }
-            sb.AppendLine($"DisplayDetected:    {(ts?.DisplayDetected ?? plugin.IsDisplayDetected)}");
+            // Both, unmasked. The sender flag only latches on session traffic
+            // (TelemetryInboundDispatcher), so a sender that never started prints
+            // false and the old `??` hid the probe result behind it — a wheel whose
+            // display had answered identity fine still read "DisplayDetected: False".
+            sb.AppendLine($"DisplayDetected:    sender={ts?.DisplayDetected.ToString() ?? "n/a"}  probe={plugin.IsDisplayDetected}");
             sb.AppendLine($"DisplayModelName:   {Blank(ts?.DisplayModelName ?? plugin.DisplayModelName)}");
             sb.AppendLine($"WheelEra:           {plugin.ActiveTelemetryWheelEra}");
             if (ts != null)
