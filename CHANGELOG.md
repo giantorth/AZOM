@@ -2,96 +2,41 @@
 
 All notable changes to the AZOM plugin are documented here.
 
-## [Unreleased]
-
-### Fixed
-
-- **The SimHub log is no longer flooded during gameplay.** On Windows 10 the background
-  responsiveness opt-out logged its result on every telemetry frame instead of only when it
-  changed — Windows 10 rejects a Windows 11-only throttling bit, so the plugin's "did this
-  change?" check compared what Windows accepted against what was asked for and never
-  matched. One 42-minute session produced 122,879 identical lines (10.8 MB of an 11.7 MB
-  log). A leftover heading/radar property dump (another 0.7 MB per session) has also been
-  removed now that the radar heading source is wired.
-- **An AB6 shifter no longer corrupts the steering readout.** Because the AB6's USB ID was
-  unrecognised, its game-controller interface was read as if it were a wheelbase or pedal set,
-  and its first axis overwrote the steering angle and range that the real wheelbase was
-  reporting — so steering-based properties, the settings-pane steering display and the
-  auto-standby activity check all fought between the two devices. Its buttons were likewise
-  merged into the wheel's button table, where they collided with rim button numbers. The AB6 is
-  now identified and, like the AB9, left to SimHub for input.
-- **Diagnostics no longer shows a port for an unplugged active shifter.** The AB9/AB6 line kept
-  printing the last COM port after the shifter was removed; it now matches the Hub and Base(aux)
-  lines and reports the live state — including an explicit "(detection disabled)" when the
-  Options toggle is what is keeping the shifter from being found.
-- **Stalks turn signals no longer cancel the moment the lever springs back.** In truck-sim
-  mode the indicator lever's neutral position re-tapped the indicator key as soon as the
-  lever returned, so the blinker was only alive while the lever was physically held. The
-  cancel is now deferred until the blinker has been lit for a **Minimum blinker time**
-  (new slider on the Stalks tab, default 3 s), so a quick flick signals for a few seconds
-  like Pit House does; holding the lever longer than that still cancels on release, and
-  0 s restores the old behaviour. Flicking the same side again cancels, and swapping sides
-  switches the old one off first. The diagnostics dump gained a Stalks section (connection,
-  buttons seen, live presses, mode, keys, and the full button map).
-- **Remembered COM port now works under Wine/Proton.** The saved last-successful port
-  was validated against the Windows device registry, which is empty under Wine — so
-  every launch discarded it ("Cleared stale saved port"), ran a full port sweep, and a
-  session that never connected erased the setting entirely. The probe now tries the
-  remembered port first and the setting is only cleared when the registry positively
-  reports the port stale.
-- **SimHub's Arduino scan no longer delays the wheelbase connection.** On startup
-  SimHub's Arduino auto-scan opened the wheelbase's COM port and held it for two full
-  scan passes (~25 s observed under Proton) before giving up, blocking the plugin's own
-  probes the whole time. The plugin now answers SimHub's pre-scan check and marks MOZA
-  ports busy — ports it holds, ports the registry identifies as MOZA hardware, and the
-  remembered last-good ports — so the Arduino scan skips them entirely.
-- **Standalone-USB CM2 LEDs on the 2026-06 meter firmware.** The LED-firmware-era
-  detection only listened for the meter heartbeat of a base-bridged CM2, so a CM2 on
-  its own USB port stayed on the legacy LED registers — which the 2026-06 indicator
-  firmware ignores, leaving the RPM/flag LEDs dark while SimHub effects (e.g. ATSR-EVO)
-  were streaming. The heartbeat is now also recognized on the standalone dashboard
-  connection; the switch applies live and persists.
+## [1.5.4]
 
 ### Added
 
-- **The bug-report reference can be selected and copied.** The result line under "Report a
-  problem" is now selectable text instead of a plain label, and a **Copy Reference** button
-  appears next to it after a successful submit so the ticket number can be pasted straight
-  into Discord. The exported-bundle path writes its file path to the same selectable line.
-- **Upload failures now say why, and travel with the manual export.** When a submit is
-  refused, the status line carries the transport or HTTP code (`[HTTP 403]`,
-  `[network: timeout]`), and every attempt — request size, response status, `cf-ray` and
-  the other Cloudflare headers, the response body, the full exception chain, plus a
-  post-failure DNS / proxy / plain-GET probe that separates "the network refused us" from
-  "the server refused us" — is recorded to the plugin log and to a new `upload-log.txt`
-  inside the diagnostics bundle. A user whose reports are always denied can now hit
-  **Export Bundle** and send a zip that already contains the reason.
+- **Português (Portuguese) language** has been added.
+- **Minimum blinker time** slider added for stalks in truck sim mode. 
+- **The bug-report reference can be selected and copied.** 
+- **Minimum steering angle lowered to 60°.** Lowest possible setting accepted by firmware.
+- **AB6 active shifter.** The AB6 (USB PID `0x1002`) is now a recognised device.
+- **10-band FFB Effect Equalizer.** On wheelbase firmware **1.2.10.10+.** 
+- **EQ sensitivity presets.** Road sensitivity presets are now supported for both 6 and 
+  10 band devices.
 
-- **Steering angle down to 60°.** The Base tab's rotation slider (and the rotation step
-  actions) now go down to 60° instead of 90° — the wheelbase firmware's actual floor,
-  which Pit House's own 90° minimum never exposed. Useful for karts, F1-style setups and
-  other short-lock rigs. After each change the plugin reads the stored value back from
-  the base and snaps the slider to what the firmware actually kept, so on firmware that
-  clamps higher the UI shows the real limit instead of the requested one.
-- **AB6 active shifter.** The AB6 (USB PID `0x1002`) is now a recognised device instead of an
-  "unknown MOZA PID", and is driven by the same lane as the AB9 — layout, input mode, the five
-  feel sliders, engine vibration and gear-shift vibration all work as they do on an AB9. The
-  shifter tab, the connect/detect log lines and the diagnostics device list name whichever model
-  actually answered, so an AB6 no longer reads "AB9" everywhere. One active shifter is driven at
-  a time: with an AB6 *and* an AB9 plugged in, only the first one enumerated is claimed. The AB6
-  is assumed to speak the AB9's protocol — that has not yet been confirmed against a capture, and
-  the plugin sends the AB9's default 7+R layout on first detection.
-- **10-band FFB Effect Equalizer.** On wheelbase firmware **1.2.10.10+** the Base tab's
-  FFB Equalizer expands from 6 to 10 bands (5/10/15/25/30/40/50/60/80/100 Hz, matching the
-  2026-07 Pit House update), with the per-band range raised to 0–500% — except the 100 Hz
-  band, which keeps its 0–100% cap. Values round-trip with the wheelbase and persist per
-  game profile. Older firmware keeps the original 6-band editor unchanged.
-- **EQ sensitivity presets.** Eleven one-click presets (0–10) matching Pit House's
-  "sensitivity settings" — each writes the base's road-sensitivity level plus a matched
-  EQ curve, opening from a low-pass shelf (0) to fully flat (10). Available on all
-  firmware: older bases receive the curve on their six bands. Road sensitivity is now
-  also read from the base and saved with the game profile. Replaces the EQ card's
-  Flat/Falloff preset buttons.
+### Fixed
+
+- SimHub log no longer floods during gameplay.
+- An AB6 shifter no longer corrupts the steering readout or the wheel's button table.
+- Diagnostics no longer shows a stale COM port for an unplugged active shifter.
+- Remembered COM port now works under Wine/Proton.
+- SimHub's Arduino scan no longer delays the wheelbase connection.
+- Standalone-USB CM2 RPM/flag LEDs work on the 2026-06 meter firmware.
+- AB9/AB6 gear shifts no longer get more violent the longer you play, and the gear-shift
+  Vibration Intensity slider now scales the whole effect.
+- AB9/AB6 FFB effect handles are read from the device instead of assumed.
+- An mBooster on the base's or hub's pedal port is now detected.
+- mBooster roles no longer stick to an axis with no pedal wired.
+- A standalone mBooster keeps its settings once its real axis resolves.
+- CM2/CM1 dash works on a rig with no wheel attached, and a bridged CM1 no longer gets
+  the CM2 device definition.
+- Paddle, knob and joystick settings no longer bleed between two wheels.
+- Display fixes for stayings dead after a game switch.
+
+### Changed
+
+- **Bundled SimHub updated to v9.11.22** (from v9.11.21).
 
 ## [1.5.3] - 2026-07-30
 
