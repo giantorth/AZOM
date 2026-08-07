@@ -1866,14 +1866,11 @@ namespace MozaPlugin
             _deviceManager.WriteSetting("base-gearshift-event", 1);
         }
 
-        // Fire AB9 per-shift triggers (0x0D 0x01 + 0x0D 0x04 engage, or
-        // 0x0D 0x06 for transitions into neutral). AB9 firmware fires its
-        // stored gear-shift-vibration rumble pattern in response — see
-        // docs/protocol/devices/ab9-shifter.md and usb-capture/AB9/
-        // {all_gears,1-N}.pcapng for the empirical observation. The previous
-        // hypothesis that the AB9 fires rumble autonomously from its
-        // mechanical sensor without host involvement was wrong; without
-        // these triggers gear engagement produces zero haptic feedback.
+        // Start the AB9's per-shift effects: the ShiftRumble square wave plus
+        // EngageForce, or NeutralForce for transitions into neutral. The host owns
+        // this — the AB9 does not fire rumble autonomously off its mechanical
+        // sensor, and without these starts gear engagement produces zero haptic
+        // feedback. See docs/protocol/devices/ab9-shifter.md.
         //
         // Gated by AB9-scoped knobs (Ab9Settings.GearShiftVibrateOnNeutral /
         // GearShiftDebounceMs), separate from the wheelbase gearshift card —
@@ -1907,9 +1904,10 @@ namespace MozaPlugin
             if (debounceMs > 0 && (now - _lastAb9GearShiftSendUtc).TotalMilliseconds < debounceMs) return;
             _lastAb9GearShiftSendUtc = now;
 
-            // engage trigger (0x0D 0x04) for any non-neutral gear,
-            // disengage (0x0D 0x06) for transitions into neutral.
-            _ab9Manager.SendGearShiftTrigger(engageNotDisengage: !isNeutral);
+            // EngageForce for any non-neutral gear, NeutralForce for transitions
+            // into neutral; the slider scales the constant-force ramp that precedes it.
+            _ab9Manager.SendGearShiftTrigger(engageNotDisengage: !isNeutral,
+                                             intensity0to100: ab9Settings.GearShiftVibrationIntensity);
         }
 
         public void DataUpdate(PluginManager pluginManager, ref GameData data)

@@ -33,10 +33,10 @@ namespace MozaPlugin.Protocol
         Ab9EngineVibration = 11,
         // AB9 secondary FFB sub-streams (latest-wins per lane).
         Ab9EnginePulse = 12,
-        Ab9TriggerA = 13,        // 0x0D 0x02 + 0x0D 0x03 (flat ~9 Hz keepalive)
-        Ab9TriggerRpm = 14,      // 0x0D 0x05 (RPM-tracking trigger)
-        Ab9TriggerExtra = 15,    // 0x0D 0x01 (newly-observed sub-cmd)
-        Ab9LowRate = 16,         // 0x08 0x04 + 0x08 0x06 (signed-pair low-rate)
+        Ab9TriggerA = 13,        // 0x0D start of both engine-pulse dampers (flat ~9 Hz)
+        Ab9TriggerRpm = 14,      // 0x0D start of the engine-vib sine (RPM-tracked)
+        Ab9TriggerExtra = 15,    // spare 0x0D lane
+        Ab9LowRate = 16,         // unused — 0x08 shift constant-force rides the one-shot FIFO
         // mBooster motor-write lane (single slot per connection; the worker
         // emits one frame per ~20 ms tick across all four effects, so a
         // shared lane is sufficient — latest-wins on the writer-lag edge).
