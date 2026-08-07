@@ -340,6 +340,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Yowff Grr Yap!</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Howl Grrowl Howl Woof!</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>Yowff!</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>Yip Yip!</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>Woof!</value></data>

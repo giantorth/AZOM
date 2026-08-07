@@ -315,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Πάντα εκκίνηση καταγραφής διαγνωστικών κατά την εκκίνηση/εναλλαγή παιχνιδιού</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Όταν είναι ενεργό, η καταγραφή σειριακής κίνησης ξεκινά αυτόματα κάθε φορά που εκκινεί το plugin.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>ΕΞΑΓΩΓΗ ΠΑΚΕΤΟΥ (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΚΩΔΙΚΟΥ</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΚΑΤΑΓΡΑΦΗΣ ΣΤΟ ΠΡΟΧΕΙΡΟ</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>ΠΛΗΡΗΣ ΔΙΑΓΝΩΣΤΙΚΗ ΑΝΑΦΟΡΑ</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// Πληροφορίες εντοπισμού σφαλμάτων</value></data>

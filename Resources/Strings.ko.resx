@@ -315,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>실행/게임 전환 시 항상 진단 캡처 시작</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>켜면 플러그인이 시작될 때마다 시리얼 트래픽 캡처가 자동으로 시작됩니다.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>번들 내보내기 (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>참조 번호 복사</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>캡처를 클립보드에 복사</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>전체 진단 보고서</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// 디버깅 정보</value></data>

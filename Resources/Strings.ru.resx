@@ -315,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Всегда начинать захват диагностики при запуске или смене игры</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Когда включено, захват последовательного трафика начинается автоматически при каждом запуске плагина.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>ЭКСПОРТ АРХИВА (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>СКОПИРОВАТЬ НОМЕР</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>СКОПИРОВАТЬ ЗАХВАТ В БУФЕР</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>ПОЛНЫЙ ДИАГНОСТИЧЕСКИЙ ОТЧЁТ</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// отладочная информация</value></data>

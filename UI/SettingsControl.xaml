@@ -3317,9 +3317,22 @@
                                     <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
                                             Click="SerialCaptureExport_Click" Margin="8,0,0,0"
                                             ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
-                                    <TextBlock x:Name="BugReportStatusText" Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap"/>
+                                    <Button x:Name="CopyBugReportRefButton" Content="{x:Static res:Strings.Button_CopyReference}"
+                                            Click="CopyBugReportRef_Click" Margin="8,0,0,0"
+                                            Visibility="Collapsed"/>
                                 </StackPanel>
+                                <!-- Read-only TextBox rather than a TextBlock: the
+                                     result line carries the ticket reference (and
+                                     the export path a file path), which the user
+                                     has to be able to select and copy. Own row so
+                                     a long message wraps instead of clipping. -->
+                                <TextBox x:Name="BugReportStatusText"
+                                         Visibility="Collapsed" Margin="0,10,0,0"
+                                         IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                                         Background="Transparent" BorderThickness="0" Padding="0"
+                                         Foreground="{StaticResource TextFaintBrush}"
+                                         FontFamily="{StaticResource FontUi}" FontSize="13"
+                                         TextWrapping="Wrap"/>
                             </StackPanel>
                         </ctrl:SectionCard>
 

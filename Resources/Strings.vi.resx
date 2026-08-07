@@ -315,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Luôn bắt đầu ghi chẩn đoán khi khởi chạy/đổi game</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Khi bật, việc ghi lưu lượng serial sẽ tự động bắt đầu mỗi khi plugin khởi động.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>XUẤT GÓI (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>SAO CHÉP MÃ THAM CHIẾU</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>SAO CHÉP BẢN GHI VÀO CLIPBOARD</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>BÁO CÁO CHẨN ĐOÁN ĐẦY ĐỦ</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// thông tin gỡ lỗi</value></data>

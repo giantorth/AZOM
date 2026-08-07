@@ -2467,7 +2467,7 @@ namespace MozaPlugin
             try
             {
                 DiagnosticsBundleWriter.Write(dlg.FileName, BuildBundleContent(reportText: null));
-                BugReportStatusText.Text = string.Format(Strings.Status_ExportedTo, dlg.FileName);
+                SetBugReportStatus(string.Format(Strings.Status_ExportedTo, dlg.FileName));
             }
             catch (Exception ex)
             {

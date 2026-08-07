@@ -315,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Diagnose-Aufzeichnung beim Start / Spielwechsel immer beginnen</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Wenn aktiv, beginnt die serielle Aufzeichnung automatisch bei jedem Plugin-Start.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>BUNDLE EXPORTIEREN (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>REFERENZ KOPIEREN</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>AUFZEICHNUNG IN ZWISCHENABLAGE KOPIEREN</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>VOLLSTÄNDIGER DIAGNOSE-BERICHT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// Debug-Informationen</value></data>

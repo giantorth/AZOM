@@ -54,6 +54,19 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Added
 
+- **The bug-report reference can be selected and copied.** The result line under "Report a
+  problem" is now selectable text instead of a plain label, and a **Copy Reference** button
+  appears next to it after a successful submit so the ticket number can be pasted straight
+  into Discord. The exported-bundle path writes its file path to the same selectable line.
+- **Upload failures now say why, and travel with the manual export.** When a submit is
+  refused, the status line carries the transport or HTTP code (`[HTTP 403]`,
+  `[network: timeout]`), and every attempt — request size, response status, `cf-ray` and
+  the other Cloudflare headers, the response body, the full exception chain, plus a
+  post-failure DNS / proxy / plain-GET probe that separates "the network refused us" from
+  "the server refused us" — is recorded to the plugin log and to a new `upload-log.txt`
+  inside the diagnostics bundle. A user whose reports are always denied can now hit
+  **Export Bundle** and send a zip that already contains the reason.
+
 - **Steering angle down to 60°.** The Base tab's rotation slider (and the rotation step
   actions) now go down to 60° instead of 90° — the wheelbase firmware's actual floor,
   which Pit House's own 90° minimum never exposed. Useful for karts, F1-style setups and

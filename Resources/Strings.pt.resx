@@ -334,6 +334,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Sempre iniciar captura de diagnóstico ao abrir/trocar de jogo</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Quando ligado, a captura de tráfego serial começa automaticamente sempre que o plugin inicia.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>Exportar pacote</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>Copiar referência</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>COPIAR CAPTURA PARA A ÁREA DE TRANSFERÊNCIA</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>RELATÓRIO DE DIAGNÓSTICO COMPLETO</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// informações de depuração</value></data>

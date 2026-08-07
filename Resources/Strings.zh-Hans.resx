@@ -315,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>启动 / 切换游戏时总是开始诊断捕获</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>启用后,每次插件启动时都会自动开始串口流量捕获。</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>导出诊断包(ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>复制编号</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>复制捕获至剪贴板</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>完整诊断报告</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// 调试信息</value></data>

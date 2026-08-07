@@ -341,6 +341,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Always start diagnostics capture on launch/game switch</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>When on, the serial traffic capture begins automatically each time the plugin starts.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>Export Bundle</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>Copy Reference</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>COPY CAPTURE TO CLIPBOARD</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>FULL DIAGNOSTIC REPORT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// debugging information</value></data>

@@ -320,6 +320,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Start diagnoselogg automatisk ved oppstart/spillbytte</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Når på, starter seriell-trafikkloggen automatisk hver gang pluginen starter.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>EKSPORTER PAKKE (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>KOPIER REFERANSE</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>KOPIER LOGG TIL UTKLIPPSTAVLEN</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>FULL DIAGNOSERAPPORT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// feilsøkingsinformasjon</value></data>

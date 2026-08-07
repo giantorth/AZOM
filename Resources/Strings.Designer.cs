@@ -408,6 +408,7 @@ namespace MozaPlugin.Resources
         public static string Label_AlwaysCaptureOnStartup => Get("Label_AlwaysCaptureOnStartup");
         public static string Tooltip_AlwaysCaptureOnStartup => Get("Tooltip_AlwaysCaptureOnStartup");
         public static string Button_ExportBundle => Get("Button_ExportBundle");
+        public static string Button_CopyReference => Get("Button_CopyReference");
         public static string Tooltip_ExportBundle => Get("Tooltip_ExportBundle");
         public static string Button_CopyCapture => Get("Button_CopyCapture");
         public static string Section_FullDiagReport => Get("Section_FullDiagReport");
