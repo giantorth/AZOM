@@ -117,11 +117,11 @@ namespace MozaPlugin.Devices
         // has its own independent pair of dividers, same bounds). See
         // MozaControls.MozaSegmentedBarEditor and
         // docs/protocol/devices/mbooster.md "Segmented Damping".
-        public const float SegDampDivider1MinPct = 10f;
-        public const float SegDampDivider1MaxPct = 80f;
-        public const float SegDampDivider2MinPct = 20f;
-        public const float SegDampDivider2MaxPct = 90f;
-        public const float SegDampDividerMinGapPct = 10f;
+        public const double SegDampDivider1MinPct = 10.0;
+        public const double SegDampDivider1MaxPct = 80.0;
+        public const double SegDampDivider2MinPct = 20.0;
+        public const double SegDampDivider2MaxPct = 90.0;
+        public const double SegDampDividerMinGapPct = 10.0;
 
         // Factory defaults, reverse-engineered from a recurring untouched
         // baseline across multiple independent captures (5+ sessions each
