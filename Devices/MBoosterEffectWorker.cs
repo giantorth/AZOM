@@ -543,9 +543,6 @@ namespace MozaPlugin.Devices
         // rpm/redline scaling below. Matches the top of the device's
         // hardware-safe engine range (MBoosterUiConstants.EngineFreqMaxHz).
         private const double EngineRedlineFreqHz = MBoosterUiConstants.EngineFreqMaxHz;
-        // Redline fallback when the game doesn't report MaxRpm — same
-        // 8000-rpm convention Ab9EngineVibrationWorker and HardwareApplier use.
-        private const double EngineDefaultRedlineRpm = 8000.0;
 
         private void UpdateEngineRequest(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
@@ -587,10 +584,10 @@ namespace MozaPlugin.Devices
             }
 
             // fraction clamped to (0,1] so over-rev can't exceed the redline
-            // pitch; a missing MaxRpm falls back to EngineDefaultRedlineRpm —
-            // same shape as Ab9EngineVibrationWorker.Tick.
-            double redline = snap.MaxRpm > 100.0 ? snap.MaxRpm : EngineDefaultRedlineRpm;
-            double fraction = Math.Min(1.0, rpm / redline);
+            // pitch; a missing MaxRpm falls back to the shared redline
+            // convention (see EngineVibrationMath.RedlineFraction — the same
+            // model Ab9EngineVibrationWorker.Tick uses).
+            double fraction = EngineVibrationMath.RedlineFraction(rpm, snap.MaxRpm);
             st.FreqHz = ClampEngineFreq(EngineRedlineFreqHz * fraction);
             // Engine continuous-effect: user 0..100 % maps to output
             // amplitude 0..EngineScaleMax — see the constants block above
@@ -1265,7 +1262,39 @@ namespace MozaPlugin.Devices
 
         // ===== Edge handling + frame emission =============================
 
-        private void ProcessEffect(MBoosterEffectId id, ref EffectState st)
+        /// <summary>
+        /// Wire-native dispatch for the four effects with their OWN
+        /// protocol-verified (or at least self-consistent) effect type —
+        /// Abs/Lockup/Threshold/Engine — where the wire id IS the logical
+        /// effect. See the <c>(id, ref st, synthesize)</c> overload below for
+        /// the shared activation-edge/phase/frame-emission core; effects that
+        /// need a DIFFERENT logical waveform than their wire id (Traction
+        /// Control, Wheel Spin, Gear Shift, Custom Effects — all reuse
+        /// Engine's wire slot) call that overload directly instead.
+        /// </summary>
+        private void ProcessEffect(MBoosterEffectId id, ref EffectState st) =>
+            ProcessEffect(id, ref st, s => id switch
+            {
+                MBoosterEffectId.Abs       => MBoosterEffectSynthesizer.SynthesizeAbs(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01),
+                MBoosterEffectId.Lockup    => MBoosterEffectSynthesizer.SynthesizeLockup(s.IntensityRequest, s.ElapsedSec),
+                MBoosterEffectId.Threshold => MBoosterEffectSynthesizer.SynthesizeThreshold(s.IntensityRequest, s.ElapsedSec, s.ThresholdDecayRequest01),
+                MBoosterEffectId.Engine    => MBoosterEffectSynthesizer.SynthesizeEngine(s.IntensityRequest, s.PhaseRad),
+                _                          => 0.0,
+            });
+
+        /// <summary>
+        /// Shared activation-edge + phase-oscillator + frame-emission core
+        /// for every vibration effect that goes out via
+        /// <see cref="MozaMBoosterProtocol.BuildMotorFrame"/> (i.e. every
+        /// effect except Road Texture and G-Force, which have their own
+        /// differently-shaped wire payloads). <paramref name="id"/> is the
+        /// WIRE effect type the frame is addressed as — for Traction
+        /// Control/Wheel Spin/Gear Shift/Custom Effects that's always
+        /// <see cref="MBoosterEffectId.Engine"/> (no verified wire type of
+        /// their own), while <paramref name="synthesize"/> picks the actual
+        /// waveform for whichever LOGICAL effect this call represents.
+        /// </summary>
+        private void ProcessEffect(MBoosterEffectId id, ref EffectState st, Func<EffectState, double> synthesize)
         {
             bool wantActive = st.IntensityRequest > 0 && st.FreqHz > 0;
 
@@ -1292,19 +1321,9 @@ namespace MozaPlugin.Devices
             }
 
             st.ElapsedSec += TickPeriodSec;
-            // phase += 2π * freq * dt; wrap at 2π for numerical stability.
-            st.PhaseRad += 2.0 * Math.PI * st.FreqHz * TickPeriodSec;
-            if (st.PhaseRad >= 2.0 * Math.PI)
-                st.PhaseRad -= 2.0 * Math.PI * Math.Floor(st.PhaseRad / (2.0 * Math.PI));
+            st.PhaseRad = EngineVibrationMath.AdvancePhase(st.PhaseRad, st.FreqHz, TickPeriodSec);
 
-            double amp01 = id switch
-            {
-                MBoosterEffectId.Abs       => MBoosterEffectSynthesizer.SynthesizeAbs(st.IntensityRequest, st.PhaseRad, st.SmoothnessRequest01),
-                MBoosterEffectId.Lockup    => MBoosterEffectSynthesizer.SynthesizeLockup(st.IntensityRequest, st.ElapsedSec),
-                MBoosterEffectId.Threshold => MBoosterEffectSynthesizer.SynthesizeThreshold(st.IntensityRequest, st.ElapsedSec, st.ThresholdDecayRequest01),
-                MBoosterEffectId.Engine    => MBoosterEffectSynthesizer.SynthesizeEngine(st.IntensityRequest, st.PhaseRad),
-                _                          => 0.0,
-            };
+            double amp01 = synthesize(st);
 
             byte param1 = MozaMBoosterProtocol.ComputeParam1(
                 MozaMBoosterProtocol.ParamKFor(id), st.FreqHz);
@@ -1538,42 +1557,9 @@ namespace MozaPlugin.Devices
         /// wire slot — see the ordering note at this method's call site in
         /// <see cref="Tick"/>.
         /// </summary>
-        private void ProcessCustomEffect(ref EffectState st)
-        {
-            const MBoosterEffectId id = MBoosterEffectId.Engine;
-            bool wantActive = st.IntensityRequest > 0 && st.FreqHz > 0;
-
-            if (!wantActive && st.Active)
-            {
-                _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice));
-                st.Active = false;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-                return;
-            }
-            if (!wantActive) return;
-
-            if (!st.Active)
-            {
-                st.Active = true;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-            }
-
-            st.ElapsedSec += TickPeriodSec;
-            st.PhaseRad += 2.0 * Math.PI * st.FreqHz * TickPeriodSec;
-            if (st.PhaseRad >= 2.0 * Math.PI)
-                st.PhaseRad -= 2.0 * Math.PI * Math.Floor(st.PhaseRad / (2.0 * Math.PI));
-
-            double amp01 = MBoosterEffectSynthesizer.SynthesizeEngine(st.IntensityRequest, st.PhaseRad);
-
-            byte param1 = MozaMBoosterProtocol.ComputeParam1(MozaMBoosterProtocol.ParamKFor(id), st.FreqHz);
-            ushort freqU16 = MozaMBoosterProtocol.EncodeFreq(st.FreqHz);
-            ushort ampU16 = MozaMBoosterProtocol.EncodeAmp(amp01);
-
-            var frame = MozaMBoosterProtocol.BuildMotorFrame(id, enable: true, param1, freqU16, ampU16, TargetDevice);
-            SendMotor(frame);
-        }
+        private void ProcessCustomEffect(ref EffectState st) =>
+            ProcessEffect(MBoosterEffectId.Engine, ref st,
+                s => MBoosterEffectSynthesizer.SynthesizeEngine(s.IntensityRequest, s.PhaseRad));
 
         /// <summary>
         /// Activation-edge + frame-emission path for Traction Control —
@@ -1588,42 +1574,9 @@ namespace MozaPlugin.Devices
         /// active custom effects for that one wire slot — see the ordering
         /// note at this method's call site in <see cref="Tick"/>.
         /// </summary>
-        private void ProcessTractionControlEffect(ref EffectState st)
-        {
-            const MBoosterEffectId id = MBoosterEffectId.Engine;
-            bool wantActive = st.IntensityRequest > 0 && st.FreqHz > 0;
-
-            if (!wantActive && st.Active)
-            {
-                _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice));
-                st.Active = false;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-                return;
-            }
-            if (!wantActive) return;
-
-            if (!st.Active)
-            {
-                st.Active = true;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-            }
-
-            st.ElapsedSec += TickPeriodSec;
-            st.PhaseRad += 2.0 * Math.PI * st.FreqHz * TickPeriodSec;
-            if (st.PhaseRad >= 2.0 * Math.PI)
-                st.PhaseRad -= 2.0 * Math.PI * Math.Floor(st.PhaseRad / (2.0 * Math.PI));
-
-            double amp01 = MBoosterEffectSynthesizer.SynthesizeTractionControl(st.IntensityRequest, st.PhaseRad, st.SmoothnessRequest01);
-
-            byte param1 = MozaMBoosterProtocol.ComputeParam1(MozaMBoosterProtocol.ParamKFor(id), st.FreqHz);
-            ushort freqU16 = MozaMBoosterProtocol.EncodeFreq(st.FreqHz);
-            ushort ampU16 = MozaMBoosterProtocol.EncodeAmp(amp01);
-
-            var frame = MozaMBoosterProtocol.BuildMotorFrame(id, enable: true, param1, freqU16, ampU16, TargetDevice);
-            SendMotor(frame);
-        }
+        private void ProcessTractionControlEffect(ref EffectState st) =>
+            ProcessEffect(MBoosterEffectId.Engine, ref st,
+                s => MBoosterEffectSynthesizer.SynthesizeTractionControl(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01));
 
         /// <summary>
         /// Activation-edge + frame-emission path for Wheel Spin — identical
@@ -1636,42 +1589,9 @@ namespace MozaPlugin.Devices
         /// see the ordering note at this method's call site in
         /// <see cref="Tick"/>.
         /// </summary>
-        private void ProcessWheelSpinEffect(ref EffectState st)
-        {
-            const MBoosterEffectId id = MBoosterEffectId.Engine;
-            bool wantActive = st.IntensityRequest > 0 && st.FreqHz > 0;
-
-            if (!wantActive && st.Active)
-            {
-                _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice));
-                st.Active = false;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-                return;
-            }
-            if (!wantActive) return;
-
-            if (!st.Active)
-            {
-                st.Active = true;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-            }
-
-            st.ElapsedSec += TickPeriodSec;
-            st.PhaseRad += 2.0 * Math.PI * st.FreqHz * TickPeriodSec;
-            if (st.PhaseRad >= 2.0 * Math.PI)
-                st.PhaseRad -= 2.0 * Math.PI * Math.Floor(st.PhaseRad / (2.0 * Math.PI));
-
-            double amp01 = MBoosterEffectSynthesizer.SynthesizeWheelSpin(st.IntensityRequest, st.PhaseRad, st.SmoothnessRequest01);
-
-            byte param1 = MozaMBoosterProtocol.ComputeParam1(MozaMBoosterProtocol.ParamKFor(id), st.FreqHz);
-            ushort freqU16 = MozaMBoosterProtocol.EncodeFreq(st.FreqHz);
-            ushort ampU16 = MozaMBoosterProtocol.EncodeAmp(amp01);
-
-            var frame = MozaMBoosterProtocol.BuildMotorFrame(id, enable: true, param1, freqU16, ampU16, TargetDevice);
-            SendMotor(frame);
-        }
+        private void ProcessWheelSpinEffect(ref EffectState st) =>
+            ProcessEffect(MBoosterEffectId.Engine, ref st,
+                s => MBoosterEffectSynthesizer.SynthesizeWheelSpin(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01));
 
         /// <summary>
         /// Activation-edge + frame-emission path for Gear Shift — same
@@ -1685,42 +1605,9 @@ namespace MozaPlugin.Devices
         /// the waveform — a short oscillating burst that decays to silence
         /// over <see cref="GearShiftPulseDurationSec"/>.
         /// </summary>
-        private void ProcessGearShiftEffect(ref EffectState st)
-        {
-            const MBoosterEffectId id = MBoosterEffectId.Engine;
-            bool wantActive = st.IntensityRequest > 0 && st.FreqHz > 0;
-
-            if (!wantActive && st.Active)
-            {
-                _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice));
-                st.Active = false;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-                return;
-            }
-            if (!wantActive) return;
-
-            if (!st.Active)
-            {
-                st.Active = true;
-                st.PhaseRad = 0;
-                st.ElapsedSec = 0;
-            }
-
-            st.ElapsedSec += TickPeriodSec;
-            st.PhaseRad += 2.0 * Math.PI * st.FreqHz * TickPeriodSec;
-            if (st.PhaseRad >= 2.0 * Math.PI)
-                st.PhaseRad -= 2.0 * Math.PI * Math.Floor(st.PhaseRad / (2.0 * Math.PI));
-
-            double amp01 = MBoosterEffectSynthesizer.SynthesizeGearShift(st.IntensityRequest, st.PhaseRad, st.ElapsedSec, GearShiftPulseDurationSec);
-
-            byte param1 = MozaMBoosterProtocol.ComputeParam1(MozaMBoosterProtocol.ParamKFor(id), st.FreqHz);
-            ushort freqU16 = MozaMBoosterProtocol.EncodeFreq(st.FreqHz);
-            ushort ampU16 = MozaMBoosterProtocol.EncodeAmp(amp01);
-
-            var frame = MozaMBoosterProtocol.BuildMotorFrame(id, enable: true, param1, freqU16, ampU16, TargetDevice);
-            SendMotor(frame);
-        }
+        private void ProcessGearShiftEffect(ref EffectState st) =>
+            ProcessEffect(MBoosterEffectId.Engine, ref st,
+                s => MBoosterEffectSynthesizer.SynthesizeGearShift(s.IntensityRequest, s.PhaseRad, s.ElapsedSec, GearShiftPulseDurationSec));
 
         // ===== Helpers ====================================================
 
