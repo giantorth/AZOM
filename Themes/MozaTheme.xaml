@@ -1058,6 +1058,15 @@
                       Data="{Binding Seg2Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <Path Fill="{TemplateBinding AccentBrush}" Opacity="0.55"
                       Data="{Binding Seg3Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <!-- Step line tracing the three segments' current values —
+                     white so it reads clearly against the accent-coloured
+                     bars (same convention as MozaCurveEditor's live-position
+                     overlay), giving the damping profile one continuous
+                     shape instead of three separate bars to compare by eye. -->
+                <Path Stroke="White" StrokeThickness="2"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                      Fill="{x:Null}" Opacity="0.9"
+                      Data="{Binding StepLineGeometry, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <!-- Per-segment value labels, floating just above each bar's
                      current height — Seg*LabelLeft/Top are pre-centered in
                      the code-behind (same technique as MozaRangeSlider's
