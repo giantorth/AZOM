@@ -68,10 +68,16 @@ jobs:
             state=$(jq -r '.state' <<<"$info")
             draft=$(jq -r '.isDraft' <<<"$info")
             head_repo=$(jq -r '.headRepositoryOwner.login + "/" + .headRepository.name' <<<"$info")
-            if [ "$state" != "OPEN" ] || [ "$draft" = "true" ] \
-               || [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
-              echo "::error::PR #${INPUT_PR} is not an open, non-draft, same-repo PR"
+            if [ "$state" != "OPEN" ] || [ "$draft" = "true" ]; then
+              echo "::error::PR #${INPUT_PR} is not an open, non-draft PR"
               exit 1
+            fi
+            # Fork heads are buildable ONLY down this path. workflow_dispatch is
+            # maintainer-triggered, so the fork's code has been reviewed before
+            # it gets a write token and DISCORD_WEBHOOK_URL. The pull_request
+            # trigger still refuses forks outright (see the `changed` job's if:).
+            if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+              echo "::warning::PR #${INPUT_PR} head is fork ${head_repo} — building fork code with repo secrets"
             fi
             pr_number=$(jq -r '.number' <<<"$info")
             pr_title=$(jq -r '.title' <<<"$info")
@@ -106,8 +112,24 @@ jobs:
         with:
           # Build the PR head, not the synthetic merge commit — the release
           # tag must point at a real commit and the artifact must match it.
-          ref: ${{ steps.pr.outputs.head_sha }}
+          # Via refs/pull/<n>/head, which resolves for a fork head too; a bare
+          # SHA does not, since that commit lives in the fork, not here.
+          ref: refs/pull/${{ steps.pr.outputs.pr_number }}/head
           fetch-depth: 0
+
+      - name: Verify checkout matches PR head
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          # refs/pull/<n>/head can advance between the resolve step and here.
+          # Tag and artifact must agree, so fail rather than ship a mismatch.
+          actual=$(git rev-parse HEAD)
+          if [ "$actual" != "$HEAD_SHA" ]; then
+            echo "::error::Checked out ${actual} but PR head is ${HEAD_SHA}"
+            exit 1
+          fi
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
