@@ -1715,12 +1715,9 @@ namespace MozaPlugin
 
         // ===== FFB Equalizer handlers =====
 
-        private static readonly string[] EqCommands = {
-            "base-equalizer1", "base-equalizer2", "base-equalizer3",
-            "base-equalizer4", "base-equalizer5", "base-equalizer6",
-            "base-equalizer7", "base-equalizer8", "base-equalizer9",
-            "base-equalizer10"
-        };
+        // EQ write commands in register order. Shared with the AZOM step
+        // actions so the button macros and the bindings drive identical values.
+        private static readonly string[] EqCommands = BaseSettingCatalog.EqRegisterCommands;
 
         private void Eq1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq1Value, "%", v => { _data.Equalizer1 = v; _plugin.WriteIfBaseConnected(EqCommands[0], v); });
         private void Eq2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq2Value, "%", v => { _data.Equalizer2 = v; _plugin.WriteIfBaseConnected(EqCommands[1], v); });
@@ -1736,12 +1733,7 @@ namespace MozaPlugin
         // 10-band mappings in FREQUENCY order (5/10/15/25/30/40/50/60/80/100 Hz)
         // — the new registers interleave. Keep in sync with the FfbEqualizer10
         // slider binding in SettingsControl.Redesign.cs.
-        private static readonly string[] Eq10Commands = {
-            "base-equalizer1", "base-equalizer7", "base-equalizer2",
-            "base-equalizer3", "base-equalizer8", "base-equalizer4",
-            "base-equalizer9", "base-equalizer5", "base-equalizer10",
-            "base-equalizer6"
-        };
+        private static readonly string[] Eq10Commands = BaseSettingCatalog.Eq10FreqOrderCommands;
         private Slider[] Eq10Sliders() => new[] {
             Eq1Slider, Eq7Slider, Eq2Slider, Eq3Slider, Eq8Slider,
             Eq4Slider, Eq9Slider, Eq5Slider, Eq10Slider, Eq6Slider };
@@ -1816,24 +1808,11 @@ namespace MozaPlugin
         // Values in frequency order 5/10/15/25/30/40/50/60/80/100 Hz. On
         // legacy firmware only the six old registers are written (columns
         // via Eq6FreqColumns) — the four new bands are skipped.
-        private static readonly int[][] EqSensitivityPresets =
-        {
-            new[] { 100, 100,  30,  10,   0,   0,   0,   0,   0,   0 },
-            new[] { 100, 100,  60,  20,  10,   0,   0,   0,   0,   0 },
-            new[] { 100, 100,  70,  40,  30,  10,   0,   0,   0,   0 },
-            new[] { 100, 100,  80,  50,  40,  20,  10,  10,   0,   0 },
-            new[] { 100, 100,  90,  60,  50,  30,  20,  20,  10,   0 },
-            new[] { 100, 100, 100,  70,  60,  40,  30,  30,  10,   0 },
-            new[] { 100, 100, 100,  90,  80,  50,  40,  40,  20,   0 },
-            new[] { 100, 100, 100, 100,  90,  60,  60,  60,  40,   0 },
-            new[] { 100, 100, 100, 100,  90,  80,  80,  80,  60,   0 },
-            new[] { 100, 100, 100, 100, 100, 100, 100, 100,  80,   0 },
-            new[] { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 },
-        };
+        private static readonly int[][] EqSensitivityPresets = BaseSettingCatalog.EqSensitivityPresets;
 
         // Frequency-order columns carried by the legacy registers Eq1..Eq6
         // (5/15/25/40/60/100 Hz).
-        private static readonly int[] Eq6FreqColumns = { 0, 2, 3, 5, 7, 9 };
+        private static readonly int[] Eq6FreqColumns = BaseSettingCatalog.Eq6FreqColumns;
 
         private void EqSensitivity_Click(object sender, RoutedEventArgs e)
         {

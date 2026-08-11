@@ -694,7 +694,7 @@ namespace MozaPlugin.UI
             // Pull counters first, so "no lines" is diagnosable without a wire
             // trace: requests=0 means we never asked, requests>0 payloads=0
             // means the display isn't answering.
-            string pull = plugin.TelemetrySender?.DeviceLogPullStatus;
+            var pull = plugin.TelemetrySender?.DeviceLogPullStatus;
             if (pull != null) sb.AppendLine($"Pull: {pull}");
             var cm2 = plugin._cm2Sender?.DeviceLogPullStatus;
             if (cm2 != null) sb.AppendLine($"Pull: {cm2}");
