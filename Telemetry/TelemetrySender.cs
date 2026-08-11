@@ -237,6 +237,12 @@ namespace MozaPlugin.Telemetry
             set => _hotSwitch.Enabled = value;
         }
 
+        /// <summary>Resolves the connected wheel's model info (null until
+        /// identity resolves). Set by MozaPlugin at sender wiring; used to
+        /// force display rotation off on non-VGS display wheels at session
+        /// init. Only wired on the main wheel sender, never the CM2 sender.</summary>
+        internal Func<Devices.WheelModelInfo?>? WheelModelInfoProvider { get; set; }
+
         // Wheel-reported current dashboard slot — ground truth, parsed from
         // type-04 records on sess=0x02 b2h. See WheelSlotTracker for parsing
         // and docs/protocol/dashboard-upload/wheel-pushed-slot.md.
@@ -1534,11 +1540,13 @@ namespace MozaPlugin.Telemetry
             // trace: failing cycles at 8.4 s of silence, working at
             // 13.9 s. This gate is the host-side enforcement.
             //
-            // Cold-start in a fresh SimHub process skips the gate: the
-            // wheel either has no prior session (clean state) or any
-            // stale session from a previous process has long since timed
-            // out. The gate only matters for fast plugin reload within
-            // the same process (e.g., SimHub game switch).
+            // Cold-start in a fresh SimHub process skips the gate: there is
+            // no prior in-process Stop to settle from. NOTE stale sessions
+            // from a PREVIOUS process do NOT reliably time out on their own
+            // (CS-Pro bundle 2026-07-21: sess=0x02 from a killed instance was
+            // still alive and acking at cold start) — that case is detected
+            // reactively in ProbeAndOpenSessions, whose acked-close settle
+            // enforces the equivalent silence before the fresh opens.
             int waitMs = _silenceGate.RemainingStopReopenWaitMs(preStopTicks);
             if (!isFirstStartInProcess)
             {
@@ -1842,6 +1850,7 @@ namespace MozaPlugin.Telemetry
             // resolve (wheel uses size=1 backref records post-switch). Drops
             // in-progress reassembly buffer + per-session seq dedup.
             _catalogParser.ClearBuffer();
+            ResetDeviceLogPull();
             _nextFlagBase = 0;
             _activeSubscription = null;
             _sessionAckSeq = 0;
@@ -2018,6 +2027,7 @@ namespace MozaPlugin.Telemetry
             try { _uploader?.Reset(); } catch { }
             _sessions.Reset();
             _dispatcher.Reset();
+            ResetDeviceLogPull();
             _session09InboundSeq = 0;
             // Reset the outbound seq counters under their guarding locks so a
             // tick still mid-burst can't clobber the reset (separate, non-nested
@@ -2506,6 +2516,11 @@ namespace MozaPlugin.Telemetry
         // Wheel-ready latch + ack latch live in Sessions/SessionLifecycle.cs.
         internal void MarkWheelReadyObserved() => _sessionLife.MarkWheelReadyObserved();
         internal void ResetWheelReadyObserved() => _sessionLife.ResetWheelReadyObserved();
+        /// <summary>True once the wheel has device-inited sess=0x09 (type=0x81)
+        /// this Start cycle — the wheel's own "session layer engaged" signal.
+        /// Never true across the stale-session wedge (the stale instance only
+        /// emits keepalives); reset per Start via <see cref="Watchdog.DisplayWatchdog.Reset"/>.</summary>
+        internal bool WheelReadyObserved => _sessionLife._wheelReadyObserved;
         // Written on tick/start threads, read per inbound chunk on the serial
         // read thread — Interlocked (x86 64-bit).
         internal long SubscriptionResponseDeadlineTicksField
@@ -2611,16 +2626,27 @@ namespace MozaPlugin.Telemetry
             _propertyPushQueue.SendBody(init2);
 
             byte[] init7 = global::MozaPlugin.Protocol.SessionPropertyPushBuilder
-                .BuildSessionInitField7Body(slotIndex: 0u);
+                .BuildSessionInitField7Body();
             _propertyPushQueue.SendBody(init7);
 
             // kind=8 / kind=11 deliberately not emitted — see method-level
             // comment above and docs/protocol/sessions/session-0x02-ff-init.md
             // for the required body-decode work before re-attempting.
 
+            // Non-VGS display wheels: force the firmware display-rotation
+            // property off. V0 value frames misrouted at a non-V0 wheel (bad
+            // manual era pick) collide with property kind=5 and latch rotation
+            // on in wheel flash; these wheels have no UI anywhere to clear it.
+            var model = WheelModelInfoProvider?.Invoke();
+            if (model != null && model.HasDisplay == true && !model.SupportsDisplayRotation)
+            {
+                SendDashDisplayRotation(0);
+                MozaLog.Debug("[AZOM] Forced display rotation off (non-VGS display wheel)");
+            }
+
             _initHandshakeSession = ResolveFfSession();
             MozaLog.Debug(
-                $"[AZOM] Sent init handshake (kind=2 nonce + kind=7 slot=0) on FF session " +
+                $"[AZOM] Sent init handshake (kind=2 nonce + kind=7 enum=3) on FF session " +
                 $"0x{_initHandshakeSession:X2} (mirror of tier-def session).");
         }
 
@@ -2705,13 +2731,14 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Convenience: push the VGS display-rotation mode (0=off, 1=smooth,
+        /// Convenience: push the display-rotation mode (0=off, 1=smooth,
         /// 2=immediate). The wheel senses its own angle with an internal IMU and
         /// counter-rotates the dashboard; this only selects how. Sent once per
         /// change (not periodic), matching PitHouse. Values outside 0..2 are
-        /// clamped. Only VGS-family wheels act on it — see the VGS gate in
+        /// clamped. VGS: profile-driven — see the gate in
         /// <c>HardwareApplier.ApplyWheelToHardware</c> and the VGS-only UI in
-        /// <c>DashboardManagementControl</c>.
+        /// <c>DashboardManagementControl</c>. All other display wheels: forced
+        /// to 0 at session init and detection (no UI).
         /// </summary>
         public void SendDashDisplayRotation(int mode)
         {
@@ -3552,6 +3579,13 @@ namespace MozaPlugin.Telemetry
 
             try
             {
+                // Device display-log pull. Deliberately ABOVE the Preamble
+                // branch and the no-tiers early return below: the log is
+                // independent of whether telemetry is transmitting, so it must
+                // run whenever the session layer is up — during preamble, and
+                // on a wheel that has no bound dashboard (no tiers) at all.
+                TickEmitDeviceLogPoll();
+
                 // Preamble: ~1 second of heartbeats while the wheel acks our
                 // session opens and pushes its initial catalog + state. No
                 // telemetry, no value frames; once the tick countdown elapses
@@ -4695,6 +4729,238 @@ namespace MozaPlugin.Telemetry
             else if (_slowCounter % 8 == 0)
                 Send28xPoll();
             SendSession09Keepalive();
+        }
+
+        // ── Device display-log pull (FF kind=14 request / kind=15 receipt) ──
+        // The wheel display runs a Linux MOZADash app with its own logger.
+        // kind=14 asks for up to N lines; the device answers with a b2h kind=14
+        // zlib'd UTF-16BE line list; kind=15 tells it how many we consumed, and
+        // it drops that many. See docs/protocol/sessions/session-0x02-ff-init.md
+        // § Device log pull.
+
+        /// <summary>Lines requested per pull. PitHouse always asks for 100 —
+        /// 1468/1468 requests across bridge-20260731-064830.jsonl.</summary>
+        private const uint DeviceLogLinesPerPull = 100;
+
+        /// <summary>Milliseconds between steady-state pulls.</summary>
+        private const int DeviceLogPollIntervalMs = 60_000;
+
+        // Next pull due, in UTC ticks. 0 = due now — so the first pull of a
+        // connection goes out on the first tick after the sessions open rather
+        // than a minute later. That first pull is the valuable one: it drains
+        // the backlog the display accumulated while nothing was asking, which
+        // is where crash backtraces live (the reference capture returned lines
+        // dated 8 and 19 days before the session).
+        private long _deviceLogNextPullUtcTicks;
+        private int _pendingLogReceipt;
+        // Session the last payload arrived on; the receipt goes back there.
+        private int _deviceLogAckSession;
+        private bool _deviceLogDecodeFailLogged;
+        private bool _deviceLogFirstPullLogged;
+        private int _deviceLogRequestsSent;
+        private int _deviceLogPayloadsReceived;
+        private int _deviceLogLastRequestSession;
+
+        /// <summary>Device-log pull counters for the Diagnostics tab. Answers
+        /// "no log lines showed up — did we ever ask, and did anything come
+        /// back?" without needing a wire trace.</summary>
+        internal string DeviceLogPullStatus
+        {
+            get
+            {
+                int sent = System.Threading.Interlocked.CompareExchange(ref _deviceLogRequestsSent, 0, 0);
+                int got = System.Threading.Interlocked.CompareExchange(ref _deviceLogPayloadsReceived, 0, 0);
+                int sess = System.Threading.Interlocked.CompareExchange(ref _deviceLogLastRequestSession, 0, 0);
+                return $"{DeviceLogSourceName}: requests={sent} payloads={got} " +
+                       $"sess=0x{sess:X2} state={_state}";
+            }
+        }
+
+        // Scratch list for inbound FF records. Only ever touched on the serial
+        // read thread (FeedFfRecords), which is single per connection even when
+        // two senders share it.
+        private readonly Sessions.FfRecordStream _ffStream = new Sessions.FfRecordStream();
+        private readonly System.Collections.Generic.List<Sessions.FfRecord> _ffScratch
+            = new System.Collections.Generic.List<Sessions.FfRecord>(4);
+
+        /// <summary>
+        /// Poll the display for log lines and ack whatever the last reply
+        /// carried. Called from the tick body ABOVE the preamble branch and the
+        /// no-tiers early return, so it runs whenever the session layer is up —
+        /// the display's log has nothing to do with whether telemetry is
+        /// transmitting, and a wheel with no bound dashboard still has one.
+        ///
+        /// Paced on the clock rather than a tick count because the tick is
+        /// ~30 Hz here, and because the interval should not drift with
+        /// <c>_baseTickMs</c>.
+        ///
+        /// Requests ride <see cref="ResolveFfSession"/> ONLY — the same session
+        /// as the kind=2/7 init handshake. Never the tier-def session: that one
+        /// carries typed sub-msgs (type=0x01 tier-def, 0x04 catalog URL, 0x05
+        /// string value, 0x06 ack) and 0xFF is not a valid type there. A "send
+        /// the first pull to both sessions for good measure" version of this
+        /// wedged the wheel's session layer outright (bundle 6TD14R8V) — the
+        /// stray FF record landed on sess=0x01 at seq 2 during cold start.
+        ///
+        /// Gated on Active so nothing is injected mid-cold-start, but called
+        /// from ABOVE the tick's no-tiers early return, so a wheel with no
+        /// bound dashboard still pulls — the log is independent of whether
+        /// telemetry is actually transmitting.
+        ///
+        /// Fire-and-forget by design: the device answers only when it has new
+        /// lines, so silence is the normal steady state (1 657 requests produced
+        /// 174 payloads in the reference capture) and is not a fault.
+        /// </summary>
+        private void TickEmitDeviceLogPoll()
+        {
+            if (!DeviceLogPullEnabled) return;
+            // Never emit during Starting/Preamble — the cold-start handshake and
+            // tier-def own the session seq stream then.
+            if (_state != TelemetryState.Active) return;
+            // Don't consume the pending receipt if we can't actually send it.
+            if (!ConnectionIsConnected) return;
+            // Session must be open for an FF record to go anywhere.
+            if (MgmtPort == 0 && FlagByte == 0) return;
+
+            // Drain any receipt the read thread parked for us. Emitting it here
+            // rather than inline in the inbound handler keeps Session0xSeqLock
+            // off the serial read thread's ack path — a lock held there once
+            // deadlocked telemetry (see docs/DEVELOPMENT.md § Threading model).
+            int consumed = System.Threading.Interlocked.Exchange(ref _pendingLogReceipt, 0);
+            if (consumed > 0)
+            {
+                // Ack on the session the payload actually arrived on, not on
+                // wherever we'd send the next request.
+                byte ackSession = (byte)System.Threading.Interlocked.CompareExchange(
+                    ref _deviceLogAckSession, 0, 0);
+                if (ackSession == 0) ackSession = ResolveFfSession();
+                _propertyPushQueue.SendU32(
+                    SessionPropertyPushBuilder.KindDeviceLogReceipt,
+                    (uint)consumed,
+                    ackSession,
+                    // A receipt advances the device's read cursor by N; a later
+                    // one does NOT supersede an earlier one the way a brightness
+                    // value does, so it must stay in the retransmit queue.
+                    coalesce: false);
+            }
+
+            long now = DateTime.UtcNow.Ticks;
+            long due = System.Threading.Interlocked.Read(ref _deviceLogNextPullUtcTicks);
+            if (due != 0 && now < due) return;
+            System.Threading.Interlocked.Exchange(
+                ref _deviceLogNextPullUtcTicks,
+                now + DeviceLogPollIntervalMs * TimeSpan.TicksPerMillisecond);
+
+            byte session = ResolveFfSession();
+            _propertyPushQueue.SendU32(
+                SessionPropertyPushBuilder.KindDeviceLogRequest,
+                DeviceLogLinesPerPull,
+                session);
+            System.Threading.Interlocked.Increment(ref _deviceLogRequestsSent);
+            System.Threading.Interlocked.Exchange(ref _deviceLogLastRequestSession, session);
+
+            if (!_deviceLogFirstPullLogged)
+            {
+                _deviceLogFirstPullLogged = true;
+                MozaLog.Debug(
+                    $"[AZOM] Device log pull started on sess=0x{session:X2} " +
+                    $"({DeviceLogLinesPerPull} lines, every {DeviceLogPollIntervalMs / 1000}s)");
+            }
+        }
+
+        /// <summary>Whether the device-log pull is on. Gates BOTH directions —
+        /// with it off the inbound reassembler must not run either, or the
+        /// plugin still buffers + scans every catalog-session chunk and still
+        /// files device log text into bug-report bundles.</summary>
+        private static bool DeviceLogPullEnabled
+            => MozaPlugin.Instance?.Settings?.EnableDeviceLogPull == true;
+
+        /// <summary>Feed one inbound session-data chunk to the FF-record
+        /// reassembler and route any completed records. Serial read thread.
+        /// This is a second reader of the same bytes the channel-catalog parser
+        /// consumes — it never mutates that parser's state.</summary>
+        internal void FeedFfRecords(byte session, int seq, byte[] chunkPayload)
+        {
+            if (chunkPayload == null || chunkPayload.Length <= 4) return;
+            if (!DeviceLogPullEnabled) return;
+            _ffScratch.Clear();
+            _ffStream.Append(session, seq, chunkPayload, _ffScratch);
+            for (int i = 0; i < _ffScratch.Count; i++)
+            {
+                var rec = _ffScratch[i];
+                // kind=14 is bidirectional: 4-byte value = a request (ours,
+                // echoed back), anything larger = the log payload.
+                if (rec.Kind == SessionPropertyPushBuilder.KindDeviceLogRequest
+                    && rec.Value.Length > 4)
+                    OnDeviceLogPayload(rec.Session, rec.Value);
+            }
+        }
+
+        /// <summary>Handle a b2h kind=14 device-log payload. Serial read thread:
+        /// parses and stores, but parks the kind=15 receipt for the tick thread
+        /// to emit.</summary>
+        private void OnDeviceLogPayload(byte session, byte[] value)
+        {
+            System.Threading.Interlocked.Increment(ref _deviceLogPayloadsReceived);
+            var result = Diagnostics.DeviceLogParser.Parse(value);
+            if (!result.Decoded)
+            {
+                // Nothing to ack: without the device's own count we can't
+                // advance its cursor, so it will re-send this same block. Warn
+                // (not Debug) — it means the pull is stuck for this connection.
+                if (!_deviceLogDecodeFailLogged)
+                {
+                    _deviceLogDecodeFailLogged = true;
+                    MozaLog.Warn(
+                        $"[AZOM] Device log payload on sess=0x{session:X2} did not decode " +
+                        $"({value?.Length ?? 0}B) — log pull is stalled for this connection");
+                }
+                return;
+            }
+
+            if (result.Lines.Length > 0)
+                MozaPlugin.Instance?.DeviceLogForDiagnostics?.Record(DeviceLogSourceName, result.Lines);
+
+            // Ack the count the DEVICE declared, not the number of lines we
+            // managed to walk, and ack it on the session the payload arrived on.
+            // The device clears by its own count, so acking a short walk would
+            // leave the remainder queued to be re-sent on every subsequent pull
+            // — a permanent stall.
+            if (result.DeclaredCount > 0)
+            {
+                System.Threading.Interlocked.Exchange(ref _deviceLogAckSession, session);
+                System.Threading.Interlocked.Add(ref _pendingLogReceipt, result.DeclaredCount);
+            }
+
+            string detail = result.Lines.Length != result.DeclaredCount
+                ? $"decoded {result.Lines.Length} of {result.DeclaredCount} declared line(s)"
+                : $"{result.DeclaredCount} line(s)";
+            MozaLog.Debug($"[AZOM] Device log ({DeviceLogSourceName}): {detail} on sess=0x{session:X2}");
+        }
+
+        /// <summary>Label recorded against this sender's log lines. A rig can
+        /// run a wheel screen and a CM2 dash concurrently, each with its own
+        /// logger feeding the shared store.</summary>
+        private string DeviceLogSourceName
+            => IsStandaloneDashboardTarget || TargetDeviceId == MozaProtocol.DeviceDash
+                ? "dash"
+                : "wheel";
+
+        /// <summary>Reset device-log pull state. Called on both start and stop —
+        /// on stop so up to 512 kB of per-session reassembly buffers aren't held
+        /// by an idle sender.</summary>
+        internal void ResetDeviceLogPull()
+        {
+            _ffStream.Clear();
+            _deviceLogDecodeFailLogged = false;
+            _deviceLogFirstPullLogged = false;
+            System.Threading.Interlocked.Exchange(ref _deviceLogRequestsSent, 0);
+            System.Threading.Interlocked.Exchange(ref _deviceLogPayloadsReceived, 0);
+            System.Threading.Interlocked.Exchange(ref _deviceLogLastRequestSession, 0);
+            System.Threading.Interlocked.Exchange(ref _pendingLogReceipt, 0);
+            System.Threading.Interlocked.Exchange(ref _deviceLogAckSession, 0);
+            // 0 = due now, so a reconnect re-pulls the backlog immediately.
+            System.Threading.Interlocked.Exchange(ref _deviceLogNextPullUtcTicks, 0);
         }
 
         // ── Session management ──────────────────────────────────────────────

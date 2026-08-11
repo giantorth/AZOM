@@ -165,52 +165,24 @@ namespace MozaPlugin.Devices.StalksTruckSim
             return false;
         }
 
-        // ------------------------------------------------------------------
-        // Key name → scan code (Set 1 "make" codes). Accepts single chars
-        // (case-insensitive) and friendly names ("Comma", "Minus", "F1"…).
-        // ------------------------------------------------------------------
-        private static readonly Dictionary<string, ushort> ScanCodes =
-            new Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase)
-        {
-            {"A",0x1E},{"B",0x30},{"C",0x2E},{"D",0x20},{"E",0x12},{"F",0x21},{"G",0x22},
-            {"H",0x23},{"I",0x17},{"J",0x24},{"K",0x25},{"L",0x26},{"M",0x32},{"N",0x31},
-            {"O",0x18},{"P",0x19},{"Q",0x10},{"R",0x13},{"S",0x1F},{"T",0x14},{"U",0x16},
-            {"V",0x2F},{"W",0x11},{"X",0x2D},{"Y",0x15},{"Z",0x2C},
-            {"0",0x0B},{"1",0x02},{"2",0x03},{"3",0x04},{"4",0x05},{"5",0x06},
-            {"6",0x07},{"7",0x08},{"8",0x09},{"9",0x0A},
-            {"Minus",0x0C},{"-",0x0C},{"Equals",0x0D},{"=",0x0D},
-            {"Comma",0x33},{",",0x33},{"Period",0x34},{".",0x34},
-            {"Slash",0x35},{"/",0x35},{"Semicolon",0x27},{";",0x27},
-            {"Apostrophe",0x28},{"'",0x28},{"LeftBracket",0x1A},{"[",0x1A},
-            {"RightBracket",0x1B},{"]",0x1B},{"Backslash",0x2B},{"\\",0x2B},
-            {"Grave",0x29},{"`",0x29},
-            {"Space",0x39},{"Enter",0x1C},{"Tab",0x0F},{"Escape",0x01},{"Esc",0x01},
-            {"F1",0x3B},{"F2",0x3C},{"F3",0x3D},{"F4",0x3E},{"F5",0x3F},{"F6",0x40},
-            {"F7",0x41},{"F8",0x42},{"F9",0x43},{"F10",0x44},{"F11",0x57},{"F12",0x58},
-        };
-
-        /// <summary>Resolve a key name to a Set-1 scan code. Returns 0 if unknown.</summary>
-        public static ushort ScanCode(string keyName)
-        {
-            if (string.IsNullOrEmpty(keyName)) return 0;
-            return ScanCodes.TryGetValue(keyName.Trim(), out var s) ? s : (ushort)0;
-        }
-
-        /// <summary>Whether a key name resolves to a known scan code.</summary>
-        public static bool IsKnownKey(string keyName) => ScanCode(keyName) != 0;
+        /// <summary>Resolve a stored key string to a Set-1 scan code. Returns 0 if unknown.</summary>
+        public static ushort ScanCode(string keyName) => KeyCodes.Parse(keyName);
 
         // ------------------------------------------------------------------
         // Win32 SendInput
         // ------------------------------------------------------------------
         private void SendKey(ushort scan, bool down)
         {
-            uint flags = KEYEVENTF_SCANCODE | (down ? 0u : KEYEVENTF_KEYUP);
+            // Extended (E0-prefixed) keys carry 0xE0 in the high byte of the code.
+            bool ext = (scan & 0xFF00) == 0xE000;
+            uint flags = KEYEVENTF_SCANCODE | (down ? 0u : KEYEVENTF_KEYUP)
+                | (ext ? KEYEVENTF_EXTENDEDKEY : 0u);
             var inputs = new INPUT[1];
             inputs[0].type = INPUT_KEYBOARD;
             inputs[0].U.ki = new KEYBDINPUT
             {
                 wVk = 0,
-                wScan = scan,
+                wScan = (ushort)(scan & 0xFF),
                 dwFlags = flags,
                 time = 0,
                 dwExtraInfo = IntPtr.Zero,
@@ -219,6 +191,7 @@ namespace MozaPlugin.Devices.StalksTruckSim
         }
 
         private const uint INPUT_KEYBOARD = 1;
+        private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
         private const uint KEYEVENTF_KEYUP = 0x0002;
         private const uint KEYEVENTF_SCANCODE = 0x0008;
 

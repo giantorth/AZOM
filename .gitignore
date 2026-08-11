@@ -9,14 +9,11 @@ serialcapture.txt
 *.pcapng
 usb-cap*
 Screenshot*.png
+*moza-diagnostics-bundle*.zip
 
 ## Build output
 bin/
 obj/
-
-## Node / Eleventy site build
-node_modules/
-_site/
 
 ## Visual Studio / Rider
 .vs/
@@ -27,6 +24,14 @@ _site/
 
 ## NuGet
 packages/
+
+## Cloudflare Worker — kept out of the repo for now (infra + call details).
+worker/
+## wrangler local state / deps / local secrets (also matches inside worker/)
+.wrangler/
+node_modules/
+.dev.vars
+*.dev.vars
 
 ## OS
 Thumbs.db

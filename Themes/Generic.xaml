@@ -424,10 +424,25 @@
                               StrokeEndLineCap="Round"
                               Fill="{x:Null}"/>
                         <Canvas IsHitTestVisible="False">
+                            <!-- Third tip dot only makes sense when a Third series is
+                                 actually bound (mBooster/Pedals traces); the two-series
+                                 bandwidth chart never sets ThirdSamples, which left
+                                 ThirdTipX/Y at their (0,0) default and pinned a stray
+                                 dot in the upper-left corner. -->
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding ThirdBrush}"
                                      Canvas.Left="{Binding ThirdTipX, RelativeSource={RelativeSource TemplatedParent}}"
-                                     Canvas.Top="{Binding ThirdTipY, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                     Canvas.Top="{Binding ThirdTipY, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ThirdLineGeometry, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding OutBrush}"
                                      Canvas.Left="{Binding OutTipX, RelativeSource={RelativeSource TemplatedParent}}"
@@ -515,6 +530,58 @@
                 <ControlTemplate TargetType="{x:Type controls:KnobRingViz}">
                     <Canvas x:Name="PART_Canvas" Width="100" Height="100"
                             Background="Transparent"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- KeyCaptureBox                                                 -->
+    <!-- ============================================================ -->
+
+    <Style TargetType="{x:Type controls:KeyCaptureBox}">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="MinWidth" Value="120"/>
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type controls:KeyCaptureBox}">
+                    <Border x:Name="Bd"
+                            Background="{StaticResource BgDeepBrush}"
+                            BorderBrush="{StaticResource BorderBrightBrush}"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Padding="10,5"
+                            SnapsToDevicePixels="True">
+                        <TextBlock x:Name="Txt"
+                                   Text="{Binding DisplayText, RelativeSource={RelativeSource TemplatedParent}}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="KeyCode" Value="0">
+                            <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsCapturing" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ToggleOnBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderGlowBrush}"/>
+                            <Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource ToggleOnTextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

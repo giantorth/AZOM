@@ -1,5 +1,6 @@
 using System;
 using SimHub.Plugins;
+using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
 
 namespace MozaPlugin
@@ -73,6 +74,15 @@ namespace MozaPlugin
             _plugin.AttachDelegate("AZOM.LeftPaddle", () => _plugin.Data?.LeftPaddlePosition ?? 0);
             _plugin.AttachDelegate("AZOM.RightPaddle", () => _plugin.Data?.RightPaddlePosition ?? 0);
             _plugin.AttachDelegate("AZOM.CombinedPaddle", () => _plugin.Data?.CombinedPaddlePosition ?? 0);
+
+            // AB9 active shifter presence + current mechanical layout (issue #112).
+            // The active profile's Ab9 block is authoritative for the layout — the
+            // UI combo and the layout actions write it, and HardwareApplier pushes
+            // it on connect; the device offers no parsed layout read-back. The label
+            // is the invariant English UI string so dashboards can key on the value
+            // regardless of UI language.
+            _plugin.AttachDelegate("AZOM.Ab9Connected", () => (_plugin.Ab9Manager?.IsConnected ?? false) || _plugin.IsAb9Detected);
+            _plugin.AttachDelegate("AZOM.Ab9Layout", () => Ab9LayoutLabel(CurrentAb9Layout()));
         }
 
         internal void RegisterActions()
@@ -99,6 +109,18 @@ namespace MozaPlugin
             AddStepActions("AZOM.Ab9EngineIntensity",    5, 10, StepAb9EngineIntensity);    // 0..100
             AddStepActions("AZOM.Ab9EngineFrequency",   10, 20, StepAb9EngineFrequency);    // 0..200 Hz
             AddStepActions("AZOM.Ab9GearShiftIntensity", 5, 10, StepAb9GearShiftIntensity); // 0..100
+
+            // AB9 mechanical layout (issue #112): Next/Prev cycle the six layouts
+            // in UI-combo order (wraparound), plus one direct-set action per
+            // layout. With the AB9 offline the choice still lands in the profile
+            // and applies on the next connect.
+            _plugin.AddAction("AZOM.Ab9LayoutNext", (a, b) => CycleAb9Layout(+1));
+            _plugin.AddAction("AZOM.Ab9LayoutPrev", (a, b) => CycleAb9Layout(-1));
+            foreach (var layout in Ab9Layouts)
+            {
+                var target = layout.Mode; // capture per iteration
+                _plugin.AddAction("AZOM.Ab9Layout" + layout.Suffix, (a, b) => SetAb9Layout(target));
+            }
 
             // Cycle the wheel's displayed dashboard (wraparound).
             _plugin.AddAction("AZOM.DashboardNext", (a, b) => CycleDashboard(+1));
@@ -331,7 +353,7 @@ namespace MozaPlugin
         {
             var data = _plugin.Data;
             if (data == null) return;
-            int deg = ClampStep(data.Limit * 2, deltaDeg, 90, 2700);
+            int deg = ClampStep(data.Limit * 2, deltaDeg, 60, 2700);
             int raw = deg / 2;
             data.Limit = raw;
             data.MaxAngle = raw;
@@ -385,10 +407,70 @@ namespace MozaPlugin
             return profile.Ab9;
         }
 
-        // Flip dashboard telemetry for the active wheel page. No-op when no wheel
-        // page is identified (ActiveTelemetryEnabled set is a no-op there).
+        // The six mechanical layouts in UI-combo order (cf. SettingsControl's
+        // Ab9ModeCombo): action-name suffix + the invariant label the
+        // AZOM.Ab9Layout property reports (matches the English UI strings).
+        private static readonly (Ab9Mode Mode, string Suffix, string Label)[] Ab9Layouts =
+        {
+            (Ab9Mode.FivePlusR_L1,  "5R1",        "5+R Layout 1"),
+            (Ab9Mode.SixPlusR_L1,   "6R1",        "6+R Layout 1"),
+            (Ab9Mode.SixPlusR_L2,   "6R2",        "6+R Layout 2"),
+            (Ab9Mode.SevenPlusR_L1, "7R1",        "7+R Layout 1"),
+            (Ab9Mode.SevenPlusR_L2, "7R2",        "7+R Layout 2"),
+            (Ab9Mode.Sequential,    "Sequential", "Sequential"),
+        };
+
+        private static string Ab9LayoutLabel(Ab9Mode mode)
+        {
+            foreach (var l in Ab9Layouts)
+                if (l.Mode == mode) return l.Label;
+            return mode.ToString();
+        }
+
+        // Active profile's layout without creating the Ab9 block (property getters
+        // must not mutate). SevenPlusR_L1 mirrors the Ab9Settings default so a
+        // missing block reads the same as the UI's defaults.
+        private Ab9Mode CurrentAb9Layout()
+            => _plugin.Settings?.ProfileStore?.CurrentProfile?.Ab9?.Mode ?? Ab9Mode.SevenPlusR_L1;
+
+        private void CycleAb9Layout(int delta)
+        {
+            var current = CurrentAb9Layout();
+            int cur = -1;
+            for (int i = 0; i < Ab9Layouts.Length; i++)
+                if (Ab9Layouts[i].Mode == current) { cur = i; break; }
+            int n = Ab9Layouts.Length;
+            // Unrecognised persisted value: step in from the appropriate end.
+            int target = cur < 0
+                ? (delta > 0 ? 0 : n - 1)
+                : ((cur + delta) % n + n) % n;
+            SetAb9Layout(Ab9Layouts[target].Mode);
+        }
+
+        // Mirror of Ab9ModeCombo_Changed's commit path: profile + device push +
+        // persist. An open settings panel re-reads the combo on its refresh tick.
+        private void SetAb9Layout(Ab9Mode mode)
+        {
+            var ab9 = GetOrCreateActiveAb9();
+            if (ab9 == null) return;
+            ab9.Mode = mode;
+            _plugin.Ab9Manager?.SendMode(mode);
+            _plugin.SaveSettings();
+            MozaLog.Debug($"[AZOM] AB9 layout → {Ab9LayoutLabel(mode)} via action");
+        }
+
+        // Flip dashboard telemetry for the active wheel page. With no wheel identified
+        // the wheel-page flag is unwritable, so target the dash pipeline instead —
+        // otherwise the action does nothing at all on a hub-only / dash-only rig.
         private void ToggleDashboardTelemetry()
         {
+            if (!_plugin.GetCurrentWheelPageGuid().HasValue)
+            {
+                bool dashOn = !_plugin.ActiveDashTelemetryEnabled;
+                _plugin.SetDashTelemetryEnabled(dashOn);
+                MozaLog.Debug($"[AZOM] Dash telemetry → {(dashOn ? "on" : "off")} via action (no wheel)");
+                return;
+            }
             bool turningOn = !_plugin.ActiveTelemetryEnabled;
             _plugin.SetTelemetryEnabled(turningOn);
             MozaLog.Debug($"[AZOM] Dashboard telemetry → {(turningOn ? "on" : "off")} via action");

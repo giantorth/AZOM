@@ -43,6 +43,16 @@ namespace MozaPlugin.Devices
         private readonly Action<MBoosterDeviceController>? _onDeviceDetectedEdge;
         private readonly Func<string, double> _customEffectFormulaEvaluator;
         private readonly Action<string, string>? _onSerialResolved;
+        private readonly Func<string, bool[]?>? _connectivitySeedLookup;
+        private readonly Action<string, bool[]>? _onConnectivityResolved;
+
+        // Highest merged position (0..100) each role has reached this session —
+        // diagnostics-only, so a support bundle can prove whether pedal input
+        // ever flowed through the merge to MozaData (vs. "the graph never
+        // moved" with no way to tell if anyone pressed).
+        private int _maxThrottleSeen, _maxBrakeSeen, _maxClutchSeen;
+        public (int throttle, int brake, int clutch) MaxMergedPositionsSeen =>
+            (_maxThrottleSeen, _maxBrakeSeen, _maxClutchSeen);
 
         // Collision logging — emit at most one warning per (role, identity-tail)
         // combo per session to avoid spam.
@@ -82,7 +92,9 @@ namespace MozaPlugin.Devices
             Func<bool> isShuttingDown,
             Action<MBoosterDeviceController>? onDeviceDetectedEdge = null,
             Func<string, double>? customEffectFormulaEvaluator = null,
-            Action<string, string>? onSerialResolved = null)
+            Action<string, string>? onSerialResolved = null,
+            Func<string, bool[]?>? connectivitySeedLookup = null,
+            Action<string, bool[]>? onConnectivityResolved = null)
         {
             _data = data ?? throw new ArgumentNullException(nameof(data));
             _settingsLookup = settingsLookup ?? throw new ArgumentNullException(nameof(settingsLookup));
@@ -90,6 +102,8 @@ namespace MozaPlugin.Devices
             _onDeviceDetectedEdge = onDeviceDetectedEdge;
             _customEffectFormulaEvaluator = customEffectFormulaEvaluator ?? (_ => 0.0);
             _onSerialResolved = onSerialResolved;
+            _connectivitySeedLookup = connectivitySeedLookup;
+            _onConnectivityResolved = onConnectivityResolved;
         }
 
         /// <summary>
@@ -145,15 +159,28 @@ namespace MozaPlugin.Devices
                         try { _onSerialResolved?.Invoke(id, ser); }
                         catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnSerialResolved: {ex.Message}"); }
                     };
+                    // Forward live connectivity so the plugin can persist it
+                    // (the seed for the NEXT controller) and heal stale roles.
+                    c.ConnectivityResolved += conn =>
+                    {
+                        try { _onConnectivityResolved?.Invoke(c.Identity, conn); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnConnectivityResolved: {ex.Message}"); }
+                    };
+                    // Arm phantom-axis protection immediately from the persisted
+                    // last-known connectivity (live diagnostic overrides later).
+                    try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(kvp.Key)); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
                     _byIdentity[kvp.Key] = c;
                     _order.Add(c);
                     (added ??= new List<MBoosterDeviceController>()).Add(c);
                 }
 
-                // Drop stale ones.
+                // Drop stale ones. Routed lanes have no USB port to diff
+                // against — their lifecycle follows the owning base/hub pipe.
                 var toRemove = new List<string>();
                 foreach (var kvp in _byIdentity)
                 {
+                    if (kvp.Value.IsRouted) continue;
                     if (!currentByIdentity.ContainsKey(kvp.Key))
                         toRemove.Add(kvp.Key);
                 }
@@ -214,6 +241,72 @@ namespace MozaPlugin.Devices
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Reconnect: {ex.Message}"); }
                 }
             }
+
+            // Routed lanes: re-elicit detection after the owning pipe comes
+            // back (a USB lane does this from its own TryConnect; a routed
+            // lane never opens the shared pipe itself). Runs on the same 5 s
+            // cadence and stops as soon as an mbooster-* response re-latches.
+            List<MBoosterDeviceController>? toNudge = null;
+            lock (_lock)
+            {
+                foreach (var c in _order)
+                    if (c.IsRouted && c.IsConnected && !c.Detected)
+                        (toNudge ??= new List<MBoosterDeviceController>()).Add(c);
+            }
+            if (toNudge != null)
+            {
+                foreach (var c in toNudge)
+                {
+                    try { c.RequestCalibrationReads(); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed re-detect: {ex.Message}"); }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Register a ROUTED lane — an mBooster tunneled behind a wheelbase/hub
+        /// pedal port (dev 0x19) rather than on its own USB pipe. The caller
+        /// (MozaPlugin) creates the controller against the owning pipe's shared
+        /// connection and only registers it once the model-name read has
+        /// confirmed an actual mBooster. Wires the same events as USB discovery;
+        /// identity/detection already latched during the pre-registration probe
+        /// are replayed so settings apply and serial re-keying happen exactly
+        /// once, same as a USB lane's rising edge.
+        /// </summary>
+        public void AddRoutedLane(MBoosterDeviceController c)
+        {
+            if (c == null || !c.IsRouted) return;
+            lock (_lock)
+            {
+                if (_byIdentity.ContainsKey(c.Identity)) return;
+                c.DetectedRisingEdge += () => OnControllerDetected(c);
+                c.SerialResolved += (id, ser) =>
+                {
+                    try { _onSerialResolved?.Invoke(id, ser); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnSerialResolved: {ex.Message}"); }
+                };
+                c.ConnectivityResolved += conn =>
+                {
+                    try { _onConnectivityResolved?.Invoke(c.Identity, conn); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnConnectivityResolved: {ex.Message}"); }
+                };
+                try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(c.Identity)); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
+                _byIdentity[c.Identity] = c;
+                _order.Add(c);
+                Volatile.Write(ref _controllerCount, _order.Count);
+            }
+            MozaLog.Info($"[AZOM/mBooster] Routed lane registered: {MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName}, dev 0x{c.HostDeviceId:x2})");
+            c.StartWorkers();
+            // Replay identity already gathered by the probe: the rising edge
+            // and serial both fired before these handlers were wired.
+            if (c.Detected) OnControllerDetected(c);
+            if (!string.IsNullOrEmpty(c.Serial))
+            {
+                try { _onSerialResolved?.Invoke(c.Identity, c.Serial!); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnSerialResolved replay: {ex.Message}"); }
+            }
+            try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceAdded handler: {ex.Message}"); }
         }
 
         private void OnControllerDetected(MBoosterDeviceController c)
@@ -231,7 +324,35 @@ namespace MozaPlugin.Devices
             lock (_lock)
             {
                 for (int i = 0; i < _order.Count; i++)
-                    _order[i].PostTelemetry(snap);
+                {
+                    var c = _order[i];
+                    if (c.IsRouted)
+                    {
+                        // A routed lane has no mBooster HID of its own — its
+                        // positions arrive via the base HID → MozaData. Mirror
+                        // them back in by role so the UI bars/curve markers and
+                        // the workers' live-position feeds (test toggles, Brake
+                        // Fade) track the real pedal.
+                        var s = _settingsLookup(c.Identity);
+                        int axisCount = c.AxisCount > 0 ? c.AxisCount : 3;
+                        if (axisCount > MBoosterDeviceController.MaxAxes) axisCount = MBoosterDeviceController.MaxAxes;
+                        for (int a = 0; a < axisCount; a++)
+                        {
+                            double v;
+                            switch (ResolveAxisRole(s, a, axisCount))
+                            {
+                                case MBoosterRole.Throttle: v = _data.ThrottlePosition / 100.0; break;
+                                case MBoosterRole.Brake:    v = _data.BrakePosition / 100.0; break;
+                                case MBoosterRole.Clutch:   v = _data.ClutchPosition / 100.0; break;
+                                default: v = 0; break;
+                            }
+                            c.LastAxisPositions[a] = v;
+                            if (a < c.LastAxisRawPercentPreCurve.Length) c.LastAxisRawPercentPreCurve[a] = v * 100.0;
+                            if (a == 0) { c.LastHidPosition = v; c.LastRawPercentPreCurve = v * 100.0; }
+                        }
+                    }
+                    c.PostTelemetry(snap);
+                }
             }
         }
 
@@ -310,7 +431,11 @@ namespace MozaPlugin.Devices
             if (axisIndex > 0)
             {
                 var pedals = laneSettings?.Pedals;
-                cfg = (pedals != null && pedals.TryGetValue(axisIndex, out var pp)) ? pp : null;
+                if (pedals != null && pedals.TryGetValue(axisIndex, out var pp)) cfg = pp;
+                // Sole-connected-pedal fallback: a standalone unit's pedal on
+                // a non-zero axis may keep its config in the flat fields —
+                // see MBoosterDeviceController.SoleConnectedAxis.
+                else cfg = c.SoleConnectedAxis() == axisIndex ? laneSettings : null;
             }
 
             double posPct = pos01 * 100.0;
@@ -657,7 +782,11 @@ namespace MozaPlugin.Devices
         /// Walk all devices in enumeration order and assign each device's
         /// position to the matching <c>MozaData</c> field if its role is set.
         /// First-wins on collision (later devices with the same role are
-        /// ignored). Devices with Role=Disabled contribute nothing.
+        /// ignored). Devices with Role=Disabled contribute nothing. Axes the
+        /// "PD Linked" diagnostic reports as having no pedal are skipped —
+        /// the HID exposes 3 axes regardless of how many pedals are wired,
+        /// and a phantom axis's role claim would otherwise first-wins a real
+        /// pedal's role with a frozen 0 position.
         /// </summary>
         private readonly HashSet<string> _unmatchedHidLogged =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -694,6 +823,11 @@ namespace MozaPlugin.Devices
                 for (int i = 0; i < _order.Count; i++)
                 {
                     var c = _order[i];
+                    // Routed lanes never merge: their positions already ARRIVE
+                    // as MozaData.{Throttle,Brake,Clutch}Position via the base
+                    // HID path — merging the mirrored copies back would just
+                    // echo (or, before the mirror ticks, zero) the real values.
+                    if (c.IsRouted) continue;
                     var s = _settingsLookup(c.Identity);
                     int rawAxisCount = c.AxisCount > 0 ? c.AxisCount : 1;
                     if (rawAxisCount > MBoosterDeviceController.MaxAxes) rawAxisCount = MBoosterDeviceController.MaxAxes;
@@ -721,15 +855,15 @@ namespace MozaPlugin.Devices
                         switch (role)
                         {
                             case MBoosterRole.Throttle:
-                                if (!throttleSet) { _data.ThrottlePosition = v100; throttleSet = true; }
+                                if (!throttleSet) { _data.ThrottlePosition = v100; throttleSet = true; if (v100 > _maxThrottleSeen) _maxThrottleSeen = v100; }
                                 else { LogCollisionOnce("throttle", c.Identity); }
                                 break;
                             case MBoosterRole.Brake:
-                                if (!brakeSet) { _data.BrakePosition = v100; brakeSet = true; }
+                                if (!brakeSet) { _data.BrakePosition = v100; brakeSet = true; if (v100 > _maxBrakeSeen) _maxBrakeSeen = v100; }
                                 else { LogCollisionOnce("brake", c.Identity); }
                                 break;
                             case MBoosterRole.Clutch:
-                                if (!clutchSet) { _data.ClutchPosition = v100; clutchSet = true; }
+                                if (!clutchSet) { _data.ClutchPosition = v100; clutchSet = true; if (v100 > _maxClutchSeen) _maxClutchSeen = v100; }
                                 else { LogCollisionOnce("clutch", c.Identity); }
                                 break;
                         }

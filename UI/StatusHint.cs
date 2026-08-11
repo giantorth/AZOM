@@ -34,6 +34,10 @@ namespace MozaPlugin.UI
         // The pipeline parked in a benign DEGRADED state (e.g. a screenless wheel
         // with no display sub-device) — expected, not a failure; calm wording.
         TelemetryDegraded,
+        // A wheel on a new-protocol-only id (0x17/0x15) classified old-protocol —
+        // a current-generation wheel answering like a legacy one, i.e. outdated
+        // firmware. Remediation: update wheel/base firmware in MOZA Pit House.
+        WheelFirmwareOutdated,
     }
 
     /// <summary>

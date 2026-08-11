@@ -21,7 +21,7 @@ namespace MozaPlugin.Protocol
         /// <summary>
         /// Parse a response (null = unrecognized). <paramref name="busHint"/> overrides
         /// the auto-derived device hint to resolve dev 0x12 collisions:
-        ///   "ab9"      — AB9 active shifter on its own PID 0x1000 USB pipe
+        ///   "ab9"      — AB9 / AB6 active shifter on its own PID 0x1000 / 0x1002 USB pipe
         ///   "mbooster" — Moza mBooster Pedals on its own PID 0x0008 USB pipe
         /// Wheelbase main, AB9 main and mBooster main all use device id 0x12;
         /// the bus hint is the only way to tell them apart at the parser layer.
@@ -111,6 +111,15 @@ namespace MozaPlugin.Protocol
             // reply would collide with base-*/wheel-* in the shared groups.
             if (deviceHint == null && deviceId == MozaProtocol.DeviceEsWheel)
                 deviceHint = "es-wheel";
+
+            // dev 0x15 / 0x17 (DeviceWheel) → "wheel" so the wheel's identity
+            // probes (groups 2/4/5/6/7/8/9/15/17) resolve deterministically
+            // against the wheel-* bucket instead of by command-registration order.
+            // docs/how-to-query-device-type.md treats 0x15/0x17/0x18 as the three
+            // wheel-identity device ids; 0x18 maps to es-wheel just above.
+            if (deviceHint == null
+                && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15))
+                deviceHint = "wheel";
 
             // dev 0x1A → "shifter" so a base/hub-relayed shifter's identity probes
             // (esp. the group-0x04 device-type reply, which shares its response group

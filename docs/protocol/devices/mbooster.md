@@ -42,6 +42,86 @@ two ways:
 | Baud rate       | 115200                                      |
 | Stable identity | USB device instance segment from the registry walk; fallback to the device instance ID surfaced by `HidDevice.DevicePath` — see `MBoosterDeviceController.Identity` |
 
+## Chain topology & connectivity diagnostics
+
+A lane's motor/config device ids are role-based: `0x12` (host) throttle,
+`0x1d` brake, `0x1e` clutch — but only when more than one pedal is
+genuinely wired. A **standalone unit's sole pedal always lives at `0x12`**
+regardless of which HID axis it reports on (confirmed on two units,
+support bundles 2026-07-30: every response frame across both came from
+`0x12`; `0x1d`/`0x1e` never acked anything).
+
+**The presence read (`mbooster-presence`) carries no chain information.**
+Three distinct topologies all returned raw `[00 02]`: a confirmed
+standalone 3-axis unit, a standalone 4-axis unit, and the 2-pedal-chain
+capture that originally suggested the last byte was a sub-device count.
+The only reliable connectivity source is the group-`0x0E` firmware
+diagnostic stream, which the device re-emits about once a minute in one
+of two dialects:
+
+| | Short form (device-type `01-02-00-08`, 3 HID axes) | Long form (device-type `01-02-07-05`, 4 HID axes) |
+|---|---|---|
+| Connectivity | `PD Linked:[T 0 B 1 C 0]` | `Pedals connected state: [throttle 0 brake 1 clutch 0]` |
+| Per-pedal type | `Brake pedal is connected, type: active pedal` / `Throttle pedal is not connected !` | same |
+| Sensor dir | `Sensor Dir:[T 1 B -1 C -1]` | `Sensor direction: [throttle 1 brake -1 clutch -1]` |
+| Output dir | `OP Dir:[T 0 B 0 C 0]` | `Output direction: [throttle 0 brake 0 clutch 0]` |
+| Pot angles | `T-PD:[min … max … angle …]` | `Throttle calibrate theta:[min … max … angle …]` |
+
+`MBoosterDeviceController.LogPedalDiagnosticIfRelevant` parses both
+connectivity forms into `ConnectedAxes` (authoritative for chain-ness
+once received; the presence read only bridges the window before it) and
+the per-pedal type lines into `AxisTypes` (active = has a motor,
+passive = no motor).
+
+The broadcast is only emitted about once a minute, so a freshly created
+controller (cold start, SimHub plugin restart) would otherwise run
+unprotected for up to that long. The plugin therefore persists each
+lane's last-known connectivity (`MozaPluginSettings.MBoosterKnownPedals`,
+keyed like the per-device settings) and seeds new controllers from it —
+the live diagnostic still overrides on arrival. When live connectivity
+proves a role is assigned to an axis with no pedal while a wired axis
+holds the same role, that provably-stale assignment is cleared across
+all profiles (logged one-time heal).
+
+The HID interface exposes 3–4 axes regardless of how many pedals are
+wired, and a sole pedal reports on its **role's** axis (brake → Ry =
+axis 1), not axis 0. The host `0x12` retains calibration registers for
+detached pedals (a standalone brake read back a non-default throttle
+register), so the calibration fingerprint that maps roles to chained
+motor ids must only consider roles the connectivity diagnostic reports
+as wired — see `MBoosterDeviceController.RecomputeChainRoleMap`.
+
+## Routed via wheelbase/hub (RJ45 pedal port, dev 0x19)
+
+An mBooster on a wheelbase's (or hub's) RJ45 pedal port never
+enumerates on USB — the base tunnels it as its standard **pedals
+sub-device `0x19`**, exactly like any other relayed peripheral, and Pit
+House drives it that way too. Same relayed-id pattern as the shifter
+(`0x12` on its own USB pipe, `0x1A` relayed). Confirmed on hardware
+(support bundle 2026-08-06, W17 base): every pedal read to `0x19`
+answers as `a3 91 …`, the ~1 Hz group-`0x25` per-pedal position polls
+flow, and the device's full diagnostic stream (PD Linked, per-pedal
+type, heartbeat) arrives on the base's `0x0E` channel with source byte
+`0x91` (= `0x19` nibble-swapped).
+
+The plugin registers a ROUTED mBooster lane for this hookup: when the
+pedal sub-device is detected on a base/hub pipe, its identity is probed
+at `0x19` and — model-name `mBooster` being the discriminator against
+plain SGP pedals, which answer the same identity groups — an
+`MBoosterDeviceController` is registered over the shared pipe. All
+mbooster-* traffic (identity, calibration, `0xb1` motor frames,
+keepalive) addresses `0x19`; `0x1d`/`0x1e` are never used on a shared
+bus (they belong to other peripherals — `0x1c` is the E-stop). Pedal
+positions in this topology arrive via the base HID / merged MozaData —
+the routed lane never participates in the position merge and mirrors
+the merged values back for its UI bars and effect workers.
+
+An mBooster can also be wired behind an **SRP control box** (plugged in
+as the box's brake pedal, box on USB PID `0x0003`). The box relays the
+same `src=0x91` diagnostics, but its CDC surface has no routed mBooster
+support here yet — captures show only the box answering. For full
+features use USB (PID `0x0008`) or the wheelbase pedal port.
+
 ## Frame shapes
 
 mBooster uses the same Moza wire framing as the wheelbase

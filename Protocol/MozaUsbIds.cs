@@ -32,6 +32,7 @@ namespace MozaPlugin.Protocol
         public const string PidWheelbaseR9     = "0x0006";
         public const string PidWheelbaseR12    = "0x0002";
         public const string PidAb9Shifter      = "0x1000";
+        public const string PidAb6Shifter      = "0x1002";
         public const string PidWheelbaseR16R21 = "0x0000";
         public const string PidPedalsCrp       = "0x0001";
         public const string PidPedalsSrp       = "0x0003";
@@ -77,6 +78,14 @@ namespace MozaPlugin.Protocol
                 [0x0024] = new InventoryEntry(MozaDeviceCategory.Stalks,    "MOZA Stalks"),
                 [0x0025] = new InventoryEntry(MozaDeviceCategory.Dashboard, "CM2 Racing Dash"),
                 [0x1000] = new InventoryEntry(MozaDeviceCategory.Ab9,       "AB9 active shifter"),
+                // AB6: AB9's sibling, same lane. Must stay in category Ab9, NOT
+                // Shifter — Shifter is the passive HGP/SGP family claimed by
+                // MozaStandalonePeripheralRegistry, whose descriptors address
+                // dev 0x1A on groups 0x51..0x54. The active shifters speak
+                // 0x1E/0x1F/0x20 on dev 0x12; re-categorizing hands the port to
+                // the wrong lane. Wire behaviour assumed identical to the AB9
+                // (docs/protocol/devices/ab9-shifter.md § AB6 sibling).
+                [0x1002] = new InventoryEntry(MozaDeviceCategory.Ab9,       "AB6 active shifter"),
             };
 
         // -------------------------------------------------------------
@@ -124,6 +133,10 @@ namespace MozaPlugin.Protocol
         public static bool IsShifterHgpPid(ushort pid)  => pid == 0x001E;
         public static bool IsShifterSgpPid(string? pid) => TryParsePid(pid, out var u) && u == 0x0023;
         public static bool IsShifterSgpPid(ushort pid)  => pid == 0x0023;
+        // AB9 (0x1000) vs AB6 (0x1002) share category Ab9 and the single active-
+        // shifter lane; only the display name differs.
+        public static bool IsAb6Pid(string? pid) => TryParsePid(pid, out var u) && u == 0x1002;
+        public static bool IsAb6Pid(ushort pid)  => pid == 0x1002;
         public static bool IsHandbrakePid(string? pid) => Categorize(pid) == MozaDeviceCategory.Handbrake;
         public static bool IsHandbrakePid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.Handbrake;
         public static bool IsHubPid(string? pid)       => Categorize(pid) == MozaDeviceCategory.Hub;
@@ -134,6 +147,24 @@ namespace MozaPlugin.Protocol
         public static bool IsMBoosterPid(ushort pid)   => Categorize(pid) == MozaDeviceCategory.MBooster;
         public static bool IsStalksPid(string? pid)    => Categorize(pid) == MozaDeviceCategory.Stalks;
         public static bool IsStalksPid(ushort pid)     => Categorize(pid) == MozaDeviceCategory.Stalks;
+
+        /// <summary>Short display name for the active-shifter lane, which the AB9
+        /// and AB6 share. Returns the family label for an unknown/null PID —
+        /// probe-based discovery (Wine, Proton) leaves
+        /// <c>MozaSerialConnection.DiscoveredPid</c> null, so callers must never
+        /// render that case as a specific model.</summary>
+        public static string ActiveShifterShortName(string? pid)
+            => IsAb6Pid(pid) ? "AB6" : IsAb9Pid(pid) ? "AB9" : "AB9/AB6";
+
+        /// <summary>All registered PIDs of one category, ascending (e.g. the wheelbase set for ShakeIt device detection).</summary>
+        public static IReadOnlyList<ushort> PidsForCategory(MozaDeviceCategory category)
+        {
+            var list = new List<ushort>();
+            foreach (var kv in Inventory)
+                if (kv.Value.Category == category) list.Add(kv.Key);
+            list.Sort();
+            return list;
+        }
 
         /// <summary>True iff the PID is registered in the inventory. Use this to gate "unknown PID" fallback paths.</summary>
         public static bool IsKnownMozaPid(string? pid)

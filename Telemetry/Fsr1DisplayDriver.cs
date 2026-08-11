@@ -183,14 +183,15 @@ namespace MozaPlugin.Telemetry
                 raw = raw * (m?.Scale ?? f.DefaultScale) + (m?.Bias ?? f.DefaultBias);
                 if (f.Kind == Fsr1FieldKind.SignedMagnitude)
                 {
-                    // Sign-magnitude: bit23 (data[9] bit7) = sign, the low **16 bits** (data[10-11])
-                    // = |value|. The firmware reads a 16-bit magnitude — the whole ACC capture kept
-                    // data[9] as pure sign (0x00/0x80). So clamp |value| to 0xFFFF: a >65.535 s gap
-                    // saturates instead of overflowing into the sign byte and wrapping to a wrong
-                    // small value. A negative delta (ahead) must not clamp to 0.
+                    // 24-bit sign-magnitude: bit23 (data[9] bit7) = sign, the low **23 bits**
+                    // (data[9] bits 0-6 + data[10-11]) = |value| in ms. Verified from a PitHouse
+                    // gap capture where data[9] carried magnitude bits (0x07/0x08/0x99) and the
+                    // range reached ±1640 s — so the field is NOT limited to ±65 s. Clamp |value|
+                    // to 0x7FFFFF only to keep the sign bit isolated (caps at ~2.3 h, unreachable
+                    // in practice). A negative delta (ahead) must not clamp to 0.
                     long sv = (long)raw;
                     long mag = System.Math.Abs(sv);
-                    if (mag > 0xFFFF) mag = 0xFFFF;
+                    if (mag > 0x7FFFFF) mag = 0x7FFFFF;
                     long v = (sv < 0 ? 0x800000L : 0L) | mag;
                     // Diagnostic: shows what we actually resolve vs what SimHub displays for this
                     // property. If 'resolved' ≠ the SimHub inspector value, we're reading a different
@@ -268,6 +269,21 @@ namespace MozaPlugin.Telemetry
                 return Fsr1DisplayEmitter.BuildRecord(dash, partition, slot => ValueForSlot(dash, slot));
             }
 
+            // Build a record, isolating a malformed partition/field so one bad record can't abort
+            // the whole tick — that used to swallow the exception at the Tick level and freeze ALL
+            // emission (the wheel, gap included, goes blank until the page changes). Returns null
+            // on error; the caller leaves that slot's last value in place and keeps streaming the rest.
+            byte[]? SafeRecordFor(Fsr1Dashboard dash)
+            {
+                try { return RecordFor(dash); }
+                catch (Exception ex)
+                {
+                    if (_tickCounter % oneHzEvery == 0)
+                        MozaLog.Debug($"[AZOM] FSR1 record 0x{dash.RecordType:X2} skipped (build error): {ex.Message}");
+                    return null;
+                }
+            }
+
             // Build the live numeric-viz record for one dash from its REAL telemetry values
             // (independent of probe/test — the panel shows actual data, not the probe pattern).
             Fsr1VizRecord BuildVizRecord(Fsr1Dashboard dash)
@@ -331,12 +347,13 @@ namespace MozaPlugin.Telemetry
                             // primary page keeps its full refresh. Matches PitHouse interleaving
                             // ~1 cache frame per 100 primary frames. Send() = non-retransmitting.
                             if (_tickCounter % (oneHzEvery * 2) == 0)
-                                _connection.Send(RecordFor(dash));
+                            { var bg = SafeRecordFor(dash); if (bg != null) _connection.Send(bg); }
                             continue;
                         }
-                        _connection.SendStream(
-                            (StreamKind)((int)StreamKind.TierDash0 + streamSlot),
-                            RecordFor(dash));
+                        var rec = SafeRecordFor(dash);
+                        if (rec != null)
+                            _connection.SendStream(
+                                (StreamKind)((int)StreamKind.TierDash0 + streamSlot), rec);
                         streamSlot++;
                     }
                 }
@@ -357,12 +374,13 @@ namespace MozaPlugin.Telemetry
                         if (dash.IsBackground)
                         {
                             if (_tickCounter % (oneHzEvery * 2) == 0)
-                                _connection.Send(RecordFor(dash));
+                            { var bg = SafeRecordFor(dash); if (bg != null) _connection.Send(bg); }
                             continue;
                         }
-                        _connection.SendStream(
-                            (StreamKind)((int)StreamKind.TierDash0 + slot),
-                            RecordFor(dash));
+                        var rec = SafeRecordFor(dash);
+                        if (rec != null)
+                            _connection.SendStream(
+                                (StreamKind)((int)StreamKind.TierDash0 + slot), rec);
                     }
                 }
             }
@@ -371,11 +389,21 @@ namespace MozaPlugin.Telemetry
             // values for the channel-mapping panel's byte strip (only while it asks for it).
             if (plugin != null && plugin.Fsr1VizActive)
             {
-                var vizSet = active.Length > 0 ? active : live;
-                var records = new Fsr1VizRecord[vizSet.Length];
-                for (int i = 0; i < vizSet.Length; i++)
-                    records[i] = BuildVizRecord(vizSet[i]);
-                plugin.SetFsr1VizSnapshot(new Fsr1VizSnapshot(records));
+                // UI-only preview — must never take down the streaming tick if one record's
+                // partition is malformed. Isolate it so the wheel keeps updating regardless.
+                try
+                {
+                    var vizSet = active.Length > 0 ? active : live;
+                    var records = new Fsr1VizRecord[vizSet.Length];
+                    for (int i = 0; i < vizSet.Length; i++)
+                        records[i] = BuildVizRecord(vizSet[i]);
+                    plugin.SetFsr1VizSnapshot(new Fsr1VizSnapshot(records));
+                }
+                catch (Exception ex)
+                {
+                    if (_tickCounter % oneHzEvery == 0)
+                        MozaLog.Debug($"[AZOM] FSR1 viz snapshot skipped (build error): {ex.Message}");
+                }
             }
 
             if (_tickCounter % oneHzEvery == 0)

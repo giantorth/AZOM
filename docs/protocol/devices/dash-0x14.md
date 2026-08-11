@@ -36,7 +36,13 @@ The CM2 (USB PID `0x0025`) connects in one of two topologies:
 
 The CM2 meter firmware was reworked around 2026-06, replacing the LED subsystem.
 The eras are distinguishable from the meter's own `0x0E` firmware-debug heartbeat
-(`src=0x41`) and drive LEDs by completely different wire commands.
+and drive LEDs by completely different wire commands. The heartbeat's `src` byte
+follows the topology: a base-bridged CM2 logs as the dash sub-device (`src=0x41`
+on the wheelbase pipe), while a standalone-USB CM2 logs as its own main MCU
+(`src=0x21` on the dashboard pipe) — same `meter_diag.c` vocabulary on both
+(bundle `CGZC7E3A` 2026-08-01: `[INFO]meter_diag.c:88 Release Heartbeat Log:` /
+`IndicatorMode:` / `StandbyMode:` inbound as `0e 21 05 …` on the CM2's own port,
+~48 s after connect, ~1/min).
 
 | | **Legacy RPM-ramp** (≤ 2026-06) | **Indicator** (2026-06+) |
 |---|---|---|
@@ -98,11 +104,16 @@ Decoded from `FSR1_CM1.pcapng` (PitHouse driving an FSR1 wheel + CM1 dash) via
 - Each record is **6 bytes**: a 16-bit field key (wire order `keyHi keyLo`) + a
   **big-endian IEEE-754 float32** value. The high key byte clusters `0xDA`/`0xF5`/`0xD9`
   but is **part of the key, not a type tag** — every value is a BE float32.
-- The full flat field set (~48 keys, e.g. `0xf54d`, `0xdaa1`) streams **round-robin,
+- The full flat field set (67 keys, e.g. `0xf54d`, `0xdaa1`) streams **round-robin,
   10 records per frame**, cycling continuously (~80 Hz frame rate; ~14-20 Hz per field).
   The same set streams regardless of which dashboard is selected — a switch only changes
   what the dash *displays*.
-- Group `0x36` carries a lower-rate secondary stream with the identical record format.
+- **Two lanes, split by volatility.** Group `0x35` is the **fast lane** — 53 keys at ~90
+  Hz (speeds, RPM, gear, pedals, tyre temps/pressures, brake temps, current lap time, DRS).
+  Group `0x36` is the **slow lane** — 14 keys at ~3.3 Hz, identical record format, carrying
+  the session / slow-changing fields: track & air temp, fuel (remaining / range) + oil
+  pressure, current lap, position, car count, last & best lap time, fuel %. The two key sets
+  are **disjoint** (a key is on exactly one lane). The plugin mirrors this split (`Cm1FieldDef.Slow`).
 - Checksum is the standard wire checksum (`MozaProtocol.CalculateWireChecksum`). Encoding
   proven byte-exact: 37319/37319 captured `0x35` frames reproduce under BE-float32 + that
   checksum.
@@ -180,17 +191,34 @@ so the plugin follows dash-initiated (button) switches with the FSR1 regex.
 
 **Field semantics**
 
-Field KEYS and the BE-float32 encoding are proven; field → channel SEMANTICS are
-best-effort by value range (the capture has no FSR1-anchor overlap in the driving window
-to correlate against). Observed groups: four-element per-wheel quads (~25 pressure-like,
-~50 and ~120 temp-like), pedal-like 0..1 fields, rising-under-load fields (speed / brake
-temp), and several fields PitHouse holds constant (e.g. `32.0`). The plugin ships these as
-a flat catalog with **blank default mappings** — the user assigns SimHub channels per field
-via the dash page's channel mapper (the original FSR1-style "map any data point" workflow).
+Each 16-bit key identifies a MOZA telemetry channel (a `v1/gameData/<path>`): the low 15
+bits are the channel's index in MOZA's channel catalog and the **top bit is set on the
+wire**. Every key thus maps to its SimHub property via `Data/Telemetry.json` (MOZA's own
+channel catalog); the mapping is confirmed for all 67 observed keys and every one is
+user-overridable via the dash page's channel mapper.
+
+Values are raw physical quantities as BE-float32 — no bit-packing / bias artifacts (the
+FSR1's `+300` / `×1000` do **not** apply here). Groups:
+
+- **Per-wheel quads** — tyre temps (base FL/FR/RL/RR plus inner/middle/outer variants),
+  tyre pressures, and brake temps. Each temperature also appears as a **°F unit-variant
+  key** (`&unit=F`), for which the plugin sends °C→°F (`Scale 1.8, Bias 32`).
+- **Scalars** — speeds (mph / km/h / m/s), RPM + max RPM, gear, pedals (throttle / brake /
+  clutch, 0..1), current lap / position / car-count / lap-count, lap times
+  (current / last / best / estimated), fuel (% / range / remaining), ERS / ABS / TC levels,
+  L/R blinkers, engine-enabled, oil pressure, track / air temp, odometers, front ARB.
+- Two keys have no generic SimHub channel (a track-name string, a kPa-unit pressure) and
+  ship unmapped for the user to assign.
+
+Earlier drafts shipped this as a flat catalog of range-guessed labels with blank default
+mappings; that guesswork was wrong on several fields (e.g. the brake-temp quad had been
+read as "speed", and the constant-`32.0` fields are real odometer / temperature-aggregate
+channels that simply read 0 in a parked capture).
 
 **Plugin handling**
 
-- `Telemetry/Cm1DashboardCatalog.cs` — flat field set (keys + labels + optional constants).
+- `Telemetry/Cm1DashboardCatalog.cs` — flat field set (keys + labels + SimHub channel +
+  per-field Scale/Bias for °F unit-variants).
 - `Telemetry/Cm1DisplayEmitter.cs` — frame/handshake/switch builders (BE-float32).
 - `Telemetry/Cm1DisplayDriver.cs` — standalone ~50 ms driver on the wheelbase connection,
   dash-lane stream slots 18-28 (disjoint from the wheel lane 0-8), so it runs concurrently

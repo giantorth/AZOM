@@ -133,37 +133,6 @@ namespace MozaPlugin.Telemetry
             return KnownSimHubProperties.Paths;
         }
 
-        // One-off diagnostic: dump every SimHub property whose name hints at
-        // heading / orientation / radar / spotter, with its current value, so we
-        // can find the live source AC populates for the radar's preamble Heading.
-        // Logged a few times while a game runs (turn the car so the right one
-        // visibly sweeps). Remove once the Heading source is wired.
-        public void LogHeadingProbe()
-        {
-            try
-            {
-                var sb = new StringBuilder();
-                foreach (var n in GetAllSimHubPropertyNames())
-                {
-                    var nl = n.ToLowerInvariant();
-                    if (nl.IndexOf("head", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("yaw", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("orient", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("direction", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("rotation", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("bearing", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("compass", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("radar", StringComparison.Ordinal) < 0
-                        && nl.IndexOf("spotter", StringComparison.Ordinal) < 0)
-                        continue;
-                    object? raw = GetValueForDisplay(n);
-                    sb.Append(n).Append('=').Append(raw?.ToString() ?? "null").Append(" | ");
-                }
-                MozaLog.Info("[AZOM][HEADPROBE] " + sb.ToString());
-            }
-            catch (Exception e) { MozaLog.Info("[AZOM][HEADPROBE] failed: " + e.Message); }
-        }
-
         /// <summary>
         /// Resolve the raw value of a SimHub property for UI display. Returns null
         /// when the path is empty or unresolvable; <c>@internal/</c> paths return

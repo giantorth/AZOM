@@ -170,6 +170,8 @@ value seen: 0x00 and 0x01. Diagnostic value low; needs more captures.
    value unchanged.
 4. **Co-existence with sess=0x02 FF**: this sess=0x01 protocol does NOT
    replace the sess=0x02 FF-record handshake — the FFB property catalog
-   (kind=11), kind=8 master catalog, wheel-event payloads (kind=14), and
-   host settings (kind=15) still ride sess=0x02. The two channels carry
+   (kind=11) and kind=8 master catalog still ride sess=0x02. The device log
+   pull (kind=14 request / payload, kind=15 receipt) rides whichever session
+   carries the FF-init handshake — sess=0x01 in the current-firmware capture,
+   interleaved with the typed sub-msgs above. The two channels carry
    complementary information.

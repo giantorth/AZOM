@@ -139,7 +139,7 @@
                  existing event handlers + persistence logic continue to drive the
                  device. The plugin-pane WheelTab is hidden (Visibility=Collapsed)
                  but its controls remain in the visual tree for this forwarding. -->
-            <TabItem x:Name="InputsTab" Header="{x:Static res:Strings.TabHeader_Inputs}">
+            <TabItem x:Name="InputsTab" Header="{x:Static res:Strings.TabHeader_Inputs}" Visibility="Collapsed">
                 <!-- ScrollViewer removed: SimHub host already provides scrolling -->
                     <StackPanel>
 

@@ -40,7 +40,7 @@ open. Plugin emits them from
 | Kind | Name             | Wire size | Status in plugin (2026-05-13) |
 |-----:|------------------|----------:|-------------------------------|
 |    2 | `init_nonce`     |      16 B | Sent. Body partially decoded. |
-|    7 | `init_enum`      |      12 B | Sent. Body partially decoded. |
+|    7 | `init_enum`      |      12 B | Sent. Value is the **constant `[3][0]`** — see below. |
 |    8 | `init_catalog_a` |  ~1.7–2 KB| **NOT sent.** Decode incomplete; replay tested and locks wheel. |
 |   11 | `init_catalog_b` |    ~2.5 KB| **NOT sent.** Decode incomplete; replay tested and locks wheel. |
 
@@ -60,11 +60,32 @@ master tables. Until the host receives both kind=10 and kind=16, the
 wheel will not echo `kind=4` dashboard-switch records and will not bind
 post-switch tier-defs to display widgets.
 
+### kind=7 — `init_enum` is a constant, NOT a dashboard slot
+
+```
+ff 0c 00 00 00  03 28 c2 81  07 00 00 00  03 00 00 00  00 00 00 00
+│  └ size = 12  └ inner CRC  └ kind = 7   └ value[0] = 3 (constant)
+└ FF property record                                    └ value[1] = 0
+```
+
+All **34** kind=7 records in `sim/logs/bridge-20260731-064830.jsonl` are
+byte-identical, across several reconnects and a dashboard switch — so the field
+cannot be slot-dependent. Matches the `[3 u32][0 u32]` decode in
+[`../findings/2026-05-04-init-sequence.md`](../findings/2026-05-04-init-sequence.md).
+
+The plugin previously emitted a dashboard slot index here (0 in practice), on
+the mistaken reading that this record "sets the initial active dashboard slot".
+With value=0 the wheel's FF-record layer stayed **dormant**: it sent no kind=9
+ticker, no kind=10/16 init ack, and never answered a kind=14 device-log request.
+Corrected 2026-08-07 in `SessionPropertyPushBuilder.BuildSessionInitField7Body`,
+which now takes no argument and emits the constant.
+
 ## Runtime property pushes (post-handshake)
 
 After the init handshake, the host pushes individual wheel-integrated-display
 settings as one-shot FF records on session 0x02 — one record per user change,
-**not** retransmitted periodically (distinct from the kind=9/14/15 heartbeats).
+**not** retransmitted periodically (distinct from the kind=9 ticker and the
+kind=14/15 log pull below).
 Each rides the same envelope above and its own chunk CRC. The inner CRC is
 `zlib.crc32(kindAndValue)` and is a deterministic integrity check over
 `(kind ‖ value)`, not a nonce (see
@@ -123,6 +144,160 @@ Plugin support: `TelemetrySender.SendDashDisplayRotation(mode)` →
 `DashboardManagementControl` (VGS wheels only). Decode tooling:
 `tools/pcap_to_jsonl.py` + `tools/moza_trace.py` (the `verify.py` scratch script
 that confirmed the inner CRCs is reproducible from those two primitives).
+
+## Device log pull — kind=14 (request + payload) / kind=15 (receipt)
+
+> Decoded 2026-08-07 from `sim/logs/bridge-20260731-064830.jsonl` (PitHouse,
+> KS-Pro-era firmware) with `tools/ff-record-decode`: 1 657 requests, 161
+> receipts and 174 payloads, every payload decoding with zero parse failures.
+> Supersedes the earlier "brightness baseline" / "heartbeat A+B" readings in
+> [`../findings/2026-04-29-session-01-property-push.md`](../findings/2026-04-29-session-01-property-push.md)
+> and [`../findings/2026-05-04-init-sequence.md`](../findings/2026-05-04-init-sequence.md).
+
+The wheel display runs a Linux (aarch64) application called **MOZADash** with
+its own logger. `kind=14` / `kind=15` are a pull-and-acknowledge pair that
+drains that log to the host — they are **not** keepalives, and nothing in the
+session layer requires them (the plugin ran for months sending neither, with
+sessions staying up).
+
+### Request — h2b `kind=14`, value 4 B
+
+```
+ff 08 00 00 00  0f ad ec c4  0e 00 00 00  64 00 00 00
+│  └ size = 8   └ inner CRC  └ kind = 14  └ maxLines : u32 LE = 100
+└ FF property record
+```
+
+`maxLines` is the most lines the host will accept. PitHouse asks for **100**
+every time (1 657/1 657 records).
+
+### Payload — b2h `kind=14`, value 4 B + zlib
+
+```
+[reserved : 4 B] [zlib stream]
+```
+
+inflating to a length-prefixed UTF-16**BE** line list — the same idiom
+`kind=8` uses:
+
+```
+[count   : u32 BE]                       number of lines in this payload
+count × ( [byteLen : u32 BE]             length of the line IN BYTES (= chars × 2)
+          [text    : UTF-16BE] )
+```
+
+Worked example (first payload in the capture, value 3 151 B → 37 226 B inflated):
+
+```
+00 00 00 64                          count = 100
+00 00 00 b0                          byteLen = 176 (= 88 chars)
+00 5b 00 54 00 68 00 75 …            "[Thu Jul 23 06:38:48 2026]
+                                      [ld-linux-aarch64.so.1][7]
+                                      ./MOZADash(+0x96090) [0x7fa77c6090]"
+00 00 00 c2                          byteLen = 194 → next line …
+```
+
+Across all 174 payloads the walk consumed the inflated buffer **exactly**
+(`consumed == len`, zero trailing bytes), so the layout is complete. Content is
+the display application's own log, and it is genuinely diagnostic:
+
+```
+[…]Uncaught C++ exception!
+[…] /app/libQt5Core.so.5(_ZN16QCoreApplication4execEv+0xa0)
+[…] [warning] MEMORY_MEDIUM: System memory usage 98.9%, Process RSS 87MB
+[…] [info] Memory details: VmSize=905MB, VmRSS=87MB(18.67%), VmPeak=970MB, …
+[…] Debug: set current location:  "en_US"
+[…] Debug: recv invalid setting cmd:  24
+[…] [error] [json.exception.parse_error.101] parse error at line 1, column 1:
+    syntax error while parsing value - unexpected end of input
+```
+
+Some lines are Chinese-localised (`内存使用: VmSize=…`), so consumers must treat
+the text as full Unicode, not ASCII.
+
+Note the `recv invalid setting cmd: 24` line: the same capture contains a host
+FF record with `kind=24` (one per session, otherwise undocumented), and the
+display is rejecting it. That is a worked example of the log's value — it
+attributes a wire record to a device-side outcome, which no other channel does.
+
+### Receipt — h2b `kind=15`, value 4 B
+
+```
+ff 08 00 00 00  <inner CRC>  0f 00 00 00  <linesRead : u32 LE>
+```
+
+`linesRead` is how many lines the host consumed; the device **drops that many**
+from its buffer. This is what advances the read cursor — without it the next
+request re-returns the same head. Observed values are line counts, nothing else:
+`{1 ×135, 5 ×10, 60 ×1, 100 ×15}` (100 = a full backlog drain,
+1 = the steady state where one new line accrued since the last poll).
+
+Under-acking stalls the cursor; the receipt must carry the count the **device**
+sent, not the count the host chose to keep after any host-side filtering.
+
+**Acking is also what keeps payloads small.** The receipt histogram is 15 full
+drains and 117 single-line pulls: the first pull on a fresh connection returns
+the accumulated backlog (~2.7–3.2 KB compressed), and every pull after that
+returns only what has accrued since — typically one line, a couple of hundred
+bytes. A peek-only host that never sent kind=15 would re-receive the whole
+backlog on every poll instead. This matters beyond bandwidth: b2h chunks on
+these sessions are also appended to `ChannelCatalogParser`'s per-session buffer,
+which is hard-limit wiped (with a warning, losing in-flight catalog data) at
+64 KB. Watch `Parser: buf=<N>B` in the Diagnostics tab's wheel-catalog section
+if the pull cadence is ever raised.
+
+### Session
+
+Both host records ride the **FF session** — the same one as the `kind=2`/`kind=7`
+init handshake, i.e. `ResolveFfSession()`, the mirror of the tier-def session.
+
+The capture spans several reconnects and shows the pair on **both** `0x01`
+(1 436 requests / 135 receipts / 131 payloads) and `0x02` (221 / 26 / 43) — and
+in each case the init handshake for that connection is on the same session.
+So the rule is "wherever the FF handshake went", not a fixed session number.
+Readers must therefore scan **both** catalog sessions for inbound payloads.
+
+### Cadence and silence
+
+The device answers **only when it has new lines** — 1 657 requests produced 174
+payloads. Silence is the normal steady state and must not be read as a fault or
+used to infer the wrong session was picked. PitHouse polls roughly every 2 s in
+some sessions and ~40 s in others; neither is required.
+
+### Plugin support
+
+`TelemetrySender.TickEmitDeviceLogPoll()` (slow path, ~1/min) emits the request
+via `PropertyPushQueue.SendU32(kind, value, sessionOverride)`. Inbound records
+are lifted off sessions 0x01/0x02 by `Telemetry/Sessions/FfRecordStream` +
+`Protocol/FfRecordReader` (CRC-validated — see below), parsed by
+`Diagnostics/DeviceLogParser`, and stored in `Diagnostics/DeviceLogStore` for
+the Diagnostics tab and the `device-display-log.txt` bundle entry. The receipt
+is emitted from the tick thread, never the serial read thread, so the session
+seq locks stay off the ack path. Disable with `EnableDeviceLogPull: false`.
+
+### Reading FF records off a mixed stream
+
+FF records are interleaved with the typed sub-msg / catalog TLV stream on the
+same session, so a scan for the `0xFF` sentinel **will** hit `0xFF` bytes inside
+other records. The inner CRC is the only reliable discriminator: validate
+`crc32(kindAndValue) == inner_crc` and resync one byte forward on a miss. Over
+the capture that recovered 2 395 real records while rejecting 5 false sentinels.
+
+Two further requirements, both learned the hard way:
+
+- **Drain incrementally**, chunk by chunk, rather than concatenating a whole
+  stream and scanning once. The device restarts its outbound seq counter on
+  session reopen, and a restart invalidates the in-progress buffer; records
+  extracted before that point must survive it. Scanning only at the end
+  recovers 21 records where incremental draining recovers 1 627.
+- **Dedup retransmits by seq** before appending, or repeated chunk bytes
+  desync the record framing.
+
+`tools/ff-record-decode` implements both and mirrors
+`Telemetry/Sessions/FfRecordStream` exactly. Prefer it over
+`tools/bridge-decode-ff-init`, whose reassembly does neither (and which slices
+bodies 4 bytes too long, reading `size` bytes from offset 13 instead of
+`size - 4`).
 
 ## Why the host must send kind=8 / kind=11
 

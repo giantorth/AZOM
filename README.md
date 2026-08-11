@@ -6,7 +6,7 @@
 > **The Unofficial MOZA SimHub Plugin is now named AZOM.**
 
 [![Release](https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin)](https://github.com/giantorth/moza-simhub-plugin/releases/latest)
-[![Dev Release](https://img.shields.io/badge/dynamic/json?url=https://api.github.com/repos/giantorth/moza-simhub-plugin/releases/tags/dev-latest&query=%24.name&label=dev&color=orange)](https://github.com/giantorth/moza-simhub-plugin/releases/tag/dev-latest)
+[![Pre-release](https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin?include_prereleases&label=pre-release&color=orange)](https://github.com/giantorth/moza-simhub-plugin/releases)
 [![License: GPL v3](https://img.shields.io/github/license/giantorth/moza-simhub-plugin)](LICENSE)
 [![Discord](https://img.shields.io/discord/1494517781016608888?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/J4enw43e62)
 [![Stars](https://img.shields.io/github/stars/giantorth/moza-simhub-plugin?label=Star&logo=github&color=yellow)](https://github.com/giantorth/moza-simhub-plugin/stargazers)
@@ -63,7 +63,7 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
-**Development builds.** The latest in-progress build from the `dev` branch is published as a pre-release: [MozaPlugin_dev.zip](https://github.com/giantorth/moza-simhub-plugin/releases/download/dev-latest/MozaPlugin_dev.zip). Expect bugs or broken features — use the stable release above if you need something reliable.
+**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open About > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
 
 **Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11.8+.
 
@@ -241,6 +241,8 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | `AZOM.LeftPaddle` | int | Left analog paddle position (0–100) |
 | `AZOM.RightPaddle` | int | Right analog paddle position (0–100) |
 | `AZOM.CombinedPaddle` | int | Combined analog paddle axis position (0–100) |
+| `AZOM.Ab9Connected` | bool | AB9 active shifter presence |
+| `AZOM.Ab9Layout` | string | AB9 mechanical layout of the active profile: `5+R Layout 1`, `6+R Layout 1`, `6+R Layout 2`, `7+R Layout 1`, `7+R Layout 2`, or `Sequential` |
 
 These input properties are populated directly from the device HID surface, so they update live even when no game is running.
 
@@ -265,6 +267,9 @@ Each *step* setting has four actions: `…Up` / `…Down` apply a fine step, and
 | `AZOM.DisplayBrightness0` … `AZOM.DisplayBrightness100` | Set wheel screen display brightness to a fixed level (0–100% in steps of 10) |
 | `AZOM.WorkModeOff` | Turn off the wheelbase work mode (puts the base into standby) |
 | `AZOM.WorkModeOn` | Turn on the wheelbase work mode (normal active state) |
+| `AZOM.Ab9LayoutNext` | Switch the AB9 shifter to the next mechanical layout (wraps around) |
+| `AZOM.Ab9LayoutPrev` | Switch the AB9 shifter to the previous mechanical layout (wraps around) |
+| `AZOM.Ab9Layout5R1` / `…6R1` / `…6R2` / `…7R1` / `…7R2` / `…Sequential` | Set the AB9 mechanical layout directly |
 | `AZOM.DashboardNext` | Switch the wheel's displayed dashboard to the next enabled slot (wraps around) |
 | `AZOM.DashboardPrev` | Switch the wheel's displayed dashboard to the previous enabled slot (wraps around) |
 | `AZOM.DashboardTelemetryToggle` | Toggle dashboard telemetry on/off for the active wheel page |

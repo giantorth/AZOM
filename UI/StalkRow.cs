@@ -1,67 +1,93 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
 using MozaPlugin.Devices.StalksTruckSim;
+using MozaPlugin.Resources;
 
 namespace MozaPlugin
 {
     /// <summary>
-    /// One row in the Stalks truck-sim button-map editor: a stalk button and its
-    /// assigned action. A single non-editable combo per row picks the assignment
-    /// from a flat option list (encoded as strings) — simple, robust binding.
+    /// One selectable assignment in the Stalks truck-sim button-map editor: an
+    /// action kind plus stage (for the stage kinds). Key-bearing kinds take
+    /// their key from the row's capture box, not from the option.
+    /// </summary>
+    internal sealed class StalkOptionItem
+    {
+        public StalkOptionItem(StalkActionKind kind, int stage, string label)
+        {
+            Kind = kind;
+            Stage = stage;
+            Label = label;
+        }
+
+        public StalkActionKind Kind { get; }
+        public int Stage { get; }
+        public string Label { get; }
+        public override string ToString() => Label;
+    }
+
+    /// <summary>
+    /// One row in the Stalks truck-sim button-map editor: a stalk button, its
+    /// assigned action kind, and (for key-bearing kinds) the captured key.
     /// </summary>
     internal sealed class StalkRow : INotifyPropertyChanged
     {
-        public const string NoneOption = "(none)";
-        private const string KeyPrefix = "Key: ";
-        private const string HeldPrefix = "Held: ";
-        private const string LatchPrefix = "Latch: ";
-        private const string WiperPrefix = "Wiper stage ";
-        private const string LightPrefix = "Light stage ";
-        private const string IndLeft = "Indicator: left";
-        private const string IndRight = "Indicator: right";
-        private const string IndCancel = "Indicator: cancel";
-        private const string WiperSwipe = "Wiper: single swipe";
-        private const string ReleaseHeldOption = "Release held keys";
-
-        // ETS2/ATS-relevant keys first, then a general set for custom binds.
-        private static readonly string[] PresetKeys =
-        {
-            "Comma", "Period", "F", "K", "J", "L", "O", "H", "P", "Minus",
-            "G", "I", "N", "B", "E", "R", "T", "Y", "U",
-            "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-        };
-
         private readonly Action<StalkRow> _onChanged;
 
-        public StalkRow(int buttonIndex, StalkAction action, IReadOnlyList<string> options, Action<StalkRow> onChanged)
+        // Stored key string kept verbatim (legacy friendly name or sc: literal);
+        // only a real capture rewrites it.
+        private string _keyStored;
+        private int _keyCode;
+
+        public StalkRow(int buttonIndex, StalkAction? action, IReadOnlyList<StalkOptionItem> options, Action<StalkRow> onChanged)
         {
             ButtonIndex = buttonIndex;
             Options = options;
             _onChanged = onChanged;
-            _selected = OptionForAction(action);
+            _keyStored = action?.Key ?? "";
+            _keyCode = KeyCodes.Parse(_keyStored);
+            _selected = OptionForAction(action, options);
         }
 
         public int ButtonIndex { get; }
         public string Label => "Btn " + (ButtonIndex + 1);
 
         /// <summary>The shared option list (same instance for every row).</summary>
-        public IReadOnlyList<string> Options { get; }
+        public IReadOnlyList<StalkOptionItem> Options { get; }
 
-        private string _selected = NoneOption;
-        public string Selected
+        private StalkOptionItem _selected;
+        public StalkOptionItem Selected
         {
             get => _selected;
             set
             {
-                var v = value ?? NoneOption;
-                if (_selected == v) return;
+                var v = value ?? Options[0];
+                if (ReferenceEquals(_selected, v)) return;
                 _selected = v;
                 OnPropertyChanged(nameof(Selected));
+                OnPropertyChanged(nameof(ShowsKeyCapture));
                 try { _onChanged?.Invoke(this); } catch { }
             }
         }
+
+        /// <summary>Captured scan code for key-bearing kinds (0 = not set).</summary>
+        public int KeyCode
+        {
+            get => _keyCode;
+            set
+            {
+                if (_keyCode == value) return;
+                _keyCode = value;
+                _keyStored = KeyCodes.Encode((ushort)value);
+                OnPropertyChanged(nameof(KeyCode));
+                try { _onChanged?.Invoke(this); } catch { }
+            }
+        }
+
+        public bool ShowsKeyCapture =>
+            _selected.Kind == StalkActionKind.Momentary ||
+            _selected.Kind == StalkActionKind.HeldKey ||
+            _selected.Kind == StalkActionKind.LatchKey;
 
         private bool _isPressed;
         public bool IsPressed
@@ -70,66 +96,44 @@ namespace MozaPlugin
             set { if (_isPressed != value) { _isPressed = value; OnPropertyChanged(nameof(IsPressed)); } }
         }
 
-        /// <summary>The <see cref="StalkAction"/> for this row's current selection,
-        /// or null when unassigned.</summary>
-        public StalkAction ToAction() => ParseAction(_selected);
-
-        // ---- option encoding (plain technical strings; not localized) ----
-
-        public static List<string> BuildOptions(int wiperStageCount, int lightStageCount)
+        /// <summary>The <see cref="StalkAction"/> for this row's current selection.</summary>
+        public StalkAction ToAction() => new StalkAction
         {
-            var list = new List<string> { NoneOption, IndLeft, IndRight, IndCancel, WiperSwipe, ReleaseHeldOption };
-            foreach (var k in PresetKeys) list.Add(KeyPrefix + k);
-            foreach (var k in PresetKeys) list.Add(HeldPrefix + k);
-            foreach (var k in PresetKeys) list.Add(LatchPrefix + k);
-            for (int i = 0; i < Math.Max(1, wiperStageCount); i++) list.Add(WiperPrefix + i);
-            for (int i = 0; i < Math.Max(1, lightStageCount); i++) list.Add(LightPrefix + i);
+            Kind = _selected.Kind,
+            Stage = _selected.Stage,
+            Key = ShowsKeyCapture ? _keyStored : "",
+        };
+
+        public static List<StalkOptionItem> BuildOptions(int wiperStageCount, int lightStageCount)
+        {
+            var list = new List<StalkOptionItem>
+            {
+                new StalkOptionItem(StalkActionKind.None, 0, Strings.StalkKind_None),
+                new StalkOptionItem(StalkActionKind.Momentary, 0, Strings.StalkKind_KeyTap),
+                new StalkOptionItem(StalkActionKind.HeldKey, 0, Strings.StalkKind_HeldKey),
+                new StalkOptionItem(StalkActionKind.LatchKey, 0, Strings.StalkKind_LatchKey),
+                new StalkOptionItem(StalkActionKind.IndicatorLeft, 0, Strings.StalkKind_IndicatorLeft),
+                new StalkOptionItem(StalkActionKind.IndicatorRight, 0, Strings.StalkKind_IndicatorRight),
+                new StalkOptionItem(StalkActionKind.IndicatorCancel, 0, Strings.StalkKind_IndicatorCancel),
+                new StalkOptionItem(StalkActionKind.WiperSingleSwipe, 0, Strings.StalkKind_WiperSwipe),
+            };
+            for (int i = 0; i < Math.Max(1, wiperStageCount); i++)
+                list.Add(new StalkOptionItem(StalkActionKind.WiperStage, i, string.Format(Strings.StalkKind_WiperStage, i)));
+            for (int i = 0; i < Math.Max(1, lightStageCount); i++)
+                list.Add(new StalkOptionItem(StalkActionKind.LightStage, i, string.Format(Strings.StalkKind_LightStage, i)));
+            list.Add(new StalkOptionItem(StalkActionKind.ReleaseHeld, 0, Strings.StalkKind_ReleaseHeld));
             return list;
         }
 
-        public static StalkAction ParseAction(string option)
+        public static StalkOptionItem OptionForAction(StalkAction? a, IReadOnlyList<StalkOptionItem> options)
         {
-            if (string.IsNullOrEmpty(option) || option == NoneOption)
-                return new StalkAction { Kind = StalkActionKind.None };
-            if (option == IndLeft) return new StalkAction { Kind = StalkActionKind.IndicatorLeft };
-            if (option == IndRight) return new StalkAction { Kind = StalkActionKind.IndicatorRight };
-            if (option == IndCancel) return new StalkAction { Kind = StalkActionKind.IndicatorCancel };
-            if (option == WiperSwipe) return new StalkAction { Kind = StalkActionKind.WiperSingleSwipe };
-            if (option == ReleaseHeldOption) return new StalkAction { Kind = StalkActionKind.ReleaseHeld };
-            if (option.StartsWith(HeldPrefix, StringComparison.Ordinal))
-                return new StalkAction { Kind = StalkActionKind.HeldKey, Key = option.Substring(HeldPrefix.Length) };
-            if (option.StartsWith(LatchPrefix, StringComparison.Ordinal))
-                return new StalkAction { Kind = StalkActionKind.LatchKey, Key = option.Substring(LatchPrefix.Length) };
-            if (option.StartsWith(KeyPrefix, StringComparison.Ordinal))
-                return new StalkAction { Kind = StalkActionKind.Momentary, Key = option.Substring(KeyPrefix.Length) };
-            if (option.StartsWith(WiperPrefix, StringComparison.Ordinal))
-                return new StalkAction { Kind = StalkActionKind.WiperStage, Stage = ParseInt(option.Substring(WiperPrefix.Length)) };
-            if (option.StartsWith(LightPrefix, StringComparison.Ordinal))
-                return new StalkAction { Kind = StalkActionKind.LightStage, Stage = ParseInt(option.Substring(LightPrefix.Length)) };
-            return new StalkAction { Kind = StalkActionKind.None };
+            var kind = a?.Kind ?? StalkActionKind.None;
+            int stage = a?.Stage ?? 0;
+            bool staged = kind == StalkActionKind.WiperStage || kind == StalkActionKind.LightStage;
+            foreach (var o in options)
+                if (o.Kind == kind && (!staged || o.Stage == stage)) return o;
+            return options[0];
         }
-
-        public static string OptionForAction(StalkAction a)
-        {
-            if (a == null) return NoneOption;
-            switch (a.Kind)
-            {
-                case StalkActionKind.Momentary: return KeyPrefix + (a.Key ?? "");
-                case StalkActionKind.HeldKey: return HeldPrefix + (a.Key ?? "");
-                case StalkActionKind.LatchKey: return LatchPrefix + (a.Key ?? "");
-                case StalkActionKind.ReleaseHeld: return ReleaseHeldOption;
-                case StalkActionKind.WiperStage: return WiperPrefix + a.Stage;
-                case StalkActionKind.LightStage: return LightPrefix + a.Stage;
-                case StalkActionKind.IndicatorLeft: return IndLeft;
-                case StalkActionKind.IndicatorRight: return IndRight;
-                case StalkActionKind.IndicatorCancel: return IndCancel;
-                case StalkActionKind.WiperSingleSwipe: return WiperSwipe;
-                default: return NoneOption;
-            }
-        }
-
-        private static int ParseInt(string s)
-            => int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged(string name)

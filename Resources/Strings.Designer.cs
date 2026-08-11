@@ -39,9 +39,11 @@ namespace MozaPlugin.Resources
                 { "it", new ResourceManager("MozaPlugin.Resources.Strings.it", typeof(Strings).Assembly) },
                 { "ko", new ResourceManager("MozaPlugin.Resources.Strings.ko", typeof(Strings).Assembly) },
                 { "nb", new ResourceManager("MozaPlugin.Resources.Strings.nb", typeof(Strings).Assembly) },
+                { "pt", new ResourceManager("MozaPlugin.Resources.Strings.pt", typeof(Strings).Assembly) },
                 { "ru", new ResourceManager("MozaPlugin.Resources.Strings.ru", typeof(Strings).Assembly) },
                 { "vi", new ResourceManager("MozaPlugin.Resources.Strings.vi", typeof(Strings).Assembly) },
                 { "zh-Hans", new ResourceManager("MozaPlugin.Resources.Strings.zh-Hans", typeof(Strings).Assembly) },
+                { "qps-ploc", new ResourceManager("MozaPlugin.Resources.Strings.qps-ploc", typeof(Strings).Assembly) },
             };
 
         private static string Get(string key)
@@ -119,8 +121,6 @@ namespace MozaPlugin.Resources
         public static string Subtitle_FfbEqualizer => Get("Subtitle_FfbEqualizer");
         public static string Section_FfbOutputCurve => Get("Section_FfbOutputCurve");
         public static string Subtitle_FfbOutputCurve => Get("Subtitle_FfbOutputCurve");
-        public static string Button_Flat => Get("Button_Flat");
-        public static string Button_Falloff => Get("Button_Falloff");
         public static string Button_Linear => Get("Button_Linear");
         public static string Button_SCurve => Get("Button_SCurve");
         public static string Button_Exponential => Get("Button_Exponential");
@@ -190,6 +190,8 @@ namespace MozaPlugin.Resources
         public static string Option_Ab9Layout7R1 => Get("Option_Ab9Layout7R1");
         public static string Option_Ab9Layout7R2 => Get("Option_Ab9Layout7R2");
         public static string Option_Sequential => Get("Option_Sequential");
+        public static string Option_HPattern => Get("Option_HPattern");
+        public static string Label_ShifterType => Get("Label_ShifterType");
         public static string Section_Feel => Get("Section_Feel");
         public static string Subtitle_PerAxisMechanicalCharacter => Get("Subtitle_PerAxisMechanicalCharacter");
         public static string SliderLabel_MechanicalResistance => Get("SliderLabel_MechanicalResistance");
@@ -382,7 +384,6 @@ namespace MozaPlugin.Resources
         public static string Label_CheckForUpdates => Get("Label_CheckForUpdates");
         public static string Label_ReleaseChannel => Get("Label_ReleaseChannel");
         public static string Option_ReleaseChannelStable => Get("Option_ReleaseChannelStable");
-        public static string Option_ReleaseChannelDev => Get("Option_ReleaseChannelDev");
         public static string Button_CheckNow => Get("Button_CheckNow");
         public static string Status_UpdateNeverChecked => Get("Status_UpdateNeverChecked");
         public static string Status_UpdateChecking => Get("Status_UpdateChecking");
@@ -417,6 +418,8 @@ namespace MozaPlugin.Resources
         public static string Label_AlwaysCaptureOnStartup => Get("Label_AlwaysCaptureOnStartup");
         public static string Tooltip_AlwaysCaptureOnStartup => Get("Tooltip_AlwaysCaptureOnStartup");
         public static string Button_ExportBundle => Get("Button_ExportBundle");
+        public static string Button_CopyReference => Get("Button_CopyReference");
+        public static string Tooltip_ExportBundle => Get("Tooltip_ExportBundle");
         public static string Button_CopyCapture => Get("Button_CopyCapture");
         public static string Section_FullDiagReport => Get("Section_FullDiagReport");
         public static string Subtitle_FullDiagReport => Get("Subtitle_FullDiagReport");
@@ -632,6 +635,9 @@ namespace MozaPlugin.Resources
         public static string Banner_TelemetryParked_Body => Get("Banner_TelemetryParked_Body");
         public static string Banner_RestartSimHub_Title => Get("Banner_RestartSimHub_Title");
         public static string Banner_RestartSimHub_Body => Get("Banner_RestartSimHub_Body");
+        public static string Banner_WheelFwOutdated_Title => Get("Banner_WheelFwOutdated_Title");
+        public static string Banner_WheelFwOutdated_BodyFmt => Get("Banner_WheelFwOutdated_BodyFmt");
+        public static string Banner_WheelFwOutdated_GenericSubject => Get("Banner_WheelFwOutdated_GenericSubject");
         public static string Banner_ProfileNotAdded_TitleFmt => Get("Banner_ProfileNotAdded_TitleFmt");
         public static string Banner_ProfileNotAddedDash_Body => Get("Banner_ProfileNotAddedDash_Body");
         public static string Banner_ProfileNotAddedBaseAmbient_Body => Get("Banner_ProfileNotAddedBaseAmbient_Body");
@@ -774,5 +780,50 @@ namespace MozaPlugin.Resources
         public static string Label_Import => Get("Label_Import");
         public static string Label_Export => Get("Label_Export");
         public static string Preset_RoadRumble => Get("Preset_RoadRumble");
+        public static string Section_BugReport => Get("Section_BugReport");
+        public static string Subtitle_BugReport => Get("Subtitle_BugReport");
+        public static string Label_BugReportDescription => Get("Label_BugReportDescription");
+        public static string Placeholder_BugReportDescription => Get("Placeholder_BugReportDescription");
+        public static string Label_BugReportContact => Get("Label_BugReportContact");
+        public static string Hint_BugReportConsent => Get("Hint_BugReportConsent");
+        public static string Button_SubmitBugReport => Get("Button_SubmitBugReport");
+        public static string Status_BugReportUploading => Get("Status_BugReportUploading");
+        public static string Status_BugReportSubmitted => Get("Status_BugReportSubmitted");
+        public static string Status_BugReportRateLimited => Get("Status_BugReportRateLimited");
+        public static string Status_BugReportTooLarge => Get("Status_BugReportTooLarge");
+        public static string Status_BugReportFailed => Get("Status_BugReportFailed");
+        public static string Status_BugReportNeedDescription => Get("Status_BugReportNeedDescription");
+        public static string Status_BugReportCooldown => Get("Status_BugReportCooldown");
+        public static string Label_DiagnosticCapture => Get("Label_DiagnosticCapture");
+        public static string Tooltip_DiagnosticCapture => Get("Tooltip_DiagnosticCapture");
+        public static string Status_CaptureOff => Get("Status_CaptureOff");
+        public static string Status_CaptureSegments => Get("Status_CaptureSegments");
+        public static string Word_Frozen => Get("Word_Frozen");
+        public static string Word_Filling => Get("Word_Filling");
+        public static string Section_StalksGameKeys => Get("Section_StalksGameKeys");
+        public static string Label_WiperForwardKey => Get("Label_WiperForwardKey");
+        public static string Label_WiperBackKey => Get("Label_WiperBackKey");
+        public static string Label_LightCycleKey => Get("Label_LightCycleKey");
+        public static string Label_IndicatorLeftKey => Get("Label_IndicatorLeftKey");
+        public static string Label_IndicatorRightKey => Get("Label_IndicatorRightKey");
+        public static string Section_StalksIndicators => Get("Section_StalksIndicators");
+        public static string SliderLabel_IndicatorMinBlink => Get("SliderLabel_IndicatorMinBlink");
+        public static string KeyCapture_Prompt => Get("KeyCapture_Prompt");
+        public static string KeyCapture_None => Get("KeyCapture_None");
+        public static string StalkKind_None => Get("StalkKind_None");
+        public static string StalkKind_KeyTap => Get("StalkKind_KeyTap");
+        public static string StalkKind_HeldKey => Get("StalkKind_HeldKey");
+        public static string StalkKind_LatchKey => Get("StalkKind_LatchKey");
+        public static string StalkKind_IndicatorLeft => Get("StalkKind_IndicatorLeft");
+        public static string StalkKind_IndicatorRight => Get("StalkKind_IndicatorRight");
+        public static string StalkKind_IndicatorCancel => Get("StalkKind_IndicatorCancel");
+        public static string StalkKind_WiperSwipe => Get("StalkKind_WiperSwipe");
+        public static string StalkKind_ReleaseHeld => Get("StalkKind_ReleaseHeld");
+        public static string StalkKind_WiperStage => Get("StalkKind_WiperStage");
+        public static string StalkKind_LightStage => Get("StalkKind_LightStage");
+        public static string Option_ReleaseChannelPr => Get("Option_ReleaseChannelPr");
+        public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
+        public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
+        public static string Label_EqSensitivity => Get("Label_EqSensitivity");
     }
 }

@@ -8,23 +8,44 @@ using System.Threading;
 namespace MozaPlugin.Diagnostics
 {
     /// <summary>
-    /// Process-wide ring buffer of timestamped serial frames in both directions,
-    /// plus an optional always-on JSONL sink that mirrors the layout produced by
-    /// <c>sim/bridge.py</c> so capture-comparison tooling works on either source.
-    /// In-memory ring is cleared on every Start() (user-initiated capture);
-    /// EnsureRunning() enables capture without clearing, used by the
-    /// AlwaysCaptureOnStartup auto-start path so the buffer survives plugin
-    /// reload across game switches. File sink (when enabled) keeps growing
-    /// until StopFileSink() or plugin unload.
+    /// Process-wide, always-on ring of timestamped serial frames, split into two
+    /// segments so a bug report keeps the connect/handshake even after hours of
+    /// running:
+    ///   • startup — every frame in the first <see cref="StartupWindowMs"/> ms
+    ///     (capped at <see cref="StartupByteCap"/>). Frozen once either bound is
+    ///     hit; never trimmed, so the cold-start handshake is always retained.
+    ///   • rolling — begins only once the startup segment has frozen, then holds
+    ///     the last <see cref="RollingWindowMs"/> ms of (post-startup) traffic,
+    ///     hard-bounded by <see cref="RollingByteCap"/> (byte cap is the RAM
+    ///     ceiling; age-trim gives the wall-clock window at low frame rates). The
+    ///     first minute lives only in the startup segment, never duplicated here.
+    /// Both segments are lock-free (ConcurrentQueue + Interlocked) — the serial
+    /// read thread's Record path must never take a lock. RAM only: nothing is
+    /// written to disk unless the developer JSONL sink is explicitly opened.
+    /// The <see cref="_startTicks"/> clock is set once and survives the
+    /// game-switch plugin reload (this is a singleton on the persistent wire),
+    /// so the startup segment reflects the true first launch.
+    /// Also keeps an optional always-on JSONL sink that mirrors the layout
+    /// produced by <c>sim/bridge.py</c> for capture-comparison tooling.
     /// </summary>
     public sealed class SerialTrafficCapture
     {
         public static SerialTrafficCapture Instance { get; } = new SerialTrafficCapture();
 
-        // Entry cap — ring discards oldest once exceeded so a long capture can't
-        // exhaust process memory. ~200k frames at typical telemetry rates ≈
-        // 30–60 minutes of continuous traffic; older bytes drop silently.
-        private const int MaxEntries = 200_000;
+        // Startup segment: first minute, hard-capped ~4 MB. Rolling segment:
+        // last 5 minutes, hard-capped ~8 MB. Total in-memory ceiling ≈ 12 MB
+        // regardless of frame rate — the byte caps are the load-bearing bound;
+        // the time windows just shape coverage.
+        private const long StartupWindowMs = 60_000;
+        private const long StartupByteCap = 4L * 1024 * 1024;
+        private const long RollingWindowMs = 300_000;
+        private const long RollingByteCap = 8L * 1024 * 1024;
+
+        // MOZA frames are tiny (often 5-50 bytes), so per-entry object overhead
+        // (Entry + byte[] header + queue slot, x86) dwarfs the payload. The caps
+        // account for this fixed overhead per frame so they bound real RAM, not
+        // just summed payload — otherwise 8 MB of payload could be 30+ MB live.
+        private const int EntryOverheadBytes = 48;
 
         public enum Direction : byte { Tx = (byte)'T', Rx = (byte)'R' }
 
@@ -36,10 +57,18 @@ namespace MozaPlugin.Diagnostics
             public byte[] Bytes = Array.Empty<byte>();
         }
 
-        private readonly ConcurrentQueue<Entry> _entries = new ConcurrentQueue<Entry>();
-        private int _count;
+        // Startup segment (frozen after the window/cap) and rolling ring.
+        private readonly ConcurrentQueue<Entry> _startupEntries = new ConcurrentQueue<Entry>();
+        private readonly ConcurrentQueue<Entry> _rollingEntries = new ConcurrentQueue<Entry>();
+        private long _startupBytes;
+        private long _rollingBytes;
+        private int _startupCount;
+        private int _rollingCount;
+
         private volatile bool _enabled;
-        private DateTime _startedAtUtc;
+        // Capture clock, in UTC ticks. Set once via CompareExchange on the first
+        // recorded frame; 0 means "not started". Never reset by EnsureRunning.
+        private long _startTicks;
 
         // Always-on JSONL sink (bridge-format). Independent of in-memory ring.
         private readonly object _fileLock = new object();
@@ -54,9 +83,32 @@ namespace MozaPlugin.Diagnostics
         private volatile bool _fileSinkEnabled;
 
         public bool Enabled => _enabled;
-        public int Count => Volatile.Read(ref _count);
-        public DateTime StartedAtUtc => _startedAtUtc;
+        public int Count => Volatile.Read(ref _startupCount) + Volatile.Read(ref _rollingCount);
+        public DateTime StartedAtUtc
+        {
+            get
+            {
+                long t = Interlocked.Read(ref _startTicks);
+                return t == 0 ? default : new DateTime(t, DateTimeKind.Utc);
+            }
+        }
         public string? FileSinkPath => _fileSinkPath;
+
+        // Per-segment stats for the Diagnostics-tab status line.
+        public int StartupFrameCount => Volatile.Read(ref _startupCount);
+        public long StartupByteSize => Volatile.Read(ref _startupBytes);
+        public int RollingFrameCount => Volatile.Read(ref _rollingCount);
+        public long RollingByteSize => Volatile.Read(ref _rollingBytes);
+        public bool StartupFrozen
+        {
+            get
+            {
+                long start = Interlocked.Read(ref _startTicks);
+                if (start == 0) return false;
+                long elapsedMs = (DateTime.UtcNow.Ticks - start) / TimeSpan.TicksPerMillisecond;
+                return elapsedMs >= StartupWindowMs || Volatile.Read(ref _startupBytes) >= StartupByteCap;
+            }
+        }
 
         // Always-on cumulative byte counters — incremented on every RecordTx /
         // RecordRx regardless of whether the in-memory ring is enabled. Powers
@@ -68,23 +120,22 @@ namespace MozaPlugin.Diagnostics
 
         private SerialTrafficCapture() { }
 
-        public void Start()
-        {
-            Clear();
-            _startedAtUtc = DateTime.UtcNow;
-            _enabled = true;
-        }
-
         /// <summary>
         /// Idempotent enable: turns capture on without clearing the buffer or
-        /// resetting StartedAtUtc. No-op when already enabled. Use this from
-        /// auto-start paths (AlwaysCaptureOnStartup) so accumulated frames
-        /// survive plugin reload on game switches.
+        /// resetting the capture clock. No-op when already enabled. This is the
+        /// primary entry point — MozaPlugin.Init calls it before any device
+        /// traffic so the startup segment covers the full connect/handshake,
+        /// and it survives the game-switch plugin reload.
         /// </summary>
         public void EnsureRunning()
         {
-            if (_enabled) return;
-            if (_startedAtUtc == default) _startedAtUtc = DateTime.UtcNow;
+            _enabled = true;
+        }
+
+        /// <summary>Clear both segments and restart the capture clock.</summary>
+        public void Start()
+        {
+            Clear();
             _enabled = true;
         }
 
@@ -131,20 +182,41 @@ namespace MozaPlugin.Diagnostics
             _fileSinkEnabled = false;
         }
 
-        /// <summary>Stop capture and return a snapshot of the recorded entries in order.</summary>
+        /// <summary>Disable capture and return an ordered snapshot of all entries.</summary>
         public IReadOnlyList<Entry> Stop()
         {
             _enabled = false;
-            var list = new List<Entry>(Volatile.Read(ref _count));
-            foreach (var e in _entries)
-                list.Add(e);
+            var list = new List<Entry>(Count);
+            foreach (var e in _startupEntries) list.Add(e);
+            foreach (var e in _rollingEntries) list.Add(e);
             return list;
         }
 
         public void Clear()
         {
-            while (_entries.TryDequeue(out _)) { }
-            Volatile.Write(ref _count, 0);
+            while (_startupEntries.TryDequeue(out _)) { }
+            while (_rollingEntries.TryDequeue(out _)) { }
+            Volatile.Write(ref _startupBytes, 0);
+            Volatile.Write(ref _rollingBytes, 0);
+            Volatile.Write(ref _startupCount, 0);
+            Volatile.Write(ref _rollingCount, 0);
+            Interlocked.Exchange(ref _startTicks, 0);
+        }
+
+        /// <summary>Ordered snapshot of the frozen first-minute startup segment.</summary>
+        public IReadOnlyList<Entry> SnapshotStartup()
+        {
+            var list = new List<Entry>(Volatile.Read(ref _startupCount));
+            foreach (var e in _startupEntries) list.Add(e);
+            return list;
+        }
+
+        /// <summary>Ordered snapshot of the rolling last-N-minutes segment.</summary>
+        public IReadOnlyList<Entry> SnapshotRolling()
+        {
+            var list = new List<Entry>(Volatile.Read(ref _rollingCount));
+            foreach (var e in _rollingEntries) list.Add(e);
+            return list;
         }
 
         public void RecordTx(string source, byte[] frame) => Record(Direction.Tx, source, frame);
@@ -165,21 +237,63 @@ namespace MozaPlugin.Diagnostics
                 WriteFileSinkLine(dir, frame);
 
             if (!_enabled) return;
+
+            var now = DateTime.UtcNow;
+            // Set the capture clock exactly once. CompareExchange returns the
+            // prior value; if it was 0 we won the race and now.Ticks is the start.
+            long prior = Interlocked.CompareExchange(ref _startTicks, now.Ticks, 0);
+            long start = prior == 0 ? now.Ticks : prior;
+            long elapsedMs = (now.Ticks - start) / TimeSpan.TicksPerMillisecond;
+
             // Copy — caller buffers (e.g. read-loop tmp buffer) get reused.
             var copy = new byte[frame.Length];
             Buffer.BlockCopy(frame, 0, copy, 0, frame.Length);
-            _entries.Enqueue(new Entry
+            var entry = new Entry
             {
-                TimestampUtc = DateTime.UtcNow,
+                TimestampUtc = now,
                 Dir = dir,
                 Source = source ?? string.Empty,
                 Bytes = copy,
-            });
-            int n = Interlocked.Increment(ref _count);
-            // Ring trim: drop oldest until back inside cap. Concurrent producers
-            // can over-trim by a few entries; that is fine — cap is approximate.
-            while (n > MaxEntries && _entries.TryDequeue(out _))
-                n = Interlocked.Decrement(ref _count);
+            };
+
+            int cost = frame.Length + EntryOverheadBytes;
+
+            // During the startup window frames go ONLY to the startup segment;
+            // the rolling segment doesn't begin until startup freezes (window
+            // elapsed or byte cap hit). This keeps the first minute out of the
+            // rolling ring and avoids storing it twice. A couple of frames may
+            // slip past the bound under concurrency; harmless.
+            if (elapsedMs < StartupWindowMs && Volatile.Read(ref _startupBytes) < StartupByteCap)
+            {
+                _startupEntries.Enqueue(entry);
+                Interlocked.Add(ref _startupBytes, cost);
+                Interlocked.Increment(ref _startupCount);
+                return;
+            }
+
+            // Startup is frozen — feed the rolling segment, then trim by byte cap and age.
+            _rollingEntries.Enqueue(entry);
+            Interlocked.Add(ref _rollingBytes, cost);
+            Interlocked.Increment(ref _rollingCount);
+
+            // Byte-cap trim: drop oldest until back inside cap.
+            while (Volatile.Read(ref _rollingBytes) > RollingByteCap
+                   && _rollingEntries.TryDequeue(out var dropped))
+            {
+                Interlocked.Add(ref _rollingBytes, -(dropped.Bytes.Length + EntryOverheadBytes));
+                Interlocked.Decrement(ref _rollingCount);
+            }
+            // Age trim: drop the head while it is older than the window. Peek to
+            // test age; the dequeued entry may differ from the peeked one under
+            // concurrency, but we subtract its actual cost so counters stay
+            // consistent (cap is approximate, matching the byte-trim above).
+            long cutoff = now.Ticks - RollingWindowMs * TimeSpan.TicksPerMillisecond;
+            while (_rollingEntries.TryPeek(out var head) && head.TimestampUtc.Ticks < cutoff)
+            {
+                if (!_rollingEntries.TryDequeue(out var aged)) break;
+                Interlocked.Add(ref _rollingBytes, -(aged.Bytes.Length + EntryOverheadBytes));
+                Interlocked.Decrement(ref _rollingCount);
+            }
         }
 
         private void WriteFileSinkLine(Direction dir, byte[] frame)
@@ -275,17 +389,26 @@ namespace MozaPlugin.Diagnostics
             sb.Append("# timestamp (local)        dir source     bytes\n");
             foreach (var e in entries)
             {
-                var local = e.TimestampUtc.ToLocalTime();
-                sb.Append(local.ToString("yyyy-MM-dd HH:mm:ss.fff"));
-                sb.Append(' ');
-                sb.Append((char)e.Dir);
-                sb.Append("  ");
-                sb.Append(e.Source.PadRight(10));
-                sb.Append(' ');
+                AppendEntryPrefix(sb, e);
                 AppendHex(sb, e.Bytes);
                 sb.Append('\n');
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Shared per-entry line prefix (timestamp, direction, source) used by
+        /// both <see cref="Format"/> and the redacting formatter.
+        /// </summary>
+        internal static void AppendEntryPrefix(StringBuilder sb, Entry e)
+        {
+            var local = e.TimestampUtc.ToLocalTime();
+            sb.Append(local.ToString("yyyy-MM-dd HH:mm:ss.fff"));
+            sb.Append(' ');
+            sb.Append((char)e.Dir);
+            sb.Append("  ");
+            sb.Append(e.Source.PadRight(10));
+            sb.Append(' ');
         }
 
         private static void AppendHex(StringBuilder sb, byte[] data)
@@ -298,6 +421,6 @@ namespace MozaPlugin.Diagnostics
             }
         }
 
-        private static char HexChar(int n) => (char)(n < 10 ? '0' + n : 'a' + (n - 10));
+        internal static char HexChar(int n) => (char)(n < 10 ? '0' + n : 'a' + (n - 10));
     }
 }

@@ -17,6 +17,13 @@ namespace MozaPlugin.Protocol
         public const byte DeviceMain = 18;
         public const byte DeviceBase = 19;
         public const byte DeviceDash = 20;
+        // Third wheel-identity device id (0x15). docs/how-to-query-device-type.md
+        // probes the model-name group (0x07) at 0x15, 0x17 and 0x18 — three wheel
+        // device types; the matching device replies with the 22-byte model-name
+        // frame. 0x15 is already a wheel-detection candidate (WheelIdCandidates)
+        // and a PitHouse keepalive target; the physical model reporting at 0x15
+        // is unconfirmed.
+        public const byte DeviceWheel15 = 21; // 0x15
         public const byte DeviceWheel = 23;
         // ES (old-protocol) steering wheel: a module of the wheelbase MCU,
         // reachable at its own internal id 0x18 (24). Distinct from DeviceWheel

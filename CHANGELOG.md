@@ -1,6 +1,165 @@
 # Changelog
 
-All notable changes to the AZOM MOZA SimHub plugin are documented here.
+All notable changes to the AZOM plugin are documented here.
+
+## [1.5.4]
+
+### Added
+
+- **Português (Portuguese) language** has been added.
+- **Minimum blinker time** slider added for stalks in truck sim mode. 
+- **The bug-report reference can be selected and copied.** 
+- **Minimum steering angle lowered to 60°.** Lowest possible setting accepted by firmware.
+- **AB6 active shifter.** The AB6 (USB PID `0x1002`) is now a recognised device.
+- **10-band FFB Effect Equalizer.** On wheelbase firmware **1.2.10.10+.** 
+- **EQ sensitivity presets.** Road sensitivity presets are now supported for both 6 and 
+  10 band devices.
+
+### Fixed
+
+- SimHub log no longer floods during gameplay.
+- An AB6 shifter no longer corrupts the steering readout or the wheel's button table.
+- Diagnostics no longer shows a stale COM port for an unplugged active shifter.
+- Remembered COM port now works under Wine/Proton.
+- SimHub's Arduino scan no longer delays the wheelbase connection.
+- Standalone-USB CM2 RPM/flag LEDs work on the 2026-06 meter firmware.
+- AB9/AB6 gear shifts no longer get more violent the longer you play, and the gear-shift
+  Vibration Intensity slider now scales the whole effect.
+- AB9/AB6 FFB effect handles are read from the device instead of assumed.
+- An mBooster on the base's or hub's pedal port is now detected.
+- mBooster roles no longer stick to an axis with no pedal wired.
+- A standalone mBooster keeps its settings once its real axis resolves.
+- CM2/CM1 dash works on a rig with no wheel attached, and a bridged CM1 no longer gets
+  the CM2 device definition.
+- Paddle, knob and joystick settings no longer bleed between two wheels.
+- Display fixes for stayings dead after a game switch.
+
+### Changed
+
+- **Bundled SimHub updated to v9.11.22** (from v9.11.21).
+
+## [1.5.3] - 2026-07-30
+
+### Fixed
+
+- **RS wheel button LEDs.** The RS rim profiles (Leather/Alcantara, Round/D-Shape) now
+  carry 10 button LEDs, restoring the button-LED controls for the RS V2 — its firmware
+  reports "RS Leather # W00", which resolves to the RS Leather Round profile that
+  previously claimed no button LEDs. The RS V2 profile's count is also corrected
+  from 14 to 10.
+- **Standalone mBooster pedals are no longer mistaken for a chain.** A lone unit reports
+  the same presence bytes as a two-pedal chain, which could route its effects to the wrong
+  motor address; stale calibration the host keeps for detached pedals could also leave the
+  unit's role unresolved, and an empty HID axis could claim a role ahead of the real pedal,
+  pinning that input at 0. Chain detection, role resolution, and axis-to-input mapping now
+  follow the device's own connected-pedal diagnostic.
+- **Unknown wheel names.** Unrecognized wheel models no longer carry the firmware's
+  "# code" module suffix (e.g. "# W00") in their SimHub device name.
+
+## [1.5.2] - 2026-07-29
+
+### Added
+
+- **Outdated-firmware warning.** When a current-generation wheel (device ID 0x17/0x15)
+  answers detection like a legacy-protocol wheel — seen on an FSR V2 whose firmware never
+  replied to the telemetry-mode probe — the plugin now shows a banner recommending a wheel
+  and wheelbase firmware update in MOZA Pit House, names the affected wheel once its model
+  resolves, and records the advisory in diagnostics bundles.
+- **CM1 Racing Dash — full default channel map.** The base/hub-bridged CM1 dash's field
+  stream is now decoded and mapped: every field ships a default SimHub binding.
+- **HGP and SGP shifters can now be used at the same time.** They're fully independent devices —
+  each with its own detection, tab, and per-profile settings.
+- **HGP shifter type selector.** The HGP tab lets you switch the shifter between H-pattern
+  and Sequential — for anyone wanting to run sequential-shifting mods — and doubles as the
+  recovery path for shifters flipped by the 1.5.1 bug (see Fixed).
+- **MOZA Stalks truck-sim mode — rebindable keys.** Every key the stalks send is now set with a
+  press-a-key capture field: the wiper forward/back and light-cycle keys, both indicator keys
+  (previously fixed at P / - / L / [ / ]), and the per-button key assignments (previously a
+  fixed preset list). Captured keys are stored as layout-independent scan codes and displayed
+  using your keyboard layout's own key names, so international layouts can bind any key.
+- **Wheelbase LFE as a SimHub ShakeIt device (prototype).** A new "MOZA Wheelbase LFE
+  haptics" device in SimHub's Devices list exposes the base's three summed LFE oscillators
+  as ShakeIt Motors channels, so any ShakeIt effect can be routed to the wheelbase through
+  SimHub's full effects editor. Automatically hides legacy LFE tab when the new device is 
+  used.
+- **"Report a problem" — built-in bug reporting (About tab).** Describe the issue (with an
+  optional contact) and the plugin uploads the report together with a diagnostics bundle —
+  diagnostics snapshot, startup and rolling serial captures (hardware identifiers masked),
+  the plugin log, and the plugin's settings — and hands back a ticket ID. Oversized bundles
+  drop the rolling capture segment to fit the upload cap. The local diagnostics ZIP export
+  gains the same settings file.
+- **AB9 mechanical layout — SimHub property and actions.** `AZOM.Ab9Layout` shows the current
+  layout on dashboards/StreamDeck (and `AZOM.Ab9Connected` reports shifter presence), while new
+  bindable actions change it on the fly: `AZOM.Ab9LayoutNext` / `AZOM.Ab9LayoutPrev` cycle the
+  six layouts, and `AZOM.Ab9Layout5R1` … `AZOM.Ab9LayoutSequential` jump straight to one.
+  Closes issue #112.
+- **MOZA × Porsche Mission R and ESSENZA SCV12 wheels recognized.** The two wheels now get 
+  correct LED handling and product images.
+
+### Changed
+
+- **Per-PR development builds.** Dev-branch builds and the rolling `dev-latest` pre-release
+  are retired; CI now publishes a pre-release for every commit pushed to an open pull request
+  (newest 5 kept per PR, all deleted when the PR closes). The release-channel dropdown
+  (About > Updates) lists Stable plus every open PR — pick a PR to track its newest build,
+  and switching back to Stable offers the stable build even from a newer-numbered PR build.
+  Users on the old Development channel are migrated to Stable automatically.
+- **Base-tab temperature graph keeps its history.** MCU/MOSFET/motor temperatures are now
+  sampled by a background timer for the plugin's whole lifetime (every 0.5 s) instead of only
+  while the settings panel is open, so the graph shows its full rolling window the moment you
+  open the Base tab.
+
+### Fixed
+
+- **ES / ESX RPM LED brightness now follows the master brightness slider.** The Global
+  Brightness slider under Devices → Moza ES → LEDs had no effect (except full-off at 0):
+  old-protocol wheels dim only via a firmware register the master path never wrote, and both
+  of SimHub's fast callbacks go quiet at idle, so the write is driven from the steady poll
+  timer. The 0–100 slider is scaled into the firmware's small brightness range (it is not a
+  0–100 percentage) so the sweep no longer wraps, and a short settle absorbs the startup
+  brightness-mode churn that otherwise flickered the bar. Closes issue #113.
+- **ESX wheel detection.** The ESX reports its firmware model name as "RSX", which the
+  model table never matched; it now resolves to its own device definition and artwork.
+- **Display rotation stuck on for non-VGS display wheels.** Selecting the wrong firmware era
+  for the wheel could stream telemetry in a format the wheel misinterprets; Display wheels 
+  other than the VGS now get the rotation setting turned off on every connection.
+- **Unresponsive display fix — the "stale-session wedge."** If a prior
+  SimHub instance exited with the wheel session still open, the wheel would keep acking
+  everything the new instance sent while never re-engaging the display (no session device-init,
+  no dashboard list, no slot report), leaving the dash dead indefinitely. Cold start now detects
+  that a session-close was acked (the wheel still held a stale session), holds ~11 s of
+  session-layer silence so the firmware tears it down, then re-closes before opening fresh; the
+  DisplayWatchdog also recognizes the wedge and triggers the proven off/on recovery cycle if one
+  slips through.
+- **Dead display after a reconnect.** After a port bounce the wheel's session layer can get
+  stuck replaying a stale open-ack; the plugin's single telemetry-session open attempt timed
+  out and the pipeline came up looking active with nothing reaching the display. The open is
+  now retried at ~1 s intervals for up to 10 rounds (matching Pit House), and if the wheel
+  still refuses, the proven off/on recovery cycle runs instead of continuing into a dead lane.
+- **Dead display after power-cycling the wheel mid-session.** Rebooting the wheel while
+  telemetry was running could leave the session the dashboard binds through completely silent
+  while cached state kept every health check green — the display stayed dark until a manual
+  off/on. The DisplayWatchdog now detects the asymmetry (binding session dead while the
+  wheel's other session stays live) and triggers the recovery cycle.
+- **FSR1 default mappings — broad capture-verified correction pass.** Brake bias, the gap
+  fields, the side pages, and the layouts of several built-in dashboards now decode correctly.
+- **A bad FSR1 field mapping can no longer freeze the whole display.** One malformed
+  partition/field used to abort the entire send tick, blanking every page until a page
+  change; the bad record is now skipped (and logged) while the rest keep streaming, and
+  field writes are bounds-guarded.
+- **1.5.1 could flip an HGP shifter into sequential mode.** 1.5.1 kept one shared set of
+  shifter profile fields and one shifter "owner", so with an SGP in the picture (attached
+  alongside the HGP, or used earlier under the same profile) profile apply could write the
+  SGP's shifter-type at the HGP — the shifter stores it, so the HGP then acts as a
+  sequential shifter even outside SimHub, and MOZA's own software does not put it back.
+  The plugin no longer captures or profile-applies shifter-type at all, and the HGP
+  tab gains a **Shifter type** selector (H-pattern / Sequential) that writes the device
+  directly with a read-back — the recovery path for affected HGPs. The value each
+  shifter reports is also logged on every connect.
+- **A shifter on its own USB port no longer hides one behind the base or hub.** The
+  relayed-shifter probe (dev `0x1A`) stopped as soon as any shifter was detected anywhere,
+  so a standalone HGP suppressed detection of an SGP plugged into the wheelbase; the probe
+  and its model resolvers are now gated per pipe.
 
 ## [1.5.1] - 2026-07-18
 
@@ -526,6 +685,8 @@ First release that can drive the wheel's built-in dashboards (requires the match
 - Initial development: wheelbase control and build pipeline, per-wheel profiles, first device
   definitions, RPM range settings, blink colors, and the first telemetry/dashboard init attempts.
 
+[1.5.3]: https://github.com/giantorth/AZOM/compare/v1.5.2...v1.5.3
+[1.5.2]: https://github.com/giantorth/AZOM/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/giantorth/AZOM/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/giantorth/AZOM/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/giantorth/AZOM/compare/v1.3.0...v1.4.0

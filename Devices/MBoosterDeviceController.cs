@@ -41,7 +41,33 @@ namespace MozaPlugin.Devices
         // reconnects within the same USB port; a user moving the device to a
         // different USB hub may get a different instance id (Windows quirk),
         // which is the same way every other USB peripheral identity-tracks.
+        // A ROUTED lane (mBooster on the wheelbase/hub pedal port — see the
+        // routed constructor) uses a synthetic "routedpedals:<port>" identity
+        // instead; both re-key to "mbooster:<serial>" once interrogated, so
+        // the same physical unit keeps its settings across hookups.
         public string Identity { get; }
+
+        // Sub-device id this lane's mBooster answers as. A unit on its own
+        // USB CDC pipe is the pipe's main device (0x12); routed through a
+        // wheelbase/hub it is that bus's pedals sub-device (0x19) — the same
+        // id Pit House addresses in that hookup, and the same relayed-id
+        // pattern the shifter uses (0x12 on USB, 0x1A relayed).
+        public byte HostDeviceId { get; } = MozaProtocol.DeviceMain;
+        // HostDeviceId nibble-swapped — the source byte inbound frames carry.
+        private readonly byte _swappedHostId = 0x21;
+        // False for a routed lane: the connection belongs to the base/hub
+        // manager — never open/close/pin/dispose it from here, and filter
+        // inbound traffic to our sub-device id (the shared pipe carries
+        // every peripheral's frames).
+        private readonly bool _ownsConnection = true;
+        public bool IsRouted => !_ownsConnection;
+
+        // Motor/config device ids this lane may address: the chain id set on
+        // a dedicated USB pipe, ONLY the host sub-device id when routed —
+        // 0x1d/0x1e are other peripherals' bus ids on a base/hub pipe (0x1c
+        // is the E-stop), so a routed lane must never spray keepalives or
+        // disables at them.
+        public byte[] MotorIds { get; } = MozaMBoosterProtocol.MotorDeviceIds;
 
         // Port name at construction time. May change on reconnect — read live
         // via Connection.LastPortName if needed.
@@ -150,6 +176,42 @@ namespace MozaPlugin.Devices
         /// </summary>
         public event Action<string, string>? SerialResolved;
 
+        /// <summary>
+        /// Fired when the device's own connectivity diagnostic ("PD Linked" /
+        /// "Pedals connected state") has been parsed — i.e. LIVE data, never a
+        /// seed. Arg: the role-indexed [T,B,C] connected flags. The plugin
+        /// persists these per device so the next controller (plugin restart,
+        /// next session) can be seeded instead of waiting for the broadcast.
+        /// </summary>
+        public event Action<bool[]>? ConnectivityResolved;
+
+        /// <summary>
+        /// Fired when the model-name read answers (once per distinct value).
+        /// The routed-lane probe uses this to discriminate an mBooster on a
+        /// base/hub pedal port from plain SGP pedals before registering the
+        /// lane — both answer the same identity groups at dev 0x19.
+        /// </summary>
+        public event Action<string>? ModelNameResolved;
+
+        /// <summary>
+        /// Seed <see cref="ConnectedAxes"/> from a persisted last-known value.
+        /// No-op when live connectivity has already been parsed (or on a null/
+        /// empty seed) — the device's own diagnostic always wins. Arms the
+        /// phantom-axis merge guard, worker gating, and role-map narrowing from
+        /// the first HID event instead of after the once-a-minute broadcast.
+        /// </summary>
+        public void SeedConnectedAxes(bool[]? connected)
+        {
+            if (connected == null || connected.Length == 0) return;
+            if (_connectedAxes != null) return;
+            _connectedAxes = (bool[])connected.Clone();
+            MozaLog.Info(
+                $"[AZOM/mBooster] {ShortIdentity(Identity)} seeded connectivity from cache: " +
+                $"T={connected.Length > 0 && connected[0]} B={connected.Length > 1 && connected[1]} C={connected.Length > 2 && connected[2]} " +
+                "(live diagnostic will confirm/override)");
+            RecomputeChainRoleMap();
+        }
+
         public MBoosterDeviceController(
             string identity,
             string portName,
@@ -203,6 +265,60 @@ namespace MozaPlugin.Devices
                     pedalAxisIndex: i, isPrimary: i == 0);
         }
 
+        /// <summary>
+        /// ROUTED-lane constructor: an mBooster attached to a wheelbase/hub
+        /// pedal port (RJ45) instead of USB. There is no dedicated CDC pipe —
+        /// the base tunnels it as its pedals sub-device (0x19), same as any
+        /// other relayed peripheral (Pit House drives it this way too), so
+        /// this lane shares the owner's <paramref name="sharedConnection"/>:
+        /// frames go out addressed to <paramref name="hostDeviceId"/>, inbound
+        /// traffic is filtered to that id's swapped source byte, and the
+        /// pipe's lifecycle (open/close/dispose/port pinning/capture label)
+        /// stays entirely with its owning manager. Positions come from the
+        /// base HID / merged MozaData (mirrored in by the registry), never
+        /// from an mBooster HID pairing.
+        /// </summary>
+        public MBoosterDeviceController(
+            string identity,
+            MozaSerialConnection sharedConnection,
+            byte hostDeviceId,
+            string portLabel,
+            Func<MBoosterDeviceSettings?> settingsLookup,
+            Func<bool> isShuttingDown,
+            Func<string, double>? customEffectFormulaEvaluator = null)
+        {
+            Identity = identity ?? throw new ArgumentNullException(nameof(identity));
+            _connection = sharedConnection ?? throw new ArgumentNullException(nameof(sharedConnection));
+            PortName = portLabel ?? "";
+            ContainerId = string.Empty;
+            _settingsLookup = settingsLookup ?? throw new ArgumentNullException(nameof(settingsLookup));
+            _isShuttingDown = isShuttingDown ?? (() => false);
+            _ownsConnection = false;
+            HostDeviceId = hostDeviceId;
+            _swappedHostId = (byte)(((hostDeviceId & 0x0f) << 4) | (hostDeviceId >> 4));
+            MotorIds = new[] { hostDeviceId };
+            // The base HID reports the full 3-axis pedal surface regardless of
+            // hookup; connectivity (ConnectedAxes) narrows it as usual.
+            AxisCount = 3;
+
+            _connection.MessageReceived += OnConnectionMessage;
+            _connection.Disconnected += OnConnectionDisconnected;
+
+            _workers = new MBoosterEffectWorker[MozaMBoosterProtocol.MotorDeviceIds.Length];
+            for (int i = 0; i < _workers.Length; i++)
+                _workers[i] = new MBoosterEffectWorker(
+                    this, _settingsLookup, _isShuttingDown, customEffectFormulaEvaluator,
+                    pedalAxisIndex: i, isPrimary: i == 0);
+        }
+
+        /// <summary>Start the per-axis effect workers — the registry calls this
+        /// when a ROUTED lane is registered (a USB lane starts them from its
+        /// own <see cref="TryConnect"/>).</summary>
+        public void StartWorkers()
+        {
+            foreach (var w in _workers) w.Start();
+        }
+
         /// <summary>The effect worker driving pedal <paramref name="pedalIndex"/>
         /// (0 = master/host), or null if out of range.</summary>
         private MBoosterEffectWorker? WorkerFor(int pedalIndex) =>
@@ -231,23 +347,30 @@ namespace MozaPlugin.Devices
         /// axis-index-to-device-id mapping only applies when that axis index
         /// corresponds to a real separate physical unit, not to wherever a
         /// lone pedal's data happens to land in the report descriptor.
-        /// Chain-ness is taken from <see cref="SubDeviceCount"/> (the presence
-        /// read, known at connect) OR the parsed <see cref="ConnectedAxes"/>,
-        /// whichever already shows more than one motor: the device streams the
-        /// "PD Linked:[T x B y C z]" diagnostic seconds after connect — and
-        /// sometimes first as an unparseable short form ("PD Linked: 1") — so
-        /// gating solely on ConnectedAxes collapses a real chain onto the
-        /// master 0x12 for that whole window (brake effects then fire from the
-        /// throttle motor). Confirmed on hardware: the device ids are
-        /// role-based (0x12 throttle / 0x1d brake / 0x1e clutch).
+        /// Chain-ness comes from the parsed <see cref="ConnectedAxes"/> once
+        /// the "PD Linked:[T x B y C z]" diagnostic has arrived — it is the
+        /// only signal that can tell a chain from a lone pedal: a confirmed
+        /// STANDALONE unit reports presence [00 02] (SubDeviceCount 2), the
+        /// same bytes as a 2-pedal chain, so the presence read cannot
+        /// distinguish the two. <see cref="SubDeviceCount"/> only bridges the
+        /// window before the diagnostic lands (it streams seconds after
+        /// connect — and sometimes first as an unparseable short form
+        /// ("PD Linked: 1")), so a real chain isn't collapsed onto the master
+        /// 0x12 for that window (brake effects would fire from the throttle
+        /// motor). Confirmed on hardware: the device ids are role-based
+        /// (0x12 throttle / 0x1d brake / 0x1e clutch).
         /// </summary>
         public byte MotorDeviceForCurrentAxis(int axisIndex)
         {
+            // Routed lane: everything addresses the tunneled pedal sub-device —
+            // 0x1d/0x1e are OTHER peripherals' ids on a shared base/hub bus.
+            // (Chained ids behind a base, if they exist, are unmapped so far.)
+            if (!_ownsConnection) return HostDeviceId;
             var connected = _connectedAxes;
             int connectedCount = 0;
             if (connected != null)
                 foreach (var b in connected) if (b) connectedCount++;
-            bool isChain = connectedCount > 1 || SubDeviceCount > 1;
+            bool isChain = connected != null ? connectedCount > 1 : SubDeviceCount > 1;
             return isChain ? MotorDeviceForAxis(axisIndex) : MozaProtocol.DeviceMain;
         }
 
@@ -295,13 +418,14 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>Role→motor device id with no axis to fall back on (used by
-        /// the calibration reads): the mapped device, else the host 0x12.</summary>
+        /// the calibration reads): the mapped device, else this lane's host id
+        /// (0x12 on a USB pipe, 0x19 routed).</summary>
         public byte MotorDeviceForRole(int roleIndex)
         {
             var map = _roleToDevice;
             if (map != null && roleIndex >= 0 && map.TryGetValue(roleIndex, out var dev))
                 return dev;
-            return MozaProtocol.DeviceMain;
+            return HostDeviceId;
         }
 
         private static int CalibIndex(string name)
@@ -349,9 +473,14 @@ namespace MozaPlugin.Devices
         /// default (min 0 / max 100) for the roles it doesn't have. So each
         /// device's role is simply the single register that is NOT the default
         /// — e.g. host 0x12 reads brake 16/99 (the rest 0/100) → Brake; chained
-        /// 0x1d reads throttle 3/99 (the rest 0/100) → Throttle. A device with
-        /// zero or more than one configured register is left unmapped (routes
-        /// by axis index), so this never routes worse than before.
+        /// 0x1d reads throttle 3/99 (the rest 0/100) → Throttle. Roles
+        /// <see cref="ConnectedAxes"/> reports as having no pedal are excluded
+        /// from the fingerprint: the host retains stale calibration for
+        /// detached pedals (a confirmed standalone brake also read back a
+        /// non-default throttle register), which would otherwise make it count
+        /// as ambiguous. A device with zero or more than one configured
+        /// register is left unmapped (routes by axis index), so this never
+        /// routes worse than before.
         /// </summary>
         private void RecomputeChainRoleMap()
         {
@@ -362,6 +491,7 @@ namespace MozaPlugin.Devices
                 foreach (var kv in _deviceCalib)
                     devices.Add(new KeyValuePair<byte, int[]>(kv.Key, (int[])kv.Value.Clone()));
             }
+            var connected = _connectedAxes; // role-indexed [T,B,C]; null until PD Linked
 
             var roleToDev = new Dictionary<int, byte>();
             var conflict = new HashSet<int>();
@@ -373,10 +503,14 @@ namespace MozaPlugin.Devices
                 if (!full) continue;
 
                 // The one register that isn't the 0..100 unconfigured default
-                // names this device's own pedal.
+                // names this device's own pedal. Registers for roles with no
+                // physically-connected pedal are stale — skip them.
                 int role = -1, count = 0;
                 for (int r = 0; r < 3; r++)
+                {
+                    if (connected != null && (r >= connected.Length || !connected[r])) continue;
                     if (!(c[r * 2] == 0 && c[r * 2 + 1] == 100)) { role = r; count++; }
+                }
                 if (count != 1) continue; // uncalibrated / ambiguous — leave to fallback
 
                 if (roleToDev.TryGetValue(role, out var existing) && existing != kv.Key)
@@ -416,6 +550,12 @@ namespace MozaPlugin.Devices
         private void OnConnectionMessage(byte[] data)
         {
             if (_disposed || data == null || data.Length < 2) return;
+            // Routed lane rides a SHARED base/hub pipe carrying every
+            // peripheral's traffic — only frames sourced from OUR pedal
+            // sub-device id (nibble-swapped in the source byte) belong to
+            // this lane. Applies to the 0x0E diagnostics too, which carry
+            // the same swapped source byte (0x91 for dev 0x19).
+            if (!_ownsConnection && data[1] != _swappedHostId) return;
             // Firmware debug/diagnostic group (0x0E) is normally silenced as noise,
             // but the mBooster streams useful chain-layout lines here ("PD Linked:
             // [T x B y C z]", "<pedal> is connected, type: active/passive pedal").
@@ -479,8 +619,15 @@ namespace MozaPlugin.Devices
                     TryCompleteSerial();
                     break;
                 case "mbooster-model-name":
-                    ModelName = MozaData.ParseNullTerminatedString(r.ArrayValue ?? Array.Empty<byte>());
+                    string model = MozaData.ParseNullTerminatedString(r.ArrayValue ?? Array.Empty<byte>());
+                    bool modelChanged = !string.Equals(model, ModelName, StringComparison.Ordinal);
+                    ModelName = model;
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} model='{ModelName}'");
+                    if (modelChanged && !string.IsNullOrEmpty(model))
+                    {
+                        try { ModelNameResolved?.Invoke(model); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] ModelNameResolved handler: {ex.Message}"); }
+                    }
                     break;
                 case "mbooster-presence":
                     // Sub-device COUNT byte offset isn't pinned yet (wheelbase reads
@@ -501,8 +648,9 @@ namespace MozaPlugin.Devices
                 default:
                     // Calibration read-backs — log at Debug so the bundle shows what
                     // the device returned. Mapping into settings happens plugin-side.
-                    // Host (0x12) per-role min/max feeds the chain role→motor map.
-                    StoreCalib(MozaProtocol.DeviceMain, r.Name, r.IntValue);
+                    // The host's (0x12 USB / 0x19 routed) per-role min/max feeds the
+                    // chain role→motor map.
+                    StoreCalib(HostDeviceId, r.Name, r.IntValue);
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
                     break;
             }
@@ -554,22 +702,36 @@ namespace MozaPlugin.Devices
             string ascii = sb.ToString().Trim();
             if (ascii.Length == 0) return;
             if (ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) < 0 &&
+                ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("pedal is connected", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) < 0)
                 return;
             lock (_diagLinesLogged) { if (!_diagLinesLogged.Add(ascii)) return; }
             MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} diag: {ascii}");
 
-            // "PD Linked:[T 0 B 1 C 1]" — 1 = that pedal slot is physically
-            // connected. Slots map to axis index 0/1/2 (throttle/brake/clutch),
-            // the same order the HID axes (Rx/Ry/Rz) sort into.
-            if (ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) >= 0)
+            // "PD Linked:[T 0 B 1 C 1]" — or, on newer firmware (device-type
+            // 01-02-07-05, support bundle 2026-07-30), the long form "Pedals
+            // connected state: [throttle 0 brake 1 clutch 0]". 1 = that pedal
+            // slot is physically connected. Slots map to axis index 0/1/2
+            // (throttle/brake/clutch), the same order the HID axes (Rx/Ry/Rz)
+            // sort into.
+            bool shortForm = ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool longForm = !shortForm && ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (shortForm || longForm)
             {
-                int t = FlagAfter(ascii, 'T'), b = FlagAfter(ascii, 'B'), c = FlagAfter(ascii, 'C');
+                int t = shortForm ? FlagAfter(ascii, 'T') : WordFlagAfter(ascii, "throttle");
+                int b = shortForm ? FlagAfter(ascii, 'B') : WordFlagAfter(ascii, "brake");
+                int c = shortForm ? FlagAfter(ascii, 'C') : WordFlagAfter(ascii, "clutch");
                 if (t >= 0 && b >= 0 && c >= 0)
                 {
-                    _connectedAxes = new[] { t == 1, b == 1, c == 1 };
+                    var live = new[] { t == 1, b == 1, c == 1 };
+                    _connectedAxes = live;
                     MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} connected pedals: T={t == 1} B={b == 1} C={c == 1}");
+                    // Connectivity narrows which roles the calibration
+                    // fingerprint may consider — re-derive with it known.
+                    RecomputeChainRoleMap();
+                    try { ConnectivityResolved?.Invoke(live); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] ConnectivityResolved handler: {ex.Message}"); }
                 }
             }
 
@@ -611,6 +773,39 @@ namespace MozaPlugin.Devices
             return -1;
         }
 
+        /// <summary>Digit (0/1) shortly after the first case-insensitive
+        /// <paramref name="word"/> in a long-form "Pedals connected state:
+        /// [throttle 0 brake 1 clutch 0]" line; -1 if absent.</summary>
+        private static int WordFlagAfter(string s, string word)
+        {
+            int i = s.IndexOf(word, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return -1;
+            int after = i + word.Length;
+            for (int j = after; j < s.Length && j <= after + 3; j++)
+                if (s[j] == '0' || s[j] == '1') return s[j] - '0';
+            return -1;
+        }
+
+        /// <summary>
+        /// Axis index of this lane's SOLE connected pedal, or -1 when
+        /// connectivity is unknown or more than one pedal is wired. A
+        /// standalone unit's sole pedal commonly reports on a non-zero HID
+        /// axis, but its config historically lives in the lane's flat
+        /// settings fields — the only row the UI shows before connectivity is
+        /// known. The worker / UI / HID-shaping paths use this to fall back
+        /// to the flat fields for that pedal when it has no per-pedal entry,
+        /// so learning the real axis doesn't orphan the existing config.
+        /// </summary>
+        public int SoleConnectedAxis()
+        {
+            var connected = _connectedAxes;
+            if (connected == null) return -1;
+            int sole = -1, count = 0;
+            for (int i = 0; i < connected.Length; i++)
+                if (connected[i]) { sole = i; count++; }
+            return count == 1 ? sole : -1;
+        }
+
         /// <summary>Short identity slug for capture labels / log lines — last 8 chars of instance id.</summary>
         public static string ShortIdentity(string identity)
         {
@@ -627,6 +822,10 @@ namespace MozaPlugin.Devices
         public bool TryConnect()
         {
             if (_disposed) return false;
+            // Routed lane: the shared pipe's lifecycle belongs to its owning
+            // base/hub manager — never open or pin it from here. Workers are
+            // started at lane registration (StartWorkers).
+            if (!_ownsConnection) return _connection.IsConnected;
             if (_connection.IsConnected) return true;
             // Pin the cached port name so the connection targets THIS specific
             // mBooster's COM port, not whichever PID 0x0008 device the registry
@@ -652,7 +851,7 @@ namespace MozaPlugin.Devices
         public void Disconnect()
         {
             foreach (var w in _workers) w.Stop();
-            _connection.Disconnect();
+            if (_ownsConnection) _connection.Disconnect();
             _detected = false;
         }
 
@@ -702,17 +901,18 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Build + send a write for a registered <c>mbooster-*</c> int command
-        /// against device 0x12 on THIS device's connection. Returns true if the
-        /// frame was enqueued. The protocol note marks this surface as "likely
-        /// but unverified" on mBooster firmware — the UI surfaces a warning so
+        /// against this lane's host sub-device (0x12 USB / 0x19 routed) when
+        /// <paramref name="device"/> is omitted. Returns true if the frame was
+        /// enqueued. The protocol note marks this surface as "likely but
+        /// unverified" on mBooster firmware — the UI surfaces a warning so
         /// the user knows the request may not be acknowledged.
         /// </summary>
-        public bool SendIntWrite(string commandName, int value, byte device = MozaProtocol.DeviceMain)
+        public bool SendIntWrite(string commandName, int value, byte? device = null)
         {
             if (!_connection.IsConnected) return false;
             var cmd = MozaCommandDatabase.Get(commandName);
             if (cmd == null) return false;
-            var msg = cmd.BuildWriteInt(device, value);
+            var msg = cmd.BuildWriteInt(device ?? HostDeviceId, value);
             if (msg == null) return false;
             _connection.Send(msg);
             return true;
@@ -720,13 +920,14 @@ namespace MozaPlugin.Devices
 
         /// <summary>Build + send a write for a registered <c>mbooster-*</c> float command.
         /// <paramref name="device"/> selects WHICH mBooster unit on a chain (0x12
-        /// host / 0x1d / 0x1e) — used to target a chained unit's own load cell.</summary>
-        public bool SendFloatWrite(string commandName, float value, byte device = MozaProtocol.DeviceMain)
+        /// host / 0x1d / 0x1e) — used to target a chained unit's own load cell.
+        /// Omitted = this lane's host sub-device.</summary>
+        public bool SendFloatWrite(string commandName, float value, byte? device = null)
         {
             if (!_connection.IsConnected) return false;
             var cmd = MozaCommandDatabase.Get(commandName);
             if (cmd == null) return false;
-            var msg = cmd.BuildWriteFloat(device, value);
+            var msg = cmd.BuildWriteFloat(device ?? HostDeviceId, value);
             if (msg == null) return false;
             _connection.Send(msg);
             return true;
@@ -752,12 +953,13 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Build + send a read for a registered <c>mbooster-*</c> command. Read
-        /// responses (group 35 + 0x80 = 0xA3) land on <see cref="MessageReceived"/>
+        /// Build + send a read for a registered <c>mbooster-*</c> command,
+        /// addressed to this lane's host sub-device (0x12 USB / 0x19 routed).
+        /// Read responses (group 35 + 0x80 = 0xA3) land on <see cref="MessageReceived"/>
         /// and the caller must <see cref="MozaResponseParser.Parse"/> them with
         /// <c>busHint: "mbooster"</c> to disambiguate from wheelbase main and AB9.
         /// </summary>
-        public bool SendRead(string commandName) => SendRead(commandName, MozaProtocol.DeviceMain);
+        public bool SendRead(string commandName) => SendRead(commandName, HostDeviceId);
 
         /// <summary>Build + send an <c>mbooster-*</c> read addressed to a specific
         /// device id (host 0x12 or a chained motor 0x1d/0x1e).</summary>
@@ -786,6 +988,9 @@ namespace MozaPlugin.Devices
         /// </summary>
         public void ProbeChainDevices()
         {
+            // Routed lane: 0x1d/0x1e are OTHER peripherals' bus ids on a shared
+            // base/hub pipe — never probe them from here.
+            if (!_ownsConnection) return;
             if (!_connection.IsConnected || _chainProbed) return;
             _chainProbed = true;
             foreach (var dev in new byte[] { 0x1d, 0x1e })
@@ -810,18 +1015,27 @@ namespace MozaPlugin.Devices
         /// device" button. Experimental: may produce no responses on
         /// mBooster firmware.
         /// </summary>
-        public void RequestCalibrationReads()
+        /// <summary>Identity/presence reads alone — the routed-lane probe uses
+        /// this to identify what's on a base/hub pedal port (model-name is the
+        /// mBooster-vs-SGP discriminator) without the calibration burst.</summary>
+        public void SendIdentityReads()
         {
             if (!_connection.IsConnected) return;
-            // Identity/presence come from the host 0x12 — they identify the
-            // unit, double as the detection-eliciting response, and presence
-            // triggers the chain probe that builds the role→motor map.
             foreach (var name in new[]
             {
                 "mbooster-model-name", "mbooster-serial-a", "mbooster-serial-b",
                 "mbooster-presence", "mbooster-device-type",
             })
                 SendRead(name);
+        }
+
+        public void RequestCalibrationReads()
+        {
+            if (!_connection.IsConnected) return;
+            // Identity/presence come from the host sub-device — they identify
+            // the unit, double as the detection-eliciting response, and presence
+            // triggers the chain probe that builds the role→motor map.
+            SendIdentityReads();
             // Per-role calibration read-backs go to each role's own mapped
             // motor device (host 0x12 until the map resolves — the first burst
             // is what discovers it), so a chained pedal's read reflects THAT
@@ -855,10 +1069,11 @@ namespace MozaPlugin.Devices
         {
             if (!_connection.IsConnected) return;
             // One-shot FIFO so they all land in order (no coalescing). Disable
-            // every effect on EVERY motor device id in the chain (host 0x12 +
-            // chain ports 0x1d/0x1e) so a chained active pedal's motor can't
-            // latch its last waveform after the port closes.
-            foreach (var dev in MozaMBoosterProtocol.MotorDeviceIds)
+            // every effect on EVERY motor device id this lane addresses (USB:
+            // host 0x12 + chain ports 0x1d/0x1e so a chained active pedal's
+            // motor can't latch its last waveform after the port closes;
+            // routed: the tunneled pedal sub-device only).
+            foreach (var dev in MotorIds)
             {
                 SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Abs, dev));
                 SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Lockup, dev));
@@ -1048,14 +1263,19 @@ namespace MozaPlugin.Devices
             {
                 // Best-effort emit disable frames before tearing down so the
                 // motor doesn't latch the last waveform after the port closes
-                // (protocol note § 3 "Disable").
-                SendAllDisableFrames();
+                // (protocol note § 3 "Disable"). Only once the lane has
+                // identified as an actual mBooster — a routed probe that
+                // turned out to be plain SGP pedals must not write motor
+                // frames at the pedals sub-device.
+                if (ModelName != null && ModelName.IndexOf("mBooster", StringComparison.OrdinalIgnoreCase) >= 0)
+                    SendAllDisableFrames();
             }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Disable on dispose: {ex.Message}"); }
             foreach (var w in _workers) { try { w.Stop(); } catch { } }
             try { _connection.MessageReceived -= OnConnectionMessage; } catch { }
             try { _connection.Disconnected -= OnConnectionDisconnected; } catch { }
-            try { _connection.Dispose(); } catch { }
+            // A routed lane shares its owner's pipe — never dispose it.
+            if (_ownsConnection) { try { _connection.Dispose(); } catch { } }
         }
     }
 }
