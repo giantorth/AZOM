@@ -35,7 +35,7 @@ namespace MozaPlugin.Devices
         // synthetic RPM (idle→redline) into the real formulas and evaluates them —
         // so the combined preset is coherent (every slot at the SAME rpm) and matches
         // in-game exactly. Non-RPM property refs still read live telemetry.
-        private const double SynthRedlineRpm = 8000.0;
+        private const double SynthRedlineRpm = EngineVibrationMath.DefaultRedlineRpm;
         private const double SynthMaxSpeedKmh = 250.0;       // speed at the top of the sweep (for speed-scaled effects)
         private const string RpmToken = "[DataCorePlugin.GameData.Rpms]";
         private const string MaxRpmToken = "[DataCorePlugin.GameData.MaxRpm]";
@@ -388,10 +388,7 @@ namespace MozaPlugin.Devices
         {
             double depth = 1.0 - smoothness01;
             if (depth > 1e-6 && freqHz > 0)
-            {
-                phase += 2.0 * Math.PI * freqHz * TickPeriodSec;
-                if (phase >= 2.0 * Math.PI) phase -= 2.0 * Math.PI * Math.Floor(phase / (2.0 * Math.PI));
-            }
+                phase = EngineVibrationMath.AdvancePhase(phase, freqHz, TickPeriodSec);
             double env = (1.0 - depth) + depth * (0.5 + 0.5 * Math.Sin(phase));
             return Clamp01(intensity01 * env);
         }

@@ -158,6 +158,15 @@ namespace MozaControls
         public static readonly DependencyProperty PlotBackgroundRectProperty = PlotBackgroundRectKey.DependencyProperty;
         public Geometry? PlotBackgroundRect => (Geometry?)GetValue(PlotBackgroundRectProperty);
 
+        /// <summary>Step line tracing the three segments' current values —
+        /// flat across each segment's travel range, jumping vertically at
+        /// each divider — so the damping profile reads as one continuous
+        /// shape instead of three disconnected bars.</summary>
+        private static readonly DependencyPropertyKey StepLineGeometryKey =
+            DependencyProperty.RegisterReadOnly(nameof(StepLineGeometry), typeof(Geometry), typeof(MozaSegmentedBarEditor), new PropertyMetadata(null));
+        public static readonly DependencyProperty StepLineGeometryProperty = StepLineGeometryKey.DependencyProperty;
+        public Geometry? StepLineGeometry => (Geometry?)GetValue(StepLineGeometryProperty);
+
         private static readonly DependencyPropertyKey Divider1XKey =
             DependencyProperty.RegisterReadOnly(nameof(Divider1X), typeof(double), typeof(MozaSegmentedBarEditor), new PropertyMetadata(0.0));
         public static readonly DependencyProperty Divider1XProperty = Divider1XKey.DependencyProperty;
@@ -419,6 +428,21 @@ namespace MozaControls
             var bg = new RectangleGeometry(new Rect(EdgePad, TopPad, plotW, plotH));
             bg.Freeze();
             SetValue(PlotBackgroundRectKey, bg);
+
+            // Step line ON TOP of the bars, at each segment's own height —
+            // flat across its travel range, a vertical jump at each divider —
+            // the same shape the three bars already imply, just traced as one
+            // line so the overall profile is easier to read at a glance.
+            var stepFig = new PathFigure { StartPoint = new Point(EdgePad, YOf(s1v)), IsClosed = false, IsFilled = false };
+            stepFig.Segments.Add(new LineSegment(new Point(d1x, YOf(s1v)), true));
+            stepFig.Segments.Add(new LineSegment(new Point(d1x, YOf(s2v)), true));
+            stepFig.Segments.Add(new LineSegment(new Point(d2x, YOf(s2v)), true));
+            stepFig.Segments.Add(new LineSegment(new Point(d2x, YOf(s3v)), true));
+            stepFig.Segments.Add(new LineSegment(new Point(EdgePad + plotW, YOf(s3v)), true));
+            var stepGeom = new PathGeometry();
+            stepGeom.Figures.Add(stepFig);
+            stepGeom.Freeze();
+            SetValue(StepLineGeometryKey, stepGeom);
 
             string fmt = "F0";
             SetValue(Seg1LabelKey, s1v.ToString(fmt, CultureInfo.InvariantCulture) + "%");

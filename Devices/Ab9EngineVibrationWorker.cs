@@ -31,10 +31,6 @@ namespace MozaPlugin.Devices
         // FreqTickHz × maxRpm does (K = FreqTickHz × maxRpm). See
         // docs/protocol/devices/ab9-shifter.md and tools/ab9-rpm-correlate.
         private const double FreqTickHz = 6.18e7; //New value from kilarn123, old: 6.366e7;
-        // Redline fallback when the game doesn't report MaxRpm (matches the
-        // HardwareApplier 8000-rpm convention) so the slider still maps to a
-        // sensible redline frequency.
-        private const double DefaultRedlineRpm = 8000.0;
         private const int TickPeriodMs = 11;
         // Sub-stream tick budgets. Scaled by rpm/IdleRpm at runtime where noted.
         private const int KeepalivePairBaseTicks = 12;
@@ -202,12 +198,12 @@ namespace MozaPlugin.Devices
             if (rawActive)
             {
                 // audible = freqSlider × (rpm/maxRpm); slider is the redline
-                // frequency. period = FreqTickHz / audible. Clamp the fraction
+                // frequency. period = FreqTickHz / audible. Fraction clamped
                 // to (0,1] so over-rev can't exceed the redline pitch and a
-                // missing MaxRpm falls back to an 8000-rpm redline.
-                double redline = maxRpm > 100.0 ? maxRpm : DefaultRedlineRpm;
-                double fraction = rpm / redline;
-                if (fraction > 1.0) fraction = 1.0;
+                // missing MaxRpm falls back to the shared redline convention
+                // (see EngineVibrationMath.RedlineFraction — the same model
+                // MBoosterEffectWorker.UpdateEngineRequest uses for Engine).
+                double fraction = EngineVibrationMath.RedlineFraction(rpm, maxRpm);
                 double p = FreqTickHz / (freqHz * fraction);
                 if (p < MozaAb9DeviceManager.MinPeriodTicks) p = MozaAb9DeviceManager.MinPeriodTicks;
                 if (p > MozaAb9DeviceManager.MaxPeriodTicks) p = MozaAb9DeviceManager.MaxPeriodTicks;
