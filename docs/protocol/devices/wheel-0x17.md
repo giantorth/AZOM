@@ -220,6 +220,8 @@ off:  0    1    2    3  4   5  6   7  8   9 10  11 12  13 14  15  16  17
 
 **Group `0x32` is a persistent-parameter write group, and writes hit wheel EEPROM.** Beyond the `0x81` select (→ Table 7 Param 6), **display brightness** is `cmd 0x00` (write) + `cmd 0x80` (commit), big-endian u32 percent `0..100` — the wheel echoes `Table 7, Param 5 Written: <N>` ("brightness changes" capture, 2026-08-06). The value survives power cycles, so hosts must NOT re-apply it on connect or push it periodically — every select/brightness frame is an EEPROM write. The plugin emits brightness only on the debounced slider commit and dedupes/rate-limits selects (skip when already on the target page; ≥300 ms between emits).
 
+**FSR1 answers NO identity read (2026-08 crash bundles).** On this wheel every identity query — model-name `0x07/01`, hw-version `0x08/01`, hw-revision `0x08/02`, sw-version `0x0F/01`, serial `0x10/00`+`01`, plus groups `0x02`/`0x04`/`0x05`/`0x06`/`0x09`/`0x11` — goes **unanswered**, while group-`0x40` config reads answer normally (`1c`/`05`/`18` fully; `03`/`09` partially). Each unanswered identity read is a param-manager read failure the wheel logs, so a periodic identity re-poll is a slow-drip `Failed to Read Parameter` generator: measured **60 unanswered `07/01` reads per minute**, with the failure sweep advancing table-by-table (Table 2 param 20→21→22→23, then Table 7 param 40→41→42→43) in lockstep with the ~1 Hz re-poll. PitHouse asks for identity **once per connect** and never re-polls. Gating rule: after identity resolves on an FSR1, do not re-read it — liveness comes from the `0x00` presence ACK and the wheel's continuous unsolicited `0x0E` logs.
+
 **Param-store wedge (failure mode, 2026-08-06 crash bundles).** The wheel's parameter subsystem can wedge: every param read fails (`Table N: Failed to Read Parameter M` sweeps across Tables 2/3/7) and a pending Table 7 Param 6 write retries ~1 Hz forever (`Table Id 7, ParamAddr 6: Failed to Write`, often split across two `0x0E` frames). The comm MCU keeps answering (polls, logs, identity) but the **display goes dark and stays dark until the wheel is power-cycled** — host reconnects don't help. No host command sustains the loop (zero `g32` traffic during the wedge); the retry is firmware-internal. The plugin detects the signature from the `0x0E` log and surfaces a PARAM-STORE FAULT line in diagnostics.
 
 **Full index→type map — verified.** Built by correlating every `g32/81` select + `Param 6` log with the `0x42` record type(s) streamed until the next switch, across `All dashboards`, `Moza FSR1 dashboard change`, `FS1 multiple changes`, `GT Style`, and the manual-change captures (`tools/` ad-hoc windowed correlation):
@@ -415,7 +417,7 @@ are **not** the fault signal.)
   `param_manage.c` channel that emits this storm — see
   [`../periodic/group-0x0E-param-reader.md`](../periodic/group-0x0E-param-reader.md).
 
-**Runtime self-protection.** `FirmwareDebugLog` counts `Failed to Read/Write
+**Runtime self-protection (implemented 2026-08-10).** `FirmwareDebugLog.ParamStormActive` counts `Failed to Read/Write
 Parameter` lines in a trailing 10 s window; ≥ 3 marks a storm (and logs a
 one-time SimHub warning so it's on record even if the user never opens the pane).
 While a storm is active the plugin skips the heavy LED-capability read batch on

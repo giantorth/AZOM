@@ -91,6 +91,8 @@ namespace MozaPlugin.Diagnostics
                     if (w || r)
                     {
                         if (w) _paramWriteFails++; else _paramReadFails++;
+                        _recentParamFails.Enqueue(entry.TimestampUtc);
+                        TrimStormWindow(entry.TimestampUtc);
                         if (_firstParamFailUtc == default) _firstParamFailUtc = entry.TimestampUtc;
                         _lastParamFailUtc = entry.TimestampUtc;
                     }
@@ -105,6 +107,35 @@ namespace MozaPlugin.Diagnostics
         {
             lock (_gate)
                 return (_paramWriteFails, _paramReadFails, _firstParamFailUtc, _lastParamFailUtc);
+        }
+
+        // A storm is live traffic, not history: ≥StormThreshold failures inside the
+        // trailing window. Used to suspend host reads the wheel evidently can't
+        // service (see MozaPlugin.PollStatusCore / DeviceProber) so we stop feeding
+        // the param manager while it is already failing.
+        private const int StormThreshold = 3;
+        private static readonly TimeSpan StormWindow = TimeSpan.FromSeconds(10);
+        private readonly Queue<DateTime> _recentParamFails = new Queue<DateTime>();
+
+        /// <summary>True while the wheel is actively failing param reads/writes
+        /// (≥3 in the trailing 10 s). A healthy wheel never sets this.</summary>
+        public bool ParamStormActive
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    TrimStormWindow(DateTime.UtcNow);
+                    return _recentParamFails.Count >= StormThreshold;
+                }
+            }
+        }
+
+        // Caller must hold _gate.
+        private void TrimStormWindow(DateTime nowUtc)
+        {
+            while (_recentParamFails.Count > 0 && nowUtc - _recentParamFails.Peek() > StormWindow)
+                _recentParamFails.Dequeue();
         }
 
         /// <summary>Number of entries currently held in the ring buffer.</summary>
@@ -147,6 +178,7 @@ namespace MozaPlugin.Diagnostics
                 _paramReadFails = 0;
                 _firstParamFailUtc = default;
                 _lastParamFailUtc = default;
+                _recentParamFails.Clear();
             }
         }
 

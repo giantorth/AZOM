@@ -72,10 +72,21 @@ namespace MozaPlugin.Devices
         /// we can detect Single / Rotary / Ambient groups we don't know about
         /// statically.
         /// </summary>
-        internal static string[] BuildNewWheelLedReadCommands(WheelModelInfo? info)
+        internal static string[] BuildNewWheelLedReadCommands(WheelModelInfo? info, bool isFsr1 = false)
         {
             info ??= WheelModelInfo.Default;
             var cmds = new List<string>();
+
+            // FSR V1 (RS21-D03): read NOTHING back. This old display rim is the
+            // most param-fragile wheel we support — its store wedges into a
+            // permanent "Failed to Read Parameter" storm that only a power-cycle
+            // clears (see wheel-0x17.md § Param-store wedge). PitHouse never reads
+            // its LED settings at all, while this batch is our heaviest read burst
+            // (measured 87 per-LED colour reads on group 0x40 cmd 0x1F in one
+            // session). Nothing needs them: the profile is the source of truth for
+            // every colour/brightness we write, so the only loss is seeding the UI
+            // pickers from the wheel's stored values on a fresh profile.
+            if (isFsr1) return System.Array.Empty<string>();
 
             // Bare RPM-only rims (the legacy "CS": RPM LEDs, no buttons / knobs /
             // flags / sleep light) have essentially no readable LED settings, and
@@ -646,9 +657,17 @@ namespace MozaPlugin.Devices
                         _deviceManager.LockWheelId(deviceId);
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
-                        _deviceManager.ReadSetting("wheel-serial-a");
-                        _deviceManager.ReadSetting("wheel-serial-b");
-                        _deviceManager.SendPithouseIdentityProbe(deviceId);
+                        // FSR V1 never answers serial-a/b (0x10/00,01) or the
+                        // 0x09/02/04/05/06/11 probe frames — verified unanswered even
+                        // on a HEALTHY session (Jul-31 bundle, zero param failures).
+                        // Each unanswered read is a param-manager miss on the wheel
+                        // whose store wedges, so skip them once we know the model.
+                        if (!_plugin.IsFsr1DisplayWheel)
+                        {
+                            _deviceManager.ReadSetting("wheel-serial-a");
+                            _deviceManager.ReadSetting("wheel-serial-b");
+                            _deviceManager.SendPithouseIdentityProbe(deviceId);
+                        }
                         _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
                         MozaLog.Info($"[AZOM] New-protocol wheel detected via model-name probe on ID {deviceId}");
                         // Fall through to the resolution block below.
@@ -691,8 +710,16 @@ namespace MozaPlugin.Devices
                             // Now that WheelModelInfo is resolved, send the
                             // LED-group-filtered reads. Skipping reads for LEDs
                             // the wheel doesn't have keeps PendingResponseTracker
-                            // from churning on inevitable timeouts.
-                            _deviceManager.ReadSettingsPaced(BuildNewWheelLedReadCommands(info));
+                            // from churning on inevitable timeouts. Suppressed while
+                            // the wheel's param manager is storming — this batch is
+                            // the heaviest read burst we emit, and re-detect loops
+                            // feeding it into a failing param store is the documented
+                            // wedge path (wheel-0x17.md § Table 8 storm).
+                            if (_plugin.FirmwareDebugLogForDiagnostics.ParamStormActive)
+                                MozaLog.Warn("[AZOM] Skipping wheel LED-capability read batch — param-store storm active.");
+                            else
+                                _deviceManager.ReadSettingsPaced(
+                                    BuildNewWheelLedReadCommands(info, _plugin.IsFsr1DisplayWheel));
                             if (DeviceDefinitionDeployer.DeployForModel(currentModel, _connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
 

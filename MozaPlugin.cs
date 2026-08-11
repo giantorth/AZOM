@@ -3743,6 +3743,8 @@ namespace MozaPlugin
         // (fast identity). See the hot-swap block in PollStatus.
         private const int WheelModelRecheckInterval = WheelMissThreshold - 1;
         private int _wheelModelRecheckTick;
+        // One-shot log edge for the param-storm suspend (see PollStatusCore).
+        private bool _paramStormLogged;
 
         // Fires from MozaSerialConnection.HandleIoFailure on the read or
         // write thread once the port has been force-closed. Pause telemetry
@@ -4130,14 +4132,46 @@ namespace MozaPlugin
                 if (DetectionState.NewWheelDetected && !IsFsr1DisplayWheel)
                     _deviceManager.SendWheelKeepalive();
 
+                // Param-storm self-protection: while the wheel is actively logging
+                // "Failed to Read/Write Parameter", every identity/config read we add
+                // is another failure for a param manager that is already drowning —
+                // the documented CS-wheel hazard (wheel-0x17.md § Table 8 storm), and
+                // the FSR1 wedge signature (2026-08 bundles: identity reads unanswered,
+                // failures advancing table-by-table while we re-polled ~1 Hz). Suspend
+                // identity rechecks + hot-swap ID probes until the storm clears; the
+                // 0x00 presence poll and 0x43 keepalive above stay on (PitHouse parity,
+                // and OnPresenceProbeAck/unsolicited 0x0E logs keep liveness alive).
+                bool paramStorm = _firmwareDebugLog.ParamStormActive;
+                if (paramStorm && !_paramStormLogged)
+                {
+                    _paramStormLogged = true;
+                    MozaLog.Warn("[AZOM] Wheel param-store storm detected — suspending identity/config "
+                        + "rechecks while it persists (wheel may need a power-cycle to recover).");
+                }
+                else if (!paramStorm && _paramStormLogged)
+                {
+                    _paramStormLogged = false;
+                    MozaLog.Info("[AZOM] Wheel param-store storm cleared — resuming identity rechecks.");
+                }
+
                 // wheel-model-name recheck: triggers initial identity resolution
                 // and hot-swap model-change detection. Every tick while unresolved
                 // (fast identity, as before); once resolved the presence ACK is the
                 // heartbeat so we recheck only every WheelModelRecheckInterval ticks
                 // (kept below WheelMissThreshold so the response still resets the
                 // miss counter even if 0x00/0x0e fall silent).
-                if (WheelModelInfo == null
-                    || ++_wheelModelRecheckTick >= WheelModelRecheckInterval)
+                // FSR1: once identity has resolved, STOP re-polling it. This firmware
+                // never answers the model-name read again after initial detection
+                // (documented above at MarkWheelAlive) — every recheck is a guaranteed
+                // unanswered identity read, i.e. one more param-manager read failure,
+                // ~1/s forever (2026-08 wedge bundles: 60 unanswered 07/01 reads per
+                // minute). Liveness for this wheel comes from the presence ACK and its
+                // continuous unsolicited 0x0E logs; a genuine unplug still trips the
+                // miss watchdog, and a rim swap re-resolves identity on re-detect.
+                bool fsr1IdentitySettled = IsFsr1DisplayWheel && WheelModelInfo != null;
+                if (!paramStorm && !fsr1IdentitySettled
+                    && (WheelModelInfo == null
+                        || ++_wheelModelRecheckTick >= WheelModelRecheckInterval))
                 {
                     _wheelModelRecheckTick = 0;
                     _deviceManager.ReadSetting("wheel-model-name");
@@ -4152,8 +4186,10 @@ namespace MozaPlugin
 
                 // Probe other wheel IDs for hot-swap detection.
                 // Handles ES → new-protocol case where the base keeps responding
-                // on the locked ID (19) so miss counter never fires.
-                _deviceManager.ProbeOtherWheelIds();
+                // on the locked ID (19) so miss counter never fires. Storm-gated:
+                // these are identity reads too (see the recheck gate above).
+                if (!paramStorm)
+                    _deviceManager.ProbeOtherWheelIds();
             }
 
             // Base temps/state are dev-0x13 reads the base main controller answers.
