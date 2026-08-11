@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 400% = tăng tối đa</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// kéo 5 điểm nút để định hình phản hồi</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>BẰNG PHẲNG</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>SUY GIẢM</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>TUYẾN TÍNH</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>ĐƯỜNG CONG S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>HÀM MŨ</value></data>
@@ -195,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>PHÁT HIỆN USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Tắt dò cổng serial dự phòng (nâng cao)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Chỉ cần thiết khi plugin giao tiếp với thiết bị không đúng.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Tắt phát hiện cần số chủ động AB9</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Bỏ qua bước dò kết nối lại AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Tắt phát hiện cần số chủ động (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Bỏ qua bước dò kết nối lại cần số chủ động.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRY BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Tải lên bảng điều khiển khi kết nối</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Tải bảng điều khiển từ vô lăng</value></data>
@@ -317,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Luôn bắt đầu ghi chẩn đoán khi khởi chạy/đổi game</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Khi bật, việc ghi lưu lượng serial sẽ tự động bắt đầu mỗi khi plugin khởi động.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>XUẤT GÓI (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>SAO CHÉP MÃ THAM CHIẾU</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>SAO CHÉP BẢN GHI VÀO CLIPBOARD</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>BÁO CÁO CHẨN ĐOÁN ĐẦY ĐỦ</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// thông tin gỡ lỗi</value></data>
@@ -739,6 +738,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Xoay vòng đèn</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Xi nhan trái</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Xi nhan phải</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Xi nhan</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Thời gian xi nhan tối thiểu (giây)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Nhấn một phím…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(chưa đặt)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(không)</value></data>
@@ -754,4 +755,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Cấp đèn {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
 </root>

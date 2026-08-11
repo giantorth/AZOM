@@ -30,12 +30,15 @@ namespace MozaPlugin.Telemetry
             _sender = sender;
         }
 
-        /// <summary>Push a u32-valued property (e.g. brightness 0–100).</summary>
-        public void SendU32(uint kind, uint value)
+        /// <summary>Push a u32-valued property (e.g. brightness 0–100).
+        /// <paramref name="sessionOverride"/> pins the record to a specific
+        /// session instead of letting this method resolve one.</summary>
+        public void SendU32(uint kind, uint value, byte? sessionOverride = null,
+                            bool coalesce = true)
         {
             if (!_sender.ConnectionIsConnected) return;
             byte[] body = SessionPropertyPushBuilder.BuildU32Body(kind, value);
-            SendBody(body);
+            SendBody(body, sessionOverride, coalesce);
         }
 
         /// <summary>Push a u64-valued property (e.g. standby in milliseconds).</summary>
@@ -61,11 +64,19 @@ namespace MozaPlugin.Telemetry
         /// PitHouse Form A: tier-def on 0x01, FF on 0x02; Form B: tier-def on
         /// 0x02, FF on 0x01. The wheel only acks the FF-init and commits the
         /// tier-def to the display when these land on the expected session.
+        /// <paramref name="sessionOverride"/> lets a caller that has already
+        /// resolved the session pass it in (the device-log pull does, so its
+        /// request and receipt provably ride the same one).
+        /// <paramref name="coalesce"/> is the supersede-a-pending-push-of-the-
+        /// same-kind behaviour described above. Correct for idempotent values
+        /// (brightness, standby) where only the latest matters; WRONG for a
+        /// record that advances a device-side cursor by its value — see the
+        /// device-log receipt (kind=15).
         /// </summary>
-        public void SendBody(byte[] body)
+        public void SendBody(byte[] body, byte? sessionOverride = null, bool coalesce = true)
         {
             if (body == null) return;
-            byte session = _sender.ResolveFfSession();
+            byte session = sessionOverride ?? _sender.ResolveFfSession();
             bool onFlagByte = session == _sender.FlagByte && _sender.FlagByte != 0;
             object seqLock = onFlagByte ? _sender.Session02SeqLock : _sender.Session01SeqLock;
 
@@ -75,7 +86,7 @@ namespace MozaPlugin.Telemetry
             //   [5..8]   inner crc32
             //   [9..12]  kind:u32 LE
             //   [13...]  value bytes
-            bool haveKind = body.Length >= 13 && body[0] == 0xFF;
+            bool haveKind = coalesce && body.Length >= 13 && body[0] == 0xFF;
             uint kind = haveKind
                 ? (uint)(body[9] | (body[10] << 8) | (body[11] << 16) | (body[12] << 24))
                 : 0u;

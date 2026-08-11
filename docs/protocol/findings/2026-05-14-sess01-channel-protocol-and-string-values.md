@@ -212,8 +212,8 @@ stream. Probably acknowledges the host's `type=0x07` init (version 2 →
 Existing docs under [`../tier-definition/`](../tier-definition/) and
 [`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md)
 describe tier-defs going on **sess=0x02 with FF-record envelopes** (kind=2/7/
-8/11 init, kind=4 dashboard switch, kind=9 periodic, kind=14/15
-wheel-state/host-setting).
+8/11 init, kind=4 dashboard switch, kind=9 periodic, kind=14/15 device log
+pull).
 
 This capture shows **sess=0x02 was ALSO active during the same session** —
 the histogram counted FF-record kinds 2/9/11/14/15 + a kind=8 catalog upload
@@ -224,7 +224,7 @@ thing:
 | Channel | Carries |
 |---------|---------|
 | sess=0x01 (this finding) | Wheel's per-dashboard channel catalog (idx → URL), host's tier-def (idx → comp / width), string-channel values |
-| sess=0x02 (existing docs) | FF-init handshake (nonce / FFB property catalog / wheel-state), kind=8 "master" channel catalog (all channels PitHouse knows about, ID → name), kind=15 host settings, kind=14 wheel events |
+| sess=0x02 (existing docs) | FF-init handshake (nonce / FFB property catalog / wheel-state), kind=8 "master" channel catalog (all channels PitHouse knows about, ID → name), and the kind=14/15 device log pull |
 | group 0x43 (`7d:23`) | Bit-packed value frames for the channels declared in the sess=0x01 tier-def |
 
 **The plugin's existing tier-def code targets sess=0x02 with FF records.** This

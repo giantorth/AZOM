@@ -577,13 +577,18 @@ namespace MozaPlugin
         public int DashRpmDisplayMode { get; set; } = -1;
         public int DashFlagsIndicatorMode { get; set; } = -1;
 
-        // ===== FFB Equalizer (6 bands) =====
+        // ===== FFB Equalizer (bands 7-10 = 10-band firmware only) =====
         public int Equalizer1 { get; set; } = -1000;
         public int Equalizer2 { get; set; } = -1000;
         public int Equalizer3 { get; set; } = -1000;
         public int Equalizer4 { get; set; } = -1000;
         public int Equalizer5 { get; set; } = -1000;
         public int Equalizer6 { get; set; } = -1000;
+        public int Equalizer7 { get; set; } = -1000;
+        public int Equalizer8 { get; set; } = -1000;
+        public int Equalizer9 { get; set; } = -1000;
+        public int Equalizer10 { get; set; } = -1000;
+        public int RoadSensitivity { get; set; } = -1;
 
         // ===== FFB Curve (X input positions of points 1-4 + Y outputs; point 5 fixed at input=100%) =====
         public int FfbCurveX1 { get; set; } = -1;
@@ -800,6 +805,9 @@ namespace MozaPlugin
             // FFB Equalizer
             Equalizer1 = p.Equalizer1; Equalizer2 = p.Equalizer2; Equalizer3 = p.Equalizer3;
             Equalizer4 = p.Equalizer4; Equalizer5 = p.Equalizer5; Equalizer6 = p.Equalizer6;
+            Equalizer7 = p.Equalizer7; Equalizer8 = p.Equalizer8; Equalizer9 = p.Equalizer9;
+            Equalizer10 = p.Equalizer10;
+            RoadSensitivity = p.RoadSensitivity;
 
             // FFB Curve
             FfbCurveX1 = p.FfbCurveX1; FfbCurveX2 = p.FfbCurveX2; FfbCurveX3 = p.FfbCurveX3; FfbCurveX4 = p.FfbCurveX4;
@@ -993,9 +1001,16 @@ namespace MozaPlugin
             GearshiftVibration = data.GearshiftVibration;
             TempStrategy = data.TempStrategy;
 
-            // FFB Equalizer
+            // FFB Equalizer. Bands 7-10 only on 10-band firmware — an old-fw
+            // session must not bake the untouched _data defaults over the sentinel.
             Equalizer1 = data.Equalizer1; Equalizer2 = data.Equalizer2; Equalizer3 = data.Equalizer3;
             Equalizer4 = data.Equalizer4; Equalizer5 = data.Equalizer5; Equalizer6 = data.Equalizer6;
+            if (data.BaseSupportsEq10)
+            {
+                Equalizer7 = data.Equalizer7; Equalizer8 = data.Equalizer8;
+                Equalizer9 = data.Equalizer9; Equalizer10 = data.Equalizer10;
+            }
+            RoadSensitivity = data.RoadSensitivity;
 
             // FFB Curve
             FfbCurveX1 = data.FfbCurveX1; FfbCurveX2 = data.FfbCurveX2; FfbCurveX3 = data.FfbCurveX3; FfbCurveX4 = data.FfbCurveX4;

@@ -4,23 +4,27 @@
 
 | Command | ID | Bytes | Type | Notes |
 |---------|----|-------|------|-------|
-| limit | `01` | 2 | int | Steering angle limit |
+| limit | `01` | 2 | int | Steering angle limit. Raw = degrees / 2. Firmware floors the stored value at 60° (raw `0x1E`) — lower writes read back as 60°. Verified live 2026-08-05 via write-then-readback; PitHouse's own UI stops at 90°. |
 | ffb-strength | `02` | 2 | int | |
 | inertia | `04` | 2 | int | |
 | damper | `07` | 2 | int | |
 | friction | `08` | 2 | int | |
 | spring | `09` | 2 | int | |
 | speed | `0A` | 2 | int | |
-| road-sensitivity | `0C` | 2 | int | |
+| road-sensitivity | `0C` | 2 | int | The 10-band EQ UI's "sensitivity" presets (fw ≥ 1.2.10.10) write this as `10 + 4×N` for UI preset N (0–10 → wire 10–50), together with a canned EQ curve. See EQ section below. |
 | protection | `0D` | 2 | int | Hands-off protection strength |
 | protection-mode | `2D` | 2 | int | |
 | gearshift-vibration | `2E` | 2 | int | "Gearshift vibration intensity" PitHouse slider. Range 0..5 (0 = effect disabled, 5 = max). Sets the strength of the rumble fired by `gearshift-event` (cmd 0x76, see Group `0x2D` below). Verified 2026-05-10 (`bridge-20260510-115644.jsonl` t=41600.748 `2E 00 01` = 1, t=41700.520 `2E 00 05` = 5). |
-| equalizer1 | `0E` | 2 | int | |
-| equalizer2 | `0F` | 2 | int | |
-| equalizer3 | `10` | 2 | int | |
-| equalizer4 | `11` | 2 | int | |
-| equalizer5 | `14` | 2 | int | |
-| equalizer6 | `2C` | 2 | int | |
+| equalizer1 | `0E` | 2 | int | 5 Hz band in the 10-band EQ UI (fw ≥ 1.2.10.10); 0–500 (%). See EQ section below. |
+| equalizer2 | `0F` | 2 | int | 15 Hz band; 0–500 (%) |
+| equalizer3 | `10` | 2 | int | 25 Hz band; 0–500 (%) |
+| equalizer4 | `11` | 2 | int | 40 Hz band; 0–500 (%) |
+| equalizer5 | `14` | 2 | int | 60 Hz band; 0–500 (%) |
+| equalizer6 | `2C` | 2 | int | 100 Hz band; 0–100 (%) — UI keeps the old cap on this band |
+| equalizer7 | `32` | 2 | int | **10 Hz band** (fw ≥ 1.2.10.10) — new in the 10-band EQ; 0–500 (%) |
+| equalizer8 | `33` | 2 | int | **30 Hz band** (fw ≥ 1.2.10.10); 0–500 (%) |
+| equalizer9 | `34` | 2 | int | **50 Hz band** (fw ≥ 1.2.10.10); 0–500 (%) |
+| equalizer10 | `35` | 2 | int | **80 Hz band** (fw ≥ 1.2.10.10); 0–500 (%) |
 | torque | `12` | 2 | int | |
 | natural-inertia | `13` | 2 | int | Hands-off protection |
 | natural-inertia-enable | `16` | 2 | int | |
@@ -51,11 +55,45 @@ each slider position re-emitted the y1–y4 points (`22 05`…`22 08`) as a 4-wr
 burst (6 bursts for the 6 slider values). These map to the existing
 `base-ffb-curve-*` command-DB entries; no new command is needed.
 
+#### FFB effect equalizer — 10 bands (fw ≥ 1.2.10.10)
+
+The 2026-07 PitHouse build expands the FFB Effect Equalizer from 6 to 10
+bands: 5 / 10 / 15 / 25 / 30 / 40 / 50 / 60 / 80 / 100 Hz. The four new
+bands (10 / 30 / 50 / 80 Hz → cmds `32 33 34 35`) are interleaved into the
+original six registers, which carry the 5 / 15 / 25 / 40 / 60 / 100 Hz
+labels in the new UI. Values are raw percent as BE u16 (500 % → `0x01F4`);
+sliders run 0–500 % except the 100 Hz band, which stays 0–100 %.
+
+PitHouse rewrites **all 10 registers** on any single slider change
+(~50 ms burst, old IDs first, then `32..35`), the base ACKs each write on
+group `0xA9`, and the page-open read sweep covers the new IDs on group
+`0x28`/`0xA8`. Note that PitHouse applies its local profile over the
+base's stored values rather than adopting read-backs.
+
+The page also offers eleven **"sensitivity" presets** (UI 0–10). Each is
+a one-shot macro: it writes `road-sensitivity` (`0C`) = `10 + 4×N` plus
+a canned 10-band curve that opens from a low-pass shelf (preset 0:
+5/10 Hz = 100, rest tapering to 0) to fully flat (preset 10: all bands
+100, the only preset that raises the 100 Hz band). No dedicated
+"sensitivity" register exists — read-backs return the individual values
+written. The selector additionally shows a **"customized"** position
+when the current `0C` + EQ tuple matches no preset row — derived
+UI state only, no wire traffic.
+
+Wire-verified per-band and per-preset 2026-07-31 on base fw 1.2.10.10 —
+full transition + preset matrices, capture reference, and the band-1
+relabel note (the old 6-band UI labeled `0E` as 10 Hz; the new UI moves
+that label to `32` and calls `0E` 5 Hz) in
+[`../findings/2026-07-31-eq-10-band.md`](../findings/2026-07-31-eq-10-band.md).
+
 ### Group `0x2A` (42) — Calibration / Music (startup chime)
 
 Group 42 is used for both writes (calibration, music set) and reads (music get). `Dir` column applies.
 
 > **Capture-verified** (2026-05-05) from R25 base. See `usb-capture/startupchime/`.
+> Re-verified 2026-07-31 under the 2026-07 PitHouse build (base fw 1.2.10.10):
+> enable, index-set, preview, and the ~2 s state polling are byte-identical;
+> still 10 chimes.
 
 | Command | ID | Dir | Bytes | Type | Notes |
 |---------|----|-----|-------|------|-------|
@@ -202,7 +240,10 @@ which returns the hardware model string (`RS21-D05-MC WB`), not a numeric versio
 
 The 4 version bytes are in **wire order `[major, minor, build, patch]`** — MOZA's
 PitHouse UI displays the last two swapped: wire `01 02 18 09` is shown `1.2.9.24`,
-wire `01 02 0A 0A` is `1.2.10.10`. The plugin packs them in display/semver order
+wire `01 02 0A 0A` is `1.2.10.10`. The same mapping holds for the **wheel's**
+version reply (dev `0x71`): wire `01 02 09 07` displays as 1.2.7.9
+(confirmed after the 2026-07-31 wheel firmware update — see
+[`../findings/2026-07-31-wheel-firmware-update-protocol.md`](../findings/2026-07-31-wheel-firmware-update-protocol.md)). The plugin packs them in display/semver order
 (`major.minor.patch.build`, swapping the last two wire bytes) so a `>=` compare
 orders correctly — packing in raw wire order would misgate (`0x01021809` >
 `0x01020A0A`, i.e. the older 1.2.9.24 would wrongly out-rank the LFE 1.2.10.10).

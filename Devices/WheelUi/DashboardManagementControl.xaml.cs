@@ -287,7 +287,9 @@ namespace MozaPlugin.Devices.WheelUi
             using (_suppressor.Begin())
             {
                 var s = _plugin.Settings;
-                TelemetryEnabledCheck.IsChecked = _plugin.ActiveTelemetryEnabled;
+                TelemetryEnabledCheck.IsChecked = IsCm2Target
+                    ? _plugin.ActiveDashTelemetryEnabled
+                    : _plugin.ActiveTelemetryEnabled;
 
                 PopulateDashboardCombo();
                 // CHANNEL MAPPINGS is always-on (no expander gate). Bind the
@@ -601,7 +603,11 @@ namespace MozaPlugin.Devices.WheelUi
         private void TelemetryEnabledCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents || _plugin == null) return;
-            _plugin.SetTelemetryEnabled(TelemetryEnabledCheck.IsChecked == true);
+            bool on = TelemetryEnabledCheck.IsChecked == true;
+            // The dash page owns its own flag — the wheel-page flag is unwritable
+            // when no wheel is attached (hub-only / dash-only rig).
+            if (IsCm2Target) _plugin.SetDashTelemetryEnabled(on);
+            else _plugin.SetTelemetryEnabled(on);
         }
 
         private void WheelDisplayBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

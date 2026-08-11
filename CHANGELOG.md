@@ -2,6 +2,42 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.5.4]
+
+### Added
+
+- **Português (Portuguese) language** has been added.
+- **Minimum blinker time** slider added for stalks in truck sim mode. 
+- **The bug-report reference can be selected and copied.** 
+- **Minimum steering angle lowered to 60°.** Lowest possible setting accepted by firmware.
+- **AB6 active shifter.** The AB6 (USB PID `0x1002`) is now a recognised device.
+- **10-band FFB Effect Equalizer.** On wheelbase firmware **1.2.10.10+.** 
+- **EQ sensitivity presets.** Road sensitivity presets are now supported for both 6 and 
+  10 band devices.
+
+### Fixed
+
+- SimHub log no longer floods during gameplay.
+- An AB6 shifter no longer corrupts the steering readout or the wheel's button table.
+- Diagnostics no longer shows a stale COM port for an unplugged active shifter.
+- Remembered COM port now works under Wine/Proton.
+- SimHub's Arduino scan no longer delays the wheelbase connection.
+- Standalone-USB CM2 RPM/flag LEDs work on the 2026-06 meter firmware.
+- AB9/AB6 gear shifts no longer get more violent the longer you play, and the gear-shift
+  Vibration Intensity slider now scales the whole effect.
+- AB9/AB6 FFB effect handles are read from the device instead of assumed.
+- An mBooster on the base's or hub's pedal port is now detected.
+- mBooster roles no longer stick to an axis with no pedal wired.
+- A standalone mBooster keeps its settings once its real axis resolves.
+- CM2/CM1 dash works on a rig with no wheel attached, and a bridged CM1 no longer gets
+  the CM2 device definition.
+- Paddle, knob and joystick settings no longer bleed between two wheels.
+- Display fixes for stayings dead after a game switch.
+
+### Changed
+
+- **Bundled SimHub updated to v9.11.22** (from v9.11.21).
+
 ## [1.5.3] - 2026-07-30
 
 ### Fixed

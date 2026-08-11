@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MozaPlugin.Diagnostics;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.UI.BugReport
@@ -39,6 +43,11 @@ namespace MozaPlugin.UI.BugReport
             public Outcome Outcome;
             public string? TicketId;
             public string? Detail;
+            // HTTP status when the server answered at all (0 for a transport
+            // failure), plus a compact code the status line can show verbatim
+            // ("HTTP 403", "network: timeout") so a refused user can quote it.
+            public int StatusCode;
+            public string? ShortCode;
         }
 
         // Dedicated client (not UpdateCheckService.Http): a multi-MB body upload
@@ -97,11 +106,30 @@ namespace MozaPlugin.UI.BugReport
             return result;
         }
 
-        /// <summary>Upload a pre-built bundle. Text fields are re-sanitized here as defense in depth.</summary>
+        /// <summary>
+        /// Upload a pre-built bundle. Text fields are re-sanitized here as
+        /// defense in depth. Every attempt is written to
+        /// <see cref="BugReportUploadLog"/> (and, on failure, to the plugin log)
+        /// with the response detail needed to tell a Worker-level rejection
+        /// apart from an edge/proxy/TLS one — a user whose uploads are refused
+        /// can then export the bundle by hand and the reason travels with it.
+        /// </summary>
         public static async Task<Result> SubmitAsync(
             byte[] bundle, string description, string contact,
             string version, string os, string model, CancellationToken ct)
         {
+            var rec = new StringBuilder();
+            rec.AppendLine($"=== Attempt {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC ===");
+            rec.AppendLine($"  Request:     POST {ReportEndpoint}");
+            rec.AppendLine($"  Bundle:      {bundle.Length:N0} bytes");
+            rec.AppendLine($"  Plugin / OS: {version} / {os}");
+            rec.AppendLine($"  Wheel:       {model}");
+            rec.AppendLine($"  Text:        description {description.Length} chars, contact " +
+                           $"{(string.IsNullOrEmpty(contact) ? "none" : contact.Length + " chars")}");
+            rec.AppendLine($"  TLS policy:  {ServicePointManager.SecurityProtocol}");
+
+            Result result;
+            var sw = Stopwatch.StartNew();
             using (var content = BuildMultipartContent(bundle, description, contact, version, os, model))
             {
                 try
@@ -109,37 +137,201 @@ namespace MozaPlugin.UI.BugReport
                     using (var resp = await s_http.PostAsync(ReportEndpoint, content, ct).ConfigureAwait(false))
                     {
                         int code = (int)resp.StatusCode;
+                        // Read the body once: on success it carries the ticket,
+                        // on failure the Worker's {"error":"..."} (or the edge's
+                        // HTML block page, which is itself the diagnosis).
+                        string body = "";
+                        try { body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false); }
+                        catch (Exception ex) { body = $"(body read failed: {ex.GetType().Name}: {ex.Message})"; }
+
+                        rec.AppendLine($"  Response:    HTTP {code} {resp.ReasonPhrase} in {sw.ElapsedMilliseconds} ms");
+                        AppendResponseHeaders(rec, resp);
+                        rec.AppendLine($"  Body:        {Snip(body, 1500)}");
+
                         if (resp.IsSuccessStatusCode)
                         {
-                            string body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
                             string? ticket = null;
                             try { ticket = (string?)JObject.Parse(body)["ticketId"]; } catch { /* body not JSON */ }
-                            return new Result { Outcome = Outcome.Success, TicketId = ticket };
+                            rec.AppendLine($"  Outcome:     Success (ticket {ticket ?? "not in response"})");
+                            result = new Result
+                            {
+                                Outcome = Outcome.Success,
+                                TicketId = ticket,
+                                StatusCode = code,
+                                ShortCode = $"HTTP {code}",
+                            };
                         }
-                        // Capture the worker's error body ({"error":"..."}) so a
-                        // failure is diagnosable from the log, not just a bare code.
-                        string errBody = "";
-                        try { errBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false); } catch { }
-                        if (errBody != null && errBody.Length > 300) errBody = errBody.Substring(0, 300);
-                        string detail = string.IsNullOrEmpty(errBody) ? code.ToString() : $"{code}: {errBody}";
-                        if (code == 429) return new Result { Outcome = Outcome.RateLimited, Detail = detail };
-                        if (code == 413) return new Result { Outcome = Outcome.TooLarge, Detail = detail };
-                        return new Result { Outcome = Outcome.ServerError, Detail = detail };
+                        else
+                        {
+                            string errBody = Snip(body, 300);
+                            string detail = string.IsNullOrEmpty(errBody) ? code.ToString() : $"{code}: {errBody}";
+                            var outcome = code == 429 ? Outcome.RateLimited
+                                        : code == 413 ? Outcome.TooLarge
+                                        : Outcome.ServerError;
+                            rec.AppendLine($"  Outcome:     {outcome}");
+                            result = new Result
+                            {
+                                Outcome = outcome,
+                                Detail = detail,
+                                StatusCode = code,
+                                ShortCode = $"HTTP {code}",
+                            };
+                        }
                     }
                 }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                catch (Exception ex) when (ex is OperationCanceledException || ex is HttpRequestException)
                 {
-                    return new Result { Outcome = Outcome.NetworkError, Detail = "cancelled" };
+                    bool cancelled = ex is OperationCanceledException && ct.IsCancellationRequested;
+                    string shortCode = cancelled ? "network: cancelled"
+                                     : ex is OperationCanceledException ? "network: timeout"
+                                     : $"network: {InnermostName(ex)}";
+                    rec.AppendLine($"  Response:    none after {sw.ElapsedMilliseconds} ms");
+                    rec.AppendLine($"  Exception:   {DescribeException(ex)}");
+                    rec.AppendLine("  Outcome:     NetworkError");
+                    result = new Result
+                    {
+                        Outcome = Outcome.NetworkError,
+                        Detail = cancelled ? "cancelled" : DescribeException(ex),
+                        ShortCode = shortCode,
+                    };
                 }
-                catch (OperationCanceledException)
+                catch (Exception ex)
                 {
-                    return new Result { Outcome = Outcome.NetworkError, Detail = "timeout" };
-                }
-                catch (HttpRequestException ex)
-                {
-                    return new Result { Outcome = Outcome.NetworkError, Detail = ex.Message };
+                    // Anything unexpected still leaves a record behind before it
+                    // goes back to the caller's error path.
+                    rec.AppendLine($"  Exception:   {DescribeException(ex)}");
+                    rec.AppendLine("  Outcome:     unhandled — rethrown to caller");
+                    BugReportUploadLog.Record(rec.ToString());
+                    throw;
                 }
             }
+
+            if (result.Outcome != Outcome.Success)
+                await AppendConnectivityProbeAsync(rec, ct).ConfigureAwait(false);
+
+            BugReportUploadLog.Record(rec.ToString());
+
+            // Failures also go to the plugin log, so a user who sends only the
+            // SimHub log (or no bundle at all) still hands over the whole reason.
+            if (result.Outcome != Outcome.Success)
+                MozaLog.Warn(
+                    $"[AZOM] Bug report not accepted ({result.Outcome}, {result.ShortCode}) — detail follows\n{rec}");
+
+            return result;
+        }
+
+        /// <summary>
+        /// Runs only after a failed submit. Separates "nothing between us and the
+        /// Worker is working" (DNS/TLS/proxy) from "the Worker itself refused":
+        /// a GET of the origin root is answered by the Worker with a 404
+        /// <c>{"error":"not found"}</c>, so anything else — HTML, 403, timeout —
+        /// points at the edge, a corporate proxy, or intercepting AV.
+        /// </summary>
+        private static async Task AppendConnectivityProbeAsync(StringBuilder rec, CancellationToken ct)
+        {
+            Uri uri;
+            try { uri = new Uri(ReportEndpoint); }
+            catch { return; }
+
+            rec.AppendLine("  --- connectivity probe ---");
+
+            try
+            {
+                var addrs = await Dns.GetHostAddressesAsync(uri.Host).ConfigureAwait(false);
+                var text = new List<string>(addrs.Length);
+                foreach (var a in addrs) text.Add(a.ToString());
+                rec.AppendLine($"  DNS {uri.Host}: {(text.Count == 0 ? "(no addresses)" : string.Join(", ", text))}");
+            }
+            catch (Exception ex)
+            {
+                rec.AppendLine($"  DNS {uri.Host}: FAILED — {DescribeException(ex)}");
+            }
+
+            try
+            {
+                var via = WebRequest.GetSystemWebProxy()?.GetProxy(uri);
+                // IWebProxy hands back the request URI itself when it is direct.
+                rec.AppendLine(via == null || via.Equals(uri)
+                    ? "  Proxy:       none for this host"
+                    : $"  Proxy:       {via}");
+            }
+            catch (Exception ex)
+            {
+                rec.AppendLine($"  Proxy:       (lookup failed: {ex.GetType().Name})");
+            }
+
+            try
+            {
+                using (var cts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    // Short: the user is already waiting on a failed submit.
+                    cts.CancelAfter(TimeSpan.FromSeconds(10));
+                    string probeUrl = uri.GetLeftPart(UriPartial.Authority) + "/";
+                    using (var resp = await s_http.GetAsync(probeUrl, cts.Token).ConfigureAwait(false))
+                    {
+                        string body = "";
+                        try { body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false); } catch { }
+                        rec.AppendLine($"  GET {probeUrl}: HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}");
+                        AppendResponseHeaders(rec, resp);
+                        rec.AppendLine($"  GET body:    {Snip(body, 300)}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                rec.AppendLine($"  GET probe:   FAILED — {DescribeException(ex)}");
+            }
+        }
+
+        // cf-ray/cf-mitigated identify a Cloudflare edge block (WAF / bot fight)
+        // as opposed to a Worker-level rejection; server/via expose an
+        // intercepting proxy; retry-after times a rate limit.
+        private static readonly string[] s_headersOfInterest =
+        {
+            "cf-ray", "cf-mitigated", "cf-cache-status", "server", "via",
+            "retry-after", "content-type", "content-length",
+        };
+
+        private static void AppendResponseHeaders(StringBuilder rec, HttpResponseMessage resp)
+        {
+            var parts = new List<string>();
+            foreach (var key in s_headersOfInterest)
+            {
+                if (resp.Headers.TryGetValues(key, out var values))
+                    parts.Add($"{key}={string.Join(",", values)}");
+                else if (resp.Content != null && resp.Content.Headers.TryGetValues(key, out var contentValues))
+                    parts.Add($"{key}={string.Join(",", contentValues)}");
+            }
+            rec.AppendLine($"  Headers:     {(parts.Count == 0 ? "(none of interest)" : string.Join("; ", parts))}");
+        }
+
+        /// <summary>Full exception chain — the cause of a TLS/proxy failure is always in an inner exception.</summary>
+        private static string DescribeException(Exception? ex)
+        {
+            var sb = new StringBuilder();
+            for (int depth = 0; ex != null && depth < 5; depth++, ex = ex.InnerException)
+            {
+                if (depth > 0) sb.Append(" → ");
+                sb.Append(ex.GetType().Name).Append(": ").Append(Snip(ex.Message, 300));
+                if (ex is WebException we) sb.Append($" [WebExceptionStatus={we.Status}]");
+                if (ex is SocketException se) sb.Append($" [SocketError={se.SocketErrorCode}/{se.NativeErrorCode}]");
+            }
+            return sb.ToString();
+        }
+
+        private static string InnermostName(Exception ex)
+        {
+            var cur = ex;
+            for (int depth = 0; cur.InnerException != null && depth < 5; depth++) cur = cur.InnerException;
+            return cur is SocketException se ? se.SocketErrorCode.ToString() : cur.GetType().Name;
+        }
+
+        /// <summary>Single-line, length-capped text for a log record.</summary>
+        private static string Snip(string? text, int max)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var flat = text!.Replace("\r\n", " ").Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return flat.Length <= max ? flat : flat.Substring(0, max) + $"… (+{flat.Length - max} chars)";
         }
 
         // Hand-build the multipart/form-data body. .NET Framework's

@@ -829,6 +829,14 @@ skipReadByMode:
                 bool showButtonsTab = newWheel && (modelInfoForTabs?.ButtonLedCount ?? 0) > 0;
                 bool showKnobsTab = newWheel && (modelInfoForTabs?.KnobCount ?? 0) > 0;
 
+                // Inputs is gated on THIS page's wheel being the attached one, like
+                // every other tab. Its handlers (paddles mode / clutch point /
+                // calibration / joystick) resolve their target from the CONNECTED
+                // wheel — UpdateActiveWheelOverlay keys on _data.WheelModelName and
+                // WriteIfWheelDetected only checks "some wheel is detected" — so an
+                // ungated Inputs tab let the CS Pro page rewrite the KS Pro's overlay
+                // slot and flash its firmware (and vice versa).
+                InputsTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
                 RpmTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;

@@ -15,6 +15,40 @@ namespace MozaPlugin
     // submit path and the Options-tab local Export.
     public partial class SettingsControl
     {
+        // Reference from the last successful submit, for the copy button.
+        private string? _lastBugReportTicketId;
+
+        /// <summary>Set the bug-report status line (a read-only TextBox, so the user can select it).</summary>
+        private void SetBugReportStatus(string text)
+        {
+            BugReportStatusText.Text = text ?? "";
+            BugReportStatusText.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Arm (or clear) the copy-reference button. The reference outlives later
+        /// status lines — an export done after a submit must not take it away —
+        /// and is cleared only when a new submit starts.
+        /// </summary>
+        private void SetBugReportReference(string? ticketId)
+        {
+            _lastBugReportTicketId = string.IsNullOrEmpty(ticketId) ? null : ticketId;
+            CopyBugReportRefButton.Visibility = _lastBugReportTicketId == null ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        // "Upload failed…  [HTTP 403]" — the bracketed part stays untranslated on
+        // purpose: it is the code the user quotes back to us.
+        private static string AppendShortCode(string message, string? shortCode)
+            => string.IsNullOrEmpty(shortCode) ? message : $"{message}  [{shortCode}]";
+
+        private void CopyBugReportRef_Click(object sender, RoutedEventArgs e)
+        {
+            var ticketId = _lastBugReportTicketId;
+            if (string.IsNullOrEmpty(ticketId)) return;
+            try { Clipboard.SetText(ticketId); }
+            catch { /* clipboard may be contested under Wine */ }
+        }
+
         /// <summary>
         /// Assemble a diagnostics bundle from the live capture. Capture text is
         /// redacted here (identifiers masked) so both the uploaded and the
@@ -39,8 +73,29 @@ namespace MozaPlugin
                     ? CaptureRedactor.FormatRedacted(rolling, _data)
                     : "(rolling segment omitted to fit the upload size limit)\n",
                 SettingsJson = SerializeSettings(),
+                DeviceLogText = BuildDeviceLogFile(),
                 ReportText = reportText,
             };
+        }
+
+        /// <summary>Full device-display-log ring, oldest-first, for the bundle's
+        /// own entry. The diagnostics dump caps its render at the most recent
+        /// 200 lines; this is the whole buffer, with hardware identifiers
+        /// masked the same way the capture files are.</summary>
+        private string BuildDeviceLogFile()
+        {
+            var entries = _plugin?.DeviceLogForDiagnostics?.Snapshot();
+            if (entries == null || entries.Length == 0) return string.Empty;
+            var sb = new StringBuilder(entries.Length * 96);
+            sb.Append("# host receive time (local) | source | display application log (hardware identifiers masked as ..)\n");
+            foreach (var e in entries)
+            {
+                sb.Append(e.ReceivedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
+                sb.Append(" [").Append(e.Source).Append("] ");
+                sb.Append(CaptureRedactor.RedactText(e.Text, _data));
+                sb.Append('\n');
+            }
+            return sb.ToString();
         }
 
         private string SerializeSettings()
@@ -83,7 +138,7 @@ namespace MozaPlugin
                     BugReportDescriptionBox.Text, BugReportService.MaxDescriptionChars);
                 if (string.IsNullOrEmpty(description))
                 {
-                    BugReportStatusText.Text = Strings.Status_BugReportNeedDescription;
+                    SetBugReportStatus(Strings.Status_BugReportNeedDescription);
                     return;
                 }
 
@@ -93,7 +148,7 @@ namespace MozaPlugin
                 if (since < BugReportService.SubmitCooldown)
                 {
                     MozaLog.Info("[AZOM] Bug report skipped: local submit cooldown active");
-                    BugReportStatusText.Text = Strings.Status_BugReportCooldown;
+                    SetBugReportStatus(Strings.Status_BugReportCooldown);
                     return;
                 }
 
@@ -104,7 +159,8 @@ namespace MozaPlugin
                 string model = UI.DiagnosticsBundleWriter.BuildWheelModelFilenameSlug(_data?.WheelModelName);
 
                 SubmitBugReportButton.IsEnabled = false;
-                BugReportStatusText.Text = Strings.Status_BugReportUploading;
+                SetBugReportReference(null);
+                SetBugReportStatus(Strings.Status_BugReportUploading);
 
                 // Assemble on the UI thread (light: snapshots + text), then
                 // compress off-thread (heavier) so the pane stays responsive.
@@ -121,7 +177,7 @@ namespace MozaPlugin
                     bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(content));
                     if (bundle.Length > BugReportService.MaxUploadBytes)
                     {
-                        BugReportStatusText.Text = Strings.Status_BugReportTooLarge;
+                        SetBugReportStatus(Strings.Status_BugReportTooLarge);
                         return;
                     }
                 }
@@ -135,29 +191,31 @@ namespace MozaPlugin
                         _plugin.Settings.LastBugReportUtc = DateTime.UtcNow;
                         _plugin.SaveSettings();
                         MozaLog.Info($"[AZOM] Bug report submitted ({bundle.Length} bytes), ref {result.TicketId ?? "?"}");
-                        BugReportStatusText.Text = string.Format(
+                        SetBugReportStatus(string.Format(
                             Strings.Status_BugReportSubmitted,
-                            string.IsNullOrEmpty(result.TicketId) ? "—" : result.TicketId);
+                            string.IsNullOrEmpty(result.TicketId) ? "—" : result.TicketId));
+                        SetBugReportReference(result.TicketId);
                         BugReportDescriptionBox.Text = "";
                         break;
                     case BugReportService.Outcome.RateLimited:
-                        MozaLog.Warn($"[AZOM] Bug report rate-limited by server: {result.Detail}");
-                        BugReportStatusText.Text = Strings.Status_BugReportRateLimited;
+                        SetBugReportStatus(Strings.Status_BugReportRateLimited);
                         break;
                     case BugReportService.Outcome.TooLarge:
-                        MozaLog.Warn($"[AZOM] Bug report rejected (too large): {result.Detail}");
-                        BugReportStatusText.Text = Strings.Status_BugReportTooLarge;
+                        SetBugReportStatus(Strings.Status_BugReportTooLarge);
                         break;
                     default:
-                        MozaLog.Warn($"[AZOM] Bug report upload failed: {result.Outcome} {result.Detail}");
-                        BugReportStatusText.Text = Strings.Status_BugReportFailed;
+                        // Append the transport/HTTP code: it is what makes a
+                        // "denied every time" report actionable when the user
+                        // quotes the line, and it also sits in the exported
+                        // bundle's upload-log.txt.
+                        SetBugReportStatus(AppendShortCode(Strings.Status_BugReportFailed, result.ShortCode));
                         break;
                 }
             }
             catch (Exception ex)
             {
                 MozaLog.Error($"[AZOM] Bug report submit error: {ex}");
-                BugReportStatusText.Text = Strings.Status_BugReportFailed;
+                SetBugReportStatus(AppendShortCode(Strings.Status_BugReportFailed, ex.GetType().Name));
             }
             finally
             {

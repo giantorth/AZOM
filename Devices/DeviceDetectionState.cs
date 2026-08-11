@@ -71,6 +71,9 @@ namespace MozaPlugin.Devices
         public volatile bool BaseAmbientLedSupported;
         // Edge guard: fire the ambient probe at most once per base detect.
         public volatile bool BaseAmbientProbed;
+        // Edge guard: apply+read equalizer7-10 at most once per base detect
+        // (deferred until the base-fw-version reply confirms 10-band support).
+        public volatile bool BaseEq10Probed;
 
         public volatile bool Group3ColorsRead;
         public volatile string LastKnownWheelModel = "";
@@ -124,6 +127,7 @@ namespace MozaPlugin.Devices
             DashDetected = false;
             BaseAmbientLedSupported = false;
             BaseAmbientProbed = false;
+            BaseEq10Probed = false;
             NewWheelDetected = false;
             OldWheelDetected = false;
             HandbrakeDetected = false;

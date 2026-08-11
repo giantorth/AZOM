@@ -32,6 +32,23 @@ namespace MozaPlugin.Protocol
         public const uint KindDashDisplayRotation = 5;
 
         /// <summary>
+        /// Property `kind` for the device display-log pull request (u32 = the
+        /// maximum number of log lines wanted; PitHouse always asks for 100).
+        /// The device answers with a record of the SAME kind carrying a zlib'd
+        /// UTF-16BE line list — so kind=14 is bidirectional and the directions
+        /// are told apart by value size (4 bytes = request, larger = payload).
+        /// See docs/protocol/sessions/session-0x02-ff-init.md § Device log pull.
+        /// </summary>
+        public const uint KindDeviceLogRequest = 14;
+
+        /// <summary>
+        /// Property `kind` for the device display-log receipt (u32 = how many
+        /// lines the host consumed). The device CLEARS that many lines from its
+        /// own buffer, so this is what advances the read cursor.
+        /// </summary>
+        public const uint KindDeviceLogReceipt = 15;
+
+        /// <summary>
         /// Field1 constant for the dashboard-switch FF-record. Verified
         /// in capture <c>automobilista-switch-dashboard-many-ends-on-grids-1.2.6.17.pcapng</c>
         /// and <c>wireshark/csp/startup, change knob colors, ...pcapng</c>.
@@ -101,15 +118,31 @@ namespace MozaPlugin.Protocol
             return WrapFfRecord(kv);
         }
 
-        /// <summary>Session-init record #2 (kind=7): sets the initial active dashboard slot.</summary>
-        public static byte[] BuildSessionInitField7Body(uint slotIndex)
+        /// <summary>
+        /// Session-init record #2 (kind=7, `init_enum`). Value is the CONSTANT
+        /// <c>[3][0]</c> — not a dashboard slot index, which is what this used
+        /// to emit.
+        ///
+        /// Verified 2026-08-07 against <c>bridge-20260731-064830.jsonl</c>: all
+        /// 34 kind=7 records in the capture are byte-identical
+        /// (<c>ff 0c 00 00 00 | 03 28 c2 81 | 07 00 00 00 | 03 00 00 00 00 00 00 00</c>)
+        /// across several reconnects and a dashboard switch, so the field cannot
+        /// be slot-dependent. Matches the decode already recorded in
+        /// docs/protocol/findings/2026-05-04-init-sequence.md ("always val=3").
+        /// Emitting 0 here left the wheel's FF-record layer dormant — it never
+        /// answered with kind=9/10/16.
+        /// </summary>
+        public static byte[] BuildSessionInitField7Body()
         {
             var kv = new byte[12];
             WriteU32LE(kv, 0, 7u);
-            WriteU32LE(kv, 4, slotIndex);
+            WriteU32LE(kv, 4, InitEnumValue);
             WriteU32LE(kv, 8, 0u);
             return WrapFfRecord(kv);
         }
+
+        /// <summary>Constant carried by the kind=7 init record.</summary>
+        private const uint InitEnumValue = 3;
 
         internal static byte[] WrapFfRecord(byte[] kindAndValue)
         {

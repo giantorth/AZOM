@@ -39,9 +39,11 @@ namespace MozaPlugin.Resources
                 { "it", new ResourceManager("MozaPlugin.Resources.Strings.it", typeof(Strings).Assembly) },
                 { "ko", new ResourceManager("MozaPlugin.Resources.Strings.ko", typeof(Strings).Assembly) },
                 { "nb", new ResourceManager("MozaPlugin.Resources.Strings.nb", typeof(Strings).Assembly) },
+                { "pt", new ResourceManager("MozaPlugin.Resources.Strings.pt", typeof(Strings).Assembly) },
                 { "ru", new ResourceManager("MozaPlugin.Resources.Strings.ru", typeof(Strings).Assembly) },
                 { "vi", new ResourceManager("MozaPlugin.Resources.Strings.vi", typeof(Strings).Assembly) },
                 { "zh-Hans", new ResourceManager("MozaPlugin.Resources.Strings.zh-Hans", typeof(Strings).Assembly) },
+                { "qps-ploc", new ResourceManager("MozaPlugin.Resources.Strings.qps-ploc", typeof(Strings).Assembly) },
             };
 
         private static string Get(string key)
@@ -119,8 +121,6 @@ namespace MozaPlugin.Resources
         public static string Subtitle_FfbEqualizer => Get("Subtitle_FfbEqualizer");
         public static string Section_FfbOutputCurve => Get("Section_FfbOutputCurve");
         public static string Subtitle_FfbOutputCurve => Get("Subtitle_FfbOutputCurve");
-        public static string Button_Flat => Get("Button_Flat");
-        public static string Button_Falloff => Get("Button_Falloff");
         public static string Button_Linear => Get("Button_Linear");
         public static string Button_SCurve => Get("Button_SCurve");
         public static string Button_Exponential => Get("Button_Exponential");
@@ -408,6 +408,7 @@ namespace MozaPlugin.Resources
         public static string Label_AlwaysCaptureOnStartup => Get("Label_AlwaysCaptureOnStartup");
         public static string Tooltip_AlwaysCaptureOnStartup => Get("Tooltip_AlwaysCaptureOnStartup");
         public static string Button_ExportBundle => Get("Button_ExportBundle");
+        public static string Button_CopyReference => Get("Button_CopyReference");
         public static string Tooltip_ExportBundle => Get("Tooltip_ExportBundle");
         public static string Button_CopyCapture => Get("Button_CopyCapture");
         public static string Section_FullDiagReport => Get("Section_FullDiagReport");
@@ -795,6 +796,8 @@ namespace MozaPlugin.Resources
         public static string Label_LightCycleKey => Get("Label_LightCycleKey");
         public static string Label_IndicatorLeftKey => Get("Label_IndicatorLeftKey");
         public static string Label_IndicatorRightKey => Get("Label_IndicatorRightKey");
+        public static string Section_StalksIndicators => Get("Section_StalksIndicators");
+        public static string SliderLabel_IndicatorMinBlink => Get("SliderLabel_IndicatorMinBlink");
         public static string KeyCapture_Prompt => Get("KeyCapture_Prompt");
         public static string KeyCapture_None => Get("KeyCapture_None");
         public static string StalkKind_None => Get("StalkKind_None");
@@ -810,5 +813,7 @@ namespace MozaPlugin.Resources
         public static string StalkKind_LightStage => Get("StalkKind_LightStage");
         public static string Option_ReleaseChannelPr => Get("Option_ReleaseChannelPr");
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
+        public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
+        public static string Label_EqSensitivity => Get("Label_EqSensitivity");
     }
 }

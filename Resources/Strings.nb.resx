@@ -57,8 +57,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 400 % = maks boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB-UTGANGSKURVE</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// dra de 5 nodene for å forme responsen</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>FLAT</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>FALLOFF</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEÆR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S-KURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EKSPONENTIELL</value></data>
@@ -200,8 +198,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB-DETEKSJON</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Deaktiver seriell-probe-fallback (avansert)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Trengs bare hvis pluginen snakker med feil enhet.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Deaktiver AB9-active-shifter-deteksjon</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Hopp over AB9-reconnect-probe.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Deaktiver active-shifter-deteksjon (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Hopp over active-shifter-reconnect-probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRI</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Last opp dashboard ved tilkobling</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Last ned dashboard fra rattet</value></data>
@@ -322,6 +320,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Start diagnoselogg automatisk ved oppstart/spillbytte</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Når på, starter seriell-trafikkloggen automatisk hver gang pluginen starter.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>EKSPORTER PAKKE (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>KOPIER REFERANSE</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>KOPIER LOGG TIL UTKLIPPSTAVLEN</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>FULL DIAGNOSERAPPORT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// feilsøkingsinformasjon</value></data>
@@ -744,6 +743,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Lyssyklus</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Blinklys venstre</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Blinklys høyre</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Blinklys</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Minste blinktid (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Trykk på en tast…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(ikke angitt)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(ingen)</value></data>
@@ -759,4 +760,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Lystrinn {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR lukket — byttet til Stabil</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
 </root>

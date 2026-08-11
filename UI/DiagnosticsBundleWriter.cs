@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Text;
 using MozaPlugin.Devices;
 using MozaPlugin.Diagnostics;
+using MozaPlugin.UI.BugReport;
 
 namespace MozaPlugin.UI
 {
@@ -21,6 +22,9 @@ namespace MozaPlugin.UI
             public IReadOnlyList<SerialTrafficCapture.Entry>? RollingSnapshot;
             // Serialized MozaPluginSettings JSON (may be null if unavailable).
             public string? SettingsJson;
+            // Wheel-display application log pulled over the session layer.
+            // Empty when nothing has been pulled (or the pull is disabled).
+            public string DeviceLogText = string.Empty;
             // Populated only on the bug-report submit path; null for a local export.
             public string? ReportText;
         }
@@ -85,6 +89,10 @@ namespace MozaPlugin.UI
             // current without depending on SimHub's rolling-file flush cadence.
             string logText = MozaLog.Snapshot();
             int logEntryCount = MozaLog.Count;
+            // Upload attempts (with their failure detail) ride along on the
+            // manual-export path too: that is exactly the path a user takes when
+            // submitting keeps getting refused.
+            string uploadLogText = BugReportUploadLog.Snapshot();
 
             var manifest = new StringBuilder();
             manifest.AppendLine("AZOM diagnostics bundle");
@@ -102,6 +110,10 @@ namespace MozaPlugin.UI
             if (!string.IsNullOrEmpty(content.SettingsJson))
                 manifest.AppendLine("  plugin-settings.json     – serialized MozaPluginSettings");
             manifest.AppendLine($"  moza-log.txt             – [AZOM] log lines from MozaLog ring buffer ({logEntryCount} entries)");
+            if (content.DeviceLogText.Length != 0)
+                manifest.AppendLine("  device-display-log.txt   – wheel display's own application log (session FF kind=14 pull)");
+            if (uploadLogText.Length != 0)
+                manifest.AppendLine("  upload-log.txt           – bug-report upload attempts + failure detail");
             manifest.AppendLine();
             manifest.AppendLine("Hardware identifiers (serial numbers, MCU UIDs) are masked as .. in the capture files.");
             manifest.AppendLine();
@@ -124,6 +136,10 @@ namespace MozaPlugin.UI
                 if (content.SettingsJson is string settingsJson && settingsJson.Length != 0)
                     WriteEntry(zip, "plugin-settings.json", settingsJson);
                 WriteEntry(zip, "moza-log.txt", logText);
+                if (content.DeviceLogText.Length != 0)
+                    WriteEntry(zip, "device-display-log.txt", content.DeviceLogText);
+                if (uploadLogText.Length != 0)
+                    WriteEntry(zip, "upload-log.txt", uploadLogText);
             }
         }
 

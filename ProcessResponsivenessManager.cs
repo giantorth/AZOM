@@ -61,10 +61,10 @@ namespace MozaPlugin
         private bool _timerRaised;   // timeBeginPeriod(1) currently held
         private bool _execOptOut;    // EcoQoS execution-speed opt-out requested
 
-        // Last power-throttling word actually accepted by the OS, so we only call
-        // SetProcessInformation on a real change. _ptApplied stays false until the
-        // first successful call (so the first reconcile always issues).
-        private bool _ptApplied;
+        // Last power-throttling word *requested*, not the one the OS accepted: Win10
+        // rejects IGNORE_TIMER_RESOLUTION and we fall back, so accepted != requested
+        // forever and keying on accepted re-issues every reconcile (telemetry rate).
+        private bool _ptAttempted;
         private uint _ptControl, _ptState;
 
         /// <summary>
@@ -133,22 +133,17 @@ namespace MozaPlugin
                 state = 0;
             }
 
-            if (_ptApplied && control == _ptControl && state == _ptState) return;
+            if (_ptAttempted && control == _ptControl && state == _ptState) return;
+            _ptAttempted = true; _ptControl = control; _ptState = state;
 
             // Win11 honours both bits; Win10 (no IGNORE_TIMER_RESOLUTION) rejects the
             // whole call, so fall back to EXECUTION_SPEED alone — the opt-out that
             // actually un-throttles us is the load-bearing half.
-            if (TrySetPowerThrottling(control, state))
+            if (!TrySetPowerThrottling(control, state)
+                && control != 0
+                && (control & PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION) != 0)
             {
-                _ptApplied = true; _ptControl = control; _ptState = state;
-            }
-            else if (control != 0 && (control & PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION) != 0)
-            {
-                uint c2 = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
-                if (TrySetPowerThrottling(c2, 0))
-                {
-                    _ptApplied = true; _ptControl = c2; _ptState = 0;
-                }
+                TrySetPowerThrottling(PROCESS_POWER_THROTTLING_EXECUTION_SPEED, 0);
             }
         }
 

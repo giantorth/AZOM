@@ -94,8 +94,8 @@ entirely different record formats.
 | 9      | LED color (36B) | Two 18B entries concatenated | Dual-controller color push in single FF record |
 | 10     | standby timeout | u64 LE (ms) | Display standby timeout in milliseconds. Sent on slider change |
 | 11     | action catalog | ~2.5 KB zlib | Compressed button/action catalog: UTF-16LE action names (decrementEqualizerGain1, etc). 9,874 bytes decompressed. Multi-chunk. Sent once at startup, heavily retransmitted |
-| 14     | brightness baseline | u32 LE | Always value=100 in captures. Periodic heartbeat every ~2s. Never changes mid-session. Paired with kind=15 |
-| 15     | unknown baseline | u32 LE | Starts at 100, then quasi-random small values (1–37). Periodic heartbeat paired with kind=14. NOT switch-specific — cycles in steady-state. Purpose unidentified |
+| 14     | **device log request** | u32 LE | "Send me up to N log lines" — always 100. **SOLVED 2026-08-07**, was misread as "brightness baseline". See [`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md) § Device log pull |
+| 15     | **device log receipt** | u32 LE | "I consumed N lines" — the device drops that many. The "quasi-random 1–37" below is simply how many lines came back. **SOLVED 2026-08-07** |
 
 ### Wheel → Host (b2h)
 
@@ -104,16 +104,18 @@ entirely different record formats.
 | 4      | switch echo | 12B (same as h2b) | Wheel echoes back the switch command |
 | 9      | LED color report | 25B: `[00] [addr] [...0A...] [hex_color_UTF16]` | Wheel reports current LED color as hex string (e.g. "#64d90a"). Different format from h2b |
 | 10     | standby echo | varies | Single occurrence per session |
-| 14     | dashboard state | ~41B zlib each | Compressed dashboard state. Multi-chunk. Completely different format from h2b kind=14 (which is just u32 brightness) |
+| 14     | **device log payload** | 4B reserved + zlib, multi-chunk | `[count u32 BE]` + `count × ([byteLen u32 BE][UTF-16BE])` — the display's MOZADash log, answering the h2b kind=14 request. **SOLVED 2026-08-07**, was guessed as "dashboard state" |
 | 16     | address report | 16B: two `[addr:u32] [0:u32]` pairs | Wheel-only. 4 records per session |
 
-### Periodic heartbeat pattern
+### ~~Periodic heartbeat pattern~~ — SUPERSEDED 2026-08-07
 
-PitHouse emits kind=14 + kind=15 as a pair approximately every 2 seconds
-on session 0x02. kind=14 is always brightness=100. kind=15 starts at 100
-then transitions to small values (1–4 typical in steady state). This
-heartbeat runs continuously regardless of dashboard switching. Plugin
-currently sends **none** of these periodic pushes.
+The kind=14 + kind=15 pair is **not** a heartbeat. It is the device log
+pull: kind=14 requests up to 100 lines, kind=15 acknowledges how many the
+host consumed (which is why its value tracks small counts in steady state).
+Nothing in the session layer requires either record. Canonical decode:
+[`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md)
+§ Device log pull. The plugin now emits both from
+`TelemetrySender.TickEmitDeviceLogPoll`.
 
 ### Startup sequence on session 0x02
 

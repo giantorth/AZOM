@@ -39,7 +39,6 @@ namespace MozaPlugin.Devices
         // Sub-stream tick budgets. Scaled by rpm/IdleRpm at runtime where noted.
         private const int KeepalivePairBaseTicks = 12;
         private const int RpmTrackBaseTicks = 80;
-        private const int LowRatePairBaseTicks = 260;
         private const double IdleRpm = 800.0;
         // Engine-vib frequency slider cap (matches the UI slider's Maximum).
         // Older saved profiles may still carry larger values; clamp at use time.
@@ -78,7 +77,6 @@ namespace MozaPlugin.Devices
         private volatile bool _latestGameRunning;
         private int _tickCount;
         private ushort _pulsePhase;
-        private short _lowRatePhase;
         // Slew-limited effective intensity (0..100). Rise is instant; fall
         // decays at IntensityFadePerSec so stopping fades the amplitude rather
         // than cutting it. Drives the 0x0A 0x05 intensity field.
@@ -269,24 +267,16 @@ namespace MozaPlugin.Devices
                 _ab9.SendEnginePulsePair(_pulsePhase, intensity0to100: 100);
             }
 
-            // 0x0D 0x05 RPM-tracking trigger.
+            // RPM-tracked restart of the sine effect.
             int rpmTrackInterval = Math.Max(2, (int)(RpmTrackBaseTicks / rpmFactor));
             if (tick % rpmTrackInterval == 0)
-                _ab9.SendTrigger(MozaAb9DeviceManager.Ab9Trigger.RpmTrack);
+                _ab9.SendTrigger(MozaAb9DeviceManager.Ab9Effect.EngineVib);
 
-            // 0x08 0x04/06 low-rate signed pair.
-            if (tick % LowRatePairBaseTicks == 0)
-            {
-                unchecked { _lowRatePhase += 100; }
-                if (_lowRatePhase > 32000) _lowRatePhase = -32000;
-                _ab9.SendLowRatePair(_lowRatePhase);
-            }
-
-            // 0x0D 0x01 (Sparse), 0x0D 0x04 (Engage), 0x0D 0x06 (Disengage) are
-            // event-driven, fired from MozaPlugin.CheckAb9GearshiftEvent on
-            // each SimHub gear-string transition — NOT emitted from this
-            // worker. See usb-capture/AB9/all_gears.pcapng / 1-N.pcapng and
-            // docs/protocol/devices/ab9-shifter.md.
+            // ShiftRumble / EngageForce / NeutralForce — and the 0x08 constant-force
+            // magnitudes feeding the latter two — are event-driven from
+            // MozaPlugin.CheckAb9GearshiftEvent. This worker must never touch them:
+            // a periodic 0x08 write ramps the shift kick to full scale.
+            // See docs/protocol/devices/ab9-shifter.md.
         }
     }
 }

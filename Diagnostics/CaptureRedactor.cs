@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -38,6 +39,38 @@ namespace MozaPlugin.Diagnostics
                 sb.Append('\n');
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Mask hardware identifiers in plain text (device log lines, which are
+        /// human-readable rather than hex). Only the ASCII-printable identity
+        /// sequences apply — MCU UIDs are binary and can't appear verbatim in a
+        /// log line. Matched runs keep their last <see cref="TailBytesVisible"/>
+        /// characters, mirroring the hex path.
+        /// </summary>
+        public static string RedactText(string text, MozaData? data)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            var sequences = data?.GetIdentityByteSequences();
+            if (sequences == null || sequences.Count == 0) return text;
+
+            foreach (var seq in sequences)
+            {
+                if (seq == null || seq.Length <= TailBytesVisible) continue;
+                bool printable = true;
+                foreach (var b in seq)
+                {
+                    if (b < 0x20 || b > 0x7E) { printable = false; break; }
+                }
+                if (!printable) continue;
+
+                string needle = Encoding.ASCII.GetString(seq);
+                if (text.IndexOf(needle, StringComparison.Ordinal) < 0) continue;
+                string replacement = new string('.', needle.Length - TailBytesVisible)
+                    + needle.Substring(needle.Length - TailBytesVisible);
+                text = text.Replace(needle, replacement);
+            }
+            return text;
         }
 
         private static void AppendMaskedHex(

@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 400% = μέγιστη ενίσχυση</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// σύρετε τους 5 κόμβους για να διαμορφώσετε την απόκριση</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>ΕΠΙΠΕΔΟ</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>FALLOFF</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>ΓΡΑΜΜΙΚΟ</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S CURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>ΕΚΘΕΤΙΚΟ</value></data>
@@ -195,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>ΑΝΙΧΝΕΥΣΗ USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Απενεργοποίηση fallback σειριακής ανίχνευσης (για προχωρημένους)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Απαιτείται μόνο αν το plugin επικοινωνεί με λάθος συσκευή.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Απενεργοποίηση ανίχνευσης AB9 active-shifter</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Παράλειψη ανίχνευσης επανασύνδεσης AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Απενεργοποίηση ανίχνευσης active-shifter (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Παράλειψη ανίχνευσης επανασύνδεσης του active-shifter.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ΤΗΛΕΜΕΤΡΙΑ ΟΘΟΝΗΣ ΟΡΓΑΝΩΝ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Μεταφόρτωση οθόνης κατά τη σύνδεση</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Λήψη οθόνης από το τιμόνι</value></data>
@@ -317,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Πάντα εκκίνηση καταγραφής διαγνωστικών κατά την εκκίνηση/εναλλαγή παιχνιδιού</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Όταν είναι ενεργό, η καταγραφή σειριακής κίνησης ξεκινά αυτόματα κάθε φορά που εκκινεί το plugin.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>ΕΞΑΓΩΓΗ ΠΑΚΕΤΟΥ (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΚΩΔΙΚΟΥ</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΚΑΤΑΓΡΑΦΗΣ ΣΤΟ ΠΡΟΧΕΙΡΟ</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>ΠΛΗΡΗΣ ΔΙΑΓΝΩΣΤΙΚΗ ΑΝΑΦΟΡΑ</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// Πληροφορίες εντοπισμού σφαλμάτων</value></data>
@@ -738,6 +737,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Κύκλος φώτων</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Φλας αριστερά</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Φλας δεξιά</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Φλας</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Ελάχιστος χρόνος φλας (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Πάτησε ένα πλήκτρο…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(δεν ορίστηκε)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(κανένα)</value></data>
@@ -753,4 +754,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Στάδιο φώτων {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
 </root>

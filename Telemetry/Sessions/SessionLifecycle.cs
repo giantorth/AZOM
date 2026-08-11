@@ -475,6 +475,47 @@ namespace MozaPlugin.Telemetry.Sessions
                 }
             }
 
+            // Asymmetric open failure: mgmt acked (wheel demonstrably alive) but
+            // the telem session drew no ack. PitHouse retries session opens at a
+            // flat ~1 s cadence and tolerates 10+ rounds (bridge captures); a
+            // single 500 ms attempt is not enough after a port bounce. CS-Pro
+            // bundle 2026-07-28: reconnect after a "Not ready" port wedge left
+            // the wheel replaying the 0x01 open-ack for every later open (0x02 /
+            // 0x03 opens answered with fc:00:01), the lone attempt timed out,
+            // FlagByte collapsed onto mgmt and the pipeline came up fake-Active —
+            // tier-def blind-retransmit 0/9 chunks acked across all 6 rounds,
+            // kind=4 switches ignored, display dead until a manual toggle. Retry
+            // flat; if the wheel still refuses, escalate the full Stop→silence→
+            // Start cycle (the proven session-layer reset) through the recovery
+            // dispatcher rather than proceeding into a known-dead lane. Collapse
+            // onto mgmt only when the dispatcher refuses (debounced/capped/parked)
+            // so the pipeline still limps instead of dead-stopping.
+            if (telemetryPort == 0 && mgmtPort != 0)
+            {
+                const int TelemOpenRetryRounds = 10;
+                const int TelemOpenRetryBudgetMs = 1_000;
+                MozaLog.Info(
+                    $"[AZOM] Telem session 0x{TelemSession:X2} open silent while mgmt acked — " +
+                    $"retrying flat: up to {TelemOpenRetryRounds} rounds at ~{TelemOpenRetryBudgetMs}ms (PitHouse parity)");
+                for (int round = 1; round <= TelemOpenRetryRounds && telemetryPort == 0; round++)
+                {
+                    if (cancel.IsCancellationRequested
+                        || _sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
+                    telemetryPort = TryOpenSession(TelemSession, TelemOpenRetryBudgetMs);
+                    MozaLog.Debug(
+                        $"[AZOM] Telem open retry round {round}/{TelemOpenRetryRounds}: " +
+                        $"{(telemetryPort != 0 ? "acked" : "no ack")}");
+                }
+                if (telemetryPort == 0
+                    && _sender.Recovery.RequestRestart(
+                        $"telem session 0x{TelemSession:X2} refused {TelemOpenRetryRounds} open retries " +
+                        "while mgmt acked — wheel session layer stuck (post-reconnect ack-replay state); " +
+                        "cycling the pipeline instead of collapsing telemetry onto the mgmt session"))
+                {
+                    return; // the queued restart supersedes this StartInner
+                }
+            }
+
             _sender._mgmtPort = mgmtPort;
 
             // Session-open frames use seq=port. Data chunks must start

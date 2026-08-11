@@ -120,6 +120,7 @@ namespace MozaPlugin.Devices
                     // (possibly different) wheel — the diagnostics tab should
                     // only show what THIS connection has produced.
                     _plugin.FirmwareDebugLogForDiagnostics.Clear();
+                    _plugin.DeviceLogForDiagnostics.Clear();
                     MozaLog.Info("[AZOM] Connected to MOZA device");
                     MarkStandaloneDashboardDetectedFromUsb("serial connect");
                     // Base temps/state are dev-0x13 reads the base main controller
@@ -218,7 +219,7 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        /// <summary>Open the AB9 shifter's dedicated CDC port (PID 0x1000) and probe identity.</summary>
+        /// <summary>Open the active shifter's dedicated CDC port (AB9 0x1000 / AB6 0x1002) and probe identity.</summary>
         internal void TryConnectAb9()
         {
             if (_ab9Manager == null) return;
@@ -446,6 +447,7 @@ namespace MozaPlugin.Devices
             _detectionState.BaseDetected = false;
             _detectionState.BaseAmbientLedSupported = false;
             _detectionState.BaseAmbientProbed = false;
+            _detectionState.BaseEq10Probed = false;
             _detectionState.BaseOwner = null;
             _data.BaseSettingsRead = false;
             try { _plugin.PendingResponses.Clear(); } catch { }
@@ -740,6 +742,7 @@ namespace MozaPlugin.Devices
             _detectionState.BaseDetected = false;
             _detectionState.BaseAmbientLedSupported = false;
             _detectionState.BaseAmbientProbed = false;
+            _detectionState.BaseEq10Probed = false;
             _data.IsBaseConnected = false;
             _data.BaseSettingsRead = false;
             var baseDm = _baseManager?.DeviceManager;

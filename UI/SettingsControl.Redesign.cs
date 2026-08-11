@@ -121,11 +121,20 @@ namespace MozaPlugin
                 });
 
                 // Two-way bindings: CurveEditor.YN ↔ EqNSlider.Value (FFB EQ
-                // now uses the same line-graph control as the output curves,
-                // configured for 6 nodes / 0-400 range via MozaEqualizerLineStyle).
+                // uses the same line-graph control as the output curves,
+                // configured via MozaEqualizerLineStyle / MozaEqualizerLineStyle10).
                 BindEditorToSliders(FfbEqualizer, new[]
                 {
                     Eq1Slider, Eq2Slider, Eq3Slider, Eq4Slider, Eq5Slider, Eq6Slider
+                });
+                // 10-band editor: node order is FREQUENCY order (5..100 Hz), which
+                // interleaves the new-band sliders — Y10 = Eq6 = 100 Hz, the node
+                // LastNodeYMax caps. Both editors stay bound; ApplyEqBandMode only
+                // swaps Visibility.
+                BindEditorToSliders(FfbEqualizer10, new[]
+                {
+                    Eq1Slider, Eq7Slider, Eq2Slider, Eq3Slider, Eq8Slider,
+                    Eq4Slider, Eq9Slider, Eq5Slider, Eq10Slider, Eq6Slider
                 });
 
                 // Bandwidth sparkline data sources — single dual-line control on
@@ -222,15 +231,17 @@ namespace MozaPlugin
         }
 
         // Two-way bind a MozaCurveEditor's YN dependency properties to the
-        // corresponding slider's Value. Accepts 5 sliders (curve mode) or 6
-        // (equalizer mode); the 6th slot binds to Y6Property.
+        // corresponding slider's Value. Accepts 5 sliders (curve mode), 6
+        // (legacy equalizer mode) or 10 (10-band equalizer).
         private void BindEditorToSliders(MozaControls.MozaCurveEditor editor, Slider[] sliders)
         {
             if (editor == null || sliders == null || sliders.Length < 5) return;
             var ys = new[] {
                 MozaControls.MozaCurveEditor.Y1Property, MozaControls.MozaCurveEditor.Y2Property,
                 MozaControls.MozaCurveEditor.Y3Property, MozaControls.MozaCurveEditor.Y4Property,
-                MozaControls.MozaCurveEditor.Y5Property, MozaControls.MozaCurveEditor.Y6Property };
+                MozaControls.MozaCurveEditor.Y5Property, MozaControls.MozaCurveEditor.Y6Property,
+                MozaControls.MozaCurveEditor.Y7Property, MozaControls.MozaCurveEditor.Y8Property,
+                MozaControls.MozaCurveEditor.Y9Property, MozaControls.MozaCurveEditor.Y10Property };
             int n = Math.Min(sliders.Length, ys.Length);
             for (int i = 0; i < n; i++)
             {

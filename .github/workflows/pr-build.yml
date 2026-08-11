@@ -3,6 +3,9 @@ name: PR Build
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    # Whole-PR diff, not the pushed range — the `changed` job below narrows a
+    # `synchronize` down to the commits that were actually pushed. Keep this
+    # list in sync with build.yml and changed-code.yml.
     paths:
       - "**.cs"
       - "**.csproj"
@@ -25,17 +28,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: windows-latest
-    permissions:
-      contents: write
-    # Fork PRs run with a read-only token and no secrets — they must never
-    # reach the release step (build.yml still compile-gates them). Drafts
-    # build on the ready_for_review transition.
+  # Fork PRs run with a read-only token and no secrets — they must never
+  # reach the release step (build.yml still compile-gates them). Drafts
+  # build on the ready_for_review transition.
+  changed:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
        github.event.pull_request.draft == false)
+    uses: ./.github/workflows/changed-code.yml
+
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    # A docs-only push to a PR that already touched source still satisfies the
+    # `paths:` filter above; `changed` is what stops it from publishing another
+    # release. A skipped `changed` (fork/draft) skips this job too.
+    needs: changed
+    if: needs.changed.outputs.code == 'true'
 
     steps:
       - name: Resolve PR context

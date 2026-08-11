@@ -386,14 +386,27 @@ namespace MozaPlugin
         // was 1.2.9.24.
         public const int BaseFwLfeMin = (1 << 24) | (2 << 16) | (10 << 8) | 10; // 1.2.10.10
         public bool BaseSupportsLfe => BaseFwVersion != 0 && BaseFwVersion >= BaseFwLfeMin;
+        // The 10-band EQ (equalizer7-10, cmds 0x32..0x35) ships in the same
+        // 1.2.10.10 firmware as LFE.
+        public bool BaseSupportsEq10 => BaseSupportsLfe;
 
-        // ===== FFB Equalizer (6 bands: 10/15/25/40/60/100 Hz, 0-400% where 100% = flat) =====
+        // ===== FFB Equalizer =====
+        // Legacy 6-band UI (fw < 1.2.10.10): 10/15/25/40/60/100 Hz, 0-400%.
+        // 10-band UI (fw >= 1.2.10.10) relabels band 1 to 5 Hz and interleaves
+        // 7..10 as 10/30/50/80 Hz; 0-500% except Equalizer6 (100 Hz, 0-100%).
+        // 100% = flat either way.
         public volatile int Equalizer1 = 100;
         public volatile int Equalizer2 = 100;
         public volatile int Equalizer3 = 100;
         public volatile int Equalizer4 = 100;
         public volatile int Equalizer5 = 100;
         public volatile int Equalizer6 = 100;
+        public volatile int Equalizer7 = 100;
+        public volatile int Equalizer8 = 100;
+        public volatile int Equalizer9 = 100;
+        public volatile int Equalizer10 = 100;
+        // Wheelbase road sensitivity (cmd 0x0C), range 10..50; -1 = not yet read.
+        public volatile int RoadSensitivity = -1;
 
         // ===== FFB Curve (5 output points; point 5 fixed at input=100%) =====
         // X1..X4 are the input-axis positions of the first four points, sent via
@@ -664,6 +677,11 @@ namespace MozaPlugin
                 case "base-equalizer4": Equalizer4 = value; break;
                 case "base-equalizer5": Equalizer5 = value; break;
                 case "base-equalizer6": Equalizer6 = value; break;
+                case "base-equalizer7": Equalizer7 = value; break;
+                case "base-equalizer8": Equalizer8 = value; break;
+                case "base-equalizer9": Equalizer9 = value; break;
+                case "base-equalizer10": Equalizer10 = value; break;
+                case "base-road-sensitivity": RoadSensitivity = value; break;
 
                 // FFB Curve (X input positions + Y output values)
                 case "base-ffb-curve-x1": FfbCurveX1 = value; break;

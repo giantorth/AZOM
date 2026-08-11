@@ -59,8 +59,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// per-band gain · 100% = neutral · 400% = max boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB OUTPUT CURVE</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// drag the 5 nodes to shape response</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>FLAT</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>FALLOFF</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S CURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENTIAL</value></data>
@@ -221,8 +219,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB DETECTION</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Disable serial-probe fallback (advanced)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Only required if plugin is talking to incorrect device.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disable AB9 active-shifter detection</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Skip the AB9 reconnect probe.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disable active-shifter detection (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Skip the active-shifter reconnect probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD TELEMETRY</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Upload dashboard on connect</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Download dashboards from wheel</value></data>
@@ -343,6 +341,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Always start diagnostics capture on launch/game switch</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>When on, the serial traffic capture begins automatically each time the plugin starts.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>Export Bundle</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>Copy Reference</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>COPY CAPTURE TO CLIPBOARD</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>FULL DIAGNOSTIC REPORT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// debugging information</value></data>
@@ -746,6 +745,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Light cycle</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Indicator left</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Indicator right</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Indicators</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Minimum blinker time (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Press a key…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(not set)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(none)</value></data>
@@ -761,4 +762,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Light stage {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR closed — switched to Stable</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// per-band gain · 100% = neutral · 500% = max boost</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSITIVITY</value></data>
 </root>

@@ -259,12 +259,25 @@ namespace MozaPlugin.Devices
                     EsIndicatorCard.Visibility = esWheel ? Visibility.Visible : Visibility.Collapsed;
                 }
 
+                // Input modes render overlay-first, _data as fallback — same rule the
+                // LED swatches and the sleep bundle already follow. Newer firmware
+                // silently drops the wheel-paddles-mode / wheel-clutch-point readback
+                // (see WheelOverride's "Inputs" comment), and _data is not per-wheel:
+                // ClearWheelIdentity leaves these mirrors alone, so after a rim swap
+                // _data still holds the OTHER rim's mode. The overlay is keyed by the
+                // wheel's page GUID, so it is the only per-wheel truth available.
+                var ov = _plugin?.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+
                 if (newWheelDetected)
                 {
-                    SetComboSafe(WiPaddlesModeCombo, _data.WheelPaddlesMode);
-                    ApplyPaddleVisibility(_data.WheelPaddlesMode);
-                    WiClutchPointSlider.Value = Math.Max(0, Math.Min(100, _data.WheelClutchPoint));
-                    WiClutchPointValue.Text   = $"{_data.WheelClutchPoint}%";
+                    int paddlesMode = ov != null && ov.WheelPaddlesMode >= 0
+                        ? ov.WheelPaddlesMode : _data.WheelPaddlesMode;
+                    int clutchPoint = ov != null && ov.WheelClutchPoint >= 0
+                        ? ov.WheelClutchPoint : _data.WheelClutchPoint;
+                    SetComboSafe(WiPaddlesModeCombo, paddlesMode);
+                    ApplyPaddleVisibility(paddlesMode);
+                    WiClutchPointSlider.Value = Math.Max(0, Math.Min(100, clutchPoint));
+                    WiClutchPointValue.Text   = $"{clutchPoint}%";
 
                     bool perKnob = _data.WheelKnobSignalModeSupported;
                     // Legacy "All Rotaries" panel now lives inside KNOB COLOURS card;
@@ -275,15 +288,18 @@ namespace MozaPlugin.Devices
                         // Per-knob mode: keep the hidden source-of-truth combos in sync;
                         // the visible chips above each KnobRingViz forward to them.
                         var combos = new[] { WiKnobSignalMode0Combo, WiKnobSignalMode1Combo, WiKnobSignalMode2Combo, WiKnobSignalMode3Combo, WiKnobSignalMode4Combo };
+                        var ovSig = ov?.WheelKnobSignalModes;
                         for (int i = 0; i < 5; i++)
                         {
-                            int v = _data.WheelKnobSignalModes[i];
+                            int v = ovSig != null && i < ovSig.Length && ovSig[i] >= 0
+                                ? ovSig[i] : _data.WheelKnobSignalModes[i];
                             if (v >= 0) SetComboSafe(combos[i], v);
                         }
                     }
                     else
                     {
-                        SetComboSafe(WiKnobModeCombo, _data.WheelKnobMode);
+                        SetComboSafe(WiKnobModeCombo, ov != null && ov.WheelKnobMode >= 0
+                            ? ov.WheelKnobMode : _data.WheelKnobMode);
                     }
                     SyncKnobSignalChips();
                 }
@@ -293,19 +309,21 @@ namespace MozaPlugin.Devices
                 // firmware reports the 1-byte assignment enum (None/Left/Right).
                 if (newWheelDetected || oldWheelDetected)
                 {
+                    int stickMode = ov != null && ov.WheelStickMode >= 0
+                        ? ov.WheelStickMode : _data.WheelStickMode;
                     if (_data.WheelDualStickSupported)
                     {
                         WiStickModeNewPanel.Visibility = Visibility.Visible;
                         WiStickModeOldPanel.Visibility = Visibility.Collapsed;
                         WiStickModeNotDetected.Visibility = Visibility.Collapsed;
-                        SetComboSafe(WiStickModeCombo, _data.WheelStickMode);
+                        SetComboSafe(WiStickModeCombo, stickMode);
                     }
                     else
                     {
                         WiStickModeOldPanel.Visibility = Visibility.Visible;
                         WiStickModeNewPanel.Visibility = Visibility.Collapsed;
                         WiStickModeNotDetected.Visibility = Visibility.Collapsed;
-                        SetComboSafe(WiStickModeOldCombo, _data.WheelStickMode != 0 ? 1 : 0);
+                        SetComboSafe(WiStickModeOldCombo, stickMode != 0 ? 1 : 0);
                     }
                 }
                 else

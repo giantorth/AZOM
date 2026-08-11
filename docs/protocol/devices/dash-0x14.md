@@ -36,7 +36,13 @@ The CM2 (USB PID `0x0025`) connects in one of two topologies:
 
 The CM2 meter firmware was reworked around 2026-06, replacing the LED subsystem.
 The eras are distinguishable from the meter's own `0x0E` firmware-debug heartbeat
-(`src=0x41`) and drive LEDs by completely different wire commands.
+and drive LEDs by completely different wire commands. The heartbeat's `src` byte
+follows the topology: a base-bridged CM2 logs as the dash sub-device (`src=0x41`
+on the wheelbase pipe), while a standalone-USB CM2 logs as its own main MCU
+(`src=0x21` on the dashboard pipe) — same `meter_diag.c` vocabulary on both
+(bundle `CGZC7E3A` 2026-08-01: `[INFO]meter_diag.c:88 Release Heartbeat Log:` /
+`IndicatorMode:` / `StandbyMode:` inbound as `0e 21 05 …` on the CM2's own port,
+~48 s after connect, ~1/min).
 
 | | **Legacy RPM-ramp** (≤ 2026-06) | **Indicator** (2026-06+) |
 |---|---|---|
