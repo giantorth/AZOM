@@ -633,6 +633,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>FOLDER</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>PRESET</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFILE</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDAL</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APPLY TO</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>CHANGES</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// no Motor presets in this folder</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// no Pedals presets in this folder</value></data>

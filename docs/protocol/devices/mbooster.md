@@ -1399,6 +1399,144 @@ existing theme pairs (same red/green the temperature graph's MCU/Motor
 series use). `BlueBrush`/`BwThirdFillBrush` are new — no prior accent
 color in the theme was a true blue distinct from Cyan.
 
+## PitHouse Pedals preset format
+
+A PitHouse preset is a JSON object (or a `.mzpreset` zip holding `preset.json`
+— see `UI/Import/PitHousePresetArchive.cs`) whose `deviceParams` object holds
+every setting as a flat key. mBooster presets carry `"deviceType": "Pedals"`
+and `"devices": ["mBooster"]`.
+
+Sample files these notes were derived from: two real user presets, `Brake`
+(100 `deviceParams` keys, saved 2026-07-14) and `Throttle` (88 keys,
+2026-07-18), from the same rig.
+
+### Per-role prefixes, and the subject role
+
+Every key except a handful of device-wide ones is prefixed `throttle_`,
+`brake_` or `clutch_`. **A preset written for one pedal still carries all
+three sections** — but only its own role gets the extended block (effects,
+travel limits, damping/friction, force curves). The other two hold just the
+device-wide snapshot:
+
+```
+channlRoleType, outdir, min, max, nonlinear1..5, press_combine
+```
+
+So the section carrying **any key outside that generic set** identifies the
+role the preset is really for — its *subject role*. In `Brake.json` only
+`brake_*` qualifies; in `Throttle.json` only `throttle_*` does.
+
+This matters because the other sections are *not* settings for those pedals in
+any meaningful sense — they are whatever the device happened to report when
+the preset was saved. `PitHousePedalsMapper` therefore imports only the subject
+section, into one pedal (`ImportPlan.ResolvedTarget`, retargetable in the
+wizard). Importing all three overwrote the untouched pedals' calibration.
+
+A preset with no extended block in any section has no discernible subject; the
+mapper treats it as a plain calibration snapshot and matches each populated
+section to the pedal carrying that role (`ImportPlan.IsCalibrationOnlyPreset`).
+
+### Key → plugin field
+
+Prefixed `<p>` = `throttle` / `brake` / `clutch`. Every effect field is
+host-rendered (see [Effect synthesis](#effect-synthesis)); the calibration
+rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
+
+| PitHouse key | Plugin field | Notes |
+|---|---|---|
+| `<p>_outdir` | `Direction` | `mbooster-<p>-dir` |
+| `<p>_min` / `<p>_max` | *(not imported)* | **unit mismatch**, see below |
+| `<p>_nonlinear1..5` | `CurveY[0..4]` | output curve, `mbooster-<p>-y1..y5`; both sides are 0–100 |
+| `<p>_abs_switch/_amp/_freq/_smoothness` | `Abs.Enabled/.IntensityPct/.FrequencyHz/.SmoothnessPct` | brake-only in PitHouse |
+| `<p>_lockup_switch/_amp/_freq` | `Lockup.*` | brake-only |
+| `<p>_brakethreshold_switch/_amp/_freq` | `Threshold.Enabled/.IntensityPct/.FrequencyHz` | brake-only |
+| `<p>_brakethreshold_trigger_input` | `Threshold.TriggerLevelPct` | same 50–100 range |
+| `<p>_brakethreshold_fade_amount` | `Threshold.DecayPct` | UI label "Vibration Decay" |
+| `<p>_tc_switch/_amp/_freq` | `TractionControl.*` | |
+| `<p>_wheel_slip_switch/_amp/_freq` | `WheelSpin.*` | plugin's range (30–80 Hz) is narrower than PitHouse's |
+| `<p>_gear_shift_vibration_switch/_amp/_freq` | `GearShift.*` | plugin's `VibrateOnNeutral`/`DebounceMs` have no PitHouse counterpart |
+| `<p>_road_texture_switch/_intensity/_smoothness` | `RoadTexture.*` | |
+| `<p>_machinelimit_min` / `_max` | `TravelStartMm` / `TravelEndMm` | **inferred**, see below |
+| `<p>_softlimit_hardness_press` / `_release` | `EndstopFrontStiffness` / `EndstopEndStiffness` | **inferred**, see below |
+| `brake_press_combine` | `SensorOutputRatioPct` | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
+
+Values are clamped to the plugin's own slider bounds (`MBoosterUiConstants`)
+on import, and the travel pair additionally honours `TravelMinGapMm` /
+`TravelMaxGapMm` so an imported range can't land somewhere the UI could not
+produce.
+
+### `<p>_min` / `<p>_max` — percent vs raw counts
+
+PitHouse states these as **percentages**: every observed value across both
+sample presets is in 0–100 (`clutch_min: 0` / `clutch_max: 100` is the
+full-range default; `brake_min: 16`, `brake_max: 99`, `throttle_min: 3`), and
+they sit alongside `nonlinear1..5`, which are unambiguously percentages.
+
+`MBoosterDeviceSettings.Min`/`Max` are the device's own **raw counts** — the
+Calibration card's sliders are labelled "Min (raw)"/"Max (raw)", run 0–65535
+(the 2-byte field's range), and are seeded from the device read-back, unlike
+every other min/max slider in the app, which clamps 0–100.
+
+The importer therefore does **not** map them. Writing PitHouse's `max: 99`
+straight into the raw field caps the pedal's output at ~0.15 % of full scale.
+The percent→raw factor is not established by any capture (the raw full-scale a
+given unit actually reports is not necessarily 65535), so the values are listed
+under "Not imported" with their reason rather than guessed at. A capture of
+PitHouse writing `mbooster-<p>-min`/`-max` after a known slider value would
+settle it.
+
+### The three inferred mappings
+
+These are read from value range, **not** from a wire capture, and are marked
+with `*` in the import wizard's change list:
+
+- `machinelimit_min/max` → travel in **mm**. Samples are 34.97/45.0 and
+  35.99/46.69, sitting inside the plugin's own 3.8–49.7 mm Start/End of Travel
+  slider (itself reverse-engineered from PitHouse captures of that control).
+- `softlimit_hardness_press/release` → End Stop Stiffness. Samples are `3`,
+  inside the confirmed 1–10 range; press↔front / release↔end is the natural
+  pairing.
+- `press_combine` → sensor blend ratio. Present only under `brake_` (70 in the
+  Brake preset, 0 in the Throttle preset's brake snapshot), matching
+  `SensorOutputRatioPct`'s own brake-only scope. Weakest of the three.
+
+### Not imported — no plugin surface
+
+`<p>_damping_*` (including the 3-segment `_segment{1,2,3}_{position,value}`
+curve), `<p>_friction_*`, `<p>_forcelimit_min/max`, `<p>_gforce_*`,
+`<p>_motor_vibration_*` (PitHouse's own motor test; `_balance` has no
+counterpart at all), and the device-wide `force_max_coef`, `pressure_weight`,
+`enter_sleep_time`, `game_mode`. The un-prefixed `machinelimit_*`,
+`softlimit_hardness_*`, `damping_*`, `friction_*`, `forcelimit_min` are
+device-wide copies of the per-pedal keys — the importer reads the prefixed ones
+because those say which pedal they belong to.
+
+Every one of these is listed with its value and a reason in the wizard's "Not
+imported" card; `PitHouseMotorMapper.SweepUnhandled` is the backstop, so a key
+PitHouse adds later still surfaces rather than vanishing.
+
+### Open questions
+
+- **`<prefix>_channlRoleType` semantics are unresolved.** In both samples the
+  *populated* section reads `2` (`brake_channlRoleType: 2` in `Brake.json`,
+  `throttle_channlRoleType: 2` in `Throttle.json`) while the other two read 1
+  and 3. That is inconsistent with the plugin's own `MBoosterRole` enum
+  (1=Throttle, 2=Brake, 3=Clutch), so the field is *not* simply the section's
+  role. Two files can't settle it — the importer marks the key considered and
+  ignores it, using the extended-key test above instead. More samples (a clutch
+  preset, or presets from a differently-wired rig) would resolve this.
+- **`stroke_curve` (6 floats) + `forces_curve` (7 floats) look like one
+  force-vs-travel curve.** `brake_stroke_curve` spans 36.4–43.6, the same range
+  as `brake_machinelimit_min/max` (⇒ likely **mm**); `brake_forces_curve` spans
+  16.1–47.0, the same range as `brake_forcelimit_min/max` (11/47, ⇒ likely
+  **kg**). The throttle preset's equivalents are lighter throughout
+  (4.3–12.0 kg vs the brake's 16–47), which is what a throttle-vs-brake pedal
+  pair should look like. The plugin's `mbooster-brake-curve7-1..6` family
+  (`0xAB`, 6 selectors, fed by `ResampleCurveAtSevenths`) is a shape candidate
+  for `stroke_curve`, but curve7 is always *derived* from `(CurveX, CurveY)`
+  and has no settings field of its own, so this stays unmapped until a capture
+  confirms it.
+
 ## Source-of-truth files in this repo
 
 - Protocol primitives — [`Protocol/MozaMBoosterProtocol.cs`](../../../Protocol/MozaMBoosterProtocol.cs)
@@ -1410,3 +1548,4 @@ color in the theme was a true blue distinct from Cyan.
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
 - Profile storage — [`UI/MozaProfile.cs`](../../../UI/MozaProfile.cs) (`MBoosterSettings` dict)
 - UI tab — [`UI/SettingsControl.xaml`](../../../UI/SettingsControl.xaml) (`MBoosterTab`) + handlers in `SettingsControl.xaml.cs` under "mBooster tab — multi-device"
+- PitHouse preset import — [`UI/Import/PitHousePedalsMapper.cs`](../../../UI/Import/PitHousePedalsMapper.cs) + wizard [`UI/Import/PitHouseImportControl.xaml.cs`](../../../UI/Import/PitHouseImportControl.xaml.cs)

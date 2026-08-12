@@ -689,6 +689,8 @@ namespace MozaPlugin.Resources
         public static string Import_Label_Folder => Get("Import_Label_Folder");
         public static string Import_Label_Preset => Get("Import_Label_Preset");
         public static string Import_Label_Profile => Get("Import_Label_Profile");
+        public static string Import_Label_SubjectRole => Get("Import_Label_SubjectRole");
+        public static string Import_Label_ApplyTo => Get("Import_Label_ApplyTo");
         public static string Import_Label_Changes => Get("Import_Label_Changes");
         public static string Import_NoMotorPresets => Get("Import_NoMotorPresets");
         public static string Import_NoPedalsPresets => Get("Import_NoPedalsPresets");

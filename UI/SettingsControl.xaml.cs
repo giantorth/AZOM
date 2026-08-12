@@ -1717,12 +1717,9 @@ namespace MozaPlugin
 
         // ===== FFB Equalizer handlers =====
 
-        private static readonly string[] EqCommands = {
-            "base-equalizer1", "base-equalizer2", "base-equalizer3",
-            "base-equalizer4", "base-equalizer5", "base-equalizer6",
-            "base-equalizer7", "base-equalizer8", "base-equalizer9",
-            "base-equalizer10"
-        };
+        // EQ write commands in register order. Shared with the AZOM step
+        // actions so the button macros and the bindings drive identical values.
+        private static readonly string[] EqCommands = BaseSettingCatalog.EqRegisterCommands;
 
         private void Eq1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq1Value, "%", v => { _data.Equalizer1 = v; _plugin.WriteIfBaseConnected(EqCommands[0], v); });
         private void Eq2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq2Value, "%", v => { _data.Equalizer2 = v; _plugin.WriteIfBaseConnected(EqCommands[1], v); });
@@ -1738,12 +1735,7 @@ namespace MozaPlugin
         // 10-band mappings in FREQUENCY order (5/10/15/25/30/40/50/60/80/100 Hz)
         // — the new registers interleave. Keep in sync with the FfbEqualizer10
         // slider binding in SettingsControl.Redesign.cs.
-        private static readonly string[] Eq10Commands = {
-            "base-equalizer1", "base-equalizer7", "base-equalizer2",
-            "base-equalizer3", "base-equalizer8", "base-equalizer4",
-            "base-equalizer9", "base-equalizer5", "base-equalizer10",
-            "base-equalizer6"
-        };
+        private static readonly string[] Eq10Commands = BaseSettingCatalog.Eq10FreqOrderCommands;
         private Slider[] Eq10Sliders() => new[] {
             Eq1Slider, Eq7Slider, Eq2Slider, Eq3Slider, Eq8Slider,
             Eq4Slider, Eq9Slider, Eq5Slider, Eq10Slider, Eq6Slider };
@@ -1818,24 +1810,11 @@ namespace MozaPlugin
         // Values in frequency order 5/10/15/25/30/40/50/60/80/100 Hz. On
         // legacy firmware only the six old registers are written (columns
         // via Eq6FreqColumns) — the four new bands are skipped.
-        private static readonly int[][] EqSensitivityPresets =
-        {
-            new[] { 100, 100,  30,  10,   0,   0,   0,   0,   0,   0 },
-            new[] { 100, 100,  60,  20,  10,   0,   0,   0,   0,   0 },
-            new[] { 100, 100,  70,  40,  30,  10,   0,   0,   0,   0 },
-            new[] { 100, 100,  80,  50,  40,  20,  10,  10,   0,   0 },
-            new[] { 100, 100,  90,  60,  50,  30,  20,  20,  10,   0 },
-            new[] { 100, 100, 100,  70,  60,  40,  30,  30,  10,   0 },
-            new[] { 100, 100, 100,  90,  80,  50,  40,  40,  20,   0 },
-            new[] { 100, 100, 100, 100,  90,  60,  60,  60,  40,   0 },
-            new[] { 100, 100, 100, 100,  90,  80,  80,  80,  60,   0 },
-            new[] { 100, 100, 100, 100, 100, 100, 100, 100,  80,   0 },
-            new[] { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 },
-        };
+        private static readonly int[][] EqSensitivityPresets = BaseSettingCatalog.EqSensitivityPresets;
 
         // Frequency-order columns carried by the legacy registers Eq1..Eq6
         // (5/15/25/40/60/100 Hz).
-        private static readonly int[] Eq6FreqColumns = { 0, 2, 3, 5, 7, 9 };
+        private static readonly int[] Eq6FreqColumns = BaseSettingCatalog.Eq6FreqColumns;
 
         private void EqSensitivity_Click(object sender, RoutedEventArgs e)
         {
@@ -2863,18 +2842,7 @@ namespace MozaPlugin
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(c.Identity);
                         int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
                         string deviceLabel = BuildMBoosterComboLabel(c);
-
-                        // Which axes are ACTUALLY wired. The HID interface
-                        // commonly reports 3 axes (Rx/Ry/Rz) regardless of how
-                        // many pedals are physically connected — IsAxisConnected
-                        // (from the "PD Linked" firmware diagnostic, or the
-                        // SubDeviceCount/axis-0 fallback before it arrives) is
-                        // the only way to tell which are real.
-                        var connectedAxes = new List<int>();
-                        for (int axis = 0; axis < axisCount && axis < MBoosterDeviceController.MaxAxes; axis++)
-                        {
-                            if (c.IsAxisConnected(axis)) connectedAxes.Add(axis);
-                        }
+                        var connectedAxes = c.ConnectedAxisIndices();
 
                         // Only label rows "— Pedal N" when this device genuinely
                         // hosts more than one wired pedal — not just because its
@@ -3155,23 +3123,11 @@ namespace MozaPlugin
         /// and creating an empty entry here would orphan it — see
         /// MBoosterDeviceController.SoleConnectedAxis. Null if no device
         /// selected. Covers effects + calibration + sim input + pedal feel.</summary>
-        private IMBoosterPedalConfig? CurrentMBoosterEffectTarget()
-        {
-            var s = CurrentMBoosterSettings();
-            if (s == null) return null;
-            if (_mboosterEffectPedalIndex <= 0) return s;
-            if (!s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p))
-            {
-                if (CurrentMBoosterController()?.SoleConnectedAxis() == _mboosterEffectPedalIndex)
-                    return s;
-                // Copy-on-write: publish a NEW dictionary via atomic reference
-                // swap rather than mutating in place, so the 50 Hz effect worker
-                // threads reading s.Pedals never see a dictionary mid-resize.
-                p = new MBoosterPedalSettings();
-                s.Pedals = new Dictionary<int, MBoosterPedalSettings>(s.Pedals) { [_mboosterEffectPedalIndex] = p };
-            }
-            return p;
-        }
+        private IMBoosterPedalConfig? CurrentMBoosterEffectTarget() =>
+            MozaMBoosterRegistry.GetOrCreatePedalConfig(
+                CurrentMBoosterSettings(),
+                _mboosterEffectPedalIndex,
+                CurrentMBoosterController()?.SoleConnectedAxis() ?? -1);
 
         /// <summary>The per-pedal config for the selected pedal WITHOUT creating a
         /// missing entry — used when seeding controls so merely viewing a chained
@@ -3179,16 +3135,11 @@ namespace MozaPlugin
         /// Same sole-connected-pedal flat-fields fallback as
         /// <see cref="CurrentMBoosterEffectTarget"/> so seeding shows the config
         /// that pedal actually runs with.</summary>
-        private IMBoosterPedalConfig? PeekMBoosterEffectTarget()
-        {
-            var s = CurrentMBoosterSettings();
-            if (s == null) return null;
-            if (_mboosterEffectPedalIndex <= 0) return s;
-            if (s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p)) return p;
-            if (CurrentMBoosterController()?.SoleConnectedAxis() == _mboosterEffectPedalIndex)
-                return s;
-            return null;
-        }
+        private IMBoosterPedalConfig? PeekMBoosterEffectTarget() =>
+            MozaMBoosterRegistry.PeekPedalConfig(
+                CurrentMBoosterSettings(),
+                _mboosterEffectPedalIndex,
+                CurrentMBoosterController()?.SoleConnectedAxis() ?? -1);
 
         /// <summary>Seed the eight vibration-effect cards' controls from one
         /// pedal's effect settings. Assumes the event suppressor is active. Brake

@@ -901,6 +901,48 @@ namespace MozaPlugin.Devices
             }
         }
 
+        /// <summary>
+        /// The full per-pedal config object for one axis of a lane, creating a
+        /// missing chained-pedal entry on demand: the master's flat fields for
+        /// axis 0, else <see cref="MBoosterDeviceSettings.Pedals"/>[axis].
+        /// A lane whose SOLE connected pedal is this (non-zero) axis with no
+        /// per-pedal entry gets the flat fields instead (and never creates the
+        /// entry) — that's where the config landed while the UI still showed the
+        /// axis-0 row, and creating an empty entry here would orphan it. See
+        /// <see cref="MBoosterDeviceController.SoleConnectedAxis"/>.
+        /// </summary>
+        internal static IMBoosterPedalConfig? GetOrCreatePedalConfig(
+            MBoosterDeviceSettings? s, int axisIndex, int soleConnectedAxis)
+        {
+            if (s == null) return null;
+            if (axisIndex <= 0) return s;
+            if (!s.Pedals.TryGetValue(axisIndex, out var p))
+            {
+                if (soleConnectedAxis == axisIndex) return s;
+                // Copy-on-write: publish a NEW dictionary via atomic reference
+                // swap rather than mutating in place, so the 50 Hz effect worker
+                // threads reading s.Pedals never see a dictionary mid-resize.
+                p = new MBoosterPedalSettings();
+                s.Pedals = new Dictionary<int, MBoosterPedalSettings>(s.Pedals) { [axisIndex] = p };
+            }
+            return p;
+        }
+
+        /// <summary>
+        /// Same resolution as <see cref="GetOrCreatePedalConfig"/> but WITHOUT
+        /// creating a missing chained-pedal entry — for read-only callers
+        /// (control seeding, import previews) so merely looking at a pedal never
+        /// persists an empty entry. Null when that pedal has no config yet.
+        /// </summary>
+        internal static IMBoosterPedalConfig? PeekPedalConfig(
+            MBoosterDeviceSettings? s, int axisIndex, int soleConnectedAxis)
+        {
+            if (s == null) return null;
+            if (axisIndex <= 0) return s;
+            if (s.Pedals.TryGetValue(axisIndex, out var p)) return p;
+            return soleConnectedAxis == axisIndex ? s : null;
+        }
+
         private void LogCollisionOnce(string role, string identity)
         {
             string key = role + ":" + identity;

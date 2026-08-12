@@ -602,6 +602,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>ΦΑΚΕΛΟΣ</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>ΠΡΟΕΠΙΛΟΓΗ</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>ΠΡΟΦΙΛ</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>ΠΕΝΤΑΛ</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>ΕΦΑΡΜΟΓΗ ΣΕ</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>ΑΛΛΑΓΕΣ</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// δεν υπάρχουν προεπιλογές Motor σε αυτόν τον φάκελο</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// δεν υπάρχουν προεπιλογές Pedals σε αυτόν τον φάκελο</value></data>
