@@ -597,6 +597,8 @@ Id : {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>DOSSIER</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>PRÉRÉGLAGE</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFIL</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PÉDALE</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APPLIQUER À</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>MODIFICATIONS</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// aucun préréglage Motor dans ce dossier</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// aucun préréglage Pedals dans ce dossier</value></data>

@@ -597,6 +597,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>文件夹</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>预设</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>配置文件</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>踏板</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>应用于</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>更改</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// 此文件夹中没有 Motor 预设</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// 此文件夹中没有 Pedals 预设</value></data>

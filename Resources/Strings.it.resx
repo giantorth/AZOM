@@ -600,6 +600,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>CARTELLA</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>PRESET</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFILO</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDALE</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APPLICA A</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>MODIFICHE</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// nessun preset Motor in questa cartella</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// nessun preset Pedals in questa cartella</value></data>

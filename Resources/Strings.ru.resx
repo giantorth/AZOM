@@ -597,6 +597,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>ПАПКА</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>ПРЕСЕТ</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>ПРОФИЛЬ</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>ПЕДАЛЬ</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>ПРИМЕНИТЬ К</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>ИЗМЕНЕНИЯ</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// в этой папке нет пресетов Motor</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// в этой папке нет пресетов Pedals</value></data>

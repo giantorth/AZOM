@@ -2839,27 +2839,8 @@ namespace MozaPlugin
                     {
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(c.Identity);
                         int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
-                        var connected = c.ConnectedAxes;
                         string deviceLabel = BuildMBoosterComboLabel(c);
-
-                        // Which axes are ACTUALLY wired. The HID interface
-                        // commonly reports 3 axes (Rx/Ry/Rz) regardless of how
-                        // many pedals are physically connected — ConnectedAxes
-                        // (from the "PD Linked" firmware diagnostic) is the
-                        // only way to tell which are real. Until that
-                        // diagnostic arrives (null), assume only axis 0 is
-                        // real: the common case is a standalone single pedal,
-                        // and a genuine chain's extra axes appear as soon as
-                        // the diagnostic confirms them, instead of showing
-                        // phantom pedals from the very first refresh.
-                        var connectedAxes = new List<int>();
-                        for (int axis = 0; axis < axisCount && axis < MBoosterDeviceController.MaxAxes; axis++)
-                        {
-                            bool axisKnownConnected = connected != null && axis < connected.Length
-                                ? connected[axis]
-                                : axis == 0;
-                            if (axisKnownConnected) connectedAxes.Add(axis);
-                        }
+                        var connectedAxes = c.ConnectedAxisIndices();
 
                         // Only label rows "— Pedal N" when this device genuinely
                         // hosts more than one wired pedal — not just because its
@@ -3128,23 +3109,11 @@ namespace MozaPlugin
         /// and creating an empty entry here would orphan it — see
         /// MBoosterDeviceController.SoleConnectedAxis. Null if no device
         /// selected. Covers effects + calibration + sim input + pedal feel.</summary>
-        private IMBoosterPedalConfig? CurrentMBoosterEffectTarget()
-        {
-            var s = CurrentMBoosterSettings();
-            if (s == null) return null;
-            if (_mboosterEffectPedalIndex <= 0) return s;
-            if (!s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p))
-            {
-                if (CurrentMBoosterController()?.SoleConnectedAxis() == _mboosterEffectPedalIndex)
-                    return s;
-                // Copy-on-write: publish a NEW dictionary via atomic reference
-                // swap rather than mutating in place, so the 50 Hz effect worker
-                // threads reading s.Pedals never see a dictionary mid-resize.
-                p = new MBoosterPedalSettings();
-                s.Pedals = new Dictionary<int, MBoosterPedalSettings>(s.Pedals) { [_mboosterEffectPedalIndex] = p };
-            }
-            return p;
-        }
+        private IMBoosterPedalConfig? CurrentMBoosterEffectTarget() =>
+            MozaMBoosterRegistry.GetOrCreatePedalConfig(
+                CurrentMBoosterSettings(),
+                _mboosterEffectPedalIndex,
+                CurrentMBoosterController()?.SoleConnectedAxis() ?? -1);
 
         /// <summary>The per-pedal config for the selected pedal WITHOUT creating a
         /// missing entry — used when seeding controls so merely viewing a chained
@@ -3152,16 +3121,11 @@ namespace MozaPlugin
         /// Same sole-connected-pedal flat-fields fallback as
         /// <see cref="CurrentMBoosterEffectTarget"/> so seeding shows the config
         /// that pedal actually runs with.</summary>
-        private IMBoosterPedalConfig? PeekMBoosterEffectTarget()
-        {
-            var s = CurrentMBoosterSettings();
-            if (s == null) return null;
-            if (_mboosterEffectPedalIndex <= 0) return s;
-            if (s.Pedals.TryGetValue(_mboosterEffectPedalIndex, out var p)) return p;
-            if (CurrentMBoosterController()?.SoleConnectedAxis() == _mboosterEffectPedalIndex)
-                return s;
-            return null;
-        }
+        private IMBoosterPedalConfig? PeekMBoosterEffectTarget() =>
+            MozaMBoosterRegistry.PeekPedalConfig(
+                CurrentMBoosterSettings(),
+                _mboosterEffectPedalIndex,
+                CurrentMBoosterController()?.SoleConnectedAxis() ?? -1);
 
         /// <summary>Seed the eight vibration-effect cards' controls from one
         /// pedal's effect settings. Assumes the event suppressor is active. Brake

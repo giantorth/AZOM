@@ -780,6 +780,30 @@ namespace MozaPlugin.Devices
             return count == 1 ? sole : -1;
         }
 
+        /// <summary>
+        /// HID axis indices of the pedals this lane ACTUALLY hosts. The HID
+        /// interface commonly reports 3 axes (Rx/Ry/Rz) regardless of how many
+        /// pedals are physically connected — <see cref="ConnectedAxes"/> (from
+        /// the "PD Linked" firmware diagnostic) is the only way to tell which
+        /// are real. Until that diagnostic arrives (null), only axis 0 counts:
+        /// the common case is a standalone single pedal, and a genuine chain's
+        /// extra axes appear as soon as the diagnostic confirms them instead of
+        /// showing phantom pedals. Shared by the mBooster tab's row list and the
+        /// PitHouse import wizard's target list so both show the same pedals.
+        /// </summary>
+        public List<int> ConnectedAxisIndices()
+        {
+            int axisCount = AxisCount > 0 ? AxisCount : 1;
+            var connected = _connectedAxes;
+            var axes = new List<int>();
+            for (int axis = 0; axis < axisCount && axis < MaxAxes; axis++)
+            {
+                bool known = connected != null && axis < connected.Length ? connected[axis] : axis == 0;
+                if (known) axes.Add(axis);
+            }
+            return axes;
+        }
+
         /// <summary>Short identity slug for capture labels / log lines — last 8 chars of instance id.</summary>
         public static string ShortIdentity(string identity)
         {

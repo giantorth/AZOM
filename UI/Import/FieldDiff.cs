@@ -44,6 +44,33 @@ namespace MozaPlugin.UI.Import
         public string? FatalError { get; set; }
 
         /// <summary>
+        /// Which pedal role(s) a Pedals preset actually configures, for the
+        /// confirm header — a PitHouse preset carries all three role sections
+        /// but only fills in its own. Null on the Motor path.
+        /// See <see cref="PitHousePedalsMapper.DetectSubjectPrefixes"/>.
+        /// </summary>
+        public string? SubjectRoleDisplay { get; set; }
+
+        /// <summary>
+        /// True when each of a Pedals preset's sections was matched to the pedal
+        /// carrying its own role, rather than one section going to one chosen
+        /// pedal — either because the preset has no discernible subject role (a
+        /// plain calibration snapshot) or because it configures more than one.
+        /// The wizard hides the "Apply to" selector in that case: retargeting
+        /// has no single meaning when several sections are in play.
+        /// </summary>
+        public bool AutoMatchedPerRole { get; set; }
+
+        /// <summary>
+        /// The pedal a Pedals preset's subject section was mapped onto — either
+        /// the caller's override or the auto-picked pedal carrying the subject
+        /// role. Null on the Motor path, on a calibration-only preset (every
+        /// section auto-matched to its own pedal), and when no attached pedal
+        /// carries the role. The wizard uses it to preselect the "Apply to" combo.
+        /// </summary>
+        public MBoosterImportTarget? ResolvedTarget { get; set; }
+
+        /// <summary>
         /// mBooster controllers whose settings were touched by one or more
         /// diffs in this plan. After all diffs have been applied, the caller
         /// must invoke <c>MozaPlugin.ApplyMBoosterToHardware(controller,

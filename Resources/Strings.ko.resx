@@ -596,6 +596,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>폴더</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>프리셋</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>프로필</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>페달</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>적용 대상</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>변경 사항</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// 이 폴더에 Motor 프리셋이 없습니다</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// 이 폴더에 Pedals 프리셋이 없습니다</value></data>
