@@ -224,6 +224,25 @@ off:  0    1    2    3  4   5  6   7  8   9 10  11 12  13 14  15  16  17
 
 **Param-store wedge (failure mode, 2026-08-06 crash bundles).** The wheel's parameter subsystem can wedge: every param read fails (`Table N: Failed to Read Parameter M` sweeps across Tables 2/3/7) and a pending Table 7 Param 6 write retries ~1 Hz forever (`Table Id 7, ParamAddr 6: Failed to Write`, often split across two `0x0E` frames). The comm MCU keeps answering (polls, logs, identity) but the **display goes dark and stays dark until the wheel is power-cycled** — host reconnects don't help. No host command sustains the loop (zero `g32` traffic during the wedge); the retry is firmware-internal. The plugin detects the signature from the `0x0E` log and surfaces a PARAM-STORE FAULT line in diagnostics.
 
+**Read-only variant + the flash-write budget (2026-08-11 bundles, FSR1 on R12).** A second wedge instance refines the picture. Signature was **0 failed writes / ~1,750 failed reads** — no stuck `Table 7 Param 6` write at all, so the wedge can present read-only. Each of Tables 2/3/7 sweeps params **0..127** on its own cursor (588/588/584 failures ≈ 4.6 sweeps), all three failing from the same instant.
+
+The whole session issued only **four** wheel flash writes, and the wedge began **33 s after the last one**:
+
+| time | write | source |
+|---|---|---|
+| 23:06:59.842 | `Table 2, Param 24 = 2` | connect-time `ApplyWheelToHardware` burst (8 group-`0x3F` cmds `1c/1d/1d/1c/20/21/22/24` in 26 ms) |
+| 23:07:00.735 | `Table 2, Param 47 = 16770560` | same burst — `0xFFE600` is the `wheel-idle-color` RGB `ff e6 00`, so **Param 47 = idle colour** |
+| 23:07:39.298 | `Table 2, Param 43 = 300000` | user set sleep timeout 15→5 min, so **Param 43 = idle timeout (ms)** |
+| 23:07:45.049 | `Table 2, Param 43 = 180000` | user set sleep timeout 5→3 min |
+| 23:08:17.785 | `Table 2: Failed to Read Parameter 24` | wedge begins; cleared only by the 23:27:10 base power-cycle |
+
+The firmware self-dedupes: 8 commands produced 2 flash writes (the other 6 already matched). The `0x42` display stream contributed **zero** param writes — its pending+coalesce+1 Hz gate works.
+
+Two host-side causes were fixed off the back of this:
+
+- **`PrimeWheelCfgFromDevice` is inert on the FSR1.** It primes the write cache from the wheel's readback, but `DeviceProber.BuildNewWheelLedReadCommands` returns an empty list for this rim (by design — its LED read burst is what storms the store). Across the whole 60 s startup capture the plugin **read 5 wheel params and wrote 8**; only `wheel-telemetry-mode` is both primable and read. So the connect-time apply now skips the flash-backed family entirely on an FSR1 (`HardwareApplier.SuppressApplyFlashCfgWrites`), matching PitHouse, which never writes this family on connect and only writes on a user edit.
+- **UI handlers bypassed the change-cache.** `WriteIfWheelDetected` and friends went straight to the wire, so every dropdown/slider interaction was an unconditional flash write *and* a later apply re-wrote the same value because the cache had never seen it. They now share the cache and are coalesced behind a 400 ms quiet window (`QueueWheelCfgWrite`), so a slider drag costs one write instead of ~50 — and a drag that ends where it started costs none.
+
 **Full index→type map — verified.** Built by correlating every `g32/81` select + `Param 6` log with the `0x42` record type(s) streamed until the next switch, across `All dashboards`, `Moza FSR1 dashboard change`, `FS1 multiple changes`, `GT Style`, and the manual-change captures (`tools/` ad-hoc windowed correlation):
 
 | index | type | index | type | index | type |

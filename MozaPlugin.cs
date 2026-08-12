@@ -903,9 +903,7 @@ namespace MozaPlugin
         /// display-probe gates in StartTelemetryIfReady and (b) put TelemetrySender
         /// into <see cref="Telemetry.TelemetrySender.Fsr1Mode"/>.
         /// </summary>
-        internal bool IsFsr1DisplayWheel =>
-            (_data?.WheelHwVersion?.StartsWith("RS21-D03", StringComparison.OrdinalIgnoreCase) ?? false)
-            || string.Equals(_data?.WheelModelName, "FSR", StringComparison.OrdinalIgnoreCase);
+        internal bool IsFsr1DisplayWheel => _data?.IsFsr1DisplayWheel ?? false;
 
         internal bool ShouldDriveDashboard()
         {
@@ -1593,6 +1591,7 @@ namespace MozaPlugin
             // Halt the AB9 engine-vib worker before disposing the AB9 manager.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
             try { _baseLfeWorker?.Stop(); _baseLfeWorker = null; } catch { }
+            try { _hardwareApplier?.Shutdown(); } catch { }
             // Release the timer-resolution request + power-throttling opt-out.
             try { _responsiveness?.Dispose(); _responsiveness = null; } catch { }
             // Dispose every mBooster controller — same reason: stop workers
@@ -2498,6 +2497,9 @@ namespace MozaPlugin
             // keeps shutdown deterministic.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
             try { _baseLfeWorker?.Stop(); _baseLfeWorker = null; } catch { }
+            // Drop the coalescing timer for flash-backed wheel writes. Anything still
+            // parked is already in the profile, so the next connect's apply carries it.
+            try { _hardwareApplier?.Shutdown(); } catch { }
             // Release the timer-resolution request + power-throttling opt-out on
             // shutdown/reload so neither leaks past the plugin's lifetime.
             try { _responsiveness?.Dispose(); _responsiveness = null; } catch { }
