@@ -20,6 +20,13 @@ namespace MozaPlugin.Protocol
         // with this effect type. Uses a materially different payload shape
         // from the other four — see BuildRoadTextureFrame.
         RoadTexture = 9,
+        // G-Force (Inertial Pedal Feel) — reverse-engineered from four real
+        // Pit House "Test" USB captures at different Max Travel/Response
+        // Speed settings (see docs/protocol/devices/mbooster.md "G-Force").
+        // Not a vibration waveform at all: a sustained, directional TRAVEL
+        // OFFSET target the firmware moves the pedal to and holds — see
+        // BuildGForceFrame.
+        GForce = 6,
     }
 
     /// <summary>
@@ -157,6 +164,57 @@ namespace MozaPlugin.Protocol
             frame[10] = (byte)(noiseRaw & 0xFF);
             frame[11] = (byte)(intensityRaw >> 8);
             frame[12] = (byte)(intensityRaw & 0xFF);
+            frame[13] = MozaProtocol.CalculateWireChecksum(frame, 13);
+            return frame;
+        }
+
+        /// <summary>
+        /// Build the motor-write frame for the G-Force (Inertial Pedal Feel)
+        /// effect — effect type 6, a genuinely different mechanism from
+        /// every other mBooster effect: not a vibration waveform, but a
+        /// sustained, directional TRAVEL OFFSET target the firmware moves
+        /// the pedal to and holds, at a firmware-side ramp rate set by
+        /// <paramref name="responseSpeedRaw"/>. Reverse-engineered from four
+        /// real Pit House "Test" captures at different Max Travel/Response
+        /// Speed settings (see docs/protocol/devices/mbooster.md "G-Force"):
+        /// <pre>
+        /// 7e  09  24  12   b1  06  EN   RH  RL   FH  FL   BH  BL   CK
+        ///                  │   │   │    └─┴─response speed u16 BE
+        ///                  │   │   │              └─┴─forward offset u16 BE
+        ///                  │   │   │                         └─┴─backward offset u16 BE
+        ///                  │   │   └ enable (0 = off, 1 = on)
+        ///                  │   └ effect type (6 = G-Force)
+        ///                  └ cmd id (0xb1)
+        /// </pre>
+        /// Exactly one of forward/backward is non-zero at a time in every
+        /// observed capture (the other is 0x0000) — Pit House's own "Test"
+        /// alternates between the two on a fixed cadence to demonstrate both
+        /// directions; a live effect instead holds enable=1 continuously and
+        /// updates whichever slot matches the sign of live longitudinal G
+        /// every tick (see MBoosterEffectWorker.ProcessGForceEffect). Both
+        /// value fields share <see cref="EncodeAmp"/>'s exact
+        /// "round(frac01*65535)" formula, verified against 4 data points
+        /// each: response speed 100%/50%/15% -> 0xFFFF/0x7FFF/0x2666 (exact);
+        /// travel 15mm/10mm/2.5mm (against the wire's fixed 15mm full-scale
+        /// range — see MBoosterUiConstants.GForceMaxTravelMaxMm) ->
+        /// 0xFFFF/0xAAAA/0x2AAA (exact).
+        /// </summary>
+        public static byte[] BuildGForceFrame(bool enable, ushort responseSpeedRaw, ushort forwardRaw, ushort backwardRaw, byte device = DeviceMotor)
+        {
+            var frame = new byte[14];
+            frame[0]  = MozaProtocol.MessageStart;
+            frame[1]  = MotorPayloadLen;
+            frame[2]  = GroupMotorWrite;
+            frame[3]  = device;
+            frame[4]  = CmdMotorWrite;
+            frame[5]  = (byte)MBoosterEffectId.GForce;
+            frame[6]  = enable ? (byte)1 : (byte)0;
+            frame[7]  = (byte)(responseSpeedRaw >> 8);
+            frame[8]  = (byte)(responseSpeedRaw & 0xFF);
+            frame[9]  = (byte)(forwardRaw >> 8);
+            frame[10] = (byte)(forwardRaw & 0xFF);
+            frame[11] = (byte)(backwardRaw >> 8);
+            frame[12] = (byte)(backwardRaw & 0xFF);
             frame[13] = MozaProtocol.CalculateWireChecksum(frame, 13);
             return frame;
         }
@@ -340,6 +398,135 @@ namespace MozaPlugin.Protocol
         {
             if (raw <= 0) return 0;
             return raw * 10.0 / 65535.0;
+        }
+
+        /// <summary>
+        /// Pit House "Natural Friction" encoding — reverse-engineered from
+        /// two real Pit House USB captures (wire commands
+        /// <c>mbooster-brake-friction-0</c>/<c>-1</c>, cmdId 0xAE with a
+        /// selector byte; see docs/protocol/devices/mbooster.md "Pedal
+        /// Feel"). Fixed 0-100% scale over the 0-65535 range: <c>raw =
+        /// round(pct * 65535 / 100)</c>. Verified against a 0/25/50/75/100%
+        /// sweep (0x0000/0x4000/0x8000/0xbfff/0xffff, all exact) and cross-
+        /// checked against the firmware's own debug log in a second capture,
+        /// which echoed the disabled write as fixed-point 0.0 and the
+        /// enabled write (slider at 100%) as fixed-point 1.0 — confirming
+        /// there is no separate wire enable bit; turning the feature off
+        /// just writes raw 0.
+        /// </summary>
+        public static int EncodeFrictionPct(double pct)
+        {
+            if (double.IsNaN(pct) || pct <= 0) return 0;
+            double raw = Math.Round(pct * 65535.0 / 100.0);
+            if (raw <= 0) return 0;
+            if (raw >= 0xFFFF) return 0xFFFF;
+            return (int)raw;
+        }
+
+        /// <summary>Inverse of <see cref="EncodeFrictionPct"/>.</summary>
+        public static double DecodeFrictionPct(int raw)
+        {
+            if (raw <= 0) return 0;
+            return raw * 100.0 / 65535.0;
+        }
+
+        /// <summary>Segmented Damping cmdId (0xB7). See <see cref="BuildSegmentedDampingFrame"/>.</summary>
+        public const byte CmdSegmentedDamping = 0xb7;
+        /// <summary>Segmented Damping payload length: cmd byte + 10 x 2-byte fields = 21 (0x15).</summary>
+        public const byte SegmentedDampingPayloadLen = 0x15;
+
+        /// <summary>
+        /// Same 0-100% encoding as <see cref="EncodeFrictionPct"/>
+        /// (<c>raw = round(pct * 65535 / 100)</c>) — kept as its own named
+        /// pair since it serves a structurally different command
+        /// (Segmented Damping's fixed 10-field frame vs Natural Friction's
+        /// prefix+selector commands), matching this file's convention of a
+        /// dedicated Encode/Decode pair per reverse-engineered feature.
+        /// </summary>
+        public static int EncodeSegmentedDampingPct(double pct)
+        {
+            if (double.IsNaN(pct) || pct <= 0) return 0;
+            double raw = Math.Round(pct * 65535.0 / 100.0);
+            if (raw <= 0) return 0;
+            if (raw >= 0xFFFF) return 0xFFFF;
+            return (int)raw;
+        }
+
+        /// <summary>Inverse of <see cref="EncodeSegmentedDampingPct"/>.</summary>
+        public static double DecodeSegmentedDampingPct(int raw)
+        {
+            if (raw <= 0) return 0;
+            return raw * 100.0 / 65535.0;
+        }
+
+        /// <summary>
+        /// Build the write frame for Segmented Damping — cmdId 0xB7,
+        /// reverse-engineered from real Pit House USB captures (see
+        /// docs/protocol/devices/mbooster.md "Segmented Damping"). ONE
+        /// fixed 21-byte payload carries the ENTIRE feature's state —
+        /// both "When Pressed" and "When Released" — as 10 big-endian
+        /// u16 fields in this exact order:
+        /// <pre>
+        /// 7e  15  24  12   b7  D1PH D1PL D2PH D2PL  D1RH D1RL D2RH D2RL
+        ///                  │   └──┴─Div1Pressed  └──┴─Div2Pressed
+        ///                  │        └──┴─Div1Released    └──┴─Div2Released
+        ///                  └ cmd id (0xb7)
+        ///     S1PH S1PL S1RH S1RL  S2PH S2PL S2RH S2RL  S3PH S3PL S3RH S3RL  CK
+        ///     └──┴─Seg1Pressed └──┴─Seg1Released
+        ///               └──┴─Seg2Pressed └──┴─Seg2Released
+        ///                         └──┴─Seg3Pressed └──┴─Seg3Released
+        /// </pre>
+        /// Every capture write resent the WHOLE frame — including fields
+        /// unrelated to whatever the user was actually dragging in that
+        /// capture — confirming this is always a full snapshot, never a
+        /// partial update. Each field's IDENTITY is independently verified
+        /// against its own isolated capture's 0/25/50/.../100%-style sweep
+        /// (e.g. Seg2Pressed's raw values track its capture's 0/22/57/100%
+        /// points closely — 0x0000/0x3852/0x91ec/0xffff). The two DIVIDER
+        /// fields per pair (typed values) landed exactly on
+        /// round(pct*65535/100) every time; the SEGMENT (Y-axis, mouse-
+        /// dragged) values are consistently within ~1 raw unit of that
+        /// formula rather than exact — expected, since a drag lands on
+        /// whatever pixel row the mouse happened to stop at (e.g. ~57.002%),
+        /// not a clean typed percentage; the filename's round numbers are
+        /// approximate labels, not exact wire values. All 10 fields share
+        /// <see cref="EncodeSegmentedDampingPct"/>.
+        /// </summary>
+        public static byte[] BuildSegmentedDampingFrame(
+            double div1Pressed, double div2Pressed, double div1Released, double div2Released,
+            double seg1Pressed, double seg1Released,
+            double seg2Pressed, double seg2Released,
+            double seg3Pressed, double seg3Released,
+            byte device = DeviceMotor)
+        {
+            var frame = new byte[26]; // 7e + len + group + device + 21 payload + checksum
+            frame[0] = MozaProtocol.MessageStart;
+            frame[1] = SegmentedDampingPayloadLen;
+            frame[2] = GroupMotorWrite;
+            frame[3] = device;
+            frame[4] = CmdSegmentedDamping;
+
+            ushort[] fields =
+            {
+                (ushort)EncodeSegmentedDampingPct(div1Pressed),
+                (ushort)EncodeSegmentedDampingPct(div2Pressed),
+                (ushort)EncodeSegmentedDampingPct(div1Released),
+                (ushort)EncodeSegmentedDampingPct(div2Released),
+                (ushort)EncodeSegmentedDampingPct(seg1Pressed),
+                (ushort)EncodeSegmentedDampingPct(seg1Released),
+                (ushort)EncodeSegmentedDampingPct(seg2Pressed),
+                (ushort)EncodeSegmentedDampingPct(seg2Released),
+                (ushort)EncodeSegmentedDampingPct(seg3Pressed),
+                (ushort)EncodeSegmentedDampingPct(seg3Released),
+            };
+            int off = 5;
+            foreach (var f in fields)
+            {
+                frame[off++] = (byte)(f >> 8);
+                frame[off++] = (byte)(f & 0xFF);
+            }
+            frame[25] = MozaProtocol.CalculateWireChecksum(frame, 25);
+            return frame;
         }
 
         /// <summary>

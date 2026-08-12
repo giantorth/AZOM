@@ -738,7 +738,7 @@ namespace MozaControls
             geom.Freeze();
             SetValue(CurveGeometryKey, geom);
 
-            UpdateLiveMarker(segments, plotW, PadTop + plotH);
+            UpdateLiveMarker(segments, pts, plotW, PadTop + plotH);
 
             // ---- Background grid (4 interior horizontal + 4 vertical lines) ----
             // Vertical lines scale with the rightmost node fraction so they
@@ -841,41 +841,79 @@ namespace MozaControls
 
         /// <summary>
         /// Position the live indicator (see <see cref="LiveX"/>) exactly ON
-        /// the already-built spline: map the data-space X to a pixel X via
-        /// the same XAxisLabels/XLabelFractions correspondence used for tick
-        /// labels, find which segment contains it, then invert that
-        /// segment's Bezier X(t) via bisection (same approach as
+        /// the already-built spline: map the data-space X to a pixel X, find
+        /// which segment contains it, then invert that segment's Bezier X(t)
+        /// via bisection (same approach as
         /// MozaMBoosterRegistry.EvaluateInputCurve) to read off both the
-        /// pixel X and Y at that point.
+        /// pixel X and Y at that point — i.e. the dot always sits ON the
+        /// curve as currently configured, not just sliding horizontally.
         /// </summary>
-        private void UpdateLiveMarker((Point p1, Point c1, Point c2, Point p2)[] segments, double plotW, double axisBottomY)
+        private void UpdateLiveMarker((Point p1, Point c1, Point c2, Point p2)[] segments, Point[] nodePts, double plotW, double axisBottomY)
         {
             double liveX = LiveX;
             bool placed = false;
 
             if (!double.IsNaN(liveX) && segments.Length > 0)
             {
-                double[] fracs = ParseFractions(XLabelFractions, new[] { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 });
-                string[] rawLabels = ParseLabels(XAxisLabels);
-                int n = Math.Min(fracs.Length, rawLabels.Length);
-                var values = new double[n];
-                bool parsedOk = n >= 2;
-                for (int i = 0; parsedOk && i < n; i++)
-                    parsedOk = double.TryParse(rawLabels[i], NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]);
+                bool haveTarget;
+                double targetPixelX = 0;
 
-                if (parsedOk)
+                if (AllowHorizontalDrag && nodePts.Length > 0)
                 {
-                    double clampedX = Math.Max(values[0], Math.Min(values[n - 1], liveX));
-                    int lo = 0;
+                    // Nodes are user-draggable in X (see ApplyDrag) — the
+                    // fixed XAxisLabels/XLabelFractions correspondence below
+                    // only matches the DEFAULT (undragged) breakpoints, so
+                    // once the user configures a node's X, that mapping no
+                    // longer reflects the actual plotted curve. Map liveX to
+                    // a pixel X from the node's OWN current (dataX, pixelX)
+                    // pairs instead — both axes are affine in a node's own
+                    // fraction, so linear interpolation between two known
+                    // node pairs reproduces the true mapping exactly whether
+                    // or not it's been dragged from its default.
+                    double[] dataXs = { X1, X2, X3, X4, X5 };
+                    int n = Math.Min(nodePts.Length, dataXs.Length);
+                    double clampedX = Math.Max(0, Math.Min(dataXs[n - 1], liveX));
+                    double x0 = 0, px0 = PadLeft, x1 = dataXs[0], px1 = nodePts[0].X;
                     for (int i = 0; i < n - 1; i++)
                     {
-                        if (clampedX >= values[i] && clampedX <= values[i + 1]) { lo = i; break; }
+                        if (clampedX >= dataXs[i] && clampedX <= dataXs[i + 1])
+                        {
+                            x0 = dataXs[i]; px0 = nodePts[i].X;
+                            x1 = dataXs[i + 1]; px1 = nodePts[i + 1].X;
+                            break;
+                        }
                     }
-                    double t0 = values[lo], t1 = values[lo + 1];
-                    double f0 = fracs[lo], f1 = fracs[lo + 1];
-                    double frac = t1 > t0 ? f0 + (clampedX - t0) / (t1 - t0) * (f1 - f0) : f0;
-                    double targetPixelX = PadLeft + Math.Max(0, Math.Min(1, frac)) * plotW;
+                    targetPixelX = x1 > x0 ? px0 + (clampedX - x0) / (x1 - x0) * (px1 - px0) : px0;
+                    haveTarget = true;
+                }
+                else
+                {
+                    double[] fracs = ParseFractions(XLabelFractions, new[] { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 });
+                    string[] rawLabels = ParseLabels(XAxisLabels);
+                    int n = Math.Min(fracs.Length, rawLabels.Length);
+                    var values = new double[n];
+                    bool parsedOk = n >= 2;
+                    for (int i = 0; parsedOk && i < n; i++)
+                        parsedOk = double.TryParse(rawLabels[i], NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]);
 
+                    if (parsedOk)
+                    {
+                        double clampedX = Math.Max(values[0], Math.Min(values[n - 1], liveX));
+                        int lo = 0;
+                        for (int i = 0; i < n - 1; i++)
+                        {
+                            if (clampedX >= values[i] && clampedX <= values[i + 1]) { lo = i; break; }
+                        }
+                        double t0 = values[lo], t1 = values[lo + 1];
+                        double f0 = fracs[lo], f1 = fracs[lo + 1];
+                        double frac = t1 > t0 ? f0 + (clampedX - t0) / (t1 - t0) * (f1 - f0) : f0;
+                        targetPixelX = PadLeft + Math.Max(0, Math.Min(1, frac)) * plotW;
+                    }
+                    haveTarget = parsedOk;
+                }
+
+                if (haveTarget)
+                {
                     int segIdx = segments.Length - 1;
                     for (int i = 0; i < segments.Length; i++)
                     {

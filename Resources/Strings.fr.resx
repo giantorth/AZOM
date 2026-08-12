@@ -148,6 +148,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Début / Fin de Course (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Rigidité de butée avant</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Rigidité de butée de fin</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simule une force de friction indépendante de la sortie du jeu.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>AMORTISSEMENT SEGMENTÉ</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Force d'amortissement indépendante de la sortie du jeu, par segment de course de pédale</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simule une force d'amortissement indépendante de la sortie du jeu. La course de la pédale est divisée en plusieurs segments, chacun avec une plage réglable et son propre amortissement naturel. Faites glisser un diviseur pour redimensionner un segment ; faites glisser à l'intérieur d'un segment pour régler sa quantité d'amortissement.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>À l'Appui</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Au Relâchement</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>MAPPAGE D'ENTRÉE SIM</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// mappe le signal de la cellule de charge/pédale vers le jeu, à la manière de Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Seuil maximal (kg)</value></data>

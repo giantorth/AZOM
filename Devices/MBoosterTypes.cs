@@ -92,6 +92,48 @@ namespace MozaPlugin.Devices
         // .ProcessCustomEffect — so the frequency range matches Engine's.
         public const float CustomEffectFreqMinHz = 5f;
         public const float CustomEffectFreqMaxHz = 200f;
+
+        // G-Force (Inertial Pedal Feel) — Max Pedal Travel slider bounds,
+        // matching Pit House's own "Max Pedal Travelment" control exactly
+        // (0-15mm — reverse-engineered from capture, see
+        // MozaMBoosterProtocol.BuildGForceFrame). This is also the wire
+        // protocol's fixed full-scale denominator: the encoded travel
+        // fraction is always relative to 15mm, not to some other range.
+        public const float GForceMaxTravelMinMm = 0f;
+        public const float GForceMaxTravelMaxMm = 15f;
+
+        // G-Force's Response Speed slider bounds, matching Pit House's own
+        // control exactly (0-100%). Sent to the firmware every frame — it's
+        // not host-side smoothing, the device itself ramps toward the
+        // commanded offset at this rate.
+        public const float GForceResponseSpeedMinPct = 0f;
+        public const float GForceResponseSpeedMaxPct = 100f;
+
+        // Segmented Damping — divider bounds per Pit House's own UI (each
+        // divider has its OWN independent min/max, unlike a plain dual-
+        // thumb range): Divider1 stays within [10, 80], Divider2 within
+        // [20, 90], and the two may never be adjusted within 10% of each
+        // other. Shared by both "When Pressed" and "When Released" (each
+        // has its own independent pair of dividers, same bounds). See
+        // MozaControls.MozaSegmentedBarEditor and
+        // docs/protocol/devices/mbooster.md "Segmented Damping".
+        public const double SegDampDivider1MinPct = 10.0;
+        public const double SegDampDivider1MaxPct = 80.0;
+        public const double SegDampDivider2MinPct = 20.0;
+        public const double SegDampDivider2MaxPct = 90.0;
+        public const double SegDampDividerMinGapPct = 10.0;
+
+        // Factory defaults, reverse-engineered from a recurring untouched
+        // baseline across multiple independent captures (5+ sessions each
+        // for Pressed and Released) — used as the fallback whenever a
+        // MBoosterSegmentedDampingSettings field is still the -1 "not set"
+        // sentinel, so a fresh profile displays a sensible starting layout
+        // without writing anything until the user actually drags a control.
+        public const float SegDampDivider1PressedDefaultPct = 33f;
+        public const float SegDampDivider2PressedDefaultPct = 67f;
+        public const float SegDampDivider1ReleasedDefaultPct = 20f;
+        public const float SegDampDivider2ReleasedDefaultPct = 70f;
+        public const float SegDampSegDefaultPct = 0f;
     }
 
     /// <summary>
@@ -197,6 +239,22 @@ namespace MozaPlugin.Devices
         // matches the wheelbase's own GearshiftDebounceMs default.
         public int DebounceMs { get; set; } = 500;
 
+        // G-Force-only (Experimental), millimeters (MBoosterUiConstants
+        // .GForceMaxTravelMinMm/MaxMm) — how far the pedal pushes at 100%
+        // commanded G, matching Pit House's own "Max Pedal Travelment"
+        // slider exactly. Sent every frame as a fraction of the wire's
+        // fixed 15mm full scale — see MBoosterEffectWorker.ProcessGForceEffect
+        // and MozaMBoosterProtocol.BuildGForceFrame.
+        public float MaxTravelMm { get; set; } = 10f;
+
+        // G-Force-only (Experimental), 0..100 (MBoosterUiConstants
+        // .GForceResponseSpeedMinPct/MaxPct) — how fast the firmware ramps
+        // the pedal toward the newly commanded offset, matching Pit House's
+        // own "Response Speed" slider exactly. Unlike every other
+        // Intensity/Frequency knob this isn't host-side shaping — the raw
+        // percentage is sent straight to the device every frame.
+        public int ResponseSpeedPct { get; set; } = 50;
+
         public MBoosterEffectSettings Clone() =>
             new MBoosterEffectSettings
             {
@@ -209,6 +267,66 @@ namespace MozaPlugin.Devices
                 BrakeFadeOnsetC = BrakeFadeOnsetC,
                 VibrateOnNeutral = VibrateOnNeutral,
                 DebounceMs = DebounceMs,
+                MaxTravelMm = MaxTravelMm,
+                ResponseSpeedPct = ResponseSpeedPct,
+            };
+    }
+
+    /// <summary>
+    /// Segmented Damping (Pedal Feel) — Pit House's "simulate a damping
+    /// force independent of in-game output, dividing pedal travel into
+    /// multiple segments with adjustable range and its own natural
+    /// damping" feature. Reverse-engineered from real Pit House USB
+    /// captures (see docs/protocol/devices/mbooster.md "Segmented
+    /// Damping"): ONE wire command (cmdId 0xB7) carries the ENTIRE
+    /// feature's state — both the "When Pressed" and "When Released"
+    /// curves — as 10 fields in a fixed order, sent as a whole snapshot
+    /// on every edit to any one of them (see
+    /// MozaMBoosterProtocol.BuildSegmentedDampingFrame). Both "When
+    /// Pressed" and "When Released" have their own UI plot; unset fields
+    /// fall back to Pit House's own factory defaults (reverse-engineered
+    /// from a recurring untouched baseline across multiple captures)
+    /// until the user actually edits them.
+    /// -1 = "not yet set / no override", same sentinel convention as
+    /// EndstopFrontStiffness/NaturalFrictionPct — a fresh profile writes
+    /// nothing until the user actually drags a divider or segment.
+    /// </summary>
+    public sealed class MBoosterSegmentedDampingSettings
+    {
+        // Two dividers split 0-100% pedal travel into 3 segments. Bounds
+        // and the 10% minimum gap between them are Pit House's own
+        // (MBoosterUiConstants.SegDampDivider1Min/Max etc.) — Divider1 and
+        // Divider2 are independent from their *Released counterparts
+        // below (confirmed from capture: dragging one pair's dividers
+        // never changed the other pair's wire field).
+        public float Divider1Pressed { get; set; } = -1;
+        public float Divider2Pressed { get; set; } = -1;
+        // Damping amount (0-100%) applied within each of the 3 segments
+        // while the pedal is being pressed.
+        public float Seg1Pressed { get; set; } = -1;
+        public float Seg2Pressed { get; set; } = -1;
+        public float Seg3Pressed { get; set; } = -1;
+
+        // "When Released" — same shape, own UI plot (see class summary).
+        public float Divider1Released { get; set; } = -1;
+        public float Divider2Released { get; set; } = -1;
+        public float Seg1Released { get; set; } = -1;
+        public float Seg2Released { get; set; } = -1;
+        public float Seg3Released { get; set; } = -1;
+
+        public MBoosterSegmentedDampingSettings Clone() =>
+            new MBoosterSegmentedDampingSettings
+            {
+                Divider1Pressed = Divider1Pressed,
+                Divider2Pressed = Divider2Pressed,
+                Seg1Pressed = Seg1Pressed,
+                Seg2Pressed = Seg2Pressed,
+                Seg3Pressed = Seg3Pressed,
+                Divider1Released = Divider1Released,
+                Divider2Released = Divider2Released,
+                Seg1Released = Seg1Released,
+                Seg2Released = Seg2Released,
+                Seg3Released = Seg3Released,
             };
     }
 
@@ -286,6 +404,7 @@ namespace MozaPlugin.Devices
         MBoosterEffectSettings TractionControl { get; set; }
         MBoosterEffectSettings WheelSpin { get; set; }
         MBoosterEffectSettings GearShift { get; set; }
+        MBoosterEffectSettings GForce { get; set; }
         System.Collections.Generic.List<MBoosterCustomEffect> CustomEffects { get; set; }
     }
 
@@ -317,6 +436,8 @@ namespace MozaPlugin.Devices
         float TravelEndMm { get; set; }
         float EndstopFrontStiffness { get; set; }
         float EndstopEndStiffness { get; set; }
+        float NaturalFrictionPct { get; set; }
+        MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
     }
 
     /// <summary>
@@ -350,6 +471,8 @@ namespace MozaPlugin.Devices
         public float TravelEndMm { get; set; } = -1;
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
+        public float NaturalFrictionPct { get; set; } = -1;
+        public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
         public MBoosterEffectSettings Abs { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
@@ -360,6 +483,7 @@ namespace MozaPlugin.Devices
         public MBoosterEffectSettings TractionControl { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
         public MBoosterEffectSettings WheelSpin { get; set; } = new MBoosterEffectSettings { FrequencyHz = 30 };
         public MBoosterEffectSettings GearShift { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
+        public MBoosterEffectSettings GForce { get; set; } = new MBoosterEffectSettings { MaxTravelMm = 10, ResponseSpeedPct = 50 };
         public List<MBoosterCustomEffect> CustomEffects { get; set; } = new List<MBoosterCustomEffect>();
 
         public MBoosterPedalSettings Clone() =>
@@ -379,6 +503,8 @@ namespace MozaPlugin.Devices
                 TravelEndMm = TravelEndMm,
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
+                NaturalFrictionPct = NaturalFrictionPct,
+                SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
@@ -387,6 +513,7 @@ namespace MozaPlugin.Devices
                 TractionControl = TractionControl?.Clone() ?? new MBoosterEffectSettings(),
                 WheelSpin = WheelSpin?.Clone() ?? new MBoosterEffectSettings(),
                 GearShift = GearShift?.Clone() ?? new MBoosterEffectSettings(),
+                GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
                 CustomEffects = CustomEffects?.Select(c => c.Clone()).ToList() ?? new List<MBoosterCustomEffect>(),
             };
     }
@@ -452,6 +579,15 @@ namespace MozaPlugin.Devices
         // Traction Control/Wheel Spin (no verified wire effect type of its
         // own — see MBoosterEffectWorker.ProcessGearShiftEffect).
         public MBoosterEffectSettings GearShift { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
+        // G-Force (Inertial Pedal Feel) — Experimental. NOT a vibration
+        // effect: a sustained, directional pedal travel offset scaled by
+        // live longitudinal G (MBoosterTelemetrySnapshot.LongitudinalG),
+        // reverse-engineered from real Pit House "Test" captures (see
+        // docs/protocol/devices/mbooster.md "G-Force"). MaxTravelMm and
+        // ResponseSpeedPct mirror Pit House's own two sliders exactly; see
+        // MBoosterEffectWorker.UpdateGForceRequest/ProcessGForceEffect and
+        // MozaMBoosterProtocol.BuildGForceFrame.
+        public MBoosterEffectSettings GForce { get; set; } = new MBoosterEffectSettings { MaxTravelMm = 10, ResponseSpeedPct = 50 };
         // FrequencyHz defaults to 55 — the exact value from the "known-good"
         // real Pit House capture (docs/protocol/devices/mbooster.md:
         // "Lockup on, 55 Hz, start of ramp").
@@ -608,6 +744,25 @@ namespace MozaPlugin.Devices
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
 
+        // Natural Friction (Pit House-style), 0-100%. Real hardware write
+        // (not host-side-only like Deadzone/MaxForce) — reverse-engineered
+        // from two real Pit House USB captures (a toggle on/off, and a
+        // 0/25/50/75/100% slider sweep): wire commands
+        // mbooster-brake-friction-0/-1 (cmdId 0xAE with a selector byte,
+        // always written together with the same value), 2-byte int, fixed
+        // 0-100% scale over 0-65535 — see
+        // MozaMBoosterProtocol.EncodeFrictionPct/DecodeFrictionPct and
+        // docs/protocol/devices/mbooster.md "Pedal Feel". -1 = "not yet set
+        // / no override", same sentinel convention as
+        // TravelStartMm/EndstopFrontStiffness, so a fresh profile never
+        // overwrites whatever value is already on the device.
+        public float NaturalFrictionPct { get; set; } = -1;
+
+        // Segmented Damping (Pit House-style) — see
+        // MBoosterSegmentedDampingSettings and
+        // docs/protocol/devices/mbooster.md "Segmented Damping".
+        public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
+
         // Friendly display label the user can edit (defaults to "mBooster"
         // with a serial-tail fallback). Survives reconnects with the dict key.
         public string DisplayName { get; set; } = "";
@@ -625,6 +780,7 @@ namespace MozaPlugin.Devices
                 TractionControl = TractionControl?.Clone() ?? new MBoosterEffectSettings(),
                 WheelSpin = WheelSpin?.Clone() ?? new MBoosterEffectSettings(),
                 GearShift = GearShift?.Clone() ?? new MBoosterEffectSettings(),
+                GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
                 Engine = Engine?.Clone() ?? new MBoosterEffectSettings(),
@@ -645,6 +801,8 @@ namespace MozaPlugin.Devices
                 TravelEndMm = TravelEndMm,
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
+                NaturalFrictionPct = NaturalFrictionPct,
+                SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 DisplayName = DisplayName,
             };
         }
@@ -679,6 +837,13 @@ namespace MozaPlugin.Devices
         // this is a proxy for road-surface roughness used by Road Texture.
         // See docs/protocol/devices/mbooster.md "Road Texture".
         public readonly double SuspensionHeaveG;
+        // Longitudinal chassis acceleration, in G — SimHub's
+        // StatusDataBase.AccelerationSurge (nullable; 0 when a game doesn't
+        // report it). Positive = accelerating, negative = braking. Drives
+        // the G-Force (Inertial Pedal Feel) effect — see
+        // MBoosterEffectWorker.UpdateGForceRequest and
+        // docs/protocol/devices/mbooster.md "G-Force".
+        public readonly double LongitudinalG;
         // Peak brake temperature across all 4 corners, normalized to
         // Celsius regardless of the game's reported TemperatureUnit —
         // sourced from StatusDataBase.BrakesTemperatureMax (nullable; 0
@@ -710,7 +875,7 @@ namespace MozaPlugin.Devices
         public MBoosterTelemetrySnapshot(
             bool gameRunning, double rpm, double maxRpm, double idleRpm, double brake, double throttle,
             bool absActive, bool tcActive,
-            double vehicleSpeedMs, double avgWheelSpeedMs, double suspensionHeaveG,
+            double vehicleSpeedMs, double avgWheelSpeedMs, double suspensionHeaveG, double longitudinalG,
             double brakeTempC, int gearShiftSeq, bool gearIsNeutral)
         {
             GameRunning = gameRunning;
@@ -724,12 +889,13 @@ namespace MozaPlugin.Devices
             VehicleSpeedMs = vehicleSpeedMs;
             AvgWheelSpeedMs = avgWheelSpeedMs;
             SuspensionHeaveG = suspensionHeaveG;
+            LongitudinalG = longitudinalG;
             BrakeTempC = brakeTempC;
             GearShiftSeq = gearShiftSeq;
             GearIsNeutral = gearIsNeutral;
         }
 
         public static readonly MBoosterTelemetrySnapshot Empty =
-            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, 0, 0, 0, 0, false);
+            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, 0, 0, 0, 0, 0, false);
     }
 }

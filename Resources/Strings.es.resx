@@ -153,6 +153,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Inicio / Fin del Recorrido (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Rigidez del límite frontal</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Rigidez del límite final</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simula una fuerza de fricción independiente de la salida del juego.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>AMORTIGUACIÓN SEGMENTADA</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Fuerza de amortiguación independiente de la salida del juego, por segmento de recorrido del pedal</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simula una fuerza de amortiguación independiente de la salida del juego. El recorrido del pedal se divide en varios segmentos, cada uno con un rango ajustable y su propia amortiguación natural. Arrastra un divisor para redimensionar un segmento; arrastra dentro de un segmento para ajustar su cantidad de amortiguación.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Al Presionar</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Al Soltar</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>MAPEO DE ENTRADA DE SIMULACIÓN</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// mapea la señal de la celda de carga/pedal al juego, al estilo Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Umbral máximo (kg)</value></data>

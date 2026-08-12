@@ -148,6 +148,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Start / Ende des Pedalwegs (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Steifigkeit vorderer Anschlag</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Steifigkeit hinterer Anschlag</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simuliert eine Reibungskraft, die unabhängig von der Spielausgabe ist.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>SEGMENTIERTE DÄMPFUNG</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Dämpfungskraft unabhängig von der Spielausgabe, pro Pedalweg-Segment</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simuliert eine Dämpfungskraft, die unabhängig von der Spielausgabe ist. Der Pedalweg wird in mehrere Segmente unterteilt, jedes mit einstellbarem Bereich und eigener natürlicher Dämpfung. Ziehen Sie einen Teiler, um ein Segment in der Größe zu ändern; ziehen Sie innerhalb eines Segments, um dessen Dämpfungsstärke einzustellen.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Beim Drücken</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Beim Loslassen</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM-EINGABEZUORDNUNG</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// Lastzellen-/Pedalsignal wie in Pit House auf das Spiel abbilden</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Max. Schwellenwert (kg)</value></data>

@@ -187,6 +187,8 @@ namespace MozaPlugin
                 CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterBrakeFadeTestToggle?.IsChecked == true)
                 CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
+            if (MBoosterGForceTestToggle?.IsChecked == true)
+                CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
             StopAllCustomEffectTests();
             // SDK CoAP server fires RecentRequestAppended on its receive
             // thread; unsubscribe so a torn-down SettingsControl can be GC'd
@@ -2853,7 +2855,12 @@ namespace MozaPlugin
                             string label = multiplePedals
                                 ? $"{deviceLabel} — {string.Format(Strings.Label_PedalAxis, shown)}"
                                 : deviceLabel;
-                            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, axisCount);
+                            // Resolve against the CONNECTED axis count, not the
+                            // raw HID axis count — a chain-capable hub exposes
+                            // all 3 GenericDesktop axes even with only one pedal
+                            // plugged in, so raw axisCount would silently override
+                            // that pedal's own Role with the axis-order default.
+                            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, connectedAxes.Count);
                             bool isSelected = string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                                 && axis == _mboosterEffectPedalIndex;
                             _mboosterDeviceRows.Add(new MBoosterDeviceRow(c.Identity, axis, label, isSelected, role,
@@ -2869,7 +2876,12 @@ namespace MozaPlugin
                         var rowController = registry.FindByIdentity(row.Identity);
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(row.Identity);
                         int axisCount = rowController != null && rowController.AxisCount > 0 ? rowController.AxisCount : 1;
-                        row.RoleIndex = (int)global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, axisCount);
+                        if (axisCount > MBoosterDeviceController.MaxAxes) axisCount = MBoosterDeviceController.MaxAxes;
+                        int connectedAxisCount = 0;
+                        if (rowController != null)
+                            for (int axis = 0; axis < axisCount; axis++)
+                                if (rowController.IsAxisConnected(axis)) connectedAxisCount++;
+                        row.RoleIndex = (int)global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, connectedAxisCount);
                         row.IsSelected = string.Equals(row.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                             && row.AxisIndex == _mboosterEffectPedalIndex;
                         // DisplayName is per-profile like every other mBooster
@@ -2981,6 +2993,8 @@ namespace MozaPlugin
                 CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterBrakeFadeTestToggle.IsChecked == true)
                 CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
+            if (MBoosterGForceTestToggle.IsChecked == true)
+                CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
             StopAllCustomEffectTests();
             _mboosterSelectedIdentity = identity;
             _mboosterEffectPedalIndex = axisIndex;
@@ -3189,6 +3203,12 @@ namespace MozaPlugin
             MBoosterRoadTextureSmoothness.Value = fx?.RoadTexture?.SmoothnessPct ?? 50;
             SetValueText(MBoosterRoadTextureSmoothnessValue, (fx?.RoadTexture?.SmoothnessPct ?? 50).ToString());
             MBoosterRoadTextureTestToggle.IsChecked = false;
+            MBoosterGForceEnable.IsChecked = fx?.GForce?.Enabled ?? false;
+            MBoosterGForceMaxTravel.Value = fx?.GForce?.MaxTravelMm ?? 10;
+            SetValueText(MBoosterGForceMaxTravelValue, MBoosterGForceMaxTravel.Value.ToString("0.#"));
+            MBoosterGForceResponseSpeed.Value = fx?.GForce?.ResponseSpeedPct ?? 50;
+            SetValueText(MBoosterGForceResponseSpeedValue, (fx?.GForce?.ResponseSpeedPct ?? 50).ToString());
+            MBoosterGForceTestToggle.IsChecked = false;
         }
 
         /// <summary>Seed the Calibration, Sim Input Mapping and Pedal Feel controls
@@ -3244,6 +3264,22 @@ namespace MozaPlugin
             SetValueText(MBoosterDeadzoneValue, (fx?.DeadzoneKg ?? 0).ToString("F1"));
             MBoosterMaxForceSlider.Value = fx?.MaxForceKg ?? 200;
             SetValueText(MBoosterMaxForceValue, (fx?.MaxForceKg ?? 200).ToString("F0"));
+            float nf = fx?.NaturalFrictionPct ?? -1;
+            MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
+            SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
+
+            var sd = fx?.SegmentedDamping;
+            MBoosterSegDampPressedPlot.Divider1 = (sd?.Divider1Pressed ?? -1) >= 0 ? sd!.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct;
+            MBoosterSegDampPressedPlot.Divider2 = (sd?.Divider2Pressed ?? -1) >= 0 ? sd!.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct;
+            MBoosterSegDampPressedPlot.Seg1Value = (sd?.Seg1Pressed ?? -1) >= 0 ? sd!.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampPressedPlot.Seg2Value = (sd?.Seg2Pressed ?? -1) >= 0 ? sd!.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampPressedPlot.Seg3Value = (sd?.Seg3Pressed ?? -1) >= 0 ? sd!.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
+
+            MBoosterSegDampReleasedPlot.Divider1 = (sd?.Divider1Released ?? -1) >= 0 ? sd!.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct;
+            MBoosterSegDampReleasedPlot.Divider2 = (sd?.Divider2Released ?? -1) >= 0 ? sd!.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct;
+            MBoosterSegDampReleasedPlot.Seg1Value = (sd?.Seg1Released ?? -1) >= 0 ? sd!.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampReleasedPlot.Seg2Value = (sd?.Seg2Released ?? -1) >= 0 ? sd!.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct;
+            MBoosterSegDampReleasedPlot.Seg3Value = (sd?.Seg3Released ?? -1) >= 0 ? sd!.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct;
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()
@@ -3937,6 +3973,50 @@ namespace MozaPlugin
             CurrentMBoosterController()?.SetBrakeFadeTestActive(MBoosterBrakeFadeTestToggle.IsChecked == true);
         }
 
+        private void MBoosterGForceEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GForce ??= new MBoosterEffectSettings()).Enabled = MBoosterGForceEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        // 0-15mm, half-mm steps (matches Pit House's own "Max Pedal
+        // Travelment" slider) — see MBoosterEffectSettings.MaxTravelMm.
+        private void MBoosterGForceMaxTravel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            double v = Math.Round(e.NewValue * 2) / 2.0;
+            v = Math.Max(MBoosterUiConstants.GForceMaxTravelMinMm, Math.Min(MBoosterUiConstants.GForceMaxTravelMaxMm, v));
+            MBoosterGForceMaxTravelValue.Text = v.ToString("0.#");
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GForce ??= new MBoosterEffectSettings()).MaxTravelMm = (float)v;
+            _plugin.SaveSettings();
+        }
+        // 0-100% — sent to the firmware unshaped every frame (it does the
+        // actual ramping, not the plugin) — see
+        // MBoosterEffectSettings.ResponseSpeedPct.
+        private void MBoosterGForceResponseSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterGForceResponseSpeedValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.GForce ??= new MBoosterEffectSettings()).ResponseSpeedPct = v;
+            _plugin.SaveSettings();
+        }
+        // Sustained test toggle — alternates the commanded travel offset
+        // forward/backward, mirroring Pit House's own "Test" demo (bypasses
+        // Enabled and the game-running gate). See
+        // MBoosterDeviceController.SetGForceTestActive.
+        private void MBoosterGForceTestToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            CurrentMBoosterController()?.SetGForceTestActive(MBoosterGForceTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
+        }
+
         // ===== Calibration (experimental) ===================================
 
         private void MBoosterDirCheck_Changed(object sender, RoutedEventArgs e)
@@ -4285,6 +4365,111 @@ namespace MozaPlugin
                 // control specifically, applied on the same-root-cause theory.
                 controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
             });
+
+        // Natural Friction (0-100%) — simulates a frictional force
+        // independent of game output. Reverse-engineered from two real Pit
+        // House USB captures (a toggle on/off, and a 0/25/50/75/100% slider
+        // sweep — see docs/protocol/devices/mbooster.md "Pedal Feel"): wire
+        // cmdId 0xAE, sharing the same "prefix bytes + selector" shape as
+        // End Stop Stiffness (0xB2). Every capture write sent BOTH
+        // selectors with the IDENTICAL value in the same burst, so this
+        // control always writes mbooster-brake-friction-0 and -1 together
+        // rather than exposing them as separate sliders. There is no
+        // separate wire enable bit — the capture's toggle-off write simply
+        // sent raw 0 (confirmed via the firmware's own debug log echoing
+        // it as fixed-point 0.0).
+        private void MBoosterNaturalFrictionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+            OnIntSliderChanged(e.NewValue, MBoosterNaturalFrictionValue, "", v =>
+            {
+                var s = CurrentMBoosterEffectTarget();
+                if (s == null) return;
+                s.NaturalFrictionPct = v;
+                var controller = CurrentMBoosterController();
+                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+                int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(v);
+                controller?.SendIntWrite("mbooster-brake-friction-0", raw, dev);
+                controller?.SendIntWrite("mbooster-brake-friction-1", raw, dev);
+                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+                // and MBoosterDeviceController.PushCurve7Resync; untested for this
+                // control specifically, applied on the same-root-cause theory.
+                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+            });
+
+        // Segmented Damping — "When Pressed". Reverse-engineered from real
+        // Pit House USB captures (see docs/protocol/devices/mbooster.md
+        // "Segmented Damping"): a SINGLE wire command (cmdId 0xB7) carries
+        // the entire feature's state — both "When Pressed" and "When
+        // Released" — as one 10-field snapshot, so every edit here must
+        // resend all 10 fields, not just the ones this plot owns. The
+        // "*Released" fields have no UI yet; they're sent using Pit
+        // House's own factory defaults (or whatever was last saved) until
+        // "When Released" gets its own plot.
+        private void MBoosterSegDampPressedPlot_ValuesChanged(object sender, EventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            var sd = s.SegmentedDamping ??= new MBoosterSegmentedDampingSettings();
+            sd.Divider1Pressed = (float)MBoosterSegDampPressedPlot.Divider1;
+            sd.Divider2Pressed = (float)MBoosterSegDampPressedPlot.Divider2;
+            sd.Seg1Pressed = (float)MBoosterSegDampPressedPlot.Seg1Value;
+            sd.Seg2Pressed = (float)MBoosterSegDampPressedPlot.Seg2Value;
+            sd.Seg3Pressed = (float)MBoosterSegDampPressedPlot.Seg3Value;
+            PushSegmentedDamping(s, sd);
+        }
+
+        // Segmented Damping — "When Released". Same shared wire command as
+        // "When Pressed" (see that handler and docs/protocol/devices/
+        // mbooster.md "Segmented Damping") — every edit here ALSO resends
+        // the current Pressed fields alongside the updated Released ones,
+        // since the frame is always a whole-feature snapshot.
+        private void MBoosterSegDampReleasedPlot_ValuesChanged(object sender, EventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            var sd = s.SegmentedDamping ??= new MBoosterSegmentedDampingSettings();
+            sd.Divider1Released = (float)MBoosterSegDampReleasedPlot.Divider1;
+            sd.Divider2Released = (float)MBoosterSegDampReleasedPlot.Divider2;
+            sd.Seg1Released = (float)MBoosterSegDampReleasedPlot.Seg1Value;
+            sd.Seg2Released = (float)MBoosterSegDampReleasedPlot.Seg2Value;
+            sd.Seg3Released = (float)MBoosterSegDampReleasedPlot.Seg3Value;
+            PushSegmentedDamping(s, sd);
+        }
+
+        /// <summary>
+        /// Save + send the ONE Segmented Damping wire frame (cmdId 0xB7)
+        /// covering both "When Pressed" and "When Released" — shared by
+        /// both plots' change handlers since either one touching its own
+        /// half still has to resend the other half's current values (the
+        /// wire command has no partial-update form). Not-yet-set fields
+        /// (-1 sentinel) fall back to Pit House's own factory defaults, same
+        /// as <see cref="MozaPlugin.ApplyMBoosterToHardware"/> does on connect.
+        /// </summary>
+        private void PushSegmentedDamping(IMBoosterPedalConfig s, MBoosterSegmentedDampingSettings sd)
+        {
+            _plugin.SaveSettings();
+
+            var controller = CurrentMBoosterController();
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            var frame = global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
+                sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
+                sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
+                sd.Divider1Released >= 0 ? sd.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
+                sd.Divider2Released >= 0 ? sd.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
+                sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg1Released >= 0 ? sd.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                dev);
+            controller?.SendOneShot(frame);
+            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
+            // and MBoosterDeviceController.PushCurve7Resync; untested for this
+            // control specifically, applied on the same-root-cause theory.
+            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+        }
 
         private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)
         {
