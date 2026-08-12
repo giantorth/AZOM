@@ -3743,6 +3743,24 @@ namespace MozaPlugin
         // (fast identity). See the hot-swap block in PollStatus.
         private const int WheelModelRecheckInterval = WheelMissThreshold - 1;
         private int _wheelModelRecheckTick;
+
+        // Flash-backed wheel settings whose readback value can seed the write cache
+        // 1:1 (scalar int, same encoding on the write path), so an apply that matches
+        // what the wheel already holds writes nothing to its parameter flash.
+        // Deliberately excludes the composite-key params (idle-speed = mode<<32|ms,
+        // idle-color = packed RGB) and every colour ARRAY — a mis-encoded prime there
+        // would silently swallow a real user edit.
+        private static readonly System.Collections.Generic.HashSet<string> s_primableWheelCfg =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal)
+            {
+                "wheel-idle-mode", "wheel-idle-timeout",
+                "wheel-telemetry-idle-effect", "wheel-buttons-idle-effect", "wheel-knob-idle-effect",
+                "wheel-telemetry-mode", "wheel-buttons-led-mode", "wheel-knob-led-mode",
+                "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-knob-ring-brightness",
+                "wheel-rpm-indicator-mode", "wheel-rpm-display-mode",
+            };
+
+        private static bool IsPrimableWheelCfg(string name) => s_primableWheelCfg.Contains(name);
         // One-shot log edge for the param-storm suspend (see PollStatusCore).
         private bool _paramStormLogged;
 
@@ -4581,6 +4599,16 @@ namespace MozaPlugin
 
             // Persist wheel-reported sleep-bundle values so next launch reapplies them.
             _profileCoordinator.SeedSleepBundleFromResponse(r);
+
+            // Prime the persistent-write cache from the wheel's own readback so an
+            // apply whose values already match writes nothing to its flash. Only the
+            // scalar flash-backed params are primed here — their write-path encoding is
+            // the raw int, so device value and write value are directly comparable.
+            // (idle-speed / idle-color pack mode+ms and RGB into composite keys; they
+            // are left alone rather than risk a mis-encoded prime silently swallowing a
+            // real user change.) See HardwareApplier.PrimeWheelCfgFromDevice.
+            if (r.Name != null && r.IntValue >= 0 && IsPrimableWheelCfg(r.Name))
+                _hardwareApplier.PrimeWheelCfgFromDevice(r.Name, r.IntValue);
 
             // Extended LED group presence: any response from a group proves it exists.
             if (r.Name != null)

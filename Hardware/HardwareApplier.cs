@@ -68,6 +68,26 @@ namespace MozaPlugin.Hardware
             return true;
         }
 
+        /// <summary>
+        /// Prime the wheel write cache with a value the WHEEL ITSELF reported, so a
+        /// profile that already matches the device writes nothing. Add-only: never
+        /// overwrites a value we wrote (a real pending change still goes out).
+        ///
+        /// Why: these settings are flash-backed and the wheel persists them across
+        /// power cycles, so re-asserting them at every connect is pure parameter-store
+        /// wear. PitHouse never does it — across four FSR1 captures it issues ZERO
+        /// writes to the idle/sleep-light family (0x3F cmds 1c/1d/1e/20/21/22/24) and
+        /// only ever READS them, writing solely when the user changes a setting in its
+        /// UI. The plugin wrote 8-12 of them per connect. On the FSR1 — whose param
+        /// store wedges into an unrecoverable read-failure storm (wheel-0x17.md
+        /// § Param-store wedge) — that difference is the whole ballgame.
+        /// </summary>
+        internal void PrimeWheelCfgFromDevice(string key, long deviceValue)
+        {
+            SyncWheelCfgCache();
+            if (!_wheelCfgCache.ContainsKey(key)) _wheelCfgCache[key] = deviceValue;
+        }
+
         private static long Fnv(long h, long v) { unchecked { return (h ^ v) * 1099511628211L; } }
 
         private bool WheelCfgChangedArr(string key, int[]? arr)
