@@ -832,6 +832,7 @@ namespace MozaPlugin
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
         internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;
+        internal MozaStandalonePeripheralRegistry? PeripheralRegistry => _peripheralRegistry;
         internal MozaSerialConnection Connection => _connection;
 
         /// <summary>The standalone-USB dashboard connection (CM2 on its own cable), or null.</summary>

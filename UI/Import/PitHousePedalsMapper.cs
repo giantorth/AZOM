@@ -273,7 +273,7 @@ namespace MozaPlugin.UI.Import
                 {
                     MarkRoleSectionConsidered(plan, dp, prefix);
                     plan.NotImported.Add(targets.Count == 0
-                        ? $"{roleLabel}: no mBooster detected"
+                        ? $"{roleLabel}: no mBooster pedal attached"
                         : $"{roleLabel}: no pedal with this role — pick one above");
                     continue;
                 }

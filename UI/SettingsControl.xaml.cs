@@ -2387,6 +2387,9 @@ namespace MozaPlugin
             sb.AppendLine("=== USB detection ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
             sb.AppendLine();
+            sb.AppendLine("=== Standalone peripherals (own USB port) ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildStandalonePeripherals(_plugin, _data));
+            sb.AppendLine();
             sb.AppendLine("=== mBooster pedals ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data));
             sb.AppendLine();
