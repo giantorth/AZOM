@@ -587,6 +587,27 @@ namespace MozaPlugin.Hardware
                 // CS and unidentified wheels (HasSleepLight=false) are skipped.
                 bool hasIdleLed = hasSleepLight;
 
+                // FSR1: never push the idle / sleep-light family from an APPLY (connect,
+                // profile switch, re-detect). This wheel HAS the feature — PitHouse
+                // exposes it and reads those params back — but across every FSR1 capture
+                // PitHouse issues ZERO writes to the family (0x3F cmds 1d/1e/20/21/22/24)
+                // and writes only when the user moves the control in its UI. The wheel
+                // persists the values itself, so an apply that re-asserts them is pure
+                // parameter-store wear on the one rim whose store wedges irrecoverably
+                // (docs wheel-0x17.md § Param-store wedge; 2026-08-13 bundle: 7 writes →
+                // 8 Table-2 param writes at connect, storm 3.4 min later).
+                //
+                // Nothing is lost: the sleep/idle controls write straight through on user
+                // edit via WriteIfWheelDetected / WriteArrayIfWheelDetected /
+                // WriteColorIfWheelDetected (MozaWheelSettingsControl), which is exactly
+                // PitHouse's model. These are also wheel-level prefs (not per-game), so
+                // there is no profile-switch behaviour to preserve here.
+                if (_plugin.IsFsr1DisplayWheel)
+                {
+                    hasIdleLed = false;
+                    hasSleepLight = false;
+                }
+
                 if (telemMode      >= 0            && WheelCfgChangedForApply("wheel-telemetry-mode", telemMode))          _deviceManager.WriteSetting("wheel-telemetry-mode", telemMode);
                 if (idleEffect     >= 0 && hasRpm  && hasIdleLed && WheelCfgChangedForApply("wheel-telemetry-idle-effect", idleEffect)) _deviceManager.WriteSetting("wheel-telemetry-idle-effect", idleEffect);
                 if (btnIdleEffect  >= 0 && hasBtn  && hasIdleLed && WheelCfgChangedForApply("wheel-buttons-idle-effect", btnIdleEffect))_deviceManager.WriteSetting("wheel-buttons-idle-effect", btnIdleEffect);
