@@ -31,7 +31,7 @@ Built using the amazing work of [Boxflat](https://github.com/Lawstorant/boxflat)
 
 ## Why This Exists
 
-MOZA makes excellent sim racing hardware, but their companion software — Pithouse — is Windows-only. Linux users have no official way to manage LED effects or stream telemetry to your wheel's dashboard. SimHub, on the other hand, runs on Linux (via Proton/Wine), opening the door for cross-platform hardware control with built-in telemetry support.
+MOZA makes excellent sim racing hardware, but their companion software — Pithouse — is Windows-only. Linux users have no official way to manage LED effects or stream telemetry to your wheel's dashboard. SimHub, on the other hand, runs on Windows and Linux (via Proton/Wine), opening the door for multi-platform hardware control with built-in telemetry support.
 
 This plugin opens up MOZA hardware to the wider world of SimHub.  Drive your leds using [ATSR-EVO](https://github.com/ATSR-Alex/ATSR-Hub-EVO/) plugin.  Map any data point from the thousands in SimHub to display on your wheel dashboards.
 The goal is to expand the functionality of MOZA devices to a wider audience by providing tools that work across multiple platforms.  
@@ -79,19 +79,17 @@ Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
 ## Videos
 
+Spanish language with English dub and subtitles availble.
+
 <table>
 <tr>
 <td width="50%" valign="top">
 
-Guide about this plugin from an early tester (español and english dubbing)
-[![Youtube Video](https://github.com/user-attachments/assets/5ab8ee11-6bbb-4eee-9e54-dc23a6917681)](https://www.youtube.com/watch?v=iVBn3PWbf4c)
-
+[![Youtube Video](https://github.com/user-attachments/assets/f19a20b7-13ff-4ff5-a23b-b015149d37cb)](https://www.youtube.com/watch?v=apPXgjnGqD0)
 </td>
 <td width="50%" valign="top">
 
-Another video, available in español and english dubbing
-
-[![Youtube Video](https://github.com/user-attachments/assets/fe44c5ac-a63e-4559-b42f-7290884eef12)](https://www.youtube.com/watch?v=HPIme1-_cnQ)
+[![Youtube Video](https://github.com/user-attachments/assets/31d05cff-9009-4954-8008-d6c0cdabd9b8)](https://www.youtube.com/watch?v=D_ZmB0xn_KY)
 
 </td>
 </tr>
