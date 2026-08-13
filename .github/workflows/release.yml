@@ -69,6 +69,25 @@ jobs:
           fail_on_unmatched_files: true
           files: ${{ env.ReleaseFileName }}
 
+      - name: Repoint dev-latest shepherd release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Legacy dev-channel plugins poll /releases/tags/dev-latest. That
+          # channel is gone (replaced by per-PR builds), so keep the tag alive
+          # mirroring each new stable — those clients see it as newer than
+          # their -dev build and get offered the upgrade path out.
+          gh release delete dev-latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create dev-latest "$ReleaseFileName" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "dev-latest (${GITHUB_REF_NAME#v})" \
+            --notes "The development channel has been replaced by per-PR builds (update your plugin and pick a PR in the release-channel dropdown). This release mirrors stable ${GITHUB_REF_NAME} so plugins still on the dev channel can update."
+
       - name: Notify Discord
         if: success()
         continue-on-error: true

@@ -53,6 +53,11 @@ namespace MozaPlugin.Protocol
             AddCommand("base-temp-strategy",      "base", 40, 41, new byte[] { 30 },     2, "int");
             AddCommand("base-soft-limit-stiffness","base",40, 41, new byte[] { 31 },     2, "int");
             AddCommand("base-equalizer6",         "base", 40, 41, new byte[] { 44 },     2, "int");
+            // 10-band EQ additions (fw >= 1.2.10.10): 10/30/50/80 Hz bands.
+            AddCommand("base-equalizer7",         "base", 40, 41, new byte[] { 50 },     2, "int");
+            AddCommand("base-equalizer8",         "base", 40, 41, new byte[] { 51 },     2, "int");
+            AddCommand("base-equalizer9",         "base", 40, 41, new byte[] { 52 },     2, "int");
+            AddCommand("base-equalizer10",        "base", 40, 41, new byte[] { 53 },     2, "int");
             AddCommand("base-protection-mode",    "base", 40, 41, new byte[] { 45 },     2, "int");
             // cmd 0x2E base "Gearshift vibration intensity" slider, range 0..5.
             // Companion fire-and-forget event = `gearshift-event` (cmd 0x76 grp 0x2D).

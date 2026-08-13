@@ -1,5 +1,6 @@
 using System;
 using SimHub.Plugins;
+using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
 
 namespace MozaPlugin
@@ -34,8 +35,44 @@ namespace MozaPlugin
             _plugin.AttachDelegate("AZOM.MosfetTemp", () => (_plugin.Data == null || _plugin.PropertyResolver == null) ? 0.0 : _plugin.PropertyResolver.ConvertTemp(_plugin.Data.MosfetTemp));
             _plugin.AttachDelegate("AZOM.MotorTemp", () => (_plugin.Data == null || _plugin.PropertyResolver == null) ? 0.0 : _plugin.PropertyResolver.ConvertTemp(_plugin.Data.MotorTemp));
             _plugin.AttachDelegate("AZOM.BaseState", () => _plugin.Data?.BaseState ?? 0);
-            _plugin.AttachDelegate("AZOM.FfbStrength", () => (_plugin.Data?.FfbStrength ?? 0) / 10);
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);
+
+            // Every wheelbase setting, in the same display units the Base-tab
+            // sliders show (AZOM.FfbStrength is one of these — it kept its
+            // historical percent scaling). Values track the device read-back,
+            // so they read their _data defaults until the base answers its
+            // settings sweep. Unsupported settings (EQ bands 7-10 on legacy
+            // firmware) report -1 rather than a plausible-looking zero.
+            foreach (var s in BaseSettingCatalog.Numeric)
+            {
+                var def = s; // capture per iteration
+                _plugin.AttachDelegate("AZOM." + def.Name, () =>
+                {
+                    var d = _plugin.Data;
+                    if (d == null || !def.IsSupported(d)) return -1;
+                    return def.ToDisplay(def.GetRaw(d));
+                });
+            }
+            foreach (var t in BaseSettingCatalog.Toggles)
+            {
+                var def = t; // capture per iteration
+                _plugin.AttachDelegate("AZOM." + def.Name, () =>
+                {
+                    var d = _plugin.Data;
+                    return d != null && def.IsOn(d);
+                });
+            }
+            // Standby: raw register value (0 = running, 1 = standby), matching
+            // the existing AZOM.WorkModeOn/Off actions rather than the UI
+            // checkbox's inverted "Standby Mode" sense.
+            _plugin.AttachDelegate("AZOM.WorkMode", () => _plugin.Data?.WorkMode ?? 0);
+            // Road sensitivity as the 0-10 preset index the Base-tab buttons
+            // use, not the 10..50 register value. -1 until the base reports it.
+            _plugin.AttachDelegate("AZOM.RoadSensitivity",
+                () => BaseSettingCatalog.RoadSensitivityPresetFromRaw(_plugin.Data?.RoadSensitivity ?? -1));
+            // Clutch split point (issue #125) — the wheel overlay is the source
+            // of truth; newer KS-family firmware drops the cmd-9 read-back.
+            _plugin.AttachDelegate("AZOM.ClutchSplitPoint", () => CurrentClutchSplitPoint());
             // Telemetry pipeline health, so users can show a degraded/parked state on
             // an overlay. TelemetryState = the PipelinePhase name (Idle/SilenceWait/
             // Starting/Active/HotSwitchBurst/Recovery/Parked). DashboardBound is a
@@ -73,6 +110,15 @@ namespace MozaPlugin
             _plugin.AttachDelegate("AZOM.LeftPaddle", () => _plugin.Data?.LeftPaddlePosition ?? 0);
             _plugin.AttachDelegate("AZOM.RightPaddle", () => _plugin.Data?.RightPaddlePosition ?? 0);
             _plugin.AttachDelegate("AZOM.CombinedPaddle", () => _plugin.Data?.CombinedPaddlePosition ?? 0);
+
+            // AB9 active shifter presence + current mechanical layout (issue #112).
+            // The active profile's Ab9 block is authoritative for the layout — the
+            // UI combo and the layout actions write it, and HardwareApplier pushes
+            // it on connect; the device offers no parsed layout read-back. The label
+            // is the invariant English UI string so dashboards can key on the value
+            // regardless of UI language.
+            _plugin.AttachDelegate("AZOM.Ab9Connected", () => (_plugin.Ab9Manager?.IsConnected ?? false) || _plugin.IsAb9Detected);
+            _plugin.AttachDelegate("AZOM.Ab9Layout", () => Ab9LayoutLabel(CurrentAb9Layout()));
         }
 
         internal void RegisterActions()
@@ -90,15 +136,44 @@ namespace MozaPlugin
             // and persists via SaveSettings(). An open settings panel re-reads the
             // new value on its refresh tick.
 
-            // Base feel.
-            AddStepActions("AZOM.FfbStrength", 5, 10, StepFfbStrength);   // 0..100 %
-            AddStepActions("AZOM.Torque",      5, 10, StepTorque);        // 50..100 %
-            AddStepActions("AZOM.Rotation",   90, 180, StepRotation);     // 90..2700 deg
+            // Every wheelbase setting in BaseSettingCatalog, including the
+            // long-standing FfbStrength / Torque / Rotation trio.
+            foreach (var s in BaseSettingCatalog.Numeric)
+            {
+                var def = s; // capture per iteration
+                AddStepActions("AZOM." + def.Name, def.Fine, def.Coarse, d => StepBaseSetting(def, d));
+            }
+            foreach (var t in BaseSettingCatalog.Toggles)
+            {
+                var def = t; // capture per iteration
+                AddToggleActions(def);
+            }
+            // Road sensitivity steps the 0..10 preset, not the raw register —
+            // the preset also rewrites the EQ curve, and moving one without the
+            // other leaves the base in a state the Base tab can't represent.
+            AddStepActions("AZOM.RoadSensitivity", 1, 2, StepRoadSensitivity);
+
+            // Clutch split point, 0..100 % (issue #125; cf.
+            // MozaWheelSettingsControl's WiClutchPointSlider). Only meaningful
+            // with Paddles Mode = Combined.
+            AddStepActions("AZOM.ClutchSplit", 5, 10, StepClutchSplit);
 
             // AB9 shifter vibration.
             AddStepActions("AZOM.Ab9EngineIntensity",    5, 10, StepAb9EngineIntensity);    // 0..100
             AddStepActions("AZOM.Ab9EngineFrequency",   10, 20, StepAb9EngineFrequency);    // 0..200 Hz
             AddStepActions("AZOM.Ab9GearShiftIntensity", 5, 10, StepAb9GearShiftIntensity); // 0..100
+
+            // AB9 mechanical layout (issue #112): Next/Prev cycle the six layouts
+            // in UI-combo order (wraparound), plus one direct-set action per
+            // layout. With the AB9 offline the choice still lands in the profile
+            // and applies on the next connect.
+            _plugin.AddAction("AZOM.Ab9LayoutNext", (a, b) => CycleAb9Layout(+1));
+            _plugin.AddAction("AZOM.Ab9LayoutPrev", (a, b) => CycleAb9Layout(-1));
+            foreach (var layout in Ab9Layouts)
+            {
+                var target = layout.Mode; // capture per iteration
+                _plugin.AddAction("AZOM.Ab9Layout" + layout.Suffix, (a, b) => SetAb9Layout(target));
+            }
 
             // Cycle the wheel's displayed dashboard (wraparound).
             _plugin.AddAction("AZOM.DashboardNext", (a, b) => CycleDashboard(+1));
@@ -155,6 +230,18 @@ namespace MozaPlugin
                 _plugin.WriteIfBaseConnected("main-set-work-mode", 0);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode on via action");
+            });
+            // Flip between the two. Registered by hand rather than through the
+            // toggle table so it can't clash with the WorkModeOn/Off names above.
+            _plugin.AddAction("AZOM.WorkModeToggle", (a, b) =>
+            {
+                var data = _plugin.Data;
+                if (data == null) return;
+                int val = data.WorkMode != 0 ? 0 : 1;
+                data.WorkMode = val;
+                _plugin.WriteIfBaseConnected("main-set-work-mode", val);
+                _plugin.SaveSettings();
+                MozaLog.Debug($"[AZOM] Work mode {(val == 0 ? "on" : "off (standby)")} via action");
             });
 
             // Toggle the wheel screen on/off, remembering the on-brightness so a
@@ -297,48 +384,137 @@ namespace MozaPlugin
             _plugin.AddAction(name + "DownCoarse", (a, b) => apply(-coarse));
         }
 
+        /// <summary>
+        /// Registers <c>{name}On</c> / <c>{name}Off</c> / <c>{name}Toggle</c>
+        /// for a two-state wheelbase setting, mirroring the Base-tab checkbox
+        /// commit path (mirror to <c>_data</c>, push, persist).
+        /// </summary>
+        private void AddToggleActions(BaseSettingCatalog.ToggleSetting def)
+        {
+            _plugin.AddAction("AZOM." + def.Name + "On",     (a, b) => SetToggle(def, true));
+            _plugin.AddAction("AZOM." + def.Name + "Off",    (a, b) => SetToggle(def, false));
+            _plugin.AddAction("AZOM." + def.Name + "Toggle", (a, b) =>
+            {
+                var data = _plugin.Data;
+                if (data != null) SetToggle(def, !def.IsOn(data));
+            });
+        }
+
+        private void SetToggle(BaseSettingCatalog.ToggleSetting def, bool on)
+        {
+            var data = _plugin.Data;
+            if (data == null) return;
+            int val = on ? def.OnValue : def.OffValue;
+            if (def.Get(data) == val) return; // already there — no flash write
+            def.Set(data, val);
+            _plugin.WriteIfBaseConnected(def.Command, val);
+            _plugin.SaveSettings();
+            MozaLog.Debug($"[AZOM] {def.Name} → {(on ? "on" : "off")} via action");
+        }
+
         private static int ClampStep(int current, int delta, int min, int max)
             => Math.Max(min, Math.Min(max, current + delta));
 
-        // FFB strength: stored raw = percent * 10 (cf. FfbStrengthSlider_ValueChanged).
-        private void StepFfbStrength(int deltaPct)
+        /// <summary>
+        /// Nudge one wheelbase setting by a signed delta in display units,
+        /// mirroring its Base-tab slider commit path exactly: clamp, mirror to
+        /// <c>_data</c>, push every command in order, persist via
+        /// <c>SaveSettings()</c> (which captures <c>_data</c> into the active
+        /// profile). An open settings panel re-reads the value on its refresh tick.
+        ///
+        /// Every one of these commands is a base parameter-store slot and hits
+        /// flash on write, so a value already saturated at a range rail must NOT
+        /// be re-written — a held button with key repeat would otherwise burn one
+        /// flash write per repeat for no change.
+        /// </summary>
+        private void StepBaseSetting(BaseSettingCatalog.NumericSetting def, int delta)
         {
             var data = _plugin.Data;
-            if (data == null) return;
-            int pct = ClampStep(data.FfbStrength / 10, deltaPct, 0, 100);
-            int raw = pct * 10;
-            data.FfbStrength = raw;
-            _plugin.WriteIfBaseConnected("base-ffb-strength", raw);
+            if (data == null || !def.IsSupported(data)) return;
+            int current = def.ToDisplay(def.GetRaw(data));
+            int next = ClampStep(current, delta, def.Min, def.EffectiveMax(data));
+            if (next == current) return; // saturated — skip the redundant flash write
+            int raw = def.ToRaw(next);
+            def.SetRaw(data, raw);
+            foreach (var cmd in def.Commands)
+                _plugin.WriteIfBaseConnected(cmd, raw);
             _plugin.SaveSettings();
-            MozaLog.Debug($"[AZOM] FFB strength → {pct}% via action");
+            MozaLog.Debug($"[AZOM] {def.Name} → {next} via action");
         }
 
-        // Torque limit: percent, 50..100 (cf. TorqueSlider_ValueChanged).
-        private void StepTorque(int deltaPct)
+        // Road sensitivity: step the 0..10 preset index (cf. the Base tab's
+        // sensitivity buttons / EqSensitivity_Click). There is no dedicated
+        // sensitivity register — a preset is the 0x0C value plus a canned EQ
+        // curve, so both move together or the base ends up in a state the Base
+        // tab can't represent. Legacy firmware gets only the six old registers.
+        private void StepRoadSensitivity(int delta)
         {
             var data = _plugin.Data;
             if (data == null) return;
-            int v = ClampStep(data.Torque, deltaPct, 50, 100);
-            data.Torque = v;
-            _plugin.WriteIfBaseConnected("base-torque", v);
+            int current = BaseSettingCatalog.RoadSensitivityPresetFromRaw(data.RoadSensitivity);
+            // Unknown (base hasn't reported): step in from the appropriate end.
+            int next = current < 0
+                ? (delta > 0 ? BaseSettingCatalog.RoadSensitivityMinPreset : BaseSettingCatalog.RoadSensitivityMaxPreset)
+                : ClampStep(current, delta,
+                            BaseSettingCatalog.RoadSensitivityMinPreset,
+                            BaseSettingCatalog.RoadSensitivityMaxPreset);
+            if (next == current) return; // saturated — skip the redundant flash write
+
+            int sensitivity = BaseSettingCatalog.RoadSensitivityRawFromPreset(next);
+            data.RoadSensitivity = sensitivity;
+            _plugin.WriteIfBaseConnected("base-road-sensitivity", sensitivity);
+
+            int[] preset = BaseSettingCatalog.EqSensitivityPresets[next];
+            if (data.BaseSupportsEq10)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    BaseSettingCatalog.SetEqRegister(data, BaseSettingCatalog.Eq10FreqOrderRegisters[i], preset[i]);
+                    _plugin.WriteIfBaseConnected(BaseSettingCatalog.Eq10FreqOrderCommands[i], preset[i]);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 6; i++)
+                {
+                    int v = preset[BaseSettingCatalog.Eq6FreqColumns[i]];
+                    BaseSettingCatalog.SetEqRegister(data, i, v);
+                    _plugin.WriteIfBaseConnected(BaseSettingCatalog.EqRegisterCommands[i], v);
+                }
+            }
             _plugin.SaveSettings();
-            MozaLog.Debug($"[AZOM] Torque → {v}% via action");
+            MozaLog.Debug($"[AZOM] Road sensitivity → preset {next} (0x0C={sensitivity}) via action");
         }
 
-        // Steering rotation: display degrees, stored raw = degrees / 2; both
-        // base-limit and base-max-angle move together (cf. RotationSlider_ValueChanged).
-        private void StepRotation(int deltaDeg)
+        // ===== Clutch split point (issue #125) =====
+
+        // Current split point using the same source of truth as the wheel device
+        // page: the per-(profile x wheel-page) overlay first, because newer
+        // KS-family firmware silently drops the cmd-9 read-back, then the live
+        // _data mirror, then the slider's 50 % default. Never returns a
+        // sentinel, so the first nudge always moves from a real value.
+        private int CurrentClutchSplitPoint()
         {
-            var data = _plugin.Data;
-            if (data == null) return;
-            int deg = ClampStep(data.Limit * 2, deltaDeg, 90, 2700);
-            int raw = deg / 2;
-            data.Limit = raw;
-            data.MaxAngle = raw;
-            _plugin.WriteIfBaseConnected("base-limit", raw);
-            _plugin.WriteIfBaseConnected("base-max-angle", raw);
+            var overlay = _plugin.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            int v = overlay?.WheelClutchPoint ?? -1;
+            if (v < 0) v = _plugin.Data?.WheelClutchPoint ?? -1;
+            if (v < 0) v = 50;
+            return v > 100 ? 100 : v;
+        }
+
+        // Mirror of WiClutchPointSlider_ValueChanged's commit path: _data +
+        // wheel overlay + device push + persist. The wheel settings page picks
+        // the new value up on its next refresh tick. Wire value == display %.
+        private void StepClutchSplit(int delta)
+        {
+            int current = CurrentClutchSplitPoint();
+            int val = ClampStep(current, delta, 0, 100);
+            if (val == current) return; // saturated — skip the redundant flash write
+            if (_plugin.Data != null) _plugin.Data.WheelClutchPoint = val;
+            _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
+            _plugin.WriteIfWheelDetected("wheel-clutch-point", val);
             _plugin.SaveSettings();
-            MozaLog.Debug($"[AZOM] Rotation → {deg}° via action");
+            MozaLog.Debug($"[AZOM] Clutch split point → {val}% via action");
         }
 
         // AB9 engine vibration is host-rendered: the worker thread picks up the
@@ -385,10 +561,70 @@ namespace MozaPlugin
             return profile.Ab9;
         }
 
-        // Flip dashboard telemetry for the active wheel page. No-op when no wheel
-        // page is identified (ActiveTelemetryEnabled set is a no-op there).
+        // The six mechanical layouts in UI-combo order (cf. SettingsControl's
+        // Ab9ModeCombo): action-name suffix + the invariant label the
+        // AZOM.Ab9Layout property reports (matches the English UI strings).
+        private static readonly (Ab9Mode Mode, string Suffix, string Label)[] Ab9Layouts =
+        {
+            (Ab9Mode.FivePlusR_L1,  "5R1",        "5+R Layout 1"),
+            (Ab9Mode.SixPlusR_L1,   "6R1",        "6+R Layout 1"),
+            (Ab9Mode.SixPlusR_L2,   "6R2",        "6+R Layout 2"),
+            (Ab9Mode.SevenPlusR_L1, "7R1",        "7+R Layout 1"),
+            (Ab9Mode.SevenPlusR_L2, "7R2",        "7+R Layout 2"),
+            (Ab9Mode.Sequential,    "Sequential", "Sequential"),
+        };
+
+        private static string Ab9LayoutLabel(Ab9Mode mode)
+        {
+            foreach (var l in Ab9Layouts)
+                if (l.Mode == mode) return l.Label;
+            return mode.ToString();
+        }
+
+        // Active profile's layout without creating the Ab9 block (property getters
+        // must not mutate). SevenPlusR_L1 mirrors the Ab9Settings default so a
+        // missing block reads the same as the UI's defaults.
+        private Ab9Mode CurrentAb9Layout()
+            => _plugin.Settings?.ProfileStore?.CurrentProfile?.Ab9?.Mode ?? Ab9Mode.SevenPlusR_L1;
+
+        private void CycleAb9Layout(int delta)
+        {
+            var current = CurrentAb9Layout();
+            int cur = -1;
+            for (int i = 0; i < Ab9Layouts.Length; i++)
+                if (Ab9Layouts[i].Mode == current) { cur = i; break; }
+            int n = Ab9Layouts.Length;
+            // Unrecognised persisted value: step in from the appropriate end.
+            int target = cur < 0
+                ? (delta > 0 ? 0 : n - 1)
+                : ((cur + delta) % n + n) % n;
+            SetAb9Layout(Ab9Layouts[target].Mode);
+        }
+
+        // Mirror of Ab9ModeCombo_Changed's commit path: profile + device push +
+        // persist. An open settings panel re-reads the combo on its refresh tick.
+        private void SetAb9Layout(Ab9Mode mode)
+        {
+            var ab9 = GetOrCreateActiveAb9();
+            if (ab9 == null) return;
+            ab9.Mode = mode;
+            _plugin.Ab9Manager?.SendMode(mode);
+            _plugin.SaveSettings();
+            MozaLog.Debug($"[AZOM] AB9 layout → {Ab9LayoutLabel(mode)} via action");
+        }
+
+        // Flip dashboard telemetry for the active wheel page. With no wheel identified
+        // the wheel-page flag is unwritable, so target the dash pipeline instead —
+        // otherwise the action does nothing at all on a hub-only / dash-only rig.
         private void ToggleDashboardTelemetry()
         {
+            if (!_plugin.GetCurrentWheelPageGuid().HasValue)
+            {
+                bool dashOn = !_plugin.ActiveDashTelemetryEnabled;
+                _plugin.SetDashTelemetryEnabled(dashOn);
+                MozaLog.Debug($"[AZOM] Dash telemetry → {(dashOn ? "on" : "off")} via action (no wheel)");
+                return;
+            }
             bool turningOn = !_plugin.ActiveTelemetryEnabled;
             _plugin.SetTelemetryEnabled(turningOn);
             MozaLog.Debug($"[AZOM] Dashboard telemetry → {(turningOn ? "on" : "off")} via action");

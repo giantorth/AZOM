@@ -100,6 +100,28 @@ namespace MozaPlugin.UI
                 }
             }
 
+            // Rule 1d: WheelFirmwareOutdated — a wheel on a new-protocol-only id
+            // (0x17/0x15) classified old-protocol: a current-generation wheel
+            // answering like a legacy one, which points at outdated firmware.
+            // The session stays old-protocol (limited features) until the user
+            // updates firmware in MOZA Pit House, so keep the banner up while
+            // the condition holds. Named with the wheel's friendly name once the
+            // model resolves; generic wording before that.
+            if (detection.NewWheelActingOldProtocol
+                && detection.OldWheelDetected
+                && (data?.IsConnected ?? false))
+            {
+                var advisoryModel = detection.NewWheelActingOldModel;
+                string subject = string.IsNullOrEmpty(advisoryModel)
+                    ? Strings.Banner_WheelFwOutdated_GenericSubject
+                    : "MOZA " + WheelModelInfo.GetFriendlyName(WheelModelInfo.ExtractPrefix(advisoryModel));
+                list.Add(new StatusHint(
+                    StatusHintKind.WheelFirmwareOutdated,
+                    Strings.Banner_WheelFwOutdated_Title,
+                    string.Format(Strings.Banner_WheelFwOutdated_BodyFmt, subject),
+                    relatedModel: string.IsNullOrEmpty(advisoryModel) ? null : advisoryModel));
+            }
+
             // Rule 2: DeviceDefinitionDeployed (existing behaviour, kept verbatim)
             if (plugin.DeviceDefinitionDeployed)
             {

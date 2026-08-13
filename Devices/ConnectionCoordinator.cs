@@ -120,6 +120,7 @@ namespace MozaPlugin.Devices
                     // (possibly different) wheel — the diagnostics tab should
                     // only show what THIS connection has produced.
                     _plugin.FirmwareDebugLogForDiagnostics.Clear();
+                    _plugin.DeviceLogForDiagnostics.Clear();
                     MozaLog.Info("[AZOM] Connected to MOZA device");
                     MarkStandaloneDashboardDetectedFromUsb("serial connect");
                     // Base temps/state are dev-0x13 reads the base main controller
@@ -218,7 +219,7 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        /// <summary>Open the AB9 shifter's dedicated CDC port (PID 0x1000) and probe identity.</summary>
+        /// <summary>Open the active shifter's dedicated CDC port (AB9 0x1000 / AB6 0x1002) and probe identity.</summary>
         internal void TryConnectAb9()
         {
             if (_ab9Manager == null) return;
@@ -446,6 +447,7 @@ namespace MozaPlugin.Devices
             _detectionState.BaseDetected = false;
             _detectionState.BaseAmbientLedSupported = false;
             _detectionState.BaseAmbientProbed = false;
+            _detectionState.BaseEq10Probed = false;
             _detectionState.BaseOwner = null;
             _data.BaseSettingsRead = false;
             try { _plugin.PendingResponses.Clear(); } catch { }
@@ -569,8 +571,9 @@ namespace MozaPlugin.Devices
                 dm.SendPresenceProbe(MozaProtocol.DevicePedals);
             if (!_detectionState.HandbrakeDetected)
                 dm.SendPresenceProbe(MozaProtocol.DeviceHandbrake);
-            // HGP/SGP shifter behind the hub (dev 0x1A).
-            if (!_detectionState.ShifterDetected)
+            // HGP/SGP shifter behind the hub (dev 0x1A). Gated per-pipe — a shifter
+            // detected on another lane must not suppress this slot's probe.
+            if (_detectionState.ShifterModelForOwner(dm) == ShifterModelKind.Unknown)
                 dm.SendPresenceProbe(MozaProtocol.DeviceHPattern);
             // Positive-evidence probe for the broken-base case: while NO wheel has
             // been detected on the primary (base), also probe the wheel over the
@@ -644,7 +647,7 @@ namespace MozaPlugin.Devices
                 else if (deviceId == MozaProtocol.DeviceHandbrake)
                     _hubDeviceProber.MarkHandbrakeDetected();
                 else if (deviceId == MozaProtocol.DeviceHPattern) // == DeviceSequential (0x1A)
-                    _hubDeviceProber.MarkShifterDetected();
+                    _hubDeviceProber.ProbeRelayedShifter();
                 return;
             }
 
@@ -675,9 +678,14 @@ namespace MozaPlugin.Devices
                 return;
 
             _hubManager.PendingResponses?.NoteResponse(r.Name);
-            _data.UpdateFromCommand(r.Name, r.IntValue);
-            if (r.ArrayValue != null)
-                _data.UpdateFromArray(r.Name, r.ArrayValue);
+            // A hub-relayed shifter's values route into whichever model resolved on
+            // this pipe (shared shifter-* command names).
+            if (!_data.TryUpdateShifter(_detectionState.ShifterModelForOwner(_hubManager.DeviceManager), r.Name, r.IntValue, r.ArrayValue))
+            {
+                _data.UpdateFromCommand(r.Name, r.IntValue);
+                if (r.ArrayValue != null)
+                    _data.UpdateFromArray(r.Name, r.ArrayValue);
+            }
             _hubDeviceProber.DetectDevices(r.Name, r.IntValue, r.DeviceId);
         }
 
@@ -734,6 +742,7 @@ namespace MozaPlugin.Devices
             _detectionState.BaseDetected = false;
             _detectionState.BaseAmbientLedSupported = false;
             _detectionState.BaseAmbientProbed = false;
+            _detectionState.BaseEq10Probed = false;
             _data.IsBaseConnected = false;
             _data.BaseSettingsRead = false;
             var baseDm = _baseManager?.DeviceManager;

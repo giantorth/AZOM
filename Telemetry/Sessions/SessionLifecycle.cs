@@ -43,6 +43,12 @@ namespace MozaPlugin.Telemetry.Sessions
         // while the wheel was still booting.
         internal volatile bool _wheelReadyObserved;
 
+        // Stale-session settle: while held, inbound-chunk acks are dropped so the
+        // host session layer stays genuinely silent (see ProbeAndOpenSessions).
+        // Written on the StartInner thread, read on the serial read thread.
+        private volatile bool _suppressSessionAcks;
+        private int _suppressedAckCount;
+
         // Gap-aware catalog ack: highest CONTIGUOUS inbound seq per catalog
         // session (mgmt/telem) during binding. A dropped catalog chunk under
         // Wine leaves a seq gap (observed 07→0c on sess=0x01); acking the
@@ -216,14 +222,27 @@ namespace MozaPlugin.Telemetry.Sessions
             MozaLog.Debug(
                 $"[AZOM] Closing stale sessions (0x01..0x{NarrowLastClosePort:X2} narrow; " +
                 "wide 0x04..0x0A escalated only if the wheel stays silent)...");
-            for (byte port = 1; port <= NarrowLastClosePort; port++)
+
+            // Close 0x01..0x03, reporting whether ANY close drew an fc:00 ack.
+            // Null return = caller must abort (cancelled / Idle / disconnected).
+            bool? CloseNarrowRange(string tag)
             {
-                if (cancel.IsCancellationRequested
-                    || _sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
-                bool acked = TryCloseSession(port, CloseAckTimeoutMs);
-                MozaLog.Debug(
-                    $"[AZOM] SessionClose 0x{port:X2} {(acked ? "acked" : "no ack within " + CloseAckTimeoutMs + "ms")}");
+                bool anyAcked = false;
+                for (byte port = 1; port <= NarrowLastClosePort; port++)
+                {
+                    if (cancel.IsCancellationRequested
+                        || _sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return null;
+                    bool acked = TryCloseSession(port, CloseAckTimeoutMs);
+                    anyAcked |= acked;
+                    MozaLog.Debug(
+                        $"[AZOM] SessionClose 0x{port:X2} {(acked ? "acked" : "no ack within " + CloseAckTimeoutMs + "ms")}{tag}");
+                }
+                return anyAcked;
             }
+
+            bool? narrowAcked = CloseNarrowRange("");
+            if (narrowAcked == null) return;
+            bool anyCloseAcked = narrowAcked.Value;
 
             // Warm-restart dashboard-list recovery. The reload path (above) leaves
             // sess=0x09 bound to avoid a re-render — correct ONLY when our configJson
@@ -252,9 +271,78 @@ namespace MozaPlugin.Telemetry.Sessions
                 && _sender.ConnectionRef.IsConnected)
             {
                 bool acked9 = TryCloseSession(0x09, CloseAckTimeoutMs);
+                anyCloseAcked |= acked9;
                 MozaLog.Info(
                     "[AZOM] Forced sess=0x09 close (EMPTY configJson dashboard list) to " +
                     $"re-trigger the wheel's dashboard-list push {(acked9 ? "(acked)" : "(no ack)")}");
+            }
+
+            // Stale-session settle. An acked close means the wheel STILL HELD that
+            // session — state left behind by a prior host instance (crashed/killed
+            // SimHub, earlier PitHouse run): this StartInner has opened nothing yet,
+            // and against a clean wheel every close above times out (verified: the
+            // post-silence Start in the CS-Pro 2026-07-21 bundle drew zero acks).
+            // The wheel acks the close but does NOT tear the stale instance down
+            // until the host's session layer goes quiet — the same ~11 s interlock
+            // the Stop→Start gate enforces. Re-opening immediately lands on the
+            // stale instance: it acks the opens too, yet never emits its engagement
+            // stream (no sess=0x09 device-init, no configJson state, no slot echo),
+            // so the dashboard stays dead. In that bundle the stale sess=0x02 kept
+            // its pre-close seq for 10+ min; the manual telemetry off/on then
+            // engaged in <2 s purely because its gate held 11 s of host silence.
+            // Replicate that proven cycle inline: hold the silence — dropping our
+            // inbound-chunk acks meanwhile, since the proven window had the
+            // dispatcher unsubscribed and acking the stale keepalives is host
+            // traffic that can keep the wheel from retiring the session — then
+            // close again (expect no acks) and open fresh.
+            if (anyCloseAcked)
+            {
+                const int SettleSliceMs = 100;
+                int settleMs = Lifecycle.SilenceGate.StopReopenSilenceMs;
+                MozaLog.Info(
+                    "[AZOM] Stale wheel session state detected (close acked = wheel still held " +
+                    $"a session from a prior host instance) — holding {settleMs}ms of host " +
+                    "session-layer silence so the wheel tears it down, then re-closing before " +
+                    "the opens (prevents the never-engaging stale-session wedge)");
+                _suppressSessionAcks = true;
+                try
+                {
+                    int slept = 0;
+                    while (slept < settleMs)
+                    {
+                        if (cancel.IsCancellationRequested
+                            || _sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
+                        try { Thread.Sleep(SettleSliceMs); } catch { }
+                        slept += SettleSliceMs;
+                    }
+                }
+                finally
+                {
+                    _suppressSessionAcks = false;
+                    int dropped = Interlocked.Exchange(ref _suppressedAckCount, 0);
+                    if (dropped > 0)
+                        MozaLog.Debug(
+                            $"[AZOM] Stale-session settle done — {dropped} inbound chunk ack(s) " +
+                            "suppressed during the silence window");
+                }
+
+                bool? recheck = CloseNarrowRange(" (post-settle)");
+                if (recheck == null) return;
+                if (recheck.Value)
+                    MozaLog.Warn(
+                        "[AZOM] Wheel still acked a session close after the stale-session settle — " +
+                        "proceeding with fresh opens; DisplayWatchdog escalates if engagement fails");
+
+                cfgListCount = _sender.ConfigJson?.LastState?.ConfigJsonList?.Count ?? 0;
+                if (cfgListCount == 0
+                    && !cancel.IsCancellationRequested && !_sender.StateIsIdle
+                    && _sender.ConnectionRef.IsConnected)
+                {
+                    bool acked9b = TryCloseSession(0x09, CloseAckTimeoutMs);
+                    MozaLog.Info(
+                        "[AZOM] Forced sess=0x09 close (EMPTY configJson dashboard list, post-settle) " +
+                        $"{(acked9b ? "(acked)" : "(no ack)")}");
+                }
             }
 
             byte mgmtPort = TryOpenSession(MgmtSession, OpenAckTimeoutMs);
@@ -384,6 +472,47 @@ namespace MozaPlugin.Telemetry.Sessions
                     if (_sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
                     if (_sender.ConnectionRef.IsConnected)
                         telemetryPort = TryOpenSession(TelemSession, OpenAckTimeoutMs);
+                }
+            }
+
+            // Asymmetric open failure: mgmt acked (wheel demonstrably alive) but
+            // the telem session drew no ack. PitHouse retries session opens at a
+            // flat ~1 s cadence and tolerates 10+ rounds (bridge captures); a
+            // single 500 ms attempt is not enough after a port bounce. CS-Pro
+            // bundle 2026-07-28: reconnect after a "Not ready" port wedge left
+            // the wheel replaying the 0x01 open-ack for every later open (0x02 /
+            // 0x03 opens answered with fc:00:01), the lone attempt timed out,
+            // FlagByte collapsed onto mgmt and the pipeline came up fake-Active —
+            // tier-def blind-retransmit 0/9 chunks acked across all 6 rounds,
+            // kind=4 switches ignored, display dead until a manual toggle. Retry
+            // flat; if the wheel still refuses, escalate the full Stop→silence→
+            // Start cycle (the proven session-layer reset) through the recovery
+            // dispatcher rather than proceeding into a known-dead lane. Collapse
+            // onto mgmt only when the dispatcher refuses (debounced/capped/parked)
+            // so the pipeline still limps instead of dead-stopping.
+            if (telemetryPort == 0 && mgmtPort != 0)
+            {
+                const int TelemOpenRetryRounds = 10;
+                const int TelemOpenRetryBudgetMs = 1_000;
+                MozaLog.Info(
+                    $"[AZOM] Telem session 0x{TelemSession:X2} open silent while mgmt acked — " +
+                    $"retrying flat: up to {TelemOpenRetryRounds} rounds at ~{TelemOpenRetryBudgetMs}ms (PitHouse parity)");
+                for (int round = 1; round <= TelemOpenRetryRounds && telemetryPort == 0; round++)
+                {
+                    if (cancel.IsCancellationRequested
+                        || _sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
+                    telemetryPort = TryOpenSession(TelemSession, TelemOpenRetryBudgetMs);
+                    MozaLog.Debug(
+                        $"[AZOM] Telem open retry round {round}/{TelemOpenRetryRounds}: " +
+                        $"{(telemetryPort != 0 ? "acked" : "no ack")}");
+                }
+                if (telemetryPort == 0
+                    && _sender.Recovery.RequestRestart(
+                        $"telem session 0x{TelemSession:X2} refused {TelemOpenRetryRounds} open retries " +
+                        "while mgmt acked — wheel session layer stuck (post-reconnect ack-replay state); " +
+                        "cycling the pipeline instead of collapsing telemetry onto the mgmt session"))
+                {
+                    return; // the queued restart supersedes this StartInner
                 }
             }
 
@@ -569,6 +698,15 @@ namespace MozaPlugin.Telemetry.Sessions
 
         internal void SendSessionAck(byte session, ushort ackSeq)
         {
+            // Stale-session settle window: total host session-layer silence is the
+            // point — acking the stale instance's keepalives would reset the wheel's
+            // quiet timer. Wheel retransmit recovers any genuinely-new chunk once
+            // the window closes.
+            if (_suppressSessionAcks)
+            {
+                Interlocked.Increment(ref _suppressedAckCount);
+                return;
+            }
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x05,

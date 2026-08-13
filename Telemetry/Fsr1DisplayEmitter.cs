@@ -245,28 +245,38 @@ namespace MozaPlugin.Telemetry
         // encoding (used by the override path; offsets MUST match the encoding's width).
         private static void WriteField(byte[] frame, int[] offsets, Fsr1Encoding enc, long value)
         {
+            if (offsets == null || offsets.Length == 0) return;
             long v = value;
             if (v < 0) v = 0;
             long cap = Fsr1DashboardCatalog.OutputMaxFor(enc, 0);
             if (v > cap) v = cap;
-            int o0 = 4 + offsets[0];
+            // Bounds-safe byte write (mirrors WriteBits): guard both the offsets array length
+            // and the frame length, so a field whose resolved offsets are shorter than its
+            // encoding needs (e.g. a U24 with <3 offsets after a bad override) writes what it
+            // can and skips the rest — never throws and aborts the whole record/tick.
+            void Put(int oi, byte b)
+            {
+                if (oi >= offsets.Length) return;
+                int fi = 4 + offsets[oi];
+                if (fi >= 0 && fi < frame.Length) frame[fi] = b;
+            }
             switch (enc)
             {
                 case Fsr1Encoding.U8:
-                    frame[o0] = (byte)(v & 0xFF);
+                    Put(0, (byte)(v & 0xFF));
                     break;
                 case Fsr1Encoding.U16_BE:
-                    frame[o0] = (byte)((v >> 8) & 0xFF);
-                    frame[4 + offsets[1]] = (byte)(v & 0xFF);
+                    Put(0, (byte)((v >> 8) & 0xFF));
+                    Put(1, (byte)(v & 0xFF));
                     break;
                 case Fsr1Encoding.U16_LE:
-                    frame[o0] = (byte)(v & 0xFF);
-                    frame[4 + offsets[1]] = (byte)((v >> 8) & 0xFF);
+                    Put(0, (byte)(v & 0xFF));
+                    Put(1, (byte)((v >> 8) & 0xFF));
                     break;
                 case Fsr1Encoding.U24_BE:
-                    frame[o0] = (byte)((v >> 16) & 0xFF);
-                    frame[4 + offsets[1]] = (byte)((v >> 8) & 0xFF);
-                    frame[4 + offsets[2]] = (byte)(v & 0xFF);
+                    Put(0, (byte)((v >> 16) & 0xFF));
+                    Put(1, (byte)((v >> 8) & 0xFF));
+                    Put(2, (byte)(v & 0xFF));
                     break;
             }
         }

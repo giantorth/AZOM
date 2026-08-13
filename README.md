@@ -6,7 +6,7 @@
 > **The Unofficial MOZA SimHub Plugin is now named AZOM.**
 
 [![Release](https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin)](https://github.com/giantorth/moza-simhub-plugin/releases/latest)
-[![Dev Release](https://img.shields.io/badge/dynamic/json?url=https://api.github.com/repos/giantorth/moza-simhub-plugin/releases/tags/dev-latest&query=%24.name&label=dev&color=orange)](https://github.com/giantorth/moza-simhub-plugin/releases/tag/dev-latest)
+[![Pre-release](https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin?include_prereleases&label=pre-release&color=orange)](https://github.com/giantorth/moza-simhub-plugin/releases)
 [![License: GPL v3](https://img.shields.io/github/license/giantorth/moza-simhub-plugin)](LICENSE)
 [![Discord](https://img.shields.io/discord/1494517781016608888?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/J4enw43e62)
 [![Stars](https://img.shields.io/github/stars/giantorth/moza-simhub-plugin?label=Star&logo=github&color=yellow)](https://github.com/giantorth/moza-simhub-plugin/stargazers)
@@ -63,7 +63,7 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
-**Development builds.** The latest in-progress build from the `dev` branch is published as a pre-release: [MozaPlugin_dev.zip](https://github.com/giantorth/moza-simhub-plugin/releases/download/dev-latest/MozaPlugin_dev.zip). Expect bugs or broken features — use the stable release above if you need something reliable.
+**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open About > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
 
 **Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11.8+.
 
@@ -229,8 +229,8 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | `AZOM.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.BaseState` | int | Wheelbase state |
-| `AZOM.FfbStrength` | int | FFB strength (%) |
 | `AZOM.MaxAngle` | int | Max steering angle (degrees) |
+| `AZOM.ClutchSplitPoint` | int | Clutch split point (%) for the current wheel, as shown on the wheel device page (Paddles Mode = Combined) |
 | `AZOM.HidConnected` | bool | Whether a device HID surface is being read (live input is available) |
 | `AZOM.SteeringAngle` | double | Live steering angle in degrees (0 = center, ± = each lock direction); 0 until max-angle is known |
 | `AZOM.SteeringPosition` | double | Live steering as 0–100 (0 = full lock, 50 = center, 100 = full lock); -1 when unknown |
@@ -241,8 +241,49 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | `AZOM.LeftPaddle` | int | Left analog paddle position (0–100) |
 | `AZOM.RightPaddle` | int | Right analog paddle position (0–100) |
 | `AZOM.CombinedPaddle` | int | Combined analog paddle axis position (0–100) |
+| `AZOM.Ab9Connected` | bool | AB9 active shifter presence |
+| `AZOM.Ab9Layout` | string | AB9 mechanical layout of the active profile: `5+R Layout 1`, `6+R Layout 1`, `6+R Layout 2`, `7+R Layout 1`, `7+R Layout 2`, or `Sequential` |
 
 These input properties are populated directly from the device HID surface, so they update live even when no game is running.
+
+#### Wheelbase settings
+
+Every wheelbase setting on the plugin's **Base** tab is also exposed as a property, in the same units the slider shows. Each has a matching set of actions (see below). Values track what the base reported on its last settings read, so they hold their defaults until the base answers after connect.
+
+The numeric ones read `-1` when the value isn't available — the plugin is still loading, or the setting doesn't exist on this firmware (equalizer bands 7–10 on 6-band bases).
+
+| Property | Type | Range | Description |
+|----------|------|-------|-------------|
+| `AZOM.FfbStrength` | int | 0–100 | Game FFB strength (%) |
+| `AZOM.Torque` | int | 50–100 | Base torque output (%) |
+| `AZOM.Rotation` | int | 60–2700 | Wheel rotation angle (degrees) |
+| `AZOM.WheelSpeedLimit` | int | 0–200 | Maximum wheel speed (%) |
+| `AZOM.Interpolation` | int | 0–10 | FFB interpolation |
+| `AZOM.GearshiftVibration` | int | 0–5 | Base gear-shift vibration intensity |
+| `AZOM.Damper` | int | 0–100 | Wheel damper (%) |
+| `AZOM.Friction` | int | 0–100 | Wheel friction (%) |
+| `AZOM.Inertia` | int | 100–500 | Natural inertia (Wheelbase Effects) |
+| `AZOM.Spring` | int | 0–100 | Wheel spring — the base's own centering force (%) |
+| `AZOM.GameDamper` | int | 0–100 | Game damper effect gain (%) |
+| `AZOM.GameFriction` | int | 0–100 | Game friction effect gain (%) |
+| `AZOM.GameInertia` | int | 0–100 | Game inertia effect gain (%) |
+| `AZOM.GameSpring` | int | 0–100 | Game spring effect gain (%) |
+| `AZOM.NaturalInertia` | int | 100–4000 | Steering wheel inertia (Protection) |
+| `AZOM.SoftLimitStiffness` | int | 1–10 | Soft limit stiffness |
+| `AZOM.SpeedDamping` | int | 0–100 | High-speed damping level (%) |
+| `AZOM.SpeedDampingPoint` | int | 0–400 | High-speed damping trigger speed (kph) |
+| `AZOM.RoadSensitivity` | int | 0–10 | Road sensitivity preset index; -1 until the base reports it |
+| `AZOM.Equalizer1` … `AZOM.Equalizer10` | int | 0–400/500 | FFB equalizer bands, in **register** order. Bands 7–10 read -1 on 6-band firmware. Band 6 (100 Hz) caps at 100 on 10-band firmware, the rest at 500; all six cap at 400 on legacy firmware |
+| `AZOM.FfbCurveX1` … `X4`, `AZOM.FfbCurveY1` … `Y5` | int | 0–100 | FFB output curve node positions |
+| `AZOM.Protection` | bool | | Hands-off protection enabled |
+| `AZOM.FfbReverse` | bool | | Force feedback reversal enabled |
+| `AZOM.SoftLimitRetain` | bool | | Soft limit "retain game FFB" enabled |
+| `AZOM.PerformanceOutput` | bool | | Performance output on full (false = reserved) |
+| `AZOM.BaseStatusLed` | bool | | Base status LED on |
+| `AZOM.Bluetooth` | bool | | Bluetooth on |
+| `AZOM.WorkMode` | int | 0/1 | 0 = base running, 1 = standby |
+
+The equalizer bands are numbered by hardware register, which is **not** frequency order on 10-band firmware. Register order maps to 5/15/25/40/60/100 Hz for bands 1–6 and 10/30/50/80 Hz for bands 7–10.
 
 ### SimHub Actions
 
@@ -254,17 +295,55 @@ Each *step* setting has four actions: `…Up` / `…Down` apply a fine step, and
 |--------|-------|------|--------|--------|
 | `AZOM.FfbStrengthUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheelbase FFB strength |
 | `AZOM.TorqueUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 50–100% | ±5 | ±10 | Wheelbase torque limit |
-| `AZOM.RotationUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 90–2700° | ±90° | ±180° | Steering rotation (max angle) |
+| `AZOM.RotationUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 60–2700° | ±90° | ±180° | Steering rotation (max angle) |
+| `AZOM.WheelSpeedLimitUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–200% | ±5 | ±10 | Maximum wheel speed |
+| `AZOM.InterpolationUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–10 | ±1 | ±2 | FFB interpolation |
+| `AZOM.GearshiftVibrationUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–5 | ±1 | ±2 | Base gear-shift vibration intensity |
+| `AZOM.DamperUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheel damper |
+| `AZOM.FrictionUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheel friction |
+| `AZOM.InertiaUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 100–500 | ±10 | ±50 | Natural inertia (Wheelbase Effects) |
+| `AZOM.SpringUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheel spring — the base's own centering force |
+| `AZOM.GameDamperUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Game damper effect gain |
+| `AZOM.GameFrictionUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Game friction effect gain |
+| `AZOM.GameInertiaUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Game inertia effect gain |
+| `AZOM.GameSpringUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Game spring effect gain |
+| `AZOM.NaturalInertiaUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 100–4000 | ±50 | ±200 | Steering wheel inertia (Protection) |
+| `AZOM.SoftLimitStiffnessUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 1–10 | ±1 | ±2 | Soft limit stiffness |
+| `AZOM.SpeedDampingUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | High-speed damping level |
+| `AZOM.SpeedDampingPointUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–400 kph | ±10 | ±50 | High-speed damping trigger speed |
+| `AZOM.RoadSensitivityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–10 | ±1 | ±2 | Road sensitivity preset (also rewrites the FFB equalizer curve, exactly like the Base-tab preset buttons) |
+| `AZOM.Equalizer1Up` … `AZOM.Equalizer10…DownCoarse` | 0–400/500% | ±5 | ±25 | FFB equalizer bands, in register order (see the property table) |
+| `AZOM.FfbCurveX1Up` … `AZOM.FfbCurveY5…DownCoarse` | 0–100 | ±5 | ±10 | FFB output curve node positions |
+| `AZOM.ClutchSplitUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Clutch split point — the combined-paddle bite point (Paddles Mode = Combined) |
 | `AZOM.Ab9EngineIntensityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100 | ±5 | ±10 | AB9 engine-vibration intensity |
 | `AZOM.Ab9EngineFrequencyUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–200 Hz | ±10 | ±20 | AB9 engine-vibration frequency |
 | `AZOM.Ab9GearShiftIntensityUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100 | ±5 | ±10 | AB9 gear-shift vibration intensity |
 | `AZOM.DisplayBrightnessUp` / `…Down` / `…UpCoarse` / `…DownCoarse` | 0–100% | ±5 | ±10 | Wheel screen display brightness |
+
+Wheelbase settings live in the base's parameter store, which is flash. A step action that would leave the value unchanged (already at the top or bottom of its range) writes nothing, so holding a bound button at a limit costs no extra flash writes.
+
+Each wheelbase *toggle* has three actions — `…On`, `…Off` and `…Toggle`:
+
+| Action | Effect |
+|--------|--------|
+| `AZOM.ProtectionOn` / `…Off` / `…Toggle` | Hands-off protection |
+| `AZOM.FfbReverseOn` / `…Off` / `…Toggle` | Force feedback reversal |
+| `AZOM.SoftLimitRetainOn` / `…Off` / `…Toggle` | Soft limit "retain game FFB" |
+| `AZOM.PerformanceOutputOn` / `…Off` / `…Toggle` | Performance output (on = full, off = reserved) |
+| `AZOM.BaseStatusLedOn` / `…Off` / `…Toggle` | Base status LED |
+| `AZOM.BluetoothOn` / `…Off` / `…Toggle` | Wheelbase Bluetooth |
+
+`AZOM.BaseStatusLed*` and `AZOM.Bluetooth*` are stored in the base itself and are not part of a per-game profile, so they don't change when you switch games.
 
 | Action | Effect |
 |--------|--------|
 | `AZOM.DisplayBrightness0` … `AZOM.DisplayBrightness100` | Set wheel screen display brightness to a fixed level (0–100% in steps of 10) |
 | `AZOM.WorkModeOff` | Turn off the wheelbase work mode (puts the base into standby) |
 | `AZOM.WorkModeOn` | Turn on the wheelbase work mode (normal active state) |
+| `AZOM.WorkModeToggle` | Flip the wheelbase between standby and its normal active state |
+| `AZOM.Ab9LayoutNext` | Switch the AB9 shifter to the next mechanical layout (wraps around) |
+| `AZOM.Ab9LayoutPrev` | Switch the AB9 shifter to the previous mechanical layout (wraps around) |
+| `AZOM.Ab9Layout5R1` / `…6R1` / `…6R2` / `…7R1` / `…7R2` / `…Sequential` | Set the AB9 mechanical layout directly |
 | `AZOM.DashboardNext` | Switch the wheel's displayed dashboard to the next enabled slot (wraps around) |
 | `AZOM.DashboardPrev` | Switch the wheel's displayed dashboard to the previous enabled slot (wraps around) |
 | `AZOM.DashboardTelemetryToggle` | Toggle dashboard telemetry on/off for the active wheel page |

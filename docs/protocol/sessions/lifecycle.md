@@ -32,17 +32,17 @@ this is a **cold start in a fresh OS process** or a **plugin reload
 within the same SimHub process** (game-switch via the plugin's
 persistent-wire pattern):
 
-- **Cold start** → close `0x01..0x0A` (wide). Covers host-managed slots
-  PLUS the wheel-managed ones (`0x04..0x0A`). On CS-Pro / KS-Pro the
-  wheel was observed to silently swallow fresh session-open frames when
-  stale wheel-side session state from a prior SimHub process was still
-  live; manually toggling the plugin "Connection enabled" off and on
-  recovered the wedge (because that path closes the OS serial port and
-  forces the wheel to drop its sessions) but a SimHub restart alone did
-  not. The wide close emulates the off/on recovery proactively. The
-  configJson handshake re-runs on next connect anyway, so closing the
-  wheel-managed sessions on cold start doesn't break anything that
-  wasn't going to be re-established a few frames later.
+- **Cold start** → narrow close `0x01..0x03` first, PLUS a forced `0x09`
+  close when the host has no cached configJson dashboard list (re-triggers
+  the wheel's list push). The wide `0x04..0x0A` close is escalated only
+  when both session opens stay silent through the 20 s bring-up wait: an
+  ENGAGED wheel force-reloads its current dashboard on a wide close, and
+  the large radar/track-map dash hard-faults the display firmware on that
+  reload (full MOZA-logo reboot), so the destructive sweep is reserved for
+  a wheel whose display demonstrably isn't up. (The plugin briefly shipped
+  an unconditional wide close on cold start — see git history.) When a
+  narrow close draws an ack, the host must additionally observe the
+  silence interlock below before re-opening.
 
 - **Plugin reload mid-SimHub** (persistent wire reuse) → close `0x01..0x03`
   only. Wheel-managed `0x04..0x0A` are intentionally left intact so the
@@ -56,7 +56,57 @@ persistent-wire pattern):
 fc:00 close-ack before moving on; an ack timeout is non-fatal and the
 host proceeds to the open phase regardless. The wheel reliably acks
 close frames for sessions it considers open and silently ignores closes
-for sessions it considers closed.
+for sessions it considers closed — which makes the close-ack a stale-state
+detector: at a point where this host process has opened nothing yet, an
+acked close proves the wheel still holds session state from a prior host
+instance.
+
+### Close-ack ≠ teardown: the ~11 s silence interlock
+
+An fc:00 close-ack means the wheel *accepted* the close for a session it
+considers open — it does **not** mean the session was torn down. The wheel
+retires the instance only after the host's **session layer goes quiet for
+~11 s** (the same interlock as the sess=0x09 dashboard-binding state;
+wire-verified 2026-05-08: reopen cycles failing at 8.4 s of silence,
+working at 13.9 s). Host session-layer traffic during that window —
+including the host **acking the stale instance's keepalives** — defers the
+teardown.
+
+Re-opening before teardown completes lands on the **stale instance**. It
+acks the open (and later closes) normally, but never re-initializes: its
+keepalive seq **continues the pre-close numbering**, and it never emits the
+engagement stream — no device-init of 0x09/0x05, no configJson state, no
+type-04 slot record on sess=0x02. Telemetry writes are accepted and acked
+while the display never binds: a silent, indefinitely-stable wedge.
+
+Evidence (CS-Pro diagnostics bundle 2026-07-21, W17 display): a cold start
+shortly after an unclean SimHub exit found sess=0x02/0x05/0x09 still alive
+from the dead process (0x02 keepalives at seq=68). The 0x02 close was acked
+(`fc 00 02 07 00`) and the re-open ~500 ms later was acked too — yet the
+0x02 keepalives continued seq=69, 70, … every ~3.6 s for 10.5 min with zero
+data records; sess=0x09 never device-inited across 10 nudge rounds, no
+configJson state, no slot report. The manual telemetry off/on (close →
+10.4 s host silence → close, all silent now → open) then produced a fresh
+sess=0x02 starting at seq=6 carrying the kind=7 identity blob, kind=5
+handshake response and type-04 slot record within 2 s of the open.
+
+Wire tells for host implementations:
+
+- **Close acked while this host has opened nothing yet** ⇒ stale wheel
+  state. Hold ~11 s of session-layer silence (send nothing, ack nothing),
+  then close again (expect silence) and open fresh.
+- **Against a clean wheel every close times out** — the same bundle's
+  post-silence close burst drew zero acks and engaged instantly.
+- **Keepalive seq continuity across a close/open cycle** is the definitive
+  stale-instance indicator on a capture.
+
+The plugin implements this as the stale-session settle in
+`SessionLifecycle.ProbeAndOpenSessions` (acked close → 11 s silent hold
+with inbound-chunk acks suppressed → re-close → open), plus a
+`DisplayWatchdog` verdict for the already-wedged signature (catalog
+present; sess=0x09 never device-inited across the retry budget; no
+configJson state; no slot ever reported) that escalates through the
+Stop → silence → Start recovery cycle.
 
 ### Plugin-side gating: don't emit close frames at all if the dashboard
 pipeline never ran
@@ -118,8 +168,8 @@ ksp/putOnWheelAndOpenPitHouse):
 
 | Session | Opened by | Role | Description |
 |---------|-----------|------|-------------|
-| 0x01 | host | **Channel catalog + tier-def + string values** | Typed sub-msg framing: wheel announces per-dashboard channel catalog (`type=0x04`, URL→idx), host sends tier-defs (`type=0x01`, idx → compression/width quads), host pushes string-channel values out-of-band (`type=0x05`, ASCII), mutual seq acks (`type=0x06`). Distinct protocol from sess=0x02 — see [`session-0x01-channel-protocol.md`](session-0x01-channel-protocol.md). Also carries the zlib-wrapped UTF-16 wheel debug log dev→host (kind=14 wheel_payload). |
-| 0x02 | host | Telemetry handshake + master catalog | FF-record protocol: init nonce / FFB property catalog (kind=11), kind=8 master channel-name catalog (PitHouse-side full list), kind=15 host settings, kind=14 wheel events. **Does not duplicate** the sess=0x01 tier-def — that is exclusively on sess=0x01 in current firmware. |
+| 0x01 | host | **Channel catalog + tier-def + string values** | Typed sub-msg framing: wheel announces per-dashboard channel catalog (`type=0x04`, URL→idx), host sends tier-defs (`type=0x01`, idx → compression/width quads), host pushes string-channel values out-of-band (`type=0x05`, ASCII), mutual seq acks (`type=0x06`). Distinct protocol from sess=0x02 — see [`session-0x01-channel-protocol.md`](session-0x01-channel-protocol.md). Also carries the display's own application log dev→host as the zlib'd UTF-16BE kind=14 payload, pulled by the host's kind=14 request and acked with kind=15 — see [`session-0x02-ff-init.md`](session-0x02-ff-init.md) § Device log pull. |
+| 0x02 | host | Telemetry handshake + master catalog | FF-record protocol: init nonce / FFB property catalog (kind=11), kind=8 master channel-name catalog (PitHouse-side full list). kind=14/15 (device log pull) appear here too, but the payloads come back on sess=0x01. **Does not duplicate** the sess=0x01 tier-def — that is exclusively on sess=0x01 in current firmware. |
 | 0x03 | host | **UNUSED** | Open frames + 4-byte zero keepalives only — reserved but no payload (older firmware's tile-server channel) |
 | 0x04 | host (also device on dir-listing) | **Tile-server push host→dev** + dir-listing reply dev→host | Multi-purpose by direction. Host→dev sends 12-byte envelope tile-server JSON (relocated from 0x03) — but KS Pro display does NOT render a map UI in PitHouse, so this push is a mozahub-side no-op. Dev→host serves 8-byte-header dir-listing replies for `/home/root` queries. |
 | 0x05 | device (host on uploads) | **File transfer** | Host uploads `.mzdash` + content-addressed PNG dependencies via type=0x02/0x03 sub-msgs (multi-file bundle, not a single-file transfer — see [`../dashboard-upload/sess05-bundle-contents.md`](../dashboard-upload/sess05-bundle-contents.md)). Replaces 0x04 in the upload role on KS Pro. b2h on sess=0x05 is empty on current PitHouse — wheel acks land on linked sessions (not yet decoded). |

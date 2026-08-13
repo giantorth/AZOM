@@ -49,6 +49,11 @@ namespace MozaPlugin.Devices
         // arrives for the others.
         private const string DashCm2ThumbnailKey = "CM2";
         private const string DashCm1ThumbnailKey = "CM1";
+        // The shared "MOZA Wheel Base" definition covers the whole ambient-strip
+        // family (R21/R25/R27); the R21 render stands in for all of them for now.
+        // Named by the model whose art it is, so per-model routing can be added
+        // later without renaming (add R25U etc. keyed on the detected base).
+        private const string BaseAmbientThumbnailKey = "R21U";
 
         // Device name → thumbnail key for the template-based definitions that ship
         // art. Drives RefreshDeployedThumbnails' startup top-up; the per-detection
@@ -57,6 +62,7 @@ namespace MozaPlugin.Devices
         {
             (DashCm2DeviceName, DashCm2ThumbnailKey),
             (DashCm1DeviceName, DashCm1ThumbnailKey),
+            (BaseAmbientDeviceName, BaseAmbientThumbnailKey),
         };
 
         // Content version of the dynamically generated wheel device.json. Bump
@@ -147,7 +153,7 @@ namespace MozaPlugin.Devices
 
             var resources = new (string DeviceName, string Resource, string Guid, string Pid, string? ThumbnailKey)[]
             {
-                (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid, null),
+                (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid, BaseAmbientThumbnailKey),
                 (DashCm1DeviceName,     DashCm1Resource,     MozaDeviceConstants.DashCm1Guid,       wheelbasePid, DashCm1ThumbnailKey),
                 (DashCm2DeviceName,     DashCm2Resource,     MozaDeviceConstants.DashCm2Guid,       dashboardPid, DashCm2ThumbnailKey),
             };
@@ -340,7 +346,8 @@ namespace MozaPlugin.Devices
         /// it (R9/R12) should never see this file deployed.
         /// </summary>
         public static bool DeployBaseAmbient(string? discoveredPid)
-            => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid, MozaDeviceConstants.BaseAmbientGuid);
+            => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid, MozaDeviceConstants.BaseAmbientGuid,
+                thumbnailKey: BaseAmbientThumbnailKey);
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
             int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid,

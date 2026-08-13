@@ -46,10 +46,13 @@ namespace MozaPlugin.Devices
     }
 
     /// <summary>
-    /// Wraps a dedicated <see cref="MozaSerialConnection"/> for the AB9 active shifter
-    /// (VID 0x346E, PID 0x1000). Owns the connection lifecycle, identity probe,
-    /// mode/slider writes, and stored-state read-back. Independent of the wheelbase
-    /// connection so both can run side-by-side.
+    /// Wraps a dedicated <see cref="MozaSerialConnection"/> for the active shifter
+    /// (VID 0x346E — AB9 PID 0x1000, AB6 PID 0x1002; one shared lane, so with both
+    /// attached only the first-enumerated one is claimed). Owns the connection
+    /// lifecycle, identity probe, mode/slider writes, and stored-state read-back.
+    /// Independent of the wheelbase connection so both can run side-by-side.
+    /// AB6 protocol parity with the AB9 is assumed, not captured — see
+    /// docs/protocol/devices/ab9-shifter.md § AB6 sibling.
     /// </summary>
     public class MozaAb9DeviceManager : IDisposable
     {
@@ -78,10 +81,26 @@ namespace MozaPlugin.Devices
         private readonly MozaSerialConnection _connection;
         private volatile bool _detected;
         private volatile bool _ffbInitSent;
+        // Device-assigned effect indices, packed one byte per Ab9Effect slot and
+        // latched from the 0x07 alloc ACKs (see LatchAllocAck). Written only on the
+        // serial read thread, read from the vib worker + data thread — Interlocked
+        // on the long so readers always get a consistent set. Defaults are the
+        // 1..6 a fresh device hands out, so a missed ACK changes nothing.
+        private const long DefaultEffectIndexBits = 0x060504030201L;
+        private long _effectIndexBits = DefaultEffectIndexBits;
+        private int _allocAckCount;
+        // Resolved once per successful open. MarkDetected runs on the serial read
+        // thread while DiscoveredPid is written on the reconnect-timer thread, and
+        // it's a plain auto-property — reading it from there can observe a stale
+        // null and log the wrong model.
+        private volatile string _modelName = "AB9/AB6";
 
         public bool Detected => _detected;
         public bool IsConnected => _connection.IsConnected;
         public MozaSerialConnection Connection => _connection;
+        /// <summary>"AB9", "AB6", or the family label when the PID is unknown
+        /// (probe-based discovery under Wine/Proton).</summary>
+        public string ModelName => _modelName;
 
         public event Action<byte[]>? MessageReceived
         {
@@ -118,12 +137,16 @@ namespace MozaPlugin.Devices
             // handshake never re-fires → engine vibration / pulse streams hit
             // an uninitialised device.
             _connection.Disconnected += OnConnectionDisconnected;
+            // Watch the raw inbound stream for the 0x07 alloc ACKs so the effect
+            // indices the device hands out are latched rather than assumed.
+            _connection.MessageReceived += OnConnectionFrame;
         }
 
         private void OnConnectionDisconnected()
         {
             _detected = false;
             _ffbInitSent = false;
+            ResetEffectIndices();
         }
 
         /// <summary>
@@ -137,7 +160,10 @@ namespace MozaPlugin.Devices
             if (_connection.IsConnected) return true;
             bool ok = _connection.Connect();
             if (ok)
-                MozaLog.Info("[AZOM/AB9] Connected to AB9 shifter");
+            {
+                _modelName = MozaUsbIds.ActiveShifterShortName(_connection.DiscoveredPid);
+                MozaLog.Info($"[AZOM/AB9] Connected to {_modelName} active shifter");
+            }
             return ok;
         }
 
@@ -158,7 +184,7 @@ namespace MozaPlugin.Devices
         {
             if (_detected) return;
             _detected = true;
-            MozaLog.Debug("[AZOM/AB9] AB9 active shifter detected");
+            MozaLog.Debug($"[AZOM/AB9] {_modelName} active shifter detected");
         }
 
         /// <summary>
@@ -292,16 +318,85 @@ namespace MozaPlugin.Devices
         //   0701            alloc effect type 0x01 (sim returns slot idx 0x06)
         //   130000          commit (mask 0x0000)
         //
-        // The 1-byte slot indices returned by 0x07 ACKs are device-side internal
-        // handles and are NOT the same as the 16-bit slot IDs used in 0x0A 0x05
-        // streaming frames (those are runtime Windows DirectInput effect handles).
-        // The plugin uses a fixed slot table on the streaming side and ignores
-        // the 0x07 response indices.
+        // Each 0x07 is answered by `a0 21 07 <idx>` and logged by the device as
+        // "[INFO]ffb.c:682 New Effect Index:<idx>, Type:<type>" — the AB9 runs a
+        // HID-PID effect table and <idx> is the handle for that effect. That index
+        // is the SECOND BYTE of every subsequent 0x0A / 0x0B / 0x08 / 0x0D frame:
+        // 0x0A sets a periodic effect (Square/Sine), 0x0B a condition effect
+        // (Damper), 0x08 a constant force, and 0x0D starts one. A fresh device
+        // hands out 1..6, but the order is session-assigned — captures with a
+        // different alloc order show the sub-bytes shifted to match. Latched in
+        // LatchAllocAck; see docs/protocol/devices/ab9-shifter.md.
 
         private static readonly byte[] FfbAllocSequence = new byte[]
         {
             0x03, 0x09, 0x09, 0x01, 0x04, 0x01,
         };
+
+        /// <summary>
+        /// The six effects <see cref="SendFfbInitSequence"/> allocates, in alloc
+        /// order. The enum value is the index into <see cref="FfbAllocSequence"/> —
+        /// NOT the wire byte, which is the device-assigned effect index resolved
+        /// through <see cref="EffectIndex"/>.
+        /// </summary>
+        public enum Ab9Effect
+        {
+            /// <summary>Alloc type 0x03 (Square) — gear-shift rumble, magnitude via 0x0A.</summary>
+            ShiftRumble = 0,
+            /// <summary>Alloc type 0x09 (Damper) — engine-pulse ON half, params via 0x0B.</summary>
+            EnginePulseOn = 1,
+            /// <summary>Alloc type 0x09 (Damper) — engine-pulse OFF half.</summary>
+            EnginePulseOff = 2,
+            /// <summary>Alloc type 0x01 (Constant force) — shift engage kick, magnitude via 0x08.</summary>
+            EngageForce = 3,
+            /// <summary>Alloc type 0x04 (Sine) — engine vibration, magnitude + period via 0x0A.</summary>
+            EngineVib = 4,
+            /// <summary>Alloc type 0x01 (Constant force) — shift disengage kick.</summary>
+            NeutralForce = 5,
+        }
+
+        /// <summary>Wire byte for <paramref name="effect"/> — the device-assigned index.</summary>
+        private byte EffectIndex(Ab9Effect effect)
+        {
+            long bits = Interlocked.Read(ref _effectIndexBits);
+            return (byte)((bits >> (8 * (int)effect)) & 0xFF);
+        }
+
+        private void ResetEffectIndices()
+        {
+            Interlocked.Exchange(ref _effectIndexBits, DefaultEffectIndexBits);
+            Interlocked.Exchange(ref _allocAckCount, 0);
+        }
+
+        // Serial read thread. The device answers the alloc burst in request order,
+        // so the Nth `a0 21 07 <idx>` carries the index for FfbAllocSequence[N].
+        private void OnConnectionFrame(byte[] data)
+        {
+            if (data == null || data.Length < 4) return;
+            if (data[0] != 0xA0 || data[1] != 0x21 || data[2] != 0x07) return;
+            LatchAllocAck(data[3]);
+        }
+
+        private void LatchAllocAck(byte index)
+        {
+            int slot = Interlocked.Increment(ref _allocAckCount) - 1;
+            if (slot < 0 || slot >= FfbAllocSequence.Length) return;
+            int shift = 8 * slot;
+            long cur = Interlocked.Read(ref _effectIndexBits);
+            long next = (cur & ~(0xFFL << shift)) | ((long)index << shift);
+            Interlocked.Exchange(ref _effectIndexBits, next);
+            if (slot == FfbAllocSequence.Length - 1)
+                MozaLog.Debug($"[AZOM/AB9] FFB effect indices latched: {DescribeEffectIndices()}");
+        }
+
+        private string DescribeEffectIndices()
+        {
+            long bits = Interlocked.Read(ref _effectIndexBits);
+            var parts = new string[FfbAllocSequence.Length];
+            for (int i = 0; i < parts.Length; i++)
+                parts[i] = $"{(Ab9Effect)i}=0x{(bits >> (8 * i)) & 0xFF:X2}";
+            return string.Join(" ", parts);
+        }
 
         /// <summary>
         /// Emit the session-start FFB handshake exactly as PitHouse does. Idempotent
@@ -314,6 +409,8 @@ namespace MozaPlugin.Devices
             if (!_connection.IsConnected) return;
             if (_ffbInitSent) return;
             _ffbInitSent = true;
+            // Fresh alloc burst ⇒ fresh index set; the ACK handler refills it.
+            ResetEffectIndices();
 
             SendFfbControl(new byte[] { 0x0E, 0x02 });
             SendFfbControl(new byte[] { 0x0E, 0x01 });
@@ -390,8 +487,8 @@ namespace MozaPlugin.Devices
             frame[1] = 0x13;                      // length = cmd(2) + payload(17)
             frame[2] = 0x20;                      // group: FFB
             frame[3] = MozaProtocol.DeviceAb9;    // dev id 0x12
-            frame[4] = 0x0A;                      // cmd hi
-            frame[5] = 0x05;                      // cmd lo: streaming refresh
+            frame[4] = 0x0A;                      // set-periodic report
+            frame[5] = EffectIndex(Ab9Effect.EngineVib);
             frame[6] = (byte)(slot >> 8);
             frame[7] = (byte)(slot & 0xFF);
             // frame[8..14] left zero (already zero-initialised)
@@ -456,8 +553,8 @@ namespace MozaPlugin.Devices
             ushort amp = (ushort)Math.Round(intensity0to100 / 100.0 * EnginePulseAmpFullScale);
             _lastEnginePulsePhase = phase;
 
-            var on  = BuildEnginePulseFrame(0x02, phase, amp);
-            var off = BuildEnginePulseFrame(0x03, phase, 0x0000);
+            var on  = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOn), phase, amp);
+            var off = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOff), phase, 0x0000);
             _connection.SendStream(StreamKind.Ab9EnginePulse, on);
             // OFF immediately follows on the wire because the lane is latest-wins:
             // queue the ON first so it goes out, then enqueue OFF to overwrite the
@@ -467,7 +564,7 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        private static byte[] BuildEnginePulseFrame(byte subLo, ushort phase, ushort amplitude)
+        private static byte[] BuildEnginePulseFrame(byte effectIdx, ushort phase, ushort amplitude)
         {
             // Wire: 7E 16 20 12 0B XX 00 00 00 [ph ph][ph ph] 00×6 FF FA 04 [amp_hi amp_lo] 00 00
             //       len 0x16 = 22 = payload (2 sub-cmd + 20 fixed)
@@ -498,7 +595,7 @@ namespace MozaPlugin.Devices
             frame[2]  = 0x20;
             frame[3]  = MozaProtocol.DeviceAb9;
             frame[4]  = 0x0B;
-            frame[5]  = subLo;
+            frame[5]  = effectIdx;
             // frame[6..8] zero (3 bytes — payload[2..4])
             frame[9]  = (byte)(phase >> 8);
             frame[10] = (byte)(phase & 0xFF);
@@ -515,38 +612,44 @@ namespace MozaPlugin.Devices
             return frame;
         }
 
-        // ===== Low-rate signed pair (Group 0x20 / cmd 0x08 0x04 + 0x08 0x06) =====
+        // ===== Shift constant-force pair (Group 0x20 / cmd 0x08, set-constant-force) =====
         //
-        // 11-byte frames carrying an engine-cycle phase signal as a signed-16 pair:
-        //   0x08 0x04 has -magnitude, 0x08 0x06 has +magnitude.
-        // Constants `00 64 04` at offset 4-6 (envelope amp 100, tag 0x04). Sparse:
-        // PitHouse fired ~0.35 Hz across the session.
+        // 11-byte frames setting the magnitude of the two constant-force effects
+        // (alloc type 0x01) that the shift triggers start — EngageForce gets the
+        // negative half, NeutralForce the positive one. Constants `00 64 04` at
+        // offset 4-6 (envelope amp 100, tag 0x04).
+        //
+        // This is the shift kick's amplitude, NOT an engine-cycle phase signal.
+        // PitHouse emits a short ascending burst here immediately before the 0x0D
+        // start, peaking at ~517. Only the shift path may write it — a periodic
+        // writer ramps every gear engagement toward full scale.
+
+        /// <summary>Ascending magnitudes PitHouse sends across one engagement burst.</summary>
+        private static readonly short[] ShiftForceRamp = { 24, 295, 419, 517 };
 
         /// <summary>
-        /// Push the signed-magnitude low-rate pair. The plugin's caller drives this
-        /// from an engine-cycle phase accumulator (advances per engine cycle).
+        /// Set the bipolar constant-force magnitude for the two shift effects.
+        /// Both halves ride the one-shot FIFO — a ramp must not coalesce.
         /// </summary>
-        public bool SendLowRatePair(short magnitude)
+        public bool SendShiftForceMagnitude(short magnitude)
         {
             if (!_connection.IsConnected) return false;
-            var neg = BuildLowRateFrame(0x04, (short)(-magnitude));
-            var pos = BuildLowRateFrame(0x06, magnitude);
-            _connection.SendStream(StreamKind.Ab9LowRate, neg);
-            _connection.Send(pos);
+            _connection.Send(BuildShiftForceFrame(EffectIndex(Ab9Effect.EngageForce), (short)(-magnitude)));
+            _connection.Send(BuildShiftForceFrame(EffectIndex(Ab9Effect.NeutralForce), magnitude));
             return true;
         }
 
-        private static byte[] BuildLowRateFrame(byte subLo, short magnitude)
+        private static byte[] BuildShiftForceFrame(byte effectIdx, short magnitude)
         {
             // Wire: 7E 0B 20 12 08 XX [mag_hi mag_lo] 00 64 04 00 00 00 00 <chk>
-            //       len 0x0B = 11 = payload (2 sub-cmd + 9)
+            //       len 0x0B = 11 = payload (2 report+idx + 9)
             var frame = new byte[16];
             frame[0]  = MozaProtocol.MessageStart;
             frame[1]  = 0x0B;
             frame[2]  = 0x20;
             frame[3]  = MozaProtocol.DeviceAb9;
             frame[4]  = 0x08;
-            frame[5]  = subLo;
+            frame[5]  = effectIdx;
             frame[6]  = (byte)((ushort)magnitude >> 8);
             frame[7]  = (byte)((ushort)magnitude & 0xFF);
             frame[8]  = 0x00;
@@ -557,34 +660,21 @@ namespace MozaPlugin.Devices
             return frame;
         }
 
-        // ===== Trigger sub-cmds (Group 0x20 / cmd 0x0D 0x01..0x06) =====
+        // ===== Effect-operation report (Group 0x20 / cmd 0x0D) =====
         //
-        // 3-byte frames with a single payload byte (always 0x01 observed).
-        //   0x0D 0x01 (Sparse / Shift) — fires alongside per-shift events.
-        //              At idle (no shifts) appears at ~0.10 Hz; during active
-        //              gear cycling jumps to ~1.2 Hz. See usb-capture/AB9/
-        //              all_gears.pcapng + 1-N.pcapng.
-        //   0x0D 0x02 + 0x0D 0x03 — paired flat-rate keepalive (~9 Hz).
-        //   0x0D 0x04 (Engage)     — per-shift trigger when entering any non-
-        //                              neutral gear. Observed only during gear
-        //                              cycling; ACKed by device with standard
-        //                              0xA0 generic FFB ACK.
-        //   0x0D 0x05 (RpmTrack)   — RPM-tracking trigger (1.3..32 Hz with state).
-        //   0x0D 0x06 (Disengage)  — per-shift trigger when entering neutral.
-        //                              Same shape as Engage.
+        // 3-byte frames — `0D <effectIdx> 01` — starting one allocated effect.
+        // The 0x01 payload byte is the operation (start); it is the only value
+        // observed. Observed cadences per effect:
+        //   ShiftRumble    — per-shift, alongside the engage/neutral start. At idle
+        //                    ~0.10 Hz; during gear cycling ~1.2 Hz.
+        //   EnginePulseOn  \ paired flat-rate restart of the two dampers (~9 Hz).
+        //   EnginePulseOff /
+        //   EngageForce    — per-shift, entering any non-neutral gear.
+        //   EngineVib      — RPM-tracked restart of the sine (1.3..32 Hz with state).
+        //   NeutralForce   — per-shift, entering neutral.
+        // All are ACKed with the standard 0xA0 generic FFB ACK.
 
-        public enum Ab9Trigger : byte
-        {
-            // Values are the sub-cmd lo byte on the wire.
-            Sparse     = 0x01,
-            KeepaliveA = 0x02,
-            KeepaliveB = 0x03,
-            Engage     = 0x04,
-            RpmTrack   = 0x05,
-            Disengage  = 0x06,
-        }
-
-        public bool SendTrigger(Ab9Trigger trigger)
+        public bool SendTrigger(Ab9Effect effect)
         {
             if (!_connection.IsConnected) return false;
             // Wire: 7E 03 20 12 0D XX 01 <chk>
@@ -594,86 +684,83 @@ namespace MozaPlugin.Devices
             frame[2] = 0x20;
             frame[3] = MozaProtocol.DeviceAb9;
             frame[4] = 0x0D;
-            frame[5] = (byte)trigger;
+            frame[5] = EffectIndex(effect);
             frame[6] = 0x01;
             frame[7] = MozaProtocol.CalculateWireChecksum(frame, 7);
 
-            // Route each trigger to its own lane so back-to-back same-kind pushes
-            // don't coalesce, while still letting stale ones drop if the worker
-            // falls behind. Per-shift events (Sparse/Engage/Disengage) bypass
-            // the latest-wins stream lane entirely — they're event-driven and
-            // must not drop or coalesce.
-            switch (trigger)
+            // Route each periodic start to its own lane so back-to-back same-kind
+            // pushes don't coalesce, while still letting stale ones drop if the
+            // worker falls behind. Per-shift starts bypass the latest-wins stream
+            // lane entirely — they're event-driven and must not drop or coalesce.
+            switch (effect)
             {
-                case Ab9Trigger.KeepaliveA:
-                case Ab9Trigger.KeepaliveB:
+                case Ab9Effect.EnginePulseOn:
+                case Ab9Effect.EnginePulseOff:
                     _connection.SendStream(StreamKind.Ab9TriggerA, frame);
                     break;
-                case Ab9Trigger.RpmTrack:
+                case Ab9Effect.EngineVib:
                     _connection.SendStream(StreamKind.Ab9TriggerRpm, frame);
                     break;
-                case Ab9Trigger.Sparse:
-                case Ab9Trigger.Engage:
-                case Ab9Trigger.Disengage:
-                    _connection.Send(frame);
-                    break;
                 default:
-                    _connection.SendStream(StreamKind.Ab9TriggerExtra, frame);
+                    _connection.Send(frame);
                     break;
             }
             return true;
         }
 
         /// <summary>
-        /// Fire the per-shift trigger pair PitHouse emits on each gear change.
-        /// Sends 0x0D 0x01 (Sparse) immediately followed by either 0x0D 0x04
-        /// (engage) or 0x0D 0x06 (disengage / into neutral). Both frames go
-        /// through the one-shot FIFO so they can't drop or reorder against
-        /// the engine-vib stream lanes. The AB9 firmware fires its stored
-        /// rumble pattern on the trigger; without it, gear engagements produce
-        /// no haptic feedback (verified empirically by the user 2026-05-24 and
-        /// in usb-capture/AB9/all_gears.pcapng / 1-N.pcapng).
+        /// Fire the per-shift sequence PitHouse emits on each gear change: the
+        /// ascending constant-force ramp, then the ShiftRumble start, then either
+        /// EngageForce or NeutralForce. Every frame goes through the one-shot FIFO
+        /// so the ramp keeps its order and nothing drops against the engine-vib
+        /// stream lanes. <paramref name="intensity0to100"/> is the user's
+        /// gear-shift vibration slider — it scales the ramp, so the kick tracks
+        /// the slider instead of elapsed streaming time.
         /// </summary>
-        public bool SendGearShiftTrigger(bool engageNotDisengage)
+        public bool SendGearShiftTrigger(bool engageNotDisengage, int intensity0to100)
         {
             if (!_connection.IsConnected) return false;
-            SendTrigger(Ab9Trigger.Sparse);
-            SendTrigger(engageNotDisengage ? Ab9Trigger.Engage : Ab9Trigger.Disengage);
+            if (intensity0to100 < 0) intensity0to100 = 0;
+            if (intensity0to100 > 100) intensity0to100 = 100;
+            foreach (var step in ShiftForceRamp)
+                SendShiftForceMagnitude((short)(step * intensity0to100 / 100));
+            SendTrigger(Ab9Effect.ShiftRumble);
+            SendTrigger(engageNotDisengage ? Ab9Effect.EngageForce : Ab9Effect.NeutralForce);
             return true;
         }
 
         /// <summary>
-        /// Emit the paired keepalive triggers (0x0D 0x02 + 0x0D 0x03). PitHouse
-        /// fires them within sub-ms of each other; we queue both into the same
-        /// lane so the second naturally follows the first onto the wire.
+        /// Restart both engine-pulse dampers. PitHouse fires them within sub-ms of
+        /// each other; we queue both into the same lane so the second naturally
+        /// follows the first onto the wire.
         /// </summary>
         public bool SendKeepalivePair()
         {
             if (!_connection.IsConnected) return false;
-            SendTrigger(Ab9Trigger.KeepaliveA);
-            // Second keepalive uses the one-shot FIFO so it can't be overwritten
-            // by another KeepaliveA before it reaches the wire.
+            SendTrigger(Ab9Effect.EnginePulseOn);
+            // Second start uses the one-shot FIFO so it can't be overwritten by
+            // another EnginePulseOn before it reaches the wire.
             var b = new byte[8];
             b[0] = MozaProtocol.MessageStart;
             b[1] = 0x03;
             b[2] = 0x20;
             b[3] = MozaProtocol.DeviceAb9;
             b[4] = 0x0D;
-            b[5] = (byte)Ab9Trigger.KeepaliveB;
+            b[5] = EffectIndex(Ab9Effect.EnginePulseOff);
             b[6] = 0x01;
             b[7] = MozaProtocol.CalculateWireChecksum(b, 7);
             _connection.Send(b);
             return true;
         }
 
-        // ===== Gear-shift vibration intensity config (Group 0x20 / cmd 0x0A 0x01) =====
+        // ===== Gear-shift rumble magnitude (Group 0x20 / cmd 0x0A, set-periodic) =====
         //
-        // One-shot push on slider change. AB9 firmware persists the value and
-        // fires the rumble pattern itself on every HID-detected gear shift —
-        // no per-shift host trigger needed (see ab9-shifter.md).
+        // One-shot push on slider change, setting the magnitude of the ShiftRumble
+        // square-wave effect that SendGearShiftTrigger then starts. The period
+        // field holds a fixed 0x0E0064.
         //
         // Layout of the 24-byte wire frame:
-        //   7E 13 20 12 0A 01 [int_hi int_lo] [00 × 7]
+        //   7E 13 20 12 0A <idx> [int_hi int_lo] [00 × 7]
         //                     [0E 00 64 04] [00 × 4] [cksum]
         // Intensity is BE 16-bit, linearly scaled from 0..100 to 0..0x332C
         // (verified: 30% = 0x0F5A, 100% = 0x332C).
@@ -697,7 +784,7 @@ namespace MozaPlugin.Devices
             frame[2] = 0x20;
             frame[3] = MozaProtocol.DeviceAb9;
             frame[4] = 0x0A;
-            frame[5] = 0x01;
+            frame[5] = EffectIndex(Ab9Effect.ShiftRumble);
             frame[6] = (byte)(raw >> 8);
             frame[7] = (byte)(raw & 0xFF);
             // frame[8..14] zero
@@ -714,8 +801,10 @@ namespace MozaPlugin.Devices
         public void Dispose()
         {
             _connection.Disconnected -= OnConnectionDisconnected;
+            _connection.MessageReceived -= OnConnectionFrame;
             _detected = false;
             _ffbInitSent = false;
+            ResetEffectIndices();
             _connection.Dispose();
         }
     }

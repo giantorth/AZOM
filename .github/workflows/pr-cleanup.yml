@@ -1,0 +1,30 @@
+name: PR Cleanup
+
+# Separate from pr-build.yml on purpose: a `paths` filter would also gate the
+# `closed` event, and cleanup must never be skipped by a filter mismatch.
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  delete-releases:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Fork PRs never had releases published.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Delete this PR's releases and tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 500 \
+            --json tagName \
+            --jq ".[] | select(.tagName | test(\"^pr-${PR_NUMBER}-[0-9a-f]{7}\$\")) | .tagName" \
+          | while read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "Deleting $tag (PR #${PR_NUMBER} closed)"
+              gh release delete "$tag" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+            done

@@ -44,7 +44,7 @@ Synthesised from four 2026-05-17 bridge captures (13-dashboard wheel, R5 base + 
 - `sim/logs/bridge-20260517-081336.jsonl` — 14 backward wheel switches
 - `sim/logs/bridge-20260517-082046.jsonl` — 10 wheel-side page changes within Grids
 
-Open items still pending more captures: full `28:00` register behaviour, FF-record kind=14/15/16/0x10 semantics, `b8 XX 02` byte 2 meaning for dashboard cases.
+Open items still pending more captures: full `28:00` register behaviour, FF-record kind=16/0x10 semantics, `b8 XX 02` byte 2 meaning for dashboard cases. (kind=14/15 resolved 2026-08-07 — the device log pull, see [`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md) § Device log pull.)
 
 A dashboard or page switch can be initiated by either the host (PitHouse UI) or the wheel hardware (knob/button on the rim). The wire signature differs by initiator; the post-switch re-bind sequence is largely the same when a dashboard changes.
 
@@ -124,8 +124,10 @@ Phase 4 — PitHouse emits a TIER-DEF BURST of multiple emissions paced
           rebuild with the wheel's latest END value so a slow wheel push
           is still picked up by emission 2/3/4. Total emissions per
           switch: 3-13 (scales with dashboard sub-tier count).
-Phase 5 — sess=0x02 b2h FF-record kind=14 (~600-820 B zlib payload) at +2-3 s
-          (post-switch wheel-side state dump — purpose UNVERIFIED).
+Phase 5 — b2h FF-record kind=14 (~600-820 B zlib payload) at +2-3 s: the
+          display's application log, answering a host kind=14 pull (the
+          switch generates fresh log lines). See sessions/session-0x02-ff-init.md
+          § Device log pull. Not part of the switch handshake.
 Phase 6 — Value-frame payload length recovers; live telemetry resumes (~+1.2 s).
 ```
 

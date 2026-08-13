@@ -59,8 +59,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// per-band gain · 100% = neutral · 400% = max boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB OUTPUT CURVE</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// drag the 5 nodes to shape response</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>FLAT</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>FALLOFF</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S CURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENTIAL</value></data>
@@ -130,6 +128,8 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R Layout 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R Layout 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Sequential</value></data>
+  <data name="Option_HPattern" xml:space="preserve"><value>H-pattern</value></data>
+  <data name="Label_ShifterType" xml:space="preserve"><value>Shifter type</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>FEEL</value></data>
   <data name="Subtitle_PerAxisMechanicalCharacter" xml:space="preserve"><value>// per-axis mechanical character</value></data>
   <data name="SliderLabel_MechanicalResistance" xml:space="preserve"><value>Mechanical Resistance</value></data>
@@ -229,8 +229,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB DETECTION</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Disable serial-probe fallback (advanced)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Only required if plugin is talking to incorrect device.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disable AB9 active-shifter detection</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Skip the AB9 reconnect probe.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disable active-shifter detection (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Skip the active-shifter reconnect probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD TELEMETRY</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Upload dashboard on connect</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Download dashboards from wheel</value></data>
@@ -317,7 +317,6 @@
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Check for updates automatically</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Release channel</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stable</value></data>
-  <data name="Option_ReleaseChannelDev" xml:space="preserve"><value>Development</value></data>
   <data name="Button_CheckNow" xml:space="preserve"><value>Check now</value></data>
   <data name="Status_UpdateNeverChecked" xml:space="preserve"><value>Never checked</value></data>
   <data name="Status_UpdateChecking" xml:space="preserve"><value>Checking…</value></data>
@@ -351,7 +350,8 @@
   <data name="Button_StartCapture" xml:space="preserve"><value>START CAPTURE</value></data>
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Always start diagnostics capture on launch/game switch</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>When on, the serial traffic capture begins automatically each time the plugin starts.</value></data>
-  <data name="Button_ExportBundle" xml:space="preserve"><value>EXPORT BUNDLE (ZIP)…</value></data>
+  <data name="Button_ExportBundle" xml:space="preserve"><value>Export Bundle</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>Copy Reference</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>COPY CAPTURE TO CLIPBOARD</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>FULL DIAGNOSTIC REPORT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// debugging information</value></data>
@@ -564,6 +564,9 @@
   <data name="Banner_TelemetryParked_Body" xml:space="preserve"><value>Toggle dashboard telemetry off and on to retry.</value></data>
   <data name="Banner_RestartSimHub_Title" xml:space="preserve"><value>Restart SimHub</value></data>
   <data name="Banner_RestartSimHub_Body" xml:space="preserve"><value>New device definitions were deployed. Restart SimHub to add them under Devices.</value></data>
+  <data name="Banner_WheelFwOutdated_Title" xml:space="preserve"><value>Wheel firmware update recommended</value></data>
+  <data name="Banner_WheelFwOutdated_BodyFmt" xml:space="preserve"><value>{0} responded using the legacy protocol, so wheel features are limited this session. Update the wheel and wheelbase firmware in MOZA Pit House, then restart SimHub.</value></data>
+  <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>The connected wheel</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} not added in SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>A MOZA dashboard is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>This wheelbase has an ambient LED strip, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0} to drive the strip.</value></data>
@@ -630,6 +633,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>FOLDER</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>PRESET</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFILE</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDAL</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APPLY TO</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>CHANGES</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// no Motor presets in this folder</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// no Pedals presets in this folder</value></data>
@@ -725,4 +730,50 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Import</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Export</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Road Rumble</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_StalksGameKeys" xml:space="preserve"><value>Game keys</value></data>
+  <data name="Label_WiperForwardKey" xml:space="preserve"><value>Wipers forward</value></data>
+  <data name="Label_WiperBackKey" xml:space="preserve"><value>Wipers back</value></data>
+  <data name="Label_LightCycleKey" xml:space="preserve"><value>Light cycle</value></data>
+  <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Indicator left</value></data>
+  <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Indicator right</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Indicators</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Minimum blinker time (s)</value></data>
+  <data name="KeyCapture_Prompt" xml:space="preserve"><value>Press a key…</value></data>
+  <data name="KeyCapture_None" xml:space="preserve"><value>(not set)</value></data>
+  <data name="StalkKind_None" xml:space="preserve"><value>(none)</value></data>
+  <data name="StalkKind_KeyTap" xml:space="preserve"><value>Key tap</value></data>
+  <data name="StalkKind_HeldKey" xml:space="preserve"><value>Held key</value></data>
+  <data name="StalkKind_LatchKey" xml:space="preserve"><value>Latch key</value></data>
+  <data name="StalkKind_IndicatorLeft" xml:space="preserve"><value>Indicator: left</value></data>
+  <data name="StalkKind_IndicatorRight" xml:space="preserve"><value>Indicator: right</value></data>
+  <data name="StalkKind_IndicatorCancel" xml:space="preserve"><value>Indicator: cancel</value></data>
+  <data name="StalkKind_WiperSwipe" xml:space="preserve"><value>Wiper: single swipe</value></data>
+  <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Release held keys</value></data>
+  <data name="StalkKind_WiperStage" xml:space="preserve"><value>Wiper stage {0}</value></data>
+  <data name="StalkKind_LightStage" xml:space="preserve"><value>Light stage {0}</value></data>
+  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
+  <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR closed — switched to Stable</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// per-band gain · 100% = neutral · 500% = max boost</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSITIVITY</value></data>
 </root>

@@ -80,6 +80,12 @@ namespace MozaPlugin.Telemetry
         // BEFORE SetPendingDashboardKey is called) can dedupe its own log line.
         private string? _lastApplyDeferReason;
 
+        // One-shot latch for the "telemetry disabled for this wheel" skip line in
+        // StartTelemetryIfReady. That method has 9 call sites, several event-driven,
+        // so an unlatched line would flood the ring buffer. Re-armed on user toggle
+        // and on ClearLastAppliedDashboardKey (plugin reload / wheel-detection reset).
+        private int _telemetryDisabledSkipLogged;
+
         private static readonly TimeSpan PendingProfileKeyTimeout = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan RetryWarnInterval = TimeSpan.FromSeconds(30);
 
@@ -131,6 +137,7 @@ namespace MozaPlugin.Telemetry
         public void ClearLastAppliedDashboardKey()
         {
             lock (_stateLock) { _lastAppliedDashboardKey = null; }
+            Interlocked.Exchange(ref _telemetryDisabledSkipLogged, 0);
         }
 
         // ── Lock-guarded helpers (call ONLY from outside _stateLock) ─────────
@@ -897,6 +904,7 @@ namespace MozaPlugin.Telemetry
         {
             _plugin.ActiveTelemetryEnabled = enabled;
             _plugin.SaveSettings();
+            Interlocked.Exchange(ref _telemetryDisabledSkipLogged, 0);
             if (enabled)
             {
                 // Explicit user re-enable clears any prior park / restart
@@ -918,12 +926,56 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        /// <summary>
+        /// The dash-page equivalent of <see cref="SetTelemetryEnabled"/>: flips the
+        /// CM2/CM1-scoped flag and starts/stops that pipeline. The dash lane is
+        /// reachable with no wheel attached, so this must not route through the
+        /// wheel-page flag (whose setter no-ops without a wheel).
+        /// </summary>
+        public void SetDashTelemetryEnabled(bool enabled)
+        {
+            _plugin.ActiveDashTelemetryEnabled = enabled;
+            _plugin.SaveSettings();
+            if (enabled)
+            {
+                // Explicit re-enable clears any prior park / restart budget, same
+                // rationale as the wheel path.
+                _plugin.Cm2Sender?.Recovery.Reset();
+                ApplyTelemetrySettings(); // → EnsureCm2Pipeline
+                _plugin.StartTelemetryIfReady();
+            }
+            else
+            {
+                // Stop directly: EnsureCm2Pipeline's teardown is debounced 12 s, so
+                // an explicit off must not wait it out.
+                try { _plugin.Cm2Sender?.Stop(); } catch { }
+                if (_plugin._cm1Driver?.IsRunning == true) { try { _plugin._cm1Driver.Stop(); } catch { } }
+            }
+        }
+
         /// <summary>Start the telemetry sender when preconditions are met. Dispatched off the read thread.</summary>
         public void StartTelemetryIfReady()
         {
             var t = _plugin.TelemetrySender;
             if (t == null) return;
-            if (!_plugin.ActiveTelemetryEnabled) return;
+            if (!_plugin.ActiveTelemetryEnabled)
+            {
+                // Logged once per arm: this is the gate that leaves a healthy wheel
+                // with a dark dashboard and nothing in the log to say why (bundle
+                // NZW8W197). The gates below it already log their skips.
+                if (Interlocked.CompareExchange(ref _telemetryDisabledSkipLogged, 1, 0) == 0)
+                {
+                    var pg = _plugin.GetCurrentWheelPageGuid();
+                    MozaLog.Info(
+                        $"[AZOM] Dashboard telemetry is OFF for wheel '{_data?.WheelModelName}' "
+                        + $"(page={(pg.HasValue ? pg.Value.ToString("N").Substring(0, 8) : "unresolved")}, "
+                        + $"HasDisplay={_plugin.WheelModelInfo?.HasDisplay?.ToString() ?? "unknown"}, "
+                        + $"installDefault={_plugin.Settings?.TelemetryEnabledDefaultForNewWheels}) "
+                        + "— skipping telemetry start until the wheel page's "
+                        + "'Enable dashboard telemetry' toggle is on");
+                }
+                return;
+            }
             // DECOUPLED: the MAIN sender drives only the wheel's own screen, so it
             // requires the wheelbase connection AND a detected wheel. A CM2 (bus or
             // USB) is driven by the dedicated _cm2Sender via EnsureCm2Pipeline (called

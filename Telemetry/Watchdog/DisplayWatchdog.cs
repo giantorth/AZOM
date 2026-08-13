@@ -75,6 +75,16 @@ namespace MozaPlugin.Telemetry.Watchdog
         // (sess=0x01); 20 s leaves headroom past legitimate quiet.
         private const int S02StallThresholdMs = 20_000;
         private const int S01StallThresholdMs = 20_000;
+        // Binding-channel death (Context C): the resolved tier-def session has
+        // carried NO inbound for this long while the mirror session stayed
+        // demonstrably alive. Healthy cadence on the tier-def session is ~4 s
+        // keepalives, so 120 s is ~30 missed periods — far past any legitimate
+        // idle gap, small next to the 27 min the 2026-07-24 wedge sat unseen.
+        private const int TierDefSessionDeadThresholdMs = 120_000;
+        // The corroborating mirror session must have inbound at least this
+        // fresh, so a dead cable / vanished port (both sessions quiet) can
+        // never fire this rule — that is the connection layer's job.
+        private const int MirrorSessionFreshMs = 30_000;
         // Don't trust inbound-bytes liveness on mgmt while a wheel-initiated
         // CLOSE is recent — the close is the wheel rejecting the session.
         private const int S01PostCloseSettleMs = 15_000;
@@ -423,6 +433,53 @@ namespace MozaPlugin.Telemetry.Watchdog
             // Context A — engagement establishment.
             if (_sender.CatalogCount <= 0)
                 return (true, $"no channel catalog past {EngagementGraceMs} ms grace");
+
+            // Context C — binding-channel liveness (binding dead under a green
+            // dashboard). Fires when the resolved tier-def session has carried
+            // ZERO inbound past the threshold while the mirror session proves
+            // the wheel and wire alive. Two confirmed true positives:
+            //   • 2026-07-24: wheel power-cycled under an Active sender — 0x01
+            //     dead 27 min, 0x02 chatty, every content check green off
+            //     caches, display dead until a manual toggle.
+            //   • 2026-07-31/08-01: HOT-path game switch drops the value feed —
+            //     the wheel ECHOES the kind=4 (slot change is not data binding!)
+            //     then 0x01 goes silent ~10 s later and the dash sits dead.
+            //     With this rule armed the restart recovered it at +2 min every
+            //     time; with it warn-only (08-01) the drop was permanent.
+            // History: briefly downgraded to warn-only on 2026-07-31 after
+            // misreading the kind=4 echo as proof of a working display — the
+            // "false positive" wasn't one. A genuinely bound display keeps the
+            // tier-def session's inbound stamp fresh (13 min of healthy play
+            // between fires, zero re-fires); do not neuter this again without a
+            // confirmed healthy-display fire. Both-quiet (cable pull) stays
+            // excluded via the mirror freshness gate — connection layer's job.
+            {
+                byte tierDefSes = _sender.ResolveTierDefSession();
+                bool tierDefIsFlag = tierDefSes == _sender.FlagByte
+                    && _sender.FlagByte != _sender.MgmtPort;
+                long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
+                long s02 = Interlocked.Read(ref _session02LastInboundUtcTicks);
+                long deadStamp = tierDefIsFlag ? s02 : s01;
+                long aliveStamp = tierDefIsFlag ? s01 : s02;
+                // Never-seen inbound this Start cycle counts from Active entry.
+                long deadAgeMs = deadStamp != 0
+                    ? (nowUtc - deadStamp) / TimeSpan.TicksPerMillisecond
+                    : Environment.TickCount - _activeStateEnteredTickCount;
+                long aliveAgeMs = aliveStamp != 0
+                    ? (nowUtc - aliveStamp) / TimeSpan.TicksPerMillisecond
+                    : long.MaxValue;
+                if (deadAgeMs >= TierDefSessionDeadThresholdMs
+                    && aliveAgeMs <= MirrorSessionFreshMs)
+                {
+                    byte mirrorSes = tierDefIsFlag ? _sender.MgmtPort : _sender.FlagByte;
+                    return (true,
+                        $"binding channel dead: no inbound on tier-def session 0x{tierDefSes:X2} " +
+                        $"for {deadAgeMs / 1000}s while sess=0x{mirrorSes:X2} stayed live " +
+                        $"(inbound {aliveAgeMs / 1000}s ago) — binding lost under a green dashboard " +
+                        "(wheel reboot, or the post-game-switch value-feed drop)");
+                }
+            }
+
             if (!_sender.ConfigJsonHasLastState)
             {
                 // The catalog is present (checked above): the display has already
@@ -442,6 +499,37 @@ namespace MozaPlugin.Telemetry.Watchdog
                 // catalog-bound display is not a restart-worthy failure: genuine
                 // non-establishment is the no-catalog check above, and genuine
                 // rejection is the wheel-CLOSE-storm backstop.
+                //
+                // EXCEPTION — the stale-session wedge (CS-Pro bundle 2026-07-21):
+                // catalog healthy on the tier-def session, but sess=0x02/0x09
+                // survived STALE from a prior host instance, so the wheel never
+                // emits ANY engagement record — no 0x09 device-init (ever), no
+                // configJson state, no slot report — while acking everything we
+                // send. None of the other triggers can fire (no wheel CLOSEs,
+                // END echoed fine), and the plugin sat Phase=Active/LastFailure=
+                // None for 10.5 min until a manual telemetry off/on. Distinguish
+                // it from the slow radar bind, which device-inits 0x09 within
+                // ~1 s and pushes its list (~40 s) INSIDE the s09 retry budget:
+                // here the wheel never device-inited 0x09 across the whole
+                // ~55 s budget, never pushed a live list, and never reported a
+                // slot. Restart = the empirically-proven off/on cycle (Stop →
+                // 11 s silence → fresh opens engaged in <2 s in that bundle);
+                // RecoveryDispatcher caps it and parks with the power-cycle hint.
+                bool s09BudgetSpent = _s09RetryRounds >= S09RetryMaxRounds;
+                bool wheelNeverDeviceInit09 = !_sender.WheelReadyObserved;
+                bool noLiveList =
+                    (_sender.ConfigJson?.LiveState?.ConfigJsonList?.Count ?? 0) == 0;
+                bool slotNeverReported = _sender.WheelReportedSlot < 0;
+                if (_sender.DisplayDetected
+                    && s09BudgetSpent && wheelNeverDeviceInit09
+                    && noLiveList && slotNeverReported)
+                {
+                    return (true,
+                        "catalog present but the display never engaged: no configJson state, " +
+                        $"sess=0x09 never device-initiated across {S09RetryMaxRounds} nudge rounds, " +
+                        "no live dashboard list, no slot report — stale-session wedge " +
+                        "(wheel session state survived from a prior host instance)");
+                }
                 return (false, "");
             }
 
@@ -705,7 +793,16 @@ namespace MozaPlugin.Telemetry.Watchdog
             // engagement verdict (see EvaluateEngagement Context B); engagement is
             // catalog + configJson establishment.
             bool engaged = catalog > 0 && state;
-            return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip})";
+            long nowUtc = DateTime.UtcNow.Ticks;
+            long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
+            long s02 = Interlocked.Read(ref _session02LastInboundUtcTicks);
+            string age(long stamp) => stamp == 0
+                ? "never"
+                : $"{(nowUtc - stamp) / TimeSpan.TicksPerSecond}s";
+            return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip} " +
+                   $"s09devinit={(_sender.WheelReadyObserved ? "yes" : "no")} " +
+                   $"s09rounds={_s09RetryRounds}/{S09RetryMaxRounds} " +
+                   $"s01inbound={age(s01)} s02inbound={age(s02)})";
         }
 
         // ───── Helpers ────────────────────────────────────────────────────

@@ -179,6 +179,8 @@ namespace MozaPlugin.Telemetry.Inbound
                 _sender.Watchdog.NoteSession02FirstInbound();
                 // Wheel-reported dashboard slot tracker.
                 _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
+                // FF-record reassembly (device display log, kind=14).
+                _sender.FeedFfRecords(session, seq, chunkPayload);
 
                 // Capture wheel's post-subscription response (5 s window).
                 if (_sender.SubscriptionResponseDeadlineTicksField != 0
@@ -215,6 +217,10 @@ namespace MozaPlugin.Telemetry.Inbound
                 // strict padding/bound validation rejects the mgmt session's
                 // 0x06 acks and 0x04 catalog-URL records.
                 _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
+                // FF-record reassembly. Scanned on both catalog sessions
+                // because which one carries the FF records is Form-dependent;
+                // a duplicate feed (FlagByte == MgmtPort) is dropped by seq.
+                _sender.FeedFfRecords(session, seq, chunkPayload);
             }
 
             // File-transfer candidate sessions (0x04..0x08): ack ALL, forward to

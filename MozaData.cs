@@ -63,6 +63,32 @@ namespace MozaPlugin
         private volatile string _serialPartA = "";
         private volatile string _serialPartB = "";
 
+        /// <summary>
+        /// Byte sequences that appear verbatim on the wire and identify this
+        /// specific hardware — MCU UIDs (raw wire bytes) and serial-number ASCII.
+        /// <see cref="MozaPlugin.Diagnostics.CaptureRedactor"/> masks any
+        /// occurrence of these inside an uploaded/exported serial capture. Only
+        /// sequences of ≥ 6 bytes are returned so a short value can't
+        /// false-positive against ordinary telemetry bytes.
+        /// </summary>
+        public System.Collections.Generic.IReadOnlyList<byte[]> GetIdentityByteSequences()
+        {
+            var list = new System.Collections.Generic.List<byte[]>();
+            void AddBytes(byte[] b) { if (b != null && b.Length >= 6) list.Add(b); }
+            void AddAscii(string s)
+            {
+                if (!string.IsNullOrEmpty(s) && s.Length >= 6)
+                    list.Add(System.Text.Encoding.ASCII.GetBytes(s));
+            }
+            AddBytes(WheelMcuUid);
+            AddBytes(DisplayMcuUid);
+            AddBytes(BaseMcuUid);
+            AddAscii(_serialPartA);
+            AddAscii(_serialPartB);
+            AddAscii(DisplaySerialNumber);
+            return list;
+        }
+
         // Raw observed reply bytes from group 0x40 cmd 0x28 polls.
         // PitHouse polls 28:00 + 28:01 at ~1 Hz throughout the active phase
         // across all four bridge captures (sim/logs/bridge-20260503-*.jsonl).
@@ -360,14 +386,27 @@ namespace MozaPlugin
         // was 1.2.9.24.
         public const int BaseFwLfeMin = (1 << 24) | (2 << 16) | (10 << 8) | 10; // 1.2.10.10
         public bool BaseSupportsLfe => BaseFwVersion != 0 && BaseFwVersion >= BaseFwLfeMin;
+        // The 10-band EQ (equalizer7-10, cmds 0x32..0x35) ships in the same
+        // 1.2.10.10 firmware as LFE.
+        public bool BaseSupportsEq10 => BaseSupportsLfe;
 
-        // ===== FFB Equalizer (6 bands: 10/15/25/40/60/100 Hz, 0-400% where 100% = flat) =====
+        // ===== FFB Equalizer =====
+        // Legacy 6-band UI (fw < 1.2.10.10): 10/15/25/40/60/100 Hz, 0-400%.
+        // 10-band UI (fw >= 1.2.10.10) relabels band 1 to 5 Hz and interleaves
+        // 7..10 as 10/30/50/80 Hz; 0-500% except Equalizer6 (100 Hz, 0-100%).
+        // 100% = flat either way.
         public volatile int Equalizer1 = 100;
         public volatile int Equalizer2 = 100;
         public volatile int Equalizer3 = 100;
         public volatile int Equalizer4 = 100;
         public volatile int Equalizer5 = 100;
         public volatile int Equalizer6 = 100;
+        public volatile int Equalizer7 = 100;
+        public volatile int Equalizer8 = 100;
+        public volatile int Equalizer9 = 100;
+        public volatile int Equalizer10 = 100;
+        // Wheelbase road sensitivity (cmd 0x0C), range 10..50; -1 = not yet read.
+        public volatile int RoadSensitivity = -1;
 
         // ===== FFB Curve (5 output points; point 5 fixed at input=100%) =====
         // X1..X4 are the input-axis positions of the first four points, sent via
@@ -406,19 +445,76 @@ namespace MozaPlugin
         public readonly int[] HandbrakeCurve = new int[] { 20, 40, 60, 80, 100 };
 
         // ===== Shifter settings (HGP/SGP, bus dev 0x1A) =====
-        // Live device-value mirror (populated by settings reads). -1 = not read yet.
-        public volatile int ShifterDirection = -1;   // 0=Normal, 1=Reversed
-        public volatile int ShifterPaddleSync = -1;  // 1/2
-        public volatile int ShifterHidMode = -1;     // 0/1 game-compat mode
-        public volatile int ShifterApplyMode = -1;   // 0/1
-        public volatile int ShifterBrightness = -1;  // SGP LED brightness 0-10
-        public volatile int ShifterLed1Index = -1;   // SGP LED S1 palette index 0-7
-        public volatile int ShifterLed2Index = -1;   // SGP LED S2 palette index 0-7
-        public volatile int ShifterTheta = -1;       // read-only raw axis (output-x)
-        // Generic device-type identity reply (grp 0x04 → `01 02 XX 06`) from a
-        // base/hub-relayed shifter; used to tell HGP from SGP where the PID isn't
-        // visible. Empty = not read.
-        public volatile byte[] ShifterDeviceType = System.Array.Empty<byte>();
+        // HGP and SGP are independent devices (both can be attached at once), so each
+        // has its own settings mirror. -1 = not read yet. Populated model-aware via
+        // UpdateShifter/UpdateShifterArray (the wire command names are shared, so the
+        // connection/owner disambiguates which device a reply belongs to).
+        public sealed class ShifterState
+        {
+            public volatile int Direction = -1;   // 0=Normal, 1=Reversed
+            public volatile int PaddleSync = -1;  // 1/2
+            public volatile int HidMode = -1;     // 0/1 game-compat mode
+            public volatile int ApplyMode = -1;   // 0/1
+            public volatile int Brightness = -1;  // SGP LED brightness 0-10
+            public volatile int Led1Index = -1;   // SGP LED S1 palette index 0-7
+            public volatile int Led2Index = -1;   // SGP LED S2 palette index 0-7
+            public volatile int Theta = -1;       // read-only raw axis (output-x)
+        }
+        public readonly ShifterState ShifterHgp = new ShifterState();
+        public readonly ShifterState ShifterSgp = new ShifterState();
+        // Relay-only scratch: the generic device-type identity reply (grp 0x04 →
+        // `01 02 XX 06`) from a base/hub-relayed shifter, used to tell HGP from SGP
+        // where the PID isn't visible. Model-agnostic — it's what RESOLVES the model.
+        public volatile byte[] RelayShifterDeviceType = System.Array.Empty<byte>();
+
+        private ShifterState? ShifterFor(Devices.ShifterModelKind model) =>
+            model == Devices.ShifterModelKind.Hgp ? ShifterHgp :
+            model == Devices.ShifterModelKind.Sgp ? ShifterSgp : null;
+
+        /// <summary>Store a parsed shifter setting into the given model's mirror.
+        /// No-op for Unknown (a relayed reply seen before the model resolves).</summary>
+        public void UpdateShifter(Devices.ShifterModelKind model, string name, int value)
+        {
+            var s = ShifterFor(model);
+            if (s == null) return;
+            switch (name)
+            {
+                case "shifter-hid-mode":    s.HidMode = value; break;
+                case "shifter-apply-mode":  s.ApplyMode = value; break;
+                case "shifter-brightness":  s.Brightness = value; break;
+                case "shifter-direction":   s.Direction = value; break;
+                case "shifter-paddle-sync": s.PaddleSync = value; break;
+                case "shifter-theta":       s.Theta = value; break;
+            }
+        }
+
+        public void UpdateShifterArray(Devices.ShifterModelKind model, string name, byte[] data)
+        {
+            var s = ShifterFor(model);
+            if (s == null) return;
+            if (name == "shifter-colors" && data.Length >= 2)
+            {
+                s.Led1Index = data[0];
+                s.Led2Index = data[1];
+            }
+        }
+
+        /// <summary>Model-aware dispatch for a parsed <c>shifter-*</c> reply. Returns
+        /// false for non-shifter commands (caller falls back to UpdateFromCommand/Array).
+        /// The device-type reply is relay identity used to resolve the model, so it's
+        /// stored model-agnostically in <see cref="RelayShifterDeviceType"/>.</summary>
+        public bool TryUpdateShifter(Devices.ShifterModelKind model, string? name, int intValue, byte[]? arrayValue)
+        {
+            if (name == null || !name.StartsWith("shifter-", StringComparison.Ordinal)) return false;
+            if (name == "shifter-device-type")
+            {
+                if (arrayValue != null) RelayShifterDeviceType = (byte[])arrayValue.Clone();
+                return true;
+            }
+            UpdateShifter(model, name, intValue);
+            if (arrayValue != null) UpdateShifterArray(model, name, arrayValue);
+            return true;
+        }
 
         // ===== Hub port power status (-1 = not read yet) =====
         public volatile int HubBasePower = -1;
@@ -581,6 +677,11 @@ namespace MozaPlugin
                 case "base-equalizer4": Equalizer4 = value; break;
                 case "base-equalizer5": Equalizer5 = value; break;
                 case "base-equalizer6": Equalizer6 = value; break;
+                case "base-equalizer7": Equalizer7 = value; break;
+                case "base-equalizer8": Equalizer8 = value; break;
+                case "base-equalizer9": Equalizer9 = value; break;
+                case "base-equalizer10": Equalizer10 = value; break;
+                case "base-road-sensitivity": RoadSensitivity = value; break;
 
                 // FFB Curve (X input positions + Y output values)
                 case "base-ffb-curve-x1": FfbCurveX1 = value; break;
@@ -636,13 +737,8 @@ namespace MozaPlugin
                 case "handbrake-y4": HandbrakeCurve[3] = value; break;
                 case "handbrake-y5": HandbrakeCurve[4] = value; break;
 
-                // Shifter settings (HGP/SGP). shifter-colors is an array — see UpdateFromArray.
-                case "shifter-hid-mode":    ShifterHidMode    = value; break;
-                case "shifter-apply-mode":  ShifterApplyMode  = value; break;
-                case "shifter-brightness":  ShifterBrightness = value; break;
-                case "shifter-direction":   ShifterDirection  = value; break;
-                case "shifter-paddle-sync": ShifterPaddleSync = value; break;
-                case "shifter-theta":       ShifterTheta      = value; break;
+                // Shifter settings (HGP/SGP) are model-aware — routed via
+                // UpdateShifter/TryUpdateShifter, not this shared switch.
 
                 // Hub port power status
                 case "hub-base-power":    HubBasePower    = value; IsHubConnected = true; break;
@@ -742,20 +838,8 @@ namespace MozaPlugin
                 if (data.Length >= 3)
                     SetColor(BaseAmbientShutdownColor, data);
             }
-            // Shifter (SGP) 2 LEDs: 2-byte payload [S1,S2], each a palette index 0-7.
-            else if (commandName == "shifter-colors")
-            {
-                if (data.Length >= 2)
-                {
-                    ShifterLed1Index = data[0];
-                    ShifterLed2Index = data[1];
-                }
-            }
-            // Relayed shifter device-type identity reply (HGP/SGP discriminator).
-            else if (commandName == "shifter-device-type")
-            {
-                ShifterDeviceType = (byte[])data.Clone();
-            }
+            // Shifter (SGP) LEDs + relayed device-type are model-aware — routed via
+            // UpdateShifterArray/TryUpdateShifter, not this shared method.
             // Dash RPM colors
             else if (commandName.StartsWith("dash-rpm-color") && !commandName.Contains("blink"))
             {

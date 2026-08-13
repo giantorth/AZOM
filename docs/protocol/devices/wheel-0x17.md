@@ -45,7 +45,7 @@ Full serial number = serial-a + serial-b (32 ASCII chars total).
 | rpm-blink-color8 | `0F 07` | 3 | array | |
 | rpm-blink-color9 | `0F 08` | 3 | array | |
 | rpm-blink-color10 | `0F 09` | 3 | array | |
-| key-combination | `13` | 4 | array | RW. Read form: 1-byte request `13` returns 4-byte current value (`FF FF FF FF` = unset) |
+| key-combination | `13` | 4 | array | RW. **Bitfield of per-shortcut enable flags** (1 = enabled; `FF FF FF FF` = factory default, all shortcuts on — earlier "unset" reading was wrong). RS21-W17-MC bit map (angle presets, mode change, dash switching) decoded per-bit 2026-07-31 — see [`../findings/2026-07-31-wheel-key-combo-bitfield.md`](../findings/2026-07-31-wheel-key-combo-bitfield.md). Persists in wheel EEPROM Table 2 Param 26. Read form: 1-byte request `13` returns the 4-byte value |
 | telemetry-mode | `1C 00` | 1 | int | |
 | telemetry-idle-effect | `1D 00` | 1 | int | |
 | buttons-idle-effect | `1D 01` | 1 | int | |
@@ -265,7 +265,7 @@ The contributor's exact channels were game/hub-specific (`ATSRHubMain.Telemetry.
 |---|---|---|---|
 | TyreTemp / TyrePressure | 5 | 4 × 10-bit LSB pack | tyre temp = **°C + 300** (inner & outer groups) |
 | BrakeTemp / Speed / Rpm / Int16 / FuelLaps | 2 | 16-bit **big-endian** | brake = raw °C; fuel-remain-laps = **laps × 100** |
-| Time (lap / gap / session) | 3 | 24-bit BE, ms | **seconds × 1000**; gap = **24-bit sign-magnitude** delta to best (**bit 23 = sign, set when ahead/faster**; low bits = \|ms\|) — verified against an ACC capture, 96% round-trip |
+| Time (lap / gap / session) | 3 | 24-bit BE, ms | **seconds × 1000**; gap = **24-bit sign-magnitude** delta to best — **bit 23 = sign**, low **23 bits** = \|ms\| (data[9] bits 0-6 carry the high magnitude bits, not just a pad). Range reaches **±1640 s+** in a PitHouse capture, so it is **not** limited to ±65 s. Sign convention verified against an ACC capture (96% round-trip) |
 | Int8 / Gear / Temperature / Float8 | 1 | 8-bit | gear = **SimHub gear + 1** (0 = R, 1 = N, 2 = 1st) |
 | GearDrsErs | 1 | gear[0:4] · **ERS mode**[4:6] (2-bit) · **DRS**[6] (1-bit) | ERS mode 0–3, DRS 0/1 |
 | Compact<4,4> | 1 | two 4-bit LSB | |
@@ -295,6 +295,29 @@ Payload = 2-byte cmd ID + 6-byte header + variable-length bit-packed channel dat
 | display-settings | `7C 1E` | 8 | array | Periodic display settings push (~1/s) — brightness/timeout/orientation; sent to all wheel models |
 | wheel-input-event | `B8 AA BB` | 3 | array | **DRAFT (2026-05-17, semantics verified across 40 events).** Wheel→host event emitted on `(b2h, grp=0xC3, dev=0x71)` immediately before the wheel's own kind=4 FF-record carrier when the user triggers a dashboard or page change from a wheel-side control. **Byte `AA` = action category**, **byte `BB` = action argument**: `00 02` = next dashboard, `01 02` = previous dashboard, `02 00` = next page within dashboard, `02 01` = previous page within dashboard. Verified across 4 captures totalling 40 events (14 forward dash + 16 backward dash + 10 page changes) with 40/40 prediction match and 0 counterexamples. 0 occurrences across 50 prior captures (~6.5 M lines), not present outside wheel-side input. Byte 2 for dashboard cases (`AA=0x00/0x01`) is always `0x02` — coincides with session id of the FF-record carrier, causation unproven. Not in `rs21_parameter.db`. b8→kind=4 delay: ~0.1 ms for dashboard, ~351 ms for page. See [`../tier-definition/handshake.md`](../tier-definition/handshake.md) § In-game dashboard switch and page change. |
 
+### Groups `0x15`–`0x19` (21–25) — Firmware Flash Transfer
+
+Dedicated wheel-firmware-update protocol, first captured live 2026-07-31
+(RS21-W17-MC, `01 02 07 07` → `01 02 09 07`). Distinct from the
+dashboard file-transfer path. Summary: `0x16` streams the image in
+58-byte frames with a mod-65536 BE u16 offset; `0x15` polls a
+received-byte counter; the wheel can push `0x96` NACK/resume frames to
+rewind the stream; `0x17` reads a 16-byte per-block digest; `0x18 01`
+commits a block, `0x18 02` walks the stored digest table for final
+verification; `0x19 00` finalizes. A 32-byte activation trailer is
+written last; the wheel applies and reboots on the internal bus with no
+CDC re-enumeration (the only reconnect is at update *initiation*).
+Update-mode traffic suspends all normal settings polling. Full frame
+formats, block cycle, and completion sequence:
+[`../findings/2026-07-31-wheel-firmware-update-protocol.md`](../findings/2026-07-31-wheel-firmware-update-protocol.md).
+
+The wheel's **display MCU** updates via a different path entirely —
+image pre-staged over session file-transfer, tiny manifest exchange at
+apply time, internal flash, no dedicated flash groups. Its firmware
+version answers on group `0x43` cmd `04` (reply `0xC3` `84` + 4 version
+bytes), not the standard version group. See
+[`../findings/2026-07-31-wheel-display-fw-update.md`](../findings/2026-07-31-wheel-display-fw-update.md).
+
 ### Old-Protocol Commands (Groups `0x3F` / `0x40`)
 
 Used by older wheel firmware revisions. Observed in protocol captures and retained for backwards compatibility.
@@ -312,7 +335,18 @@ Used by older wheel firmware revisions. Observed in protocol captures and retain
 | old-rpm-color8 | `15 00 07` | 3 | array | |
 | old-rpm-color9 | `15 00 08` | 3 | array | |
 | old-rpm-color10 | `15 00 09` | 3 | array | |
-| old-rpm-brightness | `14 00` | 1 | int | |
+| old-rpm-brightness | `14 00` | 1 | int | **Small field, NOT a 0–100 percentage** — see note below |
+
+**`old-rpm-brightness` value range.** The single payload byte is a small brightness
+count, not a 0–100 percentage. Observed empirically on ES/ESX hardware (issue #113):
+sweeping a host 0–100 value made the RPM bar ramp-and-wrap ~3.3 times, i.e. the field
+has a period of roughly 30 counts (0 = off, ~29 = full, values ≥ ~30 wrap). Exact
+maximum unconfirmed against a PitHouse capture (PitHouse's configurator surfaces this
+as a coarser 1–15 scale). The plugin therefore scales SimHub's 0–100 master brightness
+into `0..29` before writing (`EsBrightnessMax` in `MozaPlugin.cs`), kept just under the
+wrap point so a full slider lands at near-full brightness. Unlike new-protocol wheels,
+old-protocol wheels have no per-frame colour scaling, so this register is the *only* way
+to dim their RPM LEDs.
 
 ### Extended LED Group Architecture (Groups `0x3F` / `0x40`)
 

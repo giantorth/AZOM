@@ -1,8 +1,12 @@
 name: Build
 
 on:
+  # `paths:` scopes a push to the commits actually pushed, but scopes a
+  # pull_request to the PR's whole diff — the `changed` job below narrows that
+  # back to the pushed range. Keep both lists in sync with pr-build.yml and
+  # changed-code.yml.
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - "**.cs"
       - "**.csproj"
@@ -13,7 +17,16 @@ on:
       - "DeviceTemplates/**"
       - "Resources/**"
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
+    paths:
+      - "**.cs"
+      - "**.csproj"
+      - "**.sln"
+      - "**.xaml"
+      - "**.resx"
+      - "libs/**"
+      - "DeviceTemplates/**"
+      - "Resources/**"
   workflow_dispatch:
 
 concurrency:
@@ -21,8 +34,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Same-repo non-draft PRs already get a full build from pr-build.yml —
+  # skip the duplicate compile. Forks and drafts keep this gate.
+  changed:
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      github.event.pull_request.draft == true
+    uses: ./.github/workflows/changed-code.yml
+
   build:
     runs-on: windows-latest
+    needs: changed
+    if: needs.changed.outputs.code == 'true'
 
     steps:
       - name: Checkout
