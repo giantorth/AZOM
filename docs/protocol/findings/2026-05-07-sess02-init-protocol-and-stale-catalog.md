@@ -223,10 +223,12 @@ or may not be sufficient by itself. Combining both is straightforward.
    kind=11)?** Cannot be answered from data alone — needs an
    experimental capture if we move toward implementation.
 
-4. **What is the body of kind=14 (wheel_payload)?** It's 1.7 KB
-   bidirectional, also zlib-shaped. Likely `Dashes/*.mzdash` content.
-   Worth decompressing one example to confirm — relevant if we ever
-   want to upload custom dashboards.
+4. ~~**What is the body of kind=14 (wheel_payload)?**~~ — **ANSWERED
+   2026-08-07.** Not mzdash content: it is the display application's own
+   log — `[4 B reserved][zlib([count u32 BE] + count × ([byteLen u32 BE]
+   [UTF-16BE]))]`, pulled by a host kind=14 request and acked with kind=15.
+   See [`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md)
+   § Device log pull.
 
 5. **Does the chIndex=0 fix alone unblock test data after switch, or
    is the missing FF echo (and absence of kind=10/16) also load-

@@ -32,6 +32,7 @@ expected to stay in sync.
 | `0x0024` | Stalks      | MOZA Stalks                   | confirmed   |
 | `0x0025` | Dashboard   | CM2 Racing Dash               | confirmed   |
 | `0x1000` | Ab9         | AB9 active shifter            | confirmed   |
+| `0x1002` | Ab9         | AB6 active shifter            | confirmed   |
 
 PID `0x0006` is reported by Windows as USB string `"MOZA R12 Base"`
 (see [`../../../usb-capture/USB-device-tree-view-infos.txt`](../../../usb-capture/USB-device-tree-view-infos.txt)).
@@ -45,6 +46,14 @@ an R12 base on `0x0016` and CRP-2 pedals on `0x0011`; before they were
 registered, both unknown PIDs fell into the wheelbase/AB9 "unknown PID"
 probe fallback, so the pedal port received wheelbase probe traffic and
 base detection was ambiguous.
+PID `0x1002` is the **AB6** active shifter, from a user diagnostics bundle
+whose host enumerated it alongside an R21 (`0x0000`). The device names
+itself: its HID product string is `MOZA AB6 FFB Base`, so the PID↔device
+mapping is confirmed the same way `0x0006` is. What is *not* yet verified
+is the CDC protocol — it is registered in category `Ab9` and driven by that
+lane on the assumption of AB9 parity, and no AB6 capture exists (the
+reporter had active-shifter detection disabled, so the port was never
+opened). See [`ab9-shifter.md`](ab9-shifter.md) § AB6 sibling.
 PID `0x0020` is verified as the Universal HUB from a user diagnostics
 bundle: the host enumerates only the hub's CDC composite (no wheelbase
 PID), so any wheel attached behind the hub (e.g. KS Pro) reaches the
@@ -56,7 +65,7 @@ CDC device.
 | Category    | Connection class                                                          | Probe target                                                          |
 |-------------|---------------------------------------------------------------------------|-----------------------------------------------------------------------|
 | `Wheelbase` | [`MozaSerialConnection`](../../../Protocol/MozaSerialConnection.cs) wired in [`MozaPlugin.cs`](../../../MozaPlugin.cs) | `MozaProbeTarget.BaseAndHub` — base probe (group `0x2B`) + hub probe (group `0x64`) |
-| `Ab9`       | [`MozaAb9DeviceManager`](../../../Devices/MozaAb9DeviceManager.cs)        | `MozaProbeTarget.Ab9` — identity probe (group `0x09` dev `0x12`, accepts `0x89` response) |
+| `Ab9`       | [`MozaAb9DeviceManager`](../../../Devices/MozaAb9DeviceManager.cs) — one shared lane for the AB9 (`0x1000`) and AB6 (`0x1002`); with both attached only the first-enumerated one is claimed | `MozaProbeTarget.Ab9` — identity probe (group `0x09` dev `0x12`, accepts `0x89` response) |
 | `MBooster`  | [`MBoosterDeviceController`](../../../Devices/MBoosterDeviceController.cs) (multi-device under [`MozaMBoosterRegistry`](../../../Devices/MozaMBoosterRegistry.cs)) | `MozaProbeTarget.MBooster` — registry-only by design; mBooster has no application handshake (see [`mbooster.md`](mbooster.md)) so probe fallback is a no-op |
 | `Pedals`    | Pedals (`dev 0x19`) are enumerated as a sub-device on whichever CDC pipe carries them — the wheelbase pipe (base-attached) or the dedicated `Hub` pipe (hub-attached, e.g. a base model with no pedal port). The owning pipe is recorded in `DeviceDetectionState.PedalsOwner` so settings reads + calibration writes route to it. (Pedals are never opened as their OWN dedicated CDC connection.) | *(no dedicated probe target — found via presence probe `0x00 0x19` on the base and hub pipes)* |
 | `Shifter`   | Standalone-USB HGP (`0x001E`) / SGP (`0x0023`): a dedicated [`StandalonePeripheralController`](../../../Devices/StandalonePeripheralController.cs) lane per port (registry-only), addressed as root `0x12`. A shifter behind a base/hub is instead a `0x1A` sub-device on that pipe (found by presence probe `0x00 0x1A` on the base + hub pipes, recorded in `DeviceDetectionState.ShifterOwner`). | `MozaProbeTarget.ShifterOnly` (dormant; probe fallback force-disabled) |

@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 400% = 最大增益</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>力反馈输出曲线</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 拖动 5 个节点以调整响应</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>平直</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>衰减</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>线性</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 曲线</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>指数</value></data>
@@ -195,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB 检测</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>禁用串口探测回退(高级)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>仅在插件与错误设备通信时需要启用。</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>禁用 AB9 主动排挡杆检测</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>跳过 AB9 重连探测。</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>禁用主动排挡杆检测 (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>跳过主动排挡杆重连探测。</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>仪表盘遥测</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>连接时上传仪表盘</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>从方向盘下载仪表盘</value></data>
@@ -317,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>启动 / 切换游戏时总是开始诊断捕获</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>启用后,每次插件启动时都会自动开始串口流量捕获。</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>导出诊断包(ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>复制编号</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>复制捕获至剪贴板</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>完整诊断报告</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// 调试信息</value></data>
@@ -739,6 +738,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>灯光循环</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>左转向灯</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>右转向灯</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>转向灯</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>最短转向灯时间 (秒)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>请按下按键…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>（未设置）</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>（无）</value></data>
@@ -754,4 +755,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>灯光挡位 {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
 </root>

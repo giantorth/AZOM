@@ -59,8 +59,8 @@ its own seq + CRC, the wheel reassembles before parsing the inner FF record.
 |    9 | both      | `periodic` (heartbeat-shaped)    | 19 – 29 B         | small struct, fires every ~1.5–2 s              |
 |   10 | b2h       | `wheel_state_a`                  | 12 B              | status code (sent ~3.5 s after init handshake)  |
 |   11 | h2b       | `init_payload_b` (FFB props)     | 2.5 KB            | length-prefixed UTF-16-BE name list, zlib       |
-|   14 | both      | `wheel_payload`                  | 8 B – 1.7 KB      | small payload one direction, large the other   |
-|   15 | h2b       | `host_setting`                   | 8 B               | u32 + checksum                                  |
+|   14 | both      | `device_log_request` / `device_log_payload` | 8 B h2b, 2.7–3.2 KB b2h | h2b: `maxLines u32 LE` (=100). b2h: `[4 B reserved][zlib]` |
+|   15 | h2b       | `device_log_receipt`             | 8 B               | `linesRead u32 LE` — device drops that many     |
 |   16 | b2h       | `wheel_state_b`                  | 20 B              | status (sent right after kind=10)               |
 
 ## Init handshake timing (PitHouse first 10 s on sess=0x02)
@@ -121,11 +121,19 @@ to compute a CRC32 or copy them as captured.
 
 ## Body decode — kind=7 (`init_enum`)
 
-12-byte body, IDENTICAL across all 4 captures:
+8-byte value, IDENTICAL across all 4 captures (and all 34 records in
+`bridge-20260731-064830.jsonl`):
 
 ```
-03 00 00 00   00 00 00 00   83 18 92 0e
+03 00 00 00   00 00 00 00
 ```
+
+> The third group (`83 18 92 0e` in the original dump) is **not part of this
+> record** — it is the next FF record's sentinel+size, pulled in by
+> `tools/bridge-decode-ff-init` reading `size` bytes from offset 13 instead of
+> `size - 4`. Use `tools/ff-record-decode` instead. Confirmed 2026-08-07: the
+> plugin's builder reproduces the full PitHouse record byte-for-byte, inner CRC
+> included, only when the value is `[3][0]`.
 
 Field layout:
 
@@ -313,11 +321,14 @@ Brief observations; each warrants its own note when used:
   varies per record. Likely a ticker / sync ping.
 - **kind=10** — wheel-only, 12 B. Sent ~3.5 s after the host completes
   init kinds 2/7/8/11. Almost certainly the "init complete" ack.
-- **kind=14** — both directions, varying size (8 B for small messages,
-  ~1.7 KB zlib-compressed for big ones). Looks like a per-event payload
-  channel; large variant likely carries dashboard / config blobs.
-- **kind=15** — host-only, 8 B. Looks like a small u32 setting write
-  (e.g. brightness slider).
+- **kind=14 / kind=15** — **SOLVED 2026-08-07: the device log pull.** h2b
+  kind=14 requests up to N lines (always 100) from the display's MOZADash
+  logger; b2h kind=14 answers with `[4 B reserved][zlib([count u32 BE] +
+  count × ([byteLen u32 BE][UTF-16BE])) ]`; h2b kind=15 acknowledges how many
+  lines the host consumed, and the device drops that many. The guesses above
+  ("per-event payload channel", "small u32 setting write") are wrong. Canonical
+  decode: [`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md)
+  § Device log pull.
 - **kind=16** — wheel-only, 20 B. Sent immediately after kind=10. Pairs
   with kind=10 to fully ack init.
 

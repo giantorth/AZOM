@@ -227,6 +227,11 @@ namespace MozaPlugin.Devices
             // safe to read from this worker thread without a lock.
             var pedals = lane?.Pedals;
             if (pedals != null && pedals.TryGetValue(_pedalAxisIndex, out var p)) return p;
+            // A standalone unit's sole pedal on a non-zero axis: its config
+            // may live in the lane's flat fields (configured on the axis-0
+            // row before connectivity was known) — see
+            // MBoosterDeviceController.SoleConnectedAxis.
+            if (_device.SoleConnectedAxis() == _pedalAxisIndex) return lane;
             return null;
         }
 
@@ -505,17 +510,19 @@ namespace MozaPlugin.Devices
                 UpdateBrakeFade(lane, PedalEffects(lane), snap);
 
             // --- 500 ms keepalive (separate from motor frames) -------------
-            // Primary worker only, and to ALL of the chain's motor device ids
-            // (0x12 host + 0x1d/0x1e chain ports), matching PitHouse — a chained
-            // active mBooster's motor drops its connection state if its own
-            // device id isn't kept alive. Harmless for empty/passive ports.
+            // Primary worker only, and to ALL of this lane's motor device ids
+            // (USB: 0x12 host + 0x1d/0x1e chain ports, matching PitHouse — a
+            // chained active mBooster's motor drops its connection state if
+            // its own device id isn't kept alive; harmless for empty/passive
+            // ports. Routed: the tunneled pedal sub-device only — 0x1d/0x1e
+            // are other peripherals on a shared base/hub pipe).
             if (_isPrimary)
             {
                 _keepaliveCounter++;
                 if (_keepaliveCounter >= KeepaliveTickInterval)
                 {
                     _keepaliveCounter = 0;
-                    foreach (var dev in MozaMBoosterProtocol.MotorDeviceIds)
+                    foreach (var dev in _device.MotorIds)
                         _device.SendOneShot(MozaMBoosterProtocol.BuildKeepalive(dev));
                 }
             }

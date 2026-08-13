@@ -1,0 +1,28 @@
+{
+  "Subtitle_FfbEqualizer10": {
+    "en": "// per-band gain · 100% = neutral · 500% = max boost",
+    "de": "// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost",
+    "el": "// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση",
+    "es": "// ganancia por banda · 100% = neutro · 500% = realce máximo",
+    "fr": "// gain par bande · 100 % = neutre · 500 % = boost max",
+    "it": "// guadagno per banda · 100% = neutro · 500% = amplificazione massima",
+    "ko": "// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트",
+    "nb": "// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost",
+    "ru": "// усиление по полосам · 100% = нейтраль · 500% = максимум",
+    "vi": "// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa",
+    "zh-Hans": "// 各频段增益 · 100% = 中性 · 500% = 最大增益"
+  },
+  "Label_EqSensitivity": {
+    "en": "SENSITIVITY",
+    "de": "EMPFINDLICHKEIT",
+    "el": "ΕΥΑΙΣΘΗΣΙΑ",
+    "es": "SENSIBILIDAD",
+    "fr": "SENSIBILITÉ",
+    "it": "SENSIBILITÀ",
+    "ko": "감도",
+    "nb": "FØLSOMHET",
+    "ru": "ЧУВСТВИТЕЛЬНОСТЬ",
+    "vi": "ĐỘ NHẠY",
+    "zh-Hans": "灵敏度"
+  }
+}

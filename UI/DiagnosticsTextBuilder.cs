@@ -76,9 +76,22 @@ namespace MozaPlugin.UI
             string wheelbasePort = plugin.Connection?.LastPortName ?? "";
             sb.Append("Assignments:    Wheelbase ");
             sb.Append(string.IsNullOrEmpty(wheelbasePort) ? "(disconnected)" : "→ " + wheelbasePort);
-            string ab9Port = plugin.Ab9Manager?.Connection?.LastPortName ?? "";
-            sb.Append("  |  AB9 ");
-            sb.Append(string.IsNullOrEmpty(ab9Port) ? "(disconnected)" : "→ " + ab9Port);
+            // AB9/AB6 share one lane. LastPortName survives Disconnect, so gate on
+            // IsConnected like the Hub / Base(aux) lines below — otherwise this
+            // prints a port for a shifter that was unplugged. A user-disabled lane
+            // reads as such rather than as "disconnected": that setting is the
+            // single most common reason an active shifter never appears.
+            var ab9Conn = plugin.Ab9Manager?.Connection;
+            bool ab9Connected = ab9Conn?.IsConnected == true;
+            string ab9Port = ab9Connected ? ab9Conn!.LastPortName ?? "" : "";
+            sb.Append("  |  ");
+            sb.Append(ab9Connected
+                ? Protocol.MozaUsbIds.ActiveShifterShortName(ab9Conn!.DiscoveredPid)
+                : "AB9/AB6");
+            sb.Append(' ');
+            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
+                      : plugin.Settings?.DisableAb9Detection == true ? "(detection disabled)"
+                      : "(disconnected)");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");
@@ -106,15 +119,24 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
-        public static string BuildMBoosterDevices(MozaPlugin plugin)
+        public static string BuildMBoosterDevices(MozaPlugin plugin, MozaData data)
         {
             var registry = plugin.MBoosterRegistry;
             if (registry == null || registry.Devices.Count == 0)
-                return "(no mBooster pedals detected — registry-only discovery; requires VID 0x346E PID 0x0008 in Windows USB enum)";
+                return "(no mBooster pedals detected — USB discovery needs VID 0x346E PID 0x0008 in the Windows USB enum; " +
+                       "a unit on a wheelbase/hub pedal port registers as a routed lane once dev 0x19 answers the model probe)";
 
             var sb = new StringBuilder();
             var devs = registry.Devices;
             sb.AppendLine($"Discovered:     {devs.Count} mBooster device(s)");
+            // Merged (post role-merge) positions — what the trace graph and the
+            // game-facing properties actually receive. "max seen" proves whether
+            // pedal input ever flowed through the merge this session, settling
+            // "the graph never moved" vs "nobody pressed during capture".
+            var (maxT, maxB, maxC) = registry.MaxMergedPositionsSeen;
+            sb.AppendLine(
+                $"Merged pos:     T={data.ThrottlePosition} B={data.BrakePosition} C={data.ClutchPosition}" +
+                $"  (max seen this session: T={maxT} B={maxB} C={maxC})");
             for (int i = 0; i < devs.Count; i++)
             {
                 var d = devs[i];
@@ -165,6 +187,59 @@ namespace MozaPlugin.UI
                     }
                     sb.AppendLine($"        axes={d.AxisCount}  roles=[{string.Join(", ", roleParts)}]");
                 }
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Multi-Function Stalks state + the truck-sim button map. The map is
+        /// what turns a "stalk behaves wrong in ETS2" report into a diagnosis, and the
+        /// seen-index list shows which physical lever positions the device reports.</summary>
+        public static string BuildStalks(MozaPlugin plugin, MozaData d)
+        {
+            if (!d.IsStalksConnected && d.StalksButtonCount == 0)
+                return "(no MOZA Stalks detected — HID-only device, VID 0x346E PID 0x0024)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Connected:      {d.IsStalksConnected}");
+            sb.AppendLine($"Buttons seen:   {d.StalksButtonCount} (highest index reported + 1)");
+
+            var pressed = new System.Collections.Generic.List<string>();
+            var states = d.StalksButtonStates;
+            for (int i = 0; i < states.Length; i++)
+                if (states[i]) pressed.Add((i + 1).ToString());
+            sb.AppendLine($"Pressed now:    {(pressed.Count == 0 ? "(none)" : string.Join(", ", pressed))}  (btn numbers)");
+
+            var s = plugin?.Settings;
+            var cfg = s?.StalksTruckSim;
+            sb.AppendLine($"Mode:           {(s == null ? "—" : s.StalksMode.ToString())}");
+            if (cfg == null) return sb.ToString().TrimEnd();
+
+            sb.AppendLine(
+                $"Keys:           wiperFwd='{cfg.WiperForwardKey}' wiperBack='{cfg.WiperBackKey}' " +
+                $"lightCycle='{cfg.LightCycleKey}' indL='{cfg.IndicatorLeftKey}' indR='{cfg.IndicatorRightKey}'");
+            sb.AppendLine(
+                $"Stages:         wipers={cfg.WiperStageCount} (wrap={cfg.WiperForwardWraps}) " +
+                $"lights={cfg.LightStageCount}  minBlink={cfg.IndicatorMinBlinkSeconds}s  " +
+                $"keyHold={cfg.KeyHoldMs}ms gap={cfg.KeyGapMs}ms");
+
+            var map = cfg.ButtonActions;
+            if (map == null || map.Count == 0)
+            {
+                sb.AppendLine("Map:            (no buttons mapped)");
+                return sb.ToString().TrimEnd();
+            }
+            sb.AppendLine($"Map:            {map.Count} button(s)");
+            var indices = new System.Collections.Generic.List<int>(map.Keys);
+            indices.Sort();
+            foreach (int i in indices)
+            {
+                var a = map[i];
+                if (a == null) continue;
+                string extra =
+                    a.Kind == Devices.StalksTruckSim.StalkActionKind.WiperStage ||
+                    a.Kind == Devices.StalksTruckSim.StalkActionKind.LightStage ? $" stage={a.Stage}"
+                    : string.IsNullOrEmpty(a.Key) ? "" : $" key='{a.Key}'";
+                sb.AppendLine($"  btn{i + 1,-3} (idx {i,2})  {a.Kind}{extra}");
             }
             return sb.ToString().TrimEnd();
         }
@@ -221,6 +296,42 @@ namespace MozaPlugin.UI
             sb.AppendLine($"CM2 present:       {cm2Present}{(cm2Present ? $" (dev 0x{plugin!.Cm2TargetDeviceId:X2})" : "")}");
             sb.Append    ($"Main target dev:   {targetDesc}");
 
+            // The dash pipeline's own enable gate + whether a wheel page backs it.
+            // An unstarted lane below is almost always this line reading false.
+            sb.AppendLine();
+            sb.Append(
+                $"Dash telem enable: {plugin?.ActiveDashTelemetryEnabled ?? false} " +
+                $"(wheel page {(plugin?.GetCurrentWheelPageGuid().HasValue == true ? "resolved" : "unresolved")})");
+
+            // CM1-vs-CM2 classification of a BRIDGED dash (a USB 0x0025 dash is always a
+            // real CM2, so the line is omitted there). Reports the evidence, not a guess:
+            // only the CM1-exclusive 0x8E param-read answer latches CM1, and only a
+            // tier-def catalog proves CM2 — a dash showing neither stays undecided and is
+            // re-probed. "undecided" with probes climbing and ans=no is the normal
+            // steady state for a real CM2 whose catalog hasn't arrived yet.
+            if (plugin != null && plugin.IsCm2Present && !dashUsb)
+            {
+                var dd = plugin.DualDisplay;
+                int catalog = plugin._cm2Sender?.CatalogCount ?? 0;
+                string cls;
+                if (plugin.DashIsCm1)
+                    cls = $"CM1 (latched, driver {(plugin.IsCm1DriverRunning ? "running" : "stopped")})";
+                else if (catalog > 0)
+                    cls = $"CM2 (catalog={catalog})";
+                else if (dd == null)
+                    cls = "undecided (coordinator not wired yet)";
+                else
+                {
+                    var forSpan = dd.DiscriminatingFor;
+                    cls = $"undecided (0x8E ans={(dd.DashParamReadAnswered ? "yes" : "no")}, " +
+                          $"probes={dd.Cm1ProbeCount}, " +
+                          $"deciding {(forSpan.HasValue ? $"{forSpan.Value.TotalSeconds:F0}s" : "not started")}, " +
+                          $"catalog=0)";
+                }
+                sb.AppendLine();
+                sb.Append($"Dash class:        {cls}");
+            }
+
             // Dedicated CM2 lane (the _cm2Sender). DECOUPLED: present whenever a CM2
             // is attached (bus or USB), regardless of the wheel — the CM2 is ALWAYS
             // driven by this dedicated sender now. The MAIN line above stays on the
@@ -233,6 +344,11 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 dash lane:     {cm2.TargetDescription} on {cm2.ConnectionRef?.CaptureLabel} pipe " +
                     $"(frames={cm2.FramesSent}, {cm2.Phase})");
+            }
+            else if (cm2Present)
+            {
+                sb.AppendLine();
+                sb.Append("CM2 dash lane:     (not started)");
             }
 
             // Dash LED driver (SimHub effects → CM2 bitmask/colour bridge).
@@ -411,7 +527,11 @@ namespace MozaPlugin.UI
                         sb.AppendLine($"    {errs.RecentResyncSamples[i]}");
                 }
             }
-            sb.AppendLine($"DisplayDetected:    {(ts?.DisplayDetected ?? plugin.IsDisplayDetected)}");
+            // Both, unmasked. The sender flag only latches on session traffic
+            // (TelemetryInboundDispatcher), so a sender that never started prints
+            // false and the old `??` hid the probe result behind it — a wheel whose
+            // display had answered identity fine still read "DisplayDetected: False".
+            sb.AppendLine($"DisplayDetected:    sender={ts?.DisplayDetected.ToString() ?? "n/a"}  probe={plugin.IsDisplayDetected}");
             sb.AppendLine($"DisplayModelName:   {Blank(ts?.DisplayModelName ?? plugin.DisplayModelName)}");
             sb.AppendLine($"WheelEra:           {plugin.ActiveTelemetryWheelEra}");
             if (ts != null)
@@ -559,6 +679,53 @@ namespace MozaPlugin.UI
                 // forensic context.
                 if (e.Text.Length == 0) continue;
                 sb.AppendLine($"  {ts} [{e.SourceName,-7}] {e.Text}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Render the wheel display's own application log, pulled over
+        /// the session layer (FF kind=14 request / kind=15 receipt) and held in
+        /// <see cref="Diagnostics.DeviceLogStore"/>. Distinct from
+        /// <see cref="BuildFirmwareDebug"/>, which shows the base/wheel MCU
+        /// group-0x0E chatter. Lines carry their own device-side timestamp, so
+        /// the host receive time is only shown to order them.</summary>
+        public static string BuildDeviceLog(MozaPlugin plugin)
+        {
+            var log = plugin.DeviceLogForDiagnostics;
+            var entries = log.Snapshot();
+            bool enabled = plugin.Settings?.EnableDeviceLogPull ?? false;
+
+            var sb = new StringBuilder();
+            if (!enabled)
+                return "(device log pull disabled via EnableDeviceLogPull)";
+
+            // Pull counters first, so "no lines" is diagnosable without a wire
+            // trace: requests=0 means we never asked, requests>0 payloads=0
+            // means the display isn't answering.
+            string pull = plugin.TelemetrySender?.DeviceLogPullStatus;
+            if (pull != null) sb.AppendLine($"Pull: {pull}");
+            var cm2 = plugin._cm2Sender?.DeviceLogPullStatus;
+            if (cm2 != null) sb.AppendLine($"Pull: {cm2}");
+
+            if (entries.Length == 0)
+            {
+                sb.Append("(no device log lines yet; the display is polled at connect and every 60 s)");
+                return sb.ToString();
+            }
+
+            sb.AppendLine($"Lines: {entries.Length} shown / {log.TotalRecorded} recorded");
+            // Newest first, matching the firmware-debug section.
+            // Redacted here as well as in the bundle's own device-display-log.txt:
+            // this text is written to the bundle as diagnostics.txt and uploaded
+            // on the bug-report path, so masking only the dedicated entry would
+            // leak the same identifiers out of the other one.
+            var data = plugin.Data;
+            int limit = Math.Min(entries.Length, 200);
+            for (int i = entries.Length - 1; i >= entries.Length - limit; i--)
+            {
+                var e = entries[i];
+                string ts = e.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss");
+                sb.AppendLine($"  {ts} [{e.Source,-5}] {Diagnostics.CaptureRedactor.RedactText(e.Text, data)}");
             }
             return sb.ToString().TrimEnd();
         }

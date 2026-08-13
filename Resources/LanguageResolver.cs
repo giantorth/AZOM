@@ -41,7 +41,7 @@ namespace MozaPlugin.Resources
         // culture code here, add an EmbeddedResource entry in MozaPlugin.csproj,
         // and add a DisplayNames entry below.
 
-        public static readonly IReadOnlyList<string> SupportedCultures = new[] { "en", "de", "el", "es", "fr", "it", "ko", "nb", "ru", "vi", "zh-Hans" };
+        public static readonly IReadOnlyList<string> SupportedCultures = new[] { "en", "de", "el", "es", "fr", "it", "ko", "nb", "pt", "ru", "vi", "zh-Hans", "qps-ploc" };
 
         // Names shown in the in-plugin language ComboBox. Each language is
         // named in its own tongue so a user who can't read the current UI can
@@ -57,9 +57,11 @@ namespace MozaPlugin.Resources
                 { "it", "Italiano" },
                 { "ko", "한국어" },
                 { "nb", "Norsk bokmål" },
+                { "pt", "Português" },
                 { "ru", "Русский" },
                 { "vi", "Tiếng Việt" },
                 { "zh-Hans", "简体中文" },
+                { "qps-ploc", "Bark! 🐕" },
             };
 
         /// <summary>

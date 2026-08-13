@@ -638,6 +638,26 @@ namespace MozaPlugin.Hardware
                             _deviceManager.WriteSetting($"wheel-knob-signal-mode{fwIdx}", sm);
                     }
                 }
+                // Paddle input mode + the combined-mode clutch split point —
+                // overlay-only, per-(profile x wheel-page). Re-pushed here for the
+                // same reason as the knob signal modes above: the wheel firmware
+                // persists a single value, and newer firmware silently drops the
+                // readback (see WheelOverride's "Inputs" comment), so a per-game —
+                // or per-WHEEL — pick only reaches the rim if we re-assert it.
+                // Without this a mode that landed on the wrong rim stayed there,
+                // since nothing ever rewrote the right one.
+                // No capability gate: DeviceProber.NewWheelCoreReadCommands already
+                // reads these from every new-protocol wheel model-blind ("paddles/
+                // clutch/stick exist on every new-protocol wheel"), and this block
+                // is new-protocol-gated. The cfg cache is keyed on the wheel's MCU
+                // UID (SyncWheelCfgCache), so each rim re-asserts its own value on
+                // attach instead of dedup'ing against the previous rim's write.
+                // Wire form is 1/2/3 while the overlay stores the 0/1/2 display
+                // form — hence the +1, matching the UI handler.
+                if (paddles >= 0 && WheelCfgChangedForApply("wheel-paddles-mode", paddles))
+                    _deviceManager.WriteSetting("wheel-paddles-mode", paddles + 1);
+                if (clutchPoint >= 0 && WheelCfgChangedForApply("wheel-clutch-point", clutchPoint))
+                    _deviceManager.WriteSetting("wheel-clutch-point", clutchPoint);
                 if (idleEffect >= 0 && idleSpeed >= 0 && hasRpm && hasIdleLed)
                 {
                     var p = BuildIdleIntervalPayload(idleEffect, idleSpeed);
@@ -794,7 +814,10 @@ namespace MozaPlugin.Hardware
             // keyed on presence, not on the retired "main sender drives the CM2"
             // predicate, so a CM2 alongside a DISPLAY wheel (which the old predicate
             // excluded) now also gets its meter config.
-            bool isCm2 = _plugin.IsCm2Present;
+            // Excluded once the discriminator confirms the bridged dash is a CM1: the
+            // cm2-* group-0x32 block below (normal/rpm-group mode, thresholds, the 16
+            // stored colours) addresses CM2 meter registers a CM1 doesn't implement.
+            bool isCm2 = _plugin.IsCm2Present && !_plugin.DashIsCm1;
 
             if (profile.DashRpmBrightness   >= 0) _deviceManager.WriteSetting("dash-rpm-brightness", profile.DashRpmBrightness);
             if (profile.DashFlagsBrightness >= 0) _deviceManager.WriteSetting("dash-flags-brightness", profile.DashFlagsBrightness);
@@ -1155,6 +1178,9 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.TempStrategy,       v => profile.TempStrategy       = v,
                   () => _data.TempStrategy,         v => _data.TempStrategy         = v,
                   "base-temp-strategy");
+            Apply(() => profile.RoadSensitivity,    v => profile.RoadSensitivity    = v,
+                  () => _data.RoadSensitivity,      v => _data.RoadSensitivity      = v,
+                  "base-road-sensitivity");
 
             // Local helper — does seed + mirror + write in one pass. Closes
             // over `profile` and `_data` via the enclosing scope so callers
@@ -1206,6 +1232,15 @@ namespace MozaPlugin.Hardware
             ApplyEq(profile.Equalizer4, v => _data.Equalizer4 = v, "base-equalizer4");
             ApplyEq(profile.Equalizer5, v => _data.Equalizer5 = v, "base-equalizer5");
             ApplyEq(profile.Equalizer6, v => _data.Equalizer6 = v, "base-equalizer6");
+            // Bands 7-10 exist only on 10-band firmware — old bases must never
+            // see cmds 0x32..0x35.
+            if (_data.BaseSupportsEq10)
+            {
+                ApplyEq(profile.Equalizer7,  v => _data.Equalizer7  = v, "base-equalizer7");
+                ApplyEq(profile.Equalizer8,  v => _data.Equalizer8  = v, "base-equalizer8");
+                ApplyEq(profile.Equalizer9,  v => _data.Equalizer9  = v, "base-equalizer9");
+                ApplyEq(profile.Equalizer10, v => _data.Equalizer10 = v, "base-equalizer10");
+            }
 
             // FFB Curve X/Y values: mirror always; write when live.
             if (profile.FfbCurveX1 >= 0) _data.FfbCurveX1 = profile.FfbCurveX1;
@@ -1437,6 +1472,13 @@ namespace MozaPlugin.Hardware
         {
             if (value < 0) return;
             if (_detectionState.BaseDetected) BaseManager.WriteFloat(command, value);
+        }
+        // Readback path for base settings the firmware may clamp (e.g. the
+        // rotation-limit floor probe): the reply lands in _data, so the UI
+        // shows what the base actually stored rather than what was written.
+        public void ReadIfBaseConnected(string command)
+        {
+            if (_detectionState.BaseDetected) BaseManager.ReadSetting(command);
         }
         public void WriteIfHandbrakeDetected(string command, int value)
         {

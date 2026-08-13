@@ -103,6 +103,10 @@
       <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.nb</ManifestResourceName>
     </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Strings.pt.resx">
+      <WithCulture>false</WithCulture>
+      <ManifestResourceName>MozaPlugin.Resources.Strings.pt</ManifestResourceName>
+    </EmbeddedResource>
     <EmbeddedResource Update="Resources\Strings.ru.resx">
       <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.ru</ManifestResourceName>
@@ -114,6 +118,13 @@
     <EmbeddedResource Update="Resources\Strings.zh-Hans.resx">
       <WithCulture>false</WithCulture>
       <ManifestResourceName>MozaPlugin.Resources.Strings.zh-Hans</ManifestResourceName>
+    </EmbeddedResource>
+    <!-- "Bark" — a joke locale on Windows' qps-ploc pseudo-language slot,
+         so CultureInfo("qps-ploc") resolves without registering a custom
+         culture. -->
+    <EmbeddedResource Update="Resources\Strings.qps-ploc.resx">
+      <WithCulture>false</WithCulture>
+      <ManifestResourceName>MozaPlugin.Resources.Strings.qps-ploc</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Include="Data\Telemetry.json" LogicalName="MozaPlugin.Data.Telemetry.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelGeneric\MOZA Racing Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelGeneric.device.json" />

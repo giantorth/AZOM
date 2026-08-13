@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 400% = 최대 부스트</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB 출력 커브</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 5개의 노드를 드래그하여 응답 곡선 조정</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>플랫</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>폴오프</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>리니어</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 커브</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>지수</value></data>
@@ -195,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB 감지</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>시리얼 프로브 폴백 비활성화 (고급)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>플러그인이 잘못된 장치와 통신하는 경우에만 필요합니다.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>AB9 액티브 시프터 감지 비활성화</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>AB9 재연결 프로브를 건너뜁니다.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 감지 비활성화 (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 재연결 프로브를 건너뜁니다.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>연결 시 대시보드 업로드</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>휠에서 대시보드 다운로드</value></data>
@@ -317,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>실행/게임 전환 시 항상 진단 캡처 시작</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>켜면 플러그인이 시작될 때마다 시리얼 트래픽 캡처가 자동으로 시작됩니다.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>번들 내보내기 (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>참조 번호 복사</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>캡처를 클립보드에 복사</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>전체 진단 보고서</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// 디버깅 정보</value></data>
@@ -738,6 +737,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>라이트 순환</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>좌측 방향지시등</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>우측 방향지시등</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>방향지시등</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>최소 점멸 시간 (초)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>키를 누르세요…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(설정 안 됨)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(없음)</value></data>
@@ -753,4 +754,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>라이트 단계 {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
 </root>

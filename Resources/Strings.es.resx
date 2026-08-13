@@ -57,8 +57,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// ganancia por banda · 100% = neutro · 400% = realce máximo</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// arrastra los 5 nodos para definir la respuesta</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>PLANA</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>CAÍDA</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAL</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>CURVA S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENCIAL</value></data>
@@ -200,8 +198,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>DETECCIÓN USB</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Desactivar sondeo serial de respaldo (avanzado)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Solo necesario si el plugin se comunica con un dispositivo incorrecto.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Desactivar la detección de la palanca activa AB9</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Omite el sondeo de reconexión del AB9.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Desactivar la detección de la palanca activa (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Omite el sondeo de reconexión de la palanca activa.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRÍA DEL TABLERO</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Subir tablero al conectar</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Descargar tableros desde el volante</value></data>
@@ -322,6 +320,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Iniciar siempre la captura de diagnóstico al arranque o cambio de juego</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Cuando está activado, la captura de tráfico serie comienza automáticamente cada vez que se inicia el plugin.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>EXPORTAR PAQUETE (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>COPIAR REFERENCIA</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>COPIAR CAPTURA AL PORTAPAPELES</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>INFORME COMPLETO DE DIAGNÓSTICO</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// información de depuración</value></data>
@@ -744,6 +743,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Ciclo de luces</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Intermitente izquierdo</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Intermitente derecho</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Intermitentes</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Tiempo mínimo de intermitente (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Pulsa una tecla…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(sin asignar)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(ninguna)</value></data>
@@ -759,4 +760,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Etapa de luces {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR cerrado — se cambió a Estable</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// ganancia por banda · 100% = neutro · 500% = realce máximo</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILIDAD</value></data>
 </root>

@@ -33,10 +33,10 @@ namespace MozaPlugin.Protocol
         Ab9EngineVibration = 11,
         // AB9 secondary FFB sub-streams (latest-wins per lane).
         Ab9EnginePulse = 12,
-        Ab9TriggerA = 13,        // 0x0D 0x02 + 0x0D 0x03 (flat ~9 Hz keepalive)
-        Ab9TriggerRpm = 14,      // 0x0D 0x05 (RPM-tracking trigger)
-        Ab9TriggerExtra = 15,    // 0x0D 0x01 (newly-observed sub-cmd)
-        Ab9LowRate = 16,         // 0x08 0x04 + 0x08 0x06 (signed-pair low-rate)
+        Ab9TriggerA = 13,        // 0x0D start of both engine-pulse dampers (flat ~9 Hz)
+        Ab9TriggerRpm = 14,      // 0x0D start of the engine-vib sine (RPM-tracked)
+        Ab9TriggerExtra = 15,    // spare 0x0D lane
+        Ab9LowRate = 16,         // unused — 0x08 shift constant-force rides the one-shot FIFO
         // mBooster motor-write lane (single slot per connection; the worker
         // emits one frame per ~20 ms tick across all four effects, so a
         // shared lane is sufficient — latest-wins on the writer-lag edge).
@@ -494,6 +494,7 @@ namespace MozaPlugin.Protocol
             // Try the cached port first, gated on registry confirming it still
             // belongs to a MOZA device of the right family. _activePorts guards
             // against same-process sibling-connection double-open on Wine ptys.
+            string? preferredPort = _lastPortName;
             if (_lastPortName != null
                 && !_activePorts.ContainsKey(_lastPortName))
             {
@@ -505,18 +506,24 @@ namespace MozaPlugin.Protocol
                         return true;
                     MozaLog.Debug(
                         $"[AZOM] Cached port {_lastPortName} validated but failed to open — clearing");
+                    preferredPort = null;
                     _lastPortName = null;
                 }
-                else
+                else if (MozaPortDiscovery.Instance.Enumerate().Count > 0)
                 {
+                    // Registry is live and doesn't list the cached port as a
+                    // matching MOZA device — genuinely stale.
                     MozaLog.Debug(
                         $"[AZOM] Cached port {_lastPortName} no longer matches a MOZA device in the registry — clearing");
+                    preferredPort = null;
                     _lastPortName = null;
                 }
+                // Empty registry (Wine/Proton) can't validate the cached port;
+                // keep it — FindMozaPort's probe revalidates it first.
             }
 
             var (portName, pid, viaHubProbe) = FindMozaPort(
-                _pidFilter, _probeTarget, _lastPortName, _disableProbeFallback,
+                _pidFilter, _probeTarget, preferredPort, _disableProbeFallback,
                 () => _shutdownRequested);
             if (portName == null)
                 return false;
@@ -1313,6 +1320,24 @@ namespace MozaPlugin.Protocol
                 int nb = ExtractPortNumber(b);
                 return nb.CompareTo(na); // Descending - check high ports first
             });
+
+            // Saved-port hint: probe the remembered port first so registry-less
+            // discovery (Wine/Proton) revalidates it before sweeping the full
+            // list. The probe reply still decides — a different device on that
+            // port fails the probe and the sweep continues normally.
+            if (!string.IsNullOrEmpty(preferredPort))
+            {
+                for (int i = 1; i < ports.Length; i++)
+                {
+                    if (!string.Equals(ports[i], preferredPort,
+                                       StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var hint = ports[i];
+                    Array.Copy(ports, 0, ports, 1, i);
+                    ports[0] = hint;
+                    break;
+                }
+            }
 
             // Skip the probe entirely when every COM port is registry-classified
             // with a non-matching PID (kept the AB9 probe storm off wheelbase-only users).

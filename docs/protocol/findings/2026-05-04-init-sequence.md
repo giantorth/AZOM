@@ -119,7 +119,15 @@ Across all four captures combined, these FF kinds appear on h2b session 0x02. Co
 
 Note: kinds 1 and 10 are emitted from the existing plugin via UI brightness sliders / standby timeout settings. They aren't observed in these capture sessions because the user didn't move those sliders during recording. The new `FfRecordBuilder` must support them per `Protocol/SessionPropertyPushBuilder.cs:44,56`.
 
-### kind=14 + kind=15 heartbeat pattern
+### ~~kind=14 + kind=15 heartbeat pattern~~ — SOLVED 2026-08-07: it is the device log pull
+
+Not a heartbeat. `kind=14` requests up to N log lines from the display's
+MOZADash logger (N always 100); `kind=15` acknowledges how many the host
+consumed, and the device drops that many. Canonical decode:
+[`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md)
+§ Device log pull. The sample below reads cleanly under that model — the
+kind=15 values are line counts draining toward 1 as the log empties, and the
+repeated identical records are retransmits of a single receipt.
 
 Sample sequence from `bridge-20260503-113616.jsonl`:
 
@@ -142,7 +150,13 @@ Sample sequence from `bridge-20260503-113616.jsonl`:
 14 val=64000000
 ```
 
-kind=14 carries a constant value 100 across all captures. kind=15 carries a variable u32 (1, 2, 3, 24 observed). The semantics are not yet decoded — possibly an idle-time counter, possibly a tick number. The new `KeepaliveOp` should emit kind=14=100 every ~2s and replicate kind=15's pattern (start at the highest observed value and decrement, or experiment with constant value first; live-test against real wheel).
+kind=14 carries a constant value 100 across all captures — the number of log
+lines requested. kind=15's variable u32 (1, 2, 3, 24 here; 1, 60, 100 in
+`bridge-20260731-064830.jsonl`) is the number of lines the previous payload
+actually delivered. **No `KeepaliveOp` is needed**: neither record is required
+to keep a session alive, which the plugin demonstrated by running for months
+sending neither. The pull is implemented instead in
+`TelemetrySender.TickEmitDeviceLogPoll`.
 
 ### kind=4 dashboard switch
 
@@ -177,10 +191,14 @@ Out of scope for Phase 0 — LED color encoding is its own decode task. The exis
 
 3. Failure handling: if no `b2h` activity follows kind=11 within ~2s, retry the entire init sequence. Out of scope for Phase 0 — Phase 4 will define retry behavior based on live testing.
 
-## Operational rules for the new KeepaliveOp
+## ~~Operational rules for the new KeepaliveOp~~ — WITHDRAWN 2026-08-07
 
-1. Emit kind=14 with value `64000000` (constant 100) every ~2s.
-2. Emit kind=15 with value matching whatever counter PitHouse uses — Phase 4 will reverse-engineer the kind=15 value semantics if the wheel cares. Initial implementation: emit kind=15 with constant 0x18 (24) and verify wheel doesn't disconnect.
+kind=14/15 are the device log pull, not a keepalive, so there is nothing for a
+`KeepaliveOp` to do. Emitting kind=15 with a constant 24 (as this section
+proposed) would have told the display to discard 24 log lines it had never
+sent. Implemented correctly in `TelemetrySender.TickEmitDeviceLogPoll`; see
+[`../sessions/session-0x02-ff-init.md`](../sessions/session-0x02-ff-init.md)
+§ Device log pull.
 
 ## Test fixtures for Phase 6
 
@@ -204,6 +222,6 @@ The session swap was a non-issue; `END_MARKER` cumulative max-channel-idx rule a
 
 ## Open items
 
-- **kind=15 value semantics** — appears to decrement irregularly. Worth a deeper decode pass during Phase 4 if the wheel turns out to care about the exact value.
+- ~~**kind=15 value semantics**~~ — **ANSWERED 2026-08-07.** It is the number of log lines the host consumed from the preceding kind=14 payload; the device drops that many. The apparent "irregular decrement" is the log buffer draining.
 - **kind=9 LED color schema** — out of scope for telemetry refactor.
 - **CRC algorithm verification** — confirmed `zlib.crc32(kind || value)` matches all observed `inner_crc` fields. The existing `TierDefinitionBuilder.Crc32` produces the same result; new builder shares this primitive.

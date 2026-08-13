@@ -120,8 +120,20 @@ namespace MozaPlugin
         // Connection enabled (persisted toggle)
         public bool ConnectionEnabled { get; set; } = true;
 
-        // Last successful COM port — seeded into MozaSerialConnection on startup
-        // to skip re-probing. Empty = no saved port.
+        // Last-known physical pedal connectivity per mBooster lane, indexed
+        // [throttle, brake, clutch] and keyed like the per-profile device
+        // settings ("mbooster:<serial>" once interrogated, transport instance
+        // id before/alongside). Seeds a freshly created controller's
+        // ConnectedAxes so phantom-axis protection and correct routing are
+        // armed from the first HID event, instead of waiting up to a minute
+        // for the device's next PD-Linked broadcast — a window every plugin
+        // restart used to reopen. The live diagnostic still overwrites the
+        // seed when it arrives.
+        public Dictionary<string, bool[]> MBoosterKnownPedals { get; set; }
+            = new Dictionary<string, bool[]>(StringComparer.OrdinalIgnoreCase);
+
+        // Last successful COM port per device lane — seeded into that lane's
+        // MozaSerialConnection on startup to skip re-probing. Empty = no saved port.
         public string LastWheelbasePort { get; set; } = "";
         public string LastAb9Port { get; set; } = "";
         public string LastDashboardPort { get; set; } = "";
@@ -246,6 +258,11 @@ namespace MozaPlugin
         // No UI — flip to false in MozaPluginSettings.json to silence
         // frame-rate debug logging on the serial read thread.
         public bool VerboseWireDebugLog { get; set; } = true;
+
+        // ~1/min pull of the wheel display's own log via session FF kind=14,
+        // acked with kind=15 (which clears those lines on the device). No UI —
+        // flip to false in MozaPluginSettings.json to stop the pull entirely.
+        public bool EnableDeviceLogPull { get; set; } = true;
 
         // Radar (patch/ri*, OpponentCount, PlayerIndex) + track-map
         // (patch/Location*) channels. Code-only toggle — not serialized, no UI.
@@ -431,8 +448,12 @@ namespace MozaPlugin
         // in WheelTelemetryEnabledByPageGuid yet (dict-missing = "no opinion"). Fresh
         // installs set this true via the ReadCommonSettings create-if-not-found factory
         // so new users get dashboard telemetry on out of the box; existing users'
-        // on-disk JSON lacks the field, so it deserializes to false and their
-        // never-toggled wheels stay off, preserving prior behavior.
+        // on-disk JSON lacks the field, so it deserializes to false.
+        //
+        // Only consulted for SCREENLESS and unknown-model wheels now — a wheel that
+        // has a display defaults to on regardless of this flag. Being install-scoped,
+        // it left every pre-existing install's newly-attached display wheel dark
+        // (see ProfileCoordinator.ActiveTelemetryEnabled).
         public bool TelemetryEnabledDefaultForNewWheels { get; set; } = false;
 
         // Per-wheel-page firmware-era pick. Keyed by SimHub page GUID, stored as int
@@ -611,6 +632,11 @@ namespace MozaPlugin
         public string IndicatorLeftKey { get; set; } = "[";
         public string IndicatorRightKey { get; set; } = "]";
 
+        /// <summary>How long the blinker stays lit after it is switched on, in seconds.
+        /// A neutral-position cancel that lands sooner is deferred until the time is up,
+        /// so a quick flick of the lever still signals. 0 = cancel immediately.</summary>
+        public int IndicatorMinBlinkSeconds { get; set; } = 3;
+
         // Stage models.
         public int WiperStageCount { get; set; } = 4;
         public bool WiperForwardWraps { get; set; } = false;   // ETS2 wiper key does not wrap
@@ -629,6 +655,7 @@ namespace MozaPlugin
                 LightCycleKey = LightCycleKey,
                 IndicatorLeftKey = IndicatorLeftKey,
                 IndicatorRightKey = IndicatorRightKey,
+                IndicatorMinBlinkSeconds = IndicatorMinBlinkSeconds,
                 WiperStageCount = WiperStageCount,
                 WiperForwardWraps = WiperForwardWraps,
                 LightStageCount = LightStageCount,
@@ -652,6 +679,7 @@ namespace MozaPlugin
             LightCycleKey = "L";
             IndicatorLeftKey = "[";
             IndicatorRightKey = "]";
+            IndicatorMinBlinkSeconds = 3;
             WiperStageCount = 4;
             WiperForwardWraps = false;
             LightStageCount = 3;

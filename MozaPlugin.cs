@@ -161,6 +161,15 @@ namespace MozaPlugin
         internal global::MozaPlugin.Diagnostics.FirmwareDebugLog FirmwareDebugLogForDiagnostics
             => _firmwareDebugLog;
 
+        // Wheel-display application log, pulled over the session layer (FF
+        // kind=14 request / kind=15 receipt) by TelemetrySender's slow path.
+        // Distinct source from the group-0x0E ring above: that is base/wheel
+        // MCU chatter, this is the display's own MOZADash logger.
+        private readonly global::MozaPlugin.Diagnostics.DeviceLogStore _deviceLog
+            = new global::MozaPlugin.Diagnostics.DeviceLogStore();
+        internal global::MozaPlugin.Diagnostics.DeviceLogStore DeviceLogForDiagnostics
+            => _deviceLog;
+
         // Third-party SDK (CoAP-over-UDP) emulation server + name-impersonation
         // stub process. Both are gated on Settings.SdkEmulationEnabled and
         // require a plugin restart to toggle (no runtime enable/disable —
@@ -205,6 +214,11 @@ namespace MozaPlugin
         // double-fires the resume handler) across the game-switch reload if not
         // detached. See OnPowerModeChanged.
         private int _powerModeHooked;
+        // ComportScanner.Instance.CanBeScanned is likewise a process-wide event
+        // on a static singleton — detach on End()/CleanupPartialInit or the
+        // game-switch reload leaks this instance and stacks handlers. See
+        // OnArduinoPortCanBeScanned.
+        private int _arduinoScanHooked;
         // Hub detection belongs ONLY to the dedicated hub connection (_hubManager),
         // which probes for a Universal Hub on the hub's OWN port and skips the
         // wheelbase port. The base/wheelbase connection must NEVER emit hub calls
@@ -215,8 +229,6 @@ namespace MozaPlugin
         private PluginManager _pluginManager = null!;
         private SimHubPropertyResolver _propertyResolver = null!;
         internal SimHubPropertyResolver PropertyResolver => _propertyResolver;
-        private int _headProbeTick;   // diagnostic heading-probe pacing
-        private int _headProbeCount;
         private HardwareApplier _hardwareApplier = null!;
         internal HardwareApplier HardwareApplier => _hardwareApplier;
         // SimHub's shared/master LED-brightness slider (0..100), published by the
@@ -323,6 +335,7 @@ namespace MozaPlugin
         internal void OnDashboardSwitched(uint slot) => _dashboardBindingCoordinator.OnDashboardSwitched(slot);
         internal void OnDashboardSwitched() => _dashboardBindingCoordinator.OnDashboardSwitched();
         internal void SetTelemetryEnabled(bool enabled) => _dashboardBindingCoordinator.SetTelemetryEnabled(enabled);
+        internal void SetDashTelemetryEnabled(bool enabled) => _dashboardBindingCoordinator.SetDashTelemetryEnabled(enabled);
         internal void StartTelemetryIfReady()
         {
             // FSR V1 screen runs on its own driver (independent of the tier-def
@@ -362,6 +375,7 @@ namespace MozaPlugin
         internal void WriteIfDashDetected(string command, int value) => _hardwareApplier.WriteIfDashDetected(command, value);
         internal void WriteIfBaseConnected(string command, int value) => _hardwareApplier.WriteIfBaseConnected(command, value);
         internal void WriteFloatIfBaseConnected(string command, int value) => _hardwareApplier.WriteFloatIfBaseConnected(command, value);
+        internal void ReadIfBaseConnected(string command) => _hardwareApplier.ReadIfBaseConnected(command);
         internal void WriteIfHandbrakeDetected(string command, int value) => _hardwareApplier.WriteIfHandbrakeDetected(command, value);
         internal void WriteFloatIfHandbrakeDetected(string command, int value) => _hardwareApplier.WriteFloatIfHandbrakeDetected(command, value);
         internal void WriteIfPedalsDetected(string command, int value) => _hardwareApplier.WriteIfPedalsDetected(command, value);
@@ -623,17 +637,24 @@ namespace MozaPlugin
             DetectionState.DashDetected || IsStandaloneDashboardUsbConnection;
 
         /// <summary>
-        /// True when a CM2 is present at all — on its own USB cable OR bridged through
-        /// the wheelbase — independent of whether a wheel (and what kind) is attached.
-        /// This is the "a CM2 exists, so manage it" predicate, distinct from the
+        /// True when a dash is present at all — on its own USB cable OR bridged through
+        /// the primary pipe — independent of whether a wheel (and what kind) is attached.
+        /// This is the "a dash exists, so manage it" predicate, distinct from the
         /// retired "should the MAIN sender drive the CM2" routing question: the CM2 is
         /// always driven by the dedicated <see cref="_cm2Sender"/> now. Used for UI tab
         /// visibility, CM2 meter-config gating, and diagnostics.
+        ///
+        /// The bridge is whatever owns the primary pipe — a wheelbase OR a Universal Hub.
+        /// This deliberately does NOT require <c>BaseDetected</c>: that clause predated
+        /// hub-only support and made a hub-bridged dash invisible to every consumer here,
+        /// which collapsed the dash page's Dashboard tab (its telemetry-enable toggle with
+        /// it) on a hub-only rig — bundle MGXWJ3YH. A bridged dash of unknown class may
+        /// still turn out to be a CM1; <see cref="DashIsCm1"/> is the discriminated answer
+        /// and gates the CM2-specific meter config.
         /// </summary>
         internal bool IsCm2Present =>
             DashboardUsbConnected
             || (_connection?.IsConnected == true
-                && DetectionState.BaseDetected
                 && DetectionState.DashDetected);
 
         /// <summary>
@@ -646,12 +667,13 @@ namespace MozaPlugin
             DashboardUsbConnected ? MozaProtocol.DeviceMain : MozaProtocol.DeviceDash;
 
         /// <summary>
-        /// A CM2 (external display) wired through the wheelbase bus (dash sub-device
-        /// at 0x14), as opposed to a standalone-USB CM2. DECOUPLED: this is now a pure
-        /// "bus CM2 present" predicate — independent of the wheel's screen — since the
+        /// An external display wired through the primary pipe — base OR hub — as the dash
+        /// sub-device at 0x14, rather than a standalone-USB CM2. DECOUPLED: this is a pure
+        /// "bus dash present" predicate — independent of the wheel's screen — since the
         /// CM2 is always driven by the dedicated <see cref="_cm2Sender"/> regardless of
         /// the wheel. Used by detection (probe the dash at 0x14) and the CM2 meter-config
         /// re-assert. Equivalent to <c>IsCm2Present &amp;&amp; !DashboardUsbConnected</c>.
+        /// Says nothing about CM2-vs-CM1 — that is <see cref="DashIsCm1"/>'s answer.
         /// </summary>
         internal bool IsCm2BehindBaseCandidate =>
             IsCm2Present && !DashboardUsbConnected;
@@ -1253,6 +1275,23 @@ namespace MozaPlugin
                     MozaLog.Debug($"[AZOM] PowerModeChanged hook unavailable: {ex.Message}");
                 }
 
+                // Keep SimHub's Arduino auto-scan off MOZA ports. The scanner asks
+                // subscribers before opening each candidate port (CanBeScanned);
+                // without a veto it holds the wheelbase CDC port for two full scan
+                // passes on startup (~25 s observed) while our probes fail against
+                // the busy port, and its 19200-baud Arduino hello is garbage from
+                // the wheelbase's point of view. Static singleton event ⇒
+                // unsubscribe in End()/CleanupPartialInit (see _arduinoScanHooked).
+                try
+                {
+                    SerialDash.ComportScanner.Instance.CanBeScanned += OnArduinoPortCanBeScanned;
+                    Interlocked.Exchange(ref _arduinoScanHooked, 1);
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Debug($"[AZOM] Arduino-scan veto hook unavailable: {ex.Message}");
+                }
+
                 // AB9 engine-vibration worker — tick gates on connection/detection state.
                 _ab9Worker = new Ab9EngineVibrationWorker(
                     _ab9Manager,
@@ -1282,7 +1321,9 @@ namespace MozaPlugin
                     isShuttingDown: () => IsShuttingDown,
                     onDeviceDetectedEdge: OnMBoosterDeviceDetected,
                     customEffectFormulaEvaluator: CreateHapticsFormulaResolver(),
-                    onSerialResolved: OnMBoosterSerialResolved);
+                    onSerialResolved: OnMBoosterSerialResolved,
+                    connectivitySeedLookup: LookupMBoosterKnownPedals,
+                    onConnectivityResolved: OnMBoosterConnectivityResolved);
                 // Initial walk so any mBooster plugged in BEFORE SimHub launched
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.
@@ -1574,6 +1615,7 @@ namespace MozaPlugin
         private void CleanupPartialInit()
         {
             UnhookPowerMode();
+            UnhookArduinoScanVeto();
             try { _pollTimer?.Stop(); } catch { }
             try { _tempHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
@@ -1597,6 +1639,7 @@ namespace MozaPlugin
             // Dispose every mBooster controller — same reason: stop workers
             // before the connections they own get torn down.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
+            try { DisposeRoutedMBoosterProbes(); } catch { }
             // Dispose every standalone-peripheral connection (drops ownership +
             // closes each dedicated pipe).
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
@@ -1839,14 +1882,11 @@ namespace MozaPlugin
             _deviceManager.WriteSetting("base-gearshift-event", 1);
         }
 
-        // Fire AB9 per-shift triggers (0x0D 0x01 + 0x0D 0x04 engage, or
-        // 0x0D 0x06 for transitions into neutral). AB9 firmware fires its
-        // stored gear-shift-vibration rumble pattern in response — see
-        // docs/protocol/devices/ab9-shifter.md and usb-capture/AB9/
-        // {all_gears,1-N}.pcapng for the empirical observation. The previous
-        // hypothesis that the AB9 fires rumble autonomously from its
-        // mechanical sensor without host involvement was wrong; without
-        // these triggers gear engagement produces zero haptic feedback.
+        // Start the AB9's per-shift effects: the ShiftRumble square wave plus
+        // EngageForce, or NeutralForce for transitions into neutral. The host owns
+        // this — the AB9 does not fire rumble autonomously off its mechanical
+        // sensor, and without these starts gear engagement produces zero haptic
+        // feedback. See docs/protocol/devices/ab9-shifter.md.
         //
         // Gated by AB9-scoped knobs (Ab9Settings.GearShiftVibrateOnNeutral /
         // GearShiftDebounceMs), separate from the wheelbase gearshift card —
@@ -1880,9 +1920,10 @@ namespace MozaPlugin
             if (debounceMs > 0 && (now - _lastAb9GearShiftSendUtc).TotalMilliseconds < debounceMs) return;
             _lastAb9GearShiftSendUtc = now;
 
-            // engage trigger (0x0D 0x04) for any non-neutral gear,
-            // disengage (0x0D 0x06) for transitions into neutral.
-            _ab9Manager.SendGearShiftTrigger(engageNotDisengage: !isNeutral);
+            // EngageForce for any non-neutral gear, NeutralForce for transitions
+            // into neutral; the slider scales the constant-force ramp that precedes it.
+            _ab9Manager.SendGearShiftTrigger(engageNotDisengage: !isNeutral,
+                                             intensity0to100: ab9Settings.GearShiftVibrationIntensity);
         }
 
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
@@ -1896,15 +1937,6 @@ namespace MozaPlugin
             // Feed the truck-sim stalk controller the current game context so it can
             // gate keyboard output to a running ETS2/ATS session.
             try { _stalksController?.SetGameContext(pluginManager.GameName, data.GameRunning); } catch { }
-            // Heading probe (diagnostic): dump SimHub heading/radar/spotter props a
-            // handful of times while a game runs so we can identify AC's live heading
-            // source for the radar preamble. Self-limits to ~20 logs (~once/sec).
-            if (data.GameRunning && _headProbeCount < 20 && ++_headProbeTick >= 60)
-            {
-                _headProbeTick = 0;
-                _headProbeCount++;
-                try { _propertyResolver?.LogHeadingProbe(); } catch { }
-            }
             // Keep the process responsive in the background (EcoQoS opt-out + 1 ms timer)
             // the moment a game is active. Idempotent; the PollStatus backstop handles
             // release if DataUpdate goes quiet on game exit.
@@ -2304,9 +2336,237 @@ namespace MozaPlugin
             {
                 var settings = GetOrCreateMBoosterSettings(identity); // resolves + migrates current profile
                 var controller = _mboosterRegistry?.FindByIdentity(identity);
-                if (controller != null) ApplyMBoosterToHardware(controller, settings);
+                if (controller != null)
+                {
+                    // Replug on a NEW port: the transport-identity connectivity
+                    // seed missed at controller creation, but the serial-keyed
+                    // cache entry can seed now — still well ahead of the
+                    // device's own once-a-minute broadcast. No-op if live
+                    // connectivity already arrived.
+                    controller.SeedConnectedAxes(LookupMBoosterKnownPedals(identity));
+                    ApplyMBoosterToHardware(controller, settings);
+                }
             }
             catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] serial re-key for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
+        }
+
+        /// <summary>Persisted last-known pedal connectivity for a lane —
+        /// checked under the serial key when the identity has been re-keyed,
+        /// falling back to the transport identity (the cache is written under
+        /// both). Null when never seen.</summary>
+        private bool[]? LookupMBoosterKnownPedals(string identity)
+        {
+            var cache = _settings?.MBoosterKnownPedals;
+            if (cache == null || string.IsNullOrEmpty(identity)) return null;
+            string key = _mboosterSerialByIdentity.TryGetValue(identity, out var serialKey) ? serialKey : identity;
+            lock (_mboosterSettingsLock)
+            {
+                if (cache.TryGetValue(key, out var v) && v != null) return v;
+                return cache.TryGetValue(identity, out v) ? v : null;
+            }
+        }
+
+        /// <summary>
+        /// Live connectivity parsed from the device's own diagnostic. Persist
+        /// it (under both the serial key and the transport identity, so the
+        /// next controller can be seeded before the serial is re-interrogated)
+        /// and heal provably-stale role assignments: a role held by an axis
+        /// the device says has NO pedal, duplicating a role held by a wired
+        /// axis, can only be a leftover from before connectivity was known —
+        /// it first-wins the real pedal out of the merge on any build without
+        /// the phantom-axis guard, and blanks it during the unseeded window
+        /// otherwise. Healed across ALL profiles: the proof is physical
+        /// (device-reported wiring), not a per-profile preference. Runs on the
+        /// connection read thread, at most once per distinct diagnostic line
+        /// per session.
+        /// </summary>
+        private void OnMBoosterConnectivityResolved(string identity, bool[] connected)
+        {
+            if (IsShuttingDown || string.IsNullOrEmpty(identity) || connected == null || connected.Length == 0) return;
+            try
+            {
+                bool changed = false;
+                string? serialKey = _mboosterSerialByIdentity.TryGetValue(identity, out var sk) ? sk : null;
+                lock (_mboosterSettingsLock)
+                {
+                    var cache = _settings?.MBoosterKnownPedals;
+                    if (cache != null)
+                    {
+                        changed |= StoreKnownPedals(cache, identity, connected);
+                        if (serialKey != null) changed |= StoreKnownPedals(cache, serialKey, connected);
+                    }
+
+                    var profiles = _settings?.ProfileStore?.Profiles;
+                    if (profiles != null)
+                    {
+                        foreach (var profile in profiles)
+                        {
+                            var dict = profile?.MBoosterSettings;
+                            if (dict == null) continue;
+                            foreach (var key in new[] { serialKey, identity })
+                            {
+                                if (key == null || !dict.TryGetValue(key, out var s) || s == null) continue;
+                                changed |= HealMBoosterAxisRoles(
+                                    s, connected, profile!.Name ?? "?", MBoosterDeviceController.ShortIdentity(identity));
+                            }
+                        }
+                    }
+                }
+                if (changed) SaveSettings();
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] connectivity persist/heal for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
+        }
+
+        private static bool StoreKnownPedals(Dictionary<string, bool[]> cache, string key, bool[] connected)
+        {
+            if (cache.TryGetValue(key, out var old) && old != null && old.SequenceEqual(connected)) return false;
+            cache[key] = (bool[])connected.Clone();
+            return true;
+        }
+
+        // One routed-mBooster probe/lane per owning pipe (base and hub each
+        // count separately). An entry persists for the session once created —
+        // as a registered lane when the pedal device identified as an
+        // mBooster, or as a retired negative when it turned out to be plain
+        // SGP pedals (prevents a re-probe loop; a hookup change mid-session
+        // needs a plugin restart to be picked up).
+        private readonly object _routedMBoosterLock = new object();
+        private readonly Dictionary<MozaDeviceManager, MBoosterDeviceController> _routedMBoosterProbes =
+            new Dictionary<MozaDeviceManager, MBoosterDeviceController>();
+        private readonly Dictionary<MozaDeviceManager, int> _routedMBoosterProbeAttempts =
+            new Dictionary<MozaDeviceManager, int>();
+        // 5 s reconnect-timer cadence × 24 = give a silent pedal device two
+        // minutes of identity re-bursts before writing it off for the session.
+        private const int RoutedMBoosterProbeMaxAttempts = 24;
+
+        /// <summary>
+        /// A pedal sub-device was detected on a base/hub pipe — it may be an
+        /// mBooster on the RJ45 pedal port rather than plain SGP pedals. Spin
+        /// up a ROUTED controller against the pipe's shared connection (dev
+        /// 0x19) and interrogate its identity; registration with the registry
+        /// happens only when the model-name read confirms an mBooster (both
+        /// device families answer the same identity groups at 0x19, so the
+        /// model string is the discriminator). Reads-only until then.
+        /// </summary>
+        internal void ProbeRoutedMBooster(MozaDeviceManager owner)
+        {
+            if (IsShuttingDown || owner == null || _mboosterRegistry == null) return;
+            lock (_routedMBoosterLock)
+            {
+                if (_routedMBoosterProbes.ContainsKey(owner)) return;
+                string port = owner.Connection?.LastPortName ?? "";
+                string identity = "routedpedals:" + (string.IsNullOrEmpty(port) ? "pipe" : port);
+                var c = new MBoosterDeviceController(
+                    identity,
+                    owner.Connection!,
+                    MozaProtocol.DevicePedals,
+                    portLabel: string.IsNullOrEmpty(port) ? "via base" : $"via {port}",
+                    settingsLookup: () => GetOrCreateMBoosterSettings(identity),
+                    isShuttingDown: () => IsShuttingDown,
+                    customEffectFormulaEvaluator: CreateHapticsFormulaResolver());
+                c.ModelNameResolved += name => OnRoutedMBoosterModelResolved(c, name);
+                _routedMBoosterProbes[owner] = c;
+                _routedMBoosterProbeAttempts[owner] = 1;
+                c.SendIdentityReads();
+            }
+        }
+
+        /// <summary>Re-burst identity reads for probes that never got a model
+        /// answer (frame lost / pipe busy at detect time). Runs from the 5 s
+        /// reconnect timer; capped so silent non-mBooster pedals don't get
+        /// probed forever.</summary>
+        private void NudgeRoutedMBoosterProbes()
+        {
+            if (IsShuttingDown) return;
+            List<MBoosterDeviceController>? pending = null;
+            lock (_routedMBoosterLock)
+            {
+                foreach (var kv in _routedMBoosterProbes)
+                {
+                    var c = kv.Value;
+                    if (c == null || !string.IsNullOrEmpty(c.ModelName) || !c.IsConnected) continue;
+                    if (!_routedMBoosterProbeAttempts.TryGetValue(kv.Key, out int n)) n = 0;
+                    if (n >= RoutedMBoosterProbeMaxAttempts) continue;
+                    _routedMBoosterProbeAttempts[kv.Key] = n + 1;
+                    (pending ??= new List<MBoosterDeviceController>()).Add(c);
+                }
+            }
+            if (pending == null) return;
+            foreach (var c in pending)
+            {
+                try { c.SendIdentityReads(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed identity re-burst: {ex.Message}"); }
+            }
+        }
+
+        /// <summary>Teardown for routed probes/lanes — registered lanes are
+        /// disposed by the registry too, but Dispose latches so the double
+        /// call is harmless; unresolved probes are only reachable from here.
+        /// Routed Dispose never touches the shared base/hub pipe itself.</summary>
+        private void DisposeRoutedMBoosterProbes()
+        {
+            List<MBoosterDeviceController> all;
+            lock (_routedMBoosterLock)
+            {
+                all = new List<MBoosterDeviceController>(_routedMBoosterProbes.Values);
+                _routedMBoosterProbes.Clear();
+                _routedMBoosterProbeAttempts.Clear();
+            }
+            foreach (var c in all)
+            {
+                try { c?.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe dispose: {ex.Message}"); }
+            }
+        }
+
+        private void OnRoutedMBoosterModelResolved(MBoosterDeviceController c, string model)
+        {
+            if (IsShuttingDown || c == null) return;
+            try
+            {
+                if (!string.IsNullOrEmpty(model) && model.IndexOf("mBooster", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    MozaLog.Info($"[AZOM/mBooster] mBooster identified on the pedal port ({c.PortName}) — registering routed lane (dev 0x{c.HostDeviceId:x2})");
+                    _mboosterRegistry?.AddRoutedLane(c);
+                }
+                else
+                {
+                    // Plain SGP pedals (or another non-mBooster pedal device) —
+                    // retire the probe. Dispose skips the motor disable frames
+                    // when the model never identified as an mBooster.
+                    MozaLog.Debug($"[AZOM/mBooster] pedal sub-device ({c.PortName}) is '{model}', not an mBooster — routed probe retired");
+                    try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Probe dispose: {ex.Message}"); }
+                }
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] routed model resolution: {ex.Message}"); }
+        }
+
+        /// <summary>One heal pass over a single profile's device entry — the
+        /// conclusive-only rule from <see cref="OnMBoosterConnectivityResolved"/>.</summary>
+        private static bool HealMBoosterAxisRoles(MBoosterDeviceSettings s, bool[] connected, string profileName, string shortId)
+        {
+            var roles = s.AxisRoles;
+            if (roles == null) return false;
+            bool changed = false;
+            for (int a = 0; a < roles.Length; a++)
+            {
+                bool aConnected = a < connected.Length && connected[a];
+                if (aConnected || roles[a] == global::MozaPlugin.Devices.MBoosterRole.Disabled) continue;
+                for (int b = 0; b < roles.Length; b++)
+                {
+                    if (b == a || roles[b] != roles[a]) continue;
+                    if (b < connected.Length && connected[b])
+                    {
+                        MozaLog.Info(
+                            $"[AZOM/mBooster] {shortId}: cleared stale '{roles[a]}' role from axis {a} " +
+                            $"in profile '{profileName}' — the device reports no pedal wired there and " +
+                            $"the wired pedal on axis {b} holds that role");
+                        roles[a] = global::MozaPlugin.Devices.MBoosterRole.Disabled;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return changed;
         }
 
         /// <summary>
@@ -2360,9 +2620,16 @@ namespace MozaPlugin
             // Pedal 0 (master) keeps its calibration in the flat fields (the
             // existing UI); the additional chained pedals (axes 1+) store theirs
             // in s.Pedals[axis]. An unconfigured pedal (all -1 / null) writes
-            // nothing.
+            // nothing. Once connectivity is known, phantom axes (no pedal
+            // wired) are skipped, and a lane's sole connected pedal falls back
+            // to the flat fields when it has no per-pedal entry — see
+            // MBoosterDeviceController.SoleConnectedAxis.
+            var connectedAxes = controller.ConnectedAxes;
+            int soleAxis = controller.SoleConnectedAxis();
             for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBoosterDeviceController.MaxAxes; axis++)
             {
+                if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
+                    continue;
                 var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, axis, axisCount);
                 string? prefix =
                     role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? "throttle"
@@ -2376,6 +2643,7 @@ namespace MozaPlugin
                 global::MozaPlugin.Devices.IMBoosterPedalConfig cfg;
                 if (axis == 0) cfg = s;
                 else if (s.Pedals != null && s.Pedals.TryGetValue(axis, out var p) && p != null) cfg = p;
+                else if (axis == soleAxis) cfg = s;
                 else continue;
 
                 bool wroteAnyCalibration = false;
@@ -2529,6 +2797,7 @@ namespace MozaPlugin
             // each connection. Must happen before MozaData is torn down so the
             // position-merge path (which writes to _data) doesn't race.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
+            try { DisposeRoutedMBoosterProbes(); } catch { }
             // Standalone pedals/handbrake connections — close before MozaData
             // teardown so the response path (which writes to _data) can't race.
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
@@ -2618,6 +2887,7 @@ namespace MozaPlugin
             //    PowerModeChanged is static — detach first so a resume mid-teardown can't
             //    schedule a ForceReconnect against tearing-down state.
             UnhookPowerMode();
+            UnhookArduinoScanVeto();
             try
             {
                 if (_connection != null)
@@ -3127,6 +3397,7 @@ namespace MozaPlugin
                 DetectionState.DashDetected = false;
                 DetectionState.BaseAmbientLedSupported = false;
                 DetectionState.BaseAmbientProbed = false;
+                DetectionState.BaseEq10Probed = false;
                 _data.BaseModelName = "";
                 DetectionState.NewWheelDetected = false;
                 DetectionState.OldWheelDetected = false;
@@ -3397,6 +3668,13 @@ namespace MozaPlugin
         /// (connected FSR1 wheel). The tier-def sender never goes Active for an FSR1,
         /// so the dashboard UI gates the selector/status on this instead.</summary>
         internal bool IsFsr1DriverRunning => _fsr1Driver?.IsRunning ?? false;
+
+        /// <summary>True when the CM1 standalone group-0x35 display driver is running.</summary>
+        internal bool IsCm1DriverRunning => _cm1Driver?.IsRunning ?? false;
+
+        /// <summary>The dual-display coordinator, for the diagnostics bundle to read the
+        /// CM1/CM2 discrimination state. Null before Init wires it.</summary>
+        internal Telemetry.DualDisplayCoordinator? DualDisplay => _dualDisplay;
 
         /// <summary>True when the wheel's OWN screen is driven by the tier-def
         /// <see cref="_telemetrySender"/> (a display wheel like W17/W18) rather than
@@ -3723,7 +4001,7 @@ namespace MozaPlugin
         /// <summary>Inbound from the dashboard connection — same command-parse path as
         /// the wheelbase. (The telemetry inbound dispatcher follows the sender's
         /// Rebind, so dashboard session frames reach it once the sender is bound here.)</summary>
-        private void OnDashboardMessageReceived(byte[] data) => OnMessageReceived(data);
+        private void OnDashboardMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: true);
 
         /// <summary>Dashboard USB unplugged — pause the sender so the next tick rebinds
         /// it back to the wheelbase (and the base-bridged 0x14 path takes over if present).</summary>
@@ -3808,6 +4086,59 @@ namespace MozaPlugin
             {
                 try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] PowerModeChanged unhook: {ex.Message}"); }
+            }
+        }
+
+        // SimHub's Arduino scanner (ComportScanner) asks subscribers before
+        // opening each candidate COM port. Mark MOZA ports busy so it skips
+        // them. Runs on the scanner's Parallel.ForEach workers — keep it cheap
+        // and throw-proof.
+        private void OnArduinoPortCanBeScanned(object? sender, SerialDash.SerialDashController.ScanArgs e)
+        {
+            try
+            {
+                string? port = e?.ComPort;
+                if (string.IsNullOrEmpty(port)) return;
+                string? claim = DescribeMozaPortClaim(port!);
+                if (claim == null) return;
+                e!.PortIsBusy = true;
+                e.BusyReason = claim;
+                MozaLog.Debug($"[AZOM] Vetoed SimHub Arduino scan of {port} ({claim})");
+            }
+            catch { /* never break SimHub's scanner */ }
+        }
+
+        // A port is ours when a plugin connection holds it, the registry
+        // classifies it as a MOZA composite (Windows), or it matches one of the
+        // per-lane persisted last-good ports — the only identity available under
+        // Wine/Proton, where the registry walk is empty.
+        private string? DescribeMozaPortClaim(string port)
+        {
+            if (MozaSerialConnection.IsPortHeld(port))
+                return "MOZA (in use)";
+            if (MozaPortDiscovery.Instance.TryGetByPort(port, out var info))
+                return $"MOZA {MozaUsbIds.Describe(info.Pid)}";
+            var s = _settings;
+            if (s != null)
+            {
+                bool Match(string saved) =>
+                    !string.IsNullOrEmpty(saved)
+                    && string.Equals(saved, port, StringComparison.OrdinalIgnoreCase);
+                if (Match(s.LastWheelbasePort) || Match(s.LastAb9Port)
+                    || Match(s.LastDashboardPort) || Match(s.LastHubPort)
+                    || Match(s.LastBaseAuxPort))
+                    return "MOZA (last known port)";
+            }
+            return null;
+        }
+
+        // Mirror of UnhookPowerMode for the Arduino-scan veto subscription.
+        private void UnhookArduinoScanVeto()
+        {
+            if (Interlocked.Exchange(ref _arduinoScanHooked, 0) == 1)
+            {
+                try { SerialDash.ComportScanner.Instance.CanBeScanned -= OnArduinoPortCanBeScanned; }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Arduino-scan veto unhook: {ex.Message}"); }
             }
         }
 
@@ -4032,6 +4363,10 @@ namespace MozaPlugin
             // Slice I: reconnect-timer mBooster Refresh re-enabled.
             try { _mboosterRegistry?.Refresh(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Refresh: {ex.Message}"); }
+            // Routed-mBooster identity probes that lost their reply get a
+            // re-burst on the same cadence (capped — see the method).
+            try { NudgeRoutedMBoosterProbes(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe nudge: {ex.Message}"); }
 
             // Standalone pedals/handbrake on their own ports (registry-
             // only, same Wine guard as the other dedicated lanes).
@@ -4363,7 +4698,13 @@ namespace MozaPlugin
 
         internal volatile int _unmatched;
 
-        private void OnMessageReceived(byte[] data)
+        private void OnMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: false);
+
+        // fromDashboard: frame arrived on the standalone-USB dashboard pipe (CM2 on
+        // its own port) rather than the wheelbase pipe. Both pipes share this handler
+        // and both tag their own main MCU as raw 0x21, so device id alone can't tell
+        // the R5 base from a standalone CM2.
+        private void OnMessageReceived(byte[] data, bool fromDashboard)
         {
             // Shutdown guard: serial reader may deliver frames after End() begins.
             if (IsShuttingDown) return;
@@ -4421,15 +4762,20 @@ namespace MozaPlugin
                 if (rawDeviceId == 0x41 && DashIsCm1)
                     _fsr1Cm1Mapping.TryFollowCm1DashboardLog(text);
                 // CM2 meter heartbeat vocabulary identifies its firmware era (LED
-                // command family) — see DetectCm2LedFirmwareEra.
-                if (rawDeviceId == 0x41 && !DashIsCm1)
+                // command family) — see DetectCm2LedFirmwareEra. A base-bridged CM2
+                // logs as the dash sub-device (raw 0x41) on the wheelbase pipe; a
+                // standalone-USB CM2 logs as its own main MCU (raw 0x21) on the
+                // dashboard pipe.
+                if ((rawDeviceId == 0x41 && !DashIsCm1) || (fromDashboard && rawDeviceId == 0x21))
                     DetectCm2LedFirmwareEra(text);
                 // The main bridge logs steering-wheel (rim) attach/detach edges
                 // here as "steer_connected <N>" / "Gpw Wheel Disconnected". A rim
                 // pull is NOT a USB/serial disconnect, so the poll-miss hot-swap
                 // path never fires — this is the only signal that tears down the
                 // stale cached identity/catalog. See TryHandleWheelConnectionLog.
-                if (rawDeviceId == 0x21)
+                // Wheelbase pipe only: a standalone CM2's 0x21 logs are the dash's
+                // own MCU, not the main bridge.
+                if (rawDeviceId == 0x21 && !fromDashboard)
                     TryHandleWheelConnectionLog(text);
                 if (MozaLog.WireDebugEnabled)
                     MozaLog.Debug(
@@ -4739,6 +5085,13 @@ namespace MozaPlugin
         {
             get => _profileCoordinator.ActiveTelemetryEnabled;
             set => _profileCoordinator.ActiveTelemetryEnabled = value;
+        }
+        /// <summary>Telemetry-enable for the CM2/CM1 dash pipeline — resolvable with
+        /// no wheel attached, unlike <see cref="ActiveTelemetryEnabled"/>.</summary>
+        internal bool ActiveDashTelemetryEnabled
+        {
+            get => _profileCoordinator.ActiveDashTelemetryEnabled;
+            set => _profileCoordinator.ActiveDashTelemetryEnabled = value;
         }
         internal string ActiveTelemetryProfileName
         {

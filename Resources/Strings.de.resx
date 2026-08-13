@@ -52,8 +52,6 @@
   <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 400 % = max. Boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB-AUSGABEKURVE</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// die 5 Knoten ziehen, um den Verlauf zu formen</value></data>
-  <data name="Button_Flat" xml:space="preserve"><value>FLACH</value></data>
-  <data name="Button_Falloff" xml:space="preserve"><value>ABSENKUNG</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S-KURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENTIELL</value></data>
@@ -195,8 +193,8 @@
   <data name="Section_UsbDetection" xml:space="preserve"><value>USB-ERKENNUNG</value></data>
   <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Serielles Probe-Fallback deaktivieren (erweitert)</value></data>
   <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Nur erforderlich, wenn das Plugin mit einem falschen Gerät kommuniziert.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Erkennung des AB9-Aktivschalthebels deaktivieren</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Überspringt das AB9-Reconnect-Probe.</value></data>
+  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Erkennung des Aktivschalthebels deaktivieren (AB9 / AB6)</value></data>
+  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Überspringt die Reconnect-Probe des Aktivschalthebels.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRIE</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Dashboard beim Verbinden hochladen</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Dashboards vom Lenkrad herunterladen</value></data>
@@ -317,6 +315,7 @@
   <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Diagnose-Aufzeichnung beim Start / Spielwechsel immer beginnen</value></data>
   <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Wenn aktiv, beginnt die serielle Aufzeichnung automatisch bei jedem Plugin-Start.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>BUNDLE EXPORTIEREN (ZIP)…</value></data>
+  <data name="Button_CopyReference" xml:space="preserve"><value>REFERENZ KOPIEREN</value></data>
   <data name="Button_CopyCapture" xml:space="preserve"><value>AUFZEICHNUNG IN ZWISCHENABLAGE KOPIEREN</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>VOLLSTÄNDIGER DIAGNOSE-BERICHT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// Debug-Informationen</value></data>
@@ -739,6 +738,8 @@ Id: {2}</value></data>
   <data name="Label_LightCycleKey" xml:space="preserve"><value>Lichtzyklus</value></data>
   <data name="Label_IndicatorLeftKey" xml:space="preserve"><value>Blinker links</value></data>
   <data name="Label_IndicatorRightKey" xml:space="preserve"><value>Blinker rechts</value></data>
+  <data name="Section_StalksIndicators" xml:space="preserve"><value>Blinker</value></data>
+  <data name="SliderLabel_IndicatorMinBlink" xml:space="preserve"><value>Mindest-Blinkdauer (s)</value></data>
   <data name="KeyCapture_Prompt" xml:space="preserve"><value>Taste drücken…</value></data>
   <data name="KeyCapture_None" xml:space="preserve"><value>(nicht belegt)</value></data>
   <data name="StalkKind_None" xml:space="preserve"><value>(keine)</value></data>
@@ -754,4 +755,6 @@ Id: {2}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Lichtstufe {0}</value></data>
   <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
+  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
+  <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
 </root>

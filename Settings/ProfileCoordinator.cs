@@ -345,10 +345,19 @@ namespace MozaPlugin.Settings
         /// <summary>
         /// True iff telemetry is enabled for the current wheel page. Per-wheel-page
         /// (shared across profiles); reads return false when wheel not identified.
-        /// When the wheel is identified but has no explicit entry yet, falls back to
-        /// <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/> (true
-        /// for fresh installs, false for existing users) — dict-missing is "no
-        /// opinion", resolved to the install default, not a hard off.
+        ///
+        /// Dict-missing is "no opinion", never a hard off. A wheel with a SCREEN
+        /// resolves that to on — it exists to show a dashboard, so it streams until
+        /// the user says otherwise, matching <see cref="ActiveDashTelemetryEnabled"/>.
+        /// Screenless and unknown models fall back to
+        /// <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/>.
+        ///
+        /// That install-wide flag alone was not enough: it is only set true by the
+        /// ReadCommonSettings create-if-not-found factory, so every settings file
+        /// written before it existed resolves false — and a user who later attaches a
+        /// NEW display wheel gets a silently dark dashboard with no banner and no log
+        /// line (bundle NZW8W197, KS Pro on a pre-existing install). The default has
+        /// to be scoped to the wheel, not the install.
         /// </summary>
         internal bool ActiveTelemetryEnabled
         {
@@ -358,6 +367,11 @@ namespace MozaPlugin.Settings
                 if (!g.HasValue || _plugin.Settings?.WheelTelemetryEnabledByPageGuid == null) return false;
                 if (_plugin.Settings.WheelTelemetryEnabledByPageGuid.TryGetValue(g.Value, out var v))
                     return v;
+                // IsFsr1DisplayWheel is load-bearing: FSR V1 carries hasDisplay:false
+                // in WheelModelInfo (its screen rides the group-0x42 Fsr1DisplayDriver,
+                // not the tier-def sender) yet that driver gates on this same property.
+                if (_plugin.WheelModelInfo?.HasDisplay == true || _plugin.IsFsr1DisplayWheel)
+                    return true;
                 return _plugin.Settings.TelemetryEnabledDefaultForNewWheels;
             }
             set
@@ -368,6 +382,47 @@ namespace MozaPlugin.Settings
                 if (_plugin.Settings.WheelTelemetryEnabledByPageGuid == null)
                     _plugin.Settings.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
                 _plugin.Settings.WheelTelemetryEnabledByPageGuid[g.Value] = value;
+            }
+        }
+
+        /// <summary>
+        /// True iff dashboard telemetry is enabled for the CM2/CM1 dash pipeline.
+        /// A dash is not a wheel: a hub-only or dash-only rig resolves no wheel page
+        /// GUID, so <see cref="ActiveTelemetryEnabled"/> reads false and its setter
+        /// no-ops there — never gate the dash pipeline on it.
+        ///
+        /// Resolution order: explicit entry under <see cref="MozaPlugin.Cm2PageGuid"/>
+        /// (user toggled it on the dash page) → the wheel page's resolved value while
+        /// a wheel IS identified (one shared toggle for wheel+dash rigs, install default
+        /// included) → on. Dict-missing is "no opinion", never a hard off.
+        ///
+        /// The final "on" is deliberate: with no wheel identified there is no wheel
+        /// setting to inherit and <see cref="MozaPluginSettings.TelemetryEnabledDefaultForNewWheels"/>
+        /// is not a signal about a dash (it is keyed on wheels, and reads false for every
+        /// pre-existing install). Falling through to it left a hub-only / dash-only rig
+        /// with its only display dark AND — because the dash pipeline is what used to
+        /// drive the CM1 discriminator — with its CM1 stuck wearing the speculative CM2
+        /// device definition (bundle MGXWJ3YH). A dash on a wheel-less rig IS the display,
+        /// so it streams unless the user says otherwise on the dash page.
+        /// </summary>
+        internal bool ActiveDashTelemetryEnabled
+        {
+            get
+            {
+                var s = _plugin.Settings;
+                if (s?.WheelTelemetryEnabledByPageGuid == null) return false;
+                if (s.WheelTelemetryEnabledByPageGuid.TryGetValue(MozaPlugin.Cm2PageGuid, out var v))
+                    return v;
+                if (_plugin.GetCurrentWheelPageGuid().HasValue) return ActiveTelemetryEnabled;
+                return true;
+            }
+            set
+            {
+                var s = _plugin.Settings;
+                if (s == null) return;
+                if (s.WheelTelemetryEnabledByPageGuid == null)
+                    s.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
+                s.WheelTelemetryEnabledByPageGuid[MozaPlugin.Cm2PageGuid] = value;
             }
         }
 
