@@ -80,7 +80,13 @@ namespace MozaPlugin.Devices
 
         private readonly MozaSerialConnection _connection;
         private volatile bool _detected;
-        private volatile bool _ffbInitSent;
+        // Port session the FFB alloc handshake was sent for. The device rebuilds
+        // its effect table on every boot, so the handshake is per-open, not
+        // per-process: keying it to the connection's I/O generation re-runs it on
+        // any reopen without depending on a Disconnected event that a driver-side
+        // close may not deliver, and without a bool that a late event could clear
+        // after the next session already allocated.
+        private int _ffbInitGeneration = -1;
         // Device-assigned effect indices, packed one byte per Ab9Effect slot and
         // latched from the 0x07 alloc ACKs (see LatchAllocAck). Written only on the
         // serial read thread, read from the vib worker + data thread — Interlocked
@@ -129,13 +135,11 @@ namespace MozaPlugin.Devices
                 MozaProbeTarget.Ab9,
                 disableProbeFallback);
             _connection.CaptureLabel = "ab9";
-            // Reset detection latches when the underlying port wedges. The
-            // Disconnected event fires from HandleIoFailure on the read/write
-            // thread, so this handler MUST stay lightweight (no Join, no I/O):
-            // it only clears two volatile bools. Without this, _ffbInitSent
-            // stays sticky after a silent reconnect and the FFB slot-table
-            // handshake never re-fires → engine vibration / pulse streams hit
-            // an uninitialised device.
+            // Drop the detection latch when the underlying port dies. Fires on the
+            // read/write thread, so this handler MUST stay lightweight (no Join, no
+            // I/O). The FFB handshake and effect indices are NOT reset here — they
+            // are keyed to the port session (see _ffbInitGeneration), so a late
+            // event can't wipe indices the next session already latched.
             _connection.Disconnected += OnConnectionDisconnected;
             // Watch the raw inbound stream for the 0x07 alloc ACKs so the effect
             // indices the device hands out are latched rather than assumed.
@@ -145,8 +149,6 @@ namespace MozaPlugin.Devices
         private void OnConnectionDisconnected()
         {
             _detected = false;
-            _ffbInitSent = false;
-            ResetEffectIndices();
         }
 
         /// <summary>
@@ -171,7 +173,6 @@ namespace MozaPlugin.Devices
         {
             _connection.Disconnect();
             _detected = false;
-            _ffbInitSent = false;
         }
 
         /// <summary>
@@ -400,15 +401,17 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Emit the session-start FFB handshake exactly as PitHouse does. Idempotent
-        /// per connection — re-sending it would re-allocate slots on the device
-        /// side, so the plugin only fires it once per detect event (reset on
-        /// disconnect).
+        /// per port session — re-sending it would re-allocate slots on the device
+        /// side — but a reopened port is a new session and MUST re-run it: the
+        /// device comes back with an empty effect table, and streaming into stale
+        /// handles is silently accepted (generic 0xA0 ACK) while every effect stays
+        /// dead. Safe to call on every inbound frame.
         /// </summary>
         public void SendFfbInitSequence()
         {
             if (!_connection.IsConnected) return;
-            if (_ffbInitSent) return;
-            _ffbInitSent = true;
+            int generation = _connection.IoGeneration;
+            if (Interlocked.Exchange(ref _ffbInitGeneration, generation) == generation) return;
             // Fresh alloc burst ⇒ fresh index set; the ACK handler refills it.
             ResetEffectIndices();
 
@@ -803,7 +806,7 @@ namespace MozaPlugin.Devices
             _connection.Disconnected -= OnConnectionDisconnected;
             _connection.MessageReceived -= OnConnectionFrame;
             _detected = false;
-            _ffbInitSent = false;
+            Interlocked.Exchange(ref _ffbInitGeneration, -1);
             ResetEffectIndices();
             _connection.Dispose();
         }

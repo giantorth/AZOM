@@ -235,6 +235,15 @@ namespace MozaPlugin.Protocol
         // outlives its Join(1000) (syscall-wedged under Wine) exits when it
         // wakes instead of re-attaching to the next open's port and queues.
         private int _ioGeneration;
+
+        /// <summary>
+        /// Token identifying the current port session — bumped by every open and
+        /// every teardown. Owners that hand the device per-session state (the AB9's
+        /// FFB effect table) latch on this rather than on a bool, so a re-opened
+        /// port always re-runs its handshake.
+        /// </summary>
+        public int IoGeneration => Volatile.Read(ref _ioGeneration);
+
         private readonly object _lock = new object();
         private string? _lastPortName;
 
@@ -830,8 +839,29 @@ namespace MozaPlugin.Protocol
                 try
                 {
                     var port = _port;
-                    if (port == null || !port.IsOpen)
+                    if (port == null)
                     {
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    if (!port.IsOpen)
+                    {
+                        // Driver-side close: a device that re-enumerates (reboot on
+                        // an AB9 mode switch, firmware restart, replug) makes
+                        // SerialPort dispose its own stream, so IsConnected goes
+                        // false after only a couple of write errors — far short of
+                        // PortDeadThreshold, and the read loop never throws at all.
+                        // Without this nobody raises Disconnected and every owner
+                        // keeps its per-session state (AB9 FFB effect table, wheel
+                        // detection, telemetry sessions) across the silent reconnect.
+                        if (Interlocked.CompareExchange(ref _portFailureLogged, 1, 0) == 0)
+                        {
+                            MozaLog.Warn(
+                                "[AZOM] Port closed by the driver (device re-enumerated) — notifying for reconnect");
+                            RecordRuntimeFailure(ConnectionFailureKind.IoFailureAfterOpen,
+                                "port closed by the driver (device removed or re-enumerated)");
+                            ClosePortAndNotify();
+                        }
                         Thread.Sleep(100);
                         continue;
                     }

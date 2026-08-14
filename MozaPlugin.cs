@@ -5102,13 +5102,16 @@ namespace MozaPlugin
 
             bool rising = !DetectionState.Ab9Detected;
             _ab9Manager.MarkDetected();
+            // Push the FFB session-init handshake (alloc/init/commit) before any
+            // hardware apply. Not gated on `rising`: the handshake is per port
+            // session (the manager no-ops within one), and the detection latch is
+            // process-wide state that can already be set when a re-enumerated
+            // device comes back to an empty effect table.
+            try { _ab9Manager.SendFfbInitSequence(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/AB9] FFB init failed: {ex.Message}"); }
             if (rising)
             {
                 DetectionState.Ab9Detected = true;
-                // Push the FFB session-init handshake (alloc/init/commit) once on
-                // the rising edge. Manager guards against re-sending across reconnects.
-                try { _ab9Manager.SendFfbInitSequence(); }
-                catch (Exception ex) { MozaLog.Warn($"[AZOM/AB9] FFB init failed: {ex.Message}"); }
                 ApplyAb9ToHardware(_settings?.ProfileStore?.CurrentProfile);
             }
 
