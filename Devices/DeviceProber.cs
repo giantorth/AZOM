@@ -575,8 +575,16 @@ namespace MozaPlugin.Devices
                     _deviceManager.ReadSetting("base-mcu-uid");
                     _deviceManager.ReadSetting("base-identity-11");
                     // Numeric firmware version (dev 0x12, group 0x04) — gates the
-                    // wheelbase LFE effects via MozaData.BaseSupportsLfe.
+                    // wheelbase LFE effects via MozaData.BaseSupportsLfe. Three
+                    // shots because a silent base disables LFE outright and this
+                    // read is issued exactly once per detection: the canonical
+                    // 0x12 request PitHouse sends, the same request in its
+                    // zero-length form, and the same query at dev 0x13. An R12
+                    // (RS21-D07) on LFE-capable firmware answers none of them at
+                    // 0x12 in the len-4 form — see MozaCommandDatabase.
                     _deviceManager.ReadSetting("base-fw-version");
+                    _deviceManager.SendBaseFwVersionShortProbe();
+                    _deviceManager.ReadSetting("base-fw-version-b");
                 }
             }
 
@@ -600,10 +608,21 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "base-fw-version":
+                case "base-fw-version-b":
                     // The reply's packed version is always positive (major byte
-                    // < 0x80), so it clears the value guard above. Deferred
-                    // equalizer7-10 apply+read: the main base sweep runs before
-                    // the firmware version is known, and old firmware never
+                    // < 0x80), so it clears the value guard above. Logged once per
+                    // detection: it's the only LFE gate, and without it a silent
+                    // base is indistinguishable from an old one in a bug report.
+                    if (!_detectionState.BaseFwVersionLogged)
+                    {
+                        _detectionState.BaseFwVersionLogged = true;
+                        MozaLog.Info(
+                            $"[AZOM] Base firmware {_data.BaseFwVersionText} " +
+                            $"(LFE effects {(_data.BaseSupportsLfe ? "supported" : "unsupported, needs >= 1.2.10.10")}) " +
+                            $"via {commandName}");
+                    }
+                    // Deferred equalizer7-10 apply+read: the main base sweep runs
+                    // before the firmware version is known, and old firmware never
                     // answers these registers. Writes queue before reads so the
                     // read-backs reflect the profile values just applied.
                     if (_data.BaseSupportsEq10 && !_detectionState.BaseEq10Probed)
@@ -660,6 +679,17 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "wheel-model-name":
+                    // Only the wheel ids may drive wheel identity. The parser's
+                    // device hints already keep base/ES/shifter/pedals/handbrake
+                    // replies out of the wheel-* bucket, but this case both
+                    // DETECTS and HOT-SWAPS, so a single mis-routed reply costs a
+                    // full detection reset (+ a PendingResponseTracker wipe). A
+                    // relayed pedal set answering the shared group-0x07 probe used
+                    // to land here as model 'SRP' and reset a healthy 'KS' wheel —
+                    // see the pedals/handbrake hints in MozaResponseParser.
+                    if (deviceId != MozaProtocol.DeviceWheel && deviceId != MozaProtocol.DeviceWheel15)
+                        break;
+
                     // A valid model-name reply (the doc's canonical group-0x07
                     // probe, ProbeWheelDetection) can itself trigger new-protocol
                     // detection — this covers a wheel that answers the identity
@@ -670,7 +700,6 @@ namespace MozaPlugin.Devices
                     // neither reaches this case. Mirrors the wheel-telemetry-mode
                     // bring-up minus the model-name read (already in hand).
                     if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected
-                        && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
                         && IsValidWheelModelName(_data.WheelModelName))
                     {
                         _detectionState.NewWheelDetected = true;

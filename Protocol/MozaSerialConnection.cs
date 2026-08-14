@@ -524,7 +524,7 @@ namespace MozaPlugin.Protocol
 
             var (portName, pid, viaHubProbe) = FindMozaPort(
                 _pidFilter, _probeTarget, preferredPort, _disableProbeFallback,
-                () => _shutdownRequested);
+                CaptureLabel, () => _shutdownRequested);
             if (portName == null)
                 return false;
 
@@ -1236,6 +1236,10 @@ namespace MozaPlugin.Protocol
             MozaProbeTarget probeTarget,
             string? preferredPort,
             Func<bool>? disableProbeFallback,
+            // Which pipe is asking. Only used to key the repeat-suppressed status
+            // lines below (every lane re-runs this on the 5 s reconnect tick) —
+            // without a per-lane key one pipe's steady state would mask another's.
+            string laneLabel,
             Func<bool>? cancel = null)
         {
             // Stage 1: registry walk. Take the full MOZA enumeration first
@@ -1305,8 +1309,8 @@ namespace MozaPlugin.Protocol
 
             if (disableProbeFallback?.Invoke() == true)
             {
-                MozaLog.Debug(
-                    "[AZOM] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
+                MozaLog.DebugIfChanged($"probe-skip-disabled:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
                 return (null, null, false);
             }
 
@@ -1354,16 +1358,17 @@ namespace MozaPlugin.Protocol
             }
             if (probeEligible == 0 && allRegistryPorts.Count > 0)
             {
-                MozaLog.Debug(
-                    $"[AZOM] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
+                MozaLog.DebugIfChanged($"probe-skip-classified:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
                 return (null, null, false);
             }
 
             if (allRegistryPorts.Count == 0)
-                MozaLog.Debug("[AZOM] No MOZA device in registry, falling back to serial probe");
+                MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] No MOZA device in registry, falling back to serial probe");
             else
-                MozaLog.Debug(
-                    $"[AZOM] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
+                MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
 
             // 600ms budget per port — SerialPort.Open can hang indefinitely under Wine
             // if another process holds the tty. Background-thread the probe so one bad
@@ -1438,7 +1443,7 @@ namespace MozaPlugin.Protocol
                     }
                 }
 
-                MozaLog.Debug("[AZOM] No AB9 device found on any COM port");
+                MozaLog.DebugIfChanged($"ab9-probe:{laneLabel}", "[AZOM] No AB9 device found on any COM port");
                 return (null, null, false);
             }
 

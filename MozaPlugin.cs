@@ -1220,7 +1220,7 @@ namespace MozaPlugin
                 _connection.MessageReceived += OnMessageReceived;
                 _connection.Disconnected += OnSerialDisconnected;
 
-                _deviceManager = new MozaDeviceManager(_connection);
+                _deviceManager = new MozaDeviceManager(_connection, PendingResponses);
 
                 _ab9Manager = new MozaAb9DeviceManager(disableProbeFallback);
                 if (!string.IsNullOrEmpty(_settings.LastAb9Port))
@@ -1381,6 +1381,11 @@ namespace MozaPlugin
                     {
                         try { _baseManager.PendingResponses?.TickRetransmits(_baseManager.Connection.Send); }
                         catch (Exception ex) { MozaLog.Warn($"[AZOM] Base-aux PendingResponseTracker tick failed: {ex.Message}"); }
+                    }
+                    if (_dashboardManager != null && _dashboardManager.IsConnected)
+                    {
+                        try { _dashboardManager.PendingResponses.TickRetransmits(_dashboardManager.Connection.Send); }
+                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Dashboard PendingResponseTracker tick failed: {ex.Message}"); }
                     }
                     // Each standalone-peripheral pipe retransmits its own tracked
                     // reads on its own Send (same per-pipe isolation as the hub).
@@ -3443,6 +3448,7 @@ namespace MozaPlugin
                 DetectionState.BaseAmbientLedSupported = false;
                 DetectionState.BaseAmbientProbed = false;
                 DetectionState.BaseEq10Probed = false;
+                DetectionState.BaseFwVersionLogged = false;
                 _data.BaseModelName = "";
                 DetectionState.NewWheelDetected = false;
                 DetectionState.OldWheelDetected = false;
@@ -4057,6 +4063,10 @@ namespace MozaPlugin
             try { _telemetrySender?.Pause(); } catch { }
             DetectionState.DashDetected = false;
             _data.IsDashboardConnected = false;
+            // Same reasoning as OnSerialDisconnected: pending reads for a port
+            // that's gone will never be answered, and their sunsets must not
+            // carry over to whatever enumerates next.
+            try { _dashboardManager?.PendingResponses.Clear(); } catch { }
         }
 
         private const int WheelMissThreshold = 3;
@@ -4770,7 +4780,12 @@ namespace MozaPlugin
                 if (rawDeviceId == 0x21 && !fromDashboard)
                     TryHandleWheelConnectionLog(text);
                 if (MozaLog.WireDebugEnabled)
-                    MozaLog.Debug(
+                    // NoRing: these arrive at ~1/s per device and are already
+                    // retained in FirmwareDebugLog (its own ring, printed in the
+                    // diagnostics dump) and in the wire trace. Mirroring them into
+                    // MozaLog's ring as well cost 54 % of the bundle's log — the
+                    // connect/handshake lines were long gone by report time.
+                    MozaLog.DebugNoRing(
                         $"[AZOM] firmware-debug src={(rawDeviceId == 0x21 ? "main" : rawDeviceId == 0x71 ? "wheel" : rawDeviceId == 0xB1 ? "display" : $"0x{rawDeviceId:X2}")}: {text}");
                 return;
             }
@@ -4897,7 +4912,12 @@ namespace MozaPlugin
 
             var r = result.Value;
 
-            PendingResponses.NoteResponse(r.Name);
+            // Ack the tracker that owns this pipe's reads — the dashboard lane
+            // keeps its own so its retransmits go out on the CM2's port.
+            if (fromDashboard)
+                _dashboardManager?.PendingResponses.NoteResponse(r.Name);
+            else
+                PendingResponses.NoteResponse(r.Name);
 
             // Normalize stick-mode: old firmware sends 2-byte value (0 or 256),
             // new firmware sends 1-byte enum (0=none, 1=left, 2=right, 3=both).

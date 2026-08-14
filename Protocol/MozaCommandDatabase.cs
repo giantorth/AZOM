@@ -225,6 +225,14 @@ namespace MozaPlugin.Protocol
             // the NUMERIC version — distinct from base-sw-version (group 0x0F),
             // which returns the hardware model string.
             AddCommand("base-fw-version",    "main",  4, 0xFF, new byte[] { },   4, "array");
+            // Fallback for bases that don't implement group 0x04 at dev 0x12.
+            // An R12 (RS21-D07, fw 1.2.10.13 — LFE-capable) answers group 0x04 at
+            // 0x17/0x19/0x1A but is silent at 0x12, in a session where 0x12 was
+            // otherwise live (it answered 0x07 and 0x22). Since the reply is the
+            // sole LFE gate, DeviceProber asks 0x13 too, plus the zero-length form
+            // at 0x12 (the shape the pedals/shifter answer). Handled identically
+            // in MozaData; the 0x12 answer wins if both arrive.
+            AddCommand("base-fw-version-b",  "base",  4, 0xFF, new byte[] { },   0, "array");
 
             // ===== ES WHEEL IDENTITY (device 0x18) =====
             // The ES (old-protocol) steering wheel answers identity probes at its
@@ -239,6 +247,21 @@ namespace MozaPlugin.Protocol
             AddCommand("es-wheel-hw-version",  "es-wheel",  8, 0xFF, new byte[] { 1 }, 0, "array");
             AddCommand("es-wheel-mcu-uid",     "es-wheel",  6, 0xFF, new byte[] { },   0, "array");
             AddCommand("es-wheel-device-type", "es-wheel",  4, 0xFF, new byte[] { },   0, "array");
+
+            // Pedal identity (dev 0x19). A relayed pedal set answers the shared
+            // identity groups — these are the five reads the routed-mBooster probe
+            // (MBoosterDeviceController.SendIdentityReads) elicits, which the
+            // mBooster lane consumes under busHint "mbooster". They are registered
+            // here so the GENERIC parse path names them for what they are: without
+            // an entry the reply falls to whatever the group bucket lists first,
+            // which put the pedals' name/serial/presence into the wheel's identity
+            // fields (see the pedals hint in MozaResponseParser). No MozaData
+            // handler — naming them is the whole job.
+            AddCommand("pedals-model-name",  "pedals",  7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("pedals-serial-a",    "pedals", 16, 0xFF, new byte[] { 0 }, 0, "array");
+            AddCommand("pedals-serial-b",    "pedals", 16, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("pedals-presence",    "pedals",  9, 0xFF, new byte[] { },   0, "array");
+            AddCommand("pedals-device-type", "pedals",  4, 0xFF, new byte[] { },   0, "array");
 
             // ===== WHEEL SETTINGS (read group 64, write group 63) =====
             AddCommand("wheel-brightness",         "wheel", 64, 63, new byte[] { 1 },          1, "int");

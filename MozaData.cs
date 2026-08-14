@@ -386,6 +386,19 @@ namespace MozaPlugin
         // was 1.2.9.24.
         public const int BaseFwLfeMin = (1 << 24) | (2 << 16) | (10 << 8) | 10; // 1.2.10.10
         public bool BaseSupportsLfe => BaseFwVersion != 0 && BaseFwVersion >= BaseFwLfeMin;
+
+        /// <summary>Packed <see cref="BaseFwVersion"/> as PitHouse displays it
+        /// (major.minor.patch.build), or "unknown" when no probe has answered.</summary>
+        public string BaseFwVersionText
+        {
+            get
+            {
+                int v = BaseFwVersion;
+                if (v == 0) return "unknown";
+                return $"{(v >> 24) & 0xFF}.{(v >> 16) & 0xFF}.{(v >> 8) & 0xFF}.{v & 0xFF}";
+            }
+        }
+
         // The 10-band EQ (equalizer7-10, cmds 0x32..0x35) ships in the same
         // 1.2.10.10 firmware as LFE.
         public bool BaseSupportsEq10 => BaseSupportsLfe;
@@ -979,8 +992,14 @@ namespace MozaPlugin
             {
                 BaseIdentity11 = (byte[])data.Clone();
             }
-            else if (commandName == "base-fw-version")
+            else if (commandName == "base-fw-version" || commandName == "base-fw-version-b")
             {
+                // The dev-0x13 fallback only fills a still-unknown version — if
+                // dev 0x12 (the PitHouse-canonical target) ever answers, its value
+                // wins. On ES hardware 0x13 is the wheel module, but it shares the
+                // base MCU's firmware, so the value is the same either way.
+                if (commandName == "base-fw-version-b" && BaseFwVersion != 0)
+                    return;
                 // Reply payload is 4 version bytes in WIRE order [major, minor,
                 // build, patch] (no cmd echo — group 0x04). MOZA DISPLAYS the last
                 // two swapped: wire 01 02 18 09 is shown "1.2.9.24", wire 01 02 0A

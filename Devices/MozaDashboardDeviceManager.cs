@@ -16,9 +16,16 @@ namespace MozaPlugin.Devices
     {
         private readonly MozaSerialConnection _connection;
         private readonly MozaDeviceManager _deviceManager;
+        // Own retransmit tracker — a CM2 read must be re-emitted on the dashboard
+        // port, never the primary's. It also has to tick independently: a
+        // standalone CM2 with no wheelbase leaves the primary disconnected, and
+        // the retry timer's per-pipe IsConnected gate would otherwise never reach
+        // this lane's pending reads.
+        private readonly PendingResponseTracker _pendingResponses = new PendingResponseTracker();
 
         public bool IsConnected => _connection.IsConnected;
         public MozaSerialConnection Connection => _connection;
+        public PendingResponseTracker PendingResponses => _pendingResponses;
 
         public event Action<byte[]>? MessageReceived
         {
@@ -38,7 +45,7 @@ namespace MozaPlugin.Devices
                 MozaProbeTarget.BaseAndHub,
                 disableProbeFallback: () => true);
             _connection.CaptureLabel = "dashboard";
-            _deviceManager = new MozaDeviceManager(_connection);
+            _deviceManager = new MozaDeviceManager(_connection, _pendingResponses);
         }
 
         /// <summary>Open the dashboard's COM port. Idempotent; reuses the last port.</summary>
