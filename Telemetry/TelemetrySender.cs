@@ -1850,6 +1850,14 @@ namespace MozaPlugin.Telemetry
             // resolve (wheel uses size=1 backref records post-switch). Drops
             // in-progress reassembly buffer + per-session seq dedup.
             _catalogParser.ClearBuffer();
+            // Same boundary, generation side: the wheel's END counter restarts low
+            // on each session open, so the already-committed marker values from the
+            // previous epoch would make CommitLiveSet mistake the new advertisement
+            // for re-affirmation and drop it — freezing LiveCatalog (and with it the
+            // synthesised profile and the channel-mapping grid) on a stale, possibly
+            // incomplete generation. Cold starts additionally hit Reset() in
+            // StartInner, which is a superset of this.
+            _catalogParser.BeginCatalogEpoch();
             ResetDeviceLogPull();
             _nextFlagBase = 0;
             _activeSubscription = null;

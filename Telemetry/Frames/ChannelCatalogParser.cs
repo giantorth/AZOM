@@ -180,6 +180,23 @@ namespace MozaPlugin.Telemetry.Frames
         // liveIdxs={1..18}, leaving _liveCatalog with the 18 ETS2-ATS
         // idxs instead of the 3 Simple Rally idxs).
         private readonly HashSet<uint> _committedMarkers = new HashSet<uint>();
+        // True from a session (re)start until the next successful commit. The
+        // wheel's END counter is per-WHEEL-SESSION and restarts low on every
+        // session open (observed 5 → 17 → 18 → 27 → 79 across four opens in one
+        // plugin run), while _committedMarkers persisted for the life of the
+        // sender — which survives plugin reloads. Every value the counter re-treads
+        // therefore looked like re-affirmation and CommitLiveSet dropped it, so
+        // _liveCatalog froze on whatever generation happened to commit first and no
+        // later advertisement could ever correct it (bundle 5XR0GQDB: the wheel
+        // published a complete 18-channel catalog twice, but the live set stayed
+        // pinned to an earlier 17-channel burst plus 3 slots held over from a prior
+        // dashboard — LastLapTime was never subscribed and could not be re-mapped).
+        // BeginCatalogEpoch clears the marker set at that boundary; this flag makes
+        // the epoch's FIRST commit an unconditional replace (no same-burst union, no
+        // cross-switch preservation) because the wheel re-declares its whole catalog
+        // from scratch after a session open — carrying slots over from the previous
+        // epoch is what leaked the prior dashboard's idxs into the tier-def.
+        private bool _epochFirstCommitPending;
 
         /// <summary>u32 value of the most-recently-seen wheel-side END
         /// marker (tag 0x06) in a catalog push. PitHouse echoes this in
@@ -544,6 +561,29 @@ namespace MozaPlugin.Telemetry.Frames
             }
         }
 
+        /// <summary>
+        /// Start a new catalog epoch: forget which END-marker values have already
+        /// been committed, and make the next commit an unconditional replace.
+        /// Call on every session (re)start that does NOT go through
+        /// <see cref="Reset"/> — i.e. the warm/persistent-wire path, which keeps
+        /// <see cref="Catalog"/> so back-refs still resolve.
+        ///
+        /// The generation-dedup in CommitLiveSet ("already committed this END value
+        /// ⇒ re-affirmation, drop it") is only valid WITHIN one wheel session: the
+        /// wheel's END counter restarts low on each session open, so across opens it
+        /// re-treads values the host has already burned. Without this reset the live
+        /// set froze permanently after a few reconnects — see
+        /// <see cref="_epochFirstCommitPending"/>.
+        /// </summary>
+        public void BeginCatalogEpoch()
+        {
+            _committedEndMarker = 0;
+            _committedMarkers.Clear();
+            _pendingIdxs.Clear();
+            _lastSeenArmCount = -1;
+            _epochFirstCommitPending = true;
+        }
+
         /// <summary>Reset both buffers AND parsed catalog. Use only on full session
         /// restart (StartInner) where prior bindings are stale.</summary>
         public void Reset()
@@ -553,10 +593,7 @@ namespace MozaPlugin.Telemetry.Frames
             _idxByUrl = null;
             _lastActivityMs = 0;
             _liveCatalog = null;
-            _committedEndMarker = 0;
-            _committedMarkers.Clear();
-            _pendingIdxs.Clear();
-            _lastSeenArmCount = -1;
+            BeginCatalogEpoch();
             // Per-session catalog/END tracking is part of "what the wheel has
             // advertised this connection" — drop it on a full restart like the
             // parsed catalog above (kept across ClearBuffer for back-refs, but
@@ -839,7 +876,12 @@ namespace MozaPlugin.Telemetry.Frames
                     // boundary regardless of timing.
                     int currentArmCount = _getArmCount?.Invoke() ?? 0;
                     bool firstSinceArm = currentArmCount != _lastSeenArmCount;
-                    bool useUnion = !firstSinceArm && _liveCatalog != null;
+                    // Epoch boundary (session (re)open) outranks the arm count: the
+                    // wheel re-declares its full catalog after a session open, so the
+                    // first commit of an epoch replaces outright — see
+                    // _epochFirstCommitPending.
+                    bool epochFirst = _epochFirstCommitPending;
+                    bool useUnion = !epochFirst && !firstSinceArm && _liveCatalog != null;
                     _lastSeenArmCount = currentArmCount;
 
                     // No SetEquals dedup here: two real switches CAN produce
@@ -895,6 +937,7 @@ namespace MozaPlugin.Telemetry.Frames
                             masked.Add(_liveCatalog[k]);
                         }
                         else if (!useUnion
+                                 && !epochFirst
                                  && _liveCatalog != null
                                  && k < _liveCatalog.Count
                                  && !string.IsNullOrEmpty(_liveCatalog[k])
@@ -932,9 +975,12 @@ namespace MozaPlugin.Telemetry.Frames
                         $"liveIdxs={{{string.Join(",", targetIdxs.OrderBy(x => x))}}} " +
                         (useUnion
                             ? $"(same-burst UNION arm={currentArmCount}, total live={liveNonEmpty})"
-                            : $"(replace arm={currentArmCount}, preservedUnchanged={preservedIdxs}, total live={liveNonEmpty})"));
+                            : epochFirst
+                                ? $"(epoch-first replace arm={currentArmCount}, no preservation, total live={liveNonEmpty})"
+                                : $"(replace arm={currentArmCount}, preservedUnchanged={preservedIdxs}, total live={liveNonEmpty})"));
                     _committedEndMarker = markerValue;
                     _committedMarkers.Add(markerValue);
+                    _epochFirstCommitPending = false;
                     _pendingIdxs.Clear();
                 }
 
