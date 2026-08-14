@@ -132,69 +132,18 @@ namespace MozaPlugin
         /// <summary>Source value mapped to the field's full-scale output.</summary>
         public double InMax { get; set; } = 1;
 
-        // ── Boundary / encoding / gain overrides (null = use the catalog default) ──
-        // Per-profile layer over the static Fsr1DashboardCatalog so users can correct
-        // wrong-grid fields (e.g. GT-style 0x11/0x12) without a code change. A null
-        // override means "no opinion → catalog default"; only deviations are persisted.
-        /// <summary>Payload-relative first byte, null = catalog default.</summary>
-        public int? StartOffset { get; set; }
-        /// <summary>Payload-relative last byte (inclusive), null = catalog default.</summary>
-        public int? EndOffset { get; set; }
-        /// <summary>Width-2 only: true = U16-LE, false = U16-BE; null = catalog default.</summary>
-        public bool? LittleEndian { get; set; }
-        // ── Sub-byte / bit-packed geometry (null = byte-aligned) ──
-        // When StartBit or BitWidth is non-null the field is bit-packed: it owns the
-        // contiguous MSB-first bit run starting at StartOffset*8 + StartBit for BitWidth
-        // bits (may share a byte with a neighbour and leave spare bits). StartOffset stays
-        // authoritative for the first byte; EndOffset tracks the last touched byte (advisory).
-        /// <summary>In-byte MSB-first bit (0..7) of the field's MSB; null = byte-aligned.</summary>
-        public int? StartBit { get; set; }
-        /// <summary>Total bit width (1..24) of a packed field; null = byte-aligned.</summary>
-        public int? BitWidth { get; set; }
-        /// <summary>Bit order of a packed field: null/true = MSB-first (only mode used today).</summary>
-        public bool? MsbFirst { get; set; }
+        // Field GEOMETRY (byte span / bit packing / endianness) is catalog-fixed —
+        // only the channel and gain are user-assignable.
         /// <summary>Output gain: raw·Scale + Bias; null = 1.0. (CM1: per-field gain.)</summary>
         public double? Scale { get; set; }
         /// <summary>Output offset added after Scale; null = 0.0.</summary>
         public double? Bias { get; set; }
-        /// <summary>True = this catalog field has been merged into a neighbour, so it is
-        /// skipped everywhere (driver/UI/probe/viz) and its byte belongs to the neighbour.
-        /// Cleared by reset-to-defaults. Synthetic fields are removed outright, not hidden.</summary>
-        public bool Hidden { get; set; }
 
         public Fsr1FieldMapping Clone() =>
             new Fsr1FieldMapping
             {
                 Property = Property, InMin = InMin, InMax = InMax,
-                StartOffset = StartOffset, EndOffset = EndOffset,
-                LittleEndian = LittleEndian, Scale = Scale, Bias = Bias, Hidden = Hidden,
-                StartBit = StartBit, BitWidth = BitWidth, MsbFirst = MsbFirst,
-            };
-    }
-
-    /// <summary>
-    /// A net-new FSR V1 field split out of a catalog field — it does not exist in the
-    /// static <see cref="MozaPlugin.Telemetry.Fsr1DashboardCatalog"/>, so it lives in the
-    /// profile and is merged into the field list at every enumeration point (driver, UI,
-    /// probe, viz). Carries its identity plus full mapping inline, so there is a single
-    /// source of truth (no two-dict consistency hazard). The inline mapping ALWAYS sets an
-    /// explicit StartOffset/EndOffset, so a synthetic never prunes to nothing.
-    /// </summary>
-    public sealed class Fsr1SyntheticField
-    {
-        /// <summary>Generated unique key within the record (e.g. "split1"). Never parsed.</summary>
-        public string FieldId { get; set; } = "";
-        /// <summary>Display label shown in the channel-mapping list.</summary>
-        public string Label { get; set; } = "";
-        /// <summary>Channel mapping + explicit byte span owned by this synthetic field.</summary>
-        public Fsr1FieldMapping Mapping { get; set; } = new Fsr1FieldMapping();
-
-        public Fsr1SyntheticField Clone() =>
-            new Fsr1SyntheticField
-            {
-                FieldId = FieldId,
-                Label = Label,
-                Mapping = Mapping?.Clone() ?? new Fsr1FieldMapping(),
+                Scale = Scale, Bias = Bias,
             };
     }
 
@@ -722,16 +671,6 @@ namespace MozaPlugin
         public Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>> Fsr1DashboardMappings { get; set; }
             = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
 
-        // ===== FSR V1 synthetic split fields (per-profile, net-new) =====
-        // A "split" carves a new sub-span out of a catalog field; the resulting field is
-        // net-new (not in the static catalog) and gets its own channel mapping. Stored here
-        // and merged into the field list at every enumeration point (see Fsr1FieldComposer).
-        // Outer key  = wheel page DescriptorUniqueId GUID
-        // Middle key = record-type key (Fsr1DashboardCatalog.Key, e.g. "type-02")
-        // List       = the synthetic fields added to that record, in creation order.
-        public Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>> Fsr1SyntheticFields { get; set; }
-            = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
-
         // CM1 base-bridged dash (group-0x35) field mappings. Flat — the CM1 streams one
         // keyed field set regardless of selected dashboard, so there is no per-dashboard
         // record-key level:
@@ -916,26 +855,6 @@ namespace MozaPlugin
                         middle[rec.Key] = inner;
                     }
                     Fsr1DashboardMappings[kvp.Key] = middle;
-                }
-            }
-
-            // FSR V1 synthetic split fields (deep clone)
-            Fsr1SyntheticFields = new Dictionary<Guid, Dictionary<string, List<Fsr1SyntheticField>>>();
-            if (p.Fsr1SyntheticFields != null)
-            {
-                foreach (var kvp in p.Fsr1SyntheticFields)
-                {
-                    if (kvp.Value == null) continue;
-                    var middle = new Dictionary<string, List<Fsr1SyntheticField>>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var rec in kvp.Value)
-                    {
-                        if (rec.Value == null) continue;
-                        var list = new List<Fsr1SyntheticField>(rec.Value.Count);
-                        foreach (var syn in rec.Value)
-                            if (syn != null) list.Add(syn.Clone());
-                        middle[rec.Key] = list;
-                    }
-                    Fsr1SyntheticFields[kvp.Key] = middle;
                 }
             }
 

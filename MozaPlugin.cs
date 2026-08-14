@@ -926,9 +926,7 @@ namespace MozaPlugin
         /// display-probe gates in StartTelemetryIfReady and (b) put TelemetrySender
         /// into <see cref="Telemetry.TelemetrySender.Fsr1Mode"/>.
         /// </summary>
-        internal bool IsFsr1DisplayWheel =>
-            (_data?.WheelHwVersion?.StartsWith("RS21-D03", StringComparison.OrdinalIgnoreCase) ?? false)
-            || string.Equals(_data?.WheelModelName, "FSR", StringComparison.OrdinalIgnoreCase);
+        internal bool IsFsr1DisplayWheel => _data?.IsFsr1DisplayWheel ?? false;
 
         internal bool ShouldDriveDashboard()
         {
@@ -1641,6 +1639,7 @@ namespace MozaPlugin
             // Halt the AB9 engine-vib worker before disposing the AB9 manager.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
             try { _baseLfeWorker?.Stop(); _baseLfeWorker = null; } catch { }
+            try { _hardwareApplier?.Shutdown(); } catch { }
             // Release the timer-resolution request + power-throttling opt-out.
             try { _responsiveness?.Dispose(); _responsiveness = null; } catch { }
             // Dispose every mBooster controller — same reason: stop workers
@@ -2818,6 +2817,9 @@ namespace MozaPlugin
             // keeps shutdown deterministic.
             try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
             try { _baseLfeWorker?.Stop(); _baseLfeWorker = null; } catch { }
+            // Drop the coalescing timer for flash-backed wheel writes. Anything still
+            // parked is already in the profile, so the next connect's apply carries it.
+            try { _hardwareApplier?.Shutdown(); } catch { }
             // Release the timer-resolution request + power-throttling opt-out on
             // shutdown/reload so neither leaks past the plugin's lifetime.
             try { _responsiveness?.Dispose(); _responsiveness = null; } catch { }
@@ -3673,10 +3675,9 @@ namespace MozaPlugin
             if (p == null) return null;
             var dash = Telemetry.Fsr1DashboardCatalog.ByKey(p.RecordKey);
             if (dash == null) return null;
-            // Resolve through the SAME gapless partition the driver emits — so the lit span
-            // matches the wire exactly, and synthetic split fields (absent from dash.Fields)
-            // are found too. Using the raw override here diverged from the tiled output.
-            foreach (var slot in Telemetry.Fsr1DashboardCatalog.ResolvePartition(this, dash))
+            // Resolve through the SAME partition the driver emits so the lit span
+            // matches the wire exactly.
+            foreach (var slot in Telemetry.Fsr1DashboardCatalog.ResolvePartition(dash))
                 if (slot.Field.FieldId == p.FieldId)
                     return (dash.RecordType, slot.ByteStart, slot.ByteEnd,
                             !slot.IsByteAligned, slot.BitOffset, slot.BitWidth, slot.MsbFirst);
@@ -4079,6 +4080,26 @@ namespace MozaPlugin
         // (fast identity). See the hot-swap block in PollStatus.
         private const int WheelModelRecheckInterval = WheelMissThreshold - 1;
         private int _wheelModelRecheckTick;
+
+        // Flash-backed wheel settings whose readback value can seed the write cache
+        // 1:1 (scalar int, same encoding on the write path), so an apply that matches
+        // what the wheel already holds writes nothing to its parameter flash.
+        // Deliberately excludes the composite-key params (idle-speed = mode<<32|ms,
+        // idle-color = packed RGB) and every colour ARRAY — a mis-encoded prime there
+        // would silently swallow a real user edit.
+        private static readonly System.Collections.Generic.HashSet<string> s_primableWheelCfg =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal)
+            {
+                "wheel-idle-mode", "wheel-idle-timeout",
+                "wheel-telemetry-idle-effect", "wheel-buttons-idle-effect", "wheel-knob-idle-effect",
+                "wheel-telemetry-mode", "wheel-buttons-led-mode", "wheel-knob-led-mode",
+                "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-knob-ring-brightness",
+                "wheel-rpm-indicator-mode", "wheel-rpm-display-mode",
+            };
+
+        private static bool IsPrimableWheelCfg(string name) => s_primableWheelCfg.Contains(name);
+        // One-shot log edge for the param-storm suspend (see PollStatusCore).
+        private bool _paramStormLogged;
 
         // Fires from MozaSerialConnection.HandleIoFailure on the read or
         // write thread once the port has been force-closed. Pause telemetry
@@ -4523,14 +4544,46 @@ namespace MozaPlugin
                 if (DetectionState.NewWheelDetected && !IsFsr1DisplayWheel)
                     _deviceManager.SendWheelKeepalive();
 
+                // Param-storm self-protection: while the wheel is actively logging
+                // "Failed to Read/Write Parameter", every identity/config read we add
+                // is another failure for a param manager that is already drowning —
+                // the documented CS-wheel hazard (wheel-0x17.md § Table 8 storm), and
+                // the FSR1 wedge signature (2026-08 bundles: identity reads unanswered,
+                // failures advancing table-by-table while we re-polled ~1 Hz). Suspend
+                // identity rechecks + hot-swap ID probes until the storm clears; the
+                // 0x00 presence poll and 0x43 keepalive above stay on (PitHouse parity,
+                // and OnPresenceProbeAck/unsolicited 0x0E logs keep liveness alive).
+                bool paramStorm = _firmwareDebugLog.ParamStormActive;
+                if (paramStorm && !_paramStormLogged)
+                {
+                    _paramStormLogged = true;
+                    MozaLog.Warn("[AZOM] Wheel param-store storm detected — suspending identity/config "
+                        + "rechecks while it persists (wheel may need a power-cycle to recover).");
+                }
+                else if (!paramStorm && _paramStormLogged)
+                {
+                    _paramStormLogged = false;
+                    MozaLog.Info("[AZOM] Wheel param-store storm cleared — resuming identity rechecks.");
+                }
+
                 // wheel-model-name recheck: triggers initial identity resolution
                 // and hot-swap model-change detection. Every tick while unresolved
                 // (fast identity, as before); once resolved the presence ACK is the
                 // heartbeat so we recheck only every WheelModelRecheckInterval ticks
                 // (kept below WheelMissThreshold so the response still resets the
                 // miss counter even if 0x00/0x0e fall silent).
-                if (WheelModelInfo == null
-                    || ++_wheelModelRecheckTick >= WheelModelRecheckInterval)
+                // FSR1: once identity has resolved, STOP re-polling it. This firmware
+                // never answers the model-name read again after initial detection
+                // (documented above at MarkWheelAlive) — every recheck is a guaranteed
+                // unanswered identity read, i.e. one more param-manager read failure,
+                // ~1/s forever (2026-08 wedge bundles: 60 unanswered 07/01 reads per
+                // minute). Liveness for this wheel comes from the presence ACK and its
+                // continuous unsolicited 0x0E logs; a genuine unplug still trips the
+                // miss watchdog, and a rim swap re-resolves identity on re-detect.
+                bool fsr1IdentitySettled = IsFsr1DisplayWheel && WheelModelInfo != null;
+                if (!paramStorm && !fsr1IdentitySettled
+                    && (WheelModelInfo == null
+                        || ++_wheelModelRecheckTick >= WheelModelRecheckInterval))
                 {
                     _wheelModelRecheckTick = 0;
                     _deviceManager.ReadSetting("wheel-model-name");
@@ -4545,8 +4598,10 @@ namespace MozaPlugin
 
                 // Probe other wheel IDs for hot-swap detection.
                 // Handles ES → new-protocol case where the base keeps responding
-                // on the locked ID (19) so miss counter never fires.
-                _deviceManager.ProbeOtherWheelIds();
+                // on the locked ID (19) so miss counter never fires. Storm-gated:
+                // these are identity reads too (see the recheck gate above).
+                if (!paramStorm)
+                    _deviceManager.ProbeOtherWheelIds();
             }
 
             // Base temps/state are dev-0x13 reads the base main controller answers.
@@ -4960,6 +5015,16 @@ namespace MozaPlugin
             // Persist wheel-reported sleep-bundle values so next launch reapplies them.
             _profileCoordinator.SeedSleepBundleFromResponse(r);
 
+            // Prime the persistent-write cache from the wheel's own readback so an
+            // apply whose values already match writes nothing to its flash. Only the
+            // scalar flash-backed params are primed here — their write-path encoding is
+            // the raw int, so device value and write value are directly comparable.
+            // (idle-speed / idle-color pack mode+ms and RGB into composite keys; they
+            // are left alone rather than risk a mis-encoded prime silently swallowing a
+            // real user change.) See HardwareApplier.PrimeWheelCfgFromDevice.
+            if (r.Name != null && r.IntValue >= 0 && IsPrimableWheelCfg(r.Name))
+                _hardwareApplier.PrimeWheelCfgFromDevice(r.Name, r.IntValue);
+
             // Extended LED group presence: any response from a group proves it exists.
             if (r.Name != null)
             {
@@ -5160,15 +5225,27 @@ namespace MozaPlugin
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
 
-        // FSR1 synthetic split fields (net-new fields carved out of a catalog field).
-        internal System.Collections.Generic.List<Fsr1SyntheticField> GetSyntheticFields(string recordKey) => _fsr1Cm1Mapping.GetSyntheticFields(recordKey);
-        internal bool SplitFsr1Field(string recordKey, string fieldId) => _fsr1Cm1Mapping.SplitFsr1Field(recordKey, fieldId);
-        internal bool BitSplitFsr1Field(string recordKey, string fieldId) => _fsr1Cm1Mapping.BitSplitFsr1Field(recordKey, fieldId);
-        internal bool RemoveFsr1Split(string recordKey, string fieldId) => _fsr1Cm1Mapping.RemoveFsr1Split(recordKey, fieldId);
-        internal bool MergeFsr1Field(string recordKey, string fieldId, bool mergeNext) => _fsr1Cm1Mapping.MergeFsr1Field(recordKey, fieldId, mergeNext);
-        internal void ClearSyntheticFields(string recordKey) => _fsr1Cm1Mapping.ClearSyntheticFields(recordKey);
+        /// <summary>Queue an FSR1 display-brightness push (group-0x32 00/80 write+commit
+        /// pair, 0–100). The wheel PERSISTS it to EEPROM (Table 7 Param 5); the driver
+        /// emits it behind the shared Table-7 write gate (≥2 s between writes, latest
+        /// value wins, same-value repeats dropped) — back-to-back commits preceded the
+        /// 2026-08-06 param-store wedges.</summary>
+        internal void SendFsr1DisplayBrightness(int percent)
+        {
+            if (!IsFsr1DisplayWheel) return;
+            _fsr1Cm1Mapping.QueueFsr1Brightness(percent);
+        }
+        internal int TakePendingFsr1Brightness() => _fsr1Cm1Mapping.TakePendingFsr1Brightness();
+
         internal void ClearFsr1FieldOverrides(string recordKey) => _fsr1Cm1Mapping.ClearFsr1FieldOverrides(recordKey);
-        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId) => Fsr1FieldComposer.FindField(this, recordKey, fieldId);
+        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId)
+        {
+            var dash = Telemetry.Fsr1DashboardCatalog.ByKey(recordKey);
+            if (dash == null || string.IsNullOrEmpty(fieldId)) return null;
+            foreach (var f in dash.Fields)
+                if (f.FieldId == fieldId) return f;
+            return null;
+        }
 
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId) => _fsr1Cm1Mapping.GetCm1FieldMapping(fieldId);
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);

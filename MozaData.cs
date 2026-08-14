@@ -39,6 +39,17 @@ namespace MozaPlugin
         public volatile string WheelSwVersion = "";
         public volatile string WheelHwVersion = "";
         public volatile string WheelHwSubVersion = "";
+
+        /// <summary>
+        /// FSR V1 (hw "RS21-D03-*", model "FSR") — a distinct, older product from
+        /// FSR V2 ("W13"). Keyed primarily on the hw-version (most specific), with the
+        /// model name as corroboration. Lives here rather than on MozaPlugin so the
+        /// hardware-write path can consult it without a plugin back-reference;
+        /// <c>MozaPlugin.IsFsr1DisplayWheel</c> forwards to this.
+        /// </summary>
+        public bool IsFsr1DisplayWheel =>
+            (WheelHwVersion?.StartsWith("RS21-D03", StringComparison.OrdinalIgnoreCase) ?? false)
+            || string.Equals(WheelModelName, "FSR", StringComparison.OrdinalIgnoreCase);
         // PitHouse-style extended identity fields (groups 0x02/0x04/0x05/0x06/0x09/0x11).
         public volatile int WheelSubDeviceCount;               // from 0x09 reply first byte
         /// <summary>12-byte STM32 MCU UID (from 0x06 probe). Likely the mcUid PitHouse keys dashboard sync against.</summary>
