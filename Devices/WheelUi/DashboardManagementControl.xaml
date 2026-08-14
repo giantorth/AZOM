@@ -182,6 +182,15 @@
 
         <ctrl:SectionCard Title="{x:Static res:Strings.Section_ChannelMappings}"
                           Icon="{StaticResource IconDiag}">
+            <!-- Header-right slot (HeaderedContentControl.Header): opens the master
+                 channel mapper, which edits the plugin-global Telemetry.json defaults
+                 the per-dashboard list below overrides. Hidden on FSR1/CM1 surfaces —
+                 their field defaults come from their own catalogs, not Telemetry.json. -->
+            <ctrl:SectionCard.Header>
+                <Button x:Name="MasterMapperButton" Padding="10,2"
+                        Content="{x:Static res:Strings.Button_MasterChannelDefaults}"
+                        Click="MasterChannelMapper_Click"/>
+            </ctrl:SectionCard.Header>
             <StackPanel>
                 <TextBlock Text="{x:Static res:Strings.Hint_ClickPencilForProperty}"
                            Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10"/>

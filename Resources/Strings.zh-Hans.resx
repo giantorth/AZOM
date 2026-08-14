@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>编辑 SimHub 属性绑定</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>以公式方式编辑（NCalc [property] / js:）</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>重置为默认</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>全局默认值</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>全局通道默认值</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>重置所有默认值</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>已覆盖 {0} / {1}</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>恢复默认值</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>全局通道映射器不可用（见日志）</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>重置字段</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>拆分字段</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>位拆分</value></data>

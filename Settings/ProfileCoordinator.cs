@@ -140,6 +140,9 @@ namespace MozaPlugin.Settings
             _plugin.TelemetrySender?.Stop();
             _plugin._settings = new MozaPluginSettings();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
+            // The profile store holds a static snapshot of the master-mapper default
+            // overrides — re-push so the now-empty set replaces the cleared ones.
+            _plugin.PushGlobalChannelDefaults();
             InitProfileSystem();
         }
 

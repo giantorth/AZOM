@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MozaControls;
+using MozaPlugin.Resources;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
@@ -201,6 +202,7 @@ namespace MozaPlugin.Devices.WheelUi
         private void RefreshDashboardManagement()
         {
             if (!ResolvePlugin()) return;
+            UpdateMasterMapperVisibility();
             // CM2 page: refresh its dashboard dropdown (from the CM2 sender's reported
             // list) + channel-mapping list. Skip the wheel-only status / display /
             // files sections.
@@ -1022,6 +1024,46 @@ namespace MozaPlugin.Devices.WheelUi
                 _plugin.ClearCurrentDashboardMappings();
             PopulateChannelMappingList();
             TelemetryMappingStatus.Text = $"Reset to defaults at {DateTime.Now:HH:mm:ss}";
+        }
+
+        // ── Master channel mapper (Telemetry.json defaults) ─────────────
+        // The card-header button opens the plugin-global default editor. Its edits sit
+        // BELOW the per-dashboard overrides this page writes, so a channel customised
+        // here keeps its per-dashboard value; everything else follows the new default.
+
+        /// <summary>Hide the master-mapper button on the FSR1 and CM1 surfaces — their
+        /// field defaults come from Fsr1DashboardCatalog / Cm1DashboardCatalog, not
+        /// Telemetry.json, so the dialog would have no effect there. Re-evaluated every
+        /// refresh tick: the CM1 discriminator and the wheel model both resolve after
+        /// the one-shot InitTelemetryUI has run.</summary>
+        private void UpdateMasterMapperVisibility()
+        {
+            if (MasterMapperButton == null || _plugin == null) return;
+            bool telemetryJsonSurface = !IsCm1 && !(!IsCm2Target && _plugin.IsFsr1DisplayWheel);
+            var want = telemetryJsonSurface ? Visibility.Visible : Visibility.Collapsed;
+            if (MasterMapperButton.Visibility != want) MasterMapperButton.Visibility = want;
+        }
+
+        private void MasterChannelMapper_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+            try
+            {
+                // Pass this control as the backdrop source: the dialog walks up from it
+                // to find the opaque colour SimHub paints behind the plugin page, so it
+                // matches the host instead of a hardcoded shade.
+                var dlg = new MasterChannelMapperDialog(_plugin, this) { Owner = Window.GetWindow(this) };
+                dlg.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn("[AZOM] master channel mapper failed to open: " + ex.Message);
+                TelemetryMappingStatus.Text = Strings.Status_MasterMapperUnavailable;
+                return;
+            }
+            // Repaint against the new effective defaults (a channel with no per-dashboard
+            // override now resolves through the global layer).
+            PopulateChannelMappingList();
         }
 
         // ── Inline editor handlers ─────────────────────────────────────

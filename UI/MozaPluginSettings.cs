@@ -482,6 +482,19 @@ namespace MozaPlugin
         // ===== Dashboard Telemetry =====
         public bool TelemetryEnabled { get; set; } = false;
 
+        /// <summary>
+        /// Plugin-global per-channel default mapping overrides (channel URL → SimHub
+        /// property path or formula), edited via the master channel mapper. Sits
+        /// between <c>Data/Telemetry.json</c>'s <c>simhub_property</c> and the
+        /// per-dashboard overrides in <see cref="MozaProfile.TelemetryChannelMappings"/>,
+        /// which still win. Absent URL = that channel keeps its JSON default.
+        /// Newtonsoft replaces this instance on load and drops the comparer — read it
+        /// through <see cref="Telemetry.Dashboard.DashboardProfileStore.SetDefaultOverrides"/>'s
+        /// normalised snapshot, never by direct indexing.
+        /// </summary>
+        public Dictionary<string, string> TelemetryDefaultMappings { get; set; }
+            = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // Name of the active dashboard profile (empty = use first available)
         public string TelemetryProfileName { get; set; } = "";
 

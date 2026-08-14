@@ -420,6 +420,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Editar enlace a propiedad SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Editar como fórmula (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RESTABLECER VALORES</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>VALORES GLOBALES</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Valores predeterminados de canales</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>RESTABLECER TODOS</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>CERRAR</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} de {1} anulados</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Restaurar el valor predeterminado</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Asignador global de canales no disponible (ver registro)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RESTABLECER CAMPO</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>DIVIDIR CAMPO</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>DIVIDIR BITS</value></data>

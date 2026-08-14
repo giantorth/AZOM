@@ -523,6 +523,13 @@ namespace MozaPlugin.Resources
         public static string Tooltip_EditMapping => Get("Tooltip_EditMapping");
         public static string Tooltip_EditFormula => Get("Tooltip_EditFormula");
         public static string Button_ResetToDefaults => Get("Button_ResetToDefaults");
+        public static string Button_MasterChannelDefaults => Get("Button_MasterChannelDefaults");
+        public static string Title_MasterChannelDefaults => Get("Title_MasterChannelDefaults");
+        public static string Button_ResetAllDefaults => Get("Button_ResetAllDefaults");
+        public static string Button_Close => Get("Button_Close");
+        public static string Status_OverriddenCountFormat => Get("Status_OverriddenCountFormat");
+        public static string Tooltip_RevertToDefault => Get("Tooltip_RevertToDefault");
+        public static string Status_MasterMapperUnavailable => Get("Status_MasterMapperUnavailable");
         public static string Button_ResetField => Get("Button_ResetField");
         public static string Button_SplitField => Get("Button_SplitField");
         public static string Button_BitSplit => Get("Button_BitSplit");

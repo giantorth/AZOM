@@ -434,6 +434,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Awoo Bork!</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>BORK!!</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>GRRWOOF!!</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Big Bark Bowl</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>BORK THEM ALL!</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>AWOO!</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} of {1} Borked</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Un-bork it, Rrrf!</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>No Bark (check the log)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RUFF!!</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>YAP!!</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>YAP!!</value></data>

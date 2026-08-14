@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Sửa liên kết thuộc tính SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Chỉnh sửa dưới dạng công thức (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>ĐẶT LẠI MẶC ĐỊNH</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>MẶC ĐỊNH CHUNG</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Mặc định kênh chung</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>ĐẶT LẠI TẤT CẢ MẶC ĐỊNH</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>ĐÓNG</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} trên {1} đã ghi đè</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Khôi phục mặc định</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Trình ánh xạ kênh chung không khả dụng (xem nhật ký)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>ĐẶT LẠI TRƯỜNG</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>TÁCH TRƯỜNG</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>TÁCH BIT</value></data>

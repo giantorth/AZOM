@@ -418,6 +418,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Modifica binding proprietà SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Modifica come formula (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RIPRISTINA PREDEFINITI</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>PREDEFINITI GLOBALI</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Valori predefiniti dei canali</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>RIPRISTINA TUTTI</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>CHIUDI</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} di {1} sovrascritti</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Ripristina il valore predefinito</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Mappatore globale dei canali non disponibile (vedi log)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RIPRISTINA CAMPO</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>DIVIDI CAMPO</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>DIVIDI BIT</value></data>

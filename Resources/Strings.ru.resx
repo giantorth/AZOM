@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Изменить привязку к свойству SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Редактировать как формулу (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>СБРОСИТЬ ПО УМОЛЧАНИЮ</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>ГЛОБАЛЬНЫЕ ЗНАЧЕНИЯ</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Глобальные значения каналов</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>СБРОСИТЬ ВСЕ ЗНАЧЕНИЯ</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>ЗАКРЫТЬ</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} из {1} переопределено</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Восстановить значение по умолчанию</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Глобальный редактор каналов недоступен (см. журнал)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>СБРОС ПОЛЯ</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>РАЗДЕЛИТЬ ПОЛЕ</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>РАЗДЕЛИТЬ БИТЫ</value></data>

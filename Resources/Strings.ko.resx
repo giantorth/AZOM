@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>SimHub 속성 바인딩 편집</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>수식으로 편집 (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>기본값으로 재설정</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>전역 기본값</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>채널 기본값 관리</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>모든 기본값 재설정</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>닫기</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{1}개 중 {0}개 재정의됨</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>기본값 복원</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>전역 채널 매퍼를 사용할 수 없습니다 (로그 참조)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>필드 초기화</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>필드 분할</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>비트 분할</value></data>

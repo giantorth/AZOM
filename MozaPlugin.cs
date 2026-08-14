@@ -1027,6 +1027,11 @@ namespace MozaPlugin
                 if (_settings.ProfileStore == null)
                     _settings.ProfileStore = new MozaProfileStore();
 
+                // Publish the master-mapper default overrides before anything can
+                // build a profile, so the first cold-start tier-def already carries
+                // them (no dashboard switch needed to pick them up).
+                PushGlobalChannelDefaults();
+
                 // Migrate the legacy Stable/Dev update channel enum to the
                 // channel-id scheme. The dev channel is gone (dev-latest is no
                 // longer published), so prior Dev users land on Stable with a
@@ -4035,6 +4040,67 @@ namespace MozaPlugin
             newOuter[g.Value] = newMiddle;
             profile.TelemetryChannelMappings = newOuter;
             SaveSettings();
+        }
+
+        // ===== Master channel mapper: plugin-global default overrides =====
+        // Layer 2 of the mapping resolution — per-dashboard overrides above still
+        // win, Telemetry.json's simhub_property is below. Stored flat on
+        // MozaPluginSettings; DashboardProfileStore holds the live snapshot the
+        // profile builders read.
+
+        /// <summary>Push the persisted global default overrides into the profile store
+        /// so subsequent profile builds resolve against them.</summary>
+        internal void PushGlobalChannelDefaults()
+            => DashboardProfileStore.SetDefaultOverrides(_settings?.TelemetryDefaultMappings);
+
+        /// <summary>Set or clear one channel's global default mapping. An empty property
+        /// removes the entry (revert to the Telemetry.json default) — same semantics as
+        /// <see cref="SetChannelMapping"/>. COW like the per-dashboard map: the tick and
+        /// serial-read threads read the store's snapshot, so build fresh and swap.</summary>
+        internal void SetGlobalChannelDefault(string channelUrl, string propertyPath)
+        {
+            if (string.IsNullOrEmpty(channelUrl)) return;
+            var settings = _settings;
+            if (settings == null) return;
+
+            var old = settings.TelemetryDefaultMappings;
+            var next = old != null
+                ? new System.Collections.Generic.Dictionary<string, string>(old, StringComparer.OrdinalIgnoreCase)
+                : new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            string trimmed = (propertyPath ?? "").Trim();
+            if (trimmed.Length == 0) next.Remove(channelUrl);
+            else next[channelUrl] = trimmed;
+
+            settings.TelemetryDefaultMappings = next;
+            PushGlobalChannelDefaults();
+            SaveSettings();
+        }
+
+        /// <summary>Drop every global default override — all channels revert to their
+        /// Telemetry.json values.</summary>
+        internal void ClearGlobalChannelDefaults()
+        {
+            var settings = _settings;
+            if (settings == null) return;
+            if (settings.TelemetryDefaultMappings == null || settings.TelemetryDefaultMappings.Count == 0)
+                return;
+            settings.TelemetryDefaultMappings =
+                new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            PushGlobalChannelDefaults();
+            SaveSettings();
+        }
+
+        /// <summary>Rebind both display pipelines' live channels to the current
+        /// default + per-dashboard resolution. Wire-neutral (only each channel's
+        /// SimHubProperty changes; the frame builder reads it live per frame), so a
+        /// changed global default reaches the screen without a telemetry restart.
+        /// No-ops on a sender whose wheel hasn't committed a catalog generation —
+        /// there the change lands on the next profile build.</summary>
+        internal void ReResolveAllChannelMappings()
+        {
+            try { _telemetrySender?.ReResolveActiveDashboardMappings(); } catch { }
+            try { _cm2Sender?.ReResolveActiveDashboardMappings(); } catch { }
         }
 
         // Dashboard binding state moved to DashboardBindingCoordinator.

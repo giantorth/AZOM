@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Επεξεργασία σύνδεσης ιδιότητας SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Επεξεργασία ως τύπος (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΣΤΑ ΠΡΟΕΠΙΛΕΓΜΕΝΑ</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>ΓΕΝΙΚΕΣ ΠΡΟΕΠΙΛΟΓΕΣ</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Γενικές προεπιλογές καναλιών</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΟΛΩΝ ΤΩΝ ΠΡΟΕΠΙΛΟΓΩΝ</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>ΚΛΕΙΣΙΜΟ</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} από {1} με παράκαμψη</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Επαναφορά προεπιλογής</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Ο γενικός χαρτογράφος καναλιών δεν είναι διαθέσιμος (δείτε το αρχείο καταγραφής)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΠΕΔΙΟΥ</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>ΔΙΑΙΡΕΣΗ ΠΕΔΙΟΥ</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>ΔΙΑΙΡΕΣΗ BIT</value></data>

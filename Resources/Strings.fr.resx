@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Modifier la liaison à la propriété SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Modifier en tant que formule (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RÉINITIALISER PAR DÉFAUT</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>VALEURS GLOBALES</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Valeurs par défaut des canaux</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>TOUT RÉINITIALISER</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>FERMER</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} sur {1} remplacés</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Restaurer la valeur par défaut</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Mappeur global de canaux indisponible (voir le journal)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RÉINITIALISER LE CHAMP</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>DIVISER LE CHAMP</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>DIVISER LES BITS</value></data>

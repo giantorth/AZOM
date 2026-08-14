@@ -420,6 +420,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Rediger SimHub-egenskapskobling</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Rediger som formel (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>TILBAKESTILL TIL STANDARD</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>GLOBALE STANDARDER</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Globale kanalstandarder</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>TILBAKESTILL ALLE STANDARDER</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>LUKK</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} av {1} overstyrt</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Gjenopprett standarden</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Global kanaltilordning utilgjengelig (se logg)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>TILBAKESTILL FELT</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>DEL FELT</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>DEL BIT</value></data>

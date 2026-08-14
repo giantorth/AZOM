@@ -118,12 +118,23 @@ namespace MozaPlugin.Devices.WheelUi
                     finally { _syncingExpression = false; }
                 }
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SimHubProperty)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsOverridden)));
                 // Clear the live value so the next refresh repopulates from the
                 // new path/formula and the user doesn't see a stale value matched
                 // against an unrelated source.
                 CurrentValueText = "";
             }
         }
+
+        /// <summary>The pristine <c>Data/Telemetry.json</c> default for this channel —
+        /// what a reset returns to. Master channel mapper only; left empty on the
+        /// device-page rows, which never bind <see cref="IsOverridden"/>.</summary>
+        public string DefaultProperty { get; set; } = "";
+
+        /// <summary>True when <see cref="SimHubProperty"/> deviates from
+        /// <see cref="DefaultProperty"/>. Master channel mapper only.</summary>
+        public bool IsOverridden
+            => !string.Equals(SimHubProperty, DefaultProperty, StringComparison.Ordinal);
 
         // ── Advanced editing (SimHub formula dialog) ───────────────────────
         // The ƒₓ button opens SimHub's BindingEditor against Engine + a working

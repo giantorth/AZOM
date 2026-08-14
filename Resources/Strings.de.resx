@@ -415,6 +415,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>SimHub-Eigenschaftsbindung bearbeiten</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Als Formel bearbeiten (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>AUF STANDARDS ZURÜCKSETZEN</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>GLOBALE STANDARDS</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Globale Kanal-Standardwerte</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>ALLE STANDARDS ZURÜCKSETZEN</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>SCHLIESSEN</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} von {1} überschrieben</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Standard wiederherstellen</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Globaler Kanal-Editor nicht verfügbar (siehe Protokoll)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>FELD ZURÜCKSETZEN</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>FELD TEILEN</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>BIT TEILEN</value></data>
