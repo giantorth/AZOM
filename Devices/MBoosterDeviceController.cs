@@ -375,6 +375,32 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Whether HID axis <paramref name="axisIndex"/> is a genuinely wired
+        /// pedal rather than an unused GenericDesktop usage a chain-capable
+        /// hub's report descriptor always exposes (Rx/Ry/Rz) regardless of how
+        /// many pedals are actually plugged in. Trusts the parsed "PD Linked"
+        /// diagnostic (<see cref="ConnectedAxes"/>) once it arrives; before
+        /// that, treats every axis as real if <see cref="SubDeviceCount"/>
+        /// already confirmed a multi-motor chain at connect, else assumes only
+        /// axis 0 is wired. Same convention <see cref="MBoosterEffectWorker"/>
+        /// uses to gate its own per-pedal tick — callers that resolve a HID
+        /// axis's role (see <see cref="MozaMBoosterRegistry.ResolveAxisRole"/>)
+        /// need this too: raw <see cref="AxisCount"/> alone can't tell a real
+        /// chain from a single connected pedal on a chain-capable hub, so
+        /// using it directly silently overrides that pedal's own configured
+        /// Role with the axis-order default (Throttle/Brake/Clutch by index).
+        /// </summary>
+        public bool IsAxisConnected(int axisIndex)
+        {
+            var connected = _connectedAxes;
+            if (connected != null)
+                return axisIndex < connected.Length && connected[axisIndex];
+            if (SubDeviceCount > 1)
+                return axisIndex < Math.Max(1, AxisCount);
+            return axisIndex == 0;
+        }
+
+        /// <summary>
         /// The motor device id for a pedal ROLE (0=Throttle,1=Brake,2=Clutch),
         /// using the calibration-derived chain map (see
         /// <see cref="RecomputeChainRoleMap"/>) so effects reach the physical
@@ -780,6 +806,30 @@ namespace MozaPlugin.Devices
             return count == 1 ? sole : -1;
         }
 
+        /// <summary>
+        /// HID axis indices of the pedals this lane ACTUALLY hosts. The HID
+        /// interface commonly reports 3 axes (Rx/Ry/Rz) regardless of how many
+        /// pedals are physically connected — <see cref="ConnectedAxes"/> (from
+        /// the "PD Linked" firmware diagnostic) is the only way to tell which
+        /// are real. Until that diagnostic arrives (null), only axis 0 counts:
+        /// the common case is a standalone single pedal, and a genuine chain's
+        /// extra axes appear as soon as the diagnostic confirms them instead of
+        /// showing phantom pedals. Shared by the mBooster tab's row list and the
+        /// PitHouse import wizard's target list so both show the same pedals.
+        /// </summary>
+        public List<int> ConnectedAxisIndices()
+        {
+            int axisCount = AxisCount > 0 ? AxisCount : 1;
+            var connected = _connectedAxes;
+            var axes = new List<int>();
+            for (int axis = 0; axis < axisCount && axis < MaxAxes; axis++)
+            {
+                bool known = connected != null && axis < connected.Length ? connected[axis] : axis == 0;
+                if (known) axes.Add(axis);
+            }
+            return axes;
+        }
+
         /// <summary>Short identity slug for capture labels / log lines — last 8 chars of instance id.</summary>
         public static string ShortIdentity(string identity)
         {
@@ -1142,6 +1192,21 @@ namespace MozaPlugin.Devices
         {
             if (on && !_connection.IsConnected) return;
             WorkerFor(pedalIndex)?.SetRoadTextureTestSustained(on);
+        }
+
+        /// <summary>
+        /// Continuously alternates G-Force's commanded travel offset
+        /// forward/backward at the currently configured Max Travel/Response
+        /// Speed while <paramref name="on"/> is true, bypassing Enabled and
+        /// the game-running gate — mirrors Pit House's own "Test" demo. See
+        /// <see cref="SetEngineTestActive"/> for the analogous Engine
+        /// toggle; same live-tracking and always-allow-off semantics apply
+        /// here.
+        /// </summary>
+        public void SetGForceTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetGForceTestSustained(on);
         }
 
         /// <summary>

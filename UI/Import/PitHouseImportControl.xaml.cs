@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -21,6 +22,12 @@ namespace MozaPlugin.UI.Import
     {
         private MozaPlugin? _plugin;
         private string? _customPathOverride;
+
+        // Pedals path only: the attached pedals the preset can be applied to,
+        // snapshotted when the preset is loaded so a device arriving mid-confirm
+        // can't shift the combo out from under the user's selection.
+        private IReadOnlyList<MBoosterDeviceController> _pedalControllers = Array.Empty<MBoosterDeviceController>();
+        private bool _suppressTargetChange;
 
         // Selected preset + built plan, populated when Next is clicked.
         public PitHousePreset? SelectedPreset { get; private set; }
@@ -172,7 +179,6 @@ namespace MozaPlugin.UI.Import
                 return;
             }
 
-            ImportPlan plan;
             if (string.Equals(preset.DeviceType, "Motor", StringComparison.OrdinalIgnoreCase))
             {
                 var profile = _plugin?.Settings?.ProfileStore?.CurrentProfile;
@@ -184,14 +190,42 @@ namespace MozaPlugin.UI.Import
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
-                plan = PitHouseMotorMapper.BuildPlan(preset, profile);
+                SelectedPreset = preset;
+                Plan = PitHouseMotorMapper.BuildPlan(preset, profile);
+                _pedalControllers = Array.Empty<MBoosterDeviceController>();
+                PopulatePedalTargets(null);
             }
             else if (string.Equals(preset.DeviceType, "Pedals", StringComparison.OrdinalIgnoreCase))
             {
-                var registry = _plugin?.MBoosterRegistry;
-                IReadOnlyList<MBoosterDeviceController> controllers =
-                    registry?.Devices ?? Array.Empty<MBoosterDeviceController>();
-                plan = PitHousePedalsMapper.BuildPlan(preset, controllers);
+                if (RoutesToCrpPedals(preset))
+                {
+                    // CRP/CRP2/SRP: calibration lives on the profile, and the one
+                    // device carries all three pedals — no target to pick.
+                    var pedalProfile = _plugin?.Settings?.ProfileStore?.CurrentProfile;
+                    if (pedalProfile == null)
+                    {
+                        System.Windows.MessageBox.Show(Window.GetWindow(this),
+                            Strings.Import_NoActiveProfile,
+                            Strings.Import_DialogTitle,
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    SelectedPreset = preset;
+                    _pedalControllers = Array.Empty<MBoosterDeviceController>();
+                    Plan = PitHouseCrpPedalsMapper.BuildPlan(preset, pedalProfile);
+                    PopulatePedalTargets(Plan);
+                }
+                else
+                {
+                    SelectedPreset = preset;
+                    _pedalControllers = _plugin?.MBoosterRegistry?.Devices
+                                        ?? (IReadOnlyList<MBoosterDeviceController>)Array.Empty<MBoosterDeviceController>();
+                    // First build with no override so the mapper picks the pedal
+                    // carrying the preset's subject role; the combo then preselects
+                    // whatever it resolved to.
+                    Plan = PitHousePedalsMapper.BuildPlan(preset, _pedalControllers);
+                    PopulatePedalTargets(Plan);
+                }
             }
             else
             {
@@ -202,9 +236,43 @@ namespace MozaPlugin.UI.Import
                 return;
             }
 
-            SelectedPreset = preset;
-            Plan = plan;
+            LogPlan(preset, Plan);
+            ShowConfirmPanel();
+        }
 
+        /// <summary>
+        /// Whether a Pedals preset should go to the CRP/CRP2/SRP surface rather than
+        /// the mBooster one. Two gates, both conservative:
+        ///
+        /// <para>An attached mBooster always keeps the mBooster path — its plugin
+        /// fields are raw sensor counts where the CRP's are percent, so mis-routing
+        /// would write a 99 % range as ~0.15 % of full scale. A routed mBooster (RJ45
+        /// into a base pedal port) also sets <c>PedalsDetected</c>, so the flag alone
+        /// can't tell the families apart.</para>
+        ///
+        /// <para>With no mBooster attached, the preset's own <c>devices</c> list
+        /// decides: mBooster presets name "mBooster" (docs/protocol/devices/
+        /// mbooster.md § PitHouse Pedals preset format), so one that doesn't goes to
+        /// the passive surface. No CRP-family pedals detected either → stay on the
+        /// mBooster path so its "no mBooster pedal attached" note is what shows.</para>
+        /// </summary>
+        private bool RoutesToCrpPedals(PitHousePreset preset)
+        {
+            if (_plugin?.IsPedalsDetected != true) return false;
+            if (_plugin?.MBoosterRegistry?.Devices.Count > 0) return false;
+            var devs = preset.Devices;
+            if (devs != null)
+            {
+                foreach (var d in devs)
+                    if (!string.IsNullOrEmpty(d)
+                        && d.IndexOf("mBooster", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return false;
+            }
+            return true;
+        }
+
+        private static void LogPlan(PitHousePreset preset, ImportPlan plan)
+        {
             // Debug — surface what BuildPlan produced so we can diagnose the
             // "empty Changes container" case from logs. Logs to SimHub.txt.
             int changedCount = 0;
@@ -212,6 +280,7 @@ namespace MozaPlugin.UI.Import
             MozaLog.Info(
                 $"[AZOM/Import] BuildPlan '{preset.Name}' type={preset.DeviceType}: " +
                 $"dp.Count={preset.DeviceParams.Count} " +
+                $"subject='{plan.SubjectRoleDisplay ?? "-"}' target='{plan.ResolvedTarget?.Label ?? "-"}' " +
                 $"diffs={plan.Diffs.Count} changed={changedCount} " +
                 $"notImported={plan.NotImported.Count} " +
                 $"fatal='{plan.FatalError ?? ""}'");
@@ -220,7 +289,49 @@ namespace MozaPlugin.UI.Import
                 var d = plan.Diffs[i];
                 MozaLog.Info($"[AZOM/Import]   diff[{i}] {d.Label}: '{d.OldDisplay}' -> '{d.NewDisplay}' changed={d.Changed}");
             }
+        }
 
+        /// <summary>
+        /// Fill the "Apply to" combo with every attached pedal and preselect the
+        /// one <paramref name="plan"/> resolved to. Passing null (Motor path)
+        /// clears and hides the row. Runs under <see cref="_suppressTargetChange"/>
+        /// so repopulating never re-enters the rebuild.
+        /// </summary>
+        private void PopulatePedalTargets(ImportPlan? plan)
+        {
+            _suppressTargetChange = true;
+            try
+            {
+                if (plan == null)
+                {
+                    TargetPedalCombo.ItemsSource = null;
+                    return;
+                }
+
+                var targets = PitHousePedalsMapper.EnumerateTargets(_pedalControllers);
+                TargetPedalCombo.ItemsSource = targets;
+                // BuildPlan enumerated its own targets, so the plan's instance
+                // is never one of these — match on (controller, axis) instead.
+                var resolved = plan.ResolvedTarget;
+                if (resolved != null)
+                {
+                    TargetPedalCombo.SelectedItem = targets.FirstOrDefault(t =>
+                        ReferenceEquals(t.Controller, resolved.Controller) && t.AxisIndex == resolved.AxisIndex);
+                }
+                // No resolved target (no attached pedal carries the subject
+                // role) leaves the combo unselected so the user picks one.
+            }
+            finally { _suppressTargetChange = false; }
+        }
+
+        private void TargetPedalCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressTargetChange) return;
+            if (SelectedPreset == null) return;
+            if (!(TargetPedalCombo.SelectedItem is MBoosterImportTarget target)) return;
+
+            Plan = PitHousePedalsMapper.BuildPlan(SelectedPreset, _pedalControllers, target);
+            LogPlan(SelectedPreset, Plan);
             ShowConfirmPanel();
         }
 
@@ -234,6 +345,22 @@ namespace MozaPlugin.UI.Import
             // Header card key/value rows.
             ConfirmPresetText.Text = SelectedPreset.Name;
             ConfirmProfileText.Text = profileName;
+
+            // Pedals only: which role the preset configures, and where it lands.
+            // A PitHouse preset carries all three role sections but fills in
+            // only its own — the other two are the device-wide snapshot, so the
+            // header has to say which one is actually being imported.
+            bool hasSubject = !string.IsNullOrEmpty(Plan.SubjectRoleDisplay);
+            SubjectRoleLabel.Visibility = hasSubject ? Visibility.Visible : Visibility.Collapsed;
+            SubjectRoleText.Visibility = hasSubject ? Visibility.Visible : Visibility.Collapsed;
+            SubjectRoleText.Text = Plan.SubjectRoleDisplay ?? "";
+
+            // Retargeting only means something when one section drives one
+            // pedal — a calibration-only preset already covers every role.
+            bool canRetarget = hasSubject && !Plan.AutoMatchedPerRole
+                               && TargetPedalCombo.Items.Count > 0;
+            ApplyToLabel.Visibility = canRetarget ? Visibility.Visible : Visibility.Collapsed;
+            TargetPedalCombo.Visibility = canRetarget ? Visibility.Visible : Visibility.Collapsed;
 
             // Show the full diff list (changed AND unchanged) so the user can
             // see the complete mapping. The DataTemplate dims unchanged rows
@@ -296,6 +423,8 @@ namespace MozaPlugin.UI.Import
         {
             SelectedPreset = null;
             Plan = null;
+            _pedalControllers = Array.Empty<MBoosterDeviceController>();
+            PopulatePedalTargets(null);
             ConfirmPanel.Visibility = Visibility.Collapsed;
             PickerPanel.Visibility = Visibility.Visible;
 

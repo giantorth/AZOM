@@ -25,17 +25,16 @@ namespace MozaPlugin.Devices
         /// <summary>Capture-label / log base (<c>"pedals"</c> / <c>"handbrake"</c>).</summary>
         public string CaptureLabelBase { get; }
         /// <summary>Flips the shared detection flag + owner to this lane's prober.
-        /// The bool is <c>issueReads</c> — false shows the tab without firing the
-        /// (possibly doomed) settings-read cascade; true once the device has
-        /// answered our binary protocol.</summary>
+        /// The bool is <c>issueReads</c> — this lane always passes false and issues
+        /// <see cref="SettingsReadCommands"/> itself, because the shared
+        /// <c>Mark*Detected</c> helpers early-return once the flag is latched.</summary>
         public Action<DeviceProber, bool> MarkDetected { get; }
         /// <summary>Reads this peripheral's shared detection flag (gates presence-probe polling).</summary>
         public Func<DeviceDetectionState, bool> IsDetected { get; }
-        /// <summary>Settings this lane reads once the binary channel is confirmed, or
-        /// null to read nothing (pedals/handbrake populate their tab from the profile
-        /// via Apply*ToHardware instead — see StandalonePeripheralController). The
-        /// shifter descriptors set a per-model list so the tab reflects the device's
-        /// stored values on connect (the SGP list includes its LED commands).</summary>
+        /// <summary>Settings this lane reads once the binary channel is confirmed.
+        /// Every descriptor carries one: the shared <c>Mark*Detected</c> helpers latch
+        /// on first sight and early-return, so a later <c>issueReads:true</c> can never
+        /// deliver them — this list is a dedicated pipe's ONLY read path.</summary>
         public string[]? SettingsReadCommands { get; }
         /// <summary>Which shifter model this descriptor is (Hgp / Sgp), or Unknown for
         /// non-shifter peripherals. Routes this lane's <c>shifter-*</c> replies into the
@@ -66,10 +65,11 @@ namespace MozaPlugin.Devices
             ShifterModel = shifterModel;
         }
 
-        // Directly-USB-attached peripherals with a config surface. Pedals/handbrake
-        // populate their tab from the profile via Apply*ToHardware, so they carry no
-        // read list. The two shifters DO read on connect (per-model list) so the tab
-        // reflects the device's stored values — the SGP list adds its LED commands.
+        // Directly-USB-attached peripherals with a config surface. Each reads its own
+        // settings once the binary channel confirms, so the tab shows the device's
+        // stored calibration instead of MozaData's placeholder defaults; the SGP list
+        // adds its LED commands. A base/hub-relayed device reads via Mark*Detected's
+        // own issueReads path instead.
         public static readonly StandalonePeripheralDescriptor Pedals =
             new StandalonePeripheralDescriptor(
                 MozaDeviceCategory.Pedals,
@@ -79,7 +79,8 @@ namespace MozaPlugin.Devices
                 "pedals-",
                 "pedals",
                 (prober, issueReads) => prober.MarkPedalsDetected(issueReads),
-                s => s.PedalsDetected);
+                s => s.PedalsDetected,
+                DeviceProber.PedalsSettingsReadCommands);
 
         public static readonly StandalonePeripheralDescriptor Handbrake =
             new StandalonePeripheralDescriptor(
@@ -90,7 +91,8 @@ namespace MozaPlugin.Devices
                 "handbrake-",
                 "handbrake",
                 (prober, issueReads) => prober.MarkHandbrakeDetected(issueReads),
-                s => s.HandbrakeDetected);
+                s => s.HandbrakeDetected,
+                DeviceProber.HandbrakeSettingsReadCommands);
 
         private static readonly string[] ShifterCommonReads =
             { "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode", "shifter-apply-mode" };
@@ -191,6 +193,20 @@ namespace MozaPlugin.Devices
         public bool IsConnected => _connection.IsConnected;
         public MozaSerialConnection Connection => _connection;
         public PendingResponseTracker PendingResponses => _pending;
+        /// <summary>Which shifter model this lane is, or Unknown for pedals/handbrake.</summary>
+        public ShifterModelKind ShifterModel => _desc.ShifterModel;
+        /// <summary>True once the device answered a presence probe on this pipe — the
+        /// gate on the settings reads (see <see cref="OnConnectionMessage"/>).</summary>
+        public bool BinaryConfirmed => _binaryConfirmed;
+        /// <summary>The shared detection flag this lane feeds (drives the UI tab).</summary>
+        public bool SharedFlagSet => _desc.IsDetected(_detectionState);
+        /// <summary>True when this lane's device manager is the recorded owner of its
+        /// peripheral, i.e. writes for it route down THIS pipe.</summary>
+        public bool OwnsPeripheral =>
+            ReferenceEquals(_detectionState.PedalsOwner, _deviceManager)
+            || ReferenceEquals(_detectionState.HandbrakeOwner, _deviceManager)
+            || ReferenceEquals(_detectionState.HgpOwner, _deviceManager)
+            || ReferenceEquals(_detectionState.SgpOwner, _deviceManager);
 
         public StandalonePeripheralController(
             StandalonePeripheralDescriptor descriptor,
@@ -300,13 +316,17 @@ namespace MozaPlugin.Devices
             {
                 bool firstConfirm = !_binaryConfirmed;
                 _binaryConfirmed = true;
-                _desc.MarkDetected(_prober, true);
-                // Now that the binary channel is confirmed, read the descriptor's
-                // settings once so the tab reflects the device's stored values. Only
-                // the shifter descriptors set this; pedals/handbrake read nothing here
-                // (they populate the tab from the profile via Apply*ToHardware).
+                // issueReads:false — TryConnect already latched the flag, so the
+                // shared Mark* helper early-returns and could not issue reads even if
+                // asked. This call is only the idempotent re-latch for a lane whose
+                // ownership was cleared by a disconnect.
+                _desc.MarkDetected(_prober, false);
+                // Binary channel confirmed — read the descriptor's settings once so
+                // the tab reflects the device's stored values rather than defaults.
+                // Paced (and off this serial read thread): the pedal list is 25
+                // commands, and large startup bursts get dropped — see ReadSettingsPaced.
                 if (firstConfirm && _desc.SettingsReadCommands != null)
-                    _deviceManager.ReadSettings(_desc.SettingsReadCommands);
+                    _deviceManager.ReadSettingsPaced(_desc.SettingsReadCommands);
                 return;
             }
 

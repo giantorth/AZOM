@@ -222,6 +222,12 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_TravelRangeMm => Get("SliderLabel_TravelRangeMm");
         public static string SliderLabel_EndstopFrontStiffness => Get("SliderLabel_EndstopFrontStiffness");
         public static string SliderLabel_EndstopEndStiffness => Get("SliderLabel_EndstopEndStiffness");
+        public static string Hint_NaturalFrictionPedalFeel => Get("Hint_NaturalFrictionPedalFeel");
+        public static string Section_SegmentedDamping => Get("Section_SegmentedDamping");
+        public static string Subtitle_SegmentedDamping => Get("Subtitle_SegmentedDamping");
+        public static string Hint_SegmentedDampingExperimental => Get("Hint_SegmentedDampingExperimental");
+        public static string Section_SegmentedDampingPressed => Get("Section_SegmentedDampingPressed");
+        public static string Section_SegmentedDampingReleased => Get("Section_SegmentedDampingReleased");
         public static string Section_SimInputMapping => Get("Section_SimInputMapping");
         public static string Subtitle_SimInputMapping => Get("Subtitle_SimInputMapping");
         public static string SliderLabel_MaxThresholdKg => Get("SliderLabel_MaxThresholdKg");
@@ -245,6 +251,10 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_VibrationDecay => Get("SliderLabel_VibrationDecay");
         public static string SliderLabel_OnsetTempC => Get("SliderLabel_OnsetTempC");
         public static string Hint_BrakeFadeExperimental => Get("Hint_BrakeFadeExperimental");
+        public static string Section_GForce => Get("Section_GForce");
+        public static string Hint_GForceExperimental => Get("Hint_GForceExperimental");
+        public static string SliderLabel_MaxTravelMm => Get("SliderLabel_MaxTravelMm");
+        public static string SliderLabel_ResponseSpeedPct => Get("SliderLabel_ResponseSpeedPct");
         public static string Section_CustomEffects => Get("Section_CustomEffects");
         public static string Subtitle_CustomEffectsExperimental => Get("Subtitle_CustomEffectsExperimental");
         public static string Hint_CustomEffectsExperimental => Get("Hint_CustomEffectsExperimental");
@@ -679,6 +689,8 @@ namespace MozaPlugin.Resources
         public static string Import_Label_Folder => Get("Import_Label_Folder");
         public static string Import_Label_Preset => Get("Import_Label_Preset");
         public static string Import_Label_Profile => Get("Import_Label_Profile");
+        public static string Import_Label_SubjectRole => Get("Import_Label_SubjectRole");
+        public static string Import_Label_ApplyTo => Get("Import_Label_ApplyTo");
         public static string Import_Label_Changes => Get("Import_Label_Changes");
         public static string Import_NoMotorPresets => Get("Import_NoMotorPresets");
         public static string Import_NoPedalsPresets => Get("Import_NoPedalsPresets");

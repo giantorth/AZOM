@@ -148,6 +148,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>이동 시작/종료 (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>프론트 리밋 강성</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>엔드 리밋 강성</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>게임 출력과 무관한 마찰력을 시뮬레이션합니다.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>구간별 댐핑</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>게임 출력과 무관한 댐핑력, 페달 이동 구간별 적용</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>게임 내 출력과 무관한 댐핑력을 시뮬레이션합니다. 페달 이동 구간이 여러 구간으로 나뉘며, 각 구간마다 조절 가능한 범위와 고유한 자연 댐핑이 적용됩니다. 구분선을 드래그하여 구간 크기를 조정하고, 구간 내부를 드래그하여 댐핑량을 설정하세요.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>누를 때</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>뗄 때</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>시뮬레이션 입력 매핑</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// 로드셀/페달 신호를 게임에 매핑 (핏하우스 방식)</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>최대 임계값 (kg)</value></data>
@@ -596,6 +602,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>폴더</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>프리셋</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>프로필</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>페달</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>적용 대상</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>변경 사항</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// 이 폴더에 Motor 프리셋이 없습니다</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// 이 폴더에 Pedals 프리셋이 없습니다</value></data>

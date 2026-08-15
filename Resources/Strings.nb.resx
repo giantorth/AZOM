@@ -153,6 +153,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Start / Slutt på Bevegelse (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Frontgrense-stivhet</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Sluttgrense-stivhet</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simulerer en friksjonskraft som er uavhengig av spillutgangen.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>SEGMENTERT DEMPING</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Dempekraft uavhengig av spillutgangen, per pedalbevegelse-segment</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simulerer en dempekraft som er uavhengig av spillutgangen. Pedalbevegelsen deles inn i flere segmenter, hver med justerbart område og sin egen naturlige demping. Dra en delelinje for å endre størrelsen på et segment; dra inne i et segment for å angi dempemengden.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Ved Nedtrykking</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Ved Utløsning</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM-INNGANGSKARTLEGGING</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// kartlegger lastcelle-/pedalsignalet til spillet, Pit House-stil</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Maks terskel (kg)</value></data>
@@ -602,6 +608,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>MAPPE</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>FORHÅNDSINNSTILLING</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFIL</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDAL</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>BRUK PÅ</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>ENDRINGER</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// ingen Motor-forhåndsinnstillinger i denne mappen</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// ingen Pedals-forhåndsinnstillinger i denne mappen</value></data>

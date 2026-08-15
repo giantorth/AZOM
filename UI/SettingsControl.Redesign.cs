@@ -302,7 +302,12 @@ namespace MozaPlugin
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[Redesign] live update failed: {ex.Message}");
+                // Runs on the 500 ms settings refresh tick — a persistent fault
+                // (a null visual during a rebuild, say) emitted 2 lines/s for as
+                // long as the tab stayed open. Collapse repeats; a change in the
+                // failure mode still comes through.
+                MozaLog.DebugIfChanged("redesign-live-update",
+                    $"[Redesign] live update failed: {ex.Message}");
             }
         }
 

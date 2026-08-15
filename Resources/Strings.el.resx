@@ -148,6 +148,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Αρχή / Τέλος Διαδρομής (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Σκληρότητα εμπρός ορίου</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Σκληρότητα τελικού ορίου</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Προσομοιώνει μια δύναμη τριβής ανεξάρτητη από την έξοδο του παιχνιδιού.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>ΤΜΗΜΑΤΟΠΟΙΗΜΕΝΗ ΑΠΟΣΒΕΣΗ</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Δύναμη απόσβεσης ανεξάρτητη από την έξοδο του παιχνιδιού, ανά τμήμα διαδρομής πεντάλ</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Προσομοιώνει μια δύναμη απόσβεσης ανεξάρτητη από την έξοδο του παιχνιδιού εντός του παιχνιδιού. Η διαδρομή του πεντάλ χωρίζεται σε πολλά τμήματα, το καθένα με ρυθμιζόμενο εύρος και τη δική του φυσική απόσβεση. Σύρετε ένα διαχωριστικό για να αλλάξετε το μέγεθος ενός τμήματος· σύρετε μέσα σε ένα τμήμα για να ορίσετε την ποσότητα απόσβεσής του.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Κατά το Πάτημα</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Κατά την Απελευθέρωση</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>ΑΝΤΙΣΤΟΙΧΙΣΗ ΕΙΣΟΔΟΥ ΠΡΟΣΟΜΟΙΩΣΗΣ</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// αντιστοίχιση σήματος κυψέλης φόρτισης/πεντάλ στο παιχνίδι, στυλ Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Μέγιστο κατώφλι (kg)</value></data>
@@ -596,6 +602,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>ΦΑΚΕΛΟΣ</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>ΠΡΟΕΠΙΛΟΓΗ</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>ΠΡΟΦΙΛ</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>ΠΕΝΤΑΛ</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>ΕΦΑΡΜΟΓΗ ΣΕ</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>ΑΛΛΑΓΕΣ</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// δεν υπάρχουν προεπιλογές Motor σε αυτόν τον φάκελο</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// δεν υπάρχουν προεπιλογές Pedals σε αυτόν τον φάκελο</value></data>

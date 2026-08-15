@@ -160,6 +160,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Start / End of Travel (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Front Limit Stiffness</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>End Limit Stiffness</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simulate a frictional force that is independent of the game output.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>SEGMENTED DAMPING</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Damping force independent of game output, per pedal-travel segment</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simulate a damping force independent of in-game output. Pedal travel is divided into multiple segments, each with an adjustable range and its own natural damping. Drag a divider to resize a segment; drag inside a segment to set its damping amount.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>When Pressed</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>When Released</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM INPUT MAPPING</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Max Threshold (kg)</value></data>
@@ -183,6 +189,10 @@
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibration Decay</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Onset Temperature (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimental — writes the real Travel End and Max Threshold hardware calibrations while active (more travel and more force needed), then restores your configured values as brakes cool. Requires those already set in Pedal Feel / Sim Input Mapping — has no effect otherwise.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-Force (Inertial Pedal Feel) (Experimental)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimental — pushes the pedal itself under your foot in proportion to live longitudinal G (accelerating pushes forward, braking pushes back), rather than vibrating. Max Pedal Travel sets how far it moves at full G; Response Speed sets how quickly the pedal ramps to the new position.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Max Pedal Travel (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Response Speed (%)</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Custom Effects (Experimental)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// experimental — user-defined vibration driven by SimHub/NCalc formulas</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Experimental — each custom effect vibrates the motor using a SimHub property or NCalc formula you supply. All custom effects (and the built-in Engine effect) share one wire channel, so only one can drive the motor at a time; the most recently processed active effect wins. Frequency/Intensity behave like Engine's own sliders.</value></data>
@@ -623,6 +633,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>FOLDER</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>PRESET</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFILE</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDAL</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APPLY TO</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>CHANGES</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// no Motor presets in this folder</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// no Pedals presets in this folder</value></data>

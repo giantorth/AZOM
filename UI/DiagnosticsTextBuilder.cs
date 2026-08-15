@@ -104,6 +104,23 @@ namespace MozaPlugin.UI
             if (!string.IsNullOrEmpty(baseAuxPort))
                 sb.AppendLine($"                Base(aux) → {baseAuxPort}  (wheel driven via hub)");
 
+            // Directly-USB-attached peripherals get their own lanes, which the three
+            // fixed slots above don't cover — without this a pedals-only rig reads as
+            // "everything disconnected" while its CRP2 is happily answering on COM7.
+            var lanes = plugin.PeripheralRegistry?.Snapshot();
+            if (lanes != null && lanes.Count > 0)
+            {
+                var live = new List<string>();
+                for (int i = 0; i < lanes.Count; i++)
+                {
+                    var c = lanes[i];
+                    if (!c.IsConnected) continue;
+                    live.Add($"{LaneName(c)} → {c.Connection.LastPortName ?? c.PortName}");
+                }
+                if (live.Count > 0)
+                    sb.AppendLine($"                Standalone: {string.Join("  |  ", live)}");
+            }
+
             // Classified open-failure surface. AccessDenied here is the
             // "port held by another app" footgun (PitHouse etc.); a stuck
             // ConsecutiveOpenFails count with PortVanished points at hot-
@@ -117,6 +134,71 @@ namespace MozaPlugin.UI
                     $"consecutive={conn.ConsecutiveOpenFailures}");
             }
             return sb.ToString();
+        }
+
+        /// <summary>Display name for a standalone lane — the shifter lanes share a
+        /// category, so the model (HGP / SGP) is what identifies them.</summary>
+        private static string LaneName(StandalonePeripheralController c)
+        {
+            if (c.Category == MozaDeviceCategory.Shifter)
+                return c.ShifterModel == ShifterModelKind.Sgp ? "SGP"
+                     : c.ShifterModel == ShifterModelKind.Hgp ? "HGP"
+                     : "Shifter";
+            return c.Category.ToString();
+        }
+
+        /// <summary>
+        /// The dedicated lanes for peripherals plugged straight into the PC (pedals /
+        /// handbrake / HGP / SGP). Each is its own connection with its own detection
+        /// ownership, so none of them appear in the wheelbase/AB9/hub assignment slots
+        /// — a pedals-only rig otherwise reads as a total detection failure.
+        ///
+        /// <para><c>binary=</c> is the presence-probe latch that gates the settings
+        /// reads, and <c>read=</c> whether those reads actually came back: a lane that
+        /// is connected with <c>read=no</c> means the tab is showing MozaData defaults,
+        /// not the device's stored calibration.</para>
+        /// </summary>
+        public static string BuildStandalonePeripherals(MozaPlugin plugin, MozaData data)
+        {
+            var lanes = plugin.PeripheralRegistry?.Snapshot();
+            if (lanes == null || lanes.Count == 0)
+                return "(no directly-USB-attached peripherals — this lane claims the pedals / handbrake / " +
+                       "HGP / SGP PIDs from the registry; a unit behind a wheelbase or hub is a relayed " +
+                       "sub-device on that pipe instead)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Discovered:     {lanes.Count} dedicated lane(s)");
+            for (int i = 0; i < lanes.Count; i++)
+            {
+                var c = lanes[i];
+                string port = c.Connection.LastPortName ?? c.PortName;
+                string state =
+                    !c.IsConnected     ? "disconnected"
+                    : c.BinaryConfirmed ? "connected"
+                                        : "connected (probing)";
+                sb.AppendLine(
+                    $"  [{i}] {LaneName(c),-9} {port,-6}  state={state}  " +
+                    $"pid={Blank(c.Connection.DiscoveredPid ?? "")}  binary={(c.BinaryConfirmed ? "yes" : "no")}");
+                // SharedFlagSet drives the UI tab; OwnsPeripheral says writes route
+                // here. They diverge when a base/hub pipe answered for the same
+                // peripheral first, which is what makes a "my tab is empty" report
+                // diagnosable from the bundle alone.
+                string read = c.Category == MozaDeviceCategory.Pedals
+                        ? (data.PedalsSettingsRead ? "yes" : "no")
+                    : c.Category == MozaDeviceCategory.Handbrake
+                        ? (data.HandbrakeSettingsRead ? "yes" : "no")
+                        : "n/a";
+                // capture= is this lane's CaptureLabel, i.e. the exact "source" column
+                // its frames carry in serial-capture-*.txt — ties a row to its traffic.
+                sb.AppendLine(
+                    $"        tabFlag={(c.SharedFlagSet ? "set" : "clear")}  " +
+                    $"ownsWrites={(c.OwnsPeripheral ? "yes" : "no")}  settingsRead={read}  " +
+                    $"pendingReads={c.PendingResponses.PendingCount}  capture={c.Connection.CaptureLabel}");
+                var f = c.Connection.LastFailure;
+                if (f.Kind != ConnectionFailureKind.None)
+                    sb.AppendLine($"        lastFailure={f.Kind} port={Blank(f.PortName ?? "")} '{f.Message}'");
+            }
+            return sb.ToString().TrimEnd();
         }
 
         public static string BuildMBoosterDevices(MozaPlugin plugin, MozaData data)
@@ -500,7 +582,7 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of {budgetTargetBytes}B target, peak={budget.PeakBurstBytes})");
             sb.AppendLine(
-                $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} resync={errs.FrameStartScanResyncs}");
+                $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} frameErr={errs.FrameErrors} resync={errs.FrameStartScanResyncs}");
             // Resync skip-size distribution. Helps tell single-byte stray
             // padding (USB / driver idle bytes — harmless) from multi-byte
             // gaps (wire corruption — worth investigating). drops=0
@@ -653,6 +735,14 @@ namespace MozaPlugin.UI
 
             var sb = new StringBuilder();
             sb.AppendLine($"Recent frames: {entries.Length} shown / {log.TotalReceived} total received");
+            // Param-store fault line: ≥5 failures = the wedge signature (a healthy
+            // wheel logs none; one-off lines during init are below the threshold).
+            var (wf, rf, firstUtc, lastUtc) = log.ParamFaultSnapshot();
+            if (wf + rf >= 5)
+                sb.AppendLine(
+                    $"PARAM-STORE FAULT: {wf} failed writes / {rf} failed reads " +
+                    $"({firstUtc.ToLocalTime():HH:mm:ss}–{lastUtc.ToLocalTime():HH:mm:ss}) — " +
+                    "wheel parameter storage is wedged; power-cycle the wheel to recover the display");
             // Render newest first so the most recent activity is at the top
             // of the section (and the oldest, least relevant lines slide off
             // the visible area first on long scrolls). Limit to last 64 so a
@@ -694,7 +784,7 @@ namespace MozaPlugin.UI
             // Pull counters first, so "no lines" is diagnosable without a wire
             // trace: requests=0 means we never asked, requests>0 payloads=0
             // means the display isn't answering.
-            string pull = plugin.TelemetrySender?.DeviceLogPullStatus;
+            var pull = plugin.TelemetrySender?.DeviceLogPullStatus;
             if (pull != null) sb.AppendLine($"Pull: {pull}");
             var cm2 = plugin._cm2Sender?.DeviceLogPullStatus;
             if (cm2 != null) sb.AppendLine($"Pull: {cm2}");

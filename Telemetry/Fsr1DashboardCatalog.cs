@@ -193,6 +193,18 @@ namespace MozaPlugin.Telemetry
                 _bit += 8;
                 return this;
             }
+            /// <summary>GT light/flag bundle: 2-bit light stage at [0:2] (0=off, 1=low beam,
+            /// 2=high beam — one field, not two beam bits; tester box-verified), then 1-bit
+            /// flags from bit 2.</summary>
+            public Fields LightStageFlags(params (string id, string label, string prop)[] flags)
+            {
+                int b = _bit;
+                _list.Add(MakeBits("lightStage", "Light stage", b, 2, "", fullScale: 2));
+                for (int i = 0; i < flags.Length; i++)
+                    _list.Add(MakeBits(flags[i].id, flags[i].label, b + 2 + i, 1, flags[i].prop));
+                _bit += 8;
+                return this;
+            }
             public Fsr1FieldDef[] Done() => _list.ToArray();
         }
 
@@ -227,9 +239,13 @@ namespace MozaPlugin.Telemetry
         // suffix 01,02,03,04); our group order is FL,FR,RL,RR → suffix 03,04,01,02.
         private const string F1Raw = "DataCorePlugin.GameRawData.PacketCarTelemetryData.m_carTelemetryData01.";
         private const string F1RawStatus = "DataCorePlugin.GameRawData.PacketCarStatusData.m_carStatusData01.";
+        // Player-extracted car status root. m_carStatusData01 is array SLOT 0, not the player;
+        // the ERS members under it also fail to resolve on some SimHub builds (F1 2020 bundle
+        // 2026-07-30), so the ERS channels bind here instead.
+        private const string F1RawPlayerStatus = "DataCorePlugin.GameRawData.PlayerCarStatusData.";
         // ERS deploy mode 0–3 (3 = overtake) drives the firmware's OVERTAKE highlight; the game value
         // maps straight into the 2-bit field. Live delta to session best (signed seconds) for gap fields.
-        private const string ErsDeployMode = F1RawStatus + "m_ersDeployMode";
+        private const string ErsDeployMode = F1RawPlayerStatus + "m_ersDeployMode";
         private const string LiveDelta = "PersistantTrackerPlugin.SessionBestLiveDeltaSeconds";
         // SimHub predicted/estimated final lap time (projected from session-best pace). Resolves as a
         // TimeSpan → TotalSeconds (PropertyCoercion), ×MsScale to ms for the 24-bit field. Variants:
@@ -240,10 +256,12 @@ namespace MozaPlugin.Telemetry
         // ERS this-lap energy (Joules). Deploy bar shows budget REMAINING = 100 − deployed/40000 (of the
         // 4 MJ deploy cap; verified clean). Harvest bar = harvested/20000 (of the 2 MJ MGU-K cap; the
         // capture's harvest data was sparse so the scale is approximate — tune on-wheel if needed).
-        private const string ErsDeployedThisLap = F1RawStatus + "m_ersDeployedThisLap";
-        private const string ErsHarvestedThisLap = F1RawStatus + "m_ersHarvestedThisLapMGUK";
+        private const string ErsDeployedThisLap = F1RawPlayerStatus + "m_ersDeployedThisLap";
+        private const string ErsHarvestedThisLap = F1RawPlayerStatus + "m_ersHarvestedThisLapMGUK";
         // Fuel mix / class 0–3 (lean/standard/rich/max).
         private const string FuelMix = F1RawStatus + "m_fuelMix";
+        // SimHub's computed fuel consumption (litres/lap); sent ×100 like fuelRem.
+        private const string FuelPerLap = "DataCorePlugin.Computed.Fuel_LitersPerLap";
         // Session time remaining (seconds → ms via MsScale) for the GT session clock.
         private const string SessionTimeLeft = "DataCorePlugin.GameRawData.PacketSessionData.m_sessionTimeLeft";
         private static readonly string[] InnerTempProps =
@@ -261,18 +279,14 @@ namespace MozaPlugin.Telemetry
             G + "TyrePressureFrontLeft", G + "TyrePressureFrontRight",
             G + "TyrePressureRearLeft", G + "TyrePressureRearRight",
         };
-        // type-0f packs its tyre-temp/pressure 4×10-bit groups in the order RR,RL,FR,FL — reversed
-        // from the FL,FR,RL,RR order the other records use (matches PitHouse's type-0f stream).
+        // type-0f packs its tyre-TEMP 4×10-bit group in the order RR,RL,FR,FL (capture decode);
+        // its PRESSURE pack is normal FL,FR,RL,RR (tester box-verified — the RR,RL,FR,FL guess
+        // rendered diagonally crossed).
         private static readonly string[] GtTyreCorners = { "RR", "RL", "FR", "FL" };
         private static readonly string[] OuterTempProps =   // outer tyre surface temp, order RR,RL,FR,FL
         {
             G + "TyreTemperatureRearRight", G + "TyreTemperatureRearLeft",
             G + "TyreTemperatureFrontRight", G + "TyreTemperatureFrontLeft",
-        };
-        private static readonly string[] GtPressProps =     // tyre pressure, order RR,RL,FR,FL
-        {
-            G + "TyrePressureRearRight", G + "TyrePressureRearLeft",
-            G + "TyrePressureFrontRight", G + "TyrePressureFrontLeft",
         };
         // Tyre-temp 10-bit fields carry a +300 wire bias (firmware decodes value−300 °C).
         private const double TyreTempBias = 300.0;
@@ -324,13 +338,16 @@ namespace MozaPlugin.Telemetry
                 PayloadLen = 19, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U16("spd", "Speed", G + "SpeedKmh")
-                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft")
-                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight")
-                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft")
-                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight")
-                    .U8("wwFL", "Wing wear FL", "")
-                    .U8("wwFR", "Wing wear FR", "")
-                    .U8("wwR", "Wing wear R", "")
+                    // Wear gauges show REMAINING %; SimHub TyreWear* is % worn → wire = 100 − x.
+                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft", bias: 100.0, scale: -1.0)
+                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight", bias: 100.0, scale: -1.0)
+                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft", bias: 100.0, scale: -1.0)
+                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight", bias: 100.0, scale: -1.0)
+                    // Wing boxes seed from SimHub's generic damage zones (AC: 1=front, 2=rear);
+                    // same remaining-% convention as the tyre boxes.
+                    .U8("wwFL", "Wing wear FL", G + "CarDamage1", bias: 100.0, scale: -1.0)
+                    .U8("wwFR", "Wing wear FR", G + "CarDamage1", bias: 100.0, scale: -1.0)
+                    .U8("wwR", "Wing wear R", G + "CarDamage2", bias: 100.0, scale: -1.0)
                     .U8("engWear", "Engine wear", "")
                     .U8("gbxWear", "Gearbox wear", "")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
@@ -363,10 +380,11 @@ namespace MozaPlugin.Telemetry
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
                     .U16("spd", "Speed", G + "SpeedKmh")
-                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft")
-                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight")
-                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft")
-                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight")
+                    // Wear gauges show REMAINING %; SimHub TyreWear* is % worn → wire = 100 − x.
+                    .U8("twFL", "Tyre wear FL", G + "TyreWearFrontLeft", bias: 100.0, scale: -1.0)
+                    .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight", bias: 100.0, scale: -1.0)
+                    .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft", bias: 100.0, scale: -1.0)
+                    .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight", bias: 100.0, scale: -1.0)
                     .U8("pos", "Position", G + "Position")
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("lap", "Lap", G + "CurrentLap")
@@ -423,19 +441,23 @@ namespace MozaPlugin.Telemetry
             },
             new()
             {
-                RecordType = 0x0b, Key = "type-0b", Label = "Dashboard 0B — timing / bias", IsLive = true,
+                // Background timing/bias cache: no page selects it as a primary — PitHouse
+                // interleaves it sparsely (~1%) alongside type-0e on the race-info page
+                // ("Dash 12 and 13 assetto corsa" capture: 55×0b per 5204×0e, b1/b2=00/04).
+                // Bias is ×10 on the wire (capture: 0x021B = 53.9%), like type-10's.
+                RecordType = 0x0b, Key = "type-0b", Label = "Dashboard 0B — timing / bias", IsLive = true, IsBackground = true,
                 PayloadLen = 15, LiveB1 = 0x00, LiveB2 = 0x04,
                 Fields = new Fields()
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
                     .U16("fuelTemp", "Fuel temp", "")
-                    .U16("bias", "Brake bias", G + "BrakeBias")
+                    .U16("bias", "Brake bias", G + "BrakeBias", scale: 10.0)
                     .Done(),
             },
             new()
             {
                 RecordType = 0x0c, Key = "type-0c", Label = "Dashboard 0C — timing / RPM", IsLive = true,
-                PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x02,
+                PayloadLen = 18, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
@@ -450,8 +472,10 @@ namespace MozaPlugin.Telemetry
                 RecordType = 0x0d, Key = "type-0d", Label = "Tyre / status cache", IsLive = true, IsBackground = true,
                 PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
-                    .Pack10x4("tti", "Tyre inner", Corners, InnerTempProps, TyreTempBias)
+                    // Outer pack FIRST (data[5-9]), inner second — the wheel renders them in
+                    // this order (tester-verified on the brake dash; type-08 is the reverse).
                     .Pack10x4("tto", "Tyre outer", Corners, SurfaceTempProps, TyreTempBias)
+                    .Pack10x4("tti", "Tyre inner", Corners, InnerTempProps, TyreTempBias)
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("lap", "Lap", G + "CurrentLap")
                     .U8("laps", "Lap count", G + "TotalLaps")
@@ -463,7 +487,7 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x0e, Key = "type-0e", Label = "Dashboard 0E — race info", IsLive = true,
-                PayloadLen = 24, LiveB1 = 0x0e, LiveB2 = 0x01,
+                PayloadLen = 24, LiveB1 = 0x08, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("gap", "Gap", LiveDelta, MsScale, Fsr1FieldKind.SignedMagnitude)
                     .U16("frl", "Fuel remain laps", FuelRemainLaps, scale: 100.0)
@@ -474,7 +498,7 @@ namespace MozaPlugin.Telemetry
                     .U8("fuel", "Fuel remaining", G + "Fuel")
                     .U8("tc", "TC level", G + "TCLevel")
                     .U8("abs", "ABS level", G + "ABSLevel")
-                    .U8("boost", "Boost", "")
+                    .U8("boost", "Boost", G + "TurboPressure")
                     .U8("ecu", "ECU map", G + "EngineMap")
                     .U8("tc2", "TC2", "")
                     .U8("fuelClass", "Fuel mix", FuelMix)
@@ -485,8 +509,9 @@ namespace MozaPlugin.Telemetry
             {
                 // GT dashboard background record: tyre / brake status. Streamed alongside the primary
                 // type-0x11 on the GT page (verified in the "Dashboard 17 AC" capture). Layout: 4×10-bit
-                // outer tyre temp (RR,RL,FR,FL), 4×U16 brake temp (FL,FR,RL,RR), 4×10-bit tyre pressure
-                // (RR,RL,FR,FL), U8 lap = 19 bytes.
+                // outer tyre temp (RR,RL,FR,FL per capture decode), 4×U16 brake temp (FL,FR,RL,RR),
+                // 4×10-bit tyre pressure (FL,FR,RL,RR — tester box-verified; the capture-decode
+                // RR,RL,FR,FL guess rendered diagonally crossed), U8 lap = 19 bytes.
                 RecordType = 0x0f, Key = "type-0f", Label = "Dashboard 0F — tyre / brake status", IsLive = true, IsBackground = true,
                 PayloadLen = 24, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
@@ -495,7 +520,7 @@ namespace MozaPlugin.Telemetry
                     .U16("btFR", "Brake temp FR", G + "BrakeTemperatureFrontRight")
                     .U16("btRL", "Brake temp RL", G + "BrakeTemperatureRearLeft")
                     .U16("btRR", "Brake temp RR", G + "BrakeTemperatureRearRight")
-                    .Pack10x4("tp", "Tyre pressure", GtTyreCorners, GtPressProps, scale: 10.0)
+                    .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Done(),
             },
@@ -510,14 +535,14 @@ namespace MozaPlugin.Telemetry
                     .U24("blt", "Best lap time", G + "BestLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U16("bias", "Brake bias", G + "BrakeBias", scale: 10.0)
-                    .U16("fuelRem", "Fuel remaining", G + "Fuel")
-                    .U16("fuelAvg", "Fuel avg / lap", "")
+                    .U16("fuelRem", "Fuel remaining", G + "Fuel", scale: 100.0)
+                    .U16("fuelAvg", "Fuel avg / lap", FuelPerLap, scale: 100.0)
                     .U8("cars", "Car count", G + "OpponentsCount")
                     .U8("tc", "TC level", G + "TCLevel")
-                    .U8("tcCut", "TC cut", "")
+                    .U8("tcCut", "TC-R", "")   // on-wheel gauge is labelled TC-R
                     .U8("ecu", "ECU map", G + "EngineMap")
-                    .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
-                           ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
+                    .LightStageFlags(("rain", "Rain light", ""), ("wipers", "Wipers", ""),
+                           ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("wiperCls", "Wiper class", "")
                     .U8("redline", "Redline reached", "")
                     .Done(),
@@ -525,7 +550,7 @@ namespace MozaPlugin.Telemetry
             new()
             {
                 RecordType = 0x11, Key = "type-11", Label = "Dashboard 11 — GT (A)", IsLive = true,
-                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x06,
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("stl", "Session time left", SessionTimeLeft, MsScale)
                     .U24("elt", "Estimated lap time", EstLapTime, MsScale)
@@ -547,14 +572,14 @@ namespace MozaPlugin.Telemetry
                 Fields = new Fields()
                     .Pack10x4("tp", "Tyre pressure", Corners, TyrePressProps, scale: 10.0)
                     .U16("fuelUsed", "Fuel used", "")
-                    .U16("fuelAvg", "Fuel avg / lap", "")
-                    .U16("fuelRem", "Fuel remaining", G + "Fuel")
+                    .U16("fuelAvg", "Fuel avg / lap", FuelPerLap, scale: 100.0)
+                    .U16("fuelRem", "Fuel remaining", G + "Fuel", scale: 100.0)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
                     .U8("lap", "Lap", G + "CurrentLap")
                     .Nibbles("tc", "TC level", G + "TCLevel", "ecu", "ECU map", G + "EngineMap")
-                    .U8("tcCut", "TC cut", "")
-                    .Flags(("lowBeam", "Low beam", ""), ("highBeam", "High beam", ""), ("rain", "Rain light", ""),
-                           ("wipers", "Wipers", ""), ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
+                    .U8("tcCut", "TC-R", "")   // on-wheel gauge is labelled TC-R
+                    .LightStageFlags(("rain", "Rain light", ""), ("wipers", "Wipers", ""),
+                           ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("sector", "Sector", G + "CurrentSectorIndex")
                     .U8("redline", "Redline reached", "")
                     .Done(),
@@ -585,7 +610,9 @@ namespace MozaPlugin.Telemetry
             { 9, new byte[] { 0x03 } },
             { 10, new byte[] { 0x08 } },        // tyre dash carries its own inner+outer temps
             { 11, new byte[] { 0x09, 0x0d } },  // GT timing: tyres/pressure/track/air/lap-count
-            { 12, new byte[] { 0x0e, 0x0d } },  // race info: car-count + lap-count total
+            { 12, new byte[] { 0x0e, 0x0b } },  // race info + timing/bias cache (fuel temp, brake
+                                                // bias, best/last lap). PitHouse streams 0e+0b here,
+                                                // NOT 0d ("Dash 12 and 13 assetto corsa" capture).
             { 13, new byte[] { 0x04 } },
             { 14, new byte[] { 0x04 } },
             { 15, new byte[] { 0x0c } },
@@ -594,31 +621,17 @@ namespace MozaPlugin.Telemetry
             { 18, new byte[] { 0x0c } },
         };
 
-        // Per-index sub-header descriptor (b1,b2). b1/b2 are per-DASHBOARD config descriptors
-        // (b2 = a region/feature bitmask), NOT fixed per record type — the same type carries
-        // different b1/b2 on different pages (see docs wheel-0x17.md), and the wheel gates on
-        // them to accept the record, so they must match PitHouse per page. These are ground
-        // truth from PitHouse captures: indices 0-15/17/18 from the multi-dash FSR1_CM1 capture,
-        // index 16 from an ACC capture of that page. Indices 6/8/10 were not in a capture (fall
-        // back to the type default). Applied in ByIndex to the streamed record for that page.
+        // Per-index sub-header (b1/b2) override — CAPTURE-PROVEN entries only. The 2026-08
+        // cleanup emptied this dict (earlier values like 0x27fe/0x0b88 were session leftovers),
+        // but the "Dash 12 and 13 assetto corsa" PitHouse capture shows sustained page-specific
+        // headers on the GT timing pages (5204×0e all b1=0d/b2=80 on page 12; 09 at 01/80 on
+        // page 11) — the wheel gates records on b1/b2, and streaming the per-type default
+        // header on these pages is the prime suspect in the 2026-08-05 display-wedge capture.
+        // Non-background records only; anything absent falls back to the type's LiveB1/LiveB2.
         private static readonly Dictionary<int, (byte b1, byte b2)> IndexDescriptorOverride = new()
         {
-            { 0,  (0x0b, 0x88) },
-            { 1,  (0x00, 0x02) },
-            { 2,  (0x0d, 0x00) },   // type-06 gap page: PitHouse uses b1/b2=0d/00 for the GAP-showing
-            { 3,  (0x0d, 0x00) },   // config; the FSR1_CM1 b2=08 variant does NOT render the gap field.
-            { 4,  (0x27, 0xfe) },
-            { 5,  (0x02, 0x40) },
-            { 7,  (0x0d, 0x00) },   // type-06 gap page (see indices 2/3): match PitHouse's gap config.
-            { 9,  (0x27, 0xfe) },
-            { 11, (0x01, 0x80) },   // user "dashboard 12" (Param-6 11): type-09 LIVE-gap config (PitHouse "Dash 12 and 13 assetto corsa" capture; gap @ data[14-16], moving)
-            { 12, (0x0d, 0x80) },   // user "dashboard 13" (Param-6 12): type-0e LIVE-gap config (same capture; gap @ data[5-7], moving). Idle FSR1_CM1 was 18/01.
-            { 13, (0x02, 0x40) },
-            { 14, (0x02, 0x40) },
-            { 15, (0x00, 0x00) },   // user "dashboard 16" (Param-6 15): type-0c gap config (ACC dual capture)
-            { 16, (0x00, 0x40) },   // user "dashboard 17" (Param-6 16): type-0x11 gap config (Dashboard 17 AC capture)
-            { 17, (0x00, 0x02) },   // Param-6 17: GT default (unverified)
-            { 18, (0x00, 0x02) },
+            { 11, (0x01, 0x80) },   // type-09 on user dash 12 ("Dash 12 and 13 AC" capture)
+            { 12, (0x0d, 0x80) },   // type-0e on user dash 13 (same capture, 5204 frames)
         };
 
         /// <summary>Live dashboards (stream at runtime). Type 02 first (primary).</summary>
@@ -662,44 +675,10 @@ namespace MozaPlugin.Telemetry
             return list.ToArray();
         }
 
-        // ── Per-profile override resolution ─────────────────────────────────
-        // Turn (catalog default, user override, payload length) into the effective
-        // wire layout. The driver, emitter, and UI all go through this so they agree
-        // on where a field sits and how it is packed. A null override field means
-        // "use the catalog default" (dict-missing ≠ explicit-off).
-
-        /// <summary>Resolve the effective byte span + encoding for one field, applying
-        /// any user override on top of the catalog default. Start/end are clamped to the
-        /// record's data range <c>[5, payloadLen-1]</c>, width is clamped to 1..3 (the
-        /// FSR1's byte-aligned encodings), and endianness only matters for width 2.</summary>
-        internal static (int[] offsets, Fsr1Encoding encoding) ResolveLayout(
-            Fsr1FieldDef def, Fsr1FieldMapping? m, int payloadLen)
-        {
-            int defStart = def.Offsets.Length > 0 ? def.Offsets[0] : 5;
-            int defEnd = def.Offsets.Length > 0 ? def.Offsets[def.Offsets.Length - 1] : defStart;
-            int start = m?.StartOffset ?? defStart;
-            int end = m?.EndOffset ?? defEnd;
-
-            int maxOff = payloadLen - 1;
-            if (start < 5) start = 5;
-            if (start > maxOff) start = maxOff;
-            if (end < start) end = start;
-            if (end > maxOff) end = maxOff;
-            if (end - start > 2) end = start + 2;   // width ≤ 3
-
-            int width = end - start + 1;
-            Fsr1Encoding enc = width switch
-            {
-                1 => Fsr1Encoding.U8,
-                2 => (m?.LittleEndian ?? (def.Encoding == Fsr1Encoding.U16_LE))
-                        ? Fsr1Encoding.U16_LE : Fsr1Encoding.U16_BE,
-                _ => Fsr1Encoding.U24_BE,
-            };
-
-            var offsets = new int[width];
-            for (int i = 0; i < width; i++) offsets[i] = start + i;
-            return (offsets, enc);
-        }
+        // ── Layout resolution ───────────────────────────────────────────────
+        // Field GEOMETRY (byte span / bit packing / endianness) is catalog-fixed —
+        // only the channel and Scale/Bias gain are user-assignable. The driver,
+        // emitter, viz, and UI all read the same per-record slot partition.
 
         /// <summary>Output ceiling for a resolved encoding (mirrors
         /// <see cref="Fsr1FieldDef.OutputMax"/> but for the overridden width): the
@@ -729,166 +708,43 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// The record's fields resolved into a GUARANTEED gapless, non-overlapping partition
-        /// of the data range <c>[5, PayloadLen-1]</c> — the single layout source of truth for
-        /// the driver, emitter, viz, UI, and probe. Composes catalog + synthetic fields, takes
-        /// each field's desired span (<see cref="ResolveLayout"/>, catalog default merged with
-        /// the per-profile override), sorts by start, then tiles left-to-right preserving each
-        /// field's width where room allows; the last field absorbs any slack to the record end.
-        ///
-        /// This both enforces the invariant for new edits and AUTO-REPAIRS already-broken
-        /// stored configs (gaps/overlaps from earlier builds) at use time — every byte ends up
-        /// owned by exactly one field, so the wheel never renders a dead (gap) byte. Field
-        /// order and identity are preserved; only spans are reapportioned to close gaps/overlaps.
+        /// The record's fields as wire slots over the data range <c>[5, PayloadLen-1]</c>,
+        /// sorted by bit position — the single layout source of truth for the driver,
+        /// emitter, viz, and UI. Geometry comes straight from the catalog (validated once
+        /// at startup by <see cref="ValidateDefaultPartitions"/>); partitions are cached
+        /// per record type.
         /// </summary>
-        internal static System.Collections.Generic.IReadOnlyList<Fsr1Slot>
-            ResolvePartition(MozaPlugin? plugin, Fsr1Dashboard dash)
+        internal static System.Collections.Generic.IReadOnlyList<Fsr1Slot> ResolvePartition(Fsr1Dashboard dash)
         {
-            const int dataMin = 5;
-            int dataMax = dash.PayloadLen - 1;
-            int dataBytes = dataMax - dataMin + 1;
-            var empty = System.Array.Empty<Fsr1Slot>();
-            if (dataBytes <= 0) return empty;
-
-            var composed = Fsr1FieldComposer.FieldsFor(plugin, dash);
-
-            // A record enters BIT mode as soon as any composed field carries a sub-byte override.
-            // Every current catalog dash + byte-only profile stays in BYTE mode, so the tiler
-            // below is the unchanged algorithm and those records resolve byte-identically.
-            bool anyBit = false;
-            foreach (var f in composed)
+            if (dash == null) return System.Array.Empty<Fsr1Slot>();
+            lock (_partitions)
             {
-                if (f.BitWidth > 0) { anyBit = true; break; }   // catalog default is bit-packed
-                var mm = plugin?.GetFsr1FieldMapping(dash.Key, f.FieldId);
-                if (mm != null && (mm.StartBit != null || mm.BitWidth != null)) { anyBit = true; break; }
+                if (_partitions.TryGetValue(dash.RecordType, out var cached)) return cached;
+                var slots = BuildPartition(dash);
+                _partitions[dash.RecordType] = slots;
+                return slots;
             }
-            if (anyBit) return ResolveBitPartition(plugin, dash, composed, dataMin, dataMax);
-
-            // ── BYTE MODE (unchanged gapless byte tiler, wrapped as byte-aligned slots) ──
-            // Desired width + endianness per composed field (catalog + synthetic splits),
-            // ordered by where the field wants to sit.
-            var items = new System.Collections.Generic.List<(Fsr1FieldDef f, int start, int width, bool le)>();
-            foreach (var f in composed)
-            {
-                var m = plugin?.GetFsr1FieldMapping(dash.Key, f.FieldId);
-                var (offs, enc) = ResolveLayout(f, m, dash.PayloadLen);
-                items.Add((f, offs[0], offs.Length, enc == Fsr1Encoding.U16_LE));
-            }
-            items.Sort((a, b) => a.start.CompareTo(b.start));
-
-            // A partition can't have more parts than bytes; drop any overflow (e.g. stale
-            // synthetic splits piled onto a since-rebuilt catalog) so the tiling stays valid.
-            int n = System.Math.Min(items.Count, dataBytes);
-            if (n < items.Count)
-                MozaLog.Warn($"[AZOM] FSR1 partition {dash.Key}: {items.Count} fields for {dataBytes} bytes — dropping {items.Count - n}.");
-            if (n == 0) return empty;
-
-            // Distribute the data bytes across the fields: each gets its desired width clamped
-            // to [minW, maxW], where minW forces a field to grow when the remaining fields
-            // can't otherwise reach the end (≤3 each), and maxW makes it shrink to leave ≥1
-            // byte for each remaining field. Result tiles [5, dataMax] exactly — no gap/overlap.
-            var result = new Fsr1Slot[n];
-            int cursor = dataMin;
-            for (int i = 0; i < n; i++)
-            {
-                int after = n - 1 - i;
-                int bytesLeft = dataMax - cursor + 1;
-                int maxW = System.Math.Min(3, bytesLeft - after);
-                int minW = System.Math.Max(1, bytesLeft - 3 * after);
-                int w = items[i].width;
-                if (w < minW) w = minW;
-                if (w > maxW) w = maxW;
-                if (w < 1) w = 1;  // defensive — only if too few fields to cover the range
-                var offsets = new int[w];
-                for (int k = 0; k < w; k++) offsets[k] = cursor + k;
-                Fsr1Encoding enc = w switch
-                {
-                    1 => Fsr1Encoding.U8,
-                    2 => items[i].le ? Fsr1Encoding.U16_LE : Fsr1Encoding.U16_BE,
-                    _ => Fsr1Encoding.U24_BE,
-                };
-                result[i] = new Fsr1Slot(items[i].f, offsets, enc, cursor * 8, w * 8, msbFirst: true);
-                cursor += w;
-            }
-            return result;
         }
 
-        /// <summary>
-        /// Resolve a record that has at least one sub-byte / bit-packed field. Unlike byte mode
-        /// this does NOT reapportion spans — explicit bit ranges (and their intentional spare
-        /// bits) are honoured. Each field's bit run is resolved (packed → explicit; byte-aligned
-        /// neighbours → their byte span ×8), sorted by bit, and pushed right on bit overlap so no
-        /// two fields ever own the same bit. Byte-level gaps are warned but benign (an uncovered
-        /// byte stays 0, which <c>NewFrame</c> already zeroes).
-        /// </summary>
-        private static System.Collections.Generic.IReadOnlyList<Fsr1Slot> ResolveBitPartition(
-            MozaPlugin? plugin, Fsr1Dashboard dash,
-            System.Collections.Generic.IReadOnlyList<Fsr1FieldDef> composed, int dataMin, int dataMax)
+        private static readonly Dictionary<byte, System.Collections.Generic.IReadOnlyList<Fsr1Slot>> _partitions
+            = new Dictionary<byte, System.Collections.Generic.IReadOnlyList<Fsr1Slot>>();
+
+        private static System.Collections.Generic.IReadOnlyList<Fsr1Slot> BuildPartition(Fsr1Dashboard dash)
         {
-            int bitLo = dataMin * 8;
-            int bitHi = (dataMax + 1) * 8;   // exclusive
-
-            var items = new System.Collections.Generic.List<(Fsr1FieldDef f, int bo, int bw, Fsr1Encoding enc, bool msb, bool aligned)>();
-            foreach (var f in composed)
+            var fields = dash.Fields;
+            var result = new Fsr1Slot[fields.Length];
+            for (int i = 0; i < fields.Length; i++)
             {
-                var m = plugin?.GetFsr1FieldMapping(dash.Key, f.FieldId);
-                int defStart = f.Offsets.Length > 0 ? f.Offsets[0] : 5;
-                int defEnd = f.Offsets.Length > 0 ? f.Offsets[f.Offsets.Length - 1] : defStart;
-                bool mapBit = m != null && (m.StartBit != null || m.BitWidth != null);
-                if (mapBit || f.BitWidth > 0)
-                {
-                    // Bit geometry from the mapping override if present, else the catalog default.
-                    int byteStart = m?.StartOffset ?? defStart;
-                    int startBit = m?.StartBit ?? f.StartBit;
-                    int bo = byteStart * 8 + startBit;
-                    int bw = m?.BitWidth ?? (f.BitWidth > 0 ? f.BitWidth : (defEnd - defStart + 1) * 8);
-                    items.Add((f, bo, bw, Fsr1Encoding.U24_BE, false, aligned: false));
-                }
-                else
-                {
-                    var (offs, enc) = ResolveLayout(f, m, dash.PayloadLen);
-                    items.Add((f, offs[0] * 8, offs.Length * 8, enc, true, aligned: true));
-                }
+                var f = fields[i];
+                int byteStart = f.Offsets.Length > 0 ? f.Offsets[0] : 5;
+                if (f.BitWidth > 0)   // sub-byte / bit-packed (LSB-first wire order)
+                    result[i] = new Fsr1Slot(f, f.Offsets, Fsr1Encoding.U24_BE,
+                        byteStart * 8 + f.StartBit, f.BitWidth, msbFirst: false);
+                else                  // byte-aligned
+                    result[i] = new Fsr1Slot(f, f.Offsets, f.Encoding,
+                        byteStart * 8, f.Offsets.Length * 8, msbFirst: true);
             }
-            items.Sort((a, b) => a.bo.CompareTo(b.bo));
-
-            var result = new System.Collections.Generic.List<Fsr1Slot>(items.Count);
-            int prevEnd = bitLo;
-            foreach (var it in items)
-            {
-                int bo = it.bo, bw = it.bw < 1 ? 1 : it.bw;
-                if (bo < bitLo) bo = bitLo;
-                if (bo < prevEnd)   // bit overlap — push right so no two fields own a bit
-                {
-                    MozaLog.Warn($"[AZOM] FSR1 bit partition {dash.Key}: field {it.f.FieldId} overlaps at bit {bo}, pushed to {prevEnd}.");
-                    bo = prevEnd;
-                }
-                if (bo >= bitHi)
-                {
-                    MozaLog.Warn($"[AZOM] FSR1 bit partition {dash.Key}: field {it.f.FieldId} past record end — dropped.");
-                    continue;
-                }
-                if (bo + bw > bitHi) bw = bitHi - bo;   // clamp width into the record
-                prevEnd = bo + bw;
-
-                int byteStart = bo >> 3, byteEnd = (bo + bw - 1) >> 3;
-                var offsets = new int[byteEnd - byteStart + 1];
-                for (int k = 0; k < offsets.Length; k++) offsets[k] = byteStart + k;
-                // Keep the real byte encoding only for runs that stayed byte-aligned (U16_LE
-                // handling); anything sub-byte (incl. a byte field pushed off a boundary) → packed.
-                bool stillAligned = it.aligned && (bo & 7) == 0 && (bw & 7) == 0;
-                Fsr1Encoding enc = stillAligned ? it.enc : Fsr1Encoding.U24_BE;
-                result.Add(new Fsr1Slot(it.f, offsets, enc, bo, bw, it.msb));
-            }
-
-            // Coverage check (warn-only): a data byte owned by no field renders 0 on the wheel.
-            for (int b = dataMin; b <= dataMax; b++)
-            {
-                bool covered = false;
-                foreach (var s in result) if (s.ByteStart <= b && b <= s.ByteEnd) { covered = true; break; }
-                if (!covered)
-                    MozaLog.Warn($"[AZOM] FSR1 bit partition {dash.Key}: data byte {b} uncovered (renders 0).");
-            }
+            System.Array.Sort(result, (a, b) => a.BitOffset.CompareTo(b.BitOffset));
             return result;
         }
 
@@ -901,7 +757,7 @@ namespace MozaPlugin.Telemetry
             bool ok = true;
             foreach (var dash in LiveDashboards)
             {
-                var slots = ResolvePartition(null, dash);   // plugin=null → catalog defaults only
+                var slots = ResolvePartition(dash);
                 // 1. No two fields own the same bit (sort by bit, ensure non-overlap).
                 var ord = new System.Collections.Generic.List<Fsr1Slot>(slots);
                 ord.Sort((a, b) => a.BitOffset.CompareTo(b.BitOffset));

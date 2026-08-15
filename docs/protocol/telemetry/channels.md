@@ -15,15 +15,15 @@ Master reference for all compression types.
 | `uint8_t` | 8 | 0x01 inferred | `raw = value` | raw | 0–255 | 12 |
 | `percent_1` | 10 | 0x0E ✓ | `clamp(game% × 10, 0, 1000)` | `game% = raw / 10` | 0–100%, 1023=N/A | 19 |
 | `float_001` | 10 | 0x17 ✓ | `clamp(game × 1000, 0, 1000)` | `game = raw / 1000` | 0.0–1.0, 1023=N/A | 3 |
-| `tyre_pressure_1` | 12 | 0x10 inferred | `clamp(kPa × 10, 0, 4095)` | `kPa = raw × 0.1` | 0–409.5 kPa | 12 |
-| `tyre_temp_1` | 14 | 0x11 inferred | `°C × 10 + 5000` | `°C = (raw − 5000) × 0.1` | −500–1138.3°C | 43 |
-| `track_temp_1` | 14 | 0x12 inferred | `°C × 10 + 5000` | `°C = (raw − 5000) × 0.1` | −500–1138.3°C | 5 |
-| `oil_pressure_1` | 14 | 0x13 inferred | `°C × 10 + 5000` | `°C = (raw − 5000) × 0.1` | −500–1138.3°C | 1 |
+| `tyre_pressure_1` | 12 | 0x16 ✓ | `clamp(kPa × 10, 0, 4095)` | `kPa = raw × 0.1` | 0–409.5 kPa | 12 |
+| `tyre_temp_1` | 14 | 0x11 ✓ | `°C × 10 + 5000` | `°C = (raw − 5000) × 0.1` | −500–1138.3°C | 43 |
+| `track_temp_1` | **32** | **0x07** (was 0x12/14) | IEEE 754 single bits | IEEE 754 reinterpret | full float | 3 |
+| `oil_pressure_1` | **32** | **0x07** (was 0x13/14) | IEEE 754 single bits | IEEE 754 reinterpret | full float | 1 |
 | `int16_t` | 16 | 0x05 inferred | `raw = value` | raw | signed 16 | — |
 | `uint16_t` | 16 | 0x04 ✓ | `raw = value` | raw | 0–65535 | 2 |
 | `float_6000_1` | 16 | 0x0F ✓ | `clamp(game × 10, 0, 65535)` | `game = raw / 10` | 0–6553.5 | 4 |
 | `float_600_2` | 16 | 0x15 inferred | `clamp(game × 100, 0, 65535)` | `game = raw / 100` | 0–655.35 | 12 |
-| `brake_temp_1` | 16 | 0x16 inferred | `clamp(°C × 10 + 5000, 0, 65535)` | `°C = (raw − 5000) / 10` | −500–6053.5°C | 14 |
+| `brake_temp_1` | **32** | **0x07** (was 0x12/16) | IEEE 754 single bits | IEEE 754 reinterpret | full float | 14 |
 | `uint24_t` | 24 | — | `raw = value` | raw | 0–16777215 | — |
 | `float` | 32 | 0x07 ✓ | IEEE 754 single bits | IEEE 754 reinterpret | full float | 73 |
 | `int32_t` | 32 | 0x08 inferred | `raw = value` | raw | signed 32 | 3 |

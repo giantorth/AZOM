@@ -148,6 +148,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Bắt đầu / Kết thúc Hành trình (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Độ cứng giới hạn đầu</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Độ cứng giới hạn cuối</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Mô phỏng một lực ma sát độc lập với đầu ra của game.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>GIẢM CHẤN PHÂN ĐOẠN</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Lực giảm chấn độc lập với đầu ra của game, theo từng phân đoạn hành trình bàn đạp</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Mô phỏng một lực giảm chấn độc lập với đầu ra trong game. Hành trình bàn đạp được chia thành nhiều phân đoạn, mỗi phân đoạn có phạm vi điều chỉnh riêng và độ giảm chấn tự nhiên riêng. Kéo đường chia để thay đổi kích thước phân đoạn; kéo bên trong phân đoạn để đặt mức giảm chấn.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Khi Đạp</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Khi Nhả</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>ÁNH XẠ ĐẦU VÀO SIM</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// ánh xạ tín hiệu loadcell/bàn đạp vào game, theo kiểu Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Ngưỡng tối đa (kg)</value></data>
@@ -597,6 +603,8 @@ Id: {2}</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>THƯ MỤC</value></data>
   <data name="Import_Label_Preset" xml:space="preserve"><value>CÀI ĐẶT SẴN</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>HỒ SƠ</value></data>
+  <data name="Import_Label_SubjectRole" xml:space="preserve"><value>BÀN ĐẠP</value></data>
+  <data name="Import_Label_ApplyTo" xml:space="preserve"><value>ÁP DỤNG CHO</value></data>
   <data name="Import_Label_Changes" xml:space="preserve"><value>THAY ĐỔI</value></data>
   <data name="Import_NoMotorPresets" xml:space="preserve"><value>// không có cài đặt sẵn Motor trong thư mục này</value></data>
   <data name="Import_NoPedalsPresets" xml:space="preserve"><value>// không có cài đặt sẵn Pedals trong thư mục này</value></data>

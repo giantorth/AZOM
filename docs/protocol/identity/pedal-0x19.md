@@ -34,3 +34,21 @@ On a base that integrates pedals into the base MCU, `0x19` is a **base-MCU modul
 | dev_type | `01 02 10 09` (same as base — not distinguishing) |
 
 Contrast the KS Pro pedal above (`RS21-D01-*`, own `hw_id`), which is a separate device. See [`known-wheel-models.md`](known-wheel-models.md) § ES wheel identity for the full device-id map.
+
+### Parser routing — the identity groups are shared
+
+A relayed pedal set answers the *same* identity groups as the wheel (`0x04`
+device-type, `0x07` model-name, `0x09` presence, `0x10` serial), distinguished
+only by the device byte. `MozaResponseParser` therefore hints dev `0x19` →
+`pedals` (and `0x1B` → `handbrake`), exactly as it does for `0x12`/`0x13`/`0x1A`.
+
+Without that hint the reply fell through to the first entry in the group bucket —
+the `wheel-*` command — so a pedal set answering the routed-mBooster identity
+probe wrote **its** name and serial into the wheel's identity fields. On bundle
+`65HZBQJT` (R12 + KS + SRP) `87 91 01 "SRP"` parsed as `wheel-model-name`, which
+`DeviceProber` read as a wheel model change `KS` → `SRP` and treated as a
+hot-swap: full detection reset plus a `PendingResponseTracker.Clear()` that
+dropped the base identity reads still in flight ~240 ms after they were sent —
+including `base-fw-version`, which is re-issued only once per base detect and
+gates the wheelbase LFE effects. The diagnostics dump also reported the pedals'
+serial as the wheel's.

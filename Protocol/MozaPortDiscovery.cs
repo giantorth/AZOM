@@ -122,7 +122,7 @@ namespace MozaPlugin.Protocol
             if (ports.Count > 0 && Interlocked.Exchange(ref _hasLoggedFirstSuccess, 1) == 0)
                 MozaLog.Info($"[AZOM] MOZA detection: source=registry, {summary}");
             else
-                MozaLog.Debug($"[AZOM] MOZA detection: source=registry, {summary}");
+                MozaLog.DebugIfChanged("port-discovery", $"[AZOM] MOZA detection: source=registry, {summary}");
 
             return ports;
         }
