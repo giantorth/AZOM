@@ -1045,6 +1045,17 @@ namespace MozaPlugin
                     }
                 }
 
+                // VerboseWireDebugLog shipped defaulting to true and IS serialized,
+                // so every existing install has `true` baked into its settings file
+                // and would keep frame-rate wire logging after the default flipped.
+                // Clear it once. The flag makes this a one-shot: anyone who sets the
+                // setting back to true afterwards keeps it.
+                if (!_settings.VerboseWireDebugLogDefaultMigrated)
+                {
+                    _settings.VerboseWireDebugLogDefaultMigrated = true;
+                    _settings.VerboseWireDebugLog = false;
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.

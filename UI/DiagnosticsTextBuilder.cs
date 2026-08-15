@@ -582,7 +582,7 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of {budgetTargetBytes}B target, peak={budget.PeakBurstBytes})");
             sb.AppendLine(
-                $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} resync={errs.FrameStartScanResyncs}");
+                $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} frameErr={errs.FrameErrors} resync={errs.FrameStartScanResyncs}");
             // Resync skip-size distribution. Helps tell single-byte stray
             // padding (USB / driver idle bytes — harmless) from multi-byte
             // gaps (wire corruption — worth investigating). drops=0

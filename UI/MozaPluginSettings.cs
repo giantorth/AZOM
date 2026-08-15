@@ -254,10 +254,20 @@ namespace MozaPlugin
         [Newtonsoft.Json.JsonIgnore]
         public bool EnableWireTraceFileSink { get; set; } = false;
 
-        // Per-frame wire/firmware-debug log lines (MozaLog.WireDebugEnabled).
-        // No UI — flip to false in MozaPluginSettings.json to silence
-        // frame-rate debug logging on the serial read thread.
-        public bool VerboseWireDebugLog { get; set; } = true;
+        // Per-frame wire / firmware-debug / display-driver diagnostic lines
+        // (MozaLog.WireDebugEnabled). No UI — flip to true in
+        // MozaPluginSettings.json when debugging the frame path.
+        //
+        // Default OFF: measured across the diagnostics bundles in usb-capture/,
+        // the WIRE session-chunk line alone was 46–74 % of moza-log.txt at 2–4
+        // lines/s, so it evicted the connect/handshake history from the 5 000-line
+        // ring before a bug report was ever pulled. SerialTrafficCapture already
+        // records the same bytes and ships in the same bundle, so nothing is lost.
+        public bool VerboseWireDebugLog { get; set; } = false;
+
+        // One-shot marker for the migration that clears the old serialized
+        // VerboseWireDebugLog=true. See MozaPlugin.Init.
+        public bool VerboseWireDebugLogDefaultMigrated { get; set; }
 
         // ~1/min pull of the wheel display's own log via session FF kind=14,
         // acked with kind=15 (which clears those lines on the device). No UI —
