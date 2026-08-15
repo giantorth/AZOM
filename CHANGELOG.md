@@ -2,50 +2,49 @@
 
 All notable changes to the AZOM plugin are documented here.
 
-## [Unreleased]
+## [1.5.5]
+
+### Added
+
+- **Every wheelbase setting is now a SimHub property and a bindable action.** Damper, friction,
+  inertia, spring, the four game-effect gains, soft limit, high-speed damping, road sensitivity,
+  the FFB equalizer bands, the FFB curve nodes and the clutch split point join the handful that
+  were already exposed — each with fine/coarse `Up`/`Down` actions, and `On`/`Off`/`Toggle` for
+  the switches. Full list in the README.
+- **mBooster G-Force (Inertial Pedal Feel)** *(experimental)* — moves the pedal under your foot in
+  proportion to live longitudinal G instead of vibrating, with Max Pedal Travel and Response Speed.
+- **mBooster Natural Friction and Segmented Damping** — two more hardware Pedal Feel settings: a
+  friction slider, and a damping profile that splits pedal travel into three draggable segments
+  with independent levels for pressed and released.
+- **mBooster profile import picks a target pedal.** A PitHouse Pedals preset now shows which pedal
+  role it carries and which attached mBooster will receive it.
+- **PitHouse Pedals presets import onto CRP / CRP2 / SRP pedals** — previously only an mBooster
+  could receive one.
+- **FSR V1 display brightness** now follows the brightness slider and actions.
 
 ### Fixed
 
 - **Track temperature, and the channels sharing its update group, now display.** Track/air/fuel
-  temperature, brake temperatures and oil pressure were sent in a format this wheel firmware
-  does not accept. The wheel rejected the whole group of channels those sat in, so unrelated
-  channels updating at the same rate — typically best lap and last lap — went blank with them.
-  All of these are now sent as plain numbers, which the wheel displays directly.
-
-- **Dashboard elements bound to last lap / best lap now work.** After a few reconnects the
-  plugin stopped noticing that the wheel had re-published its channel list, so it kept
-  subscribing to an older, sometimes incomplete list. Channels the wheel had only announced
-  later — commonly Last Lap Time — were never subscribed at all, which is why those elements
-  stayed blank and had no row in the channel mapper. The plugin now re-reads the channel list
+  temperature, brake temperatures and oil pressure were sent in a format this firmware rejects,
+  taking down every channel on the same update rate with them — typically best lap and last lap.
+- **Channels left over from a previously-shown dashboard no longer break a whole tier.** 
+- **A pedal set plugged into the wheelbase no longer breaks wheel detection.** 
+- **Wheelbase LFE haptics now work on bases that report their firmware differently.** 
+- **Device questions that go unanswered are retried again.** 
+- **An AB6/AB9 that drops off USB no longer goes silent.** The effects are now re-registered
   on every reconnect.
-- **Channels left over from a previously-shown dashboard no longer break a whole tier.** The
-  subscription could still name slots belonging to a dashboard that was no longer loaded; the
-  wheel rejected the group of channels those slots sat in, taking working channels down with
-  them (typically the slow-updating group — best lap, track temperature). The subscription is
-  now built strictly from the dashboard the wheel currently has open.
-- **A pedal set plugged into the wheelbase no longer breaks wheel detection.** The pedals
-  answer the same identity questions as the wheel, and the plugin was reading their reply as
-  the wheel's — it saw the wheel's model "change" to the pedals' name and restarted detection
-  mid-connect, throwing away device answers that were still on their way. On the affected rigs
-  that permanently disabled the wheelbase LFE haptics (the firmware-version answer was one of
-  the casualties) and made the Diagnostics tab report the pedals' serial number as the wheel's.
-- **Wheelbase LFE haptics now work on bases that answer the firmware-version question
-  differently.** An R12 on LFE-capable firmware never replies to the version request PitHouse
-  uses, so the plugin assumed the firmware was too old: the LFE tab stayed hidden, the
-  "Wheelbase LFE haptics" device under Devices never connected, and its test buttons did
-  nothing. The plugin now asks in three ways and takes the first answer, and logs the base
-  firmware it resolved.
-- **Device questions that go unanswered are retried again.** Reads issued while the plugin was
-  still starting up were never tracked, so nothing retried them and nothing reported them as
-  unanswered — one lost reply could disable a feature until the next restart. A standalone CM2
-  dashboard's retries also went out on the wheelbase port instead of its own.
+- **FSR V1 field corrections.** Tyre wear now reads as remaining rather than used, tyre pressures
+  use the correct corner order, and the light-stage and TC-R gauges decode properly.
+- **A lone mBooster on a chain-capable hub ignored its configured role.** 
+- **Directly-attached pedals and handbrakes showed placeholder settings.** Neither read its stored
+  calibration back on connect, so the tab showed defaults instead of what the device holds.
 
 ### Changed
 
-- **The plugin's log keeps far more history.** Steady-state polling repeated the same five
-  lines every 5 seconds and the wheel's firmware-debug output was stored twice, so a bug report
-  captured barely 40 minutes and none of the connect sequence. Repeating status lines are now
-  logged only when they change.
+- **The FSR V1 field editor drops its wire-boundary controls.** The byte/bit steppers and the
+  merge/split buttons are gone now that the record layouts are decoded from firmware; per-field
+  channel assignment and Reset remain.
+- **The plugin's log is less chatty.** Repeating status lines are now logged only when they change.
 
 ## [1.5.4]
 
