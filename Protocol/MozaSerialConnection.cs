@@ -214,6 +214,11 @@ namespace MozaPlugin.Protocol
         private readonly WriteBudget _budget = new WriteBudget();
         private int _framesDropped;
         private int _checksumFailures;
+        // Read-side frame decode errors (escape violation / short decode). Was
+        // log-only, which meant one line per bad frame on a resync path that
+        // retries per byte; the aggregate is the useful signal, so it rides the
+        // same diagnostics surface as the other wire errors.
+        private int _frameErrors;
         private int _frameStartScanResyncs;
         // Resync histogram by skip-byte count. Buckets [0]=1B, [1]=2B,
         // [2]=3-4B, [3]=5-8B, [4]=9-16B, [5]=17-32B, [6]=33-64B, [7]=>64B.
@@ -334,6 +339,7 @@ namespace MozaPlugin.Protocol
                 return new WireErrorCounters(
                     Interlocked.CompareExchange(ref _framesDropped, 0, 0),
                     Interlocked.CompareExchange(ref _checksumFailures, 0, 0),
+                    Interlocked.CompareExchange(ref _frameErrors, 0, 0),
                     Interlocked.CompareExchange(ref _frameStartScanResyncs, 0, 0),
                     histo,
                     samples);
@@ -344,6 +350,9 @@ namespace MozaPlugin.Protocol
         {
             public readonly int FramesDropped;
             public readonly int ChecksumFailures;
+            /// <summary>Read-side decode errors: bad 0x7E escape or a frame
+            /// whose decoded length didn't match its header length.</summary>
+            public readonly int FrameErrors;
             public readonly int FrameStartScanResyncs;
             /// <summary>Distribution of bytes-skipped at each resync. Buckets:
             /// [0]=1B, [1]=2B, [2]=3-4B, [3]=5-8B, [4]=9-16B, [5]=17-32B,
@@ -354,11 +363,12 @@ namespace MozaPlugin.Protocol
             /// ("3B: 00 41 0B"). Oldest first, newest last. Capped to 16.</summary>
             public readonly string[] RecentResyncSamples;
 
-            public WireErrorCounters(int dropped, int cksum, int resync,
+            public WireErrorCounters(int dropped, int cksum, int frameErrors, int resync,
                 int[] histo, string[] samples)
             {
                 FramesDropped = dropped;
                 ChecksumFailures = cksum;
+                FrameErrors = frameErrors;
                 FrameStartScanResyncs = resync;
                 ResyncSkipHistogram = histo;
                 RecentResyncSamples = samples;
@@ -1026,10 +1036,19 @@ namespace MozaPlugin.Protocol
                         }
                         if (frameError || decoded != needed)
                         {
-                            int nn = Math.Min(8, Math.Max(0, decoded));
-                            string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
-                            MozaLog.Debug(
-                                $"[AZOM] DROP frame-error: decoded={decoded}/{needed} len={payloadLength} first8={first8a}");
+                            // Sampled: resync is `frameStart + 1`, so one corrupted
+                            // burst re-enters here once per byte. Logging each one
+                            // buried the rest of the ring under a single wire fault;
+                            // the running total is in WireErrors either way.
+                            int fe = Interlocked.Increment(ref _frameErrors);
+                            if (fe == 1 || fe % 500 == 0)
+                            {
+                                int nn = Math.Min(8, Math.Max(0, decoded));
+                                string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
+                                MozaLog.Debug(
+                                    $"[AZOM] DROP frame-error #{fe}: decoded={decoded}/{needed} " +
+                                    $"len={payloadLength} first8={first8a}");
+                            }
                             // Skip past the bad start byte and try to resync.
                             cursor = frameStart + 1;
                             continue;
@@ -1046,12 +1065,19 @@ namespace MozaPlugin.Protocol
                         byte actual = raw[needed - 1];
                         if (expected != actual)
                         {
-                            Interlocked.Increment(ref _checksumFailures);
-                            int nn = Math.Min(8, needed);
-                            string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
-                            MozaLog.Debug(
-                                $"[AZOM] DROP checksum mismatch: expected=0x{expected:X2} actual=0x{actual:X2} " +
-                                $"len={payloadLength} group=0x{raw[0]:X2} dev=0x{raw[1]:X2} first8={first8a}");
+                            // Sampled for the same reason as the frame-error branch
+                            // above — a noisy line otherwise emits one line per bad
+                            // frame. WireErrors.ChecksumFailures carries the total.
+                            int cf = Interlocked.Increment(ref _checksumFailures);
+                            if (cf == 1 || cf % 500 == 0)
+                            {
+                                int nn = Math.Min(8, needed);
+                                string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
+                                MozaLog.Debug(
+                                    $"[AZOM] DROP checksum mismatch #{cf}: expected=0x{expected:X2} " +
+                                    $"actual=0x{actual:X2} len={payloadLength} group=0x{raw[0]:X2} " +
+                                    $"dev=0x{raw[1]:X2} first8={first8a}");
+                            }
                             cursor = frameStart + 1;
                             continue;
                         }

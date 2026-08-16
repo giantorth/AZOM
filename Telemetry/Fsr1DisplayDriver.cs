@@ -226,7 +226,13 @@ namespace MozaPlugin.Telemetry
                     // Diagnostic: shows what we actually resolve vs what SimHub displays for this
                     // property. If 'resolved' ≠ the SimHub inspector value, we're reading a different
                     // value than the UI shows (path/timing), not a wire-format problem.
-                    if (_tickCounter % oneHzEvery == 0)
+                    //
+                    // Steady-state instrument with no error condition — it fires once a second
+                    // for EVERY gap field on EVERY streamed record (the catalog has 5, and the
+                    // fallback path streams the whole live set), so left ungated it costs 1–5
+                    // lines/s for the life of the session. Behind the verbose gate it stays
+                    // available to whoever is actually debugging gap rendering.
+                    if (MozaLog.WireDebugEnabled && _tickCounter % oneHzEvery == 0)
                         MozaLog.Debug($"[AZOM] FSR1 gap '{prop}' resolved={raw / 1000.0:F3}s -> wire {(v >> 16) & 0xFF:X2} {(v >> 8) & 0xFF:X2} {v & 0xFF:X2} (shows {(sv < 0 ? "-" : "")}{mag / 1000.0:F3}s)");
                     return v;
                 }
