@@ -267,12 +267,13 @@ namespace MozaPlugin.Devices.WheelUi
 
         private void WheelFilesDelete_Click(object sender, RoutedEventArgs e)
         {
-            // Temporarily neutered: completelyRemove RPC wedges wheel firmware until
-            // the wheelbase is power-cycled. Button is also IsEnabled="False" in XAML;
-            // this guard is defensive in case the XAML flag is flipped without
-            // re-validating the RPC behaviour.
-            return;
-#pragma warning disable CS0162 // Unreachable code — preserved scaffolding
+            // Delete = completelyRemove(id) RPC + library-list re-send without
+            // the name — the exact PitHouse exchange captured 2026-08-16
+            // (bridge-enable-toggle: RPC at t=1489.8, list re-send at t=1490.6,
+            // wheel state push confirms removal ~0.5 s later). The earlier
+            // "wedges wheel firmware" neutering traced back to the RPC
+            // envelope's comp_size missing the protocol-wide +4 — the wheel was
+            // choking on a truncated zlib stream, not on the verb.
             if (((Button)sender).Tag is not WheelFileRow row) return;
             if (string.IsNullOrEmpty(row.Id))
             {
@@ -293,12 +294,46 @@ namespace MozaPlugin.Devices.WheelUi
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            byte[]? reply = ts.SendRpcCall("completelyRemove", row.Id);
-            if (reply == null)
-                MessageBox.Show(
-                    string.Format(Strings.Dialog_CompletelyRemoveTimeout, row.Id),
-                    "Moza", MessageBoxButton.OK, MessageBoxImage.Warning);
-#pragma warning restore CS0162
+            // The RPC call blocks on a reply the wheel may answer only with a
+            // state push — run it off the UI thread; the wheel's follow-up
+            // state push refreshes the grid via the normal tick.
+            string dirName = row.DirName;
+            string id = row.Id;
+            MozaLog.Info($"[AZOM] Delete requested: \"{dirName}\" id={id}");
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    byte[]? reply = ts.SendRpcCall("completelyRemove", id);
+                    MozaLog.Info(
+                        $"[AZOM] completelyRemove(\"{dirName}\") sent; " +
+                        $"reply={(reply == null ? "none (state-push expected)" : reply.Length + "B")}");
+                    ts.RemoveDashboardFromLibrary(dirName);
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM] completelyRemove(\"{dirName}\") failed: {ex.Message}");
+                }
+            });
+        }
+
+        private void WheelFilesEnable_Click(object sender, RoutedEventArgs e)
+        {
+            // Enable = the host's configJson() library list naming the dash —
+            // the wheel syncs enablement against that list (observed flip
+            // ~108 ms after the list re-send in the 2026-08-16 ground truth).
+            if (((Button)sender).Tag is not WheelFileRow row) return;
+            if (string.IsNullOrEmpty(row.DirName)) return;
+            var ts = _plugin?.TelemetrySender;
+            if (ts == null)
+            {
+                MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
+                    "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            ts.EnableUploadedDashboard(row.DirName);
+            if (WheelFilesStatusBox != null)
+                WheelFilesStatusBox.Text = $"{Strings.Label_Enable}: {row.DirName}";
         }
 
         // ── Refresh ─────────────────────────────────────────────────────
@@ -359,6 +394,13 @@ namespace MozaPlugin.Devices.WheelUi
                     && _data.IsConnected;
         }
 
+        // Signature of the rows currently bound to the grid. The refresh tick
+        // runs every 500 ms; re-setting ItemsSource with fresh row objects on
+        // every tick recreates the row buttons under the pointer and eats
+        // clicks (observed: several Delete presses before one reached the
+        // handler). Rebind only when the data actually changed.
+        private string _lastFilesGridSignature = "\0";
+
         private void RefreshWheelFilesGrid()
         {
             if (WheelFilesGrid == null || _plugin == null) return;
@@ -387,13 +429,24 @@ namespace MozaPlugin.Devices.WheelUi
                         Id = d.Id,
                     });
             }
-            // Preserve grid selection across refresh by DirName key.
-            string? prevDir = (WheelFilesGrid.SelectedItem as WheelFileRow)?.DirName;
-            WheelFilesGrid.ItemsSource = rows;
-            if (!string.IsNullOrEmpty(prevDir))
+
+            var sigBuilder = new System.Text.StringBuilder(rows.Count * 64);
+            foreach (var r in rows)
+                sigBuilder.Append(r.State).Append('|').Append(r.DirName).Append('|')
+                          .Append(r.Hash).Append('|').Append(r.Id).Append('|')
+                          .Append(r.LastModified).Append('\n');
+            string sig = sigBuilder.ToString();
+            if (sig != _lastFilesGridSignature)
             {
-                foreach (var r in rows)
-                    if (r.DirName == prevDir) { WheelFilesGrid.SelectedItem = r; break; }
+                _lastFilesGridSignature = sig;
+                // Preserve grid selection across rebind by DirName key.
+                string? prevDir = (WheelFilesGrid.SelectedItem as WheelFileRow)?.DirName;
+                WheelFilesGrid.ItemsSource = rows;
+                if (!string.IsNullOrEmpty(prevDir))
+                {
+                    foreach (var r in rows)
+                        if (r.DirName == prevDir) { WheelFilesGrid.SelectedItem = r; break; }
+                }
             }
             if (WheelFilesStatusBox != null)
             {

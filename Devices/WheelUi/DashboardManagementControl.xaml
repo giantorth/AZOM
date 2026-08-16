@@ -647,20 +647,43 @@
                           CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
                           SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                           BorderThickness="1" RowHeight="24">
+                    <DataGrid.CellStyle>
+                        <!-- Non-focusable cells: without this the DataGrid eats
+                             the first click to move cell focus and the row's
+                             Enable/Delete buttons need 2-3 clicks to fire. -->
+                        <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                            <Setter Property="Focusable" Value="False"/>
+                        </Style>
+                    </DataGrid.CellStyle>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_State}" Binding="{Binding State}" Width="80"/>
                         <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_Title}" Binding="{Binding Title}" Width="*"/>
                         <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_DirName}" Binding="{Binding DirName}" Width="200"/>
                         <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_Hash}" Binding="{Binding HashShort}" Width="120"/>
                         <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_LastModified}" Binding="{Binding LastModified}" Width="170"/>
-                        <DataGridTemplateColumn Header="" Width="80">
+                        <DataGridTemplateColumn Header="" Width="150">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="{x:Static res:Strings.Button_Delete}" Padding="8,2"
-                                            Click="WheelFilesDelete_Click"
-                                            Tag="{Binding}"
-                                            IsEnabled="False"
-                                            ToolTip="{x:Static res:Strings.Tooltip_DeleteDisabled}"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="{x:Static res:Strings.Label_Enable}" Padding="8,2"
+                                                Margin="0,0,6,0"
+                                                Click="WheelFilesEnable_Click"
+                                                Tag="{Binding}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding State}" Value="disabled">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="{x:Static res:Strings.Button_Delete}" Padding="8,2"
+                                                Click="WheelFilesDelete_Click"
+                                                Tag="{Binding}"/>
+                                    </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>

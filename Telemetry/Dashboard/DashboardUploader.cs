@@ -153,10 +153,10 @@ namespace MozaPlugin.Telemetry.Dashboard
             int bundledPngs = 0;
             if (!string.IsNullOrEmpty(mzdashSourceDirectory))
             {
-                foreach (var (hex, bytes) in ResolvePngReferences(normalizedMzdash, mzdashSourceDirectory!))
+                foreach (var (hex, ext, bytes) in ResolveImageReferences(normalizedMzdash, mzdashSourceDirectory!))
                 {
-                    string pngDest = $"/home/moza/resource/images/MD5/{hex}.png";
-                    files.Add((pngDest, bytes));
+                    string imageDest = $"/home/moza/resource/images/MD5/{hex}.{ext}";
+                    files.Add((imageDest, bytes));
                     bundledPngs++;
                 }
             }
@@ -205,22 +205,26 @@ namespace MozaPlugin.Telemetry.Dashboard
             };
         }
 
-        // Matches the PNG ref forms used in mzdash JSON: `MD5/<32hex>.png`,
-        // with either forward slash (Linux paths in widget src attributes) or
-        // backslash (Windows paths in some PitHouse-generated JSON).
-        private static readonly Regex PngRefRegex = new Regex(
-            @"MD5[/\\]([0-9a-fA-F]{32})\.png",
-            RegexOptions.Compiled);
+        // Matches the content-addressed image ref forms used in mzdash JSON:
+        // `MD5/<32hex>.<ext>`, with either forward slash (Linux paths in
+        // widget src attributes) or backslash (Windows paths in some
+        // PitHouse-generated JSON). The wheel's image store preserves the
+        // original extension — a 2026-08-16 PitHouse ground-truth capture
+        // bundled `/home/moza/resource/images/MD5/<hex>.jpg` verbatim — so
+        // the scan accepts every raster format the display firmware renders.
+        private static readonly Regex ImageRefRegex = new Regex(
+            @"MD5[/\\]([0-9a-fA-F]{32})\.(png|jpg|jpeg|bmp|gif)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
-        /// Walk the mzdash text for distinct <c>MD5/&lt;32hex&gt;.png</c>
-        /// references and resolve each against
-        /// <c>&lt;sourceDir&gt;/Resource/MD5/&lt;hex&gt;.png</c>. Missing
+        /// Walk the mzdash text for distinct <c>MD5/&lt;32hex&gt;.&lt;ext&gt;</c>
+        /// image references and resolve each against
+        /// <c>&lt;sourceDir&gt;/Resource/MD5/&lt;hex&gt;.&lt;ext&gt;</c>. Missing
         /// files are logged at warn level and skipped — the bundle still
         /// uploads (file_count = 1 + N_resolved) but widgets bound to a
         /// missing image render blank on the wheel.
         /// </summary>
-        private static IEnumerable<(string hex, byte[] bytes)> ResolvePngReferences(
+        private static IEnumerable<(string hex, string ext, byte[] bytes)> ResolveImageReferences(
             byte[] mzdashUtf8, string sourceDirectory)
         {
             string json;
@@ -230,30 +234,32 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[AZOM] Upload: failed to decode mzdash as UTF-8 for PNG scan: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Upload: failed to decode mzdash as UTF-8 for image scan: {ex.Message}");
                 yield break;
             }
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match m in PngRefRegex.Matches(json))
+            foreach (Match m in ImageRefRegex.Matches(json))
             {
                 string hex = m.Groups[1].Value.ToLowerInvariant();
+                string ext = m.Groups[2].Value.ToLowerInvariant();
                 if (!seen.Add(hex)) continue;
 
-                string candidate = Path.Combine(sourceDirectory, "Resource", "MD5", hex + ".png");
+                string fileName = hex + "." + ext;
+                string candidate = Path.Combine(sourceDirectory, "Resource", "MD5", fileName);
                 if (!File.Exists(candidate))
                 {
                     // Also try lowercase directory variants (case-insensitive FS
                     // on Windows but not on Linux when SimHub runs in Proton —
                     // be lenient and look at both).
-                    string altRes = Path.Combine(sourceDirectory, "resource", "MD5", hex + ".png");
-                    string altMd5 = Path.Combine(sourceDirectory, "Resource", "md5", hex + ".png");
+                    string altRes = Path.Combine(sourceDirectory, "resource", "MD5", fileName);
+                    string altMd5 = Path.Combine(sourceDirectory, "Resource", "md5", fileName);
                     if (File.Exists(altRes)) candidate = altRes;
                     else if (File.Exists(altMd5)) candidate = altMd5;
                     else
                     {
                         MozaLog.Warn(
-                            $"[AZOM] Upload: PNG asset MD5/{hex}.png referenced by mzdash but not " +
+                            $"[AZOM] Upload: image asset MD5/{fileName} referenced by mzdash but not " +
                             $"found at {candidate} — widget bound to it will render blank.");
                         continue;
                     }
@@ -270,7 +276,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     continue;
                 }
 
-                yield return (hex, bytes);
+                yield return (hex, ext, bytes);
             }
         }
 

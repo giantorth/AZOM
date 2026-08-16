@@ -135,7 +135,7 @@ namespace MozaPlugin.Telemetry.Inbound
             if (session >= 0x04 && session <= 0x0b
                 && _sender.Dispatcher.GetOwner(session) == null)
             {
-                _sender.Uploader.NoteDeviceInit(session);
+                _sender.Uploader.NoteDeviceInit(session, openSeq);
             }
             // sess=0x09 device-init is the wheel's first reliable
             // "session-layer ready" signal during a slow hot-attach boot —
@@ -223,14 +223,19 @@ namespace MozaPlugin.Telemetry.Inbound
                 _sender.FeedFfRecords(session, seq, chunkPayload);
             }
 
-            // File-transfer candidate sessions (0x04..0x08): ack ALL, forward to
-            // uploader. Wheel device-inits multiple FT sessions and pushes data
-            // on whichever it chose; gating on ActiveSession alone meant chunks
-            // on the other session were never acked.
+            // File-transfer candidate sessions (0x04..0x08): forward to the
+            // uploader FIRST, then ack. Wheel device-inits multiple FT sessions
+            // and pushes data on whichever it chose; gating on ActiveSession
+            // alone meant chunks on the other session were never acked. The ack
+            // seq comes from the coordinator: cumulative high-water during an
+            // in-flight upload (acking a post-gap seq makes the wheel drop the
+            // missing chunks from its retransmit buffer — see
+            // WheelUploadCoordinator.GetInboundAckSeq), raw seq otherwise.
             if (session >= 0x04 && session <= 0x08)
             {
-                _sender.SendSessionAckInternal(session, (ushort)seq);
                 _sender.Uploader.NoteInboundChunk(session, seq, chunkPayload);
+                int ackSeq = _sender.Uploader.GetInboundAckSeq(session, seq);
+                _sender.SendSessionAckInternal(session, (ushort)ackSeq);
             }
 
             // configJson state push. Older firmware: 0x09. KS Pro / 2026-04+: 0x0a.
@@ -418,6 +423,16 @@ namespace MozaPlugin.Telemetry.Inbound
             // need this; dispatcher-owned upload sessions handle their own
             // close routing below.
             if (session == _sender.MgmtPort || session == _sender.FlagByte)
+                _sender.SendSessionAckInternal(session, (ushort)closeSeq);
+            // File-transfer sessions: the wheel's post-upload CLOSE is
+            // reliable-delivery too — PitHouse fc-acks it within ~20 ms
+            // (ground truth bridge-upload-groundtruth-20260816: b2h CLOSE
+            // seq=17 → h2b fc-ack 17). Without the ack the wheel re-sends the
+            // CLOSE ~1/s and the close-storm backstop escalates a healthy
+            // upload teardown into a full pipeline restart (observed right
+            // after the first successful upload, 2026-08-16 11:54).
+            else if (session >= 0x04 && session <= 0x0b
+                && _sender.Dispatcher.GetOwner(session) == null)
                 _sender.SendSessionAckInternal(session, (ushort)closeSeq);
             // Dispatcher-owned sessions: route exclusively.
             if (_sender.Dispatcher.GetOwner(session) != null)

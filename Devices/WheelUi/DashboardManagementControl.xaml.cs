@@ -230,10 +230,26 @@ namespace MozaPlugin.Devices.WheelUi
                 return;
             }
             InitTelemetryUI();
+            // Re-populate the dashboard dropdown when the wheel's slot-ordered
+            // ConfigJsonList changes content — an upload/enable/delete changes
+            // the list (and its slot order), and without this the combo keeps
+            // offering the stale pre-upload list until a selection event
+            // happens to fire.
+            var wheelState = _plugin?.WheelStateForDiagnostics;
+            string listSig = wheelState == null
+                ? ""
+                : string.Join("\n", wheelState.ConfigJsonList);
+            if (listSig != _lastDashComboListSignature)
+            {
+                _lastDashComboListSignature = listSig;
+                PopulateDashboardCombo();
+            }
             RefreshTelemetryStatus();
             RefreshFilesTab();
             RefreshDisplaySection();
         }
+
+        private string _lastDashComboListSignature = "\0";
 
         // Seed the Display brightness slider + standby combo from device state.
         private void RefreshDisplaySection()

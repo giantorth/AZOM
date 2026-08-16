@@ -1,6 +1,101 @@
 ### Upload protocol handshake sequence
 
 > **2026-04+ firmware (current PitHouse).** Wheels: CSP on R9, KS Pro on R12. Capture: `latestcaps/pithouse-switch-list-delete-upload-reupload.pcapng`. See [`../FIRMWARE.md`](../FIRMWARE.md) for the firmware-era matrix.
+>
+> **⚠ 2026-07/08 firmware supersedes the cross-session-ack model below** — see
+> § "2026-07/08 firmware: same-session acks + FT-ACT acquisition" immediately
+> below. The W17 that produced the 2026-05 observations has since updated
+> (fw 1.2.6.17 era) and no longer acks on sess=0x04 for uploads on other sessions.
+
+### 2026-07/08 firmware: same-session acks + FT-ACT acquisition
+
+Ground truth: two complete, successful PitHouse uploads against a real W17 (CS Pro)
+on an R5 base — `moza-simulator/sim/logs/bridge-20260731-064830.jsonl`
+(`/config/start.json`, 164 B payload, sess 0x06) and
+`bridge-upload-groundtruth-20260816-071055.jsonl` (dashboard + 103 KB JPEG,
+104,748 B payload, 26 rounds, sess 0x04). Everything below is byte-verified.
+
+**Session acquisition (per upload, not per connect):**
+
+1. Host sends the pair `7C 27 0F 80 05 00 03 00 FE 01` (PORT-OPEN 5,3) +
+   `7C 23 46 80 06 00 04 00 FE 01` (FT-ACT portA=6, sessB=4). The FT-ACT port
+   field is always `sessB + 2` (uploads (6,4); config file (8,6); downloads
+   (0x0D,0x0B) / (0x0E,0x0C)).
+2. The wheel device-inits session `sessB` ~25 ms later with a **fresh open-seq**
+   (`7C 00 04 81 [seq=4] 04 00 FD 02`), even if that session was already
+   device-inited at connect. The fresh open rebases the seq space.
+3. Host fc:00-acks the device-init.
+
+**Seq alignment (fresh open-seq S):** host data chunks start at **S + 3**;
+wheel reply chunks start at **S + 1**. (Same invariant the 2026-06 W17 RE
+found; now confirmed on a clean capture: devinit S=4 → metadata chunks 7..13,
+ready-ack chunks 5..10.)
+
+**Transfer flow — all sub-msgs on the ONE acquired session, both directions:**
+
+1. type=0x02 metadata (320 B body: 2 B pad, two `0x8C` LOCAL TLVs, `0x10`+md5,
+   `bytes_written=0` BE, `total_size` BE, `ff×4`, XOR).
+2. Wheel type=0x01 ready-ack ~70 ms later (292 B body, echoes md5 + total,
+   `bytes_written=0`).
+3. Per round: host sends one type=0x03 content sub-msg (4092-byte deflate
+   stride, 12-byte position envelope — unchanged from
+   [`per-chunk-trailer.md`](per-chunk-trailer.md)), then **waits for the
+   wheel's type=0x01 progress ack** (bytes_written advances by the stride).
+   Round ack latency observed 7–40 s while the wheel writes/renders.
+4. After the last round: wheel emits type=0x11 complete
+   (`bytes_written == total_size`), host sends session CLOSE (seq = next data
+   seq), wheel fc-acks and sends its own CLOSE.
+5. Post-upload the wheel pushes refreshed configJson state (sess 0x09) and a
+   state blob on its 0x03 notification session (fc-acked by the host as
+   sess 0x05 — the linked pair the PORT-OPEN(5,3) established).
+
+**Chunk-level flow control:** PitHouse blasts each round's ~82 chunks
+unthrottled, immediately re-emits the tail, then go-back-N retransmits from
+the first unacked seq every ~1.6 s until the wheel's cumulative fc:00 acks
+catch up. The wheel dedups by seq.
+
+**Cumulative acks cut BOTH ways.** The wheel treats the host's fc:00 acks
+as cumulative too: acking a post-gap seq tells the wheel everything below
+was received and it **permanently drops** the missing chunks from its
+retransmit buffer. When wheel→host reply chunks are lost (Wine serial
+contention), the host must keep acking the contiguous high-water seq — not
+the raw received seq — or the gap becomes unrecoverable and the upload
+completion deadlocks (observed 2026-08-16: 18 lost reply chunks, specific-
+seq acks, wheel never retransmitted, `SubMsg2AckTimeout`). Plugin:
+`WheelUploadCoordinator.GetInboundAckSeq`.
+
+**Post-upload enable.** The uploaded dash lands in `disabledManager` and
+does not appear in the wheel's picker until the host re-sends its
+`configJson()` library list including the new name — the list is the
+wheel's enable authority and slot table; see
+[`config-rpc-session-09.md`](config-rpc-session-09.md) § "library list".
+
+**Behavioral rules that differ from 2026-05:**
+
+- **Acks ride the upload session itself.** No sess=0x04 cross-session ack
+  channel, no host-side `7C 00 04 81 0E 00…` session-open, no dir-listing
+  probe at upload time. The 2026-06 "ack-session port pairing" blocker is
+  gone with this firmware.
+- **Staging path is bare `/_moza_filetransfer_md5_<hex>`** in the content
+  sub-msgs' `0x70` REMOTE TLV (no `/tmp`, no `/home/root`).
+- **No 7C:23 frames of any kind during the transfer.** PitHouse's ~1 Hz
+  display cadence drops to occasional `7C 27` pairs only. Sending a 7C:23
+  dashboard-activate mid-upload re-targets the wheel's FT state machine and
+  degrades the acks to the degenerate `total=0` form (observed with the
+  plugin 2026-08-16).
+- **Image bundle entries keep their original extension** — the content-addressed
+  store accepts non-PNG rasters verbatim (`/home/moza/resource/images/MD5/<md5>.jpg`
+  observed).
+- If the staging file for the declared md5 already exists wheel-side, the
+  wheel can emit type=0x01 ready + type=0x11 complete **immediately after the
+  metadata**, before any content is sent (observed for a repeated
+  `start.json` upload).
+
+**Session-role convention:** odd sessions (0x05/0x07/0x09…) are the display /
+page sessions (the per-page display-config triple FT-activates them); even
+sessions carry file transfers (uploads 0x04, config files 0x06, downloads
+0x0B/0x0C). An upload targeting an odd display session gets no device-init —
+the wheel won't re-init a session the display owns.
 
 Small-file flow (2025-11 firmware, `pithouse-switch-list-delete-upload-reupload.pcapng`, ~1.9KB mzdash):
 

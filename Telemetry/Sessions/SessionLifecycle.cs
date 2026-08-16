@@ -696,6 +696,46 @@ namespace MozaPlugin.Telemetry.Sessions
             _sender.ConnectionRef.Send(frame);
         }
 
+        /// <summary>
+        /// Send the paired PORT-OPEN + FT-ACTIVATE control frames that make the
+        /// wheel device-init a fresh file-transfer session. Ground truth
+        /// (bridge-upload-groundtruth-20260816, current W17 firmware): PitHouse
+        /// sends <c>7C 27 0F 80 05 00 03 00 FE 01</c> +
+        /// <c>7C 23 46 80 (sess+2) 00 (sess) 00 FE 01</c>, and the wheel
+        /// device-inits session <paramref name="ftSession"/> ~25 ms later with a
+        /// fresh open-seq. Host data seq must then start at open-seq + 3.
+        /// The FT-ACT port field is always sessB + 2 across every observed
+        /// PitHouse activation (uploads: (6,4); downloads: (0x0D,0x0B), (0x0E,0x0C)).
+        /// </summary>
+        internal void SendFileTransferActivate(byte ftSession)
+        {
+            var portOpen = new byte[]
+            {
+                MozaProtocol.MessageStart, 0x0A,
+                MozaProtocol.TelemetrySendGroup, _sender.TargetDeviceId,
+                0x7C, 0x27, 0x0F, 0x80,
+                0x05, 0x00,             // port 5
+                0x03, 0x00,             // session 3
+                0xFE, 0x01,
+                0x00                    // checksum placeholder
+            };
+            portOpen[14] = MozaProtocol.CalculateWireChecksum(portOpen);
+            _sender.ConnectionRef.Send(portOpen);
+
+            var ftActivate = new byte[]
+            {
+                MozaProtocol.MessageStart, 0x0A,
+                MozaProtocol.TelemetrySendGroup, _sender.TargetDeviceId,
+                0x7C, 0x23, 0x46, 0x80,
+                (byte)(ftSession + 2), 0x00,
+                ftSession, 0x00,
+                0xFE, 0x01,
+                0x00                    // checksum placeholder
+            };
+            ftActivate[14] = MozaProtocol.CalculateWireChecksum(ftActivate);
+            _sender.ConnectionRef.Send(ftActivate);
+        }
+
         internal void SendSessionAck(byte session, ushort ackSeq)
         {
             // Stale-session settle window: total host session-layer silence is the

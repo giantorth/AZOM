@@ -1329,7 +1329,9 @@ namespace MozaPlugin.Telemetry
                 sendSessionAck: _sessionLife.SendSessionAck,
                 sendSessionEnd: _sessionLife.SendSessionEnd,
                 sendAndTrackChunk: SendAndTrackChunk,
-                sendSessionOpen: _sessionLife.SendSessionOpen);
+                sendSessionOpen: _sessionLife.SendSessionOpen,
+                sendFileTransferActivate: _sessionLife.SendFileTransferActivate,
+                getRetransmitBacklog: () => Retransmitter.QueueSize);
 
             // Single-line outcome log per upload attempt. Without this, a
             // silent failure (e.g. NoFtSession) only shows up as a Warn deep
@@ -1343,6 +1345,15 @@ namespace MozaPlugin.Telemetry
                 {
                     case WheelUploadCoordinator.UploadOutcome.Succeeded:
                         MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": Succeeded");
+                        // Uploaded dashboards land in the wheel's
+                        // disabledManager; the wheel enables the ones present
+                        // in the host's configJson() library list (ground
+                        // truth: PitHouse re-sends its list right after an
+                        // upload — the dash in its list flipped enabled, the
+                        // one missing from it stayed disabled). Add the name
+                        // and re-send the list so the wheel's picker offers
+                        // the new dash.
+                        EnableUploadedDashboard(_uploader.MzdashName);
                         break;
                     case WheelUploadCoordinator.UploadOutcome.SkippedHashMatch:
                         MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": SkippedHashMatch");
@@ -3400,17 +3411,80 @@ namespace MozaPlugin.Telemetry
         /// usb-capture/ksp/mozahubstartup.pcapng OUT seq=0x0010..0x0017,
         /// decompressed: <c>{"configJson()":{"dashboards":[...]},"id":11}</c>).
         /// </summary>
+        // Session the last configJson reply targeted (0x09 on most firmware,
+        // 0x0a on KS Pro / 2026-04+). The post-upload enable re-send reuses it.
+        private volatile byte _lastConfigJsonReplySession = 0x09;
+
+        // Intentional enable/remove intents with UTC-tick timestamps (10-min
+        // TTL). The wire library list is rebuilt from these + the wheel's
+        // CURRENT enabled set on every send — see BuildWireLibraryList.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long>
+            _intentionalEnables = new(StringComparer.Ordinal);
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long>
+            _intentionalRemoves = new(StringComparer.Ordinal);
+        private const long IntentTtlTicks = TimeSpan.TicksPerMinute * 10;
+
+        /// <summary>
+        /// Build the library list actually sent to the wheel. The list is the
+        /// wheel's ENABLE AUTHORITY: it enables every named dash and sweeps
+        /// unnamed ones — so declaring names the wheel has no files for
+        /// creates ghost registry entries that fail with 'dash load error'
+        /// when the user cycles onto them (observed 2026-08-16: the plugin's
+        /// LOCAL library names — cache + builtins, never uploaded — got
+        /// blessed once the reply envelope became parseable). Wire list =
+        /// wheel's current enabled dirNames + recent intentional enables
+        /// (upload/Enable button; the target exists on the wheel by then) −
+        /// recent intentional removes.
+        /// </summary>
+        private System.Collections.Generic.List<string> BuildWireLibraryList(WheelDashboardState? state)
+        {
+            long now = DateTime.UtcNow.Ticks;
+            foreach (var kv in _intentionalEnables)
+                if (now - kv.Value > IntentTtlTicks) _intentionalEnables.TryRemove(kv.Key, out _);
+            foreach (var kv in _intentionalRemoves)
+                if (now - kv.Value > IntentTtlTicks) _intentionalRemoves.TryRemove(kv.Key, out _);
+
+            var list = new System.Collections.Generic.List<string>();
+            var seen = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+            if (state != null)
+            {
+                foreach (var d in state.EnabledDashboards)
+                {
+                    if (string.IsNullOrEmpty(d.DirName)) continue;
+                    if (_intentionalRemoves.ContainsKey(d.DirName)) continue;
+                    if (seen.Add(d.DirName)) list.Add(d.DirName);
+                }
+            }
+            foreach (var name in _intentionalEnables.Keys)
+            {
+                if (_intentionalRemoves.ContainsKey(name)) continue;
+                if (seen.Add(name)) list.Add(name);
+            }
+            // Ordinal sort — the host's declared list IS the wheel's slot
+            // table, and PitHouse always sends it ordinal-sorted ("Core" <
+            // "ETS2-ATS" < … < "jrams…" < "porn"; new names slot in sorted,
+            // both 2026-08-16 captures). An unsorted list reorders the
+            // wheel's slots on every enable, scrambling the selector and any
+            // slot-indexed switch.
+            list.Sort(StringComparer.Ordinal);
+            return list;
+        }
+
         private void MaybeSendConfigJsonReply(WheelDashboardState state, byte session)
         {
+            _lastConfigJsonReplySession = session;
             if (_session09ReplySent) return;
-            if (CanonicalDashboardList == null || CanonicalDashboardList.Count == 0)
+
+            var wireList = BuildWireLibraryList(state ?? _configJson.LastState);
+            if (wireList.Count == 0)
             {
-                // Fall back to whatever the wheel currently reports — that
-                // way the wheel's configJsonList survives at least one more
-                // connect cycle unchanged. Skip if wheel sent nothing.
-                if (state.ConfigJsonList == null || state.ConfigJsonList.Count == 0) return;
-                CanonicalDashboardList = state.ConfigJsonList;
+                // Nothing trustworthy to declare yet (no state received) —
+                // fall back to echoing the wheel's own list so its
+                // configJsonList survives the connect cycle unchanged.
+                if (state?.ConfigJsonList == null || state.ConfigJsonList.Count == 0) return;
+                wireList = new System.Collections.Generic.List<string>(state.ConfigJsonList);
             }
+            CanonicalDashboardList = wireList;
 
             byte[] reply = ConfigJsonClient.BuildConfigJsonReply(CanonicalDashboardList);
             int chunkCount;
@@ -3431,19 +3505,122 @@ namespace MozaPlugin.Telemetry
                         _session09OutboundSeq = seq;
                         return;
                     }
-                    // SendAndTrackChunk: PH bridge captures show wheel acks
-                    // sess=0x09 chunks at ~62% rate, so retransmit protection
-                    // recovers the ~38% that get dropped. configJson reply
-                    // is the source of the wheel's dashboard library list —
-                    // losing it leaves the wheel's UI showing stale entries.
-                    SendAndTrackChunk(frame);
+                    // Plain send, NOT retransmit-tracked: current firmware
+                    // (2026-08 W17) never fc-acks the config session, so a
+                    // tracked chunk retransmits forever — observed ×30
+                    // duplicate reply chunks flooding sess=0x09
+                    // (moza-wire-20260816-130624), which PitHouse never does
+                    // (its config-session sends are fire-once). A dropped
+                    // chunk self-heals on the next state-push → reply cycle.
+                    _connection.Send(frame);
                 }
                 _session09OutboundSeq = seq;
             }
             _session09ReplySent = true;
+            // The wheel adopts this list as its slot table — keep the cached
+            // state's ConfigJsonList (the source of every name→slot mapping
+            // and the dropdown) in lockstep instead of waiting for the
+            // wheel's next full state push.
+            _configJson.AdoptDeclaredLibraryList(CanonicalDashboardList);
             MozaLog.Debug(
                 $"[AZOM] Sent configJson() reply on session 0x{session:X2}: " +
                 $"{CanonicalDashboardList.Count} dashboards, {chunkCount} chunks");
+        }
+
+        /// <summary>
+        /// Post-upload enable: uploaded dashboards land in the wheel's
+        /// disabledManager and stay out of the on-wheel picker until the host's
+        /// configJson() library list names them — the wheel syncs enablement
+        /// against that list (ground truth 2026-08-16: PitHouse re-sends its
+        /// list after an upload; the uploaded dash present in the list flipped
+        /// enabled, the one absent stayed disabled). Adds
+        /// <paramref name="dashboardName"/> to <see cref="CanonicalDashboardList"/>
+        /// and re-sends the reply on the last-used config session.
+        /// </summary>
+        internal void EnableUploadedDashboard(string dashboardName)
+        {
+            if (string.IsNullOrEmpty(dashboardName)) return;
+
+            _intentionalEnables[dashboardName] = DateTime.UtcNow.Ticks;
+            _intentionalRemoves.TryRemove(dashboardName, out _);
+
+            var state = _configJson.LastState;
+            if (state == null)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Post-upload enable for \"{dashboardName}\" deferred — " +
+                    "no wheel state yet");
+                return;
+            }
+
+            // Group-0x40 "finalize upload" — PitHouse sends `0b 00` right
+            // after the wheel's post-upload state push and before its
+            // configJson list reply (ground truth t=328.031); the RE notes
+            // (usb-capture/pithouse-re.md § Dashboard upload group 0x40)
+            // identify 0x0B as the upload-finalize verb. Without it the
+            // uploaded dash stays parked in disabledManager.
+            try { _connection.Send(BuildGroup40Bytes(new byte[] { 0x0B, 0x00 })); }
+            catch (Exception ex)
+            { MozaLog.Debug($"[AZOM] finalize-upload 0x40/0x0B send failed: {ex.Message}"); }
+
+            // Re-send even when the name was already present — the reply
+            // itself is part of the enable exchange.
+            _session09ReplySent = false;
+            MaybeSendConfigJsonReply(state!, _lastConfigJsonReplySession);
+            RequestConfigJsonStateRefresh($"enable \"{dashboardName}\"");
+        }
+
+        // Nonce for post-mutation state-refresh seqs (distinct ranges from the
+        // watchdog's gap-recovery nudges at 0x100/0x200).
+        private int _stateRefreshNonce;
+
+        /// <summary>
+        /// Ask the wheel to re-push its full configJson state (TitleId=1) —
+        /// the same prime + open-request nudge the DisplayWatchdog uses for
+        /// gap recovery. Needed after every dashboard mutation (upload-enable,
+        /// enable, delete): the wheel's slot-ordered <c>configJsonList</c>
+        /// only arrives in full pushes, and a stale slot table sends
+        /// kind=4 switches to the wrong dashboard.
+        /// </summary>
+        internal void RequestConfigJsonStateRefresh(string reason)
+        {
+            byte session = _lastConfigJsonReplySession;
+            int n = Interlocked.Increment(ref _stateRefreshNonce) & 0x7F;
+            ushort primeSeq = (ushort)(0x300 + n);
+            ushort openSeq = (ushort)(0x380 + n);
+            MozaLog.Debug(
+                $"[AZOM] Requesting fresh configJson state on sess=0x{session:X2} ({reason})");
+            try
+            {
+                SendSessionPrime(session, primeSeq);
+                _watchdog.SendConfigJsonOpenRequest(session, openSeq);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[AZOM] configJson state-refresh request failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Post-delete library sync: drop <paramref name="dashboardName"/> from
+        /// <see cref="CanonicalDashboardList"/> and re-send the configJson()
+        /// reply — PitHouse re-sends its list right after a
+        /// <c>completelyRemove()</c> RPC (bridge-enable-toggle-20260816:
+        /// remove at t=1489.8, list re-send at t=1490.6). Without the re-send
+        /// the wheel's next sync would resurrect-enable the deleted name.
+        /// </summary>
+        internal void RemoveDashboardFromLibrary(string dashboardName)
+        {
+            if (string.IsNullOrEmpty(dashboardName)) return;
+
+            _intentionalRemoves[dashboardName] = DateTime.UtcNow.Ticks;
+            _intentionalEnables.TryRemove(dashboardName, out _);
+
+            var state = _configJson.LastState;
+            if (state == null) return;
+            _session09ReplySent = false;
+            MaybeSendConfigJsonReply(state, _lastConfigJsonReplySession);
+            RequestConfigJsonStateRefresh($"delete \"{dashboardName}\"");
         }
 
         /// <summary>
@@ -3481,15 +3658,48 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Send a host→wheel JSON RPC call on session 0x0a and wait for the wheel's
-        /// reply. Thin pass-through to <see cref="RpcCallChannel.Call"/> — kept on
-        /// TelemetrySender so external callers (Settings UI, completelyRemove flow)
-        /// don't need to know about the helper.
+        /// Send a host→wheel JSON RPC call on the live configJson session and
+        /// wait for the wheel's reply. Kept on TelemetrySender so external
+        /// callers (Settings UI, completelyRemove flow) don't need to know
+        /// about the helper. A null return means "no direct reply" — the wheel
+        /// typically answers management RPCs with a state push instead
+        /// (PitHouse's completelyRemove got no textual reply either).
         /// </summary>
         public byte[]? SendRpcCall(string method, object arg, int timeoutMs = 2000)
         {
             if (Volatile.Read(ref _disposed) != 0) return null;
-            return _rpc.Call(method, arg, timeoutMs);
+            // RPCs must ride the session the wheel's config machinery listens
+            // on (0x09 on most firmware; 0x0a on KS Pro / 2026-04+). The wheel
+            // never device-inits 0x0a on 0x09-firmware and silently drops
+            // chunks sent there — zero fc-acks (observed completelyRemove
+            // attempt, moza-wire-20260816-125328). Share session 0x09's
+            // outbound seq counter so RPC chunks can't collide with
+            // configJson-reply emissions.
+            return _rpc.Call(method, arg, timeoutMs, envelope =>
+            {
+                byte sess = _lastConfigJsonReplySession;
+                MozaLog.Debug(
+                    $"[AZOM] RPC \"{method}\" → sess=0x{sess:X2} " +
+                    $"({envelope.Length}B envelope, state={_state})");
+                lock (_session09SeqLock)
+                {
+                    int seq = _session09OutboundSeq + 1;
+                    var frames = TierDefinitionBuilder.ChunkMessage(envelope, sess, ref seq, _targetDeviceId);
+                    foreach (var frame in frames)
+                    {
+                        if (_state == TelemetryState.Idle || !_connection.IsConnected)
+                        {
+                            _session09OutboundSeq = seq;
+                            return false;
+                        }
+                        // Plain send — the config session is never fc-acked on
+                        // current firmware; tracked chunks retransmit forever.
+                        _connection.Send(frame);
+                    }
+                    _session09OutboundSeq = seq;
+                }
+                return true;
+            });
         }
 
         private void SendDisplayProbe()
@@ -3628,8 +3838,19 @@ namespace MozaPlugin.Telemetry
                     return;
 
                 TickFireGameStartHandshake();
-                TickEmitValueFrames(tiers);
-                TickEmitStringValues();
+                // Value/string frames pause while a dashboard upload is in
+                // flight: the wheel processes upload rounds at a few hundred
+                // B/s (ground truth: 26-round upload, 7-40 s per 4 KB round)
+                // and 30 ms value frames compete for the same serial + CPU
+                // budget. PitHouse's own tick traffic during an upload is only
+                // the 1 Hz display-config/keepalive class, which keeps running
+                // below (polls, retransmits, slow path).
+                bool uploadInFlight = _uploader?.IsUploadInFlight ?? false;
+                if (!uploadInFlight)
+                {
+                    TickEmitValueFrames(tiers);
+                    TickEmitStringValues();
+                }
 
                 TickEmitSequence();
                 // Parity polls keep the wheel engaged during idle. Empirically
@@ -3645,7 +3866,12 @@ namespace MozaPlugin.Telemetry
                 // trip the no-catalog engagement watchdog — it would burn restarts and
                 // spam tier-def opens while the CM1 discriminator decides. See
                 // MozaPlugin.TickCm1Discriminator.
-                if (!SuppressDisplayWatchdog)
+                // Also held off while an upload is in flight: value frames are
+                // paused (above) and the wheel goes content-quiet while writing
+                // the bundle, so an engagement verdict here would restart the
+                // pipeline mid-transfer. The upload's own per-round timeouts
+                // (60 s) bound how long this suppression can last.
+                if (!SuppressDisplayWatchdog && !uploadInFlight)
                     _watchdog.TickDisplayWatchdog();
                 TickGrowSubscriptionIfCatalogStable();
                 TickPostSwitchCatalogConvergence();
@@ -5627,8 +5853,16 @@ namespace MozaPlugin.Telemetry
             int baseIdx = page * 3;
             _connection.Send(frames[baseIdx + 0]);
             // 7C:23 dashboard-activate: tells the wheel which dashboard pages are
-            // active. PitHouse sends one per page interleaved with 7C:27 at ~1 Hz.
-            _connection.Send(frames[baseIdx + 1]);
+            // active. PitHouse sends one per page interleaved with 7C:27 at ~1 Hz —
+            // but NEVER while a file transfer is in flight. The 7C:23 46 frame is
+            // the same FT-ACT verb the upload uses to acquire its session; firing
+            // it mid-upload re-targets the wheel's file-transfer state machine at
+            // the display session and the upload's acks degrade to the degenerate
+            // total=0 form (ground truth: PitHouse's during-upload cadence in
+            // bridge-upload-groundtruth-20260816 is 7C:27-only; the 7C:23s stop
+            // for the whole transfer). The 7C:27 pair keeps flowing.
+            if (!(_uploader?.IsUploadInFlight ?? false))
+                _connection.Send(frames[baseIdx + 1]);
             _connection.Send(frames[baseIdx + 2]);
         }
 

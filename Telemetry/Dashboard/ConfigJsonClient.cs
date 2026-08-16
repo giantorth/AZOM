@@ -89,6 +89,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             var state = WheelStateParser.Parse(decomp, out var missing);
             if (state != null)
             {
+                // TitleId=4 pushes are deltas — merge into the prior state so
+                // the cached inventory doesn't collapse to the last delta.
+                state = WheelDashboardState.Merge(_lastState ?? _cachedLastState, state);
                 _lastState = state;
                 _cachedLastState = state;
                 // Consume the decoded blob so successive updates (e.g. after
@@ -131,6 +134,44 @@ namespace MozaPlugin.Telemetry.Dashboard
         private string _lastMissingShape = "";
 
         /// <summary>
+        /// Adopt the host-declared library list into the cached state's
+        /// <see cref="WheelDashboardState.ConfigJsonList"/>. The wheel adopts
+        /// the host's configJson() list as its slot table (PitHouse ground
+        /// truth: the wheel's configJsonList always equals the host's declared
+        /// list, order included) — so the moment the host sends a new list, the
+        /// cached copy every name→slot mapping reads from must change with it,
+        /// or switches route to stale slots until the wheel's next full push.
+        /// </summary>
+        public void AdoptDeclaredLibraryList(IReadOnlyList<string> names)
+        {
+            if (names == null || names.Count == 0) return;
+            var basis = _lastState ?? _cachedLastState;
+            if (basis == null) return;
+            var s = new WheelDashboardState
+            {
+                TitleId = basis.TitleId,
+                DisplayVersion = basis.DisplayVersion,
+                ResetVersion = basis.ResetVersion,
+                SortTag = basis.SortTag,
+                RootDirPath = basis.RootDirPath,
+                ConfigJsonList = new List<string>(names),
+                EnabledDashboards = basis.EnabledDashboards,
+                DisabledDashboards = basis.DisabledDashboards,
+                ImageRefMap = basis.ImageRefMap,
+                ImagePath = basis.ImagePath,
+                FontRefMap = basis.FontRefMap,
+                RootPath = basis.RootPath,
+                CapturedAt = DateTime.UtcNow,
+                EnabledListKind = basis.EnabledListKind,
+                DisabledListKind = basis.DisabledListKind,
+                EnabledDeletedIds = basis.EnabledDeletedIds,
+                DisabledDeletedIds = basis.DisabledDeletedIds,
+            };
+            _lastState = s;
+            _cachedLastState = s;
+        }
+
+        /// <summary>
         /// Seq-aware variant. Detects when a chunk seq is missing and signals the
         /// caller to re-handshake — without this, a single dropped chunk under
         /// Wine SerialPort R/W contention silently corrupts the zlib stream and
@@ -147,6 +188,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (decomp == null) return ChunkResult.Buffered;
             var state = WheelStateParser.Parse(decomp, out var missing);
             if (state == null) return ChunkResult.Buffered;
+            // TitleId=4 pushes are deltas — merge into the prior state so the
+            // cached inventory doesn't collapse to the last delta.
+            state = WheelDashboardState.Merge(_lastState ?? _cachedLastState, state);
             _lastState = state;
             _cachedLastState = state;
             _deviceInbox.Clear();
@@ -234,9 +278,17 @@ namespace MozaPlugin.Telemetry.Dashboard
             byte[] compressed = CompressZlib(uncompressed);
             // Same 9-byte envelope as device→host state blobs on session 0x09:
             //   [flag:1B=0x00] [comp_size:u32 LE] [uncomp_size:u32 LE] [zlib]
+            // comp_size = zlib length + 4 — PitHouse's convention everywhere in
+            // this protocol (also the bundle preamble's total_compressed field).
+            // The wheel slices the zlib region as comp_size − 4; emitting the
+            // bare zlib length truncates the stream by 4 bytes wheel-side and
+            // it silently DISCARDS the reply — which is why the host's library
+            // list never drove dashboard enablement (byte-diff vs PitHouse
+            // reply, bridge-enable-toggle-20260816: PH comp=208 for a 204 B
+            // zlib; ours was comp=263 for 263 B).
             var env = new byte[9 + compressed.Length];
             env[0] = 0x00;
-            uint c = (uint)compressed.Length;
+            uint c = (uint)compressed.Length + 4;
             env[1] = (byte)(c & 0xFF); env[2] = (byte)((c >> 8) & 0xFF);
             env[3] = (byte)((c >> 16) & 0xFF); env[4] = (byte)((c >> 24) & 0xFF);
             uint u = (uint)uncompressed.Length;
