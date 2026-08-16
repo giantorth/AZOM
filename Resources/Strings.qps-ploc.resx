@@ -235,10 +235,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>GRRR!!</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Boof Wuff Wroof Rrrf!</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Yowff Wan Boof Woof Yowff!</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>YAP!!</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>Grrowl Bork Woof!</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Boof Grr!</value></data>
   <data name="Label_Source" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Grrowl!</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Ruff!</value></data>
@@ -253,17 +251,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Boof!</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Wroof!</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Grr Arf Boof Arf!</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>Howl Wroof!</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Wuff!</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Snarf!</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Wuff!</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>Wuff!</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Awoo!</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>WOOF!!</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Arf!</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>Grr Rrrf Yowl!</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Howl Yowff Bork Woof Awoo Wan!</value></data>
@@ -519,7 +514,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>YAP!!</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>AWOO AWOO!!</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>Rrrf Boof!</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>YAP!!</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>Ruff Woof Boof!</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Bork!</value></data>

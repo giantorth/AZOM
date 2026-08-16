@@ -192,6 +192,9 @@
             <TabItem x:Name="DashMgmtTab" Header="{x:Static res:Strings.TabHeader_Dashboard}" Visibility="Collapsed">
                 <ContentControl x:Name="DashMgmtHostCm2" HorizontalContentAlignment="Stretch"/>
             </TabItem>
+            <TabItem x:Name="DashFilesTab" Header="{x:Static res:Strings.TabHeader_Files}" Visibility="Collapsed">
+                <ContentControl x:Name="DashFilesHostCm2" HorizontalContentAlignment="Stretch"/>
+            </TabItem>
 
             </TabControl>
         </StackPanel>

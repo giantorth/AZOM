@@ -62,6 +62,7 @@ namespace MozaPlugin.Devices
             {
                 InitializeComponent();
                 DashMgmtHost.Content = new DashboardManagementControl();
+                DashFilesHost.Content = new DashboardFilesControl();
 
                 if (ResolvePlugin())
                     BuildColorSwatches();
@@ -769,6 +770,7 @@ skipReadByMode:
             {
                 WheelNotDetectedPanel.Visibility = Visibility.Visible;
                 DashboardTab.Visibility = Visibility.Collapsed;
+                FilesTab.Visibility = Visibility.Collapsed;
                 RpmTab.Visibility = Visibility.Collapsed;
                 ButtonsTab.Visibility = Visibility.Collapsed;
                 KnobsTab.Visibility = Visibility.Collapsed;
@@ -838,6 +840,7 @@ skipReadByMode:
                 // slot and flash its firmware (and vice versa).
                 InputsTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
+                FilesTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
                 RpmTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;
                 KnobsTab.Visibility = showKnobsTab ? Visibility.Visible : Visibility.Collapsed;

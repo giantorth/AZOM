@@ -229,10 +229,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>REDEFINIR</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>LIMPAR TODAS AS CONFIGURAÇÕES E PERFIS</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Isto redefinirá todas as configurações e perfis do plugin para os padrões.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>O envio de painéis está em desenvolvimento e atualmente NÃO grava arquivos no volante.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ENVIO DE PAINEL</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// envia um arquivo .mzdash ao volante conectado</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>O status reflete o último ack do volante.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>ORIGEM</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Arquivo .mzdash local</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Biblioteca de painéis</value></data>
@@ -247,17 +245,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>Em trânsito:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Último ack bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Byte de status do último ack:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Nota: envios exigem o volante conectado e uma sessão de gerenciamento negociada.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ARQUIVOS DO VOLANTE</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// painéis carregados no volante</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>A exclusão está temporariamente desativada.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Estado</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Título</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Última modificação</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>EXCLUIR</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Desativado temporariamente.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>SERVIDOR COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// ative esta opção para impedir que o PitHouse abra automaticamente</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Fornece suporte oficial ao SDK MOZA para jogos que o exigem — como o iRacing, ou qualquer jogo que use o modo 360 Hz. O plugin executa um servidor de controle CoAP SDK embutido no loopback.</value></data>
@@ -513,7 +508,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>EDITANDO · KNOB 1 · ATIVO</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>PREENCHER ANEL COM A SELECIONADA</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>COPIAR ESTE KNOB PARA TODOS</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Envio de painel ainda não funciona</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>LUZ DE SUSPENSÃO</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// o que o volante mostra após o tempo de inatividade</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Velocidade</value></data>

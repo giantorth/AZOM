@@ -4,23 +4,67 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
 using MozaPlugin.Resources;
 
 namespace MozaPlugin.Devices.WheelUi
 {
-    // Files section: dashboard upload + on-device dashboard inventory.
-    public partial class DashboardManagementControl
+    /// <summary>
+    /// Files tab: dashboard upload + on-device dashboard inventory
+    /// (Enable/Delete). Shared by the wheel page and the CM2 dash page —
+    /// self-contained like <see cref="DashboardManagementControl"/>: own
+    /// 500 ms refresh timer gated on Loaded/Unloaded, plugin resolved per
+    /// tick so plugin reloads self-heal.
+    /// </summary>
+    public partial class DashboardFilesControl : UserControl
     {
+        private MozaPlugin? _plugin;
+        private MozaData? _data;
+        private readonly EventSuppressor _suppressor = new EventSuppressor();
+        private bool _suppressEvents => _suppressor.Suppressed;
+
+        private readonly DispatcherTimer _refreshTimer;
+
+        /// <summary>When true this control targets the CM2 dash pipeline
+        /// (<c>ActiveCm2Sender</c>), not the wheel. Set by the CM2 device page.</summary>
+        internal bool IsCm2Target { get; set; }
+
+        private global::MozaPlugin.Telemetry.TelemetrySender? ActiveSender =>
+            _plugin == null ? null : (IsCm2Target ? _plugin.ActiveCm2Sender : _plugin.TelemetrySender);
+
+        public DashboardFilesControl()
+        {
+            using (_suppressor.Begin())
+            {
+                InitializeComponent();
+                ResolvePlugin();
+            }
+
+            _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            _refreshTimer.Tick += (_, _) => RefreshFilesTab();
+
+            Loaded += (_, _) => { RefreshFilesTab(); if (!_refreshTimer.IsEnabled) _refreshTimer.Start(); };
+            Unloaded += (_, _) => _refreshTimer.Stop();
+        }
+
+        private bool ResolvePlugin()
+        {
+            _plugin = MozaPlugin.Instance;
+            if (_plugin == null) return false;
+            _data = _plugin.Data;
+            return true;
+        }
+
         // Source bytes + name held while the user picks; pushed to the
         // uploader on UploadNow_Click. Decouples picking from uploading so the
         // user can review parsed name/MD5 before sending.
         private byte[]? _uploadPickedContent;
         private string _uploadPickedName = "";
         private string _uploadPickedSourceLabel = "";
-        // Directory the mzdash file lives in. Used to find sibling PNGs at
-        // <dir>/Resource/MD5/<hex>.png for the multi-file upload bundle.
+        // Directory the mzdash file lives in. Used to find sibling image assets
+        // at <dir>/Resource/MD5/<hex>.<ext> for the multi-file upload bundle.
         // Empty for library/embedded picks.
         private string _uploadPickedSourceDirectory = "";
         private bool _uploadLibrarySeeded;
@@ -93,10 +137,10 @@ namespace MozaPlugin.Devices.WheelUi
             UpdateUploadFolderInfo();
         }
 
-        // ── Dashboard-library folder (relocated from the telemetry section) ──
-        // The mzdash folder is only needed to populate the upload library;
-        // telemetry binds to the wheel's live catalog, so the folder controls
-        // live here next to the library picker.
+        // ── Dashboard-library folder ─────────────────────────────────────
+        // The mzdash folder populates the upload library; telemetry binds to
+        // the wheel's live catalog, so the folder controls live here next to
+        // the library picker.
 
         private void UploadSetFolder_Click(object sender, RoutedEventArgs e)
         {
@@ -209,7 +253,7 @@ namespace MozaPlugin.Devices.WheelUi
             _uploadPickedName = name;
             _uploadPickedSourceLabel = $"library: {name}";
             // Library/folder entries: try to resolve the source dir from
-            // DashCache so widget PNG assets can be looked up. Builtins from
+            // DashCache so widget image assets can be looked up. Builtins from
             // embedded resources have no dir → single-file upload.
             _uploadPickedSourceDirectory = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
             if (UploadStatusText != null
@@ -220,7 +264,7 @@ namespace MozaPlugin.Devices.WheelUi
         private void UploadNow_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            var ts = _plugin.TelemetrySender;
+            var ts = ActiveSender;
             if (ts == null)
             {
                 if (UploadStatusText != null)
@@ -268,12 +312,8 @@ namespace MozaPlugin.Devices.WheelUi
         private void WheelFilesDelete_Click(object sender, RoutedEventArgs e)
         {
             // Delete = completelyRemove(id) RPC + library-list re-send without
-            // the name — the exact PitHouse exchange captured 2026-08-16
-            // (bridge-enable-toggle: RPC at t=1489.8, list re-send at t=1490.6,
-            // wheel state push confirms removal ~0.5 s later). The earlier
-            // "wedges wheel firmware" neutering traced back to the RPC
-            // envelope's comp_size missing the protocol-wide +4 — the wheel was
-            // choking on a truncated zlib stream, not on the verb.
+            // the name — the PitHouse exchange captured 2026-08-16. See
+            // docs/protocol/dashboard-upload/config-rpc-session-09.md.
             if (((Button)sender).Tag is not WheelFileRow row) return;
             if (string.IsNullOrEmpty(row.Id))
             {
@@ -287,16 +327,16 @@ namespace MozaPlugin.Devices.WheelUi
                 MessageBoxButton.OKCancel,
                 MessageBoxImage.Question);
             if (confirm != MessageBoxResult.OK) return;
-            var ts = _plugin?.TelemetrySender;
+            var ts = ActiveSender;
             if (ts == null)
             {
                 MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            // The RPC call blocks on a reply the wheel may answer only with a
-            // state push — run it off the UI thread; the wheel's follow-up
-            // state push refreshes the grid via the normal tick.
+            // The RPC blocks on a reply the wheel answers only with a state
+            // push — run off the UI thread; the follow-up state push refreshes
+            // the grid via the normal tick.
             string dirName = row.DirName;
             string id = row.Id;
             MozaLog.Info($"[AZOM] Delete requested: \"{dirName}\" id={id}");
@@ -320,11 +360,11 @@ namespace MozaPlugin.Devices.WheelUi
         private void WheelFilesEnable_Click(object sender, RoutedEventArgs e)
         {
             // Enable = the host's configJson() library list naming the dash —
-            // the wheel syncs enablement against that list (observed flip
-            // ~108 ms after the list re-send in the 2026-08-16 ground truth).
+            // the wheel syncs enablement against that list. See
+            // docs/protocol/dashboard-upload/config-rpc-session-09.md.
             if (((Button)sender).Tag is not WheelFileRow row) return;
             if (string.IsNullOrEmpty(row.DirName)) return;
-            var ts = _plugin?.TelemetrySender;
+            var ts = ActiveSender;
             if (ts == null)
             {
                 MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
@@ -340,6 +380,7 @@ namespace MozaPlugin.Devices.WheelUi
 
         internal void RefreshFilesTab()
         {
+            if (!ResolvePlugin()) return;
             RefreshDashboardUploadStatus();
             RefreshWheelFilesGrid();
         }
@@ -347,7 +388,7 @@ namespace MozaPlugin.Devices.WheelUi
         private void RefreshDashboardUploadStatus()
         {
             if (UploadInfoNameText == null || _plugin == null || _data == null) return;
-            var ts = _plugin.TelemetrySender;
+            var ts = ActiveSender;
 
             string activeName = ts?.MzdashName ?? "";
             string displayName = !string.IsNullOrEmpty(_uploadPickedName)
@@ -394,11 +435,9 @@ namespace MozaPlugin.Devices.WheelUi
                     && _data.IsConnected;
         }
 
-        // Signature of the rows currently bound to the grid. The refresh tick
-        // runs every 500 ms; re-setting ItemsSource with fresh row objects on
-        // every tick recreates the row buttons under the pointer and eats
-        // clicks (observed: several Delete presses before one reached the
-        // handler). Rebind only when the data actually changed.
+        // Signature of the rows currently bound to the grid. Rebinding fresh
+        // row objects on every 500 ms tick recreates the row buttons under the
+        // pointer and eats clicks — rebind only when the data changed.
         private string _lastFilesGridSignature = "\0";
 
         private void RefreshWheelFilesGrid()

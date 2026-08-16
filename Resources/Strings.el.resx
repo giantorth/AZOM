@@ -216,10 +216,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ ΟΛΩΝ ΤΩΝ ΡΥΘΜΙΣΕΩΝ &amp; ΠΡΟΦΙΛ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Αυτό θα επαναφέρει όλες τις ρυθμίσεις plugin και τα προφίλ στις προεπιλογές τους.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Η μεταφόρτωση οθόνης βρίσκεται υπό ανάπτυξη και ΔΕΝ αποστέλλει αρχεία στο τιμόνι αυτή τη στιγμή.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ΜΕΤΑΦΟΡΤΩΣΗ ΟΘΟΝΗΣ</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// αποστολή .mzdash στο συνδεδεμένο τιμόνι</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Η κατάσταση αντικατοπτρίζει την τελευταία επιβεβαίωση από το τιμόνι.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>ΠΗΓΗ</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Τοπικό αρχείο .mzdash</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Βιβλιοθήκη οθονών</value></data>
@@ -234,17 +232,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>Σε εξέλιξη:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Τελευταία επιβεβαίωση bytes_written / σύνολο:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Τελευταίο byte κατάστασης επιβεβαίωσης:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Σημείωση: Οι μεταφορτώσεις απαιτούν συνδεδεμένο τιμόνι και εγκατεστημένη διαχειριστική σύνοδο.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ΑΡΧΕΙΑ ΤΙΜΟΝΙΟΥ</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// Οθόνες φορτωμένες στο τιμόνι</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Η διαγραφή είναι προσωρινά απενεργοποιημένη.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Κατάσταση</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Τίτλος</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Προσωρινά απενεργοποιημένο.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP SERVER</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// ενεργοποιήστε αυτήν την επιλογή για να αποτρέψετε την αυτόματη εκκίνηση του PitHouse</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Παρέχει υποστήριξη επίσημου MOZA SDK για παιχνίδια που το απαιτούν — όπως το iRacing, ή οποιοδήποτε παιχνίδι χρησιμοποιεί λειτουργία 360 Hz. Το plugin εκτελεί ενσωματωμένο CoAP SDK control server σε loopback.</value></data>
@@ -500,7 +495,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>ΕΠΕΞΕΡΓΑΣΙΑ · ΠΟΤΕΝΣΙΟΜΕΤΡΟ 1 · ΕΝΕΡΓΟ</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>ΠΛΗΡΩΣΗ ΔΑΚΤΥΛΙΟΥ ΜΕ ΕΠΙΛΕΓΜΕΝΟ</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΣΕ ΟΛΑ ΤΑ ΠΟΤΕΝΣΙΟΜΕΤΡΑ</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Η μεταφόρτωση πίνακα δεν λειτουργεί ακόμα</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>ΦΩΣ ΑΔΡΑΝΕΙΑΣ</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// Τι εμφανίζει το τιμόνι μετά τη λήξη του χρόνου αδράνειας</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Ταχύτητα</value></data>

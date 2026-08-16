@@ -216,10 +216,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>RÉINITIALISER</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>EFFACER TOUS LES RÉGLAGES ET PROFILS</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Cela réinitialisera tous les réglages et profils du plugin à leurs valeurs par défaut.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Le téléversement du tableau de bord est en développement et n'envoie PAS actuellement de fichiers vers le volant.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TÉLÉVERSEMENT DU TABLEAU DE BORD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// envoyer un fichier .mzdash vers le volant connecté</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>L'état reflète le dernier ack du volant.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>SOURCE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Fichier .mzdash local</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Bibliothèque de tableaux de bord</value></data>
@@ -234,17 +232,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>En cours :</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Dernier ack bytes_written / total :</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Octet d'état du dernier ack :</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Remarque : les téléversements nécessitent que le volant soit connecté et une session de gestion négociée.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>FICHIERS DU VOLANT</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// tableaux de bord chargés sur le volant</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>La suppression est temporairement désactivée.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>État</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Titre</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>Dossier</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hachage</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Dernière modification</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SUPPRIMER</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Désactivé temporairement.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>SERVEUR COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// activez cette option pour empêcher PitHouse de démarrer automatiquement</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle SDK CoAP intégré.</value></data>
@@ -500,7 +495,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>ÉDITION · ENCODEUR 1 · ACTIF</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>REMPLIR LE CERCLE AVEC LA SÉLECTION</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>COPIER CET ENCODEUR À TOUS</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Le téléversement du tableau de bord ne fonctionne pas encore</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>LUMIÈRE DE VEILLE</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// ce que le volant affiche après expiration du délai d'inactivité</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Vitesse</value></data>

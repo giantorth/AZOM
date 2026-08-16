@@ -216,10 +216,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>СБРОС</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ОЧИСТИТЬ ВСЕ НАСТРОЙКИ И ПРОФИЛИ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Это сбросит все настройки и профили плагина к значениям по умолчанию.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Загрузка панели находится в разработке и пока НЕ передаёт файлы на руль.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ЗАГРУЗКА ПАНЕЛИ</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// отправка файла .mzdash на подключённый руль</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Статус отражает последний ack от руля.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>ИСТОЧНИК</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Локальный файл .mzdash</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Библиотека панелей</value></data>
@@ -234,17 +232,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>В процессе:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Последний ack bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Байт статуса последнего ack:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Примечание: для загрузки требуется подключённый руль и согласованный сеанс управления.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ФАЙЛЫ РУЛЯ</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// панели, загруженные на руль</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Удаление временно отключено.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Состояние</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Название</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>Папка</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Хеш</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Изменено</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>УДАЛИТЬ</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Временно отключено.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>СЕРВЕР COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// включите эту опцию, чтобы PitHouse не запускался автоматически</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Обеспечивает официальную поддержку MOZA SDK для игр, которым она нужна, например iRacing или любой игры, использующей режим 360 Гц. Для этого плагин запускает встроенный сервер управления CoAP SDK на loopback.</value></data>
@@ -500,7 +495,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>РЕДАКТИРОВАНИЕ · ЭНКОДЕР 1 · АКТИВНЫЙ</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>ЗАПОЛНИТЬ КОЛЬЦО ВЫБРАННЫМ</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>СКОПИРОВАТЬ ЭНКОДЕР НА ВСЕ</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Загрузка панели пока не работает</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>СВЕТ В РЕЖИМЕ СНА</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// что показывает руль после истечения времени простоя</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Скорость</value></data>

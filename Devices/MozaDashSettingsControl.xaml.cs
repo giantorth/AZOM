@@ -35,6 +35,7 @@ namespace MozaPlugin.Devices
                 // This control configures the CM2 dash pipeline (its own sender +
                 // CM2-keyed mappings), independent of the wheel page.
                 DashMgmtHostCm2.Content = new WheelUi.DashboardManagementControl { IsCm2Target = true };
+                DashFilesHostCm2.Content = new WheelUi.DashboardFilesControl { IsCm2Target = true };
 
                 if (ResolvePlugin())
                     BuildColorSwatches();
@@ -269,6 +270,7 @@ namespace MozaPlugin.Devices
             // exactly that presence (bus OR USB), independent of the wheel.
             DashMgmtTab.Visibility =
                 _plugin.IsCm2Present ? Visibility.Visible : Visibility.Collapsed;
+            DashFilesTab.Visibility = DashMgmtTab.Visibility;
 
             bool dashDetected = dashConnected;
 

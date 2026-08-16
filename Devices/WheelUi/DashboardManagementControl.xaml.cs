@@ -245,7 +245,6 @@ namespace MozaPlugin.Devices.WheelUi
                 PopulateDashboardCombo();
             }
             RefreshTelemetryStatus();
-            RefreshFilesTab();
             RefreshDisplaySection();
         }
 

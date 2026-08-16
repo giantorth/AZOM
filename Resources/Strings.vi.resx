@@ -216,10 +216,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>ĐẶT LẠI</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>XÓA TẤT CẢ CÀI ĐẶT &amp; HỒ SƠ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Thao tác này sẽ đặt lại toàn bộ cài đặt và hồ sơ của plugin về mặc định.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Tính năng tải lên bảng điều khiển đang được phát triển và HIỆN KHÔNG đẩy tệp lên vô lăng.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TẢI LÊN BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// đẩy một tệp .mzdash lên vô lăng đang kết nối</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Trạng thái phản ánh ack mới nhất từ vô lăng.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>NGUỒN</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Tệp .mzdash cục bộ</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Thư viện bảng điều khiển</value></data>
@@ -234,17 +232,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>Đang truyền:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Ack cuối bytes_written / tổng:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Byte trạng thái ack cuối:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Lưu ý: việc tải lên yêu cầu vô lăng được kết nối và đã thiết lập phiên quản lý.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>TỆP TRÊN VÔ LĂNG</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// các bảng điều khiển đã nạp lên vô lăng</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Tính năng xóa tạm thời bị vô hiệu hóa.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Trạng thái</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tiêu đề</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>Thư mục</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Mã băm</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sửa đổi lần cuối</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>XÓA</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Tạm thời vô hiệu hóa.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>MÁY CHỦ COAP</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// bật tùy chọn này để ngăn PitHouse tự động khởi chạy</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Cung cấp hỗ trợ SDK MOZA chính thức cho các game yêu cầu, chẳng hạn như iRacing hoặc bất kỳ game nào dùng chế độ 360 Hz. Để làm vậy, plugin chạy một máy chủ điều khiển SDK CoAP nhúng trên loopback.</value></data>
@@ -500,7 +495,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>ĐANG SỬA · NÚM 1 · ĐANG DÙNG</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>TÔ VÒNG BẰNG MÀU ĐÃ CHỌN</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>SAO CHÉP NÚM NÀY CHO TẤT CẢ</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Tải lên bảng điều khiển chưa hoạt động</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>ĐÈN KHI NGỦ</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// nội dung vô lăng hiển thị sau khi hết thời gian chờ</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Tốc độ</value></data>

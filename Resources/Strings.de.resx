@@ -216,10 +216,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ALLE EINSTELLUNGEN &amp; PROFILE LÖSCHEN</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Damit werden alle Plugin-Einstellungen und Profile auf ihre Standardwerte zurückgesetzt.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Der Dashboard-Upload ist in Entwicklung und überträgt aktuell KEINE Dateien an das Lenkrad.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-UPLOAD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// eine .mzdash-Datei an das verbundene Lenkrad senden</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Der Status spiegelt das zuletzt vom Lenkrad bestätigte ACK wider.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>QUELLE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Lokale .mzdash-Datei</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard-Bibliothek</value></data>
@@ -234,17 +232,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>In Übertragung:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Letztes ACK bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Letztes ACK-Statusbyte:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Hinweis: Uploads erfordern eine bestehende Verbindung zum Lenkrad und eine ausgehandelte Management-Sitzung.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>LENKRAD-DATEIEN</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// auf dem Lenkrad geladene Dashboards</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Löschen ist vorübergehend deaktiviert.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Status</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Titel</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>Verzeichnis</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Zuletzt geändert</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>LÖSCHEN</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Vorübergehend deaktiviert.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// diese Option aktivieren, um den automatischen Start von PitHouse zu verhindern</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Bietet offizielle MOZA-SDK-Unterstützung für Spiele, die sie erfordern – etwa iRacing oder jedes Spiel, das den 360-Hz-Modus nutzt. Das Plugin betreibt dazu einen eingebetteten CoAP-SDK-Steuerserver auf Loopback.</value></data>
@@ -500,7 +495,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>BEARBEITEN · DREHREGLER 1 · AKTIV</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>RING MIT AUSWAHL FÜLLEN</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>DIESEN DREHREGLER AUF ALLE KOPIEREN</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Dashboard-Upload funktioniert noch nicht</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>RUHELICHT</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// was das Lenkrad nach Ablauf der Leerlaufzeit anzeigt</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Geschwindigkeit</value></data>

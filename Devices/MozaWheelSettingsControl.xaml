@@ -290,6 +290,12 @@
                 <ContentControl x:Name="DashMgmtHost" HorizontalContentAlignment="Stretch"/>
             </TabItem>
 
+            <!-- ==================== FILES TAB ==================== -->
+            <!-- Hosts the shared DashboardFilesControl (set in code-behind). -->
+            <TabItem x:Name="FilesTab" Header="{x:Static res:Strings.TabHeader_Files}" Visibility="Collapsed">
+                <ContentControl x:Name="DashFilesHost" HorizontalContentAlignment="Stretch"/>
+            </TabItem>
+
             <!-- ==================== RPM TAB ==================== -->
             <TabItem x:Name="RpmTab" Header="{x:Static res:Strings.TabHeader_Rpm}" Visibility="Collapsed">
                 <!-- ScrollViewer removed: SimHub host already provides scrolling -->

@@ -221,10 +221,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>TILBAKESTILL</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>TØM ALLE INNSTILLINGER OG PROFILER</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Dette tilbakestiller alle plugin-innstillinger og profiler til standardverdiene.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard-opplasting er under utvikling og sender for øyeblikket IKKE filer til rattet.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-OPPLASTING</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// send en .mzdash-fil til tilkoblet ratt</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Status viser siste bekreftelse fra rattet.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>KILDE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Lokal .mzdash-fil</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard-bibliotek</value></data>
@@ -239,17 +237,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>Underveis:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Siste ack bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Siste ack status-byte:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Merk: Opplasting krever at rattet er tilkoblet og at en administrasjonsøkt er etablert.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>RATTFILER</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// dashboards lastet inn på rattet</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Sletting er midlertidig deaktivert.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Status</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tittel</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sist endret</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SLETT</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Midlertidig deaktivert.</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// aktiver dette alternativet for å hindre at PitHouse starter automatisk</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Gir offisiell MOZA SDK-støtte for spill som krever det — som iRacing, eller spill som bruker 360 Hz-modus. Pluginen kjører en innebygd CoAP SDK-kontrollserver på loopback.</value></data>
@@ -505,7 +500,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>REDIGERER · BRYTER 1 · AKTIV</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>FYLL RING MED VALGT</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>KOPIER DENNE BRYTEREN TIL ALLE</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Dashboard-opplasting fungerer ikke ennå</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>HVILELYS</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// hva rattet viser etter at tomgangs-timeouten utløper</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Hastighet</value></data>

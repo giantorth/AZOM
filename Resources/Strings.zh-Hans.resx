@@ -216,10 +216,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>重置</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>清除所有设置与配置文件</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>此操作会将所有插件设置和配置文件恢复为默认值。</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>仪表盘上传功能正在开发中,目前并不会真正把文件推送到方向盘。</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>仪表盘上传</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// 将 .mzdash 文件推送至已连接的方向盘</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>状态反映方向盘最近一次的 ACK。</value></data>
   <data name="Label_Source" xml:space="preserve"><value>来源</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>本地 .mzdash 文件</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>仪表盘库</value></data>
@@ -234,17 +232,14 @@
   <data name="Label_InFlight" xml:space="preserve"><value>传输中:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>上次 ACK bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>上次 ACK 状态字节:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>注意:上传需要方向盘已连接并完成管理会话协商。</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>方向盘文件</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// 已加载到方向盘上的仪表盘</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>删除功能已暂时禁用。</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>状态</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>标题</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>目录名</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>最后修改</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>已暂时禁用。</value></data>
   <data name="Section_CoapServer" xml:space="preserve"><value>CoAP 服务器</value></data>
   <data name="Subtitle_CoapServer" xml:space="preserve"><value>// 启用此选项可阻止 PitHouse 自动启动</value></data>
   <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>为需要的游戏提供官方 MOZA SDK 支持,例如 iRacing 或任何使用 360 Hz 模式的游戏。为此,插件会在回环上运行一个内嵌的 CoAP SDK 控制服务器。</value></data>
@@ -500,7 +495,6 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>正在编辑 · 旋钮 1 · 当前色</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>用所选色填充整圈</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>将此旋钮复制到全部</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  仪表盘上传尚未生效</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>休眠灯</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// 闲置超时后方向盘所显示的画面</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>速度</value></data>

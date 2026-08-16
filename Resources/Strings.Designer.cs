@@ -313,10 +313,8 @@ namespace MozaPlugin.Resources
         public static string Section_Language => Get("Section_Language");
         public static string SliderLabel_Language => Get("SliderLabel_Language");
         public static string Hint_LanguageChangeRestart => Get("Hint_LanguageChangeRestart");
-        public static string Hint_DashboardUploadNotWorking => Get("Hint_DashboardUploadNotWorking");
         public static string Section_DashboardUpload => Get("Section_DashboardUpload");
         public static string Subtitle_DashboardUpload => Get("Subtitle_DashboardUpload");
-        public static string Hint_UploadStatusFormat => Get("Hint_UploadStatusFormat");
         public static string Label_Source => Get("Label_Source");
         public static string Option_LocalMzdashFile => Get("Option_LocalMzdashFile");
         public static string Option_DashboardLibrary => Get("Option_DashboardLibrary");
@@ -331,17 +329,14 @@ namespace MozaPlugin.Resources
         public static string Label_InFlight => Get("Label_InFlight");
         public static string Label_LastAckBytes => Get("Label_LastAckBytes");
         public static string Label_LastAckStatus => Get("Label_LastAckStatus");
-        public static string Hint_UploadRequiresConnection => Get("Hint_UploadRequiresConnection");
         public static string Section_WheelFiles => Get("Section_WheelFiles");
         public static string Subtitle_WheelFiles => Get("Subtitle_WheelFiles");
-        public static string Hint_DeleteDisabled => Get("Hint_DeleteDisabled");
         public static string DataGridHeader_State => Get("DataGridHeader_State");
         public static string DataGridHeader_Title => Get("DataGridHeader_Title");
         public static string DataGridHeader_DirName => Get("DataGridHeader_DirName");
         public static string DataGridHeader_Hash => Get("DataGridHeader_Hash");
         public static string DataGridHeader_LastModified => Get("DataGridHeader_LastModified");
         public static string Button_Delete => Get("Button_Delete");
-        public static string Tooltip_DeleteDisabled => Get("Tooltip_DeleteDisabled");
         public static string Section_CoapServer => Get("Section_CoapServer");
         public static string Subtitle_CoapServer => Get("Subtitle_CoapServer");
         public static string Hint_CoapServerEnabled => Get("Hint_CoapServerEnabled");
@@ -608,7 +603,6 @@ namespace MozaPlugin.Resources
         public static string Label_KnobEditing => Get("Label_KnobEditing");
         public static string Button_FillRingWithSelected => Get("Button_FillRingWithSelected");
         public static string Button_CopyKnobToAll => Get("Button_CopyKnobToAll");
-        public static string Banner_DashboardUploadNotWorkingYet => Get("Banner_DashboardUploadNotWorkingYet");
         public static string Section_SleepLight => Get("Section_SleepLight");
         public static string Subtitle_SleepLight => Get("Subtitle_SleepLight");
         public static string SliderLabel_Speed => Get("SliderLabel_Speed");
