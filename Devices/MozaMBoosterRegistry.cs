@@ -166,6 +166,7 @@ namespace MozaPlugin.Devices
                         try { _onConnectivityResolved?.Invoke(c.Identity, conn); }
                         catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnConnectivityResolved: {ex.Message}"); }
                     };
+                    c.RoutingResolved += _ => OnControllerRoutingResolved(c);
                     // Arm phantom-axis protection immediately from the persisted
                     // last-known connectivity (live diagnostic overrides later).
                     try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(kvp.Key)); }
@@ -290,6 +291,7 @@ namespace MozaPlugin.Devices
                     try { _onConnectivityResolved?.Invoke(c.Identity, conn); }
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnConnectivityResolved: {ex.Message}"); }
                 };
+                c.RoutingResolved += _ => OnControllerRoutingResolved(c);
                 try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(c.Identity)); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
                 _byIdentity[c.Identity] = c;
@@ -313,6 +315,23 @@ namespace MozaPlugin.Devices
         {
             try { _onDeviceDetectedEdge?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnDetectedEdge: {ex.Message}"); }
             try { DeviceDetected?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceDetected handler: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// The lane's motor/config device-id routing just became authoritative
+        /// (or changed) — re-run the detection-edge path so every calibration
+        /// value is re-pushed to the CORRECT device id. The detection edge fires
+        /// long before the once-a-minute pedal-type diagnostic that decides
+        /// routing, so the original apply may have gone to a device id the
+        /// coarser fallback guessed (bundle KY3HK4QP: a phantom 0x1d that
+        /// answered nothing). Same handler, so the writes stay sentinel-guarded —
+        /// a lane with no overrides still produces zero traffic.
+        /// </summary>
+        private void OnControllerRoutingResolved(MBoosterDeviceController c)
+        {
+            if (_isShuttingDown() || !c.Detected) return;
+            try { _onDeviceDetectedEdge?.Invoke(c); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnRoutingResolved: {ex.Message}"); }
         }
 
         /// <summary>
@@ -443,8 +462,8 @@ namespace MozaPlugin.Devices
             {
                 // Raw 0-100% HID travel isn't a fixed 0-200kg scale — it's
                 // whatever this pedal's OWN Max Threshold calibration (Sim Input
-                // Mapping) currently says 100% is (200kg fallback when unset).
-                double fullScaleKg = cfg.MaxThresholdKg >= 0 ? cfg.MaxThresholdKg : 200.0;
+                // Mapping) currently says 100% is.
+                double fullScaleKg = ResolveFullScaleKg(cfg, c);
                 if (cfg.DeadzoneKg > 0 || cfg.MaxForceKg < fullScaleKg)
                     posPct = ApplyDeadzoneAndMaxForce(posPct, cfg.DeadzoneKg, cfg.MaxForceKg, fullScaleKg);
                 // Store the pre-input-curve percent for EVERY axis so the UI's
@@ -473,15 +492,35 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// The force (kg) at which this pedal's raw HID axis reaches 100% — the
+        /// reference scale <see cref="ApplyDeadzoneAndMaxForce"/> and the Max
+        /// Force slider's own ceiling are both expressed against. Three rungs:
+        /// <list type="number">
+        /// <item>The user's own Max Threshold override, when set (they calibrated
+        /// the device to it from this plugin, so it IS the device's scale).</item>
+        /// <item>Otherwise the value the DEVICE reported for
+        /// <c>mbooster-brake-threshold</c> — a real read-back, not a guess.</item>
+        /// <item>Only if neither exists (routed lane / firmware never answered),
+        /// the historical 200kg fallback.</item>
+        /// </list>
+        /// See docs/protocol/devices/mbooster.md "Sim Input Mapping".
+        /// </summary>
+        internal static double ResolveFullScaleKg(IMBoosterPedalConfig? cfg, MBoosterDeviceController? c)
+        {
+            if (cfg != null && cfg.MaxThresholdKg >= 0) return cfg.MaxThresholdKg;
+            float reported = c?.DeviceReportedMaxThresholdKg ?? -1;
+            if (reported > 0) return reported;
+            return 200.0;
+        }
+
+        /// <summary>
         /// Deadzone + Max Force, in kg of force — both host-side only.
         /// <paramref name="fullScaleKg"/> is the force at which raw 0-100%
-        /// HID travel is CURRENTLY known to reach 100% — i.e. the device's
-        /// own Max Threshold calibration (<c>MaxThresholdKg</c>/
-        /// <c>EncodeThresholdKg</c>, Sim Input Mapping) when the user has
-        /// set it from this plugin, or a 200kg fallback guess otherwise
-        /// (the raw HID axis has no independent force calibration of its
-        /// own to query). Combined into one kg-space remap rather than two
-        /// independent percent-space steps:
+        /// HID travel reaches 100% — resolve it with
+        /// <see cref="ResolveFullScaleKg"/>, never inline: getting it wrong
+        /// makes Max Threshold read as INVERTED, since it enters here only as
+        /// this denominator (bundle KY3HK4QP). Combined into one kg-space remap
+        /// rather than two independent percent-space steps:
         /// <list type="number">
         /// <item>Deadzone (0..40kg): force below this clamps to 0.</item>
         /// <item>Max Force (0..200kg, default 200 = off): the force at

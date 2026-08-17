@@ -1853,6 +1853,11 @@
                                             <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
                                         </StackPanel>
 
+                                        <!-- Travel + End Stop are HARDWARE writes on brake-named singleton
+                                             cmdIds (0x84/0x85/0xB2) with no per-pedal selector, so they only
+                                             belong to the pedal that owns that hardware — hidden for a passive
+                                             pedal by UpdateMBoosterEffectPassiveState. -->
+                                        <StackPanel x:Name="MBoosterTravelEndstopPanel">
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_TravelRangeMm}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" Margin="0,0,0,6"/>
                                         <ctrl:MozaRangeSlider x:Name="MBoosterTravelRangeSlider" Height="90" Margin="0,0,0,16"
                                                               AccentBrush="{StaticResource CyanBrush}"
@@ -1887,6 +1892,7 @@
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="1"/>
                                         </Grid>
+                                        </StackPanel><!-- MBoosterTravelEndstopPanel -->
                                         <Grid Margin="0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1915,13 +1921,17 @@
                                             <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"/>
                                             <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
                                             <Slider Grid.Column="2" x:Name="MBoosterMaxForceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
-                                            <TextBlock Grid.Column="3" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                            <!-- Maximum + this end label are both rewritten at seed time to the
+                                                 pedal's real full-scale force — see ApplyMBoosterMaxForceCeiling. -->
+                                            <TextBlock Grid.Column="3" x:Name="MBoosterMaxForceRangeEndLabel" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
                                             <TextBox Grid.Column="4" x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
                                                      Tag="{Binding ElementName=MBoosterMaxForceSlider}"
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="200"/>
                                         </Grid>
-                                        <Grid Margin="0,4" ToolTip="{x:Static res:Strings.Hint_NaturalFrictionPedalFeel}">
+                                        <!-- Natural Friction is another brake-named singleton hardware write
+                                             (cmdId 0xAE) — same passive-pedal gating as Travel/End Stop. -->
+                                        <Grid x:Name="MBoosterNaturalFrictionPanel" Margin="0,4" ToolTip="{x:Static res:Strings.Hint_NaturalFrictionPedalFeel}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
@@ -2033,7 +2043,10 @@
                                     </StackPanel>
                                 </Grid>
                             </ctrl:SectionCard>
-                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_SegmentedDamping}"
+                            <!-- Another brake-named singleton hardware write (cmdId 0xB7) — hidden
+                                 for a passive pedal, same as Travel / End Stop / Natural Friction. -->
+                            <ctrl:SectionCard x:Name="MBoosterSegDampCard"
+                                              Title="{x:Static res:Strings.Section_SegmentedDamping}"
                                               Subtitle="{x:Static res:Strings.Subtitle_SegmentedDamping}"
                                               Icon="{StaticResource IconDamper}"
                                               IsCollapsible="True">

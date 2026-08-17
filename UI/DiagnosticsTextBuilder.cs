@@ -269,9 +269,65 @@ namespace MozaPlugin.UI
                     }
                     sb.AppendLine($"        axes={d.AxisCount}  roles=[{string.Join(", ", roleParts)}]");
                 }
+                AppendMBoosterPedalConfig(sb, d, s);
             }
             return sb.ToString().TrimEnd();
         }
+
+        /// <summary>
+        /// Per-pedal type, resolved motor/config device id, and the calibration +
+        /// Pedal Feel values for one lane.
+        ///
+        /// The type (active/passive) and the device id are the pair that decides
+        /// whether config writes reach hardware at all: only ACTIVE pedals count
+        /// toward chain-ness, and a lane with one active pedal must address the
+        /// host for everything (bundle KY3HK4QP shipped a full capture of the
+        /// plugin writing to a phantom 0x1d, and neither of these lines existed
+        /// to show it). The settings values live in MozaProfile, NOT in
+        /// MozaPluginSettings, so plugin-settings.json carries none of them —
+        /// this is the only place a bundle records what the user configured.
+        /// </summary>
+        private static void AppendMBoosterPedalConfig(
+            StringBuilder sb, MBoosterDeviceController d, Devices.MBoosterDeviceSettings? s)
+        {
+            var types = d.AxisTypes;
+            sb.AppendLine(
+                $"        active pedals={(d.ActiveAxisCount < 0 ? "? (type diagnostic not streamed yet)" : d.ActiveAxisCount.ToString())}" +
+                $"  deviceReportedMaxThreshold={FmtKg(d.DeviceReportedMaxThresholdKg)}");
+            foreach (int a in d.ConnectedAxisIndices())
+            {
+                byte dev = d.MotorDeviceForCurrentAxis(a);
+                string type = types == null || a >= types.Length ? "?"
+                            : types[a] == 1 ? "active"
+                            : types[a] == 2 ? "passive" : "unknown";
+                var role = MozaMBoosterRegistry.ResolveAxisRole(s, a, Math.Max(1, d.AxisCount));
+                sb.AppendLine($"        ax{a} {role}/{type} → dev 0x{dev:x2}");
+                var cfg = MozaMBoosterRegistry.PeekPedalConfig(s, a, d.SoleConnectedAxis());
+                if (cfg == null) { sb.AppendLine("             (no config row)"); continue; }
+                sb.AppendLine(
+                    $"             simInput: ratio={FmtPct(cfg.SensorOutputRatioPct)} " +
+                    $"maxThreshold={FmtKg(cfg.MaxThresholdKg)} " +
+                    $"dir={(cfg.Direction < 0 ? "—" : cfg.Direction.ToString())} " +
+                    $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())} " +
+                    $"max={(cfg.Max < 0 ? "—" : cfg.Max.ToString())} " +
+                    $"outCurve={(cfg.CurveY != null ? "set" : "—")}");
+                sb.AppendLine(
+                    $"             pedalFeel: deadzone={cfg.DeadzoneKg.ToString("F1", CultureInfo.InvariantCulture)}kg " +
+                    $"maxForce={cfg.MaxForceKg.ToString("F0", CultureInfo.InvariantCulture)}kg " +
+                    $"travel={FmtMm(cfg.TravelStartMm)}..{FmtMm(cfg.TravelEndMm)} " +
+                    $"endstop={FmtRaw(cfg.EndstopFrontStiffness)}/{FmtRaw(cfg.EndstopEndStiffness)} " +
+                    $"friction={FmtPct(cfg.NaturalFrictionPct)} " +
+                    $"inCurve={(cfg.InputCurveY != null ? "set" : "—")}");
+            }
+        }
+
+        // -1 is the shared "not set / no override" sentinel across every mBooster
+        // calibration field — render it as such rather than as a real value.
+        private static string FmtRaw(float v) =>
+            v < 0 ? "—" : v.ToString("0.#", CultureInfo.InvariantCulture);
+        private static string FmtKg(float v) => v < 0 ? "—" : FmtRaw(v) + "kg";
+        private static string FmtMm(float v) => v < 0 ? "—" : FmtRaw(v) + "mm";
+        private static string FmtPct(float v) => v < 0 ? "—" : FmtRaw(v) + "%";
 
         /// <summary>Multi-Function Stalks state + the truck-sim button map. The map is
         /// what turns a "stalk behaves wrong in ETS2" report into a diagnosis, and the

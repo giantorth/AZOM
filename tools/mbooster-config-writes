@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""mBooster calibration/config read+write decoder for a support-bundle capture.
+
+Reads `serial-capture-*.txt` from a diagnostics bundle (or any file in that
+`<ts> <dir> <label> <hex bytes…>` format) and decodes every group-35 (read) /
+group-36 (write) `mbooster-*` frame, with the **target device id** and a
+physical-unit decode of the values.
+
+Why this exists: an mBooster lane can address the host (`0x12`) or the chain
+ports (`0x1d`/`0x1e`), and a write to a device id the unit doesn't have is
+silently dropped — no error, no ack, nothing in the plugin log. The
+`--tally` summary is what makes that visible: compare writes sent per device
+id against the write-echo (`a4`) / read-response (`a3`) count per source.
+Support bundle KY3HK4QP was diagnosed exactly this way — 1212 writes to
+`0x1d` drew 0 responses while all 16 writes to `0x12` were echoed. See
+docs/protocol/devices/mbooster.md "Chain topology".
+
+Usage:
+    tools/mbooster-config-writes bundle/serial-capture-startup.txt
+    tools/mbooster-config-writes bundle/*.txt --tally
+    tools/mbooster-config-writes bundle/serial-capture-rolling.txt --cmd b3
+    tools/mbooster-config-writes bundle/serial-capture-startup.txt --fwlog
+
+Frame shape (see docs/protocol/wire/): 7e <len> <group> <dev> <cmdId> <payload…> <csum>
+"""
+import argparse
+import sys
+
+GROUP_READ = 35
+GROUP_WRITE = 36
+
+# cmdId → (name, unit decoder). Mirrors Protocol/MozaCommandDatabase.cs's
+# mbooster-* block; keep the two in sync when a new command is decoded.
+CMDS = {
+    0x01: ("throttle-dir", None),
+    0x02: ("throttle-min", None),
+    0x03: ("throttle-max", None),
+    0x04: ("brake-dir", None),
+    0x05: ("brake-min", None),
+    0x06: ("brake-max", None),
+    0x07: ("clutch-dir", None),
+    0x08: ("clutch-min", None),
+    0x09: ("clutch-max", None),
+    0x1a: ("brake-angle-ratio", "float"),
+    # 5-point output curves — note the non-contiguous y5 ids (27/28/29).
+    0x0e: ("throttle-y1", "float"), 0x0f: ("throttle-y2", "float"),
+    0x10: ("throttle-y3", "float"), 0x11: ("throttle-y4", "float"),
+    0x1b: ("throttle-y5", "float"),
+    0x12: ("brake-y1", "float"), 0x13: ("brake-y2", "float"),
+    0x14: ("brake-y3", "float"), 0x15: ("brake-y4", "float"),
+    0x1c: ("brake-y5", "float"),
+    0x16: ("clutch-y1", "float"), 0x17: ("clutch-y2", "float"),
+    0x18: ("clutch-y3", "float"), 0x19: ("clutch-y4", "float"),
+    0x1d: ("clutch-y5", "float"),
+    0x84: ("brake-travel-start", "mm"),
+    0x85: ("brake-travel-end", "mm"),
+    0xab: ("brake-curve7", "pct65535-sel"),
+    0xae: ("brake-friction", "pct65535-sel"),
+    0xb2: ("brake-endstop", "endstop-sel"),
+    0xb3: ("brake-threshold", "kg"),
+    0xb7: ("brake-segmented-damping", "segdamp"),
+}
+
+
+def be(bs):
+    v = 0
+    for b in bs:
+        v = (v << 8) | b
+    return v
+
+
+def f32(bs):
+    import struct
+    return struct.unpack(">f", bytes(bs))[0] if len(bs) == 4 else None
+
+
+def decode(kind, payload):
+    """Render a payload (cmd byte already stripped) in physical units.
+    Selector-prefixed commands carry a fixed 0x00 byte + a selector before
+    their 2-byte value, so their value starts at payload[2]."""
+    try:
+        if kind == "kg":
+            return f"{be(payload) * 200.0 / 65536.0:.2f} kg"
+        if kind == "mm":
+            return f"{be(payload) * 53.5 / 65536.0:.2f} mm"
+        if kind == "float":
+            v = f32(payload)
+            return None if v is None else f"{v:.4g}"
+        if kind == "pct65535-sel" and len(payload) >= 3:
+            return f"sel={payload[1]} {be(payload[2:]) * 100.0 / 65535.0:.3f}%"
+        if kind == "endstop-sel" and len(payload) >= 3:
+            sel = "front" if payload[1] == 0 else "end"
+            return f"{sel} {be(payload[2:]) * 10.0 / 65535.0:.2f}/10"
+        if kind == "segdamp" and len(payload) >= 20:
+            fields = [be(payload[i:i + 2]) * 100.0 / 65535.0 for i in range(0, 20, 2)]
+            names = ["d1P", "d2P", "d1R", "d2R", "s1P", "s1R", "s2P", "s2R", "s3P", "s3R"]
+            return " ".join(f"{n}={v:.0f}" for n, v in zip(names, fields))
+    except Exception:
+        pass
+    return None
+
+
+def frames(path):
+    """Yield (ts, dir, label, bytes) for every parseable capture line."""
+    with open(path, errors="replace") as fh:
+        for line in fh:
+            parts = line.split()
+            if len(parts) < 5 or parts[2] not in ("T", "R"):
+                continue
+            try:
+                data = [int(x, 16) for x in parts[4:]]
+            except ValueError:
+                continue
+            yield parts[0] + " " + parts[1], parts[2], parts[3], data
+
+
+def unswap(b):
+    """Undo the nibble swap inbound frames apply to the source device byte."""
+    return ((b & 0x0F) << 4) | ((b & 0xF0) >> 4)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("files", nargs="+", help="capture text file(s) from a bundle")
+    ap.add_argument("--cmd", help="only this cmdId, in hex (e.g. b3)")
+    ap.add_argument("--tally", action="store_true",
+                    help="per-device write/read counts vs responses — the "
+                         "phantom-device-id smoking gun")
+    ap.add_argument("--fwlog", action="store_true",
+                    help="also print the group-0x0E firmware log as ASCII "
+                         "(pedal types, PD Linked, 'Param NN Written' commits)")
+    args = ap.parse_args()
+    want = int(args.cmd, 16) if args.cmd else None
+
+    tx = {}   # (group, dev) -> count
+    rx = {}   # (group, srcdev) -> count
+    any_rows = False
+
+    for path in args.files:
+        if len(args.files) > 1:
+            print(f"===== {path} =====")
+        for ts, direction, label, b in frames(path):
+            if "mbooster" not in label:
+                continue
+
+            if direction == "R":
+                if len(b) < 2:
+                    continue
+                group, src = b[0], unswap(b[1])
+                rx[(group, src)] = rx.get((group, src), 0) + 1
+                if args.fwlog and group == 0x0E and len(b) > 3:
+                    txt = "".join(chr(c) if 32 <= c < 127 else "." for c in b[3:])
+                    print(f"{ts} FWLOG  {txt}")
+                continue
+
+            # TX: 7e <len> <group> <dev> <cmd> <payload…> <csum>
+            if len(b) < 5 or b[0] != 0x7E:
+                continue
+            ln, group, dev = b[1], b[2], b[3]
+            if group not in (GROUP_READ, GROUP_WRITE):
+                continue
+            body = b[4:4 + ln]
+            if not body:
+                continue
+            cmd, payload = body[0], body[1:]
+            tx[(group, dev)] = tx.get((group, dev), 0) + 1
+            if want is not None and cmd != want:
+                continue
+            if args.tally:
+                continue
+
+            name, kind = CMDS.get(cmd, (f"cmd0x{cmd:02x}", None))
+            pretty = decode(kind, payload) if kind and payload else None
+            hexs = " ".join(f"{x:02x}" for x in payload)
+            print(f"{ts} {'READ ' if group == GROUP_READ else 'WRITE'} "
+                  f"dev=0x{dev:02x} {name:24s} raw={be(payload):<10d} [{hexs}]"
+                  + (f"  → {pretty}" if pretty else ""))
+            any_rows = True
+
+    if args.tally:
+        print("\nTX per (group, target device):")
+        for (g, d), n in sorted(tx.items(), key=lambda kv: -kv[1]):
+            gl = "read " if g == GROUP_READ else "write"
+            print(f"  {gl} dev=0x{d:02x}  {n}")
+        print("\nRX per (group, source device):")
+        for (g, d), n in sorted(rx.items(), key=lambda kv: -kv[1]):
+            gl = ("read-resp " if g == GROUP_READ | 0x80
+                  else "write-echo" if g == GROUP_WRITE | 0x80
+                  else f"group 0x{g:02x}")
+            print(f"  {gl} src=0x{d:02x}  {n}")
+        print("\nA target device id that receives writes but never appears as an "
+              "RX source is NOT PRESENT on this unit — every write to it is "
+              "silently dropped.")
+    elif not any_rows:
+        print("(no matching mbooster group-35/36 frames found)", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
