@@ -704,7 +704,17 @@ namespace MozaPlugin.Telemetry.Watchdog
             {
                 MozaLog.Warn(
                     $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                    "buffer preserved, keeping cached state — no recovery action");
+                    "buffer preserved, keeping cached state");
+                // A forward gap on the config stream is UNRECOVERABLE
+                // mid-session: the wheel fire-onces its state deltas (no
+                // retransmit on this session, symmetric with its ack-less
+                // inbound side — wire-verified 2026-08-16 21:01, seq-52 drop
+                // wedged every later delta; UI frozen until a manual
+                // reconnect). Escalate to the library-sync reconnect
+                // (debounced; the wheel re-pushes full state at connect).
+                if (_configJsonGapCount >= 3)
+                    _sender.ScheduleLibrarySyncRestart(
+                        $"configJson stream wedged (gap #{_configJsonGapCount})");
                 return;
             }
 

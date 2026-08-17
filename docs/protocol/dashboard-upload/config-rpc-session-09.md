@@ -60,18 +60,53 @@ The host's `configJson()` `dashboards` list is not informational — the wheel
   registry entry that fails with `dash load error` when cycled onto. Never
   declare names that aren't verifiably installed. (Cleanup: delete the ghost
   rows via `completelyRemove`, or let a PitHouse connect sweep them.)
-- **Slot table**: the wheel adopts the list verbatim — order included — as
-  its `configJsonList`, which is the slot numbering used by kind=4 switches
-  and wheel-side cycling. PitHouse always sends the list **ordinal-sorted**
-  (uppercase before lowercase: `Core < … < Simple… < generic… < jrams… <
-  porn`); an unsorted list reorders the wheel's slots on every send.
+- **Slot table is the WHEEL's own, not the host's**: the wheel maintains
+  its `configJsonList` itself, **ordinal-sorted** (uppercase before
+  lowercase: `Core < … < Simple… < kenobi… < radarrr`), and that list is
+  the slot numbering used by kind=4 switches and wheel-side cycling. It can
+  contain entries the host's enabled-only declaration omits (wire-verified
+  2026-08-16: a dash sat at wheel slot 3 that the host list lacked —
+  mapping against the host list shifted every later slot by one and routed
+  a switch to the wrong dash). PitHouse's declared list *coincides* with
+  the wheel's table only because both are ordinal-sorted over the same
+  set — do not model it as adoption. Name→slot mapping must always use the
+  wheel-reported `configJsonList` from the latest TitleId=1 push; the wheel
+  does NOT answer mid-session prime/open-request nudges with a fresh full
+  push (neither for the plugin nor for PitHouse — full pushes happen only at
+  connect).
+- **Mid-session slot allocator never renumbers** (behavior-verified
+  2026-08-16): an accepted delete leaves a DEAD slot — the wheel's own
+  cycling shows `dash load error` on it; a (re-)enabled name takes its
+  ordinal position (a re-upload re-occupies its own dead hole). Host-side
+  table tracking must mirror this (ordinal-insert on wheel-confirmed
+  enable, never remove): compacting after a delete shifts every later slot
+  and switches land on the wrong dash. Host *intent* must never move the
+  table either — an operation can fail to take effect (enable-confirm
+  deltas can be lost on the un-acked config session, and one 2026-08-16
+  enable was declined for reasons never wire-isolated — NOT proven to be
+  device-model matching; the same S09-targeted dash enabled fine on the
+  W17 in later tests) and only the wheel's confirming delta push means the
+  operation happened.
+- **The table rebuilds ONLY on a port-level (re)connect** (wire-verified
+  2026-08-16: at a PitHouse connect the wheel's TitleId=1 boot push already
+  carried the rebuilt, hole-free, ordinal-sorted table at t=13 — before any
+  host verb). Session-level Stop/Start on an already-open port does NOT
+  trigger the rebuild; a COM open/close (DTR) does. This is why PitHouse
+  never appears to leave delete-holes: its open/close usage pattern
+  reconnects constantly. Plugin equivalent:
+  `MozaSerialConnection.ForceReconnect` after mutations
+  (`TelemetrySender.ScheduleLibrarySyncRestart`).
+- **Persistent ghost warning**: repeatedly declaring a name the wheel
+  refuses to enable properly manufactures a file-less registry entry that
+  survives reboots and power cycles ('dash load error' at its ordinal
+  slot). Only declare names the wheel has confirmed or that were just
+  uploaded (verdict-bounded intents).
 
 Host-side bookkeeping this implies (all in `TelemetrySender`): build the
 wire list from the wheel's current enabled `dirName`s + recent intentional
 enables − recent intentional removes, ordinal-sorted
-(`BuildWireLibraryList`); adopt the declared list into the cached state's
-`ConfigJsonList` immediately on send (`AdoptDeclaredLibraryList`) so
-name→slot mappings never lag the wheel.
+(`BuildWireLibraryList`); never overwrite the cached wheel-reported
+`ConfigJsonList` with it.
 
 ### Envelope `comp_size` = zlib length + 4
 

@@ -339,11 +339,42 @@ namespace MozaPlugin.Devices.WheelUi
             // the grid via the normal tick.
             string dirName = row.DirName;
             string id = row.Id;
+            var plugin = _plugin;
             MozaLog.Info($"[AZOM] Delete requested: \"{dirName}\" id={id}");
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
+                    // Deleting the CURRENTLY-RENDERED dash strands its registry
+                    // entry (the wheel can't drop what it's displaying) and the
+                    // stub survives even the reconcile rebuild as a permanent
+                    // dead slot (observed 2026-08-16 21:0x). Switch away first.
+                    var state = plugin?.WheelStateForDiagnostics;
+                    var list = state?.ConfigJsonList;
+                    int targetSlot = -1, fallbackSlot = -1;
+                    if (list != null)
+                    {
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            if (string.Equals(list[i], dirName, StringComparison.Ordinal))
+                                targetSlot = i;
+                            else if (fallbackSlot < 0)
+                                fallbackSlot = i;
+                        }
+                    }
+                    bool deletingActive = targetSlot >= 0
+                        && (ts.WheelReportedSlot == targetSlot
+                            || string.Equals(plugin?.ActiveTelemetryProfileName, dirName,
+                                StringComparison.OrdinalIgnoreCase));
+                    if (deletingActive && fallbackSlot >= 0)
+                    {
+                        MozaLog.Info(
+                            $"[AZOM] Deleting the active dashboard — switching to " +
+                            $"slot {fallbackSlot} (\"{list![fallbackSlot]}\") first");
+                        plugin!.OnDashboardSwitched((uint)fallbackSlot);
+                        System.Threading.Thread.Sleep(1500);
+                    }
+
                     byte[]? reply = ts.SendRpcCall("completelyRemove", id);
                     MozaLog.Info(
                         $"[AZOM] completelyRemove(\"{dirName}\") sent; " +
@@ -359,21 +390,39 @@ namespace MozaPlugin.Devices.WheelUi
 
         private void WheelFilesEnable_Click(object sender, RoutedEventArgs e)
         {
-            // Enable = the host's configJson() library list naming the dash —
-            // the wheel syncs enablement against that list. See
-            // docs/protocol/dashboard-upload/config-rpc-session-09.md.
+            // Enable = RE-UPLOAD. A disabled wheel-side entry has no installed
+            // files — the library-list declaration only triggers an install
+            // when a freshly staged bundle exists, i.e. right after an upload
+            // (every observed successful enable — radarrr, porn, F1 — happened
+            // immediately post-upload; list-only declarations of long-disabled
+            // dashes do nothing). PitHouse has no enable button for the same
+            // reason: its "enable" is re-sending the dash. The upload path's
+            // post-success flow handles declaration + reconcile.
             if (((Button)sender).Tag is not WheelFileRow row) return;
             if (string.IsNullOrEmpty(row.DirName)) return;
             var ts = ActiveSender;
-            if (ts == null)
+            if (ts == null || _plugin == null)
             {
                 MessageBox.Show(Strings.Dialog_TelemetrySenderUnavailable,
                     "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            ts.EnableUploadedDashboard(row.DirName);
+            byte[]? bytes = DashboardLibraryResolver.ResolveBytes(
+                _plugin.DashCache, _plugin.DashProfileStore, row.DirName);
+            if (bytes == null)
+            {
+                if (WheelFilesStatusBox != null)
+                    WheelFilesStatusBox.Text = string.Format(
+                        Strings.Upload_CannotResolveBytes, row.DirName);
+                return;
+            }
+            string dir = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, row.DirName);
+            bool queued = ts.TriggerManualUpload(
+                bytes, row.DirName, string.IsNullOrEmpty(dir) ? null : dir);
             if (WheelFilesStatusBox != null)
-                WheelFilesStatusBox.Text = $"{Strings.Label_Enable}: {row.DirName}";
+                WheelFilesStatusBox.Text = queued
+                    ? string.Format(Strings.Upload_Queued, row.DirName)
+                    : Strings.Upload_NotStarted;
         }
 
         // ── Refresh ─────────────────────────────────────────────────────

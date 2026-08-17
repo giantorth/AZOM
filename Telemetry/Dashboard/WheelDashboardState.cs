@@ -49,6 +49,13 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         public ManagerListKind EnabledListKind { get; set; } = ManagerListKind.Absent;
         public ManagerListKind DisabledListKind { get; set; } = ManagerListKind.Absent;
+        /// <summary>dirNames whose entries the wheel CONFIRMED deleted (left
+        /// both managers via delta pushes) since the last full push. The
+        /// wheel's live slot table keeps them as dead slots until a
+        /// port-level reconnect compacts the table (order-preserving) — the
+        /// host compacts its cached copy at that same moment
+        /// (<c>ConfigJsonClient.CompactConfirmedDeletes</c>).</summary>
+        public IReadOnlyList<string> ConfirmedRemovedNames { get; set; } = Array.Empty<string>();
         /// <summary>Ids from <c>enabledManager.deletedDashboards</c> — entries the
         /// wheel removed entirely.</summary>
         public IReadOnlyList<string> EnabledDeletedIds { get; set; } = Array.Empty<string>();
@@ -117,6 +124,63 @@ namespace MozaPlugin.Telemetry.Dashboard
                 disabled.RemoveAll(x => x.Id == id);
             }
 
+            // Slot-table maintenance. Full pushes (connect-time TitleId=1)
+            // carry the authoritative ordinal-sorted configJsonList. Delta
+            // pushes don't, and the wheel never re-pushes the table
+            // mid-session — so mirror its live allocator from the
+            // wheel-CONFIRMED deltas only (host intent desyncs the table when
+            // an operation silently fails to take effect — confirm deltas can
+            // be lost on the un-acked config session).
+            IReadOnlyList<string> slotList;
+            IReadOnlyList<string> confirmedRemoved;
+            if (next.ConfigJsonList.Count > 0)
+            {
+                slotList = next.ConfigJsonList;
+                // Full push = fresh table; prior deletions are baked in.
+                confirmedRemoved = Array.Empty<string>();
+            }
+            else
+            {
+                // The wheel's live slot table is ordinal-sorted over its
+                // registry entries INCLUDING dead ones: an accepted delete
+                // keeps the entry as a dead slot (its own cycling shows 'dash
+                // load error' there) and a (re-)enabled name takes its ordinal
+                // position — behavior-verified 2026-08-16: a re-uploaded dash
+                // re-occupied its dead hole ahead of "Grids" rather than
+                // appending. So: never remove, insert new enabled names at
+                // their ordinal position.
+                var table = new List<string>(prev.ConfigJsonList);
+                foreach (var e in enabled)
+                {
+                    if (string.IsNullOrEmpty(e.DirName)) continue;
+                    if (table.FindIndex(n => string.Equals(n, e.DirName, StringComparison.Ordinal)) >= 0)
+                        continue;
+                    int at = 0;
+                    while (at < table.Count && string.CompareOrdinal(table[at], e.DirName) < 0) at++;
+                    table.Insert(at, e.DirName);
+                }
+                slotList = table;
+
+                // Accumulate wheel-confirmed deletions: names present in the
+                // managers before this merge and gone after (their entries
+                // were removed via deletedDashboards ids).
+                var removed = new List<string>(prev.ConfirmedRemovedNames);
+                var survivorNames = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var e in enabled)
+                    if (!string.IsNullOrEmpty(e.DirName)) survivorNames.Add(e.DirName);
+                foreach (var e in disabled)
+                    if (!string.IsNullOrEmpty(e.DirName)) survivorNames.Add(e.DirName);
+                foreach (var e in prev.EnabledDashboards)
+                    if (!string.IsNullOrEmpty(e.DirName) && !survivorNames.Contains(e.DirName)
+                        && !removed.Contains(e.DirName))
+                        removed.Add(e.DirName);
+                foreach (var e in prev.DisabledDashboards)
+                    if (!string.IsNullOrEmpty(e.DirName) && !survivorNames.Contains(e.DirName)
+                        && !removed.Contains(e.DirName))
+                        removed.Add(e.DirName);
+                confirmedRemoved = removed;
+            }
+
             return new WheelDashboardState
             {
                 TitleId = next.TitleId,
@@ -124,7 +188,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 ResetVersion = next.ResetVersion != 0 ? next.ResetVersion : prev.ResetVersion,
                 SortTag = next.SortTag,
                 RootDirPath = !string.IsNullOrEmpty(next.RootDirPath) ? next.RootDirPath : prev.RootDirPath,
-                ConfigJsonList = next.ConfigJsonList.Count > 0 ? next.ConfigJsonList : prev.ConfigJsonList,
+                ConfigJsonList = slotList,
                 EnabledDashboards = enabled,
                 DisabledDashboards = disabled,
                 ImageRefMap = next.ImageRefMap.Count > 0 ? next.ImageRefMap : prev.ImageRefMap,
@@ -136,6 +200,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 DisabledListKind = next.DisabledListKind,
                 EnabledDeletedIds = next.EnabledDeletedIds,
                 DisabledDeletedIds = next.DisabledDeletedIds,
+                ConfirmedRemovedNames = confirmedRemoved,
             };
         }
     }

@@ -703,6 +703,12 @@ namespace MozaPlugin.Telemetry
         // FlagByte = second acked port (session 0x02, used for tier definitions and fc:00 acks).
         internal byte _mgmtPort;
         public byte FlagByte { get; set; } = 0x02;
+
+        /// <summary>Which session the configJson exchange latched to: 0 =
+        /// unresolved, 0x0a = modern channel (latched at first sight of a
+        /// wheel push there), 0x09 stays implicit for legacy wheels. Set by
+        /// the inbound dispatcher; reset on Stop.</summary>
+        internal volatile byte ConfigSessionLatch;
         public bool SendTelemetryMode { get; set; } = true;
         public bool SendSequenceCounter { get; set; } = true;
         private bool _testMode;
@@ -1354,6 +1360,9 @@ namespace MozaPlugin.Telemetry
                         // and re-send the list so the wheel's picker offers
                         // the new dash.
                         EnableUploadedDashboard(_uploader.MzdashName);
+                        // No reconnect after uploads — enable works live via
+                        // the staged-install + list declaration; the reconcile
+                        // bounce is reserved for deletes (dead-slot cleanup).
                         break;
                     case WheelUploadCoordinator.UploadOutcome.SkippedHashMatch:
                         MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": SkippedHashMatch");
@@ -1875,6 +1884,7 @@ namespace MozaPlugin.Telemetry
             _sessionAckSeq = 0;
             _sessionLife.ClearContigAck();
             _dashboardDownloadTriggered = false;
+            ConfigSessionLatch = 0;
             _preambleTickTarget = Math.Max(1, 1000 / _baseTickMs);
             // Default the cold-start preamble gate off; StartInner re-arms it
             // for true cold starts immediately after this call.
@@ -1895,6 +1905,14 @@ namespace MozaPlugin.Telemetry
         /// will device-init the channel.</summary>
         private void PrimeAndOpenSession09()
         {
+            // 0x09 only. A 2026-08-16 experiment primed 0x0A first (the
+            // session PitHouse's whole exchange rides, with live
+            // reconciliation semantics) — but when THIS host primes both, the
+            // wheel double-pushes and the 0x0A stream never yielded a
+            // parseable full state; latching onto it starved the state
+            // pipeline (Files list never populated). Migrating to 0x0A needs
+            // its own investigation of PitHouse's full connect handshake —
+            // see docs/protocol/dashboard-upload/config-rpc-session-09.md.
             SendSessionPrime(0x09, 0x0001);
             _watchdog.SendConfigJsonOpenRequest(0x09, seq: 0x000B);
         }
@@ -3422,7 +3440,10 @@ namespace MozaPlugin.Telemetry
             _intentionalEnables = new(StringComparer.Ordinal);
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long>
             _intentionalRemoves = new(StringComparer.Ordinal);
-        private const long IntentTtlTicks = TimeSpan.TicksPerMinute * 10;
+        // Backstop only — intents normally die on the wheel's verdict (see
+        // BuildWireLibraryList). Short TTL bounds ghost-manufacture when the
+        // wheel never answers at all.
+        private const long IntentTtlTicks = TimeSpan.TicksPerMinute * 2;
 
         /// <summary>
         /// Build the library list actually sent to the wheel. The list is the
@@ -3443,6 +3464,44 @@ namespace MozaPlugin.Telemetry
                 if (now - kv.Value > IntentTtlTicks) _intentionalEnables.TryRemove(kv.Key, out _);
             foreach (var kv in _intentionalRemoves)
                 if (now - kv.Value > IntentTtlTicks) _intentionalRemoves.TryRemove(kv.Key, out _);
+
+            // An intent dies the moment the wheel renders a verdict on the
+            // name. Enabled → confirmed, the enabled set carries it from here.
+            // Disabled → REFUSED (e.g. device-mismatched dash) — declaring a
+            // name the wheel won't properly enable manufactures a file-less
+            // ghost registry entry ('dash load error' slot) that survives
+            // reboots and shifts every later slot (observed 2026-08-16:
+            // S09-targeted dash on a W17 ghosted ahead of "Grids").
+            if (state != null)
+            {
+                foreach (var e in state.EnabledDashboards)
+                    if (!string.IsNullOrEmpty(e.DirName))
+                        _intentionalEnables.TryRemove(e.DirName, out _);
+                // Refusal detection needs a settle margin: a fresh upload
+                // legitimately sits in disabledManager for a moment before
+                // the wheel flips it, and the enable-confirm delta can be
+                // delayed past a library-sync reconnect (the port bounce +
+                // fresh boot push land ~15-20 s after the intent). A short
+                // margin killed healthy enables (2026-08-16 evening: uploads
+                // stuck disabled); keep it comfortably beyond one reconnect
+                // cycle.
+                long refusalMarginTicks = TimeSpan.TicksPerSecond * 45;
+                long stateTicks = state.CapturedAt.Ticks;
+                foreach (var e in state.DisabledDashboards)
+                {
+                    if (string.IsNullOrEmpty(e.DirName)) continue;
+                    if (_intentionalEnables.TryGetValue(e.DirName, out long intentTicks)
+                        && stateTicks > intentTicks + refusalMarginTicks)
+                    {
+                        _intentionalEnables.TryRemove(e.DirName, out _);
+                        MozaLog.Info(
+                            $"[AZOM] Enable intent for \"{e.DirName}\" expired — still classified " +
+                            "disabled 3s+ after declaration (enable-confirm delta may have been " +
+                            "lost, or the wheel declined); click Enable to retry. Intent dropped " +
+                            "rather than re-declared to avoid manufacturing a ghost slot");
+                    }
+                }
+            }
 
             var list = new System.Collections.Generic.List<string>();
             var seen = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
@@ -3473,7 +3532,12 @@ namespace MozaPlugin.Telemetry
         private void MaybeSendConfigJsonReply(WheelDashboardState state, byte session)
         {
             _lastConfigJsonReplySession = session;
-            if (_session09ReplySent) return;
+            if (_session09ReplySent)
+            {
+                MozaLog.Info(
+                    $"[AZOM] configJson reply skipped (already sent this cycle) sess=0x{session:X2}");
+                return;
+            }
 
             var wireList = BuildWireLibraryList(state ?? _configJson.LastState);
             if (wireList.Count == 0)
@@ -3481,12 +3545,24 @@ namespace MozaPlugin.Telemetry
                 // Nothing trustworthy to declare yet (no state received) —
                 // fall back to echoing the wheel's own list so its
                 // configJsonList survives the connect cycle unchanged.
-                if (state?.ConfigJsonList == null || state.ConfigJsonList.Count == 0) return;
+                if (state?.ConfigJsonList == null || state.ConfigJsonList.Count == 0)
+                {
+                    MozaLog.Info(
+                        $"[AZOM] configJson reply skipped (no library names and no wheel list) sess=0x{session:X2}");
+                    return;
+                }
                 wireList = new System.Collections.Generic.List<string>(state.ConfigJsonList);
             }
             CanonicalDashboardList = wireList;
 
             byte[] reply = ConfigJsonClient.BuildConfigJsonReply(CanonicalDashboardList);
+            // Single copy. PitHouse sends 2-3 copies ~200 ms apart, but our
+            // back-to-back triple (2026-08-16 20:07 build) coincided with
+            // enables going dead — suspected wheel-side parse issue with
+            // zero-gap duplicate envelopes. The single send is the shape that
+            // demonstrably enabled dashes all day. (Loss protection: the
+            // Enable button retries on demand.)
+            const int ReplyCopies = 1;
             int chunkCount;
             // Hold _session09SeqLock across the entire read-chunk-send-write
             // so SendSession09Keepalive (timer thread) can't slip a ++seq in
@@ -3495,34 +3571,46 @@ namespace MozaPlugin.Telemetry
             // already on the wire have consumed those seqs wheel-side.
             lock (_session09SeqLock)
             {
-                int seq = _session09OutboundSeq + 1;
-                var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq, _targetDeviceId);
-                chunkCount = frames.Count;
-                foreach (var frame in frames)
+                chunkCount = 0;
+                for (int copy = 0; copy < ReplyCopies; copy++)
                 {
-                    if (_state == TelemetryState.Idle || !_connection.IsConnected)
+                    int seq = _session09OutboundSeq + 1;
+                    var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq, _targetDeviceId);
+                    chunkCount = frames.Count;
+                    foreach (var frame in frames)
                     {
-                        _session09OutboundSeq = seq;
-                        return;
+                        if (_state == TelemetryState.Idle || !_connection.IsConnected)
+                        {
+                            _session09OutboundSeq = seq;
+                            MozaLog.Info(
+                                $"[AZOM] configJson reply ABORTED mid-send sess=0x{session:X2} " +
+                                $"(state={_state}, connected={_connection.IsConnected}) — " +
+                                "connect-window sweep will not happen this cycle");
+                            return;
+                        }
+                        // Plain send, NOT retransmit-tracked: current firmware
+                        // (2026-08 W17) never fc-acks the config session, so a
+                        // tracked chunk retransmits forever — observed ×30
+                        // duplicate reply chunks flooding sess=0x09
+                        // (moza-wire-20260816-130624). Loss protection comes
+                        // from the ReplyCopies redundancy instead.
+                        _connection.Send(frame);
                     }
-                    // Plain send, NOT retransmit-tracked: current firmware
-                    // (2026-08 W17) never fc-acks the config session, so a
-                    // tracked chunk retransmits forever — observed ×30
-                    // duplicate reply chunks flooding sess=0x09
-                    // (moza-wire-20260816-130624), which PitHouse never does
-                    // (its config-session sends are fire-once). A dropped
-                    // chunk self-heals on the next state-push → reply cycle.
-                    _connection.Send(frame);
+                    _session09OutboundSeq = seq;
                 }
-                _session09OutboundSeq = seq;
             }
             _session09ReplySent = true;
-            // The wheel adopts this list as its slot table — keep the cached
-            // state's ConfigJsonList (the source of every name→slot mapping
-            // and the dropdown) in lockstep instead of waiting for the
-            // wheel's next full state push.
-            _configJson.AdoptDeclaredLibraryList(CanonicalDashboardList);
-            MozaLog.Debug(
+            // Do NOT adopt the declared list into the cached ConfigJsonList.
+            // The wheel maintains its OWN ordinal-sorted slot table which can
+            // differ from the host's enabled-only declaration (wire-verified
+            // 2026-08-16: wheel table kept a dash at slot 3 that the declared
+            // list omitted, shifting every later mapping by one — radarrr
+            // switched to slot 15 landed on the wrong dash). PitHouse's list
+            // merely coincides with the wheel's table because both are
+            // ordinal-sorted over the same set. The wheel-reported list is the
+            // only slot authority; mutations re-sync it via
+            // RequestConfigJsonStateRefresh.
+            MozaLog.Info(
                 $"[AZOM] Sent configJson() reply on session 0x{session:X2}: " +
                 $"{CanonicalDashboardList.Count} dashboards, {chunkCount} chunks");
         }
@@ -3567,20 +3655,124 @@ namespace MozaPlugin.Telemetry
             // itself is part of the enable exchange.
             _session09ReplySent = false;
             MaybeSendConfigJsonReply(state!, _lastConfigJsonReplySession);
-            RequestConfigJsonStateRefresh($"enable \"{dashboardName}\"");
+            // Slot-table membership follows the wheel's CONFIRMING delta push
+            // (WheelDashboardState.Merge), not host intent. No state-refresh
+            // nudge here: the wheel never answers mid-session prime/open
+            // nudges with a full push, and the synthetic-seq frames desync the
+            // sess=0x09 reassembler (forward-gap storm, config channel dead
+            // until reconnect — observed 2026-08-16 18:14). The wheel's own
+            // unprompted deltas carry everything needed.
         }
 
         // Nonce for post-mutation state-refresh seqs (distinct ranges from the
         // watchdog's gap-recovery nudges at 0x100/0x200).
         private int _stateRefreshNonce;
 
+        // ── Library-sync restart (PitHouse-parity reconcile) ─────────────
+        // The wheel only rebuilds its slot table (collapsing dead slots),
+        // purges deleted-entry registry stubs, and runs the declared-list
+        // sweep during the CONNECT window — no mid-session verb achieves any
+        // of it. PitHouse gets this for free because users open/close it
+        // around every library change; the plugin replicates it deliberately
+        // with a debounced full session restart after each mutation.
+        private long _librarySyncRestartDueTicks;
+        private int _librarySyncRestartScheduled;
+        private long _librarySyncFirstAttemptTicks;
+
+        internal void ScheduleLibrarySyncRestart(string reason)
+        {
+            Interlocked.Exchange(ref _librarySyncRestartDueTicks,
+                DateTime.UtcNow.Ticks + TimeSpan.TicksPerSecond * 4);
+            if (Interlocked.CompareExchange(ref _librarySyncRestartScheduled, 1, 0) != 0) return;
+            MozaLog.Info(
+                $"[AZOM] Library-sync restart scheduled ({reason}) — reconnect reconciles " +
+                "the wheel's slot table (dead slots / deleted-entry stubs clear at connect only)");
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    while (true)
+                    {
+                        long due = Interlocked.Read(ref _librarySyncRestartDueTicks);
+                        long now = DateTime.UtcNow.Ticks;
+                        if (now >= due)
+                        {
+                            // Never restart under an in-flight upload — push the
+                            // window out and re-check.
+                            if (_uploader != null && _uploader.IsUploadInFlight)
+                            {
+                                Interlocked.Exchange(ref _librarySyncRestartDueTicks,
+                                    now + TimeSpan.TicksPerSecond * 4);
+                                continue;
+                            }
+                            // Hold while an enable is awaiting the wheel's
+                            // confirming delta — bouncing the port under a
+                            // pending enable strands the dash disabled
+                            // (observed 2026-08-16 evening). Cap the hold so a
+                            // lost confirm can't block the reconcile forever.
+                            if (!_intentionalEnables.IsEmpty
+                                && now - due < TimeSpan.TicksPerSecond * 20)
+                            {
+                                Thread.Sleep(500);
+                                continue;
+                            }
+                            // Mid-blackout (a previous reconnect cycle still
+                            // settling) is a RETRY, not a bail — silently
+                            // returning here lost the reconcile for deletes
+                            // issued during the window and their dead slots
+                            // persisted. Bounded at 2 minutes of attempts.
+                            if (_state == TelemetryState.Idle || !_connection.IsConnected)
+                            {
+                                if (Interlocked.Read(ref _librarySyncFirstAttemptTicks) == 0)
+                                    Interlocked.Exchange(ref _librarySyncFirstAttemptTicks, now);
+                                else if (now - Interlocked.Read(ref _librarySyncFirstAttemptTicks)
+                                         > TimeSpan.TicksPerMinute * 2)
+                                {
+                                    MozaLog.Warn(
+                                        "[AZOM] Library-sync reconnect abandoned — sender " +
+                                        "idle/disconnected for 2min");
+                                    return;
+                                }
+                                Interlocked.Exchange(ref _librarySyncRestartDueTicks,
+                                    now + TimeSpan.TicksPerSecond * 5);
+                                continue;
+                            }
+                            break;
+                        }
+                        long waitMs = (due - now) / TimeSpan.TicksPerMillisecond;
+                        Thread.Sleep((int)Math.Min(1000, Math.Max(50, waitMs)));
+                    }
+                    Interlocked.Exchange(ref _librarySyncFirstAttemptTicks, 0);
+                    MozaLog.Info("[AZOM] Library-sync reconnect firing (port-level — the wheel " +
+                        "rebuilds its slot table only on a physical (re)connect, not on " +
+                        "session Stop/Start; wire-verified 2026-08-16: table already rebuilt " +
+                        "clean at t=13 of a PitHouse connect, before any host verbs)");
+                    // The wheel's rebuild is an order-preserving compaction of
+                    // deleted entries, and after a fast bounce it does NOT
+                    // re-push its state — compact the cached table in lockstep
+                    // so the dropdown and name→slot mapping match the rebuilt
+                    // table immediately.
+                    _configJson.CompactConfirmedDeletes();
+                    _connection.ForceReconnect("library-sync reconcile");
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM] Library-sync restart failed: {ex.Message}");
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _librarySyncRestartScheduled, 0);
+                }
+            });
+        }
+
         /// <summary>
-        /// Ask the wheel to re-push its full configJson state (TitleId=1) —
-        /// the same prime + open-request nudge the DisplayWatchdog uses for
-        /// gap recovery. Needed after every dashboard mutation (upload-enable,
-        /// enable, delete): the wheel's slot-ordered <c>configJsonList</c>
-        /// only arrives in full pushes, and a stale slot table sends
-        /// kind=4 switches to the wrong dashboard.
+        /// UNUSED — kept for reference. Mid-session prime + open-request does
+        /// NOT make the wheel re-push its full state (full TitleId=1 pushes
+        /// happen only at connect), and the synthetic-seq frames desync the
+        /// sess=0x09 reassembler (forward-gap storm; config channel dead until
+        /// reconnect). Do not call after mutations; the wheel's unprompted
+        /// TitleId=4 deltas carry the confirmations.
         /// </summary>
         internal void RequestConfigJsonStateRefresh(string reason)
         {
@@ -3617,10 +3809,14 @@ namespace MozaPlugin.Telemetry
             _intentionalEnables.TryRemove(dashboardName, out _);
 
             var state = _configJson.LastState;
-            if (state == null) return;
-            _session09ReplySent = false;
-            MaybeSendConfigJsonReply(state, _lastConfigJsonReplySession);
-            RequestConfigJsonStateRefresh($"delete \"{dashboardName}\"");
+            if (state != null)
+            {
+                _session09ReplySent = false;
+                MaybeSendConfigJsonReply(state, _lastConfigJsonReplySession);
+            }
+            // Reconcile: the wheel deletes the entry but keeps a registry stub
+            // occupying a (dead) slot until the next connect rebuild.
+            ScheduleLibrarySyncRestart($"delete \"{dashboardName}\"");
         }
 
         /// <summary>

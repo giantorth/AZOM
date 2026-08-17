@@ -238,7 +238,12 @@ namespace MozaPlugin.Telemetry.Inbound
                 _sender.SendSessionAckInternal(session, (ushort)ackSeq);
             }
 
-            // configJson state push. Older firmware: 0x09. KS Pro / 2026-04+: 0x0a.
+            // configJson state push. Older firmware: 0x09. 2026-04+: 0x0a —
+            // the modern session with live reconciliation (PitHouse uses it
+            // exclusively). When both primes get answered the wheel pushes on
+            // BOTH; latch onto 0x0a at the first sight of it and stop feeding
+            // 0x09 chunks into the shared reassembler (two interleaved seq
+            // spaces corrupt it). Wheels that never speak 0x0a stay on 0x09.
             if (session == 0x09 || session == 0x0a)
             {
                 if (session == 0x09) _sender._session09InboundSeq = seq;

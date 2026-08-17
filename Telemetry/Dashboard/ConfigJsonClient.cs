@@ -134,20 +134,106 @@ namespace MozaPlugin.Telemetry.Dashboard
         private string _lastMissingShape = "";
 
         /// <summary>
-        /// Adopt the host-declared library list into the cached state's
-        /// <see cref="WheelDashboardState.ConfigJsonList"/>. The wheel adopts
-        /// the host's configJson() list as its slot table (PitHouse ground
-        /// truth: the wheel's configJsonList always equals the host's declared
-        /// list, order included) — so the moment the host sends a new list, the
-        /// cached copy every name→slot mapping reads from must change with it,
-        /// or switches route to stale slots until the wheel's next full push.
+        /// Compact wheel-confirmed deletions out of the cached slot table —
+        /// call at the moment the library-sync port reconnect fires: the
+        /// wheel's own table rebuild on a port bounce is an ORDER-PRESERVING
+        /// compaction of deleted entries (wire-verified 2026-08-16: boot
+        /// table after a delete+bounce = same order minus the deleted name;
+        /// the wheel does NOT re-push its state after a fast bounce, so the
+        /// host must compact its cached copy in lockstep).
+        /// </summary>
+        public void CompactConfirmedDeletes()
+        {
+            var basis = _lastState ?? _cachedLastState;
+            if (basis == null || basis.ConfirmedRemovedNames.Count == 0) return;
+            var doomed = new HashSet<string>(basis.ConfirmedRemovedNames, StringComparer.Ordinal);
+            var table = new List<string>(basis.ConfigJsonList);
+            int before = table.Count;
+            table.RemoveAll(n => doomed.Contains(n));
+            var s = CloneWithList(basis, table);
+            s.ConfirmedRemovedNames = Array.Empty<string>();
+            _lastState = s;
+            _cachedLastState = s;
+            try
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Slot table compacted at reconnect: {before} → {table.Count} entries " +
+                    $"(removed: {string.Join(", ", doomed)})");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Apply a host-caused library mutation to the cached slot table. The
+        /// wheel maintains its configJsonList itself (ordinal-sorted) and
+        /// updates it LIVE on enable/delete — but never re-pushes it
+        /// mid-session (full TitleId=1 pushes only happen at connect;
+        /// wire-verified 2026-08-16, both plugin and PitHouse sessions). So
+        /// the host predicts the wheel's table by applying its OWN deltas to
+        /// the wheel-reported list: enabled names insert at their ordinal
+        /// position, removed names drop. This is deliberately NOT wholesale
+        /// adoption of the declared list (disproven — the wheel's set can
+        /// contain entries the enabled-only declaration omits) — only the
+        /// names this host just mutated move.
+        /// </summary>
+        public void ApplyLibraryDelta(string? addName, string? removeName)
+        {
+            var basis = _lastState ?? _cachedLastState;
+            if (basis == null) return;
+            var list = new List<string>(basis.ConfigJsonList);
+            bool changed = false;
+            if (!string.IsNullOrEmpty(removeName))
+                changed |= list.RemoveAll(n => string.Equals(n, removeName, StringComparison.Ordinal)) > 0;
+            if (!string.IsNullOrEmpty(addName)
+                && list.FindIndex(n => string.Equals(n, addName, StringComparison.Ordinal)) < 0)
+            {
+                int at = 0;
+                while (at < list.Count && string.CompareOrdinal(list[at], addName) < 0) at++;
+                list.Insert(at, addName!);
+                changed = true;
+            }
+            if (!changed) return;
+            AdoptList(basis, list);
+            try
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Slot-table prediction updated (add='{addName}' remove='{removeName}'): " +
+                    $"{list.Count} entries");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// UNUSED (kept for reference): early 2026-08-16 theory that the wheel
+        /// adopts the host's configJson() list as its slot table. Disproven
+        /// same day — the wheel maintains its own ordinal-sorted
+        /// configJsonList, which can include entries the host's enabled-only
+        /// declaration omits; adopting the declared list shifted name→slot
+        /// mappings and routed switches to the wrong dash. The wheel-reported
+        /// list is the only slot authority; host-caused deltas are applied via
+        /// <see cref="ApplyLibraryDelta"/>.
         /// </summary>
         public void AdoptDeclaredLibraryList(IReadOnlyList<string> names)
         {
             if (names == null || names.Count == 0) return;
             var basis = _lastState ?? _cachedLastState;
             if (basis == null) return;
-            var s = new WheelDashboardState
+            AdoptList(basis, new List<string>(names));
+        }
+
+        /// <summary>Clone <paramref name="basis"/> with a replacement
+        /// <see cref="WheelDashboardState.ConfigJsonList"/> and publish it as
+        /// the cached state.</summary>
+        private void AdoptList(WheelDashboardState basis, List<string> names)
+        {
+            var s = CloneWithList(basis, names);
+            _lastState = s;
+            _cachedLastState = s;
+        }
+
+        private static WheelDashboardState CloneWithList(WheelDashboardState basis, List<string> names)
+        {
+            return new WheelDashboardState
             {
                 TitleId = basis.TitleId,
                 DisplayVersion = basis.DisplayVersion,
@@ -166,9 +252,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 DisabledListKind = basis.DisabledListKind,
                 EnabledDeletedIds = basis.EnabledDeletedIds,
                 DisabledDeletedIds = basis.DisabledDeletedIds,
+                ConfirmedRemovedNames = basis.ConfirmedRemovedNames,
             };
-            _lastState = s;
-            _cachedLastState = s;
         }
 
         /// <summary>

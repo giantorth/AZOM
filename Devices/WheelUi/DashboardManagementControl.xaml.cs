@@ -402,10 +402,30 @@ namespace MozaPlugin.Devices.WheelUi
                                 _plugin.ActiveTelemetryMzdashPath) + "]");
                 }
 
-                // Show the device-reported slot (ground truth); fall back to the
-                // target's saved selection name.
-                string? selectedName = null;
-                if (sender != null && state != null && state.ConfigJsonList != null
+                // Selection preference: the saved selection name first (updated
+                // by both UI picks and wheel-initiated switches via
+                // DashboardBindingCoordinator), the device-reported slot as
+                // fallback. Reported-slot-first made the combo snap BACK to the
+                // pre-switch dash on every pick: this populate runs from the
+                // DashboardSelectionChanged event immediately after a switch,
+                // before the wheel's type-04 slot echo lands, so the stale
+                // reported slot kept overriding the user's fresh choice.
+                string? savedName = IsCm2Target ? _plugin.ActiveCm2DashboardName : _plugin.ActiveTelemetryProfileName;
+                bool savedInList = false;
+                if (!string.IsNullOrEmpty(savedName))
+                {
+                    foreach (var item in TelemetryProfileCombo.Items)
+                    {
+                        if (string.Equals(item?.ToString(), savedName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            savedInList = true;
+                            break;
+                        }
+                    }
+                }
+                string? selectedName = savedInList ? savedName : null;
+                if (string.IsNullOrEmpty(selectedName)
+                    && sender != null && state != null && state.ConfigJsonList != null
                     && sender.WheelReportedSlot >= 0
                     && sender.WheelReportedSlot < state.ConfigJsonList.Count)
                 {
@@ -414,7 +434,7 @@ namespace MozaPlugin.Devices.WheelUi
                         selectedName = reportedName;
                 }
                 if (string.IsNullOrEmpty(selectedName))
-                    selectedName = IsCm2Target ? _plugin.ActiveCm2DashboardName : _plugin.ActiveTelemetryProfileName;
+                    selectedName = savedName;
                 if (!string.IsNullOrEmpty(selectedName))
                 {
                     for (int i = 0; i < TelemetryProfileCombo.Items.Count; i++)
