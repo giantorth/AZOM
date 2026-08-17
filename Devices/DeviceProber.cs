@@ -81,10 +81,21 @@ namespace MozaPlugin.Devices
         /// we can detect Single / Rotary / Ambient groups we don't know about
         /// statically.
         /// </summary>
-        internal static string[] BuildNewWheelLedReadCommands(WheelModelInfo? info)
+        internal static string[] BuildNewWheelLedReadCommands(WheelModelInfo? info, bool isFsr1 = false)
         {
             info ??= WheelModelInfo.Default;
             var cmds = new List<string>();
+
+            // FSR V1 (RS21-D03): read NOTHING back. This old display rim is the
+            // most param-fragile wheel we support — its store wedges into a
+            // permanent "Failed to Read Parameter" storm that only a power-cycle
+            // clears (see wheel-0x17.md § Param-store wedge). PitHouse never reads
+            // its LED settings at all, while this batch is our heaviest read burst
+            // (measured 87 per-LED colour reads on group 0x40 cmd 0x1F in one
+            // session). Nothing needs them: the profile is the source of truth for
+            // every colour/brightness we write, so the only loss is seeding the UI
+            // pickers from the wheel's stored values on a fresh profile.
+            if (isFsr1) return System.Array.Empty<string>();
 
             // Bare RPM-only rims (the legacy "CS": RPM LEDs, no buttons / knobs /
             // flags / sleep light) have essentially no readable LED settings, and
@@ -262,6 +273,20 @@ namespace MozaPlugin.Devices
             _detectionState = detectionState;
             _drivesTelemetry = drivesTelemetry;
         }
+
+        /// <summary>
+        /// Log a device identity/capability echo, suppressing verbatim repeats.
+        /// These values are constants of the attached hardware — they only change
+        /// on a hot-swap — but the read commands are re-issued on every detection
+        /// pass, so a redetect storm re-emitted the whole block once per pass
+        /// (measured: 9 full display blocks in 178 s, and 25–74 % of every
+        /// diagnostics bundle was exact-duplicate lines). Keyed per pipe so the
+        /// primary / hub / base-aux probers don't suppress each other, and
+        /// <see cref="MozaLog.DebugIfChanged"/> still re-emits every 5 min so a
+        /// bundle pulled hours in shows current state.
+        /// </summary>
+        private void DebugIdentity(string field, string message) =>
+            MozaLog.DebugIfChanged($"{_connection.CaptureLabel}:probe:{field}", message);
 
         /// <summary>
         /// First-sight detection cascade for the dashboard sub-device. Called
@@ -575,8 +600,16 @@ namespace MozaPlugin.Devices
                     _deviceManager.ReadSetting("base-mcu-uid");
                     _deviceManager.ReadSetting("base-identity-11");
                     // Numeric firmware version (dev 0x12, group 0x04) — gates the
-                    // wheelbase LFE effects via MozaData.BaseSupportsLfe.
+                    // wheelbase LFE effects via MozaData.BaseSupportsLfe. Three
+                    // shots because a silent base disables LFE outright and this
+                    // read is issued exactly once per detection: the canonical
+                    // 0x12 request PitHouse sends, the same request in its
+                    // zero-length form, and the same query at dev 0x13. An R12
+                    // (RS21-D07) on LFE-capable firmware answers none of them at
+                    // 0x12 in the len-4 form — see MozaCommandDatabase.
                     _deviceManager.ReadSetting("base-fw-version");
+                    _deviceManager.SendBaseFwVersionShortProbe();
+                    _deviceManager.ReadSetting("base-fw-version-b");
                 }
             }
 
@@ -600,10 +633,21 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "base-fw-version":
+                case "base-fw-version-b":
                     // The reply's packed version is always positive (major byte
-                    // < 0x80), so it clears the value guard above. Deferred
-                    // equalizer7-10 apply+read: the main base sweep runs before
-                    // the firmware version is known, and old firmware never
+                    // < 0x80), so it clears the value guard above. Logged once per
+                    // detection: it's the only LFE gate, and without it a silent
+                    // base is indistinguishable from an old one in a bug report.
+                    if (!_detectionState.BaseFwVersionLogged)
+                    {
+                        _detectionState.BaseFwVersionLogged = true;
+                        MozaLog.Info(
+                            $"[AZOM] Base firmware {_data.BaseFwVersionText} " +
+                            $"(LFE effects {(_data.BaseSupportsLfe ? "supported" : "unsupported, needs >= 1.2.10.10")}) " +
+                            $"via {commandName}");
+                    }
+                    // Deferred equalizer7-10 apply+read: the main base sweep runs
+                    // before the firmware version is known, and old firmware never
                     // answers these registers. Writes queue before reads so the
                     // read-backs reflect the profile values just applied.
                     if (_data.BaseSupportsEq10 && !_detectionState.BaseEq10Probed)
@@ -660,6 +704,17 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "wheel-model-name":
+                    // Only the wheel ids may drive wheel identity. The parser's
+                    // device hints already keep base/ES/shifter/pedals/handbrake
+                    // replies out of the wheel-* bucket, but this case both
+                    // DETECTS and HOT-SWAPS, so a single mis-routed reply costs a
+                    // full detection reset (+ a PendingResponseTracker wipe). A
+                    // relayed pedal set answering the shared group-0x07 probe used
+                    // to land here as model 'SRP' and reset a healthy 'KS' wheel —
+                    // see the pedals/handbrake hints in MozaResponseParser.
+                    if (deviceId != MozaProtocol.DeviceWheel && deviceId != MozaProtocol.DeviceWheel15)
+                        break;
+
                     // A valid model-name reply (the doc's canonical group-0x07
                     // probe, ProbeWheelDetection) can itself trigger new-protocol
                     // detection — this covers a wheel that answers the identity
@@ -670,7 +725,6 @@ namespace MozaPlugin.Devices
                     // neither reaches this case. Mirrors the wheel-telemetry-mode
                     // bring-up minus the model-name read (already in hand).
                     if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected
-                        && (deviceId == MozaProtocol.DeviceWheel || deviceId == MozaProtocol.DeviceWheel15)
                         && IsValidWheelModelName(_data.WheelModelName))
                     {
                         _detectionState.NewWheelDetected = true;
@@ -678,9 +732,17 @@ namespace MozaPlugin.Devices
                         _deviceManager.LockWheelId(deviceId);
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
-                        _deviceManager.ReadSetting("wheel-serial-a");
-                        _deviceManager.ReadSetting("wheel-serial-b");
-                        _deviceManager.SendPithouseIdentityProbe(deviceId);
+                        // FSR V1 never answers serial-a/b (0x10/00,01) or the
+                        // 0x09/02/04/05/06/11 probe frames — verified unanswered even
+                        // on a HEALTHY session (Jul-31 bundle, zero param failures).
+                        // Each unanswered read is a param-manager miss on the wheel
+                        // whose store wedges, so skip them once we know the model.
+                        if (!_plugin.IsFsr1DisplayWheel)
+                        {
+                            _deviceManager.ReadSetting("wheel-serial-a");
+                            _deviceManager.ReadSetting("wheel-serial-b");
+                            _deviceManager.SendPithouseIdentityProbe(deviceId);
+                        }
                         _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
                         MozaLog.Info($"[AZOM] New-protocol wheel detected via model-name probe on ID {deviceId}");
                         // Fall through to the resolution block below.
@@ -723,8 +785,16 @@ namespace MozaPlugin.Devices
                             // Now that WheelModelInfo is resolved, send the
                             // LED-group-filtered reads. Skipping reads for LEDs
                             // the wheel doesn't have keeps PendingResponseTracker
-                            // from churning on inevitable timeouts.
-                            _deviceManager.ReadSettingsPaced(BuildNewWheelLedReadCommands(info));
+                            // from churning on inevitable timeouts. Suppressed while
+                            // the wheel's param manager is storming — this batch is
+                            // the heaviest read burst we emit, and re-detect loops
+                            // feeding it into a failing param store is the documented
+                            // wedge path (wheel-0x17.md § Table 8 storm).
+                            if (_plugin.FirmwareDebugLogForDiagnostics.ParamStormActive)
+                                MozaLog.Warn("[AZOM] Skipping wheel LED-capability read batch — param-store storm active.");
+                            else
+                                _deviceManager.ReadSettingsPaced(
+                                    BuildNewWheelLedReadCommands(info, _plugin.IsFsr1DisplayWheel));
                             if (DeviceDefinitionDeployer.DeployForModel(currentModel, _connection.DiscoveredPid))
                                 _plugin.DeviceDefinitionDeployed = true;
 
@@ -780,7 +850,8 @@ namespace MozaPlugin.Devices
                     }
                     else
                     {
-                        MozaLog.Debug($"[AZOM] Wheel model (mis-routed locked-id read): {_data.WheelModelName}");
+                        DebugIdentity("wheel-model-misrouted",
+                            $"[AZOM] Wheel model (mis-routed locked-id read): {_data.WheelModelName}");
                         // A valid model name from a new-protocol-only id while the
                         // session is classified old-protocol names the wheel behind
                         // the firmware advisory (real ES wheels reply here from the
@@ -834,53 +905,59 @@ namespace MozaPlugin.Devices
                     break;
 
                 case "wheel-sw-version":
-                    MozaLog.Debug($"[AZOM] Wheel FW: {_data.WheelSwVersion}");
+                    DebugIdentity("wheel-fw", $"[AZOM] Wheel FW: {_data.WheelSwVersion}");
                     break;
 
                 case "wheel-serial-b":
                     if (!string.IsNullOrEmpty(_data.WheelSerialNumber))
-                        MozaLog.Debug($"[AZOM] Wheel serial: {MozaLog.RedactId(_data.WheelSerialNumber)}");
+                        DebugIdentity("wheel-serial",
+                            $"[AZOM] Wheel serial: {MozaLog.RedactId(_data.WheelSerialNumber)}");
                     break;
 
                 case "wheel-hw-sub":
                     if (!string.IsNullOrEmpty(_data.WheelHwSubVersion))
-                        MozaLog.Debug($"[AZOM] Wheel HW sub: {_data.WheelHwSubVersion}");
+                        DebugIdentity("wheel-hw-sub", $"[AZOM] Wheel HW sub: {_data.WheelHwSubVersion}");
                     break;
 
                 case "wheel-mcu-uid":
                     if (_data.WheelMcuUid.Length > 0)
-                        MozaLog.Debug(
+                        DebugIdentity("wheel-mcu-uid",
                             $"[AZOM] Wheel MCU UID ({_data.WheelMcuUid.Length}B): " +
                             MozaLog.RedactBytesHex(_data.WheelMcuUid));
                     break;
 
                 case "wheel-device-type":
                     if (_data.WheelDeviceType.Length > 0)
-                        MozaLog.Debug($"[AZOM] Wheel device type: {BitConverter.ToString(_data.WheelDeviceType)}");
+                        DebugIdentity("wheel-device-type",
+                            $"[AZOM] Wheel device type: {BitConverter.ToString(_data.WheelDeviceType)}");
                     break;
 
                 case "wheel-capabilities":
                     if (_data.WheelCapabilities.Length > 0)
-                        MozaLog.Debug($"[AZOM] Wheel capabilities: {BitConverter.ToString(_data.WheelCapabilities)}");
+                        DebugIdentity("wheel-capabilities",
+                            $"[AZOM] Wheel capabilities: {BitConverter.ToString(_data.WheelCapabilities)}");
                     break;
 
                 case "wheel-presence":
-                    MozaLog.Debug($"[AZOM] Wheel presence/ready: sub_device_count={_data.WheelSubDeviceCount}");
+                    DebugIdentity("wheel-presence",
+                        $"[AZOM] Wheel presence/ready: sub_device_count={_data.WheelSubDeviceCount}");
                     break;
 
                 case "wheel-device-presence":
-                    MozaLog.Debug($"[AZOM] Wheel device presence byte: 0x{_data.WheelDevicePresence:X2}");
+                    DebugIdentity("wheel-device-presence",
+                        $"[AZOM] Wheel device presence byte: 0x{_data.WheelDevicePresence:X2}");
                     break;
 
                 case "wheel-identity-11":
                     if (_data.WheelIdentity11.Length > 0)
-                        MozaLog.Debug($"[AZOM] Wheel identity-11: {BitConverter.ToString(_data.WheelIdentity11)}");
+                        DebugIdentity("wheel-identity-11",
+                            $"[AZOM] Wheel identity-11: {BitConverter.ToString(_data.WheelIdentity11)}");
                     break;
 
                 case "display-model-name":
                     if (!string.IsNullOrEmpty(_data.DisplayModelName))
                     {
-                        MozaLog.Debug($"[AZOM] Display model: {_data.DisplayModelName}");
+                        DebugIdentity("display-model", $"[AZOM] Display model: {_data.DisplayModelName}");
                         // Bridged CM2 confirmed by display identity. The CM2 itself is
                         // driven by the dedicated _cm2Sender at 0x14 (EnsureCm2Pipeline,
                         // already running) — NOT the main sender. This block only
@@ -922,7 +999,7 @@ namespace MozaPlugin.Devices
                 case "display-hw-version":
                     if (!string.IsNullOrEmpty(_data.DisplayHwVersion))
                     {
-                        MozaLog.Debug($"[AZOM] Display HW: {_data.DisplayHwVersion}");
+                        DebugIdentity("display-hw", $"[AZOM] Display HW: {_data.DisplayHwVersion}");
                         // HW version alone satisfies IsDisplayDetected — re-trigger
                         // the deferred start for empty-model-name wheels (W17).
                         NoteDisplayIdentityReady();
@@ -931,7 +1008,7 @@ namespace MozaPlugin.Devices
                 case "display-sw-version":
                     if (!string.IsNullOrEmpty(_data.DisplaySwVersion))
                     {
-                        MozaLog.Debug($"[AZOM] Display FW: {_data.DisplaySwVersion}");
+                        DebugIdentity("display-fw", $"[AZOM] Display FW: {_data.DisplaySwVersion}");
                         // SW version alone satisfies IsDisplayDetected — re-trigger
                         // the deferred start for empty-model-name wheels (W17).
                         NoteDisplayIdentityReady();
@@ -939,25 +1016,31 @@ namespace MozaPlugin.Devices
                     break;
                 case "display-serial":
                     if (!string.IsNullOrEmpty(_data.DisplaySerialNumber))
-                        MozaLog.Debug($"[AZOM] Display serial: {MozaLog.RedactId(_data.DisplaySerialNumber)}");
+                        DebugIdentity("display-serial",
+                            $"[AZOM] Display serial: {MozaLog.RedactId(_data.DisplaySerialNumber)}");
                     break;
                 case "display-presence":
-                    MozaLog.Debug($"[AZOM] Display presence/ready: sub_device_count={_data.DisplaySubDeviceCount}");
+                    DebugIdentity("display-presence",
+                        $"[AZOM] Display presence/ready: sub_device_count={_data.DisplaySubDeviceCount}");
                     break;
                 case "display-device-presence":
-                    MozaLog.Debug($"[AZOM] Display device presence byte: 0x{_data.DisplayDevicePresence:X2}");
+                    DebugIdentity("display-device-presence",
+                        $"[AZOM] Display device presence byte: 0x{_data.DisplayDevicePresence:X2}");
                     break;
                 case "display-device-type":
                     if (_data.DisplayDeviceType.Length > 0)
-                        MozaLog.Debug($"[AZOM] Display device type: {BitConverter.ToString(_data.DisplayDeviceType)}");
+                        DebugIdentity("display-device-type",
+                            $"[AZOM] Display device type: {BitConverter.ToString(_data.DisplayDeviceType)}");
                     break;
                 case "display-capabilities":
                     if (_data.DisplayCapabilities.Length > 0)
-                        MozaLog.Debug($"[AZOM] Display capabilities: {BitConverter.ToString(_data.DisplayCapabilities)}");
+                        DebugIdentity("display-capabilities",
+                            $"[AZOM] Display capabilities: {BitConverter.ToString(_data.DisplayCapabilities)}");
                     break;
                 case "display-identity-11":
                     if (_data.DisplayIdentity11.Length > 0)
-                        MozaLog.Debug($"[AZOM] Display identity-11: {BitConverter.ToString(_data.DisplayIdentity11)}");
+                        DebugIdentity("display-identity-11",
+                            $"[AZOM] Display identity-11: {BitConverter.ToString(_data.DisplayIdentity11)}");
                     break;
                 case "display-mcu-uid":
                     // Already logged before the value<0 guard at the top.

@@ -77,9 +77,7 @@ namespace MozaPlugin.Telemetry.Protocol
                 v => (ulong)(ushort)(int)Sanitize(v), (-1000, 1000)));
 
             // 32-bit float (special: store the IEEE-754 bits)
-            Add(new Entry("float", 0x07, 32,
-                v => (ulong)BitConverter.ToUInt32(BitConverter.GetBytes((float)Sanitize(v)), 0),
-                (0, 200)));
+            Add(new Entry("float", 0x07, 32, EncodeFloatBits, (0, 200)));
 
             // 5-bit gear-style (signed via 2's complement: -1 → 31 = reverse)
             Add(new Entry("int30", 0x0D, 5, EncodeInt30, (0, 30)));
@@ -123,17 +121,39 @@ namespace MozaPlugin.Telemetry.Protocol
             Add(new Entry("tyre_pressure_1", 0x16, 12,
                 v => (ulong)Clamp(Sanitize(v) * 10.0, 0, 4095), (0, 40)));
 
-            // 14-bit temps with +5000 offset
+            // 14-bit temp with +5000 offset. 0x11/14 is the ONLY temp code that
+            // appears in a capture (95 records across the byte-exact PitHouse
+            // set, always paired with tyre_pressure_1 0x16/12).
             Add(new Entry("tyre_temp_1", 0x11, 14, EncodeTemp14, (0, 150)));
-            Add(new Entry("track_temp_1", 0x12, 14, EncodeTemp14, (0, 60)));
-            Add(new Entry("oil_pressure_1", 0x13, 14, EncodeTemp14, (0, 10)));
 
-            // 16-bit brake temp. PitHouse emits code 0x12 width 16 for brake
-            // temps (bridge-20260503 W17 + FSR2 W13). The code was previously
-            // 0x16, which collides with tyre_pressure_1 (0x16/12) — distinct on
-            // PitHouse, so brake temp uses 0x12 here too.
-            Add(new Entry("brake_temp_1", 0x12, 16,
-                v => (ulong)Clamp(Sanitize(v) * 10.0 + 5000.0, 0, 65535), (0, 1000)));
+            // track_temp_1 / oil_pressure_1 / brake_temp_1 — emitted as float.
+            //
+            // These three carried codes invented by extending the 0x11 temp
+            // pattern: 0x12/14, 0x13/14 and 0x12/16. None of them survives
+            // contact with the capture set:
+            //   * 0x12 appears at NO width in any decoded tier-def, yet the table
+            //     claimed it twice at two different widths (14 and 16) — one code
+            //     cannot be two sizes, so at least one was always wrong.
+            //   * 0x13 IS captured, but only ever at width 5 (level_1 — ABSLevel /
+            //     TCLevel / SectorIndex). oil_pressure_1 declared the same code at
+            //     width 14.
+            // A tier carrying one of these is rejected WHOLE by Type02 firmware,
+            // which logs "TelemetryBitPackageError:type size not match" and then
+            // silently discards that tier's value frames — taking every healthy
+            // channel packed alongside it down too. Seen on two W17/CS-Pro bundles
+            // (5XR0GQDB, 1HZ4ZRH7): TrackTemp&unit=F rides the pkg-2000 tier with
+            // BestLapTime and LastLapTime, and all three stayed blank while every
+            // other tier rendered.
+            //
+            // float (0x07/32) is the documented fallback for exactly this — see
+            // docs/protocol/README.md on the tyre codes: the wheel decodes the
+            // IEEE float and displays the raw game value (°C / bar / PSI), no
+            // scale applied. It is also the most-captured code in the protocol
+            // (132 records) and already rides these same tiers safely. Keep each
+            // channel's own TestRange so test mode still sweeps a sensible band.
+            Add(new Entry("track_temp_1", 0x07, 32, EncodeFloatBits, (0, 60)));
+            Add(new Entry("oil_pressure_1", 0x07, 32, EncodeFloatBits, (0, 10)));
+            Add(new Entry("brake_temp_1", 0x07, 32, EncodeFloatBits, (0, 1000)));
 
             // 4-bit
             Add(new Entry("uint3", 0x14, 4,
@@ -192,6 +212,11 @@ namespace MozaPlugin.Telemetry.Protocol
         {
             return (ulong)Clamp(Sanitize(v) * 10.0 + 5000.0, 0, 16383);
         }
+
+        // IEEE-754 single-precision bits, packed into the low 32 bits. Shared by
+        // every channel emitted as code 0x07 width 32.
+        private static ulong EncodeFloatBits(double v)
+            => BitConverter.ToUInt32(BitConverter.GetBytes((float)Sanitize(v)), 0);
 
         // Public lookups. Both throw if name/code is unknown — callers should
         // pre-validate via TryGet against the Telemetry.json catalog at load time.

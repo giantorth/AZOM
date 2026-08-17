@@ -212,9 +212,15 @@ live bit stream.
 > (`tyre_pressure_1`) and `0x11` (`tyre_temp_1`) are inferred-only —
 > live R5+W17 wheel does NOT decode them. Tyre widgets stayed at 0
 > until plugin switched these channels to `float` (`0x07`, width 32).
-> Other inferred codes that have NOT been confirmed against live
-> Type02 firmware: `0x12` (`track_temp_1`), `0x13` (`oil_pressure_1`),
-> `0x15` (`float_600_2`), `0x16` (`brake_temp_1`). Use `float` until
+> `track_temp_1`, `oil_pressure_1` and `brake_temp_1` were worse than
+> undecoded — their `(code, width)` pairs (`0x12`/14, `0x13`/14,
+> `0x12`/16) appear in NO capture, and firmware answers a tier
+> containing one with `TelemetryBitPackageError:type size not match`
+> and then drops that tier's value frames **entirely**, blanking every
+> healthy channel packed with it. All three emit as `float` since
+> 2026-08-14. Still unconfirmed: `0x15` (`float_600_2`), `0x17`
+> (`float_001`), `0x14` (`uint3`/`uint8`) — though `0x17`/10 and
+> `0x14`/4 are known to render on W17. Use `float` until
 > a PitHouse capture proves otherwise. Codes confirmed working live:
 > `0x00` (`bool`), `0x01`/`0x02` (`uint8`/`int8`), `0x04` (`uint16_t`),
 > `0x07` (`float`), `0x0D` (`int30`/`uint30`), `0x0F` (`float_6000_1`),

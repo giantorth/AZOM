@@ -15,13 +15,16 @@ namespace MozaPlugin
     /// </summary>
     public static class MozaLog
     {
-        // Gates the per-frame Debug lines on the serial read thread (the WIRE
-        // session-chunk diag and the firmware-debug echo) — each pays caller
-        // string interpolation + a ring insert under the global lock at frame
-        // rate. Everything else logs unconditionally. Default on (the ring is
-        // the diagnostics export's source); MozaPluginSettings.VerboseWireDebugLog
-        // turns it off for users who don't need wire-level logs.
-        public static volatile bool WireDebugEnabled = true;
+        // Gates the per-frame Debug lines (the WIRE session-chunk diag and the
+        // firmware-debug echo on the serial read thread, the FSR1 gap resolve on
+        // the display tick) — each pays caller string interpolation + a ring
+        // insert under the global lock at frame rate. Everything else logs
+        // unconditionally. Default OFF so steady-state frame traffic can't evict
+        // the connect/handshake history from the ring; the wire trace carries the
+        // same bytes into the same bundle. MozaPluginSettings.VerboseWireDebugLog
+        // turns it back on. Applies before settings load too, so a slow cold start
+        // doesn't log frames the user never asked for.
+        public static volatile bool WireDebugEnabled = false;
 
         // Cap covers many sessions of dense [AZOM] traffic. Older lines drop
         // silently; the export pulls a chronological snapshot on demand.
@@ -40,6 +43,49 @@ namespace MozaPlugin
         {
             try { SimHub.Logging.Current.Debug(message); } catch { }
             Record("DEBUG", message);
+        }
+
+        /// <summary>
+        /// Debug line that goes to SimHub's log but NOT the ring buffer. For
+        /// high-rate output that is already captured elsewhere in the bundle
+        /// (the firmware-debug echo has its own ring in <c>FirmwareDebugLog</c>
+        /// plus the wire trace) — mirroring it here evicted everything else.
+        /// </summary>
+        public static void DebugNoRing(string message)
+        {
+            try { SimHub.Logging.Current.Debug(message); } catch { }
+        }
+
+        // Repeat-suppression state for DebugIfChanged, keyed per call site.
+        private static readonly Dictionary<string, KeyValuePair<string, DateTime>> _lastByKey =
+            new Dictionary<string, KeyValuePair<string, DateTime>>();
+        private static readonly object _repeatGate = new object();
+        // A suppressed line is re-emitted this often even when unchanged, so a
+        // bundle pulled hours in still shows the current state.
+        private const double RepeatRefreshMinutes = 5.0;
+
+        /// <summary>
+        /// Debug line emitted only when <paramref name="message"/> differs from the
+        /// last one logged under <paramref name="key"/> (or once every
+        /// <see cref="RepeatRefreshMinutes"/> minutes regardless). For steady-state
+        /// poll output: the 5 s reconnect tick emitted five identical lines per tick,
+        /// which filled the entire 5 000-line ring in ~40 minutes and pushed the
+        /// connect/handshake history out of every bug report. Callers that run on
+        /// more than one pipe must fold the pipe label into the key.
+        /// </summary>
+        public static void DebugIfChanged(string key, string message)
+        {
+            if (string.IsNullOrEmpty(key)) { Debug(message); return; }
+            var now = DateTime.UtcNow;
+            lock (_repeatGate)
+            {
+                if (_lastByKey.TryGetValue(key, out var prev)
+                    && prev.Key == message
+                    && (now - prev.Value).TotalMinutes < RepeatRefreshMinutes)
+                    return;
+                _lastByKey[key] = new KeyValuePair<string, DateTime>(message, now);
+            }
+            Debug(message);
         }
 
         public static void Warn(string message)

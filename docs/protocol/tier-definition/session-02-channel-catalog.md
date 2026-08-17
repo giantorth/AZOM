@@ -217,6 +217,16 @@ dashboards, NOT extending the current dashboard's channel set — see
 the [Live-set tracking](#live-set-tracking-which-idxs-are-in-the-current-dashboard)
 rules for the parse-side handling.
 
+**The END counter is per wheel *session*, not per connection.** It restarts
+from a low value every time the host closes and re-opens the catalog sessions,
+so its values are re-trodden across session cycles: bundle `5XR0GQDB` (W17 /
+CS Pro) shows one plugin run observing END = 79, 5, 5, 27, 17, 18 across four
+session opens. A host that remembers committed END values for longer than one
+session therefore mistakes a genuinely new generation for re-affirmation.
+Scope any "have I already committed this END value?" state to a **catalog
+epoch** — the span between session opens — and treat the first commit of an
+epoch as authoritative for the current dashboard (see live-set rule 5).
+
 ### Live-set tracking ("which idxs are in the current dashboard?")
 
 `Catalog` (the accumulated URL list) is not dash-specific — it preserves
@@ -227,11 +237,16 @@ the parser publishes a separate `LiveCatalog` view via these rules:
 
 1. Walk records in byte order. Maintain `_pendingIdxs` (set of idxs
    touched since the last END marker boundary).
-2. **Only full URL records add to `_pendingIdxs`.** Back-references are
-   resolved into `_catalog` for URL lookup but do NOT contribute to
-   the live set — they're ambiguous (keepalive vs. carry-over) and
-   crediting them poisoned post-switch live sets with stale historical
-   idxs in observed traces.
+2. **Full URL records and successfully-resolved back-references both add
+   to `_pendingIdxs`.** Crediting back-refs is required for switches that
+   re-use existing idxs without re-declaring them as full URLs (trace
+   `moza-wire-20260525-204404`: a Nebula switch sent full URLs for idxs
+   1–4 and back-refs for 5–8; excluding the back-refs committed only
+   `{1..4}` and the synth filter then stripped channels 5–8 as "not in
+   catalog"). The ambiguity that argued against crediting them — keepalive
+   vs. carry-over — is resolved by the marker rules below instead: a pure
+   keepalive burst terminates at an *already-committed* END value, so its
+   pending set is discarded before it can reach `_liveCatalog`.
 3. On each tag-0x06 END marker encountered in the byte stream, read the
    END marker's `markerValue` from bytes 5..8 at the parse loop's
    current position (NOT from `_lastWheelEndMarker` — that field is set
@@ -263,10 +278,33 @@ the parser publishes a separate `LiveCatalog` view via these rules:
    append-only and re-walked each pass; carry-over state would let URLs
    from an uncommitted generation pollute the FIRST commit of the next
    pass.
+5. **Reset the committed-marker set on every session (re)open**, and make
+   that epoch's first commit an unconditional replace — no union with the
+   prior live set, and no carrying slots over from it. The wheel re-declares
+   its whole catalog with full-URL records after a session open, so slots
+   the new generation does not mention belong to a dashboard that is no
+   longer loaded. Without the reset, the re-trodden END values (see above)
+   all look like re-affirmation and `_liveCatalog` freezes permanently on
+   whichever generation committed first; without the replace, a *larger*
+   prior dashboard's trailing idxs survive into the current one and end up
+   declared in the tier-def, where the wheel has no slot for them
+   (bundle `5XR0GQDB`: idxs 19/20 from a prior dash rode into the pkg-2000
+   tier and the wheel logged
+   `TelemetryBitPackageError:type size not match`, dropping that tier's
+   values). Slot-preservation for a *dropped chunk* still applies inside an
+   epoch, where the wheel is re-advertising an already-known catalog.
 
 This gives the host a clean "channels in the wheel's currently-loaded
 dashboard" view for tier-def synthesis even when there's no local mzdash
 to consult.
+
+**Emit against `LiveCatalog`, not `Catalog`.** Both lists are positional and
+share idx numbering, but `Catalog` deliberately keeps every URL the wheel has
+ever announced so back-refs resolve. Filtering, sorting or idx-resolving a
+tier-def against `Catalog` therefore declares channels the current dashboard
+has no slot for; `LiveCatalog` is the same list masked to the current
+generation, so it can only ever narrow the emission. Fall back to `Catalog`
+before the first live commit (cold start), when no masked view exists yet.
 
 ### Plugin consumption
 

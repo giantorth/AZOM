@@ -151,6 +151,14 @@ namespace MozaPlugin.Devices
             }
         }
 
+        /// <summary>Every live lane, in discovery order — for the diagnostics panel.
+        /// A copy, so the caller can walk it without holding <c>_lock</c>.</summary>
+        public IReadOnlyList<StandalonePeripheralController> Snapshot()
+        {
+            lock (_lock)
+                return new List<StandalonePeripheralController>(_order);
+        }
+
         /// <summary>Retransmit each connected peripheral's tracked reads on ITS
         /// own pipe. Called from the plugin's retry timer alongside the base + hub
         /// pending-tick.</summary>

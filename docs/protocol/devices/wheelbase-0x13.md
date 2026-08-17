@@ -238,6 +238,20 @@ bytes>`, e.g. `84 21 01 02 0A 0A` = `1.2.10.10`. Same probe shape as the wheel's
 `device-type` (group `0x04`), and **distinct** from `sw-version` (group `0x0F`),
 which returns the hardware model string (`RS21-D05-MC WB`), not a numeric version.
 
+> **Not universal.** An **R12** (`RS21-D07-MC WB`, PID `0x0006`) on LFE-capable
+> firmware (owner-reported 1.2.10.13) never answers this request. Bug bundle
+> `2026-08-14_KS_1.5.4_65HZBQJT`: the probe goes out once at `19:13:49.355` and
+> no `84 21` frame appears in ~6 minutes of capture, while dev `0x12` is
+> demonstrably live either side of it (`a2 21` at `.329`, `87 21`
+> `"R12 Black # MOT-…"` at `.348`) and the *same* group-`0x04` request shape is
+> answered within 60 ms by the wheel (`84 71`), the pedals (`84 91`) and the
+> shifter (`84 a1`). The plugin therefore issues three probes at base detect —
+> the canonical 4-zero-byte request at `0x12`, the same request in its
+> zero-length form (`7E 00 04 12`, the shape `0x19`/`0x1A` answer), and the
+> query at dev `0x13` (`base-fw-version-b`) — and takes the first answer, with
+> `0x12` winning if more than one lands. Which of the three an R12 answers, if
+> any, is not yet confirmed on hardware.
+
 The 4 version bytes are in **wire order `[major, minor, build, patch]`** — MOZA's
 PitHouse UI displays the last two swapped: wire `01 02 18 09` is shown `1.2.9.24`,
 wire `01 02 0A 0A` is `1.2.10.10`. The same mapping holds for the **wheel's**

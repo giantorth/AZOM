@@ -273,6 +273,15 @@ The b2h ACK from the 0x07 alloc requests returns a **1-byte index** (0x01..0x06 
 
 Effect-type bytes in the six 0x07 allocations: `03, 09, 09, 01, 04, 01` — HID-PID effect types Square, Damper, Damper, Constant, Sine, Constant. The repeated types are two independent instances each: the two dampers are the engine-pulse ON/OFF halves, the two constants are the shift engage/neutral kicks. No new alloc frames appeared anywhere later in the session — effects are allocated once at connect and reused for the entire session.
 
+#### The effect table is per device boot, and stale handles fail silently (2026-08-14)
+
+The handshake is **per port session, not per host process**. Bundle `38FCDFDW` (CS V2.1 + AB9, plugin 1.5.5-pr.128) caught the AB9 dropping off USB mid-session and re-enumerating ~11 s later — the device's own `0x0E` heartbeat proves the reboot, `sys run_time: 689171s` before the drop and `sys run_time: 122s` after it. The plugin reconnected but did not re-run the alloc burst (no `New Effect Index` lines in the post-reconnect capture), and from then on:
+
+- every `0x0A` / `0x0B` / `0x0D` / `0x08` frame addressing handles `0x01..0x06` was answered with the ordinary generic `a0 21` ACK — **an unallocated handle is not rejected and produces no error frame**, so there is no wire-visible signal that the effect is dead;
+- all six effects (engine vibration, engine-pulse pair, shift rumble, engage/neutral kicks) stayed silent, while ordinary `0x1F` config writes (layout, resistance, sliders) kept working normally — those don't go through the effect table.
+
+The user-visible signature is therefore "settings apply but nothing vibrates". Any code path that reopens the port must re-send `0e02 / 0e01 / 07×6 / 13` and re-latch the returned indices; `MozaAb9DeviceManager` keys that on `MozaSerialConnection.IoGeneration`.
+
 The capture also begins with the PitHouse-style identity probe cascade (groups `0x09`, `0x04`, `0x06`, `0x02`, `0x05`, `0x07`, `0x0f`, `0x11`, `0x08`, `0x10` — identical to the current plugin's probe except the plugin's order is `09 → 02 → 06 → 08 → 11` only, missing 04/05/07/0f/10) followed by **stored-setting reads on `Group 0x1E` with single-byte cmd payload**, then the FFB handshake.
 
 ### Read group is `0x1E` (single-byte cmd), not `0x1F` (2026-05-15)

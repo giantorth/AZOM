@@ -1515,6 +1515,49 @@ Every one of these is listed with its value and a reason in the wizard's "Not
 imported" card; `PitHouseMotorMapper.SweepUnhandled` is the backstop, so a key
 PitHouse adds later still surfaces rather than vanishing.
 
+### CRP / CRP2 / SRP presets — the passive-pedal route
+
+`deviceType: "Pedals"` covers the passive pedal sets too, not just the mBooster.
+Those have no motor, so their presets are the **calibration-only** shape: just
+the generic per-role block (`channlRoleType`, `outdir`, `min`, `max`,
+`nonlinear1..5`, `press_combine`) for all three roles, with none of the effect /
+travel / force families above. A real CRP2 preset observed in a user bundle
+carries 31 `deviceParams` keys against the mBooster samples' 88–100.
+
+The subject-role rule does **not** apply to them. It exists because an mBooster
+is one pedal per device, so a preset's other two sections are filler; a CRP is
+one device carrying all three pedals, so every populated section is that
+device's own throttle / brake / clutch. `PitHouseCrpPedalsMapper` therefore
+imports all three, and there is no target to pick.
+
+`devices` is the family discriminator the wizard routes on (mBooster presets
+name `"mBooster"` — see the top of this section). A Pedals preset that does not
+name the mBooster goes to the CRP surface whenever CRP-family pedals are
+detected; with none detected it stays on the mBooster path so the "no mBooster
+pedal attached" note is what the user sees.
+
+| PitHouse key | Plugin field | Wire command |
+|---|---|---|
+| `<p>_outdir` | `MozaProfile.Pedals<P>Dir` | `pedals-<p>-dir` |
+| `<p>_min` / `<p>_max` | `Pedals<P>Min` / `Pedals<P>Max` | `pedals-<p>-min` / `-max` |
+| `<p>_nonlinear1..5` | `Pedals<P>Curve[0..4]` | `pedals-<p>-y1..y5` |
+| `brake_press_combine` | `PedalsBrakeAngleRatio` | `pedals-brake-angle-ratio` |
+| `<p>_channlRoleType` | *(not imported)* | — (CRP roles are fixed) |
+
+`min`/`max` **are** imported here, unlike on the mBooster path: the CRP fields
+are percent on both sides (`MozaProfile.PedalsThrottleMin` is documented 0-100,
+the sliders are `Minimum=0 Maximum=100`, and the wire value is a percent — a
+capture of the plugin writing `pedals-throttle-max` shows `24 12 03 00 63` for
+99 %). The mBooster's raw-count mismatch is a property of *its* plugin fields,
+not of PitHouse's units. The pair is emitted as one row clamped to `min ≤ max`,
+mirroring `OnMinMaxSliderChanged`; a `max` of 0 is dropped with a note, because
+`ApplyPedalsToHardware` treats 0 as the "unset" sentinel and would skip the
+write while the profile and tab moved.
+
+Imported values land on the profile and reach the device through the normal
+`ApplyProfile` → `ApplyPedalsToHardware` push, so the CRP path needs no
+equivalent of `ImportPlan.TouchedMBoosters`.
+
 ### Open questions
 
 - **`<prefix>_channlRoleType` semantics are unresolved.** In both samples the
@@ -1548,4 +1591,4 @@ PitHouse adds later still surfaces rather than vanishing.
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
 - Profile storage — [`UI/MozaProfile.cs`](../../../UI/MozaProfile.cs) (`MBoosterSettings` dict)
 - UI tab — [`UI/SettingsControl.xaml`](../../../UI/SettingsControl.xaml) (`MBoosterTab`) + handlers in `SettingsControl.xaml.cs` under "mBooster tab — multi-device"
-- PitHouse preset import — [`UI/Import/PitHousePedalsMapper.cs`](../../../UI/Import/PitHousePedalsMapper.cs) + wizard [`UI/Import/PitHouseImportControl.xaml.cs`](../../../UI/Import/PitHouseImportControl.xaml.cs)
+- PitHouse preset import — [`UI/Import/PitHousePedalsMapper.cs`](../../../UI/Import/PitHousePedalsMapper.cs) (mBooster) + [`UI/Import/PitHouseCrpPedalsMapper.cs`](../../../UI/Import/PitHouseCrpPedalsMapper.cs) (CRP/SRP) + wizard [`UI/Import/PitHouseImportControl.xaml.cs`](../../../UI/Import/PitHouseImportControl.xaml.cs)
