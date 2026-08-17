@@ -61,6 +61,25 @@ namespace MozaPlugin.Telemetry
             });
         }
 
+        /// <summary>
+        /// Display brightness write + commit pair — group <c>0x32</c> cmd <c>0x00</c>
+        /// then <c>0x80</c>, big-endian u32 percent 0–100 (PitHouse "brightness
+        /// changes" capture; the wheel echoes "Table 7, Param 5 Written: N").
+        /// The value is PERSISTED to wheel EEPROM — emit only on committed user
+        /// intent (debounced slider release), never periodically and never as a
+        /// connect-time re-apply (the wheel remembers it across power cycles).
+        /// </summary>
+        internal static byte[][] BuildBrightness(int percent)
+        {
+            if (percent < 0) percent = 0;
+            if (percent > 100) percent = 100;
+            byte[] One(byte cmd) => BuildRaw(new byte[]
+            {
+                0x7E, 0x05, 0x32, Dev, cmd, 0x00, 0x00, 0x00, (byte)percent,
+            });
+            return new[] { One(0x00), One(0x80) };
+        }
+
         private static byte[][] BuildDeclarationSweep()
         {
             var all = Fsr1DashboardCatalog.Dashboards;

@@ -2,6 +2,50 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.5.5]
+
+### Added
+
+- **Every wheelbase setting is now a SimHub property and a bindable action.** Damper, friction,
+  inertia, spring, the four game-effect gains, soft limit, high-speed damping, road sensitivity,
+  the FFB equalizer bands, the FFB curve nodes and the clutch split point join the handful that
+  were already exposed — each with fine/coarse `Up`/`Down` actions, and `On`/`Off`/`Toggle` for
+  the switches. Full list in the README.
+- **mBooster G-Force (Inertial Pedal Feel)** *(experimental)* — moves the pedal under your foot in
+  proportion to live longitudinal G instead of vibrating, with Max Pedal Travel and Response Speed.
+- **mBooster Natural Friction and Segmented Damping** — two more hardware Pedal Feel settings: a
+  friction slider, and a damping profile that splits pedal travel into three draggable segments
+  with independent levels for pressed and released.
+- **mBooster profile import picks a target pedal.** A PitHouse Pedals preset now shows which pedal
+  role it carries and which attached mBooster will receive it.
+- **PitHouse Pedals presets import onto CRP / CRP2 / SRP pedals** — previously only an mBooster
+  could receive one.
+- **FSR V1 display brightness** now follows the brightness slider and actions.
+
+### Fixed
+
+- **Track temperature, and the channels sharing its update group, now display.** Track/air/fuel
+  temperature, brake temperatures and oil pressure were sent in a format this firmware rejects,
+  taking down every channel on the same update rate with them — typically best lap and last lap.
+- **Channels left over from a previously-shown dashboard no longer break a whole tier.** 
+- **A pedal set plugged into the wheelbase no longer breaks wheel detection.** 
+- **Wheelbase LFE haptics now work on bases that report their firmware differently.** 
+- **Device questions that go unanswered are retried again.** 
+- **An AB6/AB9 that drops off USB no longer goes silent.** The effects are now re-registered
+  on every reconnect.
+- **FSR V1 field corrections.** Tyre wear now reads as remaining rather than used, tyre pressures
+  use the correct corner order, and the light-stage and TC-R gauges decode properly.
+- **A lone mBooster on a chain-capable hub ignored its configured role.** 
+- **Directly-attached pedals and handbrakes showed placeholder settings.** Neither read its stored
+  calibration back on connect, so the tab showed defaults instead of what the device holds.
+
+### Changed
+
+- **The FSR V1 field editor drops its wire-boundary controls.** The byte/bit steppers and the
+  merge/split buttons are gone now that the record layouts are decoded from firmware; per-field
+  channel assignment and Reset remain.
+- **The plugin's log is less chatty.** Repeating status lines are now logged only when they change.
+
 ## [1.5.4]
 
 ### Added

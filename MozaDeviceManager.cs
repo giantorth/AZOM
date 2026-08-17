@@ -15,15 +15,22 @@ namespace MozaPlugin
         private readonly MozaSerialConnection _connection;
         private readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
 
-        // Retransmit tracker for tracked reads. The primary connection uses the
-        // global singleton (MozaPlugin.PendingResponses), whose TickRetransmits
-        // is driven by the plugin's retry timer against the PRIMARY pipe. A
-        // sibling connection (e.g. the dedicated Universal Hub pipe) MUST pass
-        // its own tracker so its read retransmits go out on its own Send — not
-        // the primary's — otherwise hub reads would be re-emitted on the base
-        // port. Null → fall back to the global singleton (primary behavior).
+        // Retransmit tracker for tracked reads. EVERY pipe passes its own tracker
+        // at construction: a read must be re-emitted on the connection it was sent
+        // on, so the hub's reads never go out on the base port and vice versa. The
+        // primary passes MozaPlugin.PendingResponses (the same instance
+        // OnMessageReceived calls NoteResponse on, and the retry timer ticks).
+        //
+        // Deliberately NOT resolved lazily through MozaPlugin.Instance. That static
+        // is published at the END of Init while the reconnect + poll timers are
+        // started ~150 lines earlier, so a connect that lands before Init returns
+        // reaches this class with Instance still null — and Track() is a silent
+        // no-op, for the one burst that issues every identity read. Reads sent then
+        // are never retried and never sunset, so a single dropped reply can disable
+        // a firmware-gated feature for the rest of the session with nothing in the
+        // log to say so. An injected tracker cannot have that window.
         private readonly PendingResponseTracker? _pendingResponses;
-        private PendingResponseTracker? Tracker => _pendingResponses ?? MozaPlugin.Instance?.PendingResponses;
+        private PendingResponseTracker? Tracker => _pendingResponses;
 
         // When set, every command on this pipe targets this device id regardless
         // of the command's DeviceType. Used by a dedicated standalone-peripheral
@@ -108,7 +115,7 @@ namespace MozaPlugin
         }
 
         public MozaDeviceManager(MozaSerialConnection connection,
-                                 PendingResponseTracker? pendingResponses = null,
+                                 PendingResponseTracker pendingResponses,
                                  byte? deviceIdOverride = null)
         {
             _connection = connection;
@@ -184,6 +191,19 @@ namespace MozaPlugin
             SendRawProbe(g, dev, new byte[] { 0x11, 0x04 });
             SendRawProbe(g, dev, new byte[] { 0x08, 0x01 });
             SendRawProbe(g, dev, new byte[] { 0x10, 0x00 });
+        }
+
+        /// <summary>
+        /// Zero-length form of the numeric base-firmware query
+        /// (<c>7E 00 04 12 CK</c>). The tracked <c>base-fw-version</c> read sends
+        /// the 4-zero-byte form PitHouse uses; some bases answer group 0x04 only in
+        /// the short form (it is the shape a relayed pedal set / shifter answers).
+        /// Untracked — a reply lands on the tracked read's name and clears it.
+        /// </summary>
+        public void SendBaseFwVersionShortProbe()
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(0x04, GetDeviceId("main"), null);
         }
 
         private void SendRawProbe(byte group, byte deviceId, byte[]? payload)

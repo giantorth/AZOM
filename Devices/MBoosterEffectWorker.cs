@@ -188,16 +188,24 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Whether THIS worker's pedal axis is actually wired — same
-        /// "ConnectedAxes null means assume only axis 0 is real" convention
-        /// the UI uses (SettingsControl.xaml.cs). Guards the per-pedal effect
-        /// portion of <see cref="Tick"/>: without it, once TargetDevice above
-        /// stopped trusting axis index blindly, every phantom axis's worker
+        /// Whether THIS worker's pedal axis can actually play an effect: wired,
+        /// and motorized. Wiring uses the same "ConnectedAxes null means assume
+        /// only axis 0 is real" convention the UI uses
+        /// (SettingsControl.xaml.cs). Guards the per-pedal effect portion of
+        /// <see cref="Tick"/>: without it, once TargetDevice above stopped
+        /// trusting axis index blindly, every phantom or motorless axis's worker
         /// would ALSO resolve to the one real device and race the genuine
         /// pedal's worker for it.
         /// </summary>
         private bool IsPedalAxisConnected()
         {
+            // A passive pedal has no motor, so it can never play an effect. This
+            // is load-bearing, not merely tidy: a single-active-pedal lane now
+            // resolves EVERY axis's TargetDevice to the one real device id
+            // (MBoosterDeviceController.MotorDeviceForCurrentAxis), so without
+            // this gate the passive axes' workers would all stream at the active
+            // pedal's motor and race the genuine worker for it.
+            if (!_device.IsAxisMotorized(_pedalAxisIndex)) return false;
             var connected = _device.ConnectedAxes;
             if (connected != null)
                 return _pedalAxisIndex < connected.Length && connected[_pedalAxisIndex];
@@ -419,13 +427,14 @@ namespace MozaPlugin.Devices
             lock (_telemetryLock) snap = _latest;
 
             // Only compute/send THIS pedal's vibration effects if its axis is
-            // actually wired. This controller's HID interface commonly
-            // reports 3 axes regardless of how many pedals are physically
-            // connected (see IsPedalAxisConnected), and TargetDevice no
-            // longer assumes axis index directly maps to a real chain device
-            // id — without this guard, a phantom axis's worker would ALSO
-            // resolve to the one real device and fight the genuine pedal's
-            // worker over it. Brake Fade below has its own, similar gate
+            // actually wired AND motorized. This controller's HID interface
+            // commonly reports 3 axes regardless of how many pedals are
+            // physically connected, and a lane's passive pedals have no motor
+            // at all (see IsPedalAxisConnected); TargetDevice no longer assumes
+            // axis index maps to a real chain device id — without this guard, a
+            // phantom or passive axis's worker would ALSO resolve to the one
+            // real device and fight the genuine pedal's worker over it. Brake
+            // Fade below has its own, similar gate
             // (IsPedalAxisConnected + PedalRole == Brake, not primary-only);
             // the 500ms keepalive stays primary-only/lane-wide unconditionally.
             if (IsPedalAxisConnected())

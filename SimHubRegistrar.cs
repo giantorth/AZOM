@@ -357,9 +357,13 @@ namespace MozaPlugin
             val = val < 0 ? 0 : (val > 100 ? 100 : val);
             if (_plugin.Data != null) _plugin.Data.DashDisplayBrightness = val;
             _plugin.UpdateActiveProfile(p => p.DashDisplayBrightness = val);
-            // Decoupled: target the CM2's own sender when a CM2 is present (it drives
-            // the CM2 screen); fall back to the wheel-screen main sender otherwise.
-            (_plugin.ActiveCm2Sender ?? _plugin.TelemetrySender)?.SendDashDisplayBrightness(val, allowZero: true);
+            // FSR1 wheel display: brightness is a group-0x32 EEPROM param write.
+            if (_plugin.IsFsr1DisplayWheel && _plugin.ActiveCm2Sender == null)
+                _plugin.SendFsr1DisplayBrightness(val);
+            else
+                // Decoupled: target the CM2's own sender when a CM2 is present (it drives
+                // the CM2 screen); fall back to the wheel-screen main sender otherwise.
+                (_plugin.ActiveCm2Sender ?? _plugin.TelemetrySender)?.SendDashDisplayBrightness(val, allowZero: true);
             _plugin.SaveSettings();
         }
 

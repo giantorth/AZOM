@@ -46,6 +46,15 @@ namespace MozaPlugin.Telemetry
         private volatile bool _gameRunning;
         private int _tickCounter;
         private int _lastStreamedIndex = -1;
+        // Table-7 EEPROM write gate (see Tick): selects (Param 6) and display brightness
+        // (Param 5) are both PERSISTED by the wheel, and back-to-back commits preceded
+        // every observed param-store wedge (2026-08-06 crash bundles — two brightness
+        // commits 700 ms apart, storage wedged ~35 s later). 1 s sits above that crash
+        // pair with margin while staying at click cadence; the wheel's own combo-cycle
+        // writes at ~0.5 s intervals without wedging, so 1 s host writes have headroom.
+        // The gate only delays CONSECUTIVE writes — a lone click emits immediately.
+        private const int ParamWriteMinIntervalMs = 1000;
+        private int _lastParamWriteMs = Environment.TickCount - ParamWriteMinIntervalMs;
 
         // One-time-per-process guard for the catalog gapless self-check (runs on first Start).
         private static bool s_partitionsValidated;
@@ -155,12 +164,33 @@ namespace MozaPlugin.Telemetry
             var resolve = _resolve;
             long testNowMs = testMode ? DashboardTestPattern.NowMs() : 0;
 
-            // Host-initiated dashboard switch: emit the group-0x32/0x81 select command.
-            // Only when actually driving the wheel — in viz-only mode the pending select
-            // stays queued so it fires once telemetry resumes.
-            int pending = streamLive ? (plugin?.TakePendingFsr1Select() ?? -1) : -1;
-            if (pending >= 0)
-                _connection.Send(Fsr1DisplayEmitter.BuildSelect(pending));
+            // Host-initiated Table-7 param writes (dashboard select / display brightness):
+            // only when actually driving the wheel — in viz-only mode pendings stay queued
+            // so they fire once telemetry resumes. Both are wheel EEPROM writes, so at most
+            // ONE goes out per gate window; the pending slots keep only the LATEST value,
+            // so a spun cycle-dashboard encoder or a dragged brightness slider coalesces to
+            // a single write instead of one per detent/step.
+            if (streamLive && plugin != null
+                && unchecked(Environment.TickCount - _lastParamWriteMs) >= ParamWriteMinIntervalMs)
+            {
+                int pending = plugin.TakePendingFsr1Select();
+                if (pending >= 0)
+                {
+                    _connection.Send(Fsr1DisplayEmitter.BuildSelect(pending));
+                    _lastParamWriteMs = Environment.TickCount;
+                }
+                else
+                {
+                    int bright = plugin.TakePendingFsr1Brightness();
+                    if (bright >= 0)
+                    {
+                        foreach (var f in Fsr1DisplayEmitter.BuildBrightness(bright))
+                            _connection.Send(f);
+                        _lastParamWriteMs = Environment.TickCount;
+                        MozaLog.Info($"[AZOM] FSR1 display brightness → {bright}%");
+                    }
+                }
+            }
 
             // Resolve a field's value, applying the user override's Scale/Bias gain and
             // the resolved encoding's output ceiling (so an overridden byte width re-clamps).
@@ -196,7 +226,13 @@ namespace MozaPlugin.Telemetry
                     // Diagnostic: shows what we actually resolve vs what SimHub displays for this
                     // property. If 'resolved' ≠ the SimHub inspector value, we're reading a different
                     // value than the UI shows (path/timing), not a wire-format problem.
-                    if (_tickCounter % oneHzEvery == 0)
+                    //
+                    // Steady-state instrument with no error condition — it fires once a second
+                    // for EVERY gap field on EVERY streamed record (the catalog has 5, and the
+                    // fallback path streams the whole live set), so left ungated it costs 1–5
+                    // lines/s for the life of the session. Behind the verbose gate it stays
+                    // available to whoever is actually debugging gap rendering.
+                    if (MozaLog.WireDebugEnabled && _tickCounter % oneHzEvery == 0)
                         MozaLog.Debug($"[AZOM] FSR1 gap '{prop}' resolved={raw / 1000.0:F3}s -> wire {(v >> 16) & 0xFF:X2} {(v >> 8) & 0xFF:X2} {v & 0xFF:X2} (shows {(sv < 0 ? "-" : "")}{mag / 1000.0:F3}s)");
                     return v;
                 }
@@ -254,7 +290,7 @@ namespace MozaPlugin.Telemetry
                     {
                         // Overlay the ramp on just this field's bits over the live record, so the
                         // byte it shares with a neighbour keeps the neighbour's real value visible.
-                        var live = Fsr1DashboardCatalog.ResolvePartition(plugin, dash);
+                        var live = Fsr1DashboardCatalog.ResolvePartition(dash);
                         return Fsr1DisplayEmitter.BuildBitProbeRecord(dash, live, slot => ValueForSlot(dash, slot),
                             fp.bitOffset, fp.bitWidth, probeValue, fp.msbFirst);
                     }
@@ -263,9 +299,8 @@ namespace MozaPlugin.Telemetry
                 if (probe)
                     return Fsr1DisplayEmitter.BuildProbeRecord(
                         dash, dash.RecordType == probeType ? probeOff : -1, probeValue);
-                // Resolve the gapless partition (catalog + synthetic splits, broken configs
-                // auto-repaired) and pack each slot's value — never a gap/overlap on the wire.
-                var partition = Fsr1DashboardCatalog.ResolvePartition(plugin, dash);
+                // Pack each catalog slot's value — never a gap/overlap on the wire.
+                var partition = Fsr1DashboardCatalog.ResolvePartition(dash);
                 return Fsr1DisplayEmitter.BuildRecord(dash, partition, slot => ValueForSlot(dash, slot));
             }
 
@@ -288,7 +323,7 @@ namespace MozaPlugin.Telemetry
             // (independent of probe/test — the panel shows actual data, not the probe pattern).
             Fsr1VizRecord BuildVizRecord(Fsr1Dashboard dash)
             {
-                var partition = Fsr1DashboardCatalog.ResolvePartition(plugin, dash);
+                var partition = Fsr1DashboardCatalog.ResolvePartition(dash);
                 var frame = Fsr1DisplayEmitter.BuildRecord(dash, partition, slot => ValueForSlot(dash, slot));
                 var vfields = new List<Fsr1VizField>(partition.Count);
                 foreach (var slot in partition)
@@ -302,9 +337,8 @@ namespace MozaPlugin.Telemetry
                         bytes[o - start] = (idx >= 0 && idx < frame.Length) ? frame[idx] : (byte)0;
                     }
                     long value = ValueForSlot(dash, slot);
-                    bool synth = Fsr1FieldComposer.IsSynthetic(plugin, dash.Key, f.FieldId);
                     string encStr = slot.IsByteAligned ? slot.Enc.ToString() : $"{slot.BitWidth}b.{slot.BitOffset & 7}";
-                    vfields.Add(new Fsr1VizField(f.Label, start, end, encStr, value, bytes, synth,
+                    vfields.Add(new Fsr1VizField(f.Label, start, end, encStr, value, bytes,
                         slot.IsByteAligned ? -1 : slot.BitOffset, slot.IsByteAligned ? 0 : slot.BitWidth));
                 }
                 vfields.Sort((a, b) => a.Start.CompareTo(b.Start));

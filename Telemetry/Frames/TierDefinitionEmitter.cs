@@ -315,7 +315,21 @@ namespace MozaPlugin.Telemetry.Frames
 
             // V0: synthesize from catalog. V2/Type02: send all channels. V2 legacy: filter to catalog.
             // NEVER assign Profile property here — its setter re-expands tiers exponentially.
-            var catalog = _sender.CatalogParser.Catalog;
+            //
+            // LiveCatalog, not Catalog: Catalog is the never-pruned merge of every
+            // dashboard the wheel has loaded this connection (stale idxs are kept
+            // deliberately so back-ref resolution keeps working). Filtering the
+            // tier-def against it declares channels the CURRENT dashboard has no
+            // slot for — bundle 5XR0GQDB emitted idx 19/20 (TyreWearRearLeft,
+            // TyrePressureRearRight, left over from a prior "Nebula" dash) into the
+            // pkg-2000 tier, and the wheel logged
+            // "TelemetryBitPackageError:type size not match" and never rendered that
+            // tier, killing BestLapTime while the pkg-30 tier kept working.
+            // LiveCatalog is Catalog masked to the current END-marker generation —
+            // same positional idxs, stale slots blanked — so this only ever narrows
+            // what we declare. Falls back to Catalog before the first live commit
+            // (cold start), preserving the old behaviour there.
+            var catalog = _sender.CatalogParser.LiveCatalog ?? _sender.CatalogParser.Catalog;
             var policy = _sender.Policy;
             if (catalog != null && catalog.Count > 0)
             {
@@ -416,7 +430,7 @@ namespace MozaPlugin.Telemetry.Frames
                     // Type02 indexes channels by wheel-catalog position. Without
                     // a catalog, fall through to alphabetic indices.
                     bool cspIdx = policy.Encoding == TierDefEncoding.V2Type02;
-                    if (cspIdx && (_sender.CatalogParser.Catalog == null || _sender.CatalogParser.Catalog.Count == 0))
+                    if (cspIdx && (catalog == null || catalog.Count == 0))
                     {
                         MozaLog.Debug(
                             "[AZOM] No wheel catalog — using alphabetic indices for initial tier-def. " +
@@ -451,11 +465,10 @@ namespace MozaPlugin.Telemetry.Frames
                         }
                     }
 
-                    // Now re-filter+re-sort against current catalog.
-                    if (_sender.CatalogParser.Catalog != null
-                        && _sender.CatalogParser.Catalog.Count > 0)
+                    // Now re-filter+re-sort against the current generation's catalog.
+                    if (catalog != null && catalog.Count > 0)
                     {
-                        SortTierChannelsByCatalogIdx(profile, _sender.CatalogParser.Catalog);
+                        SortTierChannelsByCatalogIdx(profile, catalog);
                         RebuildFrameBuildersFromProfile();
                     }
 
@@ -490,7 +503,7 @@ namespace MozaPlugin.Telemetry.Frames
                         profile, flagBase,
                         includeEnableEntries: true,
                         useWheelCatalogIndices: cspIdx,
-                        wheelCatalog: _sender.CatalogParser.Catalog,
+                        wheelCatalog: catalog,
                         endMarkerCounter: endForThisEmission,
                         prevFlagBase: doReuse ? (byte?)null : prevSub?.FlagBase,
                         prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0),
@@ -545,7 +558,7 @@ namespace MozaPlugin.Telemetry.Frames
                     // fire the kind=4 probe — VGS response to kind=4 is unverified,
                     // and an over-eager probe causes sess=0x09 state-push storms
                     // that overwhelm the serial reassembler.
-                    var catalogSnapshot = _sender.CatalogParser.Catalog;
+                    var catalogSnapshot = catalog;
                     if (catalogSnapshot != null && catalogSnapshot.Count > 0)
                     {
                         var have = new HashSet<string>(

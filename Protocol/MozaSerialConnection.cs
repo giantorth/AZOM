@@ -214,6 +214,11 @@ namespace MozaPlugin.Protocol
         private readonly WriteBudget _budget = new WriteBudget();
         private int _framesDropped;
         private int _checksumFailures;
+        // Read-side frame decode errors (escape violation / short decode). Was
+        // log-only, which meant one line per bad frame on a resync path that
+        // retries per byte; the aggregate is the useful signal, so it rides the
+        // same diagnostics surface as the other wire errors.
+        private int _frameErrors;
         private int _frameStartScanResyncs;
         // Resync histogram by skip-byte count. Buckets [0]=1B, [1]=2B,
         // [2]=3-4B, [3]=5-8B, [4]=9-16B, [5]=17-32B, [6]=33-64B, [7]=>64B.
@@ -235,6 +240,15 @@ namespace MozaPlugin.Protocol
         // outlives its Join(1000) (syscall-wedged under Wine) exits when it
         // wakes instead of re-attaching to the next open's port and queues.
         private int _ioGeneration;
+
+        /// <summary>
+        /// Token identifying the current port session — bumped by every open and
+        /// every teardown. Owners that hand the device per-session state (the AB9's
+        /// FFB effect table) latch on this rather than on a bool, so a re-opened
+        /// port always re-runs its handshake.
+        /// </summary>
+        public int IoGeneration => Volatile.Read(ref _ioGeneration);
+
         private readonly object _lock = new object();
         private string? _lastPortName;
 
@@ -325,6 +339,7 @@ namespace MozaPlugin.Protocol
                 return new WireErrorCounters(
                     Interlocked.CompareExchange(ref _framesDropped, 0, 0),
                     Interlocked.CompareExchange(ref _checksumFailures, 0, 0),
+                    Interlocked.CompareExchange(ref _frameErrors, 0, 0),
                     Interlocked.CompareExchange(ref _frameStartScanResyncs, 0, 0),
                     histo,
                     samples);
@@ -335,6 +350,9 @@ namespace MozaPlugin.Protocol
         {
             public readonly int FramesDropped;
             public readonly int ChecksumFailures;
+            /// <summary>Read-side decode errors: bad 0x7E escape or a frame
+            /// whose decoded length didn't match its header length.</summary>
+            public readonly int FrameErrors;
             public readonly int FrameStartScanResyncs;
             /// <summary>Distribution of bytes-skipped at each resync. Buckets:
             /// [0]=1B, [1]=2B, [2]=3-4B, [3]=5-8B, [4]=9-16B, [5]=17-32B,
@@ -345,11 +363,12 @@ namespace MozaPlugin.Protocol
             /// ("3B: 00 41 0B"). Oldest first, newest last. Capped to 16.</summary>
             public readonly string[] RecentResyncSamples;
 
-            public WireErrorCounters(int dropped, int cksum, int resync,
+            public WireErrorCounters(int dropped, int cksum, int frameErrors, int resync,
                 int[] histo, string[] samples)
             {
                 FramesDropped = dropped;
                 ChecksumFailures = cksum;
+                FrameErrors = frameErrors;
                 FrameStartScanResyncs = resync;
                 ResyncSkipHistogram = histo;
                 RecentResyncSamples = samples;
@@ -524,7 +543,7 @@ namespace MozaPlugin.Protocol
 
             var (portName, pid, viaHubProbe) = FindMozaPort(
                 _pidFilter, _probeTarget, preferredPort, _disableProbeFallback,
-                () => _shutdownRequested);
+                CaptureLabel, () => _shutdownRequested);
             if (portName == null)
                 return false;
 
@@ -830,8 +849,29 @@ namespace MozaPlugin.Protocol
                 try
                 {
                     var port = _port;
-                    if (port == null || !port.IsOpen)
+                    if (port == null)
                     {
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    if (!port.IsOpen)
+                    {
+                        // Driver-side close: a device that re-enumerates (reboot on
+                        // an AB9 mode switch, firmware restart, replug) makes
+                        // SerialPort dispose its own stream, so IsConnected goes
+                        // false after only a couple of write errors — far short of
+                        // PortDeadThreshold, and the read loop never throws at all.
+                        // Without this nobody raises Disconnected and every owner
+                        // keeps its per-session state (AB9 FFB effect table, wheel
+                        // detection, telemetry sessions) across the silent reconnect.
+                        if (Interlocked.CompareExchange(ref _portFailureLogged, 1, 0) == 0)
+                        {
+                            MozaLog.Warn(
+                                "[AZOM] Port closed by the driver (device re-enumerated) — notifying for reconnect");
+                            RecordRuntimeFailure(ConnectionFailureKind.IoFailureAfterOpen,
+                                "port closed by the driver (device removed or re-enumerated)");
+                            ClosePortAndNotify();
+                        }
                         Thread.Sleep(100);
                         continue;
                     }
@@ -996,10 +1036,19 @@ namespace MozaPlugin.Protocol
                         }
                         if (frameError || decoded != needed)
                         {
-                            int nn = Math.Min(8, Math.Max(0, decoded));
-                            string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
-                            MozaLog.Debug(
-                                $"[AZOM] DROP frame-error: decoded={decoded}/{needed} len={payloadLength} first8={first8a}");
+                            // Sampled: resync is `frameStart + 1`, so one corrupted
+                            // burst re-enters here once per byte. Logging each one
+                            // buried the rest of the ring under a single wire fault;
+                            // the running total is in WireErrors either way.
+                            int fe = Interlocked.Increment(ref _frameErrors);
+                            if (fe == 1 || fe % 500 == 0)
+                            {
+                                int nn = Math.Min(8, Math.Max(0, decoded));
+                                string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
+                                MozaLog.Debug(
+                                    $"[AZOM] DROP frame-error #{fe}: decoded={decoded}/{needed} " +
+                                    $"len={payloadLength} first8={first8a}");
+                            }
                             // Skip past the bad start byte and try to resync.
                             cursor = frameStart + 1;
                             continue;
@@ -1016,12 +1065,19 @@ namespace MozaPlugin.Protocol
                         byte actual = raw[needed - 1];
                         if (expected != actual)
                         {
-                            Interlocked.Increment(ref _checksumFailures);
-                            int nn = Math.Min(8, needed);
-                            string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
-                            MozaLog.Debug(
-                                $"[AZOM] DROP checksum mismatch: expected=0x{expected:X2} actual=0x{actual:X2} " +
-                                $"len={payloadLength} group=0x{raw[0]:X2} dev=0x{raw[1]:X2} first8={first8a}");
+                            // Sampled for the same reason as the frame-error branch
+                            // above — a noisy line otherwise emits one line per bad
+                            // frame. WireErrors.ChecksumFailures carries the total.
+                            int cf = Interlocked.Increment(ref _checksumFailures);
+                            if (cf == 1 || cf % 500 == 0)
+                            {
+                                int nn = Math.Min(8, needed);
+                                string first8a = nn > 0 ? BitConverter.ToString(raw, 0, nn) : "(empty)";
+                                MozaLog.Debug(
+                                    $"[AZOM] DROP checksum mismatch #{cf}: expected=0x{expected:X2} " +
+                                    $"actual=0x{actual:X2} len={payloadLength} group=0x{raw[0]:X2} " +
+                                    $"dev=0x{raw[1]:X2} first8={first8a}");
+                            }
                             cursor = frameStart + 1;
                             continue;
                         }
@@ -1236,6 +1292,10 @@ namespace MozaPlugin.Protocol
             MozaProbeTarget probeTarget,
             string? preferredPort,
             Func<bool>? disableProbeFallback,
+            // Which pipe is asking. Only used to key the repeat-suppressed status
+            // lines below (every lane re-runs this on the 5 s reconnect tick) —
+            // without a per-lane key one pipe's steady state would mask another's.
+            string laneLabel,
             Func<bool>? cancel = null)
         {
             // Stage 1: registry walk. Take the full MOZA enumeration first
@@ -1305,8 +1365,8 @@ namespace MozaPlugin.Protocol
 
             if (disableProbeFallback?.Invoke() == true)
             {
-                MozaLog.Debug(
-                    "[AZOM] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
+                MozaLog.DebugIfChanged($"probe-skip-disabled:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
                 return (null, null, false);
             }
 
@@ -1354,16 +1414,17 @@ namespace MozaPlugin.Protocol
             }
             if (probeEligible == 0 && allRegistryPorts.Count > 0)
             {
-                MozaLog.Debug(
-                    $"[AZOM] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
+                MozaLog.DebugIfChanged($"probe-skip-classified:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
                 return (null, null, false);
             }
 
             if (allRegistryPorts.Count == 0)
-                MozaLog.Debug("[AZOM] No MOZA device in registry, falling back to serial probe");
+                MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] No MOZA device in registry, falling back to serial probe");
             else
-                MozaLog.Debug(
-                    $"[AZOM] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
+                MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
 
             // 600ms budget per port — SerialPort.Open can hang indefinitely under Wine
             // if another process holds the tty. Background-thread the probe so one bad
@@ -1438,7 +1499,7 @@ namespace MozaPlugin.Protocol
                     }
                 }
 
-                MozaLog.Debug("[AZOM] No AB9 device found on any COM port");
+                MozaLog.DebugIfChanged($"ab9-probe:{laneLabel}", "[AZOM] No AB9 device found on any COM port");
                 return (null, null, false);
             }
 

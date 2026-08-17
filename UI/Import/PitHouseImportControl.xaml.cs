@@ -197,14 +197,35 @@ namespace MozaPlugin.UI.Import
             }
             else if (string.Equals(preset.DeviceType, "Pedals", StringComparison.OrdinalIgnoreCase))
             {
-                SelectedPreset = preset;
-                _pedalControllers = _plugin?.MBoosterRegistry?.Devices
-                                    ?? (IReadOnlyList<MBoosterDeviceController>)Array.Empty<MBoosterDeviceController>();
-                // First build with no override so the mapper picks the pedal
-                // carrying the preset's subject role; the combo then preselects
-                // whatever it resolved to.
-                Plan = PitHousePedalsMapper.BuildPlan(preset, _pedalControllers);
-                PopulatePedalTargets(Plan);
+                if (RoutesToCrpPedals(preset))
+                {
+                    // CRP/CRP2/SRP: calibration lives on the profile, and the one
+                    // device carries all three pedals — no target to pick.
+                    var pedalProfile = _plugin?.Settings?.ProfileStore?.CurrentProfile;
+                    if (pedalProfile == null)
+                    {
+                        System.Windows.MessageBox.Show(Window.GetWindow(this),
+                            Strings.Import_NoActiveProfile,
+                            Strings.Import_DialogTitle,
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    SelectedPreset = preset;
+                    _pedalControllers = Array.Empty<MBoosterDeviceController>();
+                    Plan = PitHouseCrpPedalsMapper.BuildPlan(preset, pedalProfile);
+                    PopulatePedalTargets(Plan);
+                }
+                else
+                {
+                    SelectedPreset = preset;
+                    _pedalControllers = _plugin?.MBoosterRegistry?.Devices
+                                        ?? (IReadOnlyList<MBoosterDeviceController>)Array.Empty<MBoosterDeviceController>();
+                    // First build with no override so the mapper picks the pedal
+                    // carrying the preset's subject role; the combo then preselects
+                    // whatever it resolved to.
+                    Plan = PitHousePedalsMapper.BuildPlan(preset, _pedalControllers);
+                    PopulatePedalTargets(Plan);
+                }
             }
             else
             {
@@ -217,6 +238,37 @@ namespace MozaPlugin.UI.Import
 
             LogPlan(preset, Plan);
             ShowConfirmPanel();
+        }
+
+        /// <summary>
+        /// Whether a Pedals preset should go to the CRP/CRP2/SRP surface rather than
+        /// the mBooster one. Two gates, both conservative:
+        ///
+        /// <para>An attached mBooster always keeps the mBooster path — its plugin
+        /// fields are raw sensor counts where the CRP's are percent, so mis-routing
+        /// would write a 99 % range as ~0.15 % of full scale. A routed mBooster (RJ45
+        /// into a base pedal port) also sets <c>PedalsDetected</c>, so the flag alone
+        /// can't tell the families apart.</para>
+        ///
+        /// <para>With no mBooster attached, the preset's own <c>devices</c> list
+        /// decides: mBooster presets name "mBooster" (docs/protocol/devices/
+        /// mbooster.md § PitHouse Pedals preset format), so one that doesn't goes to
+        /// the passive surface. No CRP-family pedals detected either → stay on the
+        /// mBooster path so its "no mBooster pedal attached" note is what shows.</para>
+        /// </summary>
+        private bool RoutesToCrpPedals(PitHousePreset preset)
+        {
+            if (_plugin?.IsPedalsDetected != true) return false;
+            if (_plugin?.MBoosterRegistry?.Devices.Count > 0) return false;
+            var devs = preset.Devices;
+            if (devs != null)
+            {
+                foreach (var d in devs)
+                    if (!string.IsNullOrEmpty(d)
+                        && d.IndexOf("mBooster", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return false;
+            }
+            return true;
         }
 
         private static void LogPlan(PitHousePreset preset, ImportPlan plan)

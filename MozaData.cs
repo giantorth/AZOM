@@ -39,6 +39,17 @@ namespace MozaPlugin
         public volatile string WheelSwVersion = "";
         public volatile string WheelHwVersion = "";
         public volatile string WheelHwSubVersion = "";
+
+        /// <summary>
+        /// FSR V1 (hw "RS21-D03-*", model "FSR") — a distinct, older product from
+        /// FSR V2 ("W13"). Keyed primarily on the hw-version (most specific), with the
+        /// model name as corroboration. Lives here rather than on MozaPlugin so the
+        /// hardware-write path can consult it without a plugin back-reference;
+        /// <c>MozaPlugin.IsFsr1DisplayWheel</c> forwards to this.
+        /// </summary>
+        public bool IsFsr1DisplayWheel =>
+            (WheelHwVersion?.StartsWith("RS21-D03", StringComparison.OrdinalIgnoreCase) ?? false)
+            || string.Equals(WheelModelName, "FSR", StringComparison.OrdinalIgnoreCase);
         // PitHouse-style extended identity fields (groups 0x02/0x04/0x05/0x06/0x09/0x11).
         public volatile int WheelSubDeviceCount;               // from 0x09 reply first byte
         /// <summary>12-byte STM32 MCU UID (from 0x06 probe). Likely the mcUid PitHouse keys dashboard sync against.</summary>
@@ -386,6 +397,19 @@ namespace MozaPlugin
         // was 1.2.9.24.
         public const int BaseFwLfeMin = (1 << 24) | (2 << 16) | (10 << 8) | 10; // 1.2.10.10
         public bool BaseSupportsLfe => BaseFwVersion != 0 && BaseFwVersion >= BaseFwLfeMin;
+
+        /// <summary>Packed <see cref="BaseFwVersion"/> as PitHouse displays it
+        /// (major.minor.patch.build), or "unknown" when no probe has answered.</summary>
+        public string BaseFwVersionText
+        {
+            get
+            {
+                int v = BaseFwVersion;
+                if (v == 0) return "unknown";
+                return $"{(v >> 24) & 0xFF}.{(v >> 16) & 0xFF}.{(v >> 8) & 0xFF}.{v & 0xFF}";
+            }
+        }
+
         // The 10-band EQ (equalizer7-10, cmds 0x32..0x35) ships in the same
         // 1.2.10.10 firmware as LFE.
         public bool BaseSupportsEq10 => BaseSupportsLfe;
@@ -979,8 +1003,14 @@ namespace MozaPlugin
             {
                 BaseIdentity11 = (byte[])data.Clone();
             }
-            else if (commandName == "base-fw-version")
+            else if (commandName == "base-fw-version" || commandName == "base-fw-version-b")
             {
+                // The dev-0x13 fallback only fills a still-unknown version — if
+                // dev 0x12 (the PitHouse-canonical target) ever answers, its value
+                // wins. On ES hardware 0x13 is the wheel module, but it shares the
+                // base MCU's firmware, so the value is the same either way.
+                if (commandName == "base-fw-version-b" && BaseFwVersion != 0)
+                    return;
                 // Reply payload is 4 version bytes in WIRE order [major, minor,
                 // build, patch] (no cmd echo — group 0x04). MOZA DISPLAYS the last
                 // two swapped: wire 01 02 18 09 is shown "1.2.9.24", wire 01 02 0A

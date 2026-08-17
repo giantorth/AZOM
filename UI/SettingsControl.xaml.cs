@@ -2387,6 +2387,9 @@ namespace MozaPlugin
             sb.AppendLine("=== USB detection ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
             sb.AppendLine();
+            sb.AppendLine("=== Standalone peripherals (own USB port) ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildStandalonePeripherals(_plugin, _data));
+            sb.AppendLine();
             sb.AppendLine("=== mBooster pedals ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data));
             sb.AppendLine();
@@ -3262,8 +3265,9 @@ namespace MozaPlugin
             SetValueText(MBoosterEndstopEndValue, MBoosterEndstopEndSlider.Value.ToString("F0"));
             MBoosterDeadzoneSlider.Value = fx?.DeadzoneKg ?? 0;
             SetValueText(MBoosterDeadzoneValue, (fx?.DeadzoneKg ?? 0).ToString("F1"));
-            MBoosterMaxForceSlider.Value = fx?.MaxForceKg ?? 200;
-            SetValueText(MBoosterMaxForceValue, (fx?.MaxForceKg ?? 200).ToString("F0"));
+            ApplyMBoosterMaxForceCeiling(fx);
+            MBoosterMaxForceSlider.Value = Math.Min(fx?.MaxForceKg ?? 200, MBoosterMaxForceSlider.Maximum);
+            SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));
             float nf = fx?.NaturalFrictionPct ?? -1;
             MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
             SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
@@ -3280,6 +3284,29 @@ namespace MozaPlugin
             MBoosterSegDampReleasedPlot.Seg1Value = (sd?.Seg1Released ?? -1) >= 0 ? sd!.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg2Value = (sd?.Seg2Released ?? -1) >= 0 ? sd!.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg3Value = (sd?.Seg3Released ?? -1) >= 0 ? sd!.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct;
+        }
+
+        /// <summary>
+        /// Cap the Max Force slider at the force the pedal's raw HID axis
+        /// actually reaches 100% at (<see cref="MozaMBoosterRegistry.ResolveFullScaleKg"/>).
+        /// Above that point the device has already pegged its own output, so
+        /// there is no resolution left for software to require more force —
+        /// every position past it was silently inert, which with Max Threshold
+        /// at 140kg left the whole top 30% of a 0-200 slider doing nothing
+        /// (bundle KY3HK4QP). The XAML's static "200" end label would then be
+        /// wrong, so it is rewritten to match.
+        /// </summary>
+        private void ApplyMBoosterMaxForceCeiling(IMBoosterPedalConfig? fx)
+        {
+            double ceiling = MozaMBoosterRegistry.ResolveFullScaleKg(fx, CurrentMBoosterController());
+            if (ceiling <= 0) ceiling = 200;
+            MBoosterMaxForceSlider.Maximum = ceiling;
+            MBoosterMaxForceRangeEndLabel.Text = ceiling.ToString("F0");
+            if (MBoosterMaxForceSlider.Value > ceiling)
+            {
+                MBoosterMaxForceSlider.Value = ceiling;
+                SetValueText(MBoosterMaxForceValue, ceiling.ToString("F0"));
+            }
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()
@@ -3467,6 +3494,18 @@ namespace MozaPlugin
         /// (type 2 = no motor, e.g. a CRP2 — effects can't play there). When the
         /// device hasn't reported pedal types (0x0E diagnostic not received) the
         /// cards stay visible (best-effort). See MBoosterDeviceController.AxisTypes.
+        ///
+        /// The same gate hides the Pedal Feel controls that are real hardware
+        /// writes on brake-named SINGLETON cmdIds — Travel (0x84/0x85), End Stop
+        /// (0xB2), Natural Friction (0xAE) and Segmented Damping (0xB7). None of
+        /// them carries a per-pedal selector, so editing them from a passive
+        /// pedal's page didn't configure that pedal — it silently overwrote the
+        /// ACTIVE pedal's registers (bundle KY3HK4QP: the passive throttle page's
+        /// 3.8/35.9mm travel is what the brake unit committed as Params 48/49).
+        /// Inferred from the wire shape rather than from a Pit House capture of a
+        /// passive-pedal edit — see docs/protocol/devices/mbooster.md.
+        /// Host-side-only controls (Deadzone, Max Force, the input curve) and the
+        /// per-role output curve stay visible for every pedal.
         /// </summary>
         private void UpdateMBoosterEffectPassiveState()
         {
@@ -3476,6 +3515,10 @@ namespace MozaPlugin
                 && types[_mboosterEffectPedalIndex] == 2;
             MBoosterEffectsCardsPanel.Visibility = passive ? Visibility.Collapsed : Visibility.Visible;
             MBoosterEffectsPassiveNote.Visibility = passive ? Visibility.Visible : Visibility.Collapsed;
+            var hwVisibility = passive ? Visibility.Collapsed : Visibility.Visible;
+            MBoosterTravelEndstopPanel.Visibility = hwVisibility;
+            MBoosterNaturalFrictionPanel.Visibility = hwVisibility;
+            MBoosterSegDampCard.Visibility = hwVisibility;
         }
 
         /// <summary>
@@ -3502,6 +3545,9 @@ namespace MozaPlugin
             MBoosterEffectsCardsPanel.Visibility = Visibility.Visible;
             MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
             MBoosterBrakeOnlyPanel.Visibility = Visibility.Visible;
+            MBoosterTravelEndstopPanel.Visibility = Visibility.Visible;
+            MBoosterNaturalFrictionPanel.Visibility = Visibility.Visible;
+            MBoosterSegDampCard.Visibility = Visibility.Visible;
 
             // Seed every control to its default once. The curve editors take no
             // node data of their own — they two-way bind to the hidden data-store
@@ -4088,23 +4134,19 @@ namespace MozaPlugin
             if (s.CurveY == null || s.CurveY.Length != 5) return;
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            // Live-preview push to the SELECTED pedal's role command (not always
-            // throttle) so dragging the curve previews on the right pedal.
             string? prefix = MBoosterSelectedPedalRolePrefix();
             if (prefix == null) return;
-            // Route to THIS pedal's own unit by role (not the host 0x12) — its
-            // output curve is a per-device setting, same as travel/threshold.
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            // Pushed to the SELECTED pedal's own role command (not always
+            // throttle, and not always the host 0x12) so the curve lands on the
+            // right pedal. Coalesced rather than live-per-node now: these are
+            // flash-backed registers and a node drag fires per pixel — the
+            // device sees the settled shape ~400ms after the drag stops.
             var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(s.CurveX, s.CurveY);
-            for (int i = 0; i < 5; i++)
-                controller.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", resampled[i], dev);
-            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-            // and MBoosterDeviceController.PushCurve7Resync; untested for this
-            // control specifically, applied on the same-root-cause theory
-            // (this curve IS the data curve7 re-expresses, so a stale curve7
-            // could plausibly mask a fresh curve edit the same way it masked Travel).
-            controller.PushCurve7Resync(s.CurveX, s.CurveY,
-                MBoosterCalibDevice(controller, _mboosterEffectPedalIndex));
+            QueueMBoosterCalibPush($"curve-{prefix}", (c, dev) =>
+            {
+                for (int i = 0; i < 5; i++)
+                    c.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", resampled[i], dev);
+            });
         }
 
         /// <summary>The wire-command role prefix (throttle/brake/clutch) for the
@@ -4236,6 +4278,28 @@ namespace MozaPlugin
             return controller.MotorDeviceForRole(roleIdx, axisIndex);
         }
 
+        /// <summary>
+        /// Park a slider-driven mBooster calibration write on the selected
+        /// pedal's own unit, coalesced so a drag emits one write set instead of
+        /// one per tick (see MBoosterDeviceController.QueueCalibWrite). The
+        /// EXPERIMENTAL curve7 resync every one of these writes needs to
+        /// actually commit rides inside the same parked action, so it can never
+        /// be reordered ahead of the write it is committing.
+        /// </summary>
+        private void QueueMBoosterCalibPush(string key, Action<MBoosterDeviceController, byte> push)
+        {
+            var controller = CurrentMBoosterController();
+            if (controller == null) return;
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            var s = CurrentMBoosterEffectTarget();
+            float[]? curveX = s?.CurveX, curveY = s?.CurveY;
+            controller.QueueCalibWrite($"{dev:x2}:{key}", () =>
+            {
+                push(controller, dev);
+                controller.PushCurve7Resync(curveX, curveY, dev);
+            });
+        }
+
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)
         {
             if (_suppressEvents) return;
@@ -4245,16 +4309,14 @@ namespace MozaPlugin
             s.TravelEndMm = (float)MBoosterTravelRangeSlider.HighValue;
             // Travel is a physical setting on every pedal mode — push to THIS
             // pedal's own mBooster unit (device 0x12 host / 0x1d / 0x1e chain).
-            var controller = CurrentMBoosterController();
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
-            controller?.SendIntWrite("mbooster-brake-travel-start",
-                global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(s.TravelStartMm), dev);
-            controller?.SendIntWrite("mbooster-brake-travel-end",
-                global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(s.TravelEndMm), dev);
-            // EXPERIMENTAL / unverified — confirmed on hardware to be required
-            // for a Travel edit to actually take effect (see
-            // MBoosterDeviceController.PushCurve7Resync).
-            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+            float startMm = s.TravelStartMm, endMm = s.TravelEndMm;
+            QueueMBoosterCalibPush("travel", (c, dev) =>
+            {
+                c.SendIntWrite("mbooster-brake-travel-start",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(startMm), dev);
+                c.SendIntWrite("mbooster-brake-travel-end",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(endMm), dev);
+            });
             _plugin.SaveSettings();
         }
 
@@ -4296,13 +4358,8 @@ namespace MozaPlugin
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             s.SensorOutputRatioPct = v;
-            var controller = CurrentMBoosterController();
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
-            controller?.SendFloatWrite("mbooster-brake-angle-ratio", v, dev);
-            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-            // and MBoosterDeviceController.PushCurve7Resync; untested for this
-            // control specifically, applied on the same-root-cause theory.
-            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+            QueueMBoosterCalibPush("angle-ratio",
+                (c, dev) => c.SendFloatWrite("mbooster-brake-angle-ratio", v, dev));
             _plugin.SaveSettings();
         }
 
@@ -4318,14 +4375,13 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.MaxThresholdKg = v;
-                var controller = CurrentMBoosterController();
-                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
-                controller?.SendIntWrite("mbooster-brake-threshold",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev);
-                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-                // and MBoosterDeviceController.PushCurve7Resync; untested for this
-                // control specifically, applied on the same-root-cause theory.
-                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+                QueueMBoosterCalibPush("brake-threshold", (c, dev) =>
+                    c.SendIntWrite("mbooster-brake-threshold",
+                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev));
+                // This IS the raw axis's full scale, so it is also the ceiling
+                // Max Force is expressed against — re-scale that slider now
+                // rather than leaving its top span silently inert.
+                ApplyMBoosterMaxForceCeiling(s);
             });
 
         // End Stop Stiffness (Front Limit / End Limit), 1-10 — Pit House's
@@ -4340,14 +4396,9 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.EndstopFrontStiffness = v;
-                var controller = CurrentMBoosterController();
-                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
-                controller?.SendIntWrite("mbooster-brake-endstop-front",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
-                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-                // and MBoosterDeviceController.PushCurve7Resync; untested for this
-                // control specifically, applied on the same-root-cause theory.
-                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+                QueueMBoosterCalibPush("endstop-front", (c, dev) =>
+                    c.SendIntWrite("mbooster-brake-endstop-front",
+                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev));
             });
 
         private void MBoosterEndstopEndSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
@@ -4356,14 +4407,9 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.EndstopEndStiffness = v;
-                var controller = CurrentMBoosterController();
-                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
-                controller?.SendIntWrite("mbooster-brake-endstop-end",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev);
-                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-                // and MBoosterDeviceController.PushCurve7Resync; untested for this
-                // control specifically, applied on the same-root-cause theory.
-                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+                QueueMBoosterCalibPush("endstop-end", (c, dev) =>
+                    c.SendIntWrite("mbooster-brake-endstop-end",
+                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev));
             });
 
         // Natural Friction (0-100%) — simulates a frictional force
@@ -4384,15 +4430,12 @@ namespace MozaPlugin
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.NaturalFrictionPct = v;
-                var controller = CurrentMBoosterController();
-                byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
                 int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(v);
-                controller?.SendIntWrite("mbooster-brake-friction-0", raw, dev);
-                controller?.SendIntWrite("mbooster-brake-friction-1", raw, dev);
-                // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-                // and MBoosterDeviceController.PushCurve7Resync; untested for this
-                // control specifically, applied on the same-root-cause theory.
-                controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+                QueueMBoosterCalibPush("friction", (c, dev) =>
+                {
+                    c.SendIntWrite("mbooster-brake-friction-0", raw, dev);
+                    c.SendIntWrite("mbooster-brake-friction-1", raw, dev);
+                });
             });
 
         // Segmented Damping — "When Pressed". Reverse-engineered from real
@@ -4415,7 +4458,7 @@ namespace MozaPlugin
             sd.Seg1Pressed = (float)MBoosterSegDampPressedPlot.Seg1Value;
             sd.Seg2Pressed = (float)MBoosterSegDampPressedPlot.Seg2Value;
             sd.Seg3Pressed = (float)MBoosterSegDampPressedPlot.Seg3Value;
-            PushSegmentedDamping(s, sd);
+            PushSegmentedDamping(sd);
         }
 
         // Segmented Damping — "When Released". Same shared wire command as
@@ -4434,7 +4477,7 @@ namespace MozaPlugin
             sd.Seg1Released = (float)MBoosterSegDampReleasedPlot.Seg1Value;
             sd.Seg2Released = (float)MBoosterSegDampReleasedPlot.Seg2Value;
             sd.Seg3Released = (float)MBoosterSegDampReleasedPlot.Seg3Value;
-            PushSegmentedDamping(s, sd);
+            PushSegmentedDamping(sd);
         }
 
         /// <summary>
@@ -4446,29 +4489,25 @@ namespace MozaPlugin
         /// (-1 sentinel) fall back to Pit House's own factory defaults, same
         /// as <see cref="MozaPlugin.ApplyMBoosterToHardware"/> does on connect.
         /// </summary>
-        private void PushSegmentedDamping(IMBoosterPedalConfig s, MBoosterSegmentedDampingSettings sd)
+        private void PushSegmentedDamping(MBoosterSegmentedDampingSettings sd)
         {
             _plugin.SaveSettings();
 
-            var controller = CurrentMBoosterController();
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
-            var frame = global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
-                sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
-                sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
-                sd.Divider1Released >= 0 ? sd.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
-                sd.Divider2Released >= 0 ? sd.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
-                sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
-                sd.Seg1Released >= 0 ? sd.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
-                sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
-                sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                dev);
-            controller?.SendOneShot(frame);
-            // EXPERIMENTAL / unverified — see MBoosterTravelRangeSlider_RangeChanged
-            // and MBoosterDeviceController.PushCurve7Resync; untested for this
-            // control specifically, applied on the same-root-cause theory.
-            controller?.PushCurve7Resync(s.CurveX, s.CurveY, dev);
+            // Built inside the parked action so the flush sends whatever the
+            // plots hold when the drag settles, not a mid-drag snapshot.
+            QueueMBoosterCalibPush("segdamp", (c, dev) =>
+                c.SendOneShot(global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
+                    sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
+                    sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
+                    sd.Divider1Released >= 0 ? sd.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
+                    sd.Divider2Released >= 0 ? sd.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
+                    sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                    sd.Seg1Released >= 0 ? sd.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                    sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                    sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                    sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                    sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                    dev)));
         }
 
         private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)

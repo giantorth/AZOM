@@ -130,6 +130,23 @@ namespace MozaPlugin.Protocol
             if (deviceHint == null && deviceId == MozaProtocol.DeviceHPattern)
                 deviceHint = "shifter";
 
+            // dev 0x19 / 0x1B → "pedals" / "handbrake", same reasoning as 0x1A above.
+            // Relayed pedals/handbrake answer the shared identity groups
+            // (0x04 device-type, 0x07 model-name, 0x09 presence, 0x10 serial) and
+            // without a hint those replies fell through to the FIRST entry in the
+            // group bucket — the wheel-* command. A relayed pedal set answering
+            // `87 91 01 "SRP"` was therefore parsed as wheel-model-name, which wrote
+            // the pedals' name into MozaData.WheelModelName and made DeviceProber
+            // declare a wheel hot-swap (model 'KS' → 'SRP'). That reset wheel
+            // detection AND cleared PendingResponseTracker mid-detection, dropping
+            // the base identity reads still in flight — including base-fw-version,
+            // which gates the wheelbase LFE effects and is never re-issued because
+            // BaseAmbientProbed has already latched. Bundle 65HZBQJT (R12 + KS + SRP).
+            if (deviceHint == null && deviceId == MozaProtocol.DevicePedals)
+                deviceHint = "pedals";
+            if (deviceHint == null && deviceId == MozaProtocol.DeviceHandbrake)
+                deviceHint = "handbrake";
+
             // Explicit bus override (AB9 connection passes "ab9" to dodge dev 0x12 collision).
             if (busHint != null)
                 deviceHint = busHint;
