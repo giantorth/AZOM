@@ -34,7 +34,7 @@ namespace MozaPlugin.Devices
         public const int LedsPerStrip = 9;
         public const int TotalLeds = LedsPerStrip * 2;
 
-        private LedDeviceState _lastState = new LedDeviceState(
+        private LedDeviceState _lastState = SimHubLedCompat.CreateState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
             1.0, 1.0, 1.0, 1.0);
@@ -118,6 +118,36 @@ namespace MozaPlugin.Devices
 
         public ILedDriverBase? GetLedDriver() => null;
 
+        /// <summary>
+        /// SimHub &lt;= 9.11.x <c>ILedDeviceManager.Display</c>, which has no
+        /// <c>overrideState</c> channel. Declared alongside the current overload so one
+        /// DLL serves both host generations — the CLR binds an implicitly-implemented
+        /// interface method by name and signature at type-load time, so each SimHub
+        /// build picks the overload its own interface declares. Dead code on 9.12+.
+        /// Drop this once 9.11.x is no longer supported (see SimHubLedCompat).
+        ///
+        /// <c>virtual</c> is load-bearing, not style: the CLR fills an interface slot only
+        /// from a public *virtual* method (ECMA-335 II.12.2). Roslyn marks the overload
+        /// matching the compile-time interface virtual automatically, but this one matches
+        /// no interface we compile against, so without the keyword it stays non-virtual and
+        /// 9.11.x still fails type load with the error this whole shim exists to avoid.
+        /// </summary>
+        public virtual void Display(
+            Func<Color[]> leds,
+            Func<Color[]> buttons,
+            Func<Color[]> encoders,
+            Func<Color[]> matrix,
+            Func<Color[]> rawState,
+            bool forceRefresh,
+            Func<object>? extraData = null,
+            double rpmBrightness = 1.0,
+            double buttonsBrightness = 1.0,
+            double encodersBrightness = 1.0,
+            double matrixBrightness = 1.0)
+            => Display(leds, buttons, encoders, matrix, rawState, SimHubLedCompat.NoOverrides,
+                forceRefresh, extraData,
+                rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
+
         public void Display(
             Func<Color[]> leds,
             Func<Color[]> buttons,
@@ -143,7 +173,7 @@ namespace MozaPlugin.Devices
                 var rawColors = rawState?.Invoke() ?? Array.Empty<Color>();
                 var overrideColors = overrideState?.Invoke() ?? Array.Empty<Color>();
 
-                _lastState = new LedDeviceState(
+                _lastState = SimHubLedCompat.CreateState(
                     ledColors, buttonColors, encoderColors, matrixColors, rawColors, overrideColors,
                     rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
 
