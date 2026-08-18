@@ -618,6 +618,31 @@ namespace MozaPlugin.Protocol
             AddCommand("mbooster-brake-curve7-4", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x04 }, 2, "int");
             AddCommand("mbooster-brake-curve7-5", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x05 }, 2, "int");
             AddCommand("mbooster-brake-curve7-6", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x06 }, 2, "int");
+            // Pit House "Deadzone" and "Max Force" (Pedal Feel) — CONFIRMED real
+            // hardware calibration, reverse-engineered from two real Pit House
+            // captures (max-force-24-75-128-166-200.pcapng,
+            // deadzone-0-5-11-14.pcapng — see bug bundle 5VR5AQ8Y). Same cmdId
+            // 0xAB indexed-register family as curve7-1..6 above, but a
+            // DIFFERENT selector range (0x07-0x0E) carrying a genuinely separate
+            // 8-point curve: selector 0x07 = Deadzone, selector 0x0E = Max
+            // Force, both in kg using the identical encoding as Max Threshold
+            // (raw = round(kg * 65536 / 200) — see
+            // MozaMBoosterProtocol.EncodeThresholdKg). Selectors 0x08-0x0D are
+            // 6 interpolated points between the two anchors — see
+            // MozaMBoosterRegistry.ComputeFeelCurve. Unlike curve7-1..6 (never
+            // confirmed as a real requirement), every Max Force / Deadzone
+            // sweep in both captures resent this whole 8-value family as one
+            // atomic burst, and real Pit House does NOT clamp Max Force to Max
+            // Threshold (128kg/166kg were sent while Threshold read back as
+            // 125kg) — see docs/protocol/devices/mbooster.md "Pedal Feel".
+            AddCommand("mbooster-brake-deadzone",   "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x07 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-1", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x08 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-2", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x09 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-3", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0A }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-4", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0B }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-5", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0C }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-6", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0D }, 2, "int");
+            AddCommand("mbooster-brake-maxforce",    "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0E }, 2, "int");
             // Pit House "End Stop Stiffness" (Front Limit / End Limit) —
             // reverse-engineered from two real Pit House USB captures, each
             // sweeping one slider through all 10 values (1-10). Both share

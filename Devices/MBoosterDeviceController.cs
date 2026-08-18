@@ -94,10 +94,10 @@ namespace MozaPlugin.Devices
         // (mbooster-brake-threshold); -1 until it answers. Live only, never
         // persisted and never copied into MBoosterDeviceSettings.MaxThresholdKg:
         // that field's -1 means "user set no override", and seeding it would make
-        // the plugin start writing the value back on every connect. Used purely as
-        // ApplyDeadzoneAndMaxForce's fullScaleKg reference in place of the old
-        // hardcoded 200kg guess. Volatile: written on the serial read thread, read
-        // by the HID thread and the UI.
+        // the plugin start writing the value back on every connect. Surfaced in
+        // Diagnostics (see DiagnosticsTextBuilder) as a read-back sanity check.
+        // Volatile: written on the serial read thread, read by the HID thread
+        // and the UI.
         private volatile float _deviceReportedMaxThresholdKg = -1;
         public float DeviceReportedMaxThresholdKg
         {
@@ -1188,15 +1188,43 @@ namespace MozaPlugin.Devices
         /// omitting it is what made Travel Start/End silently no-op on
         /// hardware despite the raw register write reading back fine — see
         /// MozaCommandDatabase.cs's mbooster-brake-curve7-* comment. Callers
-        /// use this after any of Travel/Endstop/Ratio/Threshold's own writes
-        /// on the theory that the same firmware requirement applies to all of
-        /// them, not just Travel — unconfirmed for the others.
+        /// use this after Direction/Min/Max/CurveY/Endstop/Friction/
+        /// SegmentedDamping/Ratio's own writes too, on the theory that the
+        /// same firmware requirement applies to all of them, not just
+        /// Travel — unconfirmed for those. CONFIRMED NOT required for Max
+        /// Threshold or Deadzone/Max Force specifically: isolated captures
+        /// for both (max-threshold-4-41-105-153-200.pcapng,
+        /// max-force-24-75-128-166-200.pcapng, deadzone-0-5-11-14.pcapng)
+        /// show zero curve7-1..6 traffic alongside their real writes — see
+        /// MozaPlugin.ApplyMBoosterToHardware's needsCurve7Resync and
+        /// MBoosterDeviceController.PushFeelCurveResync.
         /// </summary>
         public void PushCurve7Resync(float[]? curveX, float[]? curveY, byte device)
         {
             var curve7 = MozaMBoosterRegistry.ResampleCurveAtSevenths(curveX, curveY);
             for (int i = 0; i < curve7.Length; i++)
                 SendIntWrite($"mbooster-brake-curve7-{i + 1}", MozaMBoosterProtocol.EncodeCurve7Point(curve7[i]), device);
+        }
+
+        /// <summary>
+        /// Write Deadzone, Max Force, and the 6 interpolated points between
+        /// them (cmdId 0xAB selectors 0x07-0x0E) as one atomic burst — CONFIRMED
+        /// real hardware calibration, reverse-engineered from
+        /// max-force-24-75-128-166-200.pcapng and deadzone-0-5-11-14.pcapng
+        /// (bug bundle 5VR5AQ8Y): every Deadzone or Max Force change in both
+        /// captures resent the whole 8-value family together, not just the
+        /// field that moved — same "no partial update" shape as Segmented
+        /// Damping. Both values use the identical kg encoding as Max
+        /// Threshold (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
+        /// See <see cref="MozaMBoosterRegistry.ComputeFeelCurve"/>.
+        /// </summary>
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, byte device)
+        {
+            SendIntWrite("mbooster-brake-deadzone", MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg), device);
+            var mid = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg);
+            for (int i = 0; i < mid.Length; i++)
+                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(mid[i]), device);
+            SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
         }
 
         // ── Coalescing gate for UI-driven calibration writes ──

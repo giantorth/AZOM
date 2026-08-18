@@ -425,26 +425,20 @@ namespace MozaPlugin.Devices
             }
             if (c == null) return;
 
-            // Pedal Feel — host-side shaping of the raw HID position,
-            // applied here so every downstream consumer (position bar,
-            // MergePositions -> game telemetry, the effect worker's
-            // brake-position fallback) sees the same shaped value. Does not
-            // touch CurveY (still written to the device's own output-curve
-            // command unchanged) — see docs/protocol/devices/mbooster.md
-            // "Pedal Feel". Start/End of Travel (mm) is NOT shaped here —
-            // it's a real hardware calibration write (mbooster-brake-travel-
-            // start/end); the device's own firmware already clips/rescales
-            // the raw signal before this HID read ever sees it.
-            // Axis 0 (the master unit's pedal) carries the host-side Pedal Feel
-            // shaping (deadzone / max force / input curve) exactly as the
-            // single-axis path always has — those controls are calibrated
-            // against the master pedal. Chained axes (1+) route raw for now;
-            // per-axis Pedal Feel is a follow-up (Stage 3).
-            // Per-axis Pedal Feel: shape EACH pedal's HID by ITS OWN config —
-            // the master (axis 0) from the lane's flat fields, each chained pedal
-            // from its per-pedal entry. Host-side only (deadzone / max force /
-            // input curve); the wire calibration is applied separately in
-            // ApplyMBoosterToHardware.
+            // Pedal Feel — Deadzone and Max Force are now REAL hardware
+            // calibration (mbooster-brake-deadzone / -maxforce, cmdId 0xAB
+            // selectors 0x07/0x0E — see MBoosterDeviceController
+            // .PushFeelCurveResync and docs/protocol/devices/mbooster.md
+            // "Pedal Feel"): the device reshapes the raw HID axis itself
+            // before this read ever sees it, so there is nothing left to
+            // reshape here. Only InputCurveY remains a host-side-only
+            // shaping step (there is no wire command for it) — applied so
+            // every downstream consumer (position bar, MergePositions ->
+            // game telemetry, the effect worker's brake-position fallback)
+            // sees the same shaped value. Does not touch CurveY (still
+            // written to the device's own output-curve command unchanged).
+            // Per-axis: the master (axis 0) uses the lane's flat fields,
+            // each chained pedal uses its own per-pedal entry.
             var laneSettings = _settingsLookup(c.Identity);
             IMBoosterPedalConfig? cfg = laneSettings;
             if (axisIndex > 0)
@@ -460,12 +454,6 @@ namespace MozaPlugin.Devices
             double posPct = pos01 * 100.0;
             if (cfg != null)
             {
-                // Raw 0-100% HID travel isn't a fixed 0-200kg scale — it's
-                // whatever this pedal's OWN Max Threshold calibration (Sim Input
-                // Mapping) currently says 100% is.
-                double fullScaleKg = ResolveFullScaleKg(cfg, c);
-                if (cfg.DeadzoneKg > 0 || cfg.MaxForceKg < fullScaleKg)
-                    posPct = ApplyDeadzoneAndMaxForce(posPct, cfg.DeadzoneKg, cfg.MaxForceKg, fullScaleKg);
                 // Store the pre-input-curve percent for EVERY axis so the UI's
                 // live curve markers follow whichever pedal is selected (axis 0
                 // also mirrored to LastRawPercentPreCurve for legacy callers).
@@ -489,81 +477,6 @@ namespace MozaPlugin.Devices
             // Merge step: re-compute the active positions across all devices
             // every time any one of them ticks. Cheap (N ≤ 3 typically).
             MergePositions();
-        }
-
-        /// <summary>
-        /// The force (kg) at which this pedal's raw HID axis reaches 100% — the
-        /// reference scale <see cref="ApplyDeadzoneAndMaxForce"/> and the Max
-        /// Force slider's own ceiling are both expressed against. Three rungs:
-        /// <list type="number">
-        /// <item>The user's own Max Threshold override, when set (they calibrated
-        /// the device to it from this plugin, so it IS the device's scale).</item>
-        /// <item>Otherwise the value the DEVICE reported for
-        /// <c>mbooster-brake-threshold</c> — a real read-back, not a guess.</item>
-        /// <item>Only if neither exists (routed lane / firmware never answered),
-        /// the historical 200kg fallback.</item>
-        /// </list>
-        /// See docs/protocol/devices/mbooster.md "Sim Input Mapping".
-        /// </summary>
-        internal static double ResolveFullScaleKg(IMBoosterPedalConfig? cfg, MBoosterDeviceController? c)
-        {
-            if (cfg != null && cfg.MaxThresholdKg >= 0) return cfg.MaxThresholdKg;
-            float reported = c?.DeviceReportedMaxThresholdKg ?? -1;
-            if (reported > 0) return reported;
-            return 200.0;
-        }
-
-        /// <summary>
-        /// Deadzone + Max Force, in kg of force — both host-side only.
-        /// <paramref name="fullScaleKg"/> is the force at which raw 0-100%
-        /// HID travel reaches 100% — resolve it with
-        /// <see cref="ResolveFullScaleKg"/>, never inline: getting it wrong
-        /// makes Max Threshold read as INVERTED, since it enters here only as
-        /// this denominator (bundle KY3HK4QP). Combined into one kg-space remap
-        /// rather than two independent percent-space steps:
-        /// <list type="number">
-        /// <item>Deadzone (0..40kg): force below this clamps to 0.</item>
-        /// <item>Max Force (0..200kg, default 200 = off): the force at
-        /// which the <em>input curve's</em> X-axis reaches 100% — lets a
-        /// user who never presses past, say, 100kg (out of the device's
-        /// real <paramref name="fullScaleKg"/>) use the curve's full
-        /// 0-100% range instead of only ever reaching its midpoint. Values
-        /// at or above <paramref name="fullScaleKg"/> are a no-op: the raw
-        /// axis is already pegged at 100% by the device itself at that
-        /// point, so there's no more resolution above it for software to
-        /// require.</item>
-        /// </list>
-        /// Everything between the two rescales linearly. See
-        /// docs/protocol/devices/mbooster.md "Pedal Feel".
-        /// </summary>
-        internal static double ApplyDeadzoneAndMaxForce(double xPercent, double deadzoneKg, double maxForceKg, double fullScaleKg)
-        {
-            if (fullScaleKg <= 0) fullScaleKg = 200.0;
-            double loPercent = Math.Max(0, Math.Min(fullScaleKg, deadzoneKg)) / fullScaleKg * 100.0;
-            double hiPercent = Math.Max(0, Math.Min(fullScaleKg, maxForceKg)) / fullScaleKg * 100.0;
-            return ClipAndRescale(xPercent, loPercent, hiPercent);
-        }
-
-        /// <summary>
-        /// Shared clip-and-rescale: positions at or below
-        /// <paramref name="loPercent"/> clip to 0, positions at or above
-        /// <paramref name="hiPercent"/> clip to 100, everything between
-        /// rescales linearly to the full 0-100 range.
-        /// </summary>
-        private static double ClipAndRescale(double xPercent, double loPercent, double hiPercent)
-        {
-            xPercent = Math.Max(0, Math.Min(100, xPercent));
-            loPercent = Math.Max(0, Math.Min(100, loPercent));
-            hiPercent = Math.Max(0, Math.Min(100, hiPercent));
-
-            double effective = Math.Max(0, xPercent - loPercent);
-            double range = hiPercent - loPercent;
-            if (range <= 0) return effective > 0 ? 100 : 0;
-
-            double result = effective / range * 100.0;
-            if (result < 0) return 0;
-            if (result > 100) return 100;
-            return result;
         }
 
         /// <summary>
@@ -703,6 +616,34 @@ namespace MozaPlugin.Devices
             var result = new float[6];
             for (int i = 1; i <= 6; i++)
                 result[i - 1] = (float)EvaluateCurveArbitraryX(xs, curveY!, i * 100.0 / 7.0);
+            return result;
+        }
+
+        // Fixed fractions of the way from Deadzone to Max Force for the 6
+        // interpolated points the device holds between those two anchors
+        // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D) —
+        // empirically measured across both max-force-24-75-128-166-200.pcapng
+        // (Deadzone fixed, Max Force swept 75/128/166kg) and
+        // deadzone-0-5-11-14.pcapng (Max Force fixed, Deadzone swept
+        // 5/11/14kg): (value - deadzone) / (maxForce - deadzone) landed on
+        // the identical constant per selector in all 6 write bursts (std-dev
+        // < 0.0001), cross-validating the same fixed shape regardless of
+        // which endpoint moved. See docs/protocol/devices/mbooster.md
+        // "Pedal Feel" and bug bundle 5VR5AQ8Y.
+        private static readonly double[] FeelCurveFractions =
+            { 0.08049, 0.19495, 0.44245, 0.72433, 0.90040, 0.97910 };
+
+        /// <summary>
+        /// The 6 points the device's own Deadzone-to-Max-Force curve holds
+        /// between its two anchors, in kg — see <see cref="FeelCurveFractions"/>
+        /// and <see cref="MBoosterDeviceController.PushFeelCurveResync"/>.
+        /// </summary>
+        internal static double[] ComputeFeelCurve(double deadzoneKg, double maxForceKg)
+        {
+            double range = maxForceKg - deadzoneKg;
+            var result = new double[FeelCurveFractions.Length];
+            for (int i = 0; i < result.Length; i++)
+                result[i] = deadzoneKg + FeelCurveFractions[i] * range;
             return result;
         }
 
