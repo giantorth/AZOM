@@ -146,7 +146,12 @@ namespace MozaPlugin.Telemetry.Inbound
             // false-positives from upload / RPC sessions later in the
             // pipeline.
             if (session == 0x09)
+            {
                 _sender.MarkWheelReadyObserved();
+                // The wheel tracks h2b data on this session from open-seq+3;
+                // seed the outbound counter so our first send lands in-window.
+                _sender.SeedSession09OutboundSeq(openSeq);
+            }
         }
 
         private void HandleSessionData(byte[] data, byte session)
@@ -278,6 +283,11 @@ namespace MozaPlugin.Telemetry.Inbound
                     var state = _sender.ConfigJson.LastState;
                     if (state != null)
                     {
+                        // Confirm-gated delete reconcile: compacts the cached
+                        // table + re-arms the reply latch when this merge
+                        // confirms a pending delete, so the reply below goes
+                        // out as the list-without-name.
+                        _sender.OnConfigJsonStateReadyCheckPendingDelete(state);
                         _sender.MaybeSendConfigJsonReplyInternal(state, session);
                         _sender.MaybeTriggerDashboardDownloadInternal(state);
                         // The wheel's catalog burst on sess=0x02 (type-04 slot

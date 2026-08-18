@@ -345,10 +345,11 @@ namespace MozaPlugin.Devices.WheelUi
             {
                 try
                 {
-                    // Deleting the CURRENTLY-RENDERED dash strands its registry
-                    // entry (the wheel can't drop what it's displaying) and the
-                    // stub survives even the reconcile rebuild as a permanent
-                    // dead slot (observed 2026-08-16 21:0x). Switch away first.
+                    // Don't delete the CURRENTLY-RENDERED dash out from under
+                    // the wheel — switch away first. WheelReportedSlot is -1
+                    // until the wheel reports a switch this session (cold
+                    // start / post-reconnect), so an UNKNOWN rendered slot is
+                    // treated as possibly-active and switched away too.
                     var state = plugin?.WheelStateForDiagnostics;
                     var list = state?.ConfigJsonList;
                     int targetSlot = -1, fallbackSlot = -1;
@@ -364,12 +365,13 @@ namespace MozaPlugin.Devices.WheelUi
                     }
                     bool deletingActive = targetSlot >= 0
                         && (ts.WheelReportedSlot == targetSlot
+                            || ts.WheelReportedSlot < 0
                             || string.Equals(plugin?.ActiveTelemetryProfileName, dirName,
                                 StringComparison.OrdinalIgnoreCase));
                     if (deletingActive && fallbackSlot >= 0)
                     {
                         MozaLog.Info(
-                            $"[AZOM] Deleting the active dashboard — switching to " +
+                            $"[AZOM] Deleting the active/possibly-active dashboard — switching to " +
                             $"slot {fallbackSlot} (\"{list![fallbackSlot]}\") first");
                         plugin!.OnDashboardSwitched((uint)fallbackSlot);
                         System.Threading.Thread.Sleep(1500);
@@ -379,7 +381,7 @@ namespace MozaPlugin.Devices.WheelUi
                     MozaLog.Info(
                         $"[AZOM] completelyRemove(\"{dirName}\") sent; " +
                         $"reply={(reply == null ? "none (state-push expected)" : reply.Length + "B")}");
-                    ts.RemoveDashboardFromLibrary(dirName);
+                    ts.RemoveDashboardFromLibrary(dirName, id);
                 }
                 catch (Exception ex)
                 {

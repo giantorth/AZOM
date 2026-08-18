@@ -135,12 +135,13 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>
         /// Compact wheel-confirmed deletions out of the cached slot table —
-        /// call at the moment the library-sync port reconnect fires: the
-        /// wheel's own table rebuild on a port bounce is an ORDER-PRESERVING
-        /// compaction of deleted entries (wire-verified 2026-08-16: boot
-        /// table after a delete+bounce = same order minus the deleted name;
-        /// the wheel does NOT re-push its state after a fast bounce, so the
-        /// host must compact its cached copy in lockstep).
+        /// call the moment the wheel's TitleId=4 confirm delta lands
+        /// (TelemetrySender.OnConfigJsonStateReadyCheckPendingDelete). The
+        /// wheel compacts its own render table (order-preserving) when it
+        /// ACCEPTS the host's follow-up list-without-name — mid-session; a
+        /// port bounce does NOT rebuild that table (wire-verified 2026-08-17).
+        /// Compacting the cache here keeps the host's name→slot mapping in
+        /// lockstep with the wheel's imminent compaction.
         /// </summary>
         public void CompactConfirmedDeletes()
         {
@@ -156,8 +157,8 @@ namespace MozaPlugin.Telemetry.Dashboard
             _cachedLastState = s;
             try
             {
-                MozaLog.Debug(
-                    $"[AZOM] Slot table compacted at reconnect: {before} → {table.Count} entries " +
+                MozaLog.Info(
+                    $"[AZOM] Slot table compacted: {before} → {table.Count} entries " +
                     $"(removed: {string.Join(", ", doomed)})");
             }
             catch { }
@@ -281,7 +282,10 @@ namespace MozaPlugin.Telemetry.Dashboard
             _deviceInbox.Clear();
             try
             {
-                MozaLog.Debug(
+                // Info, not Debug: this is the delete/enable acceptance-test
+                // monitor line — its absence at default log level misled the
+                // 2026-08-17 failure analysis.
+                MozaLog.Info(
                     $"[AZOM] configJson state received: TitleId={state.TitleId} " +
                     $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
                     $"configJsonList={state.ConfigJsonList.Count} " +

@@ -520,7 +520,15 @@ namespace MozaPlugin.Telemetry
         // with the canonical library list. See docs/protocol/dashboard-upload/config-rpc-session-09.md.
         private readonly ConfigJsonClient _configJson = new ConfigJsonClient();
         internal int _session09InboundSeq;
+        // NEXT h2b data seq to use on sess=0x09 (same convention as the
+        // sess=0x01/0x02 counters). The wheel only tracks h2b data from
+        // devinit open-seq + 3 (ack floor open-seq + 2; same +3 rule as the
+        // FT sessions) — seqs below that base are silently ignored, and any
+        // skipped seq pins the wheel's cumulative rx ack forever (it never
+        // accepts messages behind the hole). Seeded from the wheel's 0x81
+        // device-init via SeedSession09OutboundSeq; 0 = not yet seeded.
         private int _session09OutboundSeq;
+        private volatile bool _session09SeqSeeded;
 
         // Guard for the read-chunk-send-write of _session09OutboundSeq.
         // Without it, MaybeSendConfigJsonReply (runs on the serial-read thread
@@ -2069,7 +2077,7 @@ namespace MozaPlugin.Telemetry
             // Reset the outbound seq counters under their guarding locks so a
             // tick still mid-burst can't clobber the reset (separate, non-nested
             // leaf locks — no ordering deadlock; each section is a field write).
-            lock (_session09SeqLock) { _session09OutboundSeq = 0; }
+            lock (_session09SeqLock) { _session09OutboundSeq = 0; _session09SeqSeeded = false; }
             // Re-arm so the next sess=0x09 device-init re-confirms the
             // canonical dashboard list to the wheel.
             _session09ReplySent = false;
@@ -2182,6 +2190,15 @@ namespace MozaPlugin.Telemetry
         {
             _connection.Send(frame);
             _retransmitter.Track(frame);
+        }
+
+        /// <summary>Config-session variant: tracked regardless of target
+        /// device so CM2 config sends get retransmit protection too (the
+        /// broad wheel-only gate in Track stays for value-frame paths).</summary>
+        private void SendAndTrackConfigChunk(byte[] frame)
+        {
+            _connection.Send(frame);
+            _retransmitter.Track(frame, anyDevice: true);
         }
 
         /// <summary>
@@ -3556,12 +3573,11 @@ namespace MozaPlugin.Telemetry
             CanonicalDashboardList = wireList;
 
             byte[] reply = ConfigJsonClient.BuildConfigJsonReply(CanonicalDashboardList);
-            // Single copy. PitHouse sends 2-3 copies ~200 ms apart, but our
-            // back-to-back triple (2026-08-16 20:07 build) coincided with
-            // enables going dead — suspected wheel-side parse issue with
-            // zero-gap duplicate envelopes. The single send is the shape that
-            // demonstrably enabled dashes all day. (Loss protection: the
-            // Enable button retries on demand.)
+            // Single tracked copy. PitHouse sends 2-3 copies plus ack-driven
+            // retransmits; the retransmitter provides the same loss protection
+            // here without duplicate envelopes. (The 2026-08-16 "triple sends
+            // killed enables" observation was those sends sitting behind the
+            // outbound seq hole, not the copy count.)
             const int ReplyCopies = 1;
             int chunkCount;
             // Hold _session09SeqLock across the entire read-chunk-send-write
@@ -3571,30 +3587,44 @@ namespace MozaPlugin.Telemetry
             // already on the wire have consumed those seqs wheel-side.
             lock (_session09SeqLock)
             {
+                if (!_session09SeqSeeded)
+                    MozaLog.Warn(
+                        $"[AZOM] configJson reply sent before sess=0x{session:X2} device-init " +
+                        "seeded the outbound seq — the wheel will ignore seqs below its base");
                 chunkCount = 0;
                 for (int copy = 0; copy < ReplyCopies; copy++)
                 {
-                    int seq = _session09OutboundSeq + 1;
+                    // _session09OutboundSeq is the NEXT seq to use. ChunkMessage
+                    // advances it past the last chunk; a +1 on entry here used to
+                    // skip one seq per send, permanently pinning the wheel's
+                    // cumulative rx ack behind the never-sent hole (fire-once,
+                    // so it never healed) — every post-delete list re-send was
+                    // received but never accepted (wire-verified 2026-08-17).
+                    int firstSeq = _session09OutboundSeq;
+                    int seq = firstSeq;
                     var frames = TierDefinitionBuilder.ChunkMessage(reply, session, ref seq, _targetDeviceId);
                     chunkCount = frames.Count;
+                    int sent = 0;
                     foreach (var frame in frames)
                     {
                         if (_state == TelemetryState.Idle || !_connection.IsConnected)
                         {
-                            _session09OutboundSeq = seq;
+                            // Only the frames actually sent consumed seqs.
+                            _session09OutboundSeq = firstSeq + sent;
                             MozaLog.Info(
                                 $"[AZOM] configJson reply ABORTED mid-send sess=0x{session:X2} " +
                                 $"(state={_state}, connected={_connection.IsConnected}) — " +
                                 "connect-window sweep will not happen this cycle");
                             return;
                         }
-                        // Plain send, NOT retransmit-tracked: current firmware
-                        // (2026-08 W17) never fc-acks the config session, so a
-                        // tracked chunk retransmits forever — observed ×30
-                        // duplicate reply chunks flooding sess=0x09
-                        // (moza-wire-20260816-130624). Loss protection comes
-                        // from the ReplyCopies redundancy instead.
-                        _connection.Send(frame);
+                        // Ack-tracked: current firmware DOES fc-ack config-session
+                        // chunks (lazily) and dup-ack-retransmits both directions
+                        // (wire-verified in both 2026-08-16 PitHouse captures and
+                        // the 2026-08-17 plugin trace). The earlier ×30-duplicate
+                        // pathology was tracked chunks pinned behind a seq hole,
+                        // not tracking itself.
+                        SendAndTrackConfigChunk(frame);
+                        sent++;
                     }
                     _session09OutboundSeq = seq;
                 }
@@ -3793,30 +3823,145 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        // ── Pending delete (confirm-gated, mid-session reconcile) ─────────
+        // A delete completes in two wheel-side steps, both mid-session and
+        // neither needing a port bounce (wire-verified 2026-08-17; a bounce
+        // does NOT rebuild the wheel's render/UI slot table): (1) the verb —
+        // the wheel removes files+registry and confirms with TitleId=4
+        // deletedDashboards deltas; (2) the wheel ACCEPTING the host's
+        // list-without-name, which compacts its render table ("deleteOps" /
+        // "sendIndexChanged" in its device log — PitHouse sends the list right
+        // after the confirm delta: bridge-enable-toggle-20260816, remove at
+        // t=1489.8, list at t=1490.6). Without the re-send the wheel's next
+        // sync would also resurrect-enable the deleted name.
+        private sealed class PendingDelete
+        {
+            public string DirName = "";
+            public string Id = "";
+            public bool ListSent;
+        }
+        private PendingDelete? _pendingDelete;
+        private readonly object _pendingDeleteLock = new object();
+        private const int DeleteConfirmTimeoutMs = 5_000;
+        private const int DeleteFallbackTimeoutMs = 15_000;
+
         /// <summary>
-        /// Post-delete library sync: drop <paramref name="dashboardName"/> from
-        /// <see cref="CanonicalDashboardList"/> and re-send the configJson()
-        /// reply — PitHouse re-sends its list right after a
-        /// <c>completelyRemove()</c> RPC (bridge-enable-toggle-20260816:
-        /// remove at t=1489.8, list re-send at t=1490.6). Without the re-send
-        /// the wheel's next sync would resurrect-enable the deleted name.
+        /// Post-delete library sync: register the remove intent and arm the
+        /// confirm-gated reconcile. The list re-send fires from the confirm
+        /// hook (<see cref="OnConfigJsonStateReadyCheckPendingDelete"/>) the
+        /// moment the wheel's TitleId=4 delta lands; the timeout worker sends
+        /// it anyway at +5 s and falls back to the port-level reconnect only
+        /// at +15 s with no confirm at all.
         /// </summary>
-        internal void RemoveDashboardFromLibrary(string dashboardName)
+        internal void RemoveDashboardFromLibrary(string dashboardName, string dashboardId)
         {
             if (string.IsNullOrEmpty(dashboardName)) return;
 
             _intentionalRemoves[dashboardName] = DateTime.UtcNow.Ticks;
             _intentionalEnables.TryRemove(dashboardName, out _);
 
-            var state = _configJson.LastState;
-            if (state != null)
+            var pending = new PendingDelete
             {
-                _session09ReplySent = false;
-                MaybeSendConfigJsonReply(state, _lastConfigJsonReplySession);
+                DirName = dashboardName,
+                Id = dashboardId ?? "",
+            };
+            lock (_pendingDeleteLock) { _pendingDelete = pending; }
+            ThreadPool.QueueUserWorkItem(_ => PendingDeleteTimeoutWorker(pending));
+        }
+
+        private void PendingDeleteTimeoutWorker(PendingDelete pending)
+        {
+            try
+            {
+                for (int waited = 0; waited < DeleteFallbackTimeoutMs; waited += 250)
+                {
+                    Thread.Sleep(250);
+                    lock (_pendingDeleteLock)
+                        if (!ReferenceEquals(_pendingDelete, pending))
+                            return;   // confirmed (hook cleared it) or superseded by a newer delete
+                    if (waited + 250 >= DeleteConfirmTimeoutMs && !pending.ListSent)
+                    {
+                        pending.ListSent = true;
+                        MozaLog.Warn(
+                            $"[AZOM] Delete \"{pending.DirName}\": no wheel confirm within " +
+                            $"{DeleteConfirmTimeoutMs / 1000} s — sending library list without it anyway");
+                        var state = _configJson.LastState;
+                        if (state != null)
+                        {
+                            _session09ReplySent = false;
+                            MaybeSendConfigJsonReply(state, _lastConfigJsonReplySession);
+                        }
+                    }
+                }
+                lock (_pendingDeleteLock)
+                {
+                    if (!ReferenceEquals(_pendingDelete, pending)) return;
+                    _pendingDelete = null;
+                }
+                MozaLog.Warn(
+                    $"[AZOM] Delete \"{pending.DirName}\": no wheel confirm within " +
+                    $"{DeleteFallbackTimeoutMs / 1000} s — last-resort library-sync reconnect");
+                ScheduleLibrarySyncRestart($"delete \"{pending.DirName}\" unconfirmed");
             }
-            // Reconcile: the wheel deletes the entry but keeps a registry stub
-            // occupying a (dead) slot until the next connect rebuild.
-            ScheduleLibrarySyncRestart($"delete \"{dashboardName}\"");
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Pending-delete worker failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Called from the inbound dispatcher after every StateReady merge,
+        /// BEFORE its configJson-reply call. When the freshly-merged state
+        /// confirms the pending delete, compact the cached slot table NOW (so
+        /// the wheel's post-compaction kind=4 validates against the shortened
+        /// list) and re-arm the reply latch — the caller's reply send then
+        /// carries the list-without-name whose acceptance makes the wheel
+        /// compact its render table mid-session.
+        /// </summary>
+        internal void OnConfigJsonStateReadyCheckPendingDelete(WheelDashboardState state)
+        {
+            PendingDelete? p;
+            lock (_pendingDeleteLock) p = _pendingDelete;
+            if (p == null) return;
+
+            bool confirmed = false;
+            foreach (var n in state.ConfirmedRemovedNames)
+                if (string.Equals(n, p.DirName, StringComparison.Ordinal)) { confirmed = true; break; }
+            if (!confirmed && !string.IsNullOrEmpty(p.Id))
+            {
+                foreach (var id in state.EnabledDeletedIds)
+                    if (id == p.Id) { confirmed = true; break; }
+                if (!confirmed)
+                    foreach (var id in state.DisabledDeletedIds)
+                        if (id == p.Id) { confirmed = true; break; }
+            }
+            if (!confirmed && state.ConfigJsonList.Count > 0)
+            {
+                // FULL push (resets ConfirmedRemovedNames): confirmed iff the
+                // entry is gone from the table and both managers.
+                bool present = false;
+                foreach (var n in state.ConfigJsonList)
+                    if (string.Equals(n, p.DirName, StringComparison.Ordinal)) { present = true; break; }
+                if (!present)
+                    foreach (var e in state.EnabledDashboards)
+                        if (string.Equals(e.DirName, p.DirName, StringComparison.Ordinal)) { present = true; break; }
+                if (!present)
+                    foreach (var e in state.DisabledDashboards)
+                        if (string.Equals(e.DirName, p.DirName, StringComparison.Ordinal)) { present = true; break; }
+                confirmed = !present;
+            }
+            if (!confirmed) return;
+
+            lock (_pendingDeleteLock)
+            {
+                if (!ReferenceEquals(_pendingDelete, p)) return;
+                _pendingDelete = null;
+            }
+            MozaLog.Info(
+                $"[AZOM] Delete \"{p.DirName}\" confirmed by wheel — compacting slot table; " +
+                "list re-send follows (its acceptance compacts the wheel's render table)");
+            _configJson.CompactConfirmedDeletes();
+            _session09ReplySent = false;
         }
 
         /// <summary>
@@ -3879,18 +4024,23 @@ namespace MozaPlugin.Telemetry
                     $"({envelope.Length}B envelope, state={_state})");
                 lock (_session09SeqLock)
                 {
-                    int seq = _session09OutboundSeq + 1;
+                    // Counter is the NEXT seq to use (see MaybeSendConfigJsonReply
+                    // for why a +1 here left a one-seq hole after every RPC).
+                    int firstSeq = _session09OutboundSeq;
+                    int seq = firstSeq;
                     var frames = TierDefinitionBuilder.ChunkMessage(envelope, sess, ref seq, _targetDeviceId);
+                    int sent = 0;
                     foreach (var frame in frames)
                     {
                         if (_state == TelemetryState.Idle || !_connection.IsConnected)
                         {
-                            _session09OutboundSeq = seq;
+                            _session09OutboundSeq = firstSeq + sent;
                             return false;
                         }
-                        // Plain send — the config session is never fc-acked on
-                        // current firmware; tracked chunks retransmit forever.
-                        _connection.Send(frame);
+                        // Ack-tracked — the wheel fc-acks config-session chunks
+                        // on current firmware (see MaybeSendConfigJsonReply).
+                        SendAndTrackConfigChunk(frame);
+                        sent++;
                     }
                     _session09OutboundSeq = seq;
                 }
@@ -5581,15 +5731,56 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         private void SendSession09Keepalive()
         {
+            // Before the wheel device-inits 0x09 there is nothing to keep
+            // alive, and counter seqs emitted pre-seed sit below the wheel's
+            // tracking base — the solicitation primes (SessionLifecycle /
+            // DisplayWatchdog retry) own the pre-devinit phase.
+            if (!_session09SeqSeeded) return;
+            SendSession09CounterPrime();
+        }
+
+        /// <summary>Seed the sess=0x09 outbound seq from the wheel's 0x81
+        /// device-init: the wheel tracks h2b data from open-seq + 3 (ack floor
+        /// open-seq + 2 — same +3 rule as the FT sessions). Also drops any
+        /// prior-generation tracked chunks, whose stale seqs would otherwise
+        /// retransmit unackable frames into the fresh session forever.</summary>
+        internal void SeedSession09OutboundSeq(int openSeq)
+        {
+            lock (_session09SeqLock)
+            {
+                _session09OutboundSeq = openSeq + 3;
+                _session09SeqSeeded = true;
+            }
+            _retransmitter.DropSession(0x09);
+            MozaLog.Info(
+                $"[AZOM] sess=0x09 outbound seq seeded from device-init: " +
+                $"open-seq={openSeq} → first data seq={openSeq + 3}");
+        }
+
+        /// <summary>Emit one zero-length sess=0x09 data frame (keepalive /
+        /// nudge) drawing from the shared outbound counter, ack-tracked.
+        /// EVERY post-devinit sess=0x09 data emission must come through the
+        /// shared counter: the watchdog's old synthetic-seq primes
+        /// (0x0001+round etc.) collided with counter seqs — wire-verified
+        /// 2026-08-17 post-reconnect: retry rounds consumed seqs 2..5 while
+        /// keepalives sent 1..4 and the list header reused 5 (wheel-side
+        /// "Loss: 62.5%", list never accepted).</summary>
+        internal void SendSession09CounterPrime()
+        {
             // Reserve seq + emit under _session09SeqLock so a concurrent
             // MaybeSendConfigJsonReply (read-thread) can't slip its multi-chunk
             // train in between this seq reservation and the wire send.
             lock (_session09SeqLock)
             {
-                int seq = ++_session09OutboundSeq;
-                SendSessionPrime(0x09, (ushort)seq);
+                int seq = _session09OutboundSeq;
+                var frame = _sessionLife.SendSessionPrime(0x09, (ushort)seq);
+                _session09OutboundSeq = seq + 1;
+                if (_session09SeqSeeded)
+                    _retransmitter.Track(frame, anyDevice: true);
             }
         }
+
+        internal bool Session09SeqSeeded => _session09SeqSeeded;
 
         /// <summary>
         /// Tiered chunk-drop recovery for sess=0x09 / 0x0a configJson. Tier

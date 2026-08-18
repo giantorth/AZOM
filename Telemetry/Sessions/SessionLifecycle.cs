@@ -780,7 +780,10 @@ namespace MozaPlugin.Telemetry.Sessions
         /// in the burst, leaving configJson handshake stuck and dashboard
         /// rendering blocked.
         /// </summary>
-        internal void SendSessionPrime(byte session, ushort seq)
+        /// <returns>The frame that was sent, so callers on a seeded counter
+        /// can register it with the retransmitter (a lost keepalive leaves a
+        /// seq hole that pins the wheel's cumulative ack forever).</returns>
+        internal byte[] SendSessionPrime(byte session, ushort seq)
         {
             var frame = new byte[]
             {
@@ -796,6 +799,7 @@ namespace MozaPlugin.Telemetry.Sessions
             };
             frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame);
             _sender.ConnectionRef.Send(frame);
+            return frame;
         }
 
         internal void SendSessionEnd(byte session, ushort seq)

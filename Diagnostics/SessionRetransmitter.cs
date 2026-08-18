@@ -77,11 +77,16 @@ namespace MozaPlugin.Diagnostics
         /// Frame must be the unstuffed wire form: <c>7E N 43 17 7C 00 sess
         /// type seq_lo seq_hi …</c>.
         /// </summary>
-        public void Track(byte[] frame)
+        public void Track(byte[] frame, bool anyDevice = false)
         {
             if (frame == null || frame.Length < 12) return;
             if (frame[0] != 0x7E) return;
-            if (frame[2] != 0x43 || frame[3] != 0x17) return;
+            // Default: wheel-target (0x17) frames only — the broad paths
+            // (value frames, property pushes) must not start retransmitting
+            // to CM2 targets whose ack behavior is unverified. Config-session
+            // sends (low-rate, wheel-acked on current firmware) opt in to
+            // any-device tracking so CM2 config sends heal too.
+            if (frame[2] != 0x43 || (!anyDevice && frame[3] != 0x17)) return;
             if (frame[4] != 0x7C || frame[5] != 0x00) return;
             if (frame[7] != 0x01) return;  // data chunks only — skip type=00 ends and type=81 opens
 
@@ -243,6 +248,26 @@ namespace MozaPlugin.Diagnostics
                 }
             }
             return output ?? s_noneDue;
+        }
+
+        /// <summary>Drop every queued chunk for <paramref name="session"/> —
+        /// a fresh device-init starts a new seq generation, and stale prior-
+        /// generation chunks would retransmit unackable seqs into it forever.</summary>
+        public void DropSession(byte session)
+        {
+            if (_count == 0) return;
+            lock (_lock)
+            {
+                List<(byte, int)>? doomed = null;
+                foreach (var kv in _queue)
+                    if (kv.Key.session == session)
+                        (doomed ??= new List<(byte, int)>()).Add(kv.Key);
+                if (doomed != null)
+                {
+                    foreach (var k in doomed) _queue.Remove(k);
+                    _count = _queue.Count;
+                }
+            }
         }
 
         public void Clear()
