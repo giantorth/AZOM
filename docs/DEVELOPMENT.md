@@ -462,4 +462,17 @@ The canonical wire reference is [`docs/protocol/`](protocol/). Load-bearing fact
 - **Runtime (Windows only):** `Microsoft.Win32.Registry` (in `mscorlib`) — used by `MozaPortDiscovery`. The serial-probe fallback consults the registry per port and is hard-disableable via `DisableSerialProbeFallback`.
 - **SimHub DLLs** (`libs/SimHub/`, reference-only, not packaged): `SimHub.Plugins.dll`, `GameReaderCommon.dll`, `SimHub.Logging.dll`, `SerialDash.dll`, `BA63Driver.dll`, `HidSharp.dll`. A daily GitHub Actions workflow creates PRs when new SimHub versions release (those bot PRs don't trigger the PR Build workflow — dispatch it manually with the PR number if you need a test build).
 
-**Important:** the SimHub DLLs in `libs/SimHub/` must match the runtime SimHub version — the PluginSdk ships older DLLs missing newer interface members, causing `TypeLoadException` at runtime. Always update from an actual SimHub installation.
+**Important:** build against the newest supported SimHub — the PluginSdk ships older DLLs missing newer interface members, causing `TypeLoadException` at runtime. Always update `libs/SimHub/` from an actual SimHub installation (`libs/SimHub/VERSION` records which one).
+
+**Running on older SimHub builds.** Compiling against the newest DLLs bakes that build's signatures into the IL, so a host whose contract differs fails at *load* time, not compile time — and the break runs in both directions. SimHub 9.12.0 is the live example: it added an `overrideState` colour layer (the dashboard "Device LEDs override" component), which changed `ILedDeviceManager.Display` (a sixth `Func<Color[]>`) and `LedDeviceState`'s constructor (a matching `Color[]`). Two shapes of fix, both in [`Devices/SimHubLedCompat.cs`](../Devices/SimHubLedCompat.cs) and its callers:
+
+- **Interface members** — declare *both* overloads on the implementing class. Implicit interface implementations are bound by the CLR at type-load time by name and signature, so each host picks the overload its own interface declares. The compat overload must be marked `virtual` by hand: only a public **virtual** method can fill an interface slot (ECMA-335 II.12.2), and Roslyn marks only the overload matching the compile-time interface. A non-virtual compat overload compiles and looks right while the old host still throws `TypeLoadException`.
+- **Constructors / concrete methods** — a direct `new` bakes one signature in, so build the call once through reflection and bind arguments to the host's parameters by name (`SimHubLedCompat.CreateState`). Parameters the host doesn't declare are dropped; ones we don't recognise take their own declared default.
+
+Neither the compiler nor a run against a single SimHub version catches a regression here, so verify with [`tools/simhub-compat`](../tools/simhub-compat/) — it compares a built DLL's metadata references, interface implementations (including virtualness) and `MethodImpl` records against each version's DLL set, and exits non-zero on a mismatch:
+
+```bash
+tools/simhub-compat/simhub-compat bin/x86/Release/MozaPlugin.dll \
+    libs/SimHub \
+    "/path/to/an/older/SimHub"
+```

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Check a built MozaPlugin.dll for binary compatibility with one or more SimHub
+# builds. Wraps the C# checker next to this script (see Program.cs for what the
+# individual findings mean).
+#
+#   simhub-compat <plugin.dll> <simhub-dir> [<simhub-dir>...]
+#
+# Each <simhub-dir> is a directory holding that version's SimHub.Plugins.dll,
+# BA63Driver.dll, SerialDash.dll, GameReaderCommon.dll and SimHub.Logging.dll —
+# a SimHub installation, or the repo's own libs/SimHub/.
+#
+#   tools/simhub-compat/simhub-compat bin/x86/Release/MozaPlugin.dll \
+#       libs/SimHub \
+#       "$HOME/Games/richard-burns-rally/drive_c/Program Files (x86)/SimHub"
+#
+# Exits non-zero if any version reports a problem.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bin="$here/bin/Release/net9.0/simhub-compat"
+
+if [ $# -lt 2 ]; then
+    sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit 2
+fi
+
+plugin="$1"
+shift
+
+if ! command -v dotnet >/dev/null 2>&1; then
+    echo "simhub-compat: dotnet SDK not found on PATH" >&2
+    exit 2
+fi
+
+# Rebuild when the binary is missing or older than either source file.
+needs_build=0
+[ -x "$bin" ] || needs_build=1
+if [ "$needs_build" -eq 0 ]; then
+    for src in "$here/Program.cs" "$here/simhub-compat.csproj"; do
+        [ "$src" -nt "$bin" ] && needs_build=1
+    done
+fi
+if [ "$needs_build" -eq 1 ]; then
+    dotnet build -c Release --nologo -v quiet "$here/simhub-compat.csproj" >/dev/null
+fi
+
+status=0
+for hostdir in "$@"; do
+    echo "=== $hostdir"
+    "$bin" "$plugin" "$hostdir" || status=1
+done
+exit "$status"

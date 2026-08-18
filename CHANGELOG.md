@@ -2,6 +2,18 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.5.6]
+
+### Fixed
+
+- **Now works with SimHub 9.12.0.** Changes in the LED device interface, stopped the plugin
+  loading at all.  Backwards compataible with prior SimHub releases.
+- **Fixed incorrect routing for some mBooster configurations**
+
+### Changed
+
+- **Bundled SimHub updated to v9.12.0** (from v9.11.22).
+
 ## [1.5.5]
 
 ### Added
