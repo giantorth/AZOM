@@ -2708,31 +2708,43 @@ namespace MozaPlugin
                     for (int k = 0; k < 5; k++)
                         controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k], dev);
                 }
-                if (cfg.TravelStartMm >= 0)
+                // Travel / End Stop / Natural Friction / Segmented Damping are
+                // load-cell + motor Pedal Feel features living on brake-named
+                // SINGLETON cmdIds (0x84/0x85, 0xB2, 0xAE, 0xB7) with no
+                // per-pedal selector, so they can only ever configure the pedal
+                // that owns that hardware. Pushing them from a PASSIVE pedal's
+                // stored config doesn't configure that pedal — it overwrites the
+                // active pedal's registers (bundle KY3HK4QP: the passive
+                // throttle's 3.8/35.9mm is what the brake unit committed as
+                // Params 48/49). The UI hides these controls for a passive pedal;
+                // this stops values saved before that gate existed from still
+                // being replayed on every connect.
+                bool ownsPedalFeelHardware = controller.IsAxisMotorized(axis);
+                if (ownsPedalFeelHardware && cfg.TravelStartMm >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-travel-start",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelStartMm), dev);
                     wroteAnyCalibration = true;
                 }
-                if (cfg.TravelEndMm >= 0)
+                if (ownsPedalFeelHardware && cfg.TravelEndMm >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-travel-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelEndMm), dev);
                     wroteAnyCalibration = true;
                 }
-                if (cfg.EndstopFrontStiffness >= 0)
+                if (ownsPedalFeelHardware && cfg.EndstopFrontStiffness >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-endstop-front",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopFrontStiffness), dev);
                     wroteAnyCalibration = true;
                 }
-                if (cfg.EndstopEndStiffness >= 0)
+                if (ownsPedalFeelHardware && cfg.EndstopEndStiffness >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopEndStiffness), dev);
                     wroteAnyCalibration = true;
                 }
-                if (cfg.NaturalFrictionPct >= 0)
+                if (ownsPedalFeelHardware && cfg.NaturalFrictionPct >= 0)
                 {
                     int frictionRaw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.NaturalFrictionPct);
                     controller.SendIntWrite("mbooster-brake-friction-0", frictionRaw, dev);
@@ -2747,7 +2759,7 @@ namespace MozaPlugin
                 // above); once ANY field on either side is set, the frame
                 // is filled out using factory defaults for whichever side
                 // still has no override.
-                var sd = cfg.SegmentedDamping;
+                var sd = ownsPedalFeelHardware ? cfg.SegmentedDamping : null;
                 if (sd != null && (sd.Divider1Pressed >= 0 || sd.Divider2Pressed >= 0
                     || sd.Seg1Pressed >= 0 || sd.Seg2Pressed >= 0 || sd.Seg3Pressed >= 0
                     || sd.Divider1Released >= 0 || sd.Divider2Released >= 0
