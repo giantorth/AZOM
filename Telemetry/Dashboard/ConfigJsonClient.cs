@@ -282,9 +282,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             _deviceInbox.Clear();
             try
             {
-                // Info, not Debug: this is the delete/enable acceptance-test
-                // monitor line — its absence at default log level misled the
-                // 2026-08-17 failure analysis.
+                // Info: the delete/enable acceptance-test monitor line.
                 MozaLog.Info(
                     $"[AZOM] configJson state received: TitleId={state.TitleId} " +
                     $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +

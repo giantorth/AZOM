@@ -252,23 +252,8 @@ namespace MozaPlugin.Diagnostics
 
         /// <summary>Drop every queued chunk for <paramref name="session"/> —
         /// a fresh device-init starts a new seq generation, and stale prior-
-        /// generation chunks would retransmit unackable seqs into it forever.</summary>
-        public void DropSession(byte session)
-        {
-            if (_count == 0) return;
-            lock (_lock)
-            {
-                List<(byte, int)>? doomed = null;
-                foreach (var kv in _queue)
-                    if (kv.Key.session == session)
-                        (doomed ??= new List<(byte, int)>()).Add(kv.Key);
-                if (doomed != null)
-                {
-                    foreach (var k in doomed) _queue.Remove(k);
-                    _count = _queue.Count;
-                }
-            }
-        }
+        /// generation chunks would retransmit unackable seqs into it.</summary>
+        public void DropSession(byte session) => Ack(session, int.MaxValue);
 
         public void Clear()
         {

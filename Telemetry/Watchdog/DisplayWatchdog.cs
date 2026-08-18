@@ -128,10 +128,9 @@ namespace MozaPlugin.Telemetry.Watchdog
         private long _configJsonLastChunkUtcTicks;
         private long _configJsonLastPrimeRetryUtcTicks;
         private int _configJsonGapTickEscalations;
-        // First gap of the current unhealed episode (0 = healthy). Gap events
-        // are usually REORDERING healed by the wheel's dup-ack retransmits in
-        // 0.3-1.7 s (wire-verified 2026-08-17) — escalation must key on the
-        // episode staying unhealed, never on the event count.
+        // First gap of the current unhealed episode (0 = healthy). Most gaps
+        // are losses the wheel's dup-ack ARQ heals within ~2 s, so escalation
+        // keys on the episode staying unhealed, never on the event count.
         private long _configJsonGapEpisodeStartUtcTicks;
         private const int ConfigJsonGapStallEscalateMs = 10_000;
         private const int ConfigJsonGapTickEscalationCap = 3;
@@ -614,16 +613,7 @@ namespace MozaPlugin.Telemetry.Watchdog
 
             try
             {
-                // Post-devinit the prime MUST draw from the shared outbound
-                // counter — a synthetic seq collides with counter seqs and
-                // corrupts the wheel's rx stream (wire-verified 2026-08-17:
-                // retry-round primes 2..5 vs keepalives 1..4 + list at 5).
-                // Pre-devinit there is no counter base yet; the synthetic seq
-                // is solicitation-only and below the eventual tracking window.
-                if (_sender.Session09SeqSeeded)
-                    _sender.SendSession09CounterPrime();
-                else
-                    _sender.SendSessionPrime(0x09, (ushort)(0x0001 + _s09RetryRounds));
+                _sender.SendConfigSessionPrime(0x09, (ushort)(0x0001 + _s09RetryRounds));
                 SendConfigJsonOpenRequest(0x09, recoverySeq);
             }
             catch (Exception ex)
@@ -693,12 +683,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                     $"({gapAgeMs}ms >= {ConfigJsonGapPassiveWaitMs}ms passive-wait) — " +
                     $"prime + open-request (open seq=0x{recoveryOpenSeq:X4}, " +
                     $"nudge {_configJsonGapTickEscalations + 1}/{ConfigJsonGapTickEscalationCap})");
-                // 0x09 primes must draw from the shared counter once seeded
-                // (synthetic seqs collide with counter seqs — see RetryS09...).
-                if (session == 0x09 && _sender.Session09SeqSeeded)
-                    _sender.SendSession09CounterPrime();
-                else
-                    _sender.SendSessionPrime(session, (ushort)primeSeq);
+                _sender.SendConfigSessionPrime(session, (ushort)primeSeq);
                 SendConfigJsonOpenRequest(session, (ushort)recoveryOpenSeq);
                 Interlocked.Exchange(ref _configJsonLastPrimeRetryUtcTicks, now);
                 _configJsonGapTickEscalations++;
@@ -732,14 +717,9 @@ namespace MozaPlugin.Telemetry.Watchdog
                 MozaLog.Warn(
                     $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     $"buffer preserved, keeping cached state (episode {episodeMs}ms)");
-                // Gap events here are almost always REORDERING: the wheel
-                // dup-ack-retransmits the missing chunks and the episode heals
-                // in 0.3-1.7 s (StateReady resets the tracking) — wire-verified
-                // 2026-08-17, where the old count>=3 escalation port-bounced
-                // on a self-healing condition. Escalate to the library-sync
-                // reconnect only when the episode stays unhealed past the
-                // stall window (true loss, e.g. 2026-08-16 21:16 seqs 42-43
-                // never arrived).
+                // The wheel retransmits the missing chunks on our dup-acks and
+                // the episode heals within ~2 s (StateReady resets tracking).
+                // Escalate only when it stays unhealed past the stall window.
                 if (episodeMs >= ConfigJsonGapStallEscalateMs)
                     _sender.ScheduleLibrarySyncRestart(
                         $"configJson stream stalled (gap #{_configJsonGapCount}, {episodeMs}ms unhealed)");
@@ -788,11 +768,7 @@ namespace MozaPlugin.Telemetry.Watchdog
                         $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                         $"passive wait expired ({gapAgeTicks / TimeSpan.TicksPerMillisecond}ms) — " +
                         $"prime + open-request (open seq=0x{recoveryOpenSeq:X4})");
-                    // See RetryS09IfNotEstablished: counter-drawn prime once seeded.
-                    if (session == 0x09 && _sender.Session09SeqSeeded)
-                        _sender.SendSession09CounterPrime();
-                    else
-                        _sender.SendSessionPrime(session, (ushort)primeSeq);
+                    _sender.SendConfigSessionPrime(session, (ushort)primeSeq);
                     SendConfigJsonOpenRequest(session, (ushort)recoveryOpenSeq);
                     Interlocked.Exchange(ref _configJsonLastPrimeRetryUtcTicks, now);
                 }

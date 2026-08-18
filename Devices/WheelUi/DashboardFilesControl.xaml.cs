@@ -377,11 +377,15 @@ namespace MozaPlugin.Devices.WheelUi
                         System.Threading.Thread.Sleep(1500);
                     }
 
+                    // Arm BEFORE the verb: SendRpcCall blocks its full 2 s
+                    // timeout (sess=0x09 has no reply route) while the wheel's
+                    // confirm delta lands ~0.6 s in, so arming afterwards makes
+                    // the confirm hook miss the very delta it waits for.
+                    ts.RemoveDashboardFromLibrary(dirName, id);
                     byte[]? reply = ts.SendRpcCall("completelyRemove", id);
                     MozaLog.Info(
                         $"[AZOM] completelyRemove(\"{dirName}\") sent; " +
                         $"reply={(reply == null ? "none (state-push expected)" : reply.Length + "B")}");
-                    ts.RemoveDashboardFromLibrary(dirName, id);
                 }
                 catch (Exception ex)
                 {
