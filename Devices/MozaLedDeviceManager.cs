@@ -136,7 +136,8 @@ namespace MozaPlugin.Devices
         private bool _lastFlagColorsPrimed;
         private LedDeviceState _lastState = new LedDeviceState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
-            Array.Empty<Color>(), Array.Empty<Color>(), 1.0, 1.0, 1.0, 1.0);
+            Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
+            1.0, 1.0, 1.0, 1.0);
 
         private Color[]? _lastKnobs;
 
@@ -393,6 +394,7 @@ namespace MozaPlugin.Devices
             Func<Color[]> encoders,
             Func<Color[]> matrix,
             Func<Color[]> rawState,
+            Func<Color[]> overrideState,
             bool forceRefresh,
             Func<object>? extraData = null,
             double rpmBrightness = 1.0,
@@ -409,9 +411,10 @@ namespace MozaPlugin.Devices
                 var encoderColors = encoders?.Invoke() ?? Array.Empty<Color>();
                 var matrixColors = matrix?.Invoke() ?? Array.Empty<Color>();
                 var rawColors = rawState?.Invoke() ?? Array.Empty<Color>();
+                var overrideColors = overrideState?.Invoke() ?? Array.Empty<Color>();
 
                 _lastState = new LedDeviceState(
-                    ledColors, buttonColors, encoderColors, matrixColors, rawColors,
+                    ledColors, buttonColors, encoderColors, matrixColors, rawColors, overrideColors,
                     rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
 
                 var plugin = MozaPlugin.Instance;
@@ -462,8 +465,9 @@ namespace MozaPlugin.Devices
                 // master change is caught even while the wheel sits idle.
                 TrackMasterBrightness(plugin);
 
-                // Merge SimHub Individual-LED overrides (rawState channel) over the
-                // per-segment logical channels. Physical order per device.json:
+                // Merge SimHub's two physical-index colour layers (Individual LEDs on
+                // rawState, dashboard "Device LEDs override" components on overrideState)
+                // over the per-segment logical channels. Physical order per device.json:
                 // [telemetry 0..telemetryPhys-1][button 0..buttonPhys-1][knob 0..knobCount-1].
                 //
                 // Must run BEFORE the per-channel length checks below: in SimHub's
@@ -474,8 +478,11 @@ namespace MozaPlugin.Devices
                 // raw slot in its window is non-transparent, so an empty channel
                 // becomes a populated one and the per-channel processing below fires
                 // off the merged array.
+                //
+                // rawState is merged first and overrideState on top, matching the blend
+                // order in SimHub's own PhysicalMapper.GetColor.
                 var modelInfo = plugin.WheelModelInfo;
-                if (rawColors.Length > 0)
+                if (rawColors.Length > 0 || overrideColors.Length > 0)
                 {
                     // LogRawDiagnostic(rawColors, ledColors.Length, buttonColors.Length);
 
@@ -483,16 +490,27 @@ namespace MozaPlugin.Devices
                         ? modelInfo.RpmLedCount + (modelInfo.HasFlagLeds ? MozaDeviceConstants.FlagLedCount : 0)
                         : ledColors.Length;
                     int buttonPhys = modelInfo?.ButtonLedCount ?? buttonColors.Length;
-                    ledColors = ApplyOverrides(ledColors, rawColors, 0, telemetryPhys);
-                    buttonColors = ApplyOverrides(buttonColors, rawColors, telemetryPhys, buttonPhys);
-                    if (modelInfo != null && modelInfo.KnobCount > 0)
+                    int knobPhys = modelInfo?.KnobCount ?? 0;
+                    int knobPhysOffset = telemetryPhys + (modelInfo?.ButtonLedCount ?? 0);
+
+                    if (rawColors.Length > 0)
                     {
-                        int knobPhysOffset = telemetryPhys + modelInfo.ButtonLedCount;
-                        encoderColors = ApplyOverrides(encoderColors, rawColors, knobPhysOffset, modelInfo.KnobCount);
+                        ledColors = ApplyOverrides(ledColors, rawColors, 0, telemetryPhys);
+                        buttonColors = ApplyOverrides(buttonColors, rawColors, telemetryPhys, buttonPhys);
+                        if (knobPhys > 0)
+                            encoderColors = ApplyOverrides(encoderColors, rawColors, knobPhysOffset, knobPhys);
+                    }
+
+                    if (overrideColors.Length > 0)
+                    {
+                        ledColors = ApplyOverrides(ledColors, overrideColors, 0, telemetryPhys);
+                        buttonColors = ApplyOverrides(buttonColors, overrideColors, telemetryPhys, buttonPhys);
+                        if (knobPhys > 0)
+                            encoderColors = ApplyOverrides(encoderColors, overrideColors, knobPhysOffset, knobPhys);
                     }
                 }
 
-                // After the rawState merge: if every channel is still empty there's
+                // After the physical-layer merges: if every channel is still empty there's
                 // nothing to send this frame. Each per-channel block below has its
                 // own length gate too, but this avoids walking through brightness /
                 // keepalive paths when SimHub is genuinely idle (game not running,

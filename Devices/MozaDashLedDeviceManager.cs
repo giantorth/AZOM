@@ -40,7 +40,8 @@ namespace MozaPlugin.Devices
     {
         private LedDeviceState _lastState = new LedDeviceState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
-            Array.Empty<Color>(), Array.Empty<Color>(), 1.0, 1.0, 1.0, 1.0);
+            Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
+            1.0, 1.0, 1.0, 1.0);
 
         private int _lastBitmask = -1;
 
@@ -187,6 +188,7 @@ namespace MozaPlugin.Devices
             Func<Color[]> encoders,
             Func<Color[]> matrix,
             Func<Color[]> rawState,
+            Func<Color[]> overrideState,
             bool forceRefresh,
             Func<object>? extraData = null,
             double rpmBrightness = 1.0,
@@ -203,9 +205,10 @@ namespace MozaPlugin.Devices
                 var encoderColors = encoders?.Invoke() ?? Array.Empty<Color>();
                 var matrixColors = matrix?.Invoke() ?? Array.Empty<Color>();
                 var rawColors = rawState?.Invoke() ?? Array.Empty<Color>();
+                var overrideColors = overrideState?.Invoke() ?? Array.Empty<Color>();
 
                 _lastState = new LedDeviceState(
-                    ledColors, buttonColors, encoderColors, matrixColors, rawColors,
+                    ledColors, buttonColors, encoderColors, matrixColors, rawColors, overrideColors,
                     rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
 
                 // CM2 rim is a wheel-style 16-LED strip in physical order
@@ -220,8 +223,9 @@ namespace MozaPlugin.Devices
                 // manager: in SimHub's "Individual LEDs (exclusive)" mode the `leds`
                 // channel is empty and only `rawState` carries colour, so we merge
                 // rawState over the telemetry array first (ApplyOverrides — a no-op
-                // in combined mode) and then process the single merged array by
-                // position.
+                // in combined mode), then overrideState (dashboard "Device LEDs
+                // override" components) on top, and then process the single merged
+                // array by position.
 
                 var plugin = MozaPlugin.Instance;
                 if (plugin == null || !plugin.Data.IsConnected || !plugin.IsDashDetected)
@@ -229,6 +233,8 @@ namespace MozaPlugin.Devices
 
                 if (rawColors.Length > 0)
                     ledColors = MozaLedDeviceManager.ApplyOverrides(ledColors, rawColors, 0, TotalLedCount);
+                if (overrideColors.Length > 0)
+                    ledColors = MozaLedDeviceManager.ApplyOverrides(ledColors, overrideColors, 0, TotalLedCount);
 
                 if (ledColors.Length == 0)
                     return;

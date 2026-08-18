@@ -36,7 +36,8 @@ namespace MozaPlugin.Devices
 
         private LedDeviceState _lastState = new LedDeviceState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
-            Array.Empty<Color>(), Array.Empty<Color>(), 1.0, 1.0, 1.0, 1.0);
+            Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
+            1.0, 1.0, 1.0, 1.0);
 
         // Per-strip cached state. Bitmask = -1 means "nothing sent yet";
         // colorHash = 0 means "no palette captured yet" (zero is a safe
@@ -123,6 +124,7 @@ namespace MozaPlugin.Devices
             Func<Color[]> encoders,
             Func<Color[]> matrix,
             Func<Color[]> rawState,
+            Func<Color[]> overrideState,
             bool forceRefresh,
             Func<object>? extraData = null,
             double rpmBrightness = 1.0,
@@ -139,18 +141,26 @@ namespace MozaPlugin.Devices
                 var encoderColors = encoders?.Invoke() ?? Array.Empty<Color>();
                 var matrixColors = matrix?.Invoke() ?? Array.Empty<Color>();
                 var rawColors = rawState?.Invoke() ?? Array.Empty<Color>();
+                var overrideColors = overrideState?.Invoke() ?? Array.Empty<Color>();
 
                 _lastState = new LedDeviceState(
-                    ledColors, buttonColors, encoderColors, matrixColors, rawColors,
+                    ledColors, buttonColors, encoderColors, matrixColors, rawColors, overrideColors,
                     rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
 
-                // Merge SimHub Individual-LED overrides over the contiguous
-                // 18-LED telemetry strip (same ApplyOverrides pattern used by
-                // wheel + dashboard managers).
+                // Merge SimHub's physical-index colour layers (Individual LEDs on
+                // rawState, dashboard "Device LEDs override" components on
+                // overrideState) over the contiguous 18-LED telemetry strip — same
+                // ApplyOverrides pattern used by wheel + dashboard managers, raw
+                // first then override on top (PhysicalMapper.GetColor blend order).
                 if (rawColors.Length > 0)
                 {
                     ledColors = MozaLedDeviceManager.ApplyOverrides(
                         ledColors, rawColors, 0, TotalLeds);
+                }
+                if (overrideColors.Length > 0)
+                {
+                    ledColors = MozaLedDeviceManager.ApplyOverrides(
+                        ledColors, overrideColors, 0, TotalLeds);
                 }
 
                 var plugin = MozaPlugin.Instance;
