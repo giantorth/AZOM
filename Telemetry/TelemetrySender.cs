@@ -3679,13 +3679,16 @@ namespace MozaPlugin.Telemetry
             // itself is part of the enable exchange.
             _session09ReplySent = false;
             MaybeSendConfigJsonReply(state!, _lastConfigJsonReplySession);
-            // Slot-table membership follows the wheel's CONFIRMING delta push
-            // (WheelDashboardState.Merge), not host intent. No state-refresh
-            // nudge here: the wheel never answers mid-session prime/open
-            // nudges with a full push, and the synthetic-seq frames desync the
-            // sess=0x09 reassembler (forward-gap storm, config channel dead
-            // until reconnect — observed 2026-08-16 18:14). The wheel's own
-            // unprompted deltas carry everything needed.
+            // Predict the wheel's slot table: an accepted list enables the
+            // declared name, and the wheel updates its own ordinal-sorted
+            // table live but does NOT re-push it mid-session — so the host
+            // ordinal-inserts its own delta or the dropdown / name→slot map
+            // lacks the new dash until the next connect. Corrected wholesale
+            // by the next full push if the wheel declines.
+            _configJson.ApplyLibraryDelta(dashboardName, null);
+            // No state-refresh nudge: the wheel never answers mid-session
+            // prime/open nudges with a full push, and synthetic-seq frames
+            // desync the sess=0x09 reassembler.
         }
 
         // Nonce for post-mutation state-refresh seqs (distinct ranges from the
@@ -5755,6 +5758,13 @@ namespace MozaPlugin.Telemetry
         }
 
         internal bool Session09SeqSeeded => _session09SeqSeeded;
+
+        /// <summary>True while a host enable declaration for this dirName is
+        /// outstanding — the wheel accepts the list but often never pushes a
+        /// confirming delta mid-session, so the UI would otherwise keep
+        /// showing a freshly-uploaded dash as disabled until a reconnect.</summary>
+        public bool IsEnableDeclared(string dirName) =>
+            !string.IsNullOrEmpty(dirName) && _intentionalEnables.ContainsKey(dirName);
 
         /// <summary>
         /// Tiered chunk-drop recovery for sess=0x09 / 0x0a configJson. Tier

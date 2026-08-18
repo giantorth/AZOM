@@ -480,6 +480,23 @@ namespace MozaPlugin.Devices.WheelUi
         /// </summary>
         private int _lastPopulatedWheelSlot = int.MinValue;
 
+        /// <summary>Content signature of the ConfigJsonList the dropdown was
+        /// last populated from. The list changes mid-session on upload/delete
+        /// (host-predicted ordinal insert / confirmed-delete compaction) with
+        /// no slot change, so without this the new dash never appears until a
+        /// reconnect. 0 = never populated.</summary>
+        private int _lastPopulatedListSignature;
+
+        private static int ConfigJsonListSignature(WheelDashboardState? state)
+        {
+            var list = state?.ConfigJsonList;
+            if (list == null || list.Count == 0) return 0;
+            int h = 17 + list.Count * 31;
+            foreach (var n in list)
+                h = unchecked(h * 31 + StringComparer.Ordinal.GetHashCode(n ?? ""));
+            return h;
+        }
+
         // Signature of the data feeding the channel-mapping list. Composed from
         // (profile-ref-hash, tier-count, total-channel-count, string-channel-count,
         // catalog-count) — any change means the wheel sent more data and we should
@@ -539,13 +556,16 @@ namespace MozaPlugin.Devices.WheelUi
             var state = _plugin.WheelStateForDiagnostics;
             var senderForCombo = _plugin.TelemetrySender;
             int curWheelSlot = senderForCombo?.WheelReportedSlot ?? -1;
+            int listSig = ConfigJsonListSignature(state);
             bool needPopulate =
                 (!_dashComboFromWheelState && state != null && state.ConfigJsonList.Count > 0)
-                || (curWheelSlot != _lastPopulatedWheelSlot);
+                || (curWheelSlot != _lastPopulatedWheelSlot)
+                || (listSig != 0 && listSig != _lastPopulatedListSignature);
             if (needPopulate)
             {
                 if (state != null && state.ConfigJsonList.Count > 0)
                     _dashComboFromWheelState = true;
+                _lastPopulatedListSignature = listSig;
                 PopulateDashboardCombo();
             }
 

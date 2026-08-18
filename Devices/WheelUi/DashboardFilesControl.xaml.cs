@@ -306,6 +306,9 @@ namespace MozaPlugin.Devices.WheelUi
 
         private void WheelFilesRefresh_Click(object sender, RoutedEventArgs e)
         {
+            // Drop the signature so the grid rebinds even when the wheel state
+            // is unchanged — otherwise the button looks dead.
+            _lastFilesGridSignature = "\0";
             RefreshFilesTab();
         }
 
@@ -499,6 +502,7 @@ namespace MozaPlugin.Devices.WheelUi
         {
             if (WheelFilesGrid == null || _plugin == null) return;
             var state = _plugin.WheelStateForDiagnostics;
+            var senderForRows = ActiveSender;
             var rows = new List<WheelFileRow>();
             if (state != null)
             {
@@ -515,13 +519,42 @@ namespace MozaPlugin.Devices.WheelUi
                 foreach (var d in state.DisabledDashboards)
                     rows.Add(new WheelFileRow
                     {
-                        State = "disabled",
+                        // A just-uploaded dash sits in disabledManager until the
+                        // wheel acts on our enable declaration, and that
+                        // confirming delta often never arrives mid-session —
+                        // show the declaration rather than a stale "disabled".
+                        State = (senderForRows?.IsEnableDeclared(d.DirName) ?? false)
+                            ? "enabling…" : "disabled",
                         Title = d.Title,
                         DirName = d.DirName,
                         Hash = d.Hash,
                         LastModified = d.LastModified,
                         Id = d.Id,
                     });
+                // A freshly-uploaded dash can sit in the wheel's slot table with
+                // NO manager entry yet (wire-observed 2026-08-18 upload #2:
+                // configJsonList grew while enabled/disabled counts held) — the
+                // managers alone therefore cannot render it. Add slot-table
+                // names that no manager claims.
+                foreach (var name in state.ConfigJsonList)
+                {
+                    if (string.IsNullOrEmpty(name)) continue;
+                    bool have = false;
+                    foreach (var r in rows)
+                        if (string.Equals(r.DirName, name, StringComparison.Ordinal)) { have = true; break; }
+                    if (have) continue;
+                    rows.Add(new WheelFileRow
+                    {
+                        State = (senderForRows?.IsEnableDeclared(name) ?? false)
+                            ? "enabling…" : "on wheel",
+                        Title = name,
+                        DirName = name,
+                    });
+                }
+                // Ordinal by dirName — the order the wheel keeps its own table
+                // in, so a new dash lands at its slot position instead of the
+                // bottom of an enabled-then-disabled concatenation.
+                rows.Sort((a, b) => string.CompareOrdinal(a.DirName, b.DirName));
             }
 
             var sigBuilder = new System.Text.StringBuilder(rows.Count * 64);
