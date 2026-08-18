@@ -1893,6 +1893,11 @@
                                                      Text="1"/>
                                         </Grid>
                                         </StackPanel><!-- MBoosterTravelEndstopPanel -->
+                                        <!-- Deadzone and Max Force are ALSO a brake-named singleton hardware
+                                             write now (cmdId 0xAB selectors 0x07/0x0E) — same passive-pedal
+                                             gating as Travel/End Stop, since editing them from a passive
+                                             pedal's page would overwrite the active pedal's registers instead. -->
+                                        <StackPanel x:Name="MBoosterDeadzoneMaxForcePanel">
                                         <Grid Margin="0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1921,14 +1926,13 @@
                                             <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"/>
                                             <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
                                             <Slider Grid.Column="2" x:Name="MBoosterMaxForceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
-                                            <!-- Maximum + this end label are both rewritten at seed time to the
-                                                 pedal's real full-scale force — see ApplyMBoosterMaxForceCeiling. -->
                                             <TextBlock Grid.Column="3" x:Name="MBoosterMaxForceRangeEndLabel" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
                                             <TextBox Grid.Column="4" x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
                                                      Tag="{Binding ElementName=MBoosterMaxForceSlider}"
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="200"/>
                                         </Grid>
+                                        </StackPanel><!-- MBoosterDeadzoneMaxForcePanel -->
                                         <!-- Natural Friction is another brake-named singleton hardware write
                                              (cmdId 0xAE) — same passive-pedal gating as Travel/End Stop. -->
                                         <Grid x:Name="MBoosterNaturalFrictionPanel" Margin="0,4" ToolTip="{x:Static res:Strings.Hint_NaturalFrictionPedalFeel}">

@@ -3263,10 +3263,11 @@ namespace MozaPlugin
             float ee = fx?.EndstopEndStiffness ?? -1;
             MBoosterEndstopEndSlider.Value = ee >= 0 ? ee : 1;
             SetValueText(MBoosterEndstopEndValue, MBoosterEndstopEndSlider.Value.ToString("F0"));
-            MBoosterDeadzoneSlider.Value = fx?.DeadzoneKg ?? 0;
-            SetValueText(MBoosterDeadzoneValue, (fx?.DeadzoneKg ?? 0).ToString("F1"));
-            ApplyMBoosterMaxForceCeiling(fx);
-            MBoosterMaxForceSlider.Value = Math.Min(fx?.MaxForceKg ?? 200, MBoosterMaxForceSlider.Maximum);
+            float dz = fx?.DeadzoneKg ?? -1;
+            MBoosterDeadzoneSlider.Value = dz >= 0 ? dz : 0;
+            SetValueText(MBoosterDeadzoneValue, MBoosterDeadzoneSlider.Value.ToString("F1"));
+            float mf = fx?.MaxForceKg ?? -1;
+            MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));
             float nf = fx?.NaturalFrictionPct ?? -1;
             MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
@@ -3284,29 +3285,6 @@ namespace MozaPlugin
             MBoosterSegDampReleasedPlot.Seg1Value = (sd?.Seg1Released ?? -1) >= 0 ? sd!.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg2Value = (sd?.Seg2Released ?? -1) >= 0 ? sd!.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg3Value = (sd?.Seg3Released ?? -1) >= 0 ? sd!.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct;
-        }
-
-        /// <summary>
-        /// Cap the Max Force slider at the force the pedal's raw HID axis
-        /// actually reaches 100% at (<see cref="MozaMBoosterRegistry.ResolveFullScaleKg"/>).
-        /// Above that point the device has already pegged its own output, so
-        /// there is no resolution left for software to require more force —
-        /// every position past it was silently inert, which with Max Threshold
-        /// at 140kg left the whole top 30% of a 0-200 slider doing nothing
-        /// (bundle KY3HK4QP). The XAML's static "200" end label would then be
-        /// wrong, so it is rewritten to match.
-        /// </summary>
-        private void ApplyMBoosterMaxForceCeiling(IMBoosterPedalConfig? fx)
-        {
-            double ceiling = MozaMBoosterRegistry.ResolveFullScaleKg(fx, CurrentMBoosterController());
-            if (ceiling <= 0) ceiling = 200;
-            MBoosterMaxForceSlider.Maximum = ceiling;
-            MBoosterMaxForceRangeEndLabel.Text = ceiling.ToString("F0");
-            if (MBoosterMaxForceSlider.Value > ceiling)
-            {
-                MBoosterMaxForceSlider.Value = ceiling;
-                SetValueText(MBoosterMaxForceValue, ceiling.ToString("F0"));
-            }
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()
@@ -3497,15 +3475,16 @@ namespace MozaPlugin
         ///
         /// The same gate hides the Pedal Feel controls that are real hardware
         /// writes on brake-named SINGLETON cmdIds — Travel (0x84/0x85), End Stop
-        /// (0xB2), Natural Friction (0xAE) and Segmented Damping (0xB7). None of
-        /// them carries a per-pedal selector, so editing them from a passive
-        /// pedal's page didn't configure that pedal — it silently overwrote the
-        /// ACTIVE pedal's registers (bundle KY3HK4QP: the passive throttle page's
+        /// (0xB2), Deadzone/Max Force (0xAB selectors 0x07/0x0E), Natural
+        /// Friction (0xAE) and Segmented Damping (0xB7). None of them carries a
+        /// per-pedal selector, so editing them from a passive pedal's page
+        /// didn't configure that pedal — it silently overwrote the ACTIVE
+        /// pedal's registers (bundle KY3HK4QP: the passive throttle page's
         /// 3.8/35.9mm travel is what the brake unit committed as Params 48/49).
         /// Inferred from the wire shape rather than from a Pit House capture of a
         /// passive-pedal edit — see docs/protocol/devices/mbooster.md.
-        /// Host-side-only controls (Deadzone, Max Force, the input curve) and the
-        /// per-role output curve stay visible for every pedal.
+        /// The input curve (host-side-only) and the per-role output curve stay
+        /// visible for every pedal.
         /// </summary>
         private void UpdateMBoosterEffectPassiveState()
         {
@@ -3517,6 +3496,7 @@ namespace MozaPlugin
             MBoosterEffectsPassiveNote.Visibility = passive ? Visibility.Visible : Visibility.Collapsed;
             var hwVisibility = passive ? Visibility.Collapsed : Visibility.Visible;
             MBoosterTravelEndstopPanel.Visibility = hwVisibility;
+            MBoosterDeadzoneMaxForcePanel.Visibility = hwVisibility;
             MBoosterNaturalFrictionPanel.Visibility = hwVisibility;
             MBoosterSegDampCard.Visibility = hwVisibility;
         }
@@ -4284,9 +4264,14 @@ namespace MozaPlugin
         /// one per tick (see MBoosterDeviceController.QueueCalibWrite). The
         /// EXPERIMENTAL curve7 resync every one of these writes needs to
         /// actually commit rides inside the same parked action, so it can never
-        /// be reordered ahead of the write it is committing.
+        /// be reordered ahead of the write it is committing — unless
+        /// <paramref name="includeCurve7Resync"/> is false, which
+        /// MBoosterMaxThresholdSlider_ValueChanged passes: an isolated capture
+        /// (max-threshold-4-41-105-153-200.pcapng) shows zero 0xAB traffic of
+        /// any kind alongside 4 clean Threshold writes, directly disconfirming
+        /// the resync for Threshold specifically.
         /// </summary>
-        private void QueueMBoosterCalibPush(string key, Action<MBoosterDeviceController, byte> push)
+        private void QueueMBoosterCalibPush(string key, Action<MBoosterDeviceController, byte> push, bool includeCurve7Resync = true)
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
@@ -4296,8 +4281,31 @@ namespace MozaPlugin
             controller.QueueCalibWrite($"{dev:x2}:{key}", () =>
             {
                 push(controller, dev);
-                controller.PushCurve7Resync(curveX, curveY, dev);
+                if (includeCurve7Resync) controller.PushCurve7Resync(curveX, curveY, dev);
             });
+        }
+
+        /// <summary>
+        /// Park a Deadzone/Max Force write (cmdId 0xAB selectors 0x07-0x0E) —
+        /// separate from <see cref="QueueMBoosterCalibPush"/> because neither
+        /// capture that confirmed this family (max-force-24-75-128-166-200
+        /// .pcapng, deadzone-0-5-11-14.pcapng) included the curve7-1..6
+        /// resync that helper tacks on for every other calibration write, so
+        /// reusing it here would send frames Pit House itself never sends
+        /// for this field. Uses the CURRENT value of whichever of the two
+        /// fields didn't just change, since the device has no partial-update
+        /// form for this 8-value family — see
+        /// MBoosterDeviceController.PushFeelCurveResync.
+        /// </summary>
+        private void PushMBoosterFeelCurve(IMBoosterPedalConfig s)
+        {
+            var controller = CurrentMBoosterController();
+            if (controller == null) return;
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
+            double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
+            controller.QueueCalibWrite($"{dev:x2}:feel-curve", () =>
+                controller.PushFeelCurveResync(dz, mf, dev));
         }
 
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)
@@ -4320,10 +4328,13 @@ namespace MozaPlugin
             _plugin.SaveSettings();
         }
 
-        // Deadzone at the start of pedal travel (0..40kg, host-side only —
-        // see MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce). Decimal
-        // precision (0.1kg ticks), so this doesn't reuse OnIntSliderChanged
-        // (which rounds to whole numbers like the other mBooster sliders).
+        // Deadzone at the start of pedal travel (0..40kg) — CONFIRMED real
+        // hardware calibration (mbooster-brake-deadzone, cmdId 0xAB selector
+        // 0x07), reverse-engineered from deadzone-0-5-11-14.pcapng (bug
+        // bundle 5VR5AQ8Y). See MBoosterDeviceController.PushFeelCurveResync
+        // and PushMBoosterFeelCurve. Decimal precision (0.1kg ticks), so this
+        // doesn't reuse OnIntSliderChanged (which rounds to whole numbers
+        // like the other mBooster sliders).
         private void MBoosterDeadzoneSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents) return;
@@ -4332,18 +4343,24 @@ namespace MozaPlugin
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             s.DeadzoneKg = (float)v;
+            PushMBoosterFeelCurve(s);
             _plugin.SaveSettings();
         }
 
-        // Max Force (0..200kg, host-side only, default 200 = off) — the
-        // force at which the Pedal Feel input curve's X-axis reaches 100%.
-        // See MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce.
+        // Max Force (0..200kg) — the force at which the pedal's raw HID axis
+        // reaches 100% travel. CONFIRMED real hardware calibration
+        // (mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
+        // engineered from max-force-24-75-128-166-200.pcapng (bug bundle
+        // 5VR5AQ8Y) — not clamped to Max Threshold on the wire. See
+        // MBoosterDeviceController.PushFeelCurveResync and
+        // PushMBoosterFeelCurve.
         private void MBoosterMaxForceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
             OnIntSliderChanged(e.NewValue, MBoosterMaxForceValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.MaxForceKg = v;
+                PushMBoosterFeelCurve(s);
             });
 
         // Sensor Output Ratio — blend between the mBooster's angle sensor
@@ -4368,7 +4385,11 @@ namespace MozaPlugin
         // mbooster-brake-threshold (cmdId 0xB3), a 4-byte big-endian raw
         // uint (NOT a float) on a fixed 0-200kg scale — see
         // MozaMBoosterProtocol.EncodeThresholdKg and
-        // docs/protocol/devices/mbooster.md "Sim Input Mapping".
+        // docs/protocol/devices/mbooster.md "Sim Input Mapping". No curve7
+        // resync (unlike every other QueueMBoosterCalibPush caller): an
+        // isolated capture (max-threshold-4-41-105-153-200.pcapng, Max Force
+        // held static) shows zero 0xAB traffic of any kind alongside 4
+        // clean Threshold writes.
         private void MBoosterMaxThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
             OnIntSliderChanged(e.NewValue, MBoosterMaxThresholdValue, "", v =>
             {
@@ -4377,11 +4398,8 @@ namespace MozaPlugin
                 s.MaxThresholdKg = v;
                 QueueMBoosterCalibPush("brake-threshold", (c, dev) =>
                     c.SendIntWrite("mbooster-brake-threshold",
-                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev));
-                // This IS the raw axis's full scale, so it is also the ceiling
-                // Max Force is expressed against — re-scale that slider now
-                // rather than leaving its top span silently inert.
-                ApplyMBoosterMaxForceCeiling(s);
+                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev),
+                    includeCurve7Resync: false);
             });
 
         // End Stop Stiffness (Front Limit / End Limit), 1-10 — Pit House's

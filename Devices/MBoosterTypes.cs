@@ -463,10 +463,12 @@ namespace MozaPlugin.Devices
         public float SensorOutputRatioPct { get; set; } = -1;
         public float MaxThresholdKg { get; set; } = -1;
 
-        // Pedal Feel (host-side shaping + brake-only wire calibration).
+        // Pedal Feel (InputCurveY is host-side shaping; Deadzone/MaxForce are
+        // real brake-only wire calibration — see MBoosterDeviceSettings for
+        // the field semantics).
         public float[]? InputCurveY { get; set; } = null;
-        public float DeadzoneKg { get; set; } = 0;
-        public float MaxForceKg { get; set; } = 200;
+        public float DeadzoneKg { get; set; } = -1;
+        public float MaxForceKg { get; set; } = -1;
         public float TravelStartMm { get; set; } = -1;
         public float TravelEndMm { get; set; } = -1;
         public float EndstopFrontStiffness { get; set; } = -1;
@@ -621,8 +623,13 @@ namespace MozaPlugin.Devices
         //   load-cell force to reach 100%, capped at
         //   MBoosterUiConstants.BrakeFadeMaxThresholdKg — this is what
         //   actually makes the pedal feel "softer" (more effort needed for
-        //   the same signal), unlike the host-side-only MaxForceKg, which
-        //   has no wire command and wouldn't affect what the game receives.
+        //   the same signal). MaxForceKg is now also a real wire calibration
+        //   (see docs/protocol/devices/mbooster.md "Pedal Feel"), but Brake
+        //   Fade deliberately still ramps MaxThresholdKg, not MaxForceKg:
+        //   Threshold rescales the sensor's own 0-100% span, while Max Force
+        //   only lowers the effort needed below whatever that span already
+        //   is — ramping it couldn't demand MORE force than Threshold
+        //   already caps at, so it can't reproduce "harder to press."
         // Both restore to their configured values as brake temp cools. If
         // the user has never configured a given base value, that ONE
         // calibration stays fully inert (the other can still ramp
@@ -694,28 +701,29 @@ namespace MozaPlugin.Devices
         // docs/protocol/devices/mbooster.md "Pedal Feel".
         public float[]? InputCurveY { get; set; } = null;
 
-        // Deadzone at the start of pedal travel, in kg of force (0..40).
-        // Host-side only, applied before InputCurveY (a physical/sensor
-        // characteristic — the resting force before the load cell means
-        // anything — should shape the signal before the user's "feel"
-        // curve does). See MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce.
-        // 0 = off (default).
-        public float DeadzoneKg { get; set; } = 0;
+        // Deadzone at the start of pedal travel, in kg of force (0..40) —
+        // REAL hardware calibration (wire command mbooster-brake-deadzone,
+        // cmdId 0xAB selector 0x07), reverse-engineered from
+        // deadzone-0-5-11-14.pcapng (bug bundle 5VR5AQ8Y). Same kg encoding
+        // as MaxThresholdKg — see MozaMBoosterProtocol.EncodeThresholdKg and
+        // MBoosterDeviceController.PushFeelCurveResync. -1 = "not yet set /
+        // no override", same sentinel convention as every other real
+        // calibration field, so a fresh profile never overwrites whatever
+        // the device already has. Previously host-side-only (0 = off
+        // default); see docs/protocol/devices/mbooster.md "Pedal Feel".
+        public float DeadzoneKg { get; set; } = -1;
 
-        // Force (kg, 0..200) at which the Pedal Feel input curve's X-axis
-        // reaches 100%. Host-side only. Raw 0-100% pedal travel isn't a
-        // fixed 0-200kg scale — 100% raw is whatever MaxThresholdKg (Sim
-        // Input Mapping) currently calibrates the device itself to reach
-        // 100% at (200kg is only a fallback guess when MaxThresholdKg is
-        // still -1/unset — see MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce).
-        // 200 = off IF the device's real threshold is also 200kg; if it's
-        // lower (real Pit House captures commonly show ~100-125kg), 200
-        // has no additional effect beyond whatever the device already
-        // saturates at, since there's no headroom above the device's own
-        // calibrated max for software to require more force. Lower it if
-        // you never press hard enough to reach the curve's right edge
-        // otherwise.
-        public float MaxForceKg { get; set; } = 200;
+        // Force (kg, 0..200) at which the pedal's raw HID axis reaches
+        // 100% travel — REAL hardware calibration (wire command
+        // mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
+        // engineered from max-force-24-75-128-166-200.pcapng (bug bundle
+        // 5VR5AQ8Y). Same kg encoding as MaxThresholdKg. Confirmed NOT
+        // clamped to MaxThresholdKg on the wire (128/166kg sent while
+        // Threshold read back 125kg) — it's an independent parameter, not
+        // a rescale of Threshold's own ceiling. -1 = "not yet set / no
+        // override". Previously host-side-only (200 = off default); see
+        // docs/protocol/devices/mbooster.md "Pedal Feel".
+        public float MaxForceKg { get; set; } = -1;
 
         // Start/End of pedal travel, in mm (Pit House's own calibration
         // control, not a host-side shim). Reverse-engineered from two real
@@ -745,8 +753,8 @@ namespace MozaPlugin.Devices
         public float EndstopEndStiffness { get; set; } = -1;
 
         // Natural Friction (Pit House-style), 0-100%. Real hardware write
-        // (not host-side-only like Deadzone/MaxForce) — reverse-engineered
-        // from two real Pit House USB captures (a toggle on/off, and a
+        // (like Deadzone/MaxForce above) — reverse-engineered from two
+        // real Pit House USB captures (a toggle on/off, and a
         // 0/25/50/75/100% slider sweep): wire commands
         // mbooster-brake-friction-0/-1 (cmdId 0xAE with a selector byte,
         // always written together with the same value), 2-byte int, fixed

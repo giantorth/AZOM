@@ -2672,7 +2672,15 @@ namespace MozaPlugin
                 else if (axis == soleAxis) cfg = s;
                 else continue;
 
-                bool wroteAnyCalibration = false;
+                // Named for what it gates below, NOT "wrote anything" — Max
+                // Threshold and Deadzone/Max Force are deliberately excluded
+                // (see their own write blocks below) because isolated capture
+                // evidence now DISCONFIRMS the curve7-1..6 resync for them
+                // specifically (bug bundle 5VR5AQ8Y's max-threshold-4-41-105-
+                // 153-200.pcapng shows zero 0xAB traffic of any kind
+                // alongside 4 clean Threshold writes) — unlike Travel, which
+                // pedal_travel.pcapng directly confirmed DOES need it.
+                bool needsCurve7Resync = false;
 
                 // Every per-pedal calibration here is a PHYSICAL setting stored
                 // on that pedal's own mBooster unit (confirmed on hardware: each
@@ -2689,12 +2697,12 @@ namespace MozaPlugin
                             : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
                 byte dev = controller.MotorDeviceForRole(roleIdx, axis);
 
-                if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev); wroteAnyCalibration = true; }
-                if (cfg.Min >= 0) { controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev); wroteAnyCalibration = true; }
-                if (cfg.Max >= 0) { controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev); wroteAnyCalibration = true; }
+                if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev); needsCurve7Resync = true; }
+                if (cfg.Min >= 0) { controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev); needsCurve7Resync = true; }
+                if (cfg.Max >= 0) { controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev); needsCurve7Resync = true; }
                 if (cfg.CurveY != null && cfg.CurveY.Length == 5)
                 {
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                     // Resample at the fixed 20/40/60/80/100 breakpoints in case
                     // CurveX has been horizontally dragged (see
                     // MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints) —
@@ -2719,32 +2727,32 @@ namespace MozaPlugin
                 {
                     controller.SendIntWrite("mbooster-brake-travel-start",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelStartMm), dev);
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.TravelEndMm >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-travel-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelEndMm), dev);
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.EndstopFrontStiffness >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-endstop-front",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopFrontStiffness), dev);
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.EndstopEndStiffness >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopEndStiffness), dev);
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.NaturalFrictionPct >= 0)
                 {
                     int frictionRaw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.NaturalFrictionPct);
                     controller.SendIntWrite("mbooster-brake-friction-0", frictionRaw, dev);
                     controller.SendIntWrite("mbooster-brake-friction-1", frictionRaw, dev);
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                 }
                 // Segmented Damping (both "When Pressed" and "When
                 // Released" — see cfg.SegmentedDamping). One wire command
@@ -2774,32 +2782,60 @@ namespace MozaPlugin
                         sd.Seg3Released >= 0 ? sd.Seg3Released : c,
                         dev);
                     controller.SendOneShot(frame);
-                    wroteAnyCalibration = true;
+                    needsCurve7Resync = true;
                 }
                 if (role == global::MozaPlugin.Devices.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0)
                     {
                         controller.SendFloatWrite("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct, dev);
-                        wroteAnyCalibration = true;
+                        needsCurve7Resync = true;
                     }
+                    // Max Threshold does NOT set needsCurve7Resync — see the
+                    // variable's own doc comment above. Confirmed by an
+                    // isolated capture (max-threshold-4-41-105-153-200.pcapng,
+                    // Max Force held static): zero 0xAB traffic of any kind
+                    // alongside 4 clean Threshold writes.
                     if (cfg.MaxThresholdKg >= 0)
                     {
                         controller.SendIntWrite("mbooster-brake-threshold",
                             global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(cfg.MaxThresholdKg), dev);
-                        wroteAnyCalibration = true;
                     }
+                }
+
+                // Deadzone / Max Force — CONFIRMED real hardware calibration
+                // (see MBoosterDeviceController.PushFeelCurveResync). Fresh
+                // profile with neither set (-1) sends nothing, same guarantee
+                // as every other calibration write here. Once EITHER is set,
+                // the whole 8-value family is pushed together (the device has
+                // no partial-update form for it), using the pedal's own sane
+                // "off" default for whichever side has no override — 0kg
+                // deadzone, 200kg max force (an out-of-range pedal never
+                // presses hard enough for Max Force to matter). Does NOT set
+                // needsCurve7Resync: both max-force-24-75-128-166-200.pcapng
+                // and deadzone-0-5-11-14.pcapng show this family's own
+                // resync (selectors 0x07-0x0E) is everything the device
+                // needs — neither ever included a curve7-1..6 (selectors
+                // 0x01-0x06) frame.
+                if (ownsPedalFeelHardware && (cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0))
+                {
+                    double dz = cfg.DeadzoneKg >= 0 ? cfg.DeadzoneKg : 0;
+                    double mf = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200;
+                    controller.PushFeelCurveResync(dz, mf, dev);
                 }
 
                 // EXPERIMENTAL / unverified — confirmed on hardware to be
                 // required for a Travel edit to actually take effect; applied
                 // here too on the theory the same firmware requirement covers
-                // every write above, not just Travel. See
-                // MBoosterDeviceController.PushCurve7Resync. Guarded like the
-                // writes above (not unconditional) to preserve this method's
-                // "fresh profile with no overrides produces zero hardware
-                // writes" guarantee.
-                if (wroteAnyCalibration)
+                // Direction/Min/Max/CurveY/Endstop/Friction/SegmentedDamping/
+                // Ratio as well — unconfirmed for those specifically, unlike
+                // Threshold and Deadzone/MaxForce (see needsCurve7Resync's own
+                // comment), which now have direct capture evidence against
+                // it. See MBoosterDeviceController.PushCurve7Resync. Guarded
+                // like the writes above (not unconditional) to preserve this
+                // method's "fresh profile with no overrides produces zero
+                // hardware writes" guarantee.
+                if (needsCurve7Resync)
                     controller.PushCurve7Resync(cfg.CurveX, cfg.CurveY, dev);
             }
         }
