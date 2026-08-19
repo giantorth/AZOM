@@ -425,20 +425,23 @@ namespace MozaPlugin.Devices
             }
             if (c == null) return;
 
-            // Pedal Feel — Deadzone and Max Force are now REAL hardware
-            // calibration (mbooster-brake-deadzone / -maxforce, cmdId 0xAB
-            // selectors 0x07/0x0E — see MBoosterDeviceController
-            // .PushFeelCurveResync and docs/protocol/devices/mbooster.md
-            // "Pedal Feel"): the device reshapes the raw HID axis itself
-            // before this read ever sees it, so there is nothing left to
-            // reshape here. Only InputCurveY remains a host-side-only
-            // shaping step (there is no wire command for it) — applied so
-            // every downstream consumer (position bar, MergePositions ->
-            // game telemetry, the effect worker's brake-position fallback)
-            // sees the same shaped value. Does not touch CurveY (still
-            // written to the device's own output-curve command unchanged).
-            // Per-axis: the master (axis 0) uses the lane's flat fields,
-            // each chained pedal uses its own per-pedal entry.
+            // Pedal Feel — Deadzone, Max Force, and the Pedal Feel curve
+            // (InputCurveY) are all now REAL hardware calibration
+            // (mbooster-brake-deadzone/-maxforce/-feelcurve-1..6, cmdId
+            // 0xAB selectors 0x07-0x0E — see
+            // MBoosterDeviceController.PushFeelCurveResync and
+            // docs/protocol/devices/mbooster.md "Pedal Feel"): the device
+            // reshapes the raw HID axis itself before this read ever sees
+            // it, so there is nothing left to reshape here for those.
+            // Sim Input Mapping (CurveY/CurveX) is the opposite: it has NO
+            // wire command at all (see docs "Sim Input Mapping") — it
+            // remaps THIS already-hardware-shaped value into what AZOM
+            // reports to the sim, applied here so every downstream
+            // consumer (position bar, MergePositions -> game telemetry,
+            // the effect worker's brake-position fallback) sees the same
+            // remapped value. Per-axis: the master (axis 0) uses the
+            // lane's flat fields, each chained pedal uses its own per-pedal
+            // entry.
             var laneSettings = _settingsLookup(c.Identity);
             IMBoosterPedalConfig? cfg = laneSettings;
             if (axisIndex > 0)
@@ -454,13 +457,13 @@ namespace MozaPlugin.Devices
             double posPct = pos01 * 100.0;
             if (cfg != null)
             {
-                // Store the pre-input-curve percent for EVERY axis so the UI's
+                // Store the pre-remap percent for EVERY axis so the UI's
                 // live curve markers follow whichever pedal is selected (axis 0
                 // also mirrored to LastRawPercentPreCurve for legacy callers).
                 if (axisIndex < c.LastAxisRawPercentPreCurve.Length) c.LastAxisRawPercentPreCurve[axisIndex] = posPct;
                 if (axisIndex == 0) c.LastRawPercentPreCurve = posPct;
-                if (cfg.InputCurveY != null && cfg.InputCurveY.Length == 5)
-                    posPct = EvaluateInputCurve(cfg.InputCurveY, posPct);
+                if (cfg.CurveY != null && cfg.CurveY.Length == MBoosterUiConstants.SimInputMappingNodeCount)
+                    posPct = EvaluateCurveArbitraryX(cfg.CurveX ?? DefaultCurveX, cfg.CurveY, posPct);
             }
             else
             {
@@ -479,51 +482,6 @@ namespace MozaPlugin.Devices
             MergePositions();
         }
 
-        /// <summary>
-        /// Evaluate a 5-point Pedal Feel curve at a given X (0..100),
-        /// reproducing <see cref="MozaControls.MozaCurveEditor"/>'s
-        /// Catmull-Rom rendering exactly (same 1/6-tangent formula, anchored
-        /// at the origin) so the applied shaping matches what the user sees
-        /// drawn. <paramref name="y"/> holds the 5 node Y-values for
-        /// X=20,40,60,80,100; X=0 is an implicit (0,0) anchor. The control
-        /// points this formula produces always fall between their segment's
-        /// endpoints in X, so the segment's X(t) is monotonic — bisection
-        /// reliably inverts it to find t for the requested X.
-        /// </summary>
-        internal static double EvaluateInputCurve(float[] y, double x)
-        {
-            if (y == null || y.Length != 5) return x;
-            x = Math.Max(0, Math.Min(100, x));
-
-            var xs = new double[] { 0, 20, 40, 60, 80, 100, 100 };
-            var ys = new double[] { 0, y[0], y[1], y[2], y[3], y[4], y[4] };
-
-            int i = (int)Math.Min(4, Math.Floor(x / 20.0));
-            int p0i = i == 0 ? 0 : i - 1;
-            int p2i = i + 1;
-            int p3i = (i + 2 >= xs.Length) ? i + 1 : i + 2;
-
-            double p0x = xs[p0i], p0y = ys[p0i];
-            double p1x = xs[i], p1y = ys[i];
-            double p2x = xs[p2i], p2y = ys[p2i];
-            double p3x = xs[p3i], p3y = ys[p3i];
-
-            double c1x = p1x + (p2x - p0x) / 6.0, c1y = p1y + (p2y - p0y) / 6.0;
-            double c2x = p2x - (p3x - p1x) / 6.0, c2y = p2y - (p3y - p1y) / 6.0;
-
-            double lo = 0, hi = 1;
-            for (int iter = 0; iter < 24; iter++)
-            {
-                double t = (lo + hi) / 2.0;
-                double bx = CubicBezier(p1x, c1x, c2x, p2x, t);
-                if (bx < x) lo = t; else hi = t;
-            }
-            double result = CubicBezier(p1y, c1y, c2y, p2y, (lo + hi) / 2.0);
-            if (result < 0) result = 0;
-            if (result > 100) result = 100;
-            return result;
-        }
-
         private static double CubicBezier(double p0, double c1, double c2, double p1, double t)
         {
             double mt = 1 - t;
@@ -531,26 +489,39 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Same Catmull-Rom evaluation as <see cref="EvaluateInputCurve"/>,
-        /// generalized to arbitrary (draggable) node X positions instead of
-        /// the fixed 20/40/60/80/100 — used for the Sim Input Mapping output
-        /// curve's horizontal node drag (<c>MBoosterDeviceSettings.CurveX</c>).
-        /// Beyond the last node's X, returns that node's Y (flat plateau) —
-        /// this is what makes "100% output before 100% input" work: drag the
-        /// last node left and everything past it just stays at that Y.
+        /// Catmull-Rom evaluation generalized to arbitrary (draggable) node
+        /// X positions instead of a fixed spacing — used for the Sim Input
+        /// Mapping output curve's horizontal node drag
+        /// (<c>MBoosterDeviceSettings.CurveX</c>/<c>CurveY</c>). Purely
+        /// host-side (see docs/protocol/devices/mbooster.md "Sim Input
+        /// Mapping") — this remaps the pedal's already-hardware-shaped raw
+        /// HID position into what AZOM reports as game telemetry; there is
+        /// no wire command for it. Beyond the last node's X, returns that
+        /// node's Y (flat plateau) — this is what makes "100% output
+        /// before 100% input" work: drag the last node left and everything
+        /// past it just stays at that Y. Node count is derived from
+        /// <paramref name="xs"/>'s own length (not hardcoded to the current
+        /// <see cref="MBoosterUiConstants.SimInputMappingNodeCount"/>) so
+        /// this same evaluator can also resample an OLDER saved curve (e.g.
+        /// a legacy 5-node one) at a NEW breakpoint set during migration —
+        /// see MozaPlugin's curve-array migration.
         /// </summary>
         internal static double EvaluateCurveArbitraryX(float[] xs, float[] ys, double x)
         {
-            if (xs == null || ys == null || xs.Length != 5 || ys.Length != 5) return x;
+            if (xs == null || ys == null || xs.Length < 2 || xs.Length != ys.Length) return x;
+            int n = xs.Length;
 
-            var px = new double[] { 0, xs[0], xs[1], xs[2], xs[3], xs[4], xs[4] };
-            var py = new double[] { 0, ys[0], ys[1], ys[2], ys[3], ys[4], ys[4] };
+            var px = new double[n + 2];
+            var py = new double[n + 2];
+            px[0] = 0; py[0] = 0;
+            for (int k = 0; k < n; k++) { px[k + 1] = xs[k]; py[k + 1] = ys[k]; }
+            px[n + 1] = xs[n - 1]; py[n + 1] = ys[n - 1];
 
             if (x <= 0) return 0;
-            if (x >= px[5]) return py[5];
+            if (x >= px[n + 1]) return py[n + 1];
 
             int i = 0;
-            for (int k = 0; k < 5; k++)
+            for (int k = 0; k <= n; k++)
             {
                 if (x >= px[k] && x <= px[k + 1]) { i = k; break; }
             }
@@ -577,73 +548,54 @@ namespace MozaPlugin.Devices
             return CubicBezier(p1y, c1y, c2y, p2y, (lo + hi) / 2.0);
         }
 
-        private static readonly float[] DefaultCurveX = { 20, 40, 60, 80, 100 };
+        // Default (un-dragged) node X breakpoints for the Sim Input Mapping
+        // output curve, 100/7 * k for k=1..6 — evenly spaced, ending short
+        // of 100% so the curve can plateau before full physical travel
+        // (see EvaluateCurveArbitraryX's "100% output before 100% input").
+        private static readonly float[] DefaultCurveX =
+            { 100f / 7f, 200f / 7f, 300f / 7f, 400f / 7f, 500f / 7f, 600f / 7f };
 
-        /// <summary>
-        /// Resample a (possibly horizontally-dragged) output curve at the
-        /// fixed 20/40/60/80/100 breakpoints the wire protocol actually
-        /// supports. When <paramref name="curveX"/> is null (node never
-        /// dragged), this is the identity — sampling
-        /// <see cref="EvaluateCurveArbitraryX"/> exactly at a node's own X
-        /// returns that node's own Y — so callers can always resample
-        /// unconditionally without a "has the user customized X" branch.
-        /// </summary>
-        internal static float[] ResampleCurveAtFixedBreakpoints(float[]? curveX, float[] curveY)
-        {
-            var xs = (curveX != null && curveX.Length == 5) ? curveX : DefaultCurveX;
-            var result = new float[5];
-            for (int i = 0; i < 5; i++)
-                result[i] = (float)EvaluateCurveArbitraryX(xs, curveY, DefaultCurveX[i]);
-            return result;
-        }
-
-        /// <summary>
-        /// EXPERIMENTAL / unverified — resample the output curve at 6 evenly
-        /// spaced breakpoints (100/7, 200/7, ..., 600/7 percent) instead of
-        /// the wire protocol's usual 20/40/60/80/100, for the
-        /// <c>mbooster-brake-curve7-*</c> commands (cmdId 0xAB — see
-        /// MozaCommandDatabase.cs and MozaMBoosterProtocol.EncodeCurve7Point).
-        /// Spotted once in pedal_travel.pcapng sent alongside a Travel Start
-        /// write; not confirmed as an actual protocol requirement. Same
-        /// null-curveY-is-identity fallback as <see cref="ResampleCurveAtFixedBreakpoints"/>
-        /// (via <see cref="EvaluateCurveArbitraryX"/>'s own null guard).
-        /// Returned array is indexed 0..5 for wire selectors 1..6
-        /// (<c>result[i]</c> is selector <c>i + 1</c>'s value).
-        /// </summary>
-        internal static float[] ResampleCurveAtSevenths(float[]? curveX, float[]? curveY)
-        {
-            var xs = (curveX != null && curveX.Length == 5) ? curveX : DefaultCurveX;
-            var result = new float[6];
-            for (int i = 1; i <= 6; i++)
-                result[i - 1] = (float)EvaluateCurveArbitraryX(xs, curveY!, i * 100.0 / 7.0);
-            return result;
-        }
-
-        // Fixed fractions of the way from Deadzone to Max Force for the 6
-        // interpolated points the device holds between those two anchors
-        // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D) —
+        // Default/un-dragged shape of the Pedal Feel curve's 6 nodes
+        // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D),
+        // as a fraction (0-1) of the way from Deadzone to Max Force —
         // empirically measured across both max-force-24-75-128-166-200.pcapng
         // (Deadzone fixed, Max Force swept 75/128/166kg) and
         // deadzone-0-5-11-14.pcapng (Max Force fixed, Deadzone swept
         // 5/11/14kg): (value - deadzone) / (maxForce - deadzone) landed on
         // the identical constant per selector in all 6 write bursts (std-dev
-        // < 0.0001), cross-validating the same fixed shape regardless of
-        // which endpoint moved. See docs/protocol/devices/mbooster.md
+        // < 0.0001). This is Pit House's own un-dragged default shape (a
+        // Linear/identity curve — Y=X trivially holds for any untouched
+        // curve regardless of its real X-breakpoint spacing), NOT a fixed
+        // rule: the 6 points are genuinely user-adjustable via
+        // MBoosterDeviceSettings.InputCurveY (see ComputeFeelCurve below).
+        // Also doubles as each node's fixed X breakpoint (in % of the
+        // Deadzone-Max Force span) since no capture has yet isolated a
+        // dragged (non-identity) curve to independently confirm the
+        // breakpoints' spacing. See docs/protocol/devices/mbooster.md
         // "Pedal Feel" and bug bundle 5VR5AQ8Y.
-        private static readonly double[] FeelCurveFractions =
+        internal static readonly double[] FeelCurveFractions =
             { 0.08049, 0.19495, 0.44245, 0.72433, 0.90040, 0.97910 };
 
         /// <summary>
-        /// The 6 points the device's own Deadzone-to-Max-Force curve holds
-        /// between its two anchors, in kg — see <see cref="FeelCurveFractions"/>
-        /// and <see cref="MBoosterDeviceController.PushFeelCurveResync"/>.
+        /// The 6 points of the Pedal Feel curve, in kg, ready to write to
+        /// <c>mbooster-brake-feelcurve-1..6</c> — see
+        /// <see cref="MBoosterDeviceController.PushFeelCurveResync"/>.
+        /// Each node in <paramref name="inputCurveY"/> is a percentage
+        /// (0-100) of the Deadzone-Max Force span; falls back to
+        /// <see cref="FeelCurveFractions"/> (the Linear default) for any
+        /// node the user hasn't customized (null or wrong-length array).
         /// </summary>
-        internal static double[] ComputeFeelCurve(double deadzoneKg, double maxForceKg)
+        internal static double[] ComputeFeelCurve(double deadzoneKg, double maxForceKg, float[]? inputCurveY = null)
         {
             double range = maxForceKg - deadzoneKg;
-            var result = new double[FeelCurveFractions.Length];
-            for (int i = 0; i < result.Length; i++)
-                result[i] = deadzoneKg + FeelCurveFractions[i] * range;
+            int n = FeelCurveFractions.Length;
+            bool haveCurve = inputCurveY != null && inputCurveY.Length == n;
+            var result = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                double frac01 = haveCurve ? inputCurveY![i] / 100.0 : FeelCurveFractions[i];
+                result[i] = deadzoneKg + frac01 * range;
+            }
             return result;
         }
 

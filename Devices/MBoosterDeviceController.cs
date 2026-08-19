@@ -1181,62 +1181,43 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// EXPERIMENTAL / unverified — resend the output curve at 7
-        /// breakpoints (<c>mbooster-brake-curve7-*</c>, cmdId 0xAB) after a
-        /// real hardware calibration write. pedal_travel.pcapng showed Pit
-        /// House doing exactly this alongside a Travel Start write, and
-        /// omitting it is what made Travel Start/End silently no-op on
-        /// hardware despite the raw register write reading back fine — see
-        /// MozaCommandDatabase.cs's mbooster-brake-curve7-* comment. Callers
-        /// use this after Direction/Min/Max/CurveY/Endstop/Friction/
-        /// SegmentedDamping/Ratio's own writes too, on the theory that the
-        /// same firmware requirement applies to all of them, not just
-        /// Travel — unconfirmed for those. CONFIRMED NOT required for Max
-        /// Threshold or Deadzone/Max Force specifically: isolated captures
-        /// for both (max-threshold-4-41-105-153-200.pcapng,
-        /// max-force-24-75-128-166-200.pcapng, deadzone-0-5-11-14.pcapng)
-        /// show zero curve7-1..6 traffic alongside their real writes — see
-        /// MozaPlugin.ApplyMBoosterToHardware's needsCurve7Resync and
-        /// MBoosterDeviceController.PushFeelCurveResync.
-        /// </summary>
-        public void PushCurve7Resync(float[]? curveX, float[]? curveY, byte device)
-        {
-            var curve7 = MozaMBoosterRegistry.ResampleCurveAtSevenths(curveX, curveY);
-            for (int i = 0; i < curve7.Length; i++)
-                SendIntWrite($"mbooster-brake-curve7-{i + 1}", MozaMBoosterProtocol.EncodeCurve7Point(curve7[i]), device);
-        }
-
-        /// <summary>
-        /// Write Deadzone, Max Force, and the 6 interpolated points between
-        /// them (cmdId 0xAB selectors 0x07-0x0E) as one atomic burst — CONFIRMED
-        /// real hardware calibration, reverse-engineered from
+        /// Write Deadzone, Max Force, and the Pedal Feel curve's 6 nodes
+        /// between them (cmdId 0xAB selectors 0x07-0x0E) as one atomic burst —
+        /// CONFIRMED real hardware calibration, reverse-engineered from
         /// max-force-24-75-128-166-200.pcapng and deadzone-0-5-11-14.pcapng
         /// (bug bundle 5VR5AQ8Y): every Deadzone or Max Force change in both
         /// captures resent the whole 8-value family together, not just the
         /// field that moved — same "no partial update" shape as Segmented
-        /// Damping. Both values use the identical kg encoding as Max
-        /// Threshold (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
-        /// See <see cref="MozaMBoosterRegistry.ComputeFeelCurve"/>.
+        /// Damping. All three use the identical kg encoding as Max Threshold
+        /// (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
+        /// <paramref name="inputCurveY"/> is the Pedal Feel curve's own 6
+        /// user-adjustable nodes (0-100%, null/wrong-length = use the
+        /// default Linear shape) — see
+        /// <see cref="MozaMBoosterRegistry.ComputeFeelCurve"/>.
         /// </summary>
-        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, byte device)
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, byte device)
         {
             SendIntWrite("mbooster-brake-deadzone", MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg), device);
-            var mid = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg);
+            var mid = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg, inputCurveY);
             for (int i = 0; i < mid.Length; i++)
                 SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(mid[i]), device);
             SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
         }
 
         // ── Coalescing gate for UI-driven calibration writes ──
-        // A slider raises ValueChanged per tick, and every one of these commands
-        // is a flash-backed calibration register that additionally drags a
-        // 6-frame PushCurve7Resync burst behind it. Bundle KY3HK4QP shows what
-        // that costs unthrottled: a ~2 s Max Threshold drag emitted 77 threshold
-        // + 462 curve7 frames, ~40 writes/second into flash. So UI writes are
-        // parked in a latest-wins slot per (device, command) and flushed once the
-        // user stops moving, collapsing a whole drag into one write set. Same
-        // pending+coalesce+throttle shape HardwareApplier.QueueWheelCfgWrite uses
-        // for the wheel's own flash-backed writes, minus its change cache.
+        // A slider raises ValueChanged per tick, and every one of these
+        // commands is a flash-backed calibration register — writing it on
+        // every tick of a drag would hammer flash unnecessarily. (An
+        // earlier design also dragged a 6-frame curve7 resync behind every
+        // write here, motivated by bundle KY3HK4QP's "~2s Max Threshold
+        // drag emitted 77 threshold + 462 curve7 frames" cost — that resync
+        // was later removed as unconfirmed/unneeded, but the coalescing
+        // below is still worth it purely for the primary writes.) UI writes
+        // are parked in a latest-wins slot per (device, command) and
+        // flushed once the user stops moving, collapsing a whole drag into
+        // one write set. Same pending+coalesce+throttle shape
+        // HardwareApplier.QueueWheelCfgWrite uses for the wheel's own
+        // flash-backed writes, minus its change cache.
         //
         // The connect-time apply (MozaPlugin.ApplyMBoosterToHardware) deliberately
         // does NOT go through this — it fires once and must not be deferred.

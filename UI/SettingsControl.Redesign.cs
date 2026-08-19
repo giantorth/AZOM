@@ -107,17 +107,17 @@ namespace MozaPlugin
                 BindEditorToSliders(MBoosterCurveEditor, new[]
                 {
                     MBoosterY1Slider, MBoosterY2Slider, MBoosterY3Slider,
-                    MBoosterY4Slider, MBoosterY5Slider
+                    MBoosterY4Slider, MBoosterY5Slider, MBoosterY6Slider
                 });
                 BindEditorXToSliders(MBoosterCurveEditor, new[]
                 {
                     MBoosterX1Slider, MBoosterX2Slider, MBoosterX3Slider,
-                    MBoosterX4Slider, MBoosterX5Slider
+                    MBoosterX4Slider, MBoosterX5Slider, MBoosterX6Slider
                 });
                 BindEditorToSliders(MBoosterInputCurveEditor, new[]
                 {
                     MBoosterInputY1Slider, MBoosterInputY2Slider, MBoosterInputY3Slider,
-                    MBoosterInputY4Slider, MBoosterInputY5Slider
+                    MBoosterInputY4Slider, MBoosterInputY5Slider, MBoosterInputY6Slider
                 });
 
                 // Two-way bindings: CurveEditor.YN ↔ EqNSlider.Value (FFB EQ
@@ -257,17 +257,17 @@ namespace MozaPlugin
 
         // Two-way bind a MozaCurveEditor's X dependency properties to sliders —
         // only meaningful when the editor has AllowHorizontalDrag="True". Accepts
-        // 5 sliders (mBooster Sim Input Mapping — all nodes draggable) or 4 (the
+        // 6 sliders (mBooster Sim Input Mapping — all nodes draggable) or 4 (the
         // wheelbase FFB curve, whose last node is pinned at input=100 via
-        // LockLastNodeX so X5 keeps its DP default). No X6 — horizontal drag
-        // isn't offered on the 6-band EQ.
+        // LockLastNodeX so X5 keeps its DP default). Horizontal drag isn't
+        // offered on the 6-band EQ.
         private void BindEditorXToSliders(MozaControls.MozaCurveEditor editor, Slider[] sliders)
         {
             if (editor == null || sliders == null || sliders.Length < 4) return;
             var xs = new[] {
                 MozaControls.MozaCurveEditor.X1Property, MozaControls.MozaCurveEditor.X2Property,
                 MozaControls.MozaCurveEditor.X3Property, MozaControls.MozaCurveEditor.X4Property,
-                MozaControls.MozaCurveEditor.X5Property };
+                MozaControls.MozaCurveEditor.X5Property, MozaControls.MozaCurveEditor.X6Property };
             int n = Math.Min(sliders.Length, xs.Length);
             for (int i = 0; i < n; i++)
             {

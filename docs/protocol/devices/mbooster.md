@@ -959,8 +959,8 @@ parking still applies to whichever calibrations still carry it.
 
 ## Sim Input Mapping
 
-Two real hardware calibrations plus the per-role output curve, all on the
-pedal's own unit (`MotorDeviceForRole` — see
+Two real hardware calibrations, plus a purely host-side output curve, all
+on the pedal's own unit (`MotorDeviceForRole` — see
 [Chain topology](#chain-topology--connectivity-diagnostics)).
 
 - **Sensor Output Ratio** (`SensorOutputRatioPct`, 0–100%) — blends the
@@ -974,55 +974,87 @@ pedal's own unit (`MotorDeviceForRole` — see
   `raw = round(kg * 65536 / 200)`. Verified on two capture points (4 kg →
   1311 exactly; an unlabeled capture decoding to ~126 kg against an
   independently-reported real Pit House setting of ~125 kg). See
-  `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`.
-- **Output curve** — 5 points through `mbooster-{throttle,brake,clutch}-y1..y5`,
-  resampled at the fixed 20/40/60/80/100 breakpoints the wire supports (see
-  `MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints`; a horizontally
-  dragged node has no wire command of its own).
+  `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`. This
+  recalibrates the sensor's own full-scale range on the DEVICE — the raw
+  HID axis itself reads exactly `MaxThresholdKg` of force at 100% travel,
+  which is what the game reads directly (bypassing AZOM entirely) if it
+  binds to the pedal's raw joystick axis.
+- **Output curve** (`CurveY`/`CurveX`, 6 nodes + an implicit fixed origin
+  at (0,0)) — **REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed
+  **purely host-side, with no wire command at all**. It used to be
+  believed to write through `mbooster-{throttle,brake,clutch}-y1..y5`
+  (15 commands, confirmed-real but for the wrong shape) and, in an
+  even earlier iteration, an experimental `curve7` resync (`0xAB`
+  selectors `0x01`-`0x06`) — both are now removed; see
+  [Removed: `y1..y5` and `curve7`](#removed-y1y5-and-curve7-historical)
+  below. What this curve actually does: it remaps the pedal's raw HID
+  position — which by the time AZOM reads it already reflects Deadzone,
+  Max Force, and the Pedal Feel curve's real hardware shaping (see
+  [Pedal Feel](#pedal-feel) below) — into whatever value AZOM reports as
+  game telemetry (`MozaData.{Throttle,Brake,Clutch}Position`). Applied in
+  `MozaMBoosterRegistry.OnHidAxisUpdate` via
+  `EvaluateCurveArbitraryX(cfg.CurveX, cfg.CurveY, posPct)`, in the exact
+  spot `InputCurveY`'s host-side application used to occupy before Pedal
+  Feel moved to hardware. Nodes are draggable both vertically (`CurveY`)
+  and horizontally (`CurveX`, via `AllowHorizontalDrag` on the curve
+  editor) — a dragged last node lets "100% output" happen before "100%
+  input," since the evaluator plateaus at the last node's Y beyond its X
+  (same trick as before, just now the ONLY consumer of the shaped value
+  is AZOM's own telemetry, not a second wire push). Six wire breakpoints
+  `100/7 × k` for k=1..6 (≈14.29/28.57/42.86/57.14/71.43/85.71%) were kept
+  as the curve's fixed node-count reference/default shape even though
+  nothing sends them over the wire anymore — chosen to match what the
+  (now-removed) `curve7` mechanism's own selectors were, so a node that's
+  never been dragged renders identically to before.
 
-Both calibrations use the shared `-1` "not yet set / no override" sentinel,
-so a fresh profile never overwrites what is already on the device.
-
-Max Threshold **is** the raw HID axis's full scale: at 100% travel the axis
-reads exactly `MaxThresholdKg` of force, and the device pegs its own output
-there. That makes it the reference every host-side kg-space control is
-expressed against (`MozaMBoosterRegistry.ResolveFullScaleKg`, resolved in
-three rungs: the user's own override, else the device's
-`mbooster-brake-threshold` read-back, else a 200 kg last resort).
-
-Getting that reference wrong, or failing to land the write, makes Max
-Threshold read as **inverted** — it enters the host-side path only as the
-`ApplyDeadzoneAndMaxForce` *denominator*, so raising it shrinks both the
-deadzone and the Max Force ceiling in raw-travel terms and the reported
-pedal position rises *faster*. When the hardware write does land the two
-effects cancel exactly (shaped output ends up a function of force and Max
-Force alone), which is what makes the control feel correct. Bundle
-KY3HK4QP hit precisely this: the write was going to a phantom device id.
-The device read-back is now consumed (it is deliberately *not* copied into
-`MaxThresholdKg`, whose `-1` means "user set no override" — seeding it
-would make the plugin write the value back on every connect).
+Both hardware calibrations use the shared `-1` "not yet set / no override"
+sentinel, so a fresh profile never overwrites what is already on the
+device. `CurveY`/`CurveX` are `null` by default (identity / no remapping)
+— existing profiles are unaffected until a user opens this section.
 
 ## Pedal Feel
 
-A card above Sim Input Mapping holds a second 5-point curve,
-`InputCurveY` on `MBoosterDeviceSettings`. Unlike `CurveY`, this one has
-**no wire command at all** — it's pure host-side shaping, applied in
-`MozaMBoosterRegistry.OnHidAxisUpdate` to the raw HID axis position
-before it becomes `c.LastHidPosition`, i.e. before it reaches
-`MozaData.{Throttle,Brake,Clutch}Position` (game telemetry) *and*
-before the effect worker's brake-position test-pulse fallback. `CurveY`
-is completely unaffected — it still writes to the device's own
-output-curve command exactly as before.
+A card to the left of Sim Input Mapping holds `InputCurveY` on
+`MBoosterDeviceSettings` — 6 nodes, Y-only (no X-dragging).
+**REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed **real hardware
+calibration**, not host-side shaping. It directly populates the 6
+interpolated selectors already reverse-engineered for Deadzone/Max Force
+(`mbooster-brake-feelcurve-1..6`, cmdId `0xAB` selectors `0x08`-`0x0D` —
+see [Deadzone / Max Force](#deadzone--max-force--revised-real-hardware-calibration-not-host-side-bug-bundle-5vr5aq8y)
+below) — Deadzone (`0x07`) and Max Force (`0x0E`) stay their own separate
+anchor sliders, untouched by the curve. Each node's UI value is a
+percentage (0-100%) of the Deadzone→Max Force span; the wire value per
+node is `kg = deadzoneKg + (nodePct/100) × (maxForceKg − deadzoneKg)`,
+encoded via the same `MozaMBoosterProtocol.EncodeThresholdKg` every kg
+field in this family uses. See `MozaMBoosterRegistry.ComputeFeelCurve`
+and `MBoosterDeviceController.PushFeelCurveResync`.
 
-`MozaMBoosterRegistry.EvaluateInputCurve` reproduces
-`MozaControls.MozaCurveEditor`'s Catmull-Rom rendering exactly (same
-1/6-tangent formula, anchored at the origin), inverted via bisection to
-solve X(t)=x for the requested input X — so the applied shaping always
-matches what's drawn on screen. Verified: the Linear preset is an exact
-identity function (not just at the 5 breakpoints), and the S-Curve
-preset interpolates smoothly through all 5 breakpoints. `null` (the
-default) means no shaping — existing profiles are unaffected until a
-user opens this section.
+Since the device now shapes this curve's effect into the raw HID axis
+itself, the OLD host-side application (`MozaMBoosterRegistry
+.EvaluateInputCurve`, applied to the raw HID position before it became
+`c.LastHidPosition`/game telemetry) has been **removed** — keeping it
+would have double-applied the curve on top of what the hardware already
+did, the same class of bug the original Deadzone/Max Force host-side
+implementation had. `CurveY` (Sim Input Mapping, above) is unaffected —
+it's a completely separate, still-host-side remap that runs where
+`EvaluateInputCurve` used to.
+
+The curve's 6 fixed X breakpoints — `{8.049, 19.495, 44.245, 72.433,
+90.040, 97.910}%` of the Deadzone→Max Force span — are the SAME
+constants documented under Deadzone/Max Force below
+(`MozaMBoosterRegistry.FeelCurveFractions`), now reframed: they were
+originally measured as a fixed interpolation *formula*, but are actually
+Pit House's own un-dragged default shape (a Linear/identity curve — Y=X
+trivially holds for any untouched curve regardless of the real breakpoint
+spacing, so the measurement couldn't distinguish "fixed rule" from
+"default shape" until this session's clarification that the curve is
+genuinely user-adjustable). `null` (the default) means "use this Linear
+default" — existing profiles are unaffected until a user opens this
+section. Same passive-pedal protection as Deadzone/Max Force
+(`MBoosterDeadzoneMaxForcePanel` in `SettingsControl.xaml`) — this is a
+brake-named singleton `0xAB` write with no per-pedal selector, so editing
+it from a passive pedal's page would overwrite the active pedal's
+registers instead.
 
 The same card also has a **Start/End of Travel (mm)** control —
 `TravelStartMm`/`TravelEndMm` on `MBoosterDeviceSettings`. Unlike every
@@ -1253,11 +1285,54 @@ address either, so editing them from a passive pedal's page would
 overwrite the active pedal's registers the same way KY3HK4QP found for
 Travel.
 
-`InputCurveY` (the 5-point curve above) remains genuinely host-side —
-no wire command was found for it in either capture, and it still shapes
-`MozaData.{Throttle,Brake,Clutch}Position` (the `AZOM.*` properties, the
-pedal traces, the live curve markers) *after* whatever the device now
-delivers already-shaped on the raw HID axis.
+**Further revision**: `InputCurveY`'s 6 nodes are what populate selectors
+`0x08`-`0x0D` above — see [Pedal Feel](#pedal-feel). An earlier pass
+through this doc (during the same investigation) described those 6
+selectors as a fixed, non-adjustable interpolation formula and treated
+`InputCurveY` as staying host-side; that turned out to be wrong once the
+user clarified Pedal Feel is specifically the curve meant to change the
+pedal's physical feel. `FeelCurveFractions` (the constant array measured
+below) is kept, just reframed as the curve's default/Linear shape rather
+than a hard rule.
+
+### Removed: `y1..y5` and `curve7` (historical)
+
+Two mechanisms this investigation built, then removed once the Sim Input
+Mapping / Pedal Feel split above was clarified — kept here for context,
+matching this doc's convention of preserving past-bug/decision history
+rather than deleting it:
+
+- **`mbooster-{throttle,brake,clutch}-y1..y5`** (cmdIds 14-29,
+  non-sequential per role, 4-byte float, group 35/36) — a genuinely
+  confirmed-via-capture wire mechanism, believed to be the Sim Input
+  Mapping output curve's real encoding (5 points at fixed 20/40/60/80/100%
+  breakpoints). Removed once it became clear the output curve is purely
+  host-side (see above) — the confirmed capture evidence for these 15
+  commands existing is not in question, only whether AZOM's output curve
+  should be sending them, and it turns out it shouldn't.
+- **`curve7`** (`0xAB` selectors `0x01`-`0x06`, cmdId shared with the
+  entirely separate Deadzone/Max Force/Pedal-Feel-curve family at
+  selectors `0x07`-`0x0E` above) — always EXPERIMENTAL/unconfirmed: spotted
+  exactly once, alongside a Travel Start write in `pedal_travel.pcapng`,
+  and speculatively wired into `QueueMBoosterCalibPush` (`SettingsControl
+  .xaml.cs`) as an automatic resync tacked onto EVERY other calibration
+  write (Direction/Min/Max/CurveY/Travel/Endstop/Friction/SegmentedDamping/
+  Ratio), on the theory the same firmware requirement applied broadly.
+  This session's more rigorous, isolated captures directly disconfirmed it
+  for Max Threshold and Deadzone/Max Force specifically (zero `0xAB`
+  selector `0x01`-`0x06` traffic alongside their real writes) — and once
+  neither redesigned curve needed it either, the whole mechanism (
+  `ResampleCurveAtSevenths`, `EncodeCurve7Point`, `PushCurve7Resync`, the 6
+  `AddCommand` entries, and every `needsCurve7Resync`/`includeCurve7Resync`
+  call site) was removed rather than kept half-justified for Travel alone
+  — Travel's own write already reads back correctly without it (per the
+  original Travel writeup above); only the resync's *additional* benefit
+  was ever unconfirmed, not the base write.
+
+Net effect: Direction/Min/Max/Travel/Endstop/Friction/SegmentedDamping/
+Ratio/Threshold no longer drag any resync behind their writes — just the
+one write each already documented above, with `QueueCalibWrite`'s 400ms
+debounce still doing its job of collapsing a drag into one write set.
 
 ### Traction Control — new effect, no verified wire type
 

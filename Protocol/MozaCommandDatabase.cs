@@ -596,45 +596,25 @@ namespace MozaPlugin.Protocol
             // docs/protocol/devices/mbooster.md "Pedal Feel".
             AddCommand("mbooster-brake-travel-start", "mbooster", 35, 36, new byte[] { 0x84 }, 2, "int");
             AddCommand("mbooster-brake-travel-end",   "mbooster", 35, 36, new byte[] { 0x85 }, 2, "int");
-            // EXPERIMENTAL / unverified — spotted in pedal_travel.pcapng: Pit
-            // House sent these 6 alongside a single Travel Start write, never
-            // in isolation, so this is a correlation from one capture, not a
-            // confirmed protocol requirement. cmdId 0xAB, same "prefix bytes
-            // then payload" shape as endstop above: a fixed 0x00 byte + a 1-6
-            // selector before the 2-byte value. Values decoded near a linear
-            // ramp (selector/7 * 65535) with two outliers, consistent with
-            // this being the 5-point output curve
-            // (CurveX/CurveY) re-expressed at 7 evenly-spaced breakpoints
-            // instead of the usual 20/40/60/80/100 — see
-            // MozaMBoosterRegistry.ResampleCurveAtSevenths and
-            // MozaMBoosterProtocol.EncodeCurve7Point. Hypothesis: the
-            // firmware needs this resent for a Travel/Pedal-Feel write to
-            // actually take effect, even though the raw Travel register
-            // itself reads back correctly without it. Needs on-hardware
-            // confirmation — see docs/protocol/devices/mbooster.md "Pedal Feel".
-            AddCommand("mbooster-brake-curve7-1", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x01 }, 2, "int");
-            AddCommand("mbooster-brake-curve7-2", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x02 }, 2, "int");
-            AddCommand("mbooster-brake-curve7-3", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x03 }, 2, "int");
-            AddCommand("mbooster-brake-curve7-4", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x04 }, 2, "int");
-            AddCommand("mbooster-brake-curve7-5", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x05 }, 2, "int");
-            AddCommand("mbooster-brake-curve7-6", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x06 }, 2, "int");
             // Pit House "Deadzone" and "Max Force" (Pedal Feel) — CONFIRMED real
             // hardware calibration, reverse-engineered from two real Pit House
             // captures (max-force-24-75-128-166-200.pcapng,
-            // deadzone-0-5-11-14.pcapng — see bug bundle 5VR5AQ8Y). Same cmdId
-            // 0xAB indexed-register family as curve7-1..6 above, but a
-            // DIFFERENT selector range (0x07-0x0E) carrying a genuinely separate
-            // 8-point curve: selector 0x07 = Deadzone, selector 0x0E = Max
-            // Force, both in kg using the identical encoding as Max Threshold
-            // (raw = round(kg * 65536 / 200) — see
+            // deadzone-0-5-11-14.pcapng — see bug bundle 5VR5AQ8Y). cmdId 0xAB
+            // indexed-register family, selectors 0x07-0x0E carrying a genuinely
+            // separate 8-point curve: selector 0x07 = Deadzone, selector 0x0E =
+            // Max Force, both in kg using the identical encoding as Max
+            // Threshold (raw = round(kg * 65536 / 200) — see
             // MozaMBoosterProtocol.EncodeThresholdKg). Selectors 0x08-0x0D are
-            // 6 interpolated points between the two anchors — see
-            // MozaMBoosterRegistry.ComputeFeelCurve. Unlike curve7-1..6 (never
-            // confirmed as a real requirement), every Max Force / Deadzone
-            // sweep in both captures resent this whole 8-value family as one
-            // atomic burst, and real Pit House does NOT clamp Max Force to Max
-            // Threshold (128kg/166kg were sent while Threshold read back as
-            // 125kg) — see docs/protocol/devices/mbooster.md "Pedal Feel".
+            // the Pedal Feel curve's own 6 user-adjustable nodes (0-100% of the
+            // Deadzone-Max Force span) — see MozaMBoosterRegistry
+            // .ComputeFeelCurve. Every Max Force / Deadzone sweep in both
+            // captures resent this whole 8-value family as one atomic burst,
+            // and real Pit House does NOT clamp Max Force to Max Threshold
+            // (128kg/166kg were sent while Threshold read back as 125kg) — see
+            // docs/protocol/devices/mbooster.md "Pedal Feel". (An earlier,
+            // separate 0xAB selector range 0x01-0x06, "curve7", was removed —
+            // it was only ever an experimental, unconfirmed resync guess for
+            // an unrelated curve; see docs for the historical writeup.)
             AddCommand("mbooster-brake-deadzone",   "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x07 }, 2, "int");
             AddCommand("mbooster-brake-feelcurve-1", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x08 }, 2, "int");
             AddCommand("mbooster-brake-feelcurve-2", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x09 }, 2, "int");
@@ -669,22 +649,11 @@ namespace MozaPlugin.Protocol
             // docs/protocol/devices/mbooster.md "Pedal Feel".
             AddCommand("mbooster-brake-friction-0", "mbooster", 35, 36, new byte[] { 0xAE, 0x00, 0x00 }, 2, "int");
             AddCommand("mbooster-brake-friction-1", "mbooster", 35, 36, new byte[] { 0xAE, 0x00, 0x01 }, 2, "int");
-            // 5-point output curves per pedal (4-byte float, read 35 / write 36)
-            AddCommand("mbooster-throttle-y1", "mbooster", 35, 36, new byte[] { 14 }, 4, "float");
-            AddCommand("mbooster-throttle-y2", "mbooster", 35, 36, new byte[] { 15 }, 4, "float");
-            AddCommand("mbooster-throttle-y3", "mbooster", 35, 36, new byte[] { 16 }, 4, "float");
-            AddCommand("mbooster-throttle-y4", "mbooster", 35, 36, new byte[] { 17 }, 4, "float");
-            AddCommand("mbooster-throttle-y5", "mbooster", 35, 36, new byte[] { 27 }, 4, "float");
-            AddCommand("mbooster-brake-y1",    "mbooster", 35, 36, new byte[] { 18 }, 4, "float");
-            AddCommand("mbooster-brake-y2",    "mbooster", 35, 36, new byte[] { 19 }, 4, "float");
-            AddCommand("mbooster-brake-y3",    "mbooster", 35, 36, new byte[] { 20 }, 4, "float");
-            AddCommand("mbooster-brake-y4",    "mbooster", 35, 36, new byte[] { 21 }, 4, "float");
-            AddCommand("mbooster-brake-y5",    "mbooster", 35, 36, new byte[] { 28 }, 4, "float");
-            AddCommand("mbooster-clutch-y1",   "mbooster", 35, 36, new byte[] { 22 }, 4, "float");
-            AddCommand("mbooster-clutch-y2",   "mbooster", 35, 36, new byte[] { 23 }, 4, "float");
-            AddCommand("mbooster-clutch-y3",   "mbooster", 35, 36, new byte[] { 24 }, 4, "float");
-            AddCommand("mbooster-clutch-y4",   "mbooster", 35, 36, new byte[] { 25 }, 4, "float");
-            AddCommand("mbooster-clutch-y5",   "mbooster", 35, 36, new byte[] { 29 }, 4, "float");
+            // (The per-role 5-point output curve commands (cmdIds 14-29,
+            // mbooster-{throttle,brake,clutch}-y1..y5) were removed — the Sim
+            // Input Mapping output curve is now purely host-side, with no
+            // wire encoding at all; see docs/protocol/devices/mbooster.md
+            // "Sim Input Mapping" for the historical writeup.)
             // Live outputs (read-only group 37) — fallback live-position source
             // if HID identity pairing fails on a particular unit.
             AddCommand("mbooster-throttle-output", "mbooster", 37, 0xFF, new byte[] { 1 }, 2, "int");

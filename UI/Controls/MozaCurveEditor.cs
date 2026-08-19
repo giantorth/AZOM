@@ -65,16 +65,19 @@ namespace MozaControls
         public double Y10 { get => (double)GetValue(Y10Property); set => SetValue(Y10Property, value); }
 
         // -------- X values (data-space 0..100, only meaningful when
-        // AllowHorizontalDrag is true — 5-node curves only, no X6). Defaults
-        // match the fixed 20/40/60/80/100 breakpoints every other curve in
-        // this app uses, so a fresh instance renders identically to one
-        // driven by NodeXFractions until the user actually drags a node
-        // sideways. --------
+        // AllowHorizontalDrag is true — 5-node curves default to the fixed
+        // 20/40/60/80/100 breakpoints every other curve in this app uses;
+        // the 6-node Sim Input Mapping curve overwrites X1-X6 from its own
+        // seeding code (100/7 * k for k=1..6) immediately on load, so X6's
+        // own DP default below is cosmetic. A fresh instance renders
+        // identically to one driven by NodeXFractions until the user
+        // actually drags a node sideways. --------
         public static readonly DependencyProperty X1Property = RegisterX(nameof(X1), 20);
         public static readonly DependencyProperty X2Property = RegisterX(nameof(X2), 40);
         public static readonly DependencyProperty X3Property = RegisterX(nameof(X3), 60);
         public static readonly DependencyProperty X4Property = RegisterX(nameof(X4), 80);
         public static readonly DependencyProperty X5Property = RegisterX(nameof(X5), 100);
+        public static readonly DependencyProperty X6Property = RegisterX(nameof(X6), 600.0 / 7.0);
 
         private static DependencyProperty RegisterX(string name, double dflt)
             => DependencyProperty.Register(name, typeof(double), typeof(MozaCurveEditor),
@@ -87,6 +90,7 @@ namespace MozaControls
         public double X3 { get => (double)GetValue(X3Property); set => SetValue(X3Property, value); }
         public double X4 { get => (double)GetValue(X4Property); set => SetValue(X4Property, value); }
         public double X5 { get => (double)GetValue(X5Property); set => SetValue(X5Property, value); }
+        public double X6 { get => (double)GetValue(X6Property); set => SetValue(X6Property, value); }
 
         // When true, nodes can be dragged horizontally (within their
         // neighbours' bounds) as well as vertically — used only by the
@@ -534,10 +538,10 @@ namespace MozaControls
             // Horizontal drag (output curve only — see AllowHorizontalDrag).
             // Clamped between immediate neighbours (min 1-unit gap) so nodes
             // can never cross, which would make the curve's X non-monotonic
-            // and the Bezier-inversion evaluators (EvaluateInputCurve-style)
-            // ill-defined.
+            // and the Bezier-inversion evaluator
+            // (MozaMBoosterRegistry.EvaluateCurveArbitraryX) ill-defined.
             int lastNode = ClampedNodeCount() - 1;
-            if (AllowHorizontalDrag && _dragNode >= 0 && _dragNode < 5
+            if (AllowHorizontalDrag && _dragNode >= 0 && _dragNode < 6
                 && !(LockLastNodeX && _dragNode == lastNode))
             {
                 double w = _canvas?.ActualWidth ?? ActualWidth;
@@ -546,7 +550,7 @@ namespace MozaControls
                 double dataX = x01 * 100.0;
 
                 double lo = _dragNode == 0 ? 1.0 : GetX(_dragNode - 1) + 1.0;
-                double hi = _dragNode == 4 ? 100.0 : GetX(_dragNode + 1) - 1.0;
+                double hi = _dragNode == lastNode ? 100.0 : GetX(_dragNode + 1) - 1.0;
                 if (hi < lo) hi = lo;
                 dataX = Math.Max(lo, Math.Min(hi, dataX));
                 SetX(_dragNode, Math.Round(dataX));
@@ -579,6 +583,7 @@ namespace MozaControls
                 case 2: return X3;
                 case 3: return X4;
                 case 4: return X5;
+                case 5: return X6;
                 default: return 0;
             }
         }
@@ -592,6 +597,7 @@ namespace MozaControls
                 case 2: X3 = v; break;
                 case 3: X4 = v; break;
                 case 4: X5 = v; break;
+                case 5: X6 = v; break;
             }
         }
 
@@ -638,13 +644,13 @@ namespace MozaControls
 
             // ---- Node X fractions / Y values ----
             double[] nodeFracs;
-            if (AllowHorizontalDrag && nodeCount <= 5)
+            if (AllowHorizontalDrag && nodeCount <= 6)
             {
                 // Nodes are user-draggable in X (see ApplyDrag) — derive
-                // fractions from X1..X5 instead of the fixed NodeXFractions
+                // fractions from X1..X6 instead of the fixed NodeXFractions
                 // string. Same 0.98 compression as Default5NodeFractions so
                 // a never-dragged node lands exactly where it always has.
-                double[] xs = { X1, X2, X3, X4, X5 };
+                double[] xs = { X1, X2, X3, X4, X5, X6 };
                 nodeFracs = new double[nodeCount];
                 for (int i = 0; i < nodeCount; i++)
                     nodeFracs[i] = Math.Max(0, Math.Min(1, (xs[i] / 100.0) * 0.98));
@@ -844,7 +850,7 @@ namespace MozaControls
         /// the already-built spline: map the data-space X to a pixel X, find
         /// which segment contains it, then invert that segment's Bezier X(t)
         /// via bisection (same approach as
-        /// MozaMBoosterRegistry.EvaluateInputCurve) to read off both the
+        /// MozaMBoosterRegistry.EvaluateCurveArbitraryX) to read off both the
         /// pixel X and Y at that point — i.e. the dot always sits ON the
         /// curve as currently configured, not just sliding horizontally.
         /// </summary>
@@ -870,7 +876,7 @@ namespace MozaControls
                     // fraction, so linear interpolation between two known
                     // node pairs reproduces the true mapping exactly whether
                     // or not it's been dragged from its default.
-                    double[] dataXs = { X1, X2, X3, X4, X5 };
+                    double[] dataXs = { X1, X2, X3, X4, X5, X6 };
                     int n = Math.Min(nodePts.Length, dataXs.Length);
                     double clampedX = Math.Max(0, Math.Min(dataXs[n - 1], liveX));
                     double x0 = 0, px0 = PadLeft, x1 = dataXs[0], px1 = nodePts[0].X;

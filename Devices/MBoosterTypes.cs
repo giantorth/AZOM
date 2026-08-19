@@ -134,6 +134,17 @@ namespace MozaPlugin.Devices
         public const float SegDampDivider1ReleasedDefaultPct = 20f;
         public const float SegDampDivider2ReleasedDefaultPct = 70f;
         public const float SegDampSegDefaultPct = 0f;
+
+        // Node counts for the two mBooster curve editors (both were 5-point
+        // originally). Sim Input Mapping (CurveY/CurveX) is purely host-side,
+        // no wire command — see MozaMBoosterRegistry.EvaluateCurveArbitraryX.
+        // Pedal Feel (InputCurveY) is a REAL hardware write, populating
+        // mbooster-brake-feelcurve-1..6 (cmdId 0xAB selectors 0x08-0x0D) —
+        // see MozaMBoosterRegistry.ComputeFeelCurve and
+        // MBoosterDeviceController.PushFeelCurveResync. See
+        // docs/protocol/devices/mbooster.md "Sim Input Mapping" / "Pedal Feel".
+        public const int SimInputMappingNodeCount = 6;
+        public const int PedalFeelNodeCount = 6;
     }
 
     /// <summary>
@@ -456,16 +467,16 @@ namespace MozaPlugin.Devices
         public int Direction { get; set; } = -1;
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
-        public float[]? CurveY { get; set; } = null;   // 5-point output curve
+        public float[]? CurveY { get; set; } = null;   // 6-point output curve (host-side only)
         public float[]? CurveX { get; set; } = null;   // draggable node X (null = fixed breakpoints)
 
         // Sim Input Mapping (see MBoosterDeviceSettings for the field semantics).
         public float SensorOutputRatioPct { get; set; } = -1;
         public float MaxThresholdKg { get; set; } = -1;
 
-        // Pedal Feel (InputCurveY is host-side shaping; Deadzone/MaxForce are
+        // Pedal Feel — InputCurveY (6-point), Deadzone, and MaxForce are ALL
         // real brake-only wire calibration — see MBoosterDeviceSettings for
-        // the field semantics).
+        // the field semantics.
         public float[]? InputCurveY { get; set; } = null;
         public float DeadzoneKg { get; set; } = -1;
         public float MaxForceKg { get; set; } = -1;
@@ -648,19 +659,23 @@ namespace MozaPlugin.Devices
         public int Direction { get; set; } = -1;
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
-        public float[]? CurveY { get; set; } = null;   // 5-point output curve
+
+        // Sim Input Mapping output curve (6-point) — PURELY host-side, no
+        // wire command at all. Remaps the pedal's raw HID position (which
+        // by this point already reflects Deadzone/Max Force/the Pedal Feel
+        // curve's hardware shaping) into what AZOM reports as game
+        // telemetry (MozaData.{Throttle,Brake,Clutch}Position) — see
+        // MozaMBoosterRegistry.OnHidAxisUpdate/EvaluateCurveArbitraryX and
+        // docs/protocol/devices/mbooster.md "Sim Input Mapping". CurveY
+        // holds the 6 node Y-values; CurveX (below) holds their X
+        // positions, draggable in the curve editor. Null = identity / no
+        // remapping — existing profiles are unaffected until the user
+        // opens this section.
+        public float[]? CurveY { get; set; } = null;
 
         // X position (0..100) of each output-curve node, draggable in the
         // Sim Input Mapping curve editor. Null = default fixed breakpoints
-        // (20/40/60/80/100 — identical to every other curve in the app).
-        // There is no hardware command for this (unlike the wheelbase's own
-        // FFB curve, which has base-ffb-curve-x1..x4) — moving a node here
-        // instead RESAMPLES the (CurveX, CurveY) shape at the fixed
-        // 20/40/60/80/100 breakpoints and pushes those 5 values through the
-        // existing mbooster-throttle-y1..y5 commands, so "100% output before
-        // 100% input" works using only the wire commands that actually
-        // exist. See MozaMBoosterRegistry.EvaluateCurveArbitraryX and
-        // docs/protocol/devices/mbooster.md "Sim Input Mapping".
+        // (100/7 * k for k=1..6 — see MozaMBoosterRegistry.DefaultCurveX).
         public float[]? CurveX { get; set; } = null;
 
         // Per-pedal calibration for the ADDITIONAL pedals on a chained mBooster
@@ -690,14 +705,14 @@ namespace MozaPlugin.Devices
         // value is already on the device.
         public float MaxThresholdKg { get; set; } = -1;
 
-        // Pedal Feel (Pit House-style). Host-side only — there is no wire
-        // command for this; it shapes the raw HID axis position BEFORE it
-        // becomes MozaData.{Throttle,Brake,Clutch}Position (and before the
-        // effect worker's brake-position fallback), independent of CurveY
-        // (which still writes to the device's own output-curve command
-        // unchanged). Null = identity / no shaping — existing profiles are
-        // unaffected until the user opens the new Pedal Feel section. See
-        // MozaMBoosterRegistry.EvaluateInputCurve and
+        // Pedal Feel input curve (6-point, Pit House-style) — REAL hardware
+        // calibration: its nodes (0-100% of the Deadzone-Max Force span)
+        // populate mbooster-brake-feelcurve-1..6 directly (cmdId 0xAB
+        // selectors 0x08-0x0D). Null = use the default Linear shape
+        // (MozaMBoosterRegistry.FeelCurveFractions) — existing profiles are
+        // unaffected until the user opens this section. See
+        // MozaMBoosterRegistry.ComputeFeelCurve,
+        // MBoosterDeviceController.PushFeelCurveResync, and
         // docs/protocol/devices/mbooster.md "Pedal Feel".
         public float[]? InputCurveY { get; set; } = null;
 

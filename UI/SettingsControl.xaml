@@ -1845,13 +1845,6 @@
                                     <!-- Left half: Pedal Feel -->
                                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                                         <TextBlock Text="{x:Static res:Strings.Section_PedalFeel}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
-                                        <ctrl:MozaCurveEditor x:Name="MBoosterInputCurveEditor" Height="220"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
-                                            <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Linear"/>
-                                            <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_SCurve"/>
-                                            <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Exponential"/>
-                                            <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
-                                        </StackPanel>
 
                                         <!-- Travel + End Stop are HARDWARE writes on brake-named singleton
                                              cmdIds (0x84/0x85/0xB2) with no per-pedal selector, so they only
@@ -1893,11 +1886,19 @@
                                                      Text="1"/>
                                         </Grid>
                                         </StackPanel><!-- MBoosterTravelEndstopPanel -->
-                                        <!-- Deadzone and Max Force are ALSO a brake-named singleton hardware
-                                             write now (cmdId 0xAB selectors 0x07/0x0E) — same passive-pedal
-                                             gating as Travel/End Stop, since editing them from a passive
-                                             pedal's page would overwrite the active pedal's registers instead. -->
+                                        <!-- Deadzone, Max Force, and the Pedal Feel curve are ALL a
+                                             brake-named singleton hardware write (cmdId 0xAB selectors
+                                             0x07-0x0E) — same passive-pedal gating as Travel/End Stop,
+                                             since editing them from a passive pedal's page would
+                                             overwrite the active pedal's registers instead. -->
                                         <StackPanel x:Name="MBoosterDeadzoneMaxForcePanel">
+                                        <ctrl:MozaCurveEditor x:Name="MBoosterInputCurveEditor" Height="220" NodeCount="6"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
+                                            <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Linear"/>
+                                            <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_SCurve"/>
+                                            <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Exponential"/>
+                                            <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
+                                        </StackPanel>
                                         <Grid Margin="0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1960,6 +1961,8 @@
                                             <TextBox x:Name="MBoosterInputY4Value" Text="80"/>
                                             <Slider x:Name="MBoosterInputY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY5Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterInputY5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterInputY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY6Value" Text="100"/>
                                         </StackPanel>
                                     </StackPanel>
 
@@ -1969,7 +1972,7 @@
                                     <!-- Right half: Sim Input Mapping -->
                                     <StackPanel Grid.Column="2" Margin="16,0,0,0">
                                         <TextBlock Text="{x:Static res:Strings.Section_SimInputMapping}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
-                                        <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220"
+                                        <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220" NodeCount="6"
                                                               AccentBrush="{StaticResource CyanBrush}"
                                                               AllowHorizontalDrag="True"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
@@ -2033,6 +2036,8 @@
                                             <TextBox x:Name="MBoosterY4Value" Text="80"/>
                                             <Slider x:Name="MBoosterY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY5Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterY5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY6Value" Text="100"/>
                                             <Slider x:Name="MBoosterX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX1Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterX1Value" Text="20"/>
                                             <Slider x:Name="MBoosterX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX2Slider_ValueChanged"/>
@@ -2043,6 +2048,8 @@
                                             <TextBox x:Name="MBoosterX4Value" Text="80"/>
                                             <Slider x:Name="MBoosterX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX5Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterX5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterX6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX6Value" Text="100"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>

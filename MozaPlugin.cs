@@ -1056,6 +1056,19 @@ namespace MozaPlugin
                     _settings.VerboseWireDebugLog = false;
                 }
 
+                // The mBooster CurveY/CurveX (Sim Input Mapping) and
+                // InputCurveY (Pedal Feel) arrays moved from 5 to 6 nodes.
+                // Every other call site treats a wrong-length array as
+                // "unset" and falls back to a default shape — fine for new
+                // profiles, but it would silently discard an existing
+                // user's tuned curve the first time this version runs.
+                // Resample once instead, preserving each curve's shape.
+                if (!_settings.MBoosterCurveArraysMigratedTo6)
+                {
+                    _settings.MBoosterCurveArraysMigratedTo6 = true;
+                    MigrateMBoosterCurveArraysTo6();
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
@@ -2595,6 +2608,71 @@ namespace MozaPlugin
             return changed;
         }
 
+        // Old 5-node output curve's fixed X breakpoints — what CurveX
+        // defaulted to (and what InputCurveY was always implicitly fixed
+        // at) before the redesign to 6 nodes. Used only by the one-shot
+        // migration below.
+        private static readonly float[] LegacyMBoosterCurveDefaultX = { 20, 40, 60, 80, 100 };
+
+        /// <summary>
+        /// One-shot migration (see
+        /// <see cref="MozaPluginSettings.MBoosterCurveArraysMigratedTo6"/>):
+        /// resamples every saved mBooster CurveY/CurveX (Sim Input Mapping)
+        /// and InputCurveY (Pedal Feel) array from its old 5-node shape to
+        /// the current 6-node one, across every profile's master settings
+        /// and every chained pedal — preserving each curve's visual shape
+        /// instead of letting the ordinary "wrong length = unset" guards
+        /// elsewhere silently discard it to a default. CurveX itself does
+        /// not carry over (the old dragged X positions don't map cleanly
+        /// onto the new node count) — only the resulting Y-shape does; a
+        /// fresh CurveX default takes over on the next edit.
+        /// </summary>
+        private void MigrateMBoosterCurveArraysTo6()
+        {
+            var profiles = _settings?.ProfileStore?.Profiles;
+            if (profiles == null) return;
+            foreach (var profile in profiles)
+            {
+                if (profile?.MBoosterSettings == null) continue;
+                foreach (var device in profile.MBoosterSettings.Values)
+                {
+                    if (device == null) continue;
+                    MigrateOneMBoosterCurveSet(device);
+                    if (device.Pedals != null)
+                        foreach (var pedal in device.Pedals.Values)
+                            if (pedal != null) MigrateOneMBoosterCurveSet(pedal);
+                }
+            }
+        }
+
+        private static void MigrateOneMBoosterCurveSet(global::MozaPlugin.Devices.IMBoosterPedalConfig cfg)
+        {
+            const int oldNodeCount = 5;
+            if (cfg.CurveY != null && cfg.CurveY.Length == oldNodeCount)
+            {
+                var oldXs = (cfg.CurveX != null && cfg.CurveX.Length == oldNodeCount)
+                    ? cfg.CurveX : LegacyMBoosterCurveDefaultX;
+                var newY = new float[global::MozaPlugin.Devices.MBoosterUiConstants.SimInputMappingNodeCount];
+                for (int i = 0; i < newY.Length; i++)
+                {
+                    double x = (i + 1) * 100.0 / 7.0;
+                    newY[i] = (float)global::MozaPlugin.Devices.MozaMBoosterRegistry.EvaluateCurveArbitraryX(oldXs, cfg.CurveY, x);
+                }
+                cfg.CurveY = newY;
+                cfg.CurveX = null;
+            }
+            if (cfg.InputCurveY != null && cfg.InputCurveY.Length == oldNodeCount)
+            {
+                var newInput = new float[global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount];
+                for (int i = 0; i < newInput.Length; i++)
+                {
+                    double x = global::MozaPlugin.Devices.MozaMBoosterRegistry.FeelCurveFractions[i] * 100.0;
+                    newInput[i] = (float)global::MozaPlugin.Devices.MozaMBoosterRegistry.EvaluateCurveArbitraryX(LegacyMBoosterCurveDefaultX, cfg.InputCurveY, x);
+                }
+                cfg.InputCurveY = newInput;
+            }
+        }
+
         /// <summary>
         /// Called once per detection rising edge by the registry. Pushes any
         /// saved calibration values to the device and kicks off a read-back
@@ -2672,16 +2750,6 @@ namespace MozaPlugin
                 else if (axis == soleAxis) cfg = s;
                 else continue;
 
-                // Named for what it gates below, NOT "wrote anything" — Max
-                // Threshold and Deadzone/Max Force are deliberately excluded
-                // (see their own write blocks below) because isolated capture
-                // evidence now DISCONFIRMS the curve7-1..6 resync for them
-                // specifically (bug bundle 5VR5AQ8Y's max-threshold-4-41-105-
-                // 153-200.pcapng shows zero 0xAB traffic of any kind
-                // alongside 4 clean Threshold writes) — unlike Travel, which
-                // pedal_travel.pcapng directly confirmed DOES need it.
-                bool needsCurve7Resync = false;
-
                 // Every per-pedal calibration here is a PHYSICAL setting stored
                 // on that pedal's own mBooster unit (confirmed on hardware: each
                 // unit reports only its own pedal's calibration, under its own
@@ -2697,20 +2765,13 @@ namespace MozaPlugin
                             : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
                 byte dev = controller.MotorDeviceForRole(roleIdx, axis);
 
-                if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev); needsCurve7Resync = true; }
-                if (cfg.Min >= 0) { controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev); needsCurve7Resync = true; }
-                if (cfg.Max >= 0) { controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev); needsCurve7Resync = true; }
-                if (cfg.CurveY != null && cfg.CurveY.Length == 5)
-                {
-                    needsCurve7Resync = true;
-                    // Resample at the fixed 20/40/60/80/100 breakpoints in case
-                    // CurveX has been horizontally dragged (see
-                    // MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints) —
-                    // identity when it hasn't.
-                    var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(cfg.CurveX, cfg.CurveY);
-                    for (int k = 0; k < 5; k++)
-                        controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k], dev);
-                }
+                if (cfg.Direction >= 0) controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev);
+                if (cfg.Min >= 0) controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev);
+                if (cfg.Max >= 0) controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev);
+                // CurveY/CurveX (Sim Input Mapping output curve) are NOT
+                // pushed here — purely host-side now, no wire command at
+                // all (see MozaMBoosterRegistry.EvaluateCurveArbitraryX and
+                // docs/protocol/devices/mbooster.md "Sim Input Mapping").
                 // Travel / End Stop / Natural Friction / Segmented Damping are
                 // load-cell + motor Pedal Feel features living on brake-named
                 // SINGLETON cmdIds (0x84/0x85, 0xB2, 0xAE, 0xB7) with no
@@ -2727,32 +2788,27 @@ namespace MozaPlugin
                 {
                     controller.SendIntWrite("mbooster-brake-travel-start",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelStartMm), dev);
-                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.TravelEndMm >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-travel-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(cfg.TravelEndMm), dev);
-                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.EndstopFrontStiffness >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-endstop-front",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopFrontStiffness), dev);
-                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.EndstopEndStiffness >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopEndStiffness), dev);
-                    needsCurve7Resync = true;
                 }
                 if (ownsPedalFeelHardware && cfg.NaturalFrictionPct >= 0)
                 {
                     int frictionRaw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.NaturalFrictionPct);
                     controller.SendIntWrite("mbooster-brake-friction-0", frictionRaw, dev);
                     controller.SendIntWrite("mbooster-brake-friction-1", frictionRaw, dev);
-                    needsCurve7Resync = true;
                 }
                 // Segmented Damping (both "When Pressed" and "When
                 // Released" — see cfg.SegmentedDamping). One wire command
@@ -2782,20 +2838,13 @@ namespace MozaPlugin
                         sd.Seg3Released >= 0 ? sd.Seg3Released : c,
                         dev);
                     controller.SendOneShot(frame);
-                    needsCurve7Resync = true;
                 }
                 if (role == global::MozaPlugin.Devices.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0)
                     {
                         controller.SendFloatWrite("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct, dev);
-                        needsCurve7Resync = true;
                     }
-                    // Max Threshold does NOT set needsCurve7Resync — see the
-                    // variable's own doc comment above. Confirmed by an
-                    // isolated capture (max-threshold-4-41-105-153-200.pcapng,
-                    // Max Force held static): zero 0xAB traffic of any kind
-                    // alongside 4 clean Threshold writes.
                     if (cfg.MaxThresholdKg >= 0)
                     {
                         controller.SendIntWrite("mbooster-brake-threshold",
@@ -2803,40 +2852,25 @@ namespace MozaPlugin
                     }
                 }
 
-                // Deadzone / Max Force — CONFIRMED real hardware calibration
-                // (see MBoosterDeviceController.PushFeelCurveResync). Fresh
-                // profile with neither set (-1) sends nothing, same guarantee
-                // as every other calibration write here. Once EITHER is set,
-                // the whole 8-value family is pushed together (the device has
-                // no partial-update form for it), using the pedal's own sane
-                // "off" default for whichever side has no override — 0kg
-                // deadzone, 200kg max force (an out-of-range pedal never
-                // presses hard enough for Max Force to matter). Does NOT set
-                // needsCurve7Resync: both max-force-24-75-128-166-200.pcapng
-                // and deadzone-0-5-11-14.pcapng show this family's own
-                // resync (selectors 0x07-0x0E) is everything the device
-                // needs — neither ever included a curve7-1..6 (selectors
-                // 0x01-0x06) frame.
-                if (ownsPedalFeelHardware && (cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0))
+                // Deadzone / Max Force / Pedal Feel curve — CONFIRMED real
+                // hardware calibration (see
+                // MBoosterDeviceController.PushFeelCurveResync). Fresh
+                // profile with none set sends nothing, same guarantee as
+                // every other calibration write here. Once ANY of the three
+                // is set, the whole 8-value family is pushed together (the
+                // device has no partial-update form for it), using the
+                // pedal's own sane "off" default for whichever side has no
+                // override — 0kg deadzone, 200kg max force, and the curve's
+                // own default Linear shape (MozaMBoosterRegistry
+                // .FeelCurveFractions) for an uncustomized curve.
+                bool curveCustomized = cfg.InputCurveY != null
+                    && cfg.InputCurveY.Length == global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount;
+                if (ownsPedalFeelHardware && (cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0 || curveCustomized))
                 {
                     double dz = cfg.DeadzoneKg >= 0 ? cfg.DeadzoneKg : 0;
                     double mf = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200;
-                    controller.PushFeelCurveResync(dz, mf, dev);
+                    controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, dev);
                 }
-
-                // EXPERIMENTAL / unverified — confirmed on hardware to be
-                // required for a Travel edit to actually take effect; applied
-                // here too on the theory the same firmware requirement covers
-                // Direction/Min/Max/CurveY/Endstop/Friction/SegmentedDamping/
-                // Ratio as well — unconfirmed for those specifically, unlike
-                // Threshold and Deadzone/MaxForce (see needsCurve7Resync's own
-                // comment), which now have direct capture evidence against
-                // it. See MBoosterDeviceController.PushCurve7Resync. Guarded
-                // like the writes above (not unconditional) to preserve this
-                // method's "fresh profile with no overrides produces zero
-                // hardware writes" guarantee.
-                if (needsCurve7Resync)
-                    controller.PushCurve7Resync(cfg.CurveX, cfg.CurveY, dev);
             }
         }
 

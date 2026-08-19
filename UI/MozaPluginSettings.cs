@@ -269,6 +269,13 @@ namespace MozaPlugin
         // VerboseWireDebugLog=true. See MozaPlugin.Init.
         public bool VerboseWireDebugLogDefaultMigrated { get; set; }
 
+        // One-shot marker for the migration that resamples every saved
+        // mBooster CurveY/CurveX/InputCurveY array from its old 5-node
+        // shape to the current 6-node one, preserving each curve's visual
+        // shape instead of silently discarding it to a default. See
+        // MozaPlugin.Init and MozaMBoosterRegistry.MigrateCurveArraysTo6.
+        public bool MBoosterCurveArraysMigratedTo6 { get; set; }
+
         // ~1/min pull of the wheel display's own log via session FF kind=14,
         // acked with kind=15 (which clears those lines on the device). No UI —
         // flip to false in MozaPluginSettings.json to stop the pull entirely.
