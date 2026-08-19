@@ -1892,47 +1892,57 @@
                                              since editing them from a passive pedal's page would
                                              overwrite the active pedal's registers instead. -->
                                         <StackPanel x:Name="MBoosterDeadzoneMaxForcePanel">
-                                        <ctrl:MozaCurveEditor x:Name="MBoosterInputCurveEditor" Height="220" NodeCount="6"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <!-- Live "position % · kg force" readout, updated at 30 Hz in
+                                                 UpdateMBoosterCurveMarkers alongside this tab's other live
+                                                 displays. kg is a computed estimate (raw position % scaled by
+                                                 this pedal's own Max Threshold, i.e. what force reads 100%
+                                                 travel), not a directly-read sensor value. -->
+                                            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MBoosterPedalFeelLiveLabel" Text="{x:Static res:Strings.Label_Position}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="2" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <!-- Vertical Deadzone slider, same Height as the curve editor so its
+                                                 0-40kg span lines up top-to-bottom with the curve's own 0-100%
+                                                 span (40kg at the top, matching the curve's top edge; 0kg at the
+                                                 bottom, matching the curve's bottom edge). -->
+                                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,0" HorizontalAlignment="Center">
+                                                <Slider x:Name="MBoosterDeadzoneSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
+                                                        Minimum="0" Maximum="40" TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
+                                                <TextBox x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
+                                                         Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
+                                                         HorizontalAlignment="Center" Width="56" Margin="0,8,0,0"
+                                                         KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                         Text="0.0"/>
+                                            </StackPanel>
+                                            <ctrl:MozaCurveEditor Grid.Row="1" Grid.Column="1" x:Name="MBoosterInputCurveEditor" Height="220" NodeCount="6"/>
+                                            <!-- Vertical Max Force slider, same Height/scaling logic as Deadzone
+                                                 above, mirrored to the curve editor's right (0kg bottom, 200kg
+                                                 top). -->
+                                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="12,0,0,0" HorizontalAlignment="Center">
+                                                <Slider x:Name="MBoosterMaxForceSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
+                                                        Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
+                                                <TextBox x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
+                                                         Tag="{Binding ElementName=MBoosterMaxForceSlider}"
+                                                         HorizontalAlignment="Center" Width="56" Margin="0,8,0,0"
+                                                         KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                         Text="200"/>
+                                            </StackPanel>
+                                        </Grid>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
                                             <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Linear"/>
                                             <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_SCurve"/>
                                             <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Exponential"/>
                                             <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
                                         </StackPanel>
-                                        <Grid Margin="0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"/>
-                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
-                                            <Slider Grid.Column="2" x:Name="MBoosterDeadzoneSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="40" TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
-                                            <TextBlock Grid.Column="3" Text="40" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
-                                            <TextBox Grid.Column="4" x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
-                                                     Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="0.0"/>
-                                        </Grid>
-                                        <Grid Margin="0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"/>
-                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
-                                            <Slider Grid.Column="2" x:Name="MBoosterMaxForceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
-                                            <TextBlock Grid.Column="3" x:Name="MBoosterMaxForceRangeEndLabel" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
-                                            <TextBox Grid.Column="4" x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
-                                                     Tag="{Binding ElementName=MBoosterMaxForceSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="200"/>
-                                        </Grid>
                                         </StackPanel><!-- MBoosterDeadzoneMaxForcePanel -->
                                         <!-- Natural Friction is another brake-named singleton hardware write
                                              (cmdId 0xAE) — same passive-pedal gating as Travel/End Stop. -->

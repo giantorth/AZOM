@@ -338,6 +338,28 @@ namespace MozaPlugin
             MBoosterInputCurveEditor.LiveX = double.NaN;
             MBoosterCurveEditor.LiveX = preCurve;
 
+            // Live "position % · kg force" readout above the Pedal Feel
+            // curve editor (MBoosterPedalFeelLiveLabel). kg is an estimate,
+            // not a directly-read sensor value: the raw HID axis only ever
+            // reports a 0-100% position, calibrated so 100% == this pedal's
+            // Max Threshold force (see docs/protocol/devices/mbooster.md
+            // "Sim Input Mapping") — so force = pct/100 * that threshold.
+            // Resolution order matches the removed ResolveFullScaleKg: the
+            // user's own MaxThresholdKg override, else the device's own
+            // mbooster-brake-threshold read-back, else a 200kg last resort.
+            if (hidConnected)
+            {
+                var cfg = PeekMBoosterEffectTarget();
+                double fullScaleKg = (cfg != null && cfg.MaxThresholdKg >= 0) ? cfg.MaxThresholdKg
+                    : (selected.DeviceReportedMaxThresholdKg > 0 ? selected.DeviceReportedMaxThresholdKg : 200.0);
+                double kg = preCurve / 100.0 * fullScaleKg;
+                MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_Position}: {preCurve:F0}% · {kg:F1} kg";
+            }
+            else
+            {
+                MBoosterPedalFeelLiveLabel.Text = Strings.Label_Position;
+            }
+
             // Effects card pedal trace — same 30 Hz cadence as the Inputs
             // tab's pedal bars above, and the same merged 0-100 values
             // (_data.*Position), so it shows every connected pedal's live
