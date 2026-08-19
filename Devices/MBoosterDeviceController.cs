@@ -1181,26 +1181,37 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Write Deadzone, Max Force, and the Pedal Feel curve's 6 nodes
-        /// between them (cmdId 0xAB selectors 0x07-0x0E) as one atomic burst —
-        /// CONFIRMED real hardware calibration, reverse-engineered from
-        /// max-force-24-75-128-166-200.pcapng and deadzone-0-5-11-14.pcapng
-        /// (bug bundle 5VR5AQ8Y): every Deadzone or Max Force change in both
-        /// captures resent the whole 8-value family together, not just the
-        /// field that moved — same "no partial update" shape as Segmented
-        /// Damping. All three use the identical kg encoding as Max Threshold
-        /// (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
-        /// <paramref name="inputCurveY"/> is the Pedal Feel curve's own 6
-        /// user-adjustable nodes (0-100%, null/wrong-length = use the
-        /// default Linear shape) — see
+        /// Write Deadzone, Max Force, and the Pedal Feel curve's 6 nodes on
+        /// BOTH axes between them (cmdId 0xAB selectors 0x01-0x0E) as one
+        /// atomic burst — CONFIRMED real hardware calibration. The Y half
+        /// (selectors 0x07-0x0E: Deadzone, 6 nodes, Max Force) is reverse-
+        /// engineered from max-force-24-75-128-166-200.pcapng and
+        /// deadzone-0-5-11-14.pcapng (bug bundle 5VR5AQ8Y): every Deadzone or
+        /// Max Force change in both captures resent the whole 8-value family
+        /// together, not just the field that moved — same "no partial
+        /// update" shape as Segmented Damping. The X half (selectors
+        /// 0x01-0x06, one per node) is reverse-engineered from
+        /// pedal-feel-node{2,5}-{x,y}-adjust.pcapng: every isolated single-
+        /// node drag (on EITHER axis) wrote that node's X selector and its Y
+        /// selector together, X first — sent here in the same order for
+        /// consistency, though a full resync's exact intra-burst ordering is
+        /// unconfirmed to matter. All fields use the identical kg encoding
+        /// as Max Threshold (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
+        /// <paramref name="inputCurveY"/>/<paramref name="inputCurveX"/> are
+        /// the Pedal Feel curve's own 6 user-adjustable nodes per axis
+        /// (0-100%, null/wrong-length = use the default Linear shape) — see
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurve"/>.
         /// </summary>
-        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, byte device)
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device)
         {
             SendIntWrite("mbooster-brake-deadzone", MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg), device);
-            var mid = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg, inputCurveY);
-            for (int i = 0; i < mid.Length; i++)
-                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(mid[i]), device);
+            var midX = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg, inputCurveX);
+            var midY = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg, inputCurveY);
+            for (int i = 0; i < midY.Length; i++)
+            {
+                SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midX[i]), device);
+                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midY[i]), device);
+            }
             SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
         }
 

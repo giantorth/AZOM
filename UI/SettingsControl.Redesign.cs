@@ -119,6 +119,11 @@ namespace MozaPlugin
                     MBoosterInputY1Slider, MBoosterInputY2Slider, MBoosterInputY3Slider,
                     MBoosterInputY4Slider, MBoosterInputY5Slider, MBoosterInputY6Slider
                 });
+                BindEditorXToSliders(MBoosterInputCurveEditor, new[]
+                {
+                    MBoosterInputX1Slider, MBoosterInputX2Slider, MBoosterInputX3Slider,
+                    MBoosterInputX4Slider, MBoosterInputX5Slider, MBoosterInputX6Slider
+                });
 
                 // Two-way bindings: CurveEditor.YN ↔ EqNSlider.Value (FFB EQ
                 // uses the same line-graph control as the output curves,
@@ -257,10 +262,10 @@ namespace MozaPlugin
 
         // Two-way bind a MozaCurveEditor's X dependency properties to sliders —
         // only meaningful when the editor has AllowHorizontalDrag="True". Accepts
-        // 6 sliders (mBooster Sim Input Mapping — all nodes draggable) or 4 (the
-        // wheelbase FFB curve, whose last node is pinned at input=100 via
-        // LockLastNodeX so X5 keeps its DP default). Horizontal drag isn't
-        // offered on the 6-band EQ.
+        // 6 sliders (mBooster Sim Input Mapping and Pedal Feel — all nodes
+        // draggable) or 4 (the wheelbase FFB curve, whose last node is pinned
+        // at input=100 via LockLastNodeX so X5 keeps its DP default).
+        // Horizontal drag isn't offered on the 6-band EQ.
         private void BindEditorXToSliders(MozaControls.MozaCurveEditor editor, Slider[] sliders)
         {
             if (editor == null || sliders == null || sliders.Length < 4) return;

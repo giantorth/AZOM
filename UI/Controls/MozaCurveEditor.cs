@@ -116,6 +116,37 @@ namespace MozaControls
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool LockLastNodeX { get => (bool)GetValue(LockLastNodeXProperty); set => SetValue(LockLastNodeXProperty, value); }
 
+        // When true (with AllowHorizontalDrag), only the FIRST and LAST nodes
+        // may move horizontally — every node in between is Y-only. The first
+        // node is additionally locked in Y (X-only movement), since its sole
+        // role is to mark where the curve's usable input range begins; the
+        // last node keeps moving on both axes. Dragging either endpoint
+        // horizontally rescales all the in-between nodes' X in proportion to
+        // their old position between the two (old) endpoints, so the curve's
+        // shape (relative node spacing) is preserved rather than left behind.
+        // Used only by the Sim Input Mapping curve (MBoosterCurveEditor) —
+        // every other curve using AllowHorizontalDrag (e.g. the wheelbase FFB
+        // output curve) keeps its existing per-node drag behaviour unchanged.
+        public static readonly DependencyProperty EndpointsOnlyDraggableInXProperty =
+            DependencyProperty.Register(nameof(EndpointsOnlyDraggableInX), typeof(bool), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public bool EndpointsOnlyDraggableInX { get => (bool)GetValue(EndpointsOnlyDraggableInXProperty); set => SetValue(EndpointsOnlyDraggableInXProperty, value); }
+
+        // When true, a node's Y is ALSO clamped between its immediate
+        // neighbours' current Y (index-adjacent, same convention as the
+        // existing X neighbour-clamp below) — the first/last node clamp
+        // against YMin/YMax instead. Used by the Pedal Feel curve, where
+        // both axes are freely draggable (unlike Sim Input Mapping's
+        // endpoint-only-X nodes) so nothing else stops a node from being
+        // dragged past its neighbour's Y. Off by default so every other
+        // curve keeps its existing unconstrained Y-drag behaviour.
+        public static readonly DependencyProperty ClampYToAdjacentNodesProperty =
+            DependencyProperty.Register(nameof(ClampYToAdjacentNodes), typeof(bool), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public bool ClampYToAdjacentNodes { get => (bool)GetValue(ClampYToAdjacentNodesProperty); set => SetValue(ClampYToAdjacentNodesProperty, value); }
+
         // Per-node Y cap for the LAST node only (NaN = disabled) — the 10-band
         // EQ's 100 Hz band stays 0-100% while every other band runs to YMax=500.
         public static readonly DependencyProperty LastNodeYMaxProperty =
@@ -169,6 +200,21 @@ namespace MozaControls
                 new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool AnchorAtOrigin { get => (bool)GetValue(AnchorAtOriginProperty); set => SetValue(AnchorAtOriginProperty, value); }
+
+        // When true, the spline is ALSO anchored at the plot's upper-right
+        // corner (data-space 100,100) as a real drawn point, symmetric to
+        // AnchorAtOrigin's lower-left corner — so the visible line reaches
+        // (100,100) even when the last draggable node doesn't sit exactly
+        // there. Used by the Pedal Feel curve (MBoosterInputCurveEditor,
+        // both axes now draggable): its domain is 0-100% of the Deadzone→Max
+        // Force span on BOTH axes, so the curve should visually span that
+        // whole square. Off by default — every other curve already ends at
+        // its own last node/point with no separate corner anchor.
+        public static readonly DependencyProperty AnchorAtTopRightProperty =
+            DependencyProperty.Register(nameof(AnchorAtTopRight), typeof(bool), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public bool AnchorAtTopRight { get => (bool)GetValue(AnchorAtTopRightProperty); set => SetValue(AnchorAtTopRightProperty, value); }
 
         // Diagonal y=x reference line from plot lower-left to upper-right —
         // the "nominal" / linear response. Shown on output curves to make it
@@ -526,23 +572,41 @@ namespace MozaControls
 
         private void ApplyDrag(Point p)
         {
-            double h = _canvas?.ActualHeight ?? ActualHeight;
-            double plotH = Math.Max(1, h - PadTop - PadBottom);
-            double y01 = (h - PadBottom - p.Y) / plotH;
-            double range = Math.Max(1, YMax - YMin);
-            double v = Math.Max(YMin, Math.Min(YMax, Math.Round(YMin + y01 * range)));
-            if (!double.IsNaN(LastNodeYMax) && _dragNode == ClampedNodeCount() - 1)
-                v = Math.Min(v, LastNodeYMax);
-            SetY(_dragNode, v);
+            int lastNode = ClampedNodeCount() - 1;
+            bool isEndpoint = _dragNode == 0 || _dragNode == lastNode;
+
+            // Vertical drag — locked for the first node when
+            // EndpointsOnlyDraggableInX is set (see its doc comment): that
+            // node moves horizontally only.
+            if (!(EndpointsOnlyDraggableInX && _dragNode == 0))
+            {
+                double h = _canvas?.ActualHeight ?? ActualHeight;
+                double plotH = Math.Max(1, h - PadTop - PadBottom);
+                double y01 = (h - PadBottom - p.Y) / plotH;
+                double range = Math.Max(1, YMax - YMin);
+                double v = Math.Max(YMin, Math.Min(YMax, Math.Round(YMin + y01 * range)));
+                if (!double.IsNaN(LastNodeYMax) && _dragNode == lastNode)
+                    v = Math.Min(v, LastNodeYMax);
+                // Clamp to the neighbours' Y too — same crossing-prevention
+                // reasoning as the X neighbour-clamp below, just per-axis.
+                if (ClampYToAdjacentNodes)
+                {
+                    double loY = _dragNode == 0 ? YMin : GetY(_dragNode - 1);
+                    double hiY = _dragNode == lastNode ? YMax : GetY(_dragNode + 1);
+                    if (hiY < loY) hiY = loY;
+                    v = Math.Max(loY, Math.Min(hiY, v));
+                }
+                SetY(_dragNode, v);
+            }
 
             // Horizontal drag (output curve only — see AllowHorizontalDrag).
             // Clamped between immediate neighbours (min 1-unit gap) so nodes
             // can never cross, which would make the curve's X non-monotonic
             // and the Bezier-inversion evaluator
             // (MozaMBoosterRegistry.EvaluateCurveArbitraryX) ill-defined.
-            int lastNode = ClampedNodeCount() - 1;
             if (AllowHorizontalDrag && _dragNode >= 0 && _dragNode < 6
-                && !(LockLastNodeX && _dragNode == lastNode))
+                && !(LockLastNodeX && _dragNode == lastNode)
+                && !(EndpointsOnlyDraggableInX && !isEndpoint))
             {
                 double w = _canvas?.ActualWidth ?? ActualWidth;
                 double plotW = Math.Max(1, w - PadLeft - PadRight);
@@ -552,8 +616,34 @@ namespace MozaControls
                 double lo = _dragNode == 0 ? 1.0 : GetX(_dragNode - 1) + 1.0;
                 double hi = _dragNode == lastNode ? 100.0 : GetX(_dragNode + 1) - 1.0;
                 if (hi < lo) hi = lo;
-                dataX = Math.Max(lo, Math.Min(hi, dataX));
-                SetX(_dragNode, Math.Round(dataX));
+                dataX = Math.Round(Math.Max(lo, Math.Min(hi, dataX)));
+
+                if (EndpointsOnlyDraggableInX && isEndpoint)
+                {
+                    // Rescale every in-between node's X to keep its old
+                    // fractional position between the two endpoints, so the
+                    // curve's shape follows the endpoint being dragged
+                    // instead of being left bunched up behind it.
+                    double oldFirstX = GetX(0);
+                    double oldLastX = GetX(lastNode);
+                    double oldSpan = oldLastX - oldFirstX;
+                    SetX(_dragNode, dataX);
+                    if (oldSpan > 0.0001)
+                    {
+                        double newFirstX = GetX(0);
+                        double newLastX = GetX(lastNode);
+                        double newSpan = newLastX - newFirstX;
+                        for (int m = 1; m < lastNode; m++)
+                        {
+                            double frac = (GetX(m) - oldFirstX) / oldSpan;
+                            SetX(m, Math.Round(newFirstX + frac * newSpan));
+                        }
+                    }
+                }
+                else
+                {
+                    SetX(_dragNode, dataX);
+                }
             }
         }
 
@@ -571,6 +661,24 @@ namespace MozaControls
                 case 7: Y8 = v; break;
                 case 8: Y9 = v; break;
                 case 9: Y10 = v; break;
+            }
+        }
+
+        private double GetY(int i)
+        {
+            switch (i)
+            {
+                case 0: return Y1;
+                case 1: return Y2;
+                case 2: return Y3;
+                case 3: return Y4;
+                case 4: return Y5;
+                case 5: return Y6;
+                case 6: return Y7;
+                case 7: return Y8;
+                case 8: return Y9;
+                case 9: return Y10;
+                default: return 0;
             }
         }
 
@@ -696,48 +804,53 @@ namespace MozaControls
             }
 
             // ---- Catmull-Rom spline ----
-            // Two endpoint regimes:
-            //  • AnchorAtOrigin=true (output curves): prepend the plot's
-            //    lower-left corner so the visible line starts at (0,0).
-            //  • AnchorAtOrigin=false (EQ): duplicate the first node as its
-            //    own virtual "previous" neighbour and skip the first segment,
-            //    so the line starts AT the first node with a smooth tangent.
-            // The last node is always duplicated for the same tangent reason
-            // — the curve ends AT the last node, not at the right edge.
-            bool anchor = AnchorAtOrigin;
-            var allPts = new Point[nodeCount + 2];
-            allPts[0] = anchor ? new Point(PadLeft, PadTop + plotH) : pts[0];
-            for (int i = 0; i < nodeCount; i++) allPts[i + 1] = pts[i];
-            allPts[nodeCount + 1] = pts[nodeCount - 1];
+            // `real` holds every point the visible curve actually passes
+            // through, in order — the draggable nodes, optionally prefixed
+            // with the plot's lower-left corner (AnchorAtOrigin) and/or
+            // suffixed with its upper-right corner (AnchorAtTopRight), both
+            // as genuine drawn points rather than mere tangent helpers.
+            // Standard Catmull-Rom flat-tangent endpoints: `allPts` pads
+            // `real` with a duplicate of its own first/last point on each
+            // side purely so the p0/p3 tangent terms have something to read
+            // — this reproduces the pre-existing "flat tangent at the first/
+            // last drawn point" behaviour for every current curve (anchored
+            // or not) and extends the same rule to the new top-right anchor.
+            bool anchorStart = AnchorAtOrigin;
+            bool anchorEnd = AnchorAtTopRight;
+            int realCount = nodeCount + (anchorStart ? 1 : 0) + (anchorEnd ? 1 : 0);
+            var real = new Point[realCount];
+            int wi = 0;
+            if (anchorStart) real[wi++] = new Point(PadLeft, PadTop + plotH);
+            for (int i = 0; i < nodeCount; i++) real[wi++] = pts[i];
+            if (anchorEnd) real[wi++] = new Point(PadLeft + 0.98 * plotW, PadTop);
+
+            var allPts = new Point[realCount + 2];
+            allPts[0] = real[0];
+            for (int i = 0; i < realCount; i++) allPts[i + 1] = real[i];
+            allPts[realCount + 1] = real[realCount - 1];
 
             var fig = new PathFigure
             {
-                StartPoint = anchor ? allPts[0] : pts[0],
+                StartPoint = real[0],
                 IsClosed = false,
                 IsFilled = false,
             };
-            // Stop the loop one short of the duplicated endpoint: the final
-            // iteration that ran before added a zero-length last_node→last_node
-            // segment whose tangent control point sticks out past the final
-            // node, rendering as a tiny tail. The duplicate is still used as
-            // p3 for the LAST visible segment's tangent computation.
-            int firstSeg = anchor ? 0 : 1;
-            int lastSeg = nodeCount;
             // Cached alongside geometry construction so the live-position
             // marker (below) can locate the exact pixel point ON the spline
             // for a given data-space X, without re-deriving the Catmull-Rom
             // tangents a second time.
-            var segments = new (Point p1, Point c1, Point c2, Point p2)[lastSeg - firstSeg];
-            for (int i = firstSeg; i < lastSeg; i++)
+            int segCount = realCount - 1;
+            var segments = new (Point p1, Point c1, Point c2, Point p2)[segCount];
+            for (int i = 0; i < segCount; i++)
             {
-                Point p0 = i == 0 ? allPts[0] : allPts[i - 1];
-                Point p1 = allPts[i];
-                Point p2 = allPts[i + 1];
-                Point p3 = i + 2 >= allPts.Length ? allPts[i + 1] : allPts[i + 2];
+                Point p0 = allPts[i];
+                Point p1 = allPts[i + 1];
+                Point p2 = allPts[i + 2];
+                Point p3 = allPts[i + 3];
                 Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
                 Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
                 fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
-                segments[i - firstSeg] = (p1, c1, c2, p2);
+                segments[i] = (p1, c1, c2, p2);
             }
             var geom = new PathGeometry();
             geom.Figures.Add(fig);
@@ -750,7 +863,15 @@ namespace MozaControls
             // Vertical lines scale with the rightmost node fraction so they
             // stay under the dots/labels when the X axis is compressed; the
             // horizontal lines stay evenly spaced (Y axis is always linear).
-            double xScale = Math.Max(0, Math.Min(1, nodeFracs[nodeCount - 1]));
+            // Exception: AllowHorizontalDrag curves (Sim Input Mapping,
+            // Pedal Feel, the FFB output curve) always use the full 0-100%
+            // span instead — their nodes can end up anywhere along X, so
+            // tying the grid to wherever the LAST node currently happens to
+            // sit would shrink/shift the whole grid as it's dragged, right
+            // when a stable position reference matters most. Every
+            // fixed-X curve (EQ, Handbrake, Throttle, Brake, Clutch) keeps
+            // its existing behaviour unchanged.
+            double xScale = AllowHorizontalDrag ? 0.98 : Math.Max(0, Math.Min(1, nodeFracs[nodeCount - 1]));
             var grid = new GeometryGroup();
             for (int i = 1; i <= 4; i++)
             {

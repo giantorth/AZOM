@@ -450,6 +450,7 @@ namespace MozaPlugin.Devices
         float MaxThresholdKg { get; set; }
         // Pedal Feel
         float[]? InputCurveY { get; set; }
+        float[]? InputCurveX { get; set; }
         float DeadzoneKg { get; set; }
         float MaxForceKg { get; set; }
         float TravelStartMm { get; set; }
@@ -488,6 +489,9 @@ namespace MozaPlugin.Devices
         // real brake-only wire calibration — see MBoosterDeviceSettings for
         // the field semantics.
         public float[]? InputCurveY { get; set; } = null;
+        // X position (0-100% of the Deadzone-Max Force span) of each Pedal
+        // Feel node — see MBoosterDeviceSettings.InputCurveX.
+        public float[]? InputCurveX { get; set; } = null;
         public float DeadzoneKg { get; set; } = -1;
         public float MaxForceKg { get; set; } = -1;
         public float TravelStartMm { get; set; } = -1;
@@ -522,6 +526,7 @@ namespace MozaPlugin.Devices
                 SensorOutputRatioPct = SensorOutputRatioPct,
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
+                InputCurveX = InputCurveX == null ? null : (float[])InputCurveX.Clone(),
                 DeadzoneKg = DeadzoneKg,
                 MaxForceKg = MaxForceKg,
                 TravelStartMm = TravelStartMm,
@@ -729,6 +734,21 @@ namespace MozaPlugin.Devices
         // docs/protocol/devices/mbooster.md "Pedal Feel".
         public float[]? InputCurveY { get; set; } = null;
 
+        // X position (0-100% of the Deadzone-Max Force span) of each Pedal
+        // Feel node, draggable in the curve editor exactly like Sim Input
+        // Mapping's CurveX — ALSO real hardware calibration though, unlike
+        // CurveX: reverse-engineered from pedal-feel-node{2,5}-{x,y}-adjust
+        // .pcapng (four isolated single-node-drag captures), which showed a
+        // second, previously-undocumented cmdId 0xAB selector family
+        // (0x01-0x06, one per node, distinct from feelcurve-1..6's
+        // 0x08-0x0D) always written alongside the node's own feelcurve-N
+        // write — sent first, same kg-relative-to-span encoding. Null =
+        // default fixed breakpoints (MozaMBoosterRegistry.FeelCurveFractions
+        // — the same identity shape InputCurveY defaults to). See
+        // MozaMBoosterRegistry.ComputeFeelCurve and
+        // MBoosterDeviceController.PushFeelCurveResync.
+        public float[]? InputCurveX { get; set; } = null;
+
         // Deadzone at the start of pedal travel, in kg of force (0..40) —
         // REAL hardware calibration (wire command mbooster-brake-deadzone,
         // cmdId 0xAB selector 0x07), reverse-engineered from
@@ -840,6 +860,7 @@ namespace MozaPlugin.Devices
                 SensorOutputRatioPct = SensorOutputRatioPct,
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
+                InputCurveX = InputCurveX == null ? null : (float[])InputCurveX.Clone(),
                 DeadzoneKg = DeadzoneKg,
                 MaxForceKg = MaxForceKg,
                 TravelStartMm = TravelStartMm,

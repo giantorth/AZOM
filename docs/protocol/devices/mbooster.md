@@ -1015,7 +1015,10 @@ device. `CurveY`/`CurveX` are `null` by default (identity / no remapping)
 ## Pedal Feel
 
 A card to the left of Sim Input Mapping holds `InputCurveY` on
-`MBoosterDeviceSettings` — 6 nodes, Y-only (no X-dragging).
+`MBoosterDeviceSettings` — 6 nodes.
+**FURTHER REVISED**: each node is also draggable horizontally via
+`InputCurveX` — see [Node X position](#pedal-feel-node-x-position) below;
+the "Y-only (no X-dragging)" claim that used to be here was wrong.
 **REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed **real hardware
 calibration**, not host-side shaping. It directly populates the 6
 interpolated selectors already reverse-engineered for Deadzone/Max Force
@@ -1039,22 +1042,56 @@ implementation had. `CurveY` (Sim Input Mapping, above) is unaffected —
 it's a completely separate, still-host-side remap that runs where
 `EvaluateInputCurve` used to.
 
-The curve's 6 fixed X breakpoints — `{8.049, 19.495, 44.245, 72.433,
-90.040, 97.910}%` of the Deadzone→Max Force span — are the SAME
+The curve's default (un-dragged) X breakpoints — `{8.049, 19.495, 44.245,
+72.433, 90.040, 97.910}%` of the Deadzone→Max Force span — are the SAME
 constants documented under Deadzone/Max Force below
-(`MozaMBoosterRegistry.FeelCurveFractions`), now reframed: they were
-originally measured as a fixed interpolation *formula*, but are actually
-Pit House's own un-dragged default shape (a Linear/identity curve — Y=X
-trivially holds for any untouched curve regardless of the real breakpoint
-spacing, so the measurement couldn't distinguish "fixed rule" from
-"default shape" until this session's clarification that the curve is
-genuinely user-adjustable). `null` (the default) means "use this Linear
-default" — existing profiles are unaffected until a user opens this
+(`MozaMBoosterRegistry.FeelCurveFractions`), now reframed twice over: they
+were originally measured as a fixed interpolation *formula*, then
+recognized as Pit House's own un-dragged default SHAPE (Y=X trivially
+holds for any untouched curve regardless of the real breakpoint spacing),
+and — see [Node X position](#pedal-feel-node-x-position) immediately below —
+now confirmed to be draggable on the wire too, not just visually. `null`
+(the default, on either `InputCurveY` or `InputCurveX`) means "use this
+Linear default" — existing profiles are unaffected until a user opens this
 section. Same passive-pedal protection as Deadzone/Max Force
 (`MBoosterDeadzoneMaxForcePanel` in `SettingsControl.xaml`) — this is a
 brake-named singleton `0xAB` write with no per-pedal selector, so editing
 it from a passive pedal's page would overwrite the active pedal's
 registers instead.
+
+### Pedal Feel node X position
+
+**REVISED**: each of the 6 Pedal Feel nodes is draggable on BOTH axes —
+`InputCurveX` on `MBoosterDeviceSettings`/`MBoosterPedalSettings`, a real
+hardware write exactly like `InputCurveY`, not just a UI convenience.
+Reverse-engineered from four isolated single-node-drag Pit House captures,
+`pedal-feel-node{2,5}-{x,y}-adjust.pcapng` (one node dragged on one axis
+only, per capture): every drag — on EITHER axis — wrote TWO `0xAB`
+selectors together, X first: the node's own `feelcurve-N` Y selector
+(`0x08`-`0x0D`, already known) AND a second, distinct selector equal to
+the node's own 1-based index (`0x01`-`0x06`), using the identical
+kg-relative-to-Deadzone/Max-Force-span encoding as Y. Node 2's low
+selector read back `0x02` = 19.29% (user-reported drag target ≈20%); node
+5's read back `0x05` ≈ 60% (user-reported drag target ≈64% — the
+imprecision here is attributed to eyeballing an on-screen drag rather
+than a scale mismatch, since kg-scale and percent-of-span encodings are
+numerically identical at the default 0kg/200kg anchors these captures
+were taken at).
+
+This selector range (`0x01`-`0x06`) is the SAME one an earlier, less
+rigorous investigation spotted exactly once — alongside an unrelated
+Travel Start write, not an isolated node drag — and removed as an
+unconfirmed guess wired to the wrong curve entirely (see
+[Removed: `y1..y5` and `curve7`](#removed-y1y5-and-curve7-historical)
+below); these new isolated single-axis captures are the missing evidence
+that investigation lacked, and settle it: it's Pedal Feel's own node X,
+not a Sim Input Mapping mechanism and not a universal per-write resync.
+New wire command names (`mbooster-brake-feelcurve-x-1..6`) were added
+rather than reusing the old removed `mbooster-brake-curve7-N` names, to
+avoid conflating with that disproven theory. Pushed by the SAME
+`MBoosterDeviceController.PushFeelCurveResync` atomic burst as Deadzone/
+Max Force/`InputCurveY` — never attached to any other calibration write,
+learning from the earlier mechanism's "resync everything" mistake.
 
 The same card also has a **Start/End of Travel (mm)** control —
 `TravelStartMm`/`TravelEndMm` on `MBoosterDeviceSettings`. Unlike every
@@ -1335,8 +1372,9 @@ rather than deleting it:
   should be sending them, and it turns out it shouldn't.
 - **`curve7`** (`0xAB` selectors `0x01`-`0x06`, cmdId shared with the
   entirely separate Deadzone/Max Force/Pedal-Feel-curve family at
-  selectors `0x07`-`0x0E` above) — always EXPERIMENTAL/unconfirmed: spotted
-  exactly once, alongside a Travel Start write in `pedal_travel.pcapng`,
+  selectors `0x07`-`0x0E` above) — at the time, EXPERIMENTAL/unconfirmed:
+  spotted exactly once, alongside a Travel Start write in
+  `pedal_travel.pcapng`,
   and speculatively wired into `QueueMBoosterCalibPush` (`SettingsControl
   .xaml.cs`) as an automatic resync tacked onto EVERY other calibration
   write (Direction/Min/Max/CurveY/Travel/Endstop/Friction/SegmentedDamping/
@@ -1351,6 +1389,15 @@ rather than deleting it:
   — Travel's own write already reads back correctly without it (per the
   original Travel writeup above); only the resync's *additional* benefit
   was ever unconfirmed, not the base write.
+  **Later confirmed, not disproven**: this exact selector range turned out
+  to be real after all — just not a universal resync, and not tied to
+  Travel/Sim Input Mapping/`stroke_curve` (all speculated elsewhere in this
+  doc). Four fresh isolated captures that actually dragged individual
+  Pedal Feel nodes (rather than an unrelated control) showed `0x01`-`0x06`
+  is that curve's own per-node X position — see
+  [Pedal Feel node X position](#pedal-feel-node-x-position) above, added
+  back under new command names (`mbooster-brake-feelcurve-x-1..6`) so as
+  not to resurrect the old, wrong `curve7`/universal-resync theory.
 
 Net effect: Direction/Min/Max/Travel/Endstop/Friction/SegmentedDamping/
 Ratio/Threshold no longer drag any resync behind their writes — just the
@@ -1855,11 +1902,16 @@ equivalent of `ImportPlan.TouchedMBoosters`.
   16.1–47.0, the same range as `brake_forcelimit_min/max` (11/47, ⇒ likely
   **kg**). The throttle preset's equivalents are lighter throughout
   (4.3–12.0 kg vs the brake's 16–47), which is what a throttle-vs-brake pedal
-  pair should look like. The plugin's `mbooster-brake-curve7-1..6` family
-  (`0xAB`, 6 selectors, fed by `ResampleCurveAtSevenths`) is a shape candidate
-  for `stroke_curve`, but curve7 is always *derived* from `(CurveX, CurveY)`
-  and has no settings field of its own, so this stays unmapped until a capture
-  confirms it.
+  pair should look like. The old `mbooster-brake-curve7-1..6` family this
+  paragraph originally pointed at (`0xAB`, 6 selectors, fed by
+  `ResampleCurveAtSevenths`) was removed as an unconfirmed guess (see
+  "Removed: y1..y5 and curve7") — but that exact `0xAB` `0x01`-`0x06`
+  selector range was later confirmed real, as Pedal Feel's own per-node X
+  position (`InputCurveX`, see [Pedal Feel node X position]
+  (#pedal-feel-node-x-position)), which is a plausible match for
+  `stroke_curve` on its face (position-along-travel, mm-scale) — still
+  unconfirmed against this specific PitHouse-export field until a capture
+  ties the two together.
 
 ## Source-of-truth files in this repo
 

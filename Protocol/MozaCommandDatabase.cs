@@ -612,9 +612,13 @@ namespace MozaPlugin.Protocol
             // and real Pit House does NOT clamp Max Force to Max Threshold
             // (128kg/166kg were sent while Threshold read back as 125kg) — see
             // docs/protocol/devices/mbooster.md "Pedal Feel". (An earlier,
-            // separate 0xAB selector range 0x01-0x06, "curve7", was removed —
-            // it was only ever an experimental, unconfirmed resync guess for
-            // an unrelated curve; see docs for the historical writeup.)
+            // separate 0xAB selector range 0x01-0x06, "curve7", was removed as
+            // an experimental/unconfirmed resync guess for an unrelated
+            // curve — see docs for that writeup — but isolated single-node
+            // drag captures later confirmed that SAME selector range is real
+            // after all, just for a different purpose: each Pedal Feel
+            // node's own X position, added back below as
+            // mbooster-brake-feelcurve-x-1..6.)
             AddCommand("mbooster-brake-deadzone",   "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x07 }, 2, "int");
             AddCommand("mbooster-brake-feelcurve-1", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x08 }, 2, "int");
             AddCommand("mbooster-brake-feelcurve-2", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x09 }, 2, "int");
@@ -623,6 +627,27 @@ namespace MozaPlugin.Protocol
             AddCommand("mbooster-brake-feelcurve-5", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0C }, 2, "int");
             AddCommand("mbooster-brake-feelcurve-6", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0D }, 2, "int");
             AddCommand("mbooster-brake-maxforce",    "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x0E }, 2, "int");
+            // Pedal Feel node X position (0-100% of the Deadzone-Max Force
+            // span, one per node) — CONFIRMED real hardware calibration,
+            // reverse-engineered from pedal-feel-node{2,5}-{x,y}-adjust.pcapng
+            // (four isolated single-node drags): every drag wrote this
+            // selector AND the node's own feelcurve-N selector above
+            // together, this one first. Same cmdId 0xAB, selectors 0x01-0x06
+            // (node K -> selector K) — the SAME selector range an earlier,
+            // less rigorous investigation spotted once (alongside a Travel
+            // Start write, not a node drag) and removed as unconfirmed/
+            // guessed-wrong (see docs/protocol/devices/mbooster.md "Removed:
+            // y1..y5 and curve7" and "Pedal Feel"): these isolated captures
+            // resolve that mystery — it's Pedal Feel's own node X, not a
+            // universal resync, and not tied to Sim Input Mapping either.
+            // New command names (not the old removed mbooster-brake-curve7-N)
+            // to avoid conflating with that disproven theory.
+            AddCommand("mbooster-brake-feelcurve-x-1", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x01 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-x-2", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x02 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-x-3", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x03 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-x-4", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x04 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-x-5", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x05 }, 2, "int");
+            AddCommand("mbooster-brake-feelcurve-x-6", "mbooster", 35, 36, new byte[] { 0xAB, 0x00, 0x06 }, 2, "int");
             // Pit House "End Stop Stiffness" (Front Limit / End Limit) —
             // reverse-engineered from two real Pit House USB captures, each
             // sweeping one slider through all 10 values (1-10). Both share

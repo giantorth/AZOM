@@ -555,45 +555,52 @@ namespace MozaPlugin.Devices
         private static readonly float[] DefaultCurveX =
             { 100f / 7f, 200f / 7f, 300f / 7f, 400f / 7f, 500f / 7f, 600f / 7f };
 
-        // Default/un-dragged shape of the Pedal Feel curve's 6 nodes
-        // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D),
-        // as a fraction (0-1) of the way from Deadzone to Max Force —
-        // empirically measured across both max-force-24-75-128-166-200.pcapng
-        // (Deadzone fixed, Max Force swept 75/128/166kg) and
-        // deadzone-0-5-11-14.pcapng (Max Force fixed, Deadzone swept
-        // 5/11/14kg): (value - deadzone) / (maxForce - deadzone) landed on
-        // the identical constant per selector in all 6 write bursts (std-dev
-        // < 0.0001). This is Pit House's own un-dragged default shape (a
-        // Linear/identity curve — Y=X trivially holds for any untouched
-        // curve regardless of its real X-breakpoint spacing), NOT a fixed
-        // rule: the 6 points are genuinely user-adjustable via
-        // MBoosterDeviceSettings.InputCurveY (see ComputeFeelCurve below).
-        // Also doubles as each node's fixed X breakpoint (in % of the
-        // Deadzone-Max Force span) since no capture has yet isolated a
-        // dragged (non-identity) curve to independently confirm the
-        // breakpoints' spacing. See docs/protocol/devices/mbooster.md
-        // "Pedal Feel" and bug bundle 5VR5AQ8Y.
+        // Default/un-dragged shape of the Pedal Feel curve's 6 nodes on
+        // EITHER axis (mbooster-brake-feelcurve-1..6 for Y, cmdId 0xAB
+        // selectors 0x08-0x0D; mbooster-brake-feelcurve-x-1..6 for X,
+        // selectors 0x01-0x06), as a fraction (0-1) of the way from Deadzone
+        // to Max Force — empirically measured across both
+        // max-force-24-75-128-166-200.pcapng (Deadzone fixed, Max Force
+        // swept 75/128/166kg) and deadzone-0-5-11-14.pcapng (Max Force
+        // fixed, Deadzone swept 5/11/14kg): (value - deadzone) / (maxForce -
+        // deadzone) landed on the identical constant per selector in all 6
+        // write bursts (std-dev < 0.0001). This is Pit House's own
+        // un-dragged default shape (a Linear/identity curve — Y=X trivially
+        // holds for any untouched curve regardless of its real X-breakpoint
+        // spacing), NOT a fixed rule: the 6 points on EACH axis are
+        // genuinely user-adjustable, Y via
+        // MBoosterDeviceSettings.InputCurveY and X via InputCurveX (see
+        // ComputeFeelCurve below, used for both) — confirmed by isolated
+        // single-node-drag captures (pedal-feel-node{2,5}-{x,y}-adjust
+        // .pcapng) that independently exercised the X selector family, which
+        // an earlier, less rigorous investigation had spotted once and
+        // dismissed as an unconfirmed guess for a different curve (see
+        // docs/protocol/devices/mbooster.md "Removed: y1..y5 and curve7").
+        // See docs/protocol/devices/mbooster.md "Pedal Feel" and bug bundle
+        // 5VR5AQ8Y.
         internal static readonly double[] FeelCurveFractions =
             { 0.08049, 0.19495, 0.44245, 0.72433, 0.90040, 0.97910 };
 
         /// <summary>
-        /// The 6 points of the Pedal Feel curve, in kg, ready to write to
-        /// <c>mbooster-brake-feelcurve-1..6</c> — see
-        /// <see cref="MBoosterDeviceController.PushFeelCurveResync"/>.
-        /// Each node in <paramref name="inputCurveY"/> is a percentage
-        /// (0-100) of the Deadzone-Max Force span; falls back to
-        /// <see cref="FeelCurveFractions"/> (the Linear default) for any
-        /// node the user hasn't customized (null or wrong-length array).
+        /// The 6 points of the Pedal Feel curve on ONE axis, in kg, ready to
+        /// write to <c>mbooster-brake-feelcurve-1..6</c> (Y) or
+        /// <c>mbooster-brake-feelcurve-x-1..6</c> (X) — see
+        /// <see cref="MBoosterDeviceController.PushFeelCurveResync"/>. Each
+        /// node in <paramref name="inputCurve"/> is a percentage (0-100) of
+        /// the Deadzone-Max Force span; falls back to
+        /// <see cref="FeelCurveFractions"/> (the Linear default, shared by
+        /// both axes) for any node the user hasn't customized (null or
+        /// wrong-length array).
         /// </summary>
-        internal static double[] ComputeFeelCurve(double deadzoneKg, double maxForceKg, float[]? inputCurveY = null)
+        internal static double[] ComputeFeelCurve(double deadzoneKg, double maxForceKg, float[]? inputCurve = null)
         {
             double range = maxForceKg - deadzoneKg;
             int n = FeelCurveFractions.Length;
-            bool haveCurve = inputCurveY != null && inputCurveY.Length == n;
+            bool haveCurve = inputCurve != null && inputCurve.Length == n;
             var result = new double[n];
             for (int i = 0; i < n; i++)
             {
-                double frac01 = haveCurve ? inputCurveY![i] / 100.0 : FeelCurveFractions[i];
+                double frac01 = haveCurve ? inputCurve![i] / 100.0 : FeelCurveFractions[i];
                 result[i] = deadzoneKg + frac01 * range;
             }
             return result;

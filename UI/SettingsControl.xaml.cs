@@ -3281,6 +3281,14 @@ namespace MozaPlugin
             MBoosterInputY4Slider.Value = inputCurve[3]; SetValueText(MBoosterInputY4Value, inputCurve[3].ToString("F0"));
             MBoosterInputY5Slider.Value = inputCurve[4]; SetValueText(MBoosterInputY5Value, inputCurve[4].ToString("F0"));
             MBoosterInputY6Slider.Value = inputCurve[5]; SetValueText(MBoosterInputY6Value, inputCurve[5].ToString("F0"));
+            var inputCurveX = (fx?.InputCurveX != null && fx.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
+                ? fx.InputCurveX : MBoosterInputCurveDefault;
+            MBoosterInputX1Slider.Value = inputCurveX[0]; SetValueText(MBoosterInputX1Value, inputCurveX[0].ToString("F0"));
+            MBoosterInputX2Slider.Value = inputCurveX[1]; SetValueText(MBoosterInputX2Value, inputCurveX[1].ToString("F0"));
+            MBoosterInputX3Slider.Value = inputCurveX[2]; SetValueText(MBoosterInputX3Value, inputCurveX[2].ToString("F0"));
+            MBoosterInputX4Slider.Value = inputCurveX[3]; SetValueText(MBoosterInputX4Value, inputCurveX[3].ToString("F0"));
+            MBoosterInputX5Slider.Value = inputCurveX[4]; SetValueText(MBoosterInputX5Value, inputCurveX[4].ToString("F0"));
+            MBoosterInputX6Slider.Value = inputCurveX[5]; SetValueText(MBoosterInputX6Value, inputCurveX[5].ToString("F0"));
             float ts = fx?.TravelStartMm ?? -1;
             MBoosterTravelRangeSlider.LowValue = ts >= 0 ? ts : MBoosterUiConstants.TravelMinMm;
             float te = fx?.TravelEndMm ?? -1;
@@ -4272,12 +4280,39 @@ namespace MozaPlugin
         private void MBoosterInputY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY5Value, "", v => SetMBoosterInputCurveY(4, v));
         private void MBoosterInputY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY6Value, "", v => SetMBoosterInputCurveY(5, v));
 
+        // Pedal Feel node X position (0-100% of the Deadzone-Max Force span)
+        // — CONFIRMED real hardware calibration alongside InputCurveY (see
+        // MBoosterDeviceSettings.InputCurveX and
+        // MBoosterDeviceController.PushFeelCurveResync): every edit here
+        // pushes the same atomic (X, Y) resync SetMBoosterInputCurveY does.
+        private void SetMBoosterInputCurveX(int index, int v)
+        {
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            int n = global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount;
+            if (s.InputCurveX == null || s.InputCurveX.Length != n)
+                s.InputCurveX = Array.ConvertAll(MBoosterInputCurvePresets[0], x => (float)x);
+            s.InputCurveX[index] = v;
+            PushMBoosterFeelCurve(s);
+        }
+
+        private void MBoosterInputX1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX1Value, "", v => SetMBoosterInputCurveX(0, v));
+        private void MBoosterInputX2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX2Value, "", v => SetMBoosterInputCurveX(1, v));
+        private void MBoosterInputX3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX3Value, "", v => SetMBoosterInputCurveX(2, v));
+        private void MBoosterInputX4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX4Value, "", v => SetMBoosterInputCurveX(3, v));
+        private void MBoosterInputX5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX5Value, "", v => SetMBoosterInputCurveX(4, v));
+        private void MBoosterInputX6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX6Value, "", v => SetMBoosterInputCurveX(5, v));
+
         private void ApplyMBoosterInputCurvePreset(int[] curve)
         {
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             int n = global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount;
             if (s.InputCurveY == null || s.InputCurveY.Length != n) s.InputCurveY = new float[n];
+            // Presets are a clean, standard shape — reset any dragged X
+            // positions back to the fixed breakpoints too (same convention
+            // as ApplyMBoosterCurvePreset for Sim Input Mapping).
+            s.InputCurveX = null;
             using (_suppressor.Begin())
             {
                 MBoosterInputY1Slider.Value = curve[0]; SetValueText(MBoosterInputY1Value, curve[0].ToString());
@@ -4286,6 +4321,12 @@ namespace MozaPlugin
                 MBoosterInputY4Slider.Value = curve[3]; SetValueText(MBoosterInputY4Value, curve[3].ToString());
                 MBoosterInputY5Slider.Value = curve[4]; SetValueText(MBoosterInputY5Value, curve[4].ToString());
                 MBoosterInputY6Slider.Value = curve[5]; SetValueText(MBoosterInputY6Value, curve[5].ToString());
+                MBoosterInputX1Slider.Value = MBoosterInputCurveDefault[0]; SetValueText(MBoosterInputX1Value, MBoosterInputCurveDefault[0].ToString("F0"));
+                MBoosterInputX2Slider.Value = MBoosterInputCurveDefault[1]; SetValueText(MBoosterInputX2Value, MBoosterInputCurveDefault[1].ToString("F0"));
+                MBoosterInputX3Slider.Value = MBoosterInputCurveDefault[2]; SetValueText(MBoosterInputX3Value, MBoosterInputCurveDefault[2].ToString("F0"));
+                MBoosterInputX4Slider.Value = MBoosterInputCurveDefault[3]; SetValueText(MBoosterInputX4Value, MBoosterInputCurveDefault[3].ToString("F0"));
+                MBoosterInputX5Slider.Value = MBoosterInputCurveDefault[4]; SetValueText(MBoosterInputX5Value, MBoosterInputCurveDefault[4].ToString("F0"));
+                MBoosterInputX6Slider.Value = MBoosterInputCurveDefault[5]; SetValueText(MBoosterInputX6Value, MBoosterInputCurveDefault[5].ToString("F0"));
             }
             for (int i = 0; i < n; i++)
                 s.InputCurveY[i] = curve[i];
@@ -4367,9 +4408,10 @@ namespace MozaPlugin
             byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
             double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
             double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
-            float[]? curve = s.InputCurveY;
+            float[]? curveY = s.InputCurveY;
+            float[]? curveX = s.InputCurveX;
             controller.QueueCalibWrite($"{dev:x2}:feel-curve", () =>
-                controller.PushFeelCurveResync(dz, mf, curve, dev));
+                controller.PushFeelCurveResync(dz, mf, curveY, curveX, dev));
         }
 
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)

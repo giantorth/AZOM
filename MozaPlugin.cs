@@ -2873,13 +2873,15 @@ namespace MozaPlugin
                 // override — 0kg deadzone, 200kg max force, and the curve's
                 // own default Linear shape (MozaMBoosterRegistry
                 // .FeelCurveFractions) for an uncustomized curve.
-                bool curveCustomized = cfg.InputCurveY != null
-                    && cfg.InputCurveY.Length == global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount;
+                bool curveCustomized = (cfg.InputCurveY != null
+                    && cfg.InputCurveY.Length == global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount)
+                    || (cfg.InputCurveX != null
+                    && cfg.InputCurveX.Length == global::MozaPlugin.Devices.MBoosterUiConstants.PedalFeelNodeCount);
                 if (ownsPedalFeelHardware && (cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0 || curveCustomized))
                 {
                     double dz = cfg.DeadzoneKg >= 0 ? cfg.DeadzoneKg : 0;
                     double mf = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200;
-                    controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, dev);
+                    controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, cfg.InputCurveX, dev);
                 }
             }
         }
