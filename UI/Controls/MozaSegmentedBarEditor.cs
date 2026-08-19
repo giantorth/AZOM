@@ -434,16 +434,25 @@ namespace MozaControls
 
             // Smoothed line ON TOP of the bars, at each segment's own height —
             // flat across the middle of its travel range, easing through a
-            // wide curve around each divider instead of jumping vertically
-            // — the same shape the three bars already imply, just traced as
-            // one continuous, rounded line so the overall profile is easier
-            // to read at a glance. The transition half-width reaches well
-            // into each neighboring segment/gap for a gradual blend, but is
-            // still capped and shrunk for narrow segments/gaps so the six
-            // control points below can never cross each other or the plot
-            // edges.
-            double transitionHalfWidth = Math.Max(2.0, Math.Min(36.0,
-                Math.Min(d1x - EdgePad, Math.Min(d2x - d1x, EdgePad + plotW - d2x)) / 2.2));
+            // short, tight curve right at each divider instead of jumping
+            // vertically — the same shape the three bars already imply, just
+            // traced as one continuous line so the overall profile is easier
+            // to read at a glance. Sized to match Pit House's own rendering
+            // (a quick S right at the divider, flat everywhere else): the
+            // half-width is ~1/4 of the SMALLEST segment's width, measured
+            // against a real Pit House screenshot's proportions (its
+            // transition-to-segment-width ratio came out close to that,
+            // vs. the previous /2.2 divisor here which was visibly wider/
+            // more "curvy" than the reference — a long, gradual bow reaching
+            // deep into each segment instead of a quick kink at the
+            // divider). The 60px ceiling is just a backstop for an unusually
+            // wide segment, not the normal-case constraint; the /4.0 term
+            // does the real work and scales with the control's actual
+            // rendered size. Still shrinks for narrow segments/gaps so the
+            // six control points below can never cross each other or the
+            // plot edges.
+            double transitionHalfWidth = Math.Max(2.0, Math.Min(60.0,
+                Math.Min(d1x - EdgePad, Math.Min(d2x - d1x, EdgePad + plotW - d2x)) / 4.0));
             var stepPts = new[]
             {
                 new Point(EdgePad, YOf(s1v)),

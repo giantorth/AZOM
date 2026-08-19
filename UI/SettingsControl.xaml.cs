@@ -2775,6 +2775,23 @@ namespace MozaPlugin
         private string? _mboosterSeededProfileName;
         private string? _mboosterSeededIdentity;
 
+        // The exact MBoosterDeviceSettings INSTANCE last seeded from — not
+        // just a string identity check, because MozaPlugin
+        // .GetOrCreateMBoosterSettings can return a genuinely DIFFERENT
+        // object for the SAME identity string across two calls: it first
+        // hands back a fresh, all-defaults placeholder keyed by the raw
+        // transport identity (before the device's serial has been read
+        // back), then — once OnMBoosterSerialResolved fires, asynchronously,
+        // on the connection thread — silently swaps in the real, saved
+        // profile object under the resolved serial key. If this tab's first
+        // seed pass raced that swap, the string-only checks above never
+        // noticed the object underneath had changed, so the tab kept
+        // displaying the placeholder's all-defaults values forever instead
+        // of the actual saved profile (the values were never lost — this
+        // was a display bug, not a persistence one). Comparing the object
+        // reference catches that swap and forces a proper reseed.
+        private MBoosterDeviceSettings? _mboosterSeededSettings;
+
         // Custom Effects (Experimental) — dynamic per-device list, rebuilt
         // (not incrementally synced) on every seed/device-switch. See
         // PopulateMBoosterCustomEffectsList.
@@ -2974,20 +2991,20 @@ namespace MozaPlugin
             UpdateMBoosterConfigVisibilityForRole();
 
             // Re-seed when the active profile or the selected device changed
-            // since the last seed — otherwise the gate below keeps the
-            // previously-seeded values on screen while edits write to the
-            // now-current profile/device (mBooster settings are per-profile,
-            // per-device).
-            var currentProfileName = _plugin?.Settings?.ProfileStore?.CurrentProfile?.Name;
+            // since the last seed, OR the settings object itself is a
+            // different instance than last time (see _mboosterSeededSettings)
+            // — otherwise the gate below keeps the previously-seeded values
+            // on screen while edits write to the now-current profile/device
+            // (mBooster settings are per-profile, per-device).
+            if (_plugin == null) return;
+            var s = _plugin.GetOrCreateMBoosterSettings(selected.Identity);
+            var currentProfileName = _plugin.Settings?.ProfileStore?.CurrentProfile?.Name;
             if (!string.Equals(currentProfileName, _mboosterSeededProfileName, StringComparison.Ordinal)
-                || !string.Equals(selected.Identity, _mboosterSeededIdentity, StringComparison.OrdinalIgnoreCase))
+                || !string.Equals(selected.Identity, _mboosterSeededIdentity, StringComparison.OrdinalIgnoreCase)
+                || !ReferenceEquals(s, _mboosterSeededSettings))
                 _mboosterUiSeeded = false;
 
             if (_mboosterUiSeeded) return;
-            // Seed slider/checkbox values from the profile entry. _plugin is
-            // never null past Init (the constructor stores it); guard anyway.
-            if (_plugin == null) return;
-            var s = _plugin.GetOrCreateMBoosterSettings(selected.Identity);
             using (_suppressor.Begin())
             {
                 // Role is seeded per-row by the device rows block above (each
@@ -3008,6 +3025,7 @@ namespace MozaPlugin
             _mboosterUiSeeded = true;
             _mboosterSeededProfileName = currentProfileName;
             _mboosterSeededIdentity = selected.Identity;
+            _mboosterSeededSettings = s;
         }
 
         /// <summary>Click handler for a pedal row's label Button (see
