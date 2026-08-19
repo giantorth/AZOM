@@ -255,18 +255,18 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      # pwsh: Git Bash mangles the leading slash in /p:Version= (MSB1009).
       - name: Build plugin DLL
-        shell: bash
+        shell: pwsh
         env:
           PR_VERSION: ${{ steps.vars.outputs.pr_version }}
         run: |
-          set -euo pipefail
-          # Compile-only modes leave PR_VERSION empty and build unversioned.
-          if [ -n "${PR_VERSION:-}" ]; then
-            dotnet build -c Release --no-restore "/p:Version=${PR_VERSION}"
-          else
+          if ($env:PR_VERSION) {
+            dotnet build -c Release --no-restore "/p:Version=$env:PR_VERSION"
+          } else {
             dotnet build -c Release --no-restore
-          fi
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Stage and zip release files
         if: steps.mode.outputs.release == 'true'
