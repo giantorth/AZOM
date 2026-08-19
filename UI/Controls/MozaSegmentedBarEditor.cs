@@ -434,14 +434,16 @@ namespace MozaControls
 
             // Smoothed line ON TOP of the bars, at each segment's own height —
             // flat across the middle of its travel range, easing through a
-            // short curve around each divider instead of jumping vertically
+            // wide curve around each divider instead of jumping vertically
             // — the same shape the three bars already imply, just traced as
             // one continuous, rounded line so the overall profile is easier
-            // to read at a glance. The transition half-width is capped at
-            // 18px and shrunk for narrow segments/gaps so the six control
-            // points below can never cross each other or the plot edges.
-            double transitionHalfWidth = Math.Max(2.0, Math.Min(18.0,
-                Math.Min(d1x - EdgePad, Math.Min(d2x - d1x, EdgePad + plotW - d2x)) / 3.0));
+            // to read at a glance. The transition half-width reaches well
+            // into each neighboring segment/gap for a gradual blend, but is
+            // still capped and shrunk for narrow segments/gaps so the six
+            // control points below can never cross each other or the plot
+            // edges.
+            double transitionHalfWidth = Math.Max(2.0, Math.Min(36.0,
+                Math.Min(d1x - EdgePad, Math.Min(d2x - d1x, EdgePad + plotW - d2x)) / 2.2));
             var stepPts = new[]
             {
                 new Point(EdgePad, YOf(s1v)),
