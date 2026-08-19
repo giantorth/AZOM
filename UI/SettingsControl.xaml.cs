@@ -353,11 +353,11 @@ namespace MozaPlugin
                 double fullScaleKg = (cfg != null && cfg.MaxThresholdKg >= 0) ? cfg.MaxThresholdKg
                     : (selected.DeviceReportedMaxThresholdKg > 0 ? selected.DeviceReportedMaxThresholdKg : 200.0);
                 double kg = preCurve / 100.0 * fullScaleKg;
-                MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_Position}: {preCurve:F0}% · {kg:F1} kg";
+                MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_OutputForce}: {preCurve:F0}% · {kg:F1} kg";
             }
             else
             {
-                MBoosterPedalFeelLiveLabel.Text = Strings.Label_Position;
+                MBoosterPedalFeelLiveLabel.Text = Strings.Label_OutputForce;
             }
 
             // Effects card pedal trace — same 30 Hz cadence as the Inputs
@@ -4165,8 +4165,19 @@ namespace MozaPlugin
             var s = CurrentMBoosterSettings();
             var c = CurrentMBoosterController();
             if (s == null || c == null) return null;
-            int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
-            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, _mboosterEffectPedalIndex, axisCount);
+            // Resolve against the CONNECTED axis count, not the raw HID axis
+            // count (bug: a chain-capable hub exposes all 3 GenericDesktop
+            // axes even with only one pedal plugged in, so using the raw
+            // count here fell into ResolveAxisRole's axis-order fallback
+            // instead of reading the single pedal's own Role — silently
+            // showing "Throttle" for axis 0 regardless of what the Role
+            // dropdown said, and hiding the brake-only Sensor Output Ratio /
+            // Max Threshold sliders even for a pedal explicitly set to
+            // Brake). Same fix as RefreshMBoosterTab already applies when
+            // building the device row list.
+            int connectedAxisCount = c.ConnectedAxisIndices().Count;
+            if (connectedAxisCount <= 0) connectedAxisCount = 1;
+            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, _mboosterEffectPedalIndex, connectedAxisCount);
             return role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? "throttle"
                  : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? "brake"
                  : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? "clutch" : null;
@@ -4309,7 +4320,14 @@ namespace MozaPlugin
         private static byte MBoosterCalibDevice(global::MozaPlugin.Devices.MBoosterDeviceController? controller, int axisIndex)
         {
             if (controller == null) return global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
-            int axisCount = controller.AxisCount > 0 ? controller.AxisCount : 1;
+            // Resolve against the CONNECTED axis count, not the raw HID axis
+            // count — same fix as MBoosterSelectedPedalRolePrefix. Otherwise
+            // a chain-capable hub with fewer pedals wired than raw axis slots
+            // falls into ResolveAxisRole's axis-order fallback here too,
+            // routing calibration writes (Travel/Endstop/Max Threshold/
+            // Sensor Ratio) to the wrong physical MotorDeviceForRole.
+            int axisCount = controller.ConnectedAxisIndices().Count;
+            if (axisCount <= 0) axisCount = 1;
             var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(controller.CurrentSettings, axisIndex, axisCount);
             int roleIdx = role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? 0
                         : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? 1

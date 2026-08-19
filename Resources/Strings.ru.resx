@@ -765,4 +765,9 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR закрыт — переключено на Стабильный</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// усиление по полосам · 100% = нейтраль · 500% = максимум</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ЧУВСТВИТЕЛЬНОСТЬ</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Выходное усилие</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-сила (инерционное ощущение педали) (экспериментально)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Макс. ход педали (мм)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Скорость отклика (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Экспериментально — толкает саму педаль под вашей ногой пропорционально текущей продольной перегрузке G (ускорение толкает вперёд, торможение — назад), вместо вибрации. Макс. ход педали задаёт, насколько далеко она движется при максимальной G; Скорость отклика задаёт, как быстро педаль переходит в новое положение.</value></data>
 </root>

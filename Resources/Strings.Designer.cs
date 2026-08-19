@@ -151,6 +151,7 @@ namespace MozaPlugin.Resources
         public static string Section_Position => Get("Section_Position");
         public static string Subtitle_LiveHandbrakeInput => Get("Subtitle_LiveHandbrakeInput");
         public static string Label_Position => Get("Label_Position");
+        public static string Label_OutputForce => Get("Label_OutputForce");
         public static string Section_Calibration => Get("Section_Calibration");
         public static string Subtitle_PullHandbrakeFully => Get("Subtitle_PullHandbrakeFully");
         public static string Button_StartCalibration => Get("Button_StartCalibration");

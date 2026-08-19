@@ -770,4 +770,9 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR cerrado — se cambió a Estable</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// ganancia por banda · 100% = neutro · 500% = realce máximo</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILIDAD</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Fuerza de salida</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Fuerza G (sensación inercial del pedal) (experimental)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Recorrido máximo del pedal (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Velocidad de respuesta (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimental — mueve el propio pedal bajo tu pie en proporción a la G longitudinal en tiempo real (acelerar lo empuja hacia adelante, frenar lo empuja hacia atrás), en lugar de vibrar. El Recorrido máximo del pedal define hasta dónde se mueve con G máxima; la Velocidad de respuesta define con qué rapidez el pedal avanza hacia la nueva posición.</value></data>
 </root>

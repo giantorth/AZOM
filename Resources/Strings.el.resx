@@ -764,4 +764,9 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Δύναμη εξόδου</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Δύναμη G (Αδρανειακή Αίσθηση Πεντάλ) (Πειραματικό)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Μέγιστη διαδρομή πεντάλ (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Ταχύτητα απόκρισης (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Πειραματικό — μετακινεί το ίδιο το πεντάλ κάτω από το πόδι σας ανάλογα με την τρέχουσα διαμήκη δύναμη G (η επιτάχυνση το σπρώχνει προς τα εμπρός, το φρενάρισμα προς τα πίσω), αντί να δονείται. Η Μέγιστη διαδρομή πεντάλ ορίζει πόσο μετακινείται στη μέγιστη δύναμη G· η Ταχύτητα απόκρισης ορίζει πόσο γρήγορα το πεντάλ μεταβαίνει στη νέα θέση.</value></data>
 </root>

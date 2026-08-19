@@ -765,4 +765,9 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Ausgabekraft</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-Kraft (Trägheits-Pedalgefühl) (Experimentell)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Max. Pedalweg (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Reaktionsgeschwindigkeit (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimentell — bewegt das Pedal selbst unter Ihrem Fuß proportional zur aktuellen Längs-G-Kraft (Beschleunigen drückt nach vorne, Bremsen drückt zurück), anstatt zu vibrieren. Max. Pedalweg legt fest, wie weit es sich bei voller G-Kraft bewegt; Reaktionsgeschwindigkeit legt fest, wie schnell das Pedal zur neuen Position übergeht.</value></data>
 </root>

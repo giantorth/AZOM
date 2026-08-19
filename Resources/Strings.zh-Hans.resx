@@ -765,4 +765,9 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>输出力值</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G力(惯性踏板手感)(实验性)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>最大踏板行程 (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>响应速度 (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>实验性 — 根据实时纵向 G 力推动脚下的踏板本身(加速时向前推,刹车时向后推),而不是震动。最大踏板行程设置在最大 G 力下移动的距离;响应速度设置踏板过渡到新位置的快慢。</value></data>
 </root>

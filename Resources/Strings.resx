@@ -89,6 +89,7 @@
   <data name="Section_Position" xml:space="preserve"><value>POSITION</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// live handbrake input</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Position</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Output Force</value></data>
   <data name="Section_Calibration" xml:space="preserve"><value>CALIBRATION</value></data>
   <data name="Subtitle_PullHandbrakeFully" xml:space="preserve"><value>// pull the handbrake fully once</value></data>
   <data name="Button_StartCalibration" xml:space="preserve"><value>START CALIBRATION</value></data>

@@ -765,4 +765,9 @@ Id : {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR fermée — retour à Stable</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// gain par bande · 100 % = neutre · 500 % = boost max</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILITÉ</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Force de sortie</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Force G (ressenti inertiel de la pédale) (expérimental)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Course maximale de la pédale (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Vitesse de réponse (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Expérimental — pousse la pédale elle-même sous votre pied en proportion de la G longitudinale en temps réel (accélérer la pousse vers l'avant, freiner la pousse vers l'arrière), plutôt que de vibrer. La Course maximale de la pédale définit jusqu'où elle se déplace à G maximale ; la Vitesse de réponse définit la rapidité avec laquelle la pédale rejoint la nouvelle position.</value></data>
 </root>

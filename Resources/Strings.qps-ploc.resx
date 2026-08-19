@@ -19,7 +19,7 @@
   <data name="TabHeader_Options" xml:space="preserve"><value>Arf!</value></data>
   <data name="TabHeader_Sdk" xml:space="preserve"><value>ARF!!</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Boof!</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>Wuff!</value></data>
+  <data name="TabHeader_About" xml:space="preserve"><value>GOD DAMMIT FRANK</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Bark!</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>GRRR!!</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Wroof!</value></data>
@@ -749,4 +749,15 @@
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Bark Arf!</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Wroof!</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Yowl!</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Boof!</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Yap!</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Grrowl Yip Wuff Bork Howl Arf!</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Snarf Wan Boof!</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>GRRR!!</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Yowl Bork!</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Ruff Yowl Grr Wuff Yip Bark!</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Arf!</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Grr!</value></data>
 </root>

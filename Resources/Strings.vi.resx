@@ -765,4 +765,9 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
+  <data name="Label_OutputForce" xml:space="preserve"><value>Lực đầu ra</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Lực G (cảm giác bàn đạp quán tính) (thử nghiệm)</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Hành trình bàn đạp tối đa (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Tốc độ phản hồi (%)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Thử nghiệm — đẩy chính bàn đạp dưới chân bạn tỷ lệ với lực G dọc theo thời gian thực (tăng tốc đẩy về phía trước, phanh đẩy về phía sau), thay vì rung. Hành trình bàn đạp tối đa quy định nó di chuyển bao xa ở G tối đa; Tốc độ phản hồi quy định bàn đạp chuyển đến vị trí mới nhanh như thế nào.</value></data>
 </root>
