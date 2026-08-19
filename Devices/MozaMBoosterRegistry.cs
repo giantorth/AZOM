@@ -816,13 +816,18 @@ namespace MozaPlugin.Devices
         /// (<see cref="MBoosterDeviceSettings.AxisRoles"/>, set by the UI when
         /// the user remaps) always wins. Otherwise: a single-axis device uses
         /// the legacy <see cref="MBoosterDeviceSettings.Role"/> (exact backward
-        /// compat); a multi-pedal chain defaults by axis order to
-        /// [Throttle, Brake, Clutch]. That order is the standard Moza pedal
-        /// usage convention — real hardware (support bundle 2026-07-07) exposes
-        /// the chain's pedals as GenericDesktop axes Rx(0x33)/Ry(0x34)/Rz(0x35),
-        /// which ascending-sorted give index 0/1/2, and Moza maps Rx→throttle,
-        /// Ry→brake, Rz→clutch (see MozaHidClass.Pedals). The user remaps via
-        /// the UI if a given unit's wiring differs.
+        /// compat); axis 0 of a grown-but-not-yet-remapped chain ALSO honors an
+        /// already-explicit Role rather than the position default, so a pedal
+        /// the user set to Brake while solo doesn't silently become "Throttle"
+        /// the moment a second pedal gets chained onto the same lane. Any other
+        /// axis (or axis 0 with Role still at its Disabled default) falls back
+        /// to axis order: [Throttle, Brake, Clutch]. That order is the standard
+        /// Moza pedal usage convention — real hardware (support bundle
+        /// 2026-07-07) exposes the chain's pedals as GenericDesktop axes
+        /// Rx(0x33)/Ry(0x34)/Rz(0x35), which ascending-sorted give index 0/1/2,
+        /// and Moza maps Rx→throttle, Ry→brake, Rz→clutch (see
+        /// MozaHidClass.Pedals). The user remaps via the UI if a given unit's
+        /// wiring differs.
         /// </summary>
         internal static MBoosterRole ResolveAxisRole(MBoosterDeviceSettings? s, int axisIndex, int axisCount)
         {
@@ -831,6 +836,16 @@ namespace MozaPlugin.Devices
                 return roles[axisIndex];
             if (axisCount <= 1)
                 return s?.Role ?? MBoosterRole.Disabled;
+            // Axis 0 IS the legacy Role field's slot for a single-axis device
+            // (see the axisCount<=1 branch above) — if the chain then grows to
+            // a multi-pedal lane before AxisRoles is ever explicitly seeded,
+            // honor whatever the user already set there instead of silently
+            // reverting axis 0 to the position-based Throttle default below.
+            // Losing an explicitly-set Brake there used to hide the brake-only
+            // Sensor Output Ratio/Max Threshold sliders (and mis-route
+            // calibration writes) for a pedal the user never touched.
+            if (axisIndex == 0 && s?.Role is MBoosterRole role0 && role0 != MBoosterRole.Disabled)
+                return role0;
             switch (axisIndex)
             {
                 case 0:  return MBoosterRole.Throttle;  // Rx (0x33)

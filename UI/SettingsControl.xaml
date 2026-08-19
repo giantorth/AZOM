@@ -2007,6 +2007,13 @@
                                     <!-- Right half: Sim Input Mapping -->
                                     <StackPanel Grid.Column="2" Margin="16,0,0,0">
                                         <TextBlock Text="{x:Static res:Strings.Section_SimInputMapping}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
+                                        <!-- Invisible-but-space-reserving spacer, same style/wrap-width/margin as
+                                             the Pedal Feel Deadzone/Max Force labels on the left, so THIS curve
+                                             starts level with that one instead of sitting a row higher (the left
+                                             curve has that labels row above it; this one otherwise wouldn't). -->
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"
+                                                   MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"
+                                                   Visibility="Hidden"/>
                                         <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220" NodeCount="6"
                                                               AccentBrush="{StaticResource CyanBrush}"
                                                               AllowHorizontalDrag="True"

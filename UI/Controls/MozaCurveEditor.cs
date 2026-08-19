@@ -509,6 +509,19 @@ namespace MozaControls
         private int _dragNode = -1;
         private Canvas? _canvas;
 
+        // Endpoint-drag rescale baseline (see EndpointsOnlyDraggableInX) —
+        // captured ONCE at the start of an endpoint drag, not re-derived
+        // every tick from the current (already-rescaled, already-rounded)
+        // positions. Re-deriving it every tick let a middle node's fraction
+        // collapse to exactly 0 or 1 once heavy compression rounded its X
+        // onto an endpoint's own X: every later tick read frac=0 (or 1)
+        // again from that same now-stuck position, so the curve could
+        // compress but never re-expand — this fixes that by keeping the
+        // reference fractions stable for the whole drag gesture.
+        private double[]? _dragBaseFracs;
+        private double _dragBaseFirstX;
+        private double _dragBaseSpan;
+
         private void HookCanvas()
         {
             _canvas = GetTemplateChild("PART_Canvas") as Canvas;
@@ -528,10 +541,23 @@ namespace MozaControls
             _dragNode = FindClosestNode(p);
             if (_dragNode >= 0)
             {
+                int lastNode = ClampedNodeCount() - 1;
+                if (EndpointsOnlyDraggableInX && (_dragNode == 0 || _dragNode == lastNode))
+                    CaptureEndpointDragBaseline(lastNode);
                 _canvas.CaptureMouse();
                 ApplyDrag(p);
                 e.Handled = true;
             }
+        }
+
+        private void CaptureEndpointDragBaseline(int lastNode)
+        {
+            _dragBaseFirstX = GetX(0);
+            _dragBaseSpan = GetX(lastNode) - _dragBaseFirstX;
+            _dragBaseFracs = new double[lastNode + 1];
+            if (_dragBaseSpan > 0.0001)
+                for (int m = 1; m < lastNode; m++)
+                    _dragBaseFracs[m] = (GetX(m) - _dragBaseFirstX) / _dragBaseSpan;
         }
 
         private void OnMouseMove(object sender, MouseEventArgs e)
@@ -620,24 +646,20 @@ namespace MozaControls
 
                 if (EndpointsOnlyDraggableInX && isEndpoint)
                 {
-                    // Rescale every in-between node's X to keep its old
-                    // fractional position between the two endpoints, so the
-                    // curve's shape follows the endpoint being dragged
-                    // instead of being left bunched up behind it.
-                    double oldFirstX = GetX(0);
-                    double oldLastX = GetX(lastNode);
-                    double oldSpan = oldLastX - oldFirstX;
+                    // Rescale every in-between node's X to keep its
+                    // fractional position — captured once at drag start in
+                    // _dragBaseFracs, see CaptureEndpointDragBaseline — between
+                    // the two endpoints, so the curve's shape follows the
+                    // endpoint being dragged instead of being left bunched up
+                    // behind it.
                     SetX(_dragNode, dataX);
-                    if (oldSpan > 0.0001)
+                    if (_dragBaseFracs != null && _dragBaseSpan > 0.0001)
                     {
                         double newFirstX = GetX(0);
                         double newLastX = GetX(lastNode);
                         double newSpan = newLastX - newFirstX;
                         for (int m = 1; m < lastNode; m++)
-                        {
-                            double frac = (GetX(m) - oldFirstX) / oldSpan;
-                            SetX(m, Math.Round(newFirstX + frac * newSpan));
-                        }
+                            SetX(m, Math.Round(newFirstX + _dragBaseFracs[m] * newSpan));
                     }
                 }
                 else
