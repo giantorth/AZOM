@@ -1949,12 +1949,14 @@
                                         <Grid x:Name="MBoosterNaturalFrictionPanel" Margin="0,4" ToolTip="{x:Static res:Strings.Hint_NaturalFrictionPedalFeel}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_NaturalFriction}" Style="{StaticResource SliderLabel}"/>
-                                            <Slider Grid.Column="1" x:Name="MBoosterNaturalFrictionSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterNaturalFrictionSlider_ValueChanged"/>
-                                            <TextBox Grid.Column="2" x:Name="MBoosterNaturalFrictionValue" Style="{StaticResource SliderValueEditBox}"
+                                            <ctrl:OffOnToggle Grid.Column="0" x:Name="MBoosterNaturalFrictionEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Margin="0,0,12,0" Checked="MBoosterNaturalFrictionEnable_Changed" Unchecked="MBoosterNaturalFrictionEnable_Changed"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Static res:Strings.SliderLabel_NaturalFriction}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="2" x:Name="MBoosterNaturalFrictionSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterNaturalFrictionSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="3" x:Name="MBoosterNaturalFrictionValue" Style="{StaticResource SliderValueEditBox}"
                                                      Tag="{Binding ElementName=MBoosterNaturalFrictionSlider}"
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="0"/>
@@ -2072,6 +2074,7 @@
                                               Icon="{StaticResource IconDamper}"
                                               IsCollapsible="True">
                                 <StackPanel>
+                                    <ctrl:OffOnToggle x:Name="MBoosterSegDampEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Margin="0,0,0,12" Checked="MBoosterSegDampEnable_Changed" Unchecked="MBoosterSegDampEnable_Changed"/>
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"

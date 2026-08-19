@@ -2804,9 +2804,15 @@ namespace MozaPlugin
                     controller.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(cfg.EndstopEndStiffness), dev);
                 }
-                if (ownsPedalFeelHardware && cfg.NaturalFrictionPct >= 0)
+                // NaturalFrictionEnabled == false forces the pushed value to
+                // 0% regardless of NaturalFrictionPct — same convention as
+                // SegmentedDampingSettings.DampingEnabled below — so it also
+                // has to fire on an otherwise-untouched profile once the
+                // feature has been explicitly switched off.
+                if (ownsPedalFeelHardware && (cfg.NaturalFrictionPct >= 0 || !cfg.NaturalFrictionEnabled))
                 {
-                    int frictionRaw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.NaturalFrictionPct);
+                    float frictionPct = cfg.NaturalFrictionEnabled ? cfg.NaturalFrictionPct : 0f;
+                    int frictionRaw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(frictionPct);
                     controller.SendIntWrite("mbooster-brake-friction-0", frictionRaw, dev);
                     controller.SendIntWrite("mbooster-brake-friction-1", frictionRaw, dev);
                 }
@@ -2815,27 +2821,31 @@ namespace MozaPlugin
                 // carries the whole feature's state at once, so a fresh
                 // profile with no override on EITHER side still sends
                 // nothing here (guarded like every other calibration write
-                // above); once ANY field on either side is set, the frame
-                // is filled out using factory defaults for whichever side
-                // still has no override.
+                // above); once ANY field on either side is set — or the
+                // feature has been switched off via DampingEnabled — the
+                // frame is filled out using factory defaults for whichever
+                // side still has no override. DampingEnabled == false forces
+                // every segment field to 0%, same as PushSegmentedDamping in
+                // UI/SettingsControl.xaml.cs.
                 var sd = ownsPedalFeelHardware ? cfg.SegmentedDamping : null;
-                if (sd != null && (sd.Divider1Pressed >= 0 || sd.Divider2Pressed >= 0
+                if (sd != null && (!sd.DampingEnabled || sd.Divider1Pressed >= 0 || sd.Divider2Pressed >= 0
                     || sd.Seg1Pressed >= 0 || sd.Seg2Pressed >= 0 || sd.Seg3Pressed >= 0
                     || sd.Divider1Released >= 0 || sd.Divider2Released >= 0
                     || sd.Seg1Released >= 0 || sd.Seg2Released >= 0 || sd.Seg3Released >= 0))
                 {
+                    bool sdEnabled = sd.DampingEnabled;
                     var c = global::MozaPlugin.Devices.MBoosterUiConstants.SegDampSegDefaultPct;
                     var frame = global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
                         sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
                         sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
                         sd.Divider1Released >= 0 ? sd.Divider1Released : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
                         sd.Divider2Released >= 0 ? sd.Divider2Released : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
-                        sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : c,
-                        sd.Seg1Released >= 0 ? sd.Seg1Released : c,
-                        sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : c,
-                        sd.Seg2Released >= 0 ? sd.Seg2Released : c,
-                        sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : c,
-                        sd.Seg3Released >= 0 ? sd.Seg3Released : c,
+                        !sdEnabled ? 0 : sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : c,
+                        !sdEnabled ? 0 : sd.Seg1Released >= 0 ? sd.Seg1Released : c,
+                        !sdEnabled ? 0 : sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : c,
+                        !sdEnabled ? 0 : sd.Seg2Released >= 0 ? sd.Seg2Released : c,
+                        !sdEnabled ? 0 : sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : c,
+                        !sdEnabled ? 0 : sd.Seg3Released >= 0 ? sd.Seg3Released : c,
                         dev);
                     controller.SendOneShot(frame);
                 }

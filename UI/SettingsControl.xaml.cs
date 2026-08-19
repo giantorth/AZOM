@@ -3300,8 +3300,15 @@ namespace MozaPlugin
             float nf = fx?.NaturalFrictionPct ?? -1;
             MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
             SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
+            bool frictionEnabled = fx?.NaturalFrictionEnabled ?? true;
+            MBoosterNaturalFrictionEnable.IsChecked = frictionEnabled;
+            MBoosterNaturalFrictionSlider.IsEnabled = frictionEnabled;
 
             var sd = fx?.SegmentedDamping;
+            bool dampingEnabled = sd?.DampingEnabled ?? true;
+            MBoosterSegDampEnable.IsChecked = dampingEnabled;
+            MBoosterSegDampPressedPlot.IsEnabled = dampingEnabled;
+            MBoosterSegDampReleasedPlot.IsEnabled = dampingEnabled;
             MBoosterSegDampPressedPlot.Divider1 = (sd?.Divider1Pressed ?? -1) >= 0 ? sd!.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct;
             MBoosterSegDampPressedPlot.Divider2 = (sd?.Divider2Pressed ?? -1) >= 0 ? sd!.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct;
             MBoosterSegDampPressedPlot.Seg1Value = (sd?.Seg1Pressed ?? -1) >= 0 ? sd!.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
@@ -4490,6 +4497,29 @@ namespace MozaPlugin
                 });
             });
 
+        // Master on/off for Natural Friction — see
+        // MBoosterDeviceSettings.NaturalFrictionEnabled. Off pushes raw 0
+        // immediately (same effect as dragging the slider to 0, per Pit
+        // House's own toggle-off capture) without touching the stored
+        // NaturalFrictionPct, so switching back on restores it. The slider
+        // is disabled while off to avoid a drag implicitly re-enabling it.
+        private void MBoosterNaturalFrictionEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            s.NaturalFrictionEnabled = MBoosterNaturalFrictionEnable.IsChecked == true;
+            MBoosterNaturalFrictionSlider.IsEnabled = s.NaturalFrictionEnabled;
+            _plugin.SaveSettings();
+            float pct = s.NaturalFrictionEnabled ? (float)MBoosterNaturalFrictionSlider.Value : 0f;
+            int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(pct);
+            QueueMBoosterCalibPush("friction", (c, dev) =>
+            {
+                c.SendIntWrite("mbooster-brake-friction-0", raw, dev);
+                c.SendIntWrite("mbooster-brake-friction-1", raw, dev);
+            });
+        }
+
         // Segmented Damping — "When Pressed". Reverse-engineered from real
         // Pit House USB captures (see docs/protocol/devices/mbooster.md
         // "Segmented Damping"): a SINGLE wire command (cmdId 0xB7) carries
@@ -4540,10 +4570,16 @@ namespace MozaPlugin
         /// wire command has no partial-update form). Not-yet-set fields
         /// (-1 sentinel) fall back to Pit House's own factory defaults, same
         /// as <see cref="MozaPlugin.ApplyMBoosterToHardware"/> does on connect.
+        /// When <see cref="MBoosterSegmentedDampingSettings.DampingEnabled"/>
+        /// is off, every segment field is forced to 0% regardless of what's
+        /// stored/displayed — same wire effect as the user zeroing all six
+        /// sliders themselves.
         /// </summary>
         private void PushSegmentedDamping(MBoosterSegmentedDampingSettings sd)
         {
             _plugin.SaveSettings();
+
+            bool enabled = sd.DampingEnabled;
 
             // Built inside the parked action so the flush sends whatever the
             // plots hold when the drag settles, not a mid-drag snapshot.
@@ -4553,13 +4589,28 @@ namespace MozaPlugin
                     sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
                     sd.Divider1Released >= 0 ? sd.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
                     sd.Divider2Released >= 0 ? sd.Divider2Released : MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
-                    sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
-                    sd.Seg1Released >= 0 ? sd.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                    sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
-                    sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                    sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
-                    sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                    !enabled ? 0 : sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                    !enabled ? 0 : sd.Seg1Released >= 0 ? sd.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                    !enabled ? 0 : sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                    !enabled ? 0 : sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
+                    !enabled ? 0 : sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
+                    !enabled ? 0 : sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
                     dev)));
+        }
+
+        // Master on/off for the whole Segmented Damping feature — see
+        // MBoosterSegmentedDampingSettings.DampingEnabled and
+        // PushSegmentedDamping's zero-forcing above.
+        private void MBoosterSegDampEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            var sd = s.SegmentedDamping ??= new MBoosterSegmentedDampingSettings();
+            sd.DampingEnabled = MBoosterSegDampEnable.IsChecked == true;
+            MBoosterSegDampPressedPlot.IsEnabled = sd.DampingEnabled;
+            MBoosterSegDampReleasedPlot.IsEnabled = sd.DampingEnabled;
+            PushSegmentedDamping(sd);
         }
 
         private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)

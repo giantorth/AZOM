@@ -325,6 +325,14 @@ namespace MozaPlugin.Devices
         public float Seg2Released { get; set; } = -1;
         public float Seg3Released { get; set; } = -1;
 
+        // Master on/off for the whole feature. Off is a software-side
+        // convention, not a separate wire command: it sends the same
+        // BuildSegmentedDampingFrame with all six segment-damping fields
+        // forced to 0% (dividers left as-is — they're inert once every
+        // segment damps at 0%). Defaults true so untouched profiles match
+        // Pit House's own factory-enabled state.
+        public bool DampingEnabled { get; set; } = true;
+
         public MBoosterSegmentedDampingSettings Clone() =>
             new MBoosterSegmentedDampingSettings
             {
@@ -338,6 +346,7 @@ namespace MozaPlugin.Devices
                 Seg1Released = Seg1Released,
                 Seg2Released = Seg2Released,
                 Seg3Released = Seg3Released,
+                DampingEnabled = DampingEnabled,
             };
     }
 
@@ -448,6 +457,7 @@ namespace MozaPlugin.Devices
         float EndstopFrontStiffness { get; set; }
         float EndstopEndStiffness { get; set; }
         float NaturalFrictionPct { get; set; }
+        bool NaturalFrictionEnabled { get; set; }
         MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
     }
 
@@ -485,6 +495,8 @@ namespace MozaPlugin.Devices
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
         public float NaturalFrictionPct { get; set; } = -1;
+        // Master on/off — see MBoosterDeviceSettings.NaturalFrictionEnabled.
+        public bool NaturalFrictionEnabled { get; set; } = true;
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
@@ -517,6 +529,7 @@ namespace MozaPlugin.Devices
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
+                NaturalFrictionEnabled = NaturalFrictionEnabled,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
@@ -781,6 +794,15 @@ namespace MozaPlugin.Devices
         // overwrites whatever value is already on the device.
         public float NaturalFrictionPct { get; set; } = -1;
 
+        // Master on/off for Natural Friction. Not a separate wire concept —
+        // Pit House's own toggle-off capture simply sent raw 0 (see the doc
+        // comment above), so AZOM's toggle reproduces that in software: off
+        // forces the pushed value to 0% regardless of NaturalFrictionPct,
+        // same pattern as MBoosterSegmentedDampingSettings.DampingEnabled.
+        // Defaults true so untouched profiles behave as before this toggle
+        // existed.
+        public bool NaturalFrictionEnabled { get; set; } = true;
+
         // Segmented Damping (Pit House-style) — see
         // MBoosterSegmentedDampingSettings and
         // docs/protocol/devices/mbooster.md "Segmented Damping".
@@ -825,6 +847,7 @@ namespace MozaPlugin.Devices
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
+                NaturalFrictionEnabled = NaturalFrictionEnabled,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 DisplayName = DisplayName,
             };

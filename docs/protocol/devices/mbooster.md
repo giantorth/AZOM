@@ -1136,6 +1136,17 @@ when off and restores the last slider value when on. See
 "not yet set / no override" sentinel convention as
 `EndstopFrontStiffness`/`EndstopEndStiffness`.
 
+AZOM's own UI (`MBoosterNaturalFrictionEnable`,
+`NaturalFrictionEnabled` on both `MBoosterDeviceSettings` and
+`MBoosterPedalSettings`, default `true`) reproduces that exact behavior
+rather than inventing a new wire concept: switching it off pushes raw 0
+immediately (`MBoosterNaturalFrictionEnable_Changed`) without touching
+the stored `NaturalFrictionPct`, and disables the slider so a drag can't
+implicitly re-enable it; switching back on restores whatever the slider
+currently shows. `MozaPlugin.ApplyMBoosterToHardware` mirrors the same
+zero-forcing on connect so a profile saved with friction switched off
+reconnects silent rather than restoring its last on-wire value.
+
 **Segmented Damping** (labeled "SEGMENTED DAMPING" with its own card, two
 plots — "When Pressed" and "When Released") is Pit House's "simulate a
 damping force independent of in-game output, dividing pedal travel into
@@ -1211,6 +1222,18 @@ calibration; a fresh profile writes nothing until the user drags a
 divider or a segment on EITHER plot, at which point any still-unset
 field on the OTHER plot is filled from the factory defaults above rather
 than left blank (the wire frame has no concept of "not sent" per field).
+
+**Enable toggle** (`MBoosterSegDampEnable`,
+`MBoosterSegmentedDampingSettings.DampingEnabled`, default `true`): not a
+separate wire command — Pit House's own "toggle off/on" capture
+(mentioned above) showed all-zero segment values on disable, so AZOM's
+toggle reproduces that exactly in software: switching it off sends the
+same `BuildSegmentedDampingFrame` with all six segment fields forced to
+`0%` (dividers untouched, since they're inert once every segment damps
+at 0%), both from the UI (`SettingsControl.PushSegmentedDamping`) and on
+connect (`MozaPlugin.ApplyMBoosterToHardware`). Switching it back on
+resumes whatever divider/segment values were last stored (or factory
+defaults for a still-untouched profile).
 
 ### Deadzone / Max Force — REVISED: real hardware calibration, not host-side (bug bundle 5VR5AQ8Y)
 
