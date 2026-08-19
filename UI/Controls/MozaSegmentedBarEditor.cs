@@ -158,10 +158,13 @@ namespace MozaControls
         public static readonly DependencyProperty PlotBackgroundRectProperty = PlotBackgroundRectKey.DependencyProperty;
         public Geometry? PlotBackgroundRect => (Geometry?)GetValue(PlotBackgroundRectProperty);
 
-        /// <summary>Step line tracing the three segments' current values —
-        /// flat across each segment's travel range, jumping vertically at
-        /// each divider — so the damping profile reads as one continuous
-        /// shape instead of three disconnected bars.</summary>
+        /// <summary>Smoothed line tracing the three segments' current values —
+        /// flat across the middle of each segment's travel range, easing
+        /// through a short Catmull-Rom-style curve around each divider
+        /// instead of jumping vertically — so the damping profile reads as
+        /// one continuous shape instead of three disconnected bars. See
+        /// <see cref="AddSmoothPolyline"/> (same 1/6-tangent Bezier
+        /// conversion <c>MozaCurveEditor</c> uses for its own curves).</summary>
         private static readonly DependencyPropertyKey StepLineGeometryKey =
             DependencyProperty.RegisterReadOnly(nameof(StepLineGeometry), typeof(Geometry), typeof(MozaSegmentedBarEditor), new PropertyMetadata(null));
         public static readonly DependencyProperty StepLineGeometryProperty = StepLineGeometryKey.DependencyProperty;
@@ -429,16 +432,27 @@ namespace MozaControls
             bg.Freeze();
             SetValue(PlotBackgroundRectKey, bg);
 
-            // Step line ON TOP of the bars, at each segment's own height —
-            // flat across its travel range, a vertical jump at each divider —
-            // the same shape the three bars already imply, just traced as one
-            // line so the overall profile is easier to read at a glance.
-            var stepFig = new PathFigure { StartPoint = new Point(EdgePad, YOf(s1v)), IsClosed = false, IsFilled = false };
-            stepFig.Segments.Add(new LineSegment(new Point(d1x, YOf(s1v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(d1x, YOf(s2v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(d2x, YOf(s2v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(d2x, YOf(s3v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(EdgePad + plotW, YOf(s3v)), true));
+            // Smoothed line ON TOP of the bars, at each segment's own height —
+            // flat across the middle of its travel range, easing through a
+            // short curve around each divider instead of jumping vertically
+            // — the same shape the three bars already imply, just traced as
+            // one continuous, rounded line so the overall profile is easier
+            // to read at a glance. The transition half-width is capped at
+            // 18px and shrunk for narrow segments/gaps so the six control
+            // points below can never cross each other or the plot edges.
+            double transitionHalfWidth = Math.Max(2.0, Math.Min(18.0,
+                Math.Min(d1x - EdgePad, Math.Min(d2x - d1x, EdgePad + plotW - d2x)) / 3.0));
+            var stepPts = new[]
+            {
+                new Point(EdgePad, YOf(s1v)),
+                new Point(d1x - transitionHalfWidth, YOf(s1v)),
+                new Point(d1x + transitionHalfWidth, YOf(s2v)),
+                new Point(d2x - transitionHalfWidth, YOf(s2v)),
+                new Point(d2x + transitionHalfWidth, YOf(s3v)),
+                new Point(EdgePad + plotW, YOf(s3v)),
+            };
+            var stepFig = new PathFigure { StartPoint = stepPts[0], IsClosed = false, IsFilled = false };
+            AddSmoothPolyline(stepFig, stepPts);
             var stepGeom = new PathGeometry();
             stepGeom.Figures.Add(stepFig);
             stepGeom.Freeze();
@@ -460,6 +474,32 @@ namespace MozaControls
             SetValue(Seg1LabelTopKey, LabelTopFor(YOf(s1v)));
             SetValue(Seg2LabelTopKey, LabelTopFor(YOf(s2v)));
             SetValue(Seg3LabelTopKey, LabelTopFor(YOf(s3v)));
+        }
+
+        /// <summary>
+        /// Append a smooth Catmull-Rom-style curve through <paramref name="pts"/>
+        /// to <paramref name="fig"/> as a chain of cubic Bezier segments — same
+        /// 1/6-tangent conversion <c>MozaCurveEditor.Recompute</c> uses for its
+        /// own curves, so this reads as the same "smooth line" visual language
+        /// elsewhere in the app. <paramref name="fig"/>.StartPoint must already
+        /// be set to <c>pts[0]</c>. The first/last points are their own
+        /// duplicated neighbour (rather than wrapping or extrapolating), so the
+        /// curve starts/ends exactly AT <c>pts[0]</c>/<c>pts[^1]</c> with a
+        /// sensible (non-overshooting) tangent instead of curving past them.
+        /// </summary>
+        private static void AddSmoothPolyline(PathFigure fig, Point[] pts)
+        {
+            int n = pts.Length;
+            for (int i = 0; i < n - 1; i++)
+            {
+                Point p0 = i == 0 ? pts[0] : pts[i - 1];
+                Point p1 = pts[i];
+                Point p2 = pts[i + 1];
+                Point p3 = (i + 2 < n) ? pts[i + 2] : pts[n - 1];
+                Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
+                Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
+                fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
+            }
         }
     }
 }
