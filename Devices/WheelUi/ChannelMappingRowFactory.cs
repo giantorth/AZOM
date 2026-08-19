@@ -98,8 +98,10 @@ namespace MozaPlugin.Devices.WheelUi
                         InMin = m?.InMin ?? f.DefaultInMin,
                         InMax = m?.InMax ?? f.DefaultInMax,
                         SimHubProperty = m?.Property ?? f.DefaultProperty,
-                        Scale = m?.Scale ?? 1.0,
-                        Bias = m?.Bias ?? 0.0,
+                        DefaultScale = f.DefaultScale,
+                        DefaultBias = f.DefaultBias,
+                        Scale = m?.Scale ?? f.DefaultScale,
+                        Bias = m?.Bias ?? f.DefaultBias,
                     });
                 }
             }

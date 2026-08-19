@@ -343,13 +343,17 @@ namespace MozaPlugin.Telemetry
                     .U8("twFR", "Tyre wear FR", G + "TyreWearFrontRight", bias: 100.0, scale: -1.0)
                     .U8("twRL", "Tyre wear RL", G + "TyreWearRearLeft", bias: 100.0, scale: -1.0)
                     .U8("twRR", "Tyre wear RR", G + "TyreWearRearRight", bias: 100.0, scale: -1.0)
-                    // Wing boxes seed from SimHub's generic damage zones (AC: 1=front, 2=rear);
-                    // same remaining-% convention as the tyre boxes.
-                    .U8("wwFL", "Wing wear FL", G + "CarDamage1", bias: 100.0, scale: -1.0)
-                    .U8("wwFR", "Wing wear FR", G + "CarDamage1", bias: 100.0, scale: -1.0)
-                    .U8("wwR", "Wing wear R", G + "CarDamage2", bias: 100.0, scale: -1.0)
-                    .U8("engWear", "Engine wear", "")
-                    .U8("gbxWear", "Gearbox wear", "")
+                    // Damage boxes, in on-wheel gauge order: FL wing, FR wing, ICE, gearbox,
+                    // REAR wing (tester-confirmed on dashboards 5/10 — the last three read one
+                    // gauge earlier than the old labels claimed). Unlike the tyre boxes these
+                    // carry DAMAGE, not remaining %: 0 renders green and rises to red, so no
+                    // 100− inversion. FieldIds are historical, kept so existing profile
+                    // overrides stay attached to the same gauge.
+                    .U8("wwFL", "Front wing damage FL", G + "CarDamage1")
+                    .U8("wwFR", "Front wing damage FR", G + "CarDamage1")
+                    .U8("wwR", "ICE wear", "")
+                    .U8("engWear", "Gearbox wear", "")
+                    .U8("gbxWear", "Rear wing damage", G + "CarDamage2")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
                     .U8("fuel", "Fuel remaining", G + "Fuel")
                     .GearDrsErs("gde")

@@ -68,6 +68,15 @@ namespace MozaPlugin.Devices.WheelUi
             }
         }
 
+        // The field's catalog gain, so the row can show the gain actually applied (lap
+        // times ×1000, tyre temps +300, fuel laps ×100) instead of a flat 1/0, and so a
+        // save can tell "still at default" from "user override" — persisting Scale=1 over
+        // a ×1000 default silently drops the unit conversion.
+        /// <summary>Catalog default for <see cref="Scale"/> (1 = none).</summary>
+        public double DefaultScale { get; set; } = 1.0;
+        /// <summary>Catalog default for <see cref="Bias"/> (0 = none).</summary>
+        public double DefaultBias { get; set; }
+
 
         private double _inMin;
         public double InMin

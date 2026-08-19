@@ -1305,8 +1305,10 @@ namespace MozaPlugin.Devices.WheelUi
         }
 
         // Build a deviation-only FSR1 field mapping from a UI row: the gain overrides
-        // are set ONLY when they differ from unity, so an unedited field prunes to
-        // nothing (dict-missing ≠ explicit-off). Geometry is catalog-fixed.
+        // are set ONLY when they differ from the field's CATALOG gain, so an unedited
+        // field prunes to nothing (dict-missing ≠ explicit-off) and a row left at the
+        // catalog value can't persist a unity gain over a ×1000 / +300 default.
+        // Geometry is catalog-fixed.
         private static Fsr1FieldMapping BuildFsr1MappingFromRow(ChannelMappingRow row)
         {
             return new Fsr1FieldMapping
@@ -1314,8 +1316,8 @@ namespace MozaPlugin.Devices.WheelUi
                 Property = (row.SimHubProperty ?? "").Trim(),
                 InMin = row.InMin,
                 InMax = row.InMax,
-                Scale = row.Scale != 1.0 ? row.Scale : (double?)null,
-                Bias = row.Bias != 0.0 ? row.Bias : (double?)null,
+                Scale = row.Scale != row.DefaultScale ? row.Scale : (double?)null,
+                Bias = row.Bias != row.DefaultBias ? row.Bias : (double?)null,
             };
         }
 

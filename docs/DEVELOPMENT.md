@@ -355,7 +355,7 @@ The FSR V1 (model-name `FSR`, hw `RS21-D03*`) uses a fundamentally different tra
 - **Catalog/emitter:** `Fsr1DashboardCatalog.cs` (per record type: field defs with offsets/encoding/capability/default property + the partial page-index → record-type map) and `Fsr1DisplayEmitter.cs` (startup declaration sweep, live records, 0x43 keepalive, the `g32/81` select command) — byte-exact-verified against captures.
 - **Switching, both directions:** host→wheel via group 0x32 cmd 0x81 BE32 page index 0..18 (dropdown → `SetActiveFsr1Index(idx, sendToWheel:true)`, drained by the driver); wheel→host via the `Table 7, Param 6 Written: <idx>` firmware log (HID combo switches included), parsed by `Fsr1Cm1MappingCoordinator.TryFollowFsr1DashboardLog` so the plugin auto-follows.
 - **User mapping:** per wheel-GUID → record-key → field in `MozaProfile.Fsr1DashboardMappings` with per-field input-scale min/max, edited in the standard channel mapper (`ChannelMappingRowFactory.BuildFromFsr1Catalog`).
-- **Open items:** 5 of 19 page indices confirmed; field semantics for record types `06/09/0d/0e` decoded structurally but unnamed (exposed as raw slots); `b1`/`b2` meaning. Remaining unknowns must come from captures — do not fill a field on a guess. Tools: `tools/fsr1-0x42-extract`, `tools/fsr1-field-decode`, `tools/fsr1-hid-decode`.
+- **Open items:** 5 of 19 page indices confirmed; field semantics for record types `06/09/0d/0e` decoded structurally but unnamed (exposed as raw slots); `b1`/`b2` meaning. Remaining unknowns must come from captures — do not fill a field on a guess. Tools: `tools/fsr1-0x42-extract`, `tools/fsr1-field-decode`, `tools/fsr1-page-field-map.py` (per-page b1/b2 + per-byte variance), `tools/fsr1-hid-decode`.
 
 ### Dashboard switch state machine
 
