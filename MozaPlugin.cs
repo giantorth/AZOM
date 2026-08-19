@@ -2352,6 +2352,13 @@ namespace MozaPlugin
 
                 if (!dict.TryGetValue(key, out var s) || s == null)
                 {
+                    // Diagnostic trail for the "curve values wrong until profile
+                    // reload" class of bug — this is the moment a caller gets
+                    // handed a brand-new, all-defaults placeholder instead of
+                    // the real saved entry, e.g. because `key` is still the raw
+                    // transport identity (serial not resolved/re-keyed yet) at
+                    // the moment the settings UI first seeds from it.
+                    MozaLog.Info($"[AZOM\\mBooster] GetOrCreateMBoosterSettings: NEW placeholder for key='{key}' (original='{original}', resolvedSerial={!string.Equals(original, key, StringComparison.OrdinalIgnoreCase)}) in profile '{profile.Name}'");
                     s = new MBoosterDeviceSettings();
                     dict[key] = s;
                 }
@@ -2370,6 +2377,12 @@ namespace MozaPlugin
         private void OnMBoosterSerialResolved(string identity, string serial)
         {
             if (IsShuttingDown || string.IsNullOrEmpty(identity) || string.IsNullOrEmpty(serial)) return;
+            // Diagnostic trail alongside GetOrCreateMBoosterSettings's own
+            // placeholder-creation log — if this fires well AFTER the settings
+            // UI has already seeded from a transport-keyed placeholder for the
+            // same identity, that's the race: the UI showed defaults/stale data
+            // before this re-key ever ran, and nothing told it to reseed.
+            MozaLog.Info($"[AZOM\\mBooster] OnMBoosterSerialResolved: identity={MBoosterDeviceController.ShortIdentity(identity)} serial={serial}");
             _mboosterSerialByIdentity[identity] = "mbooster:" + serial;
             try
             {

@@ -3005,6 +3005,17 @@ namespace MozaPlugin
                 _mboosterUiSeeded = false;
 
             if (_mboosterUiSeeded) return;
+            // Diagnostic trail for the "curve values wrong until profile
+            // reload" bug — logs exactly what this seed pass is about to push
+            // into the curve editors, timestamped, so it can be correlated
+            // against GetOrCreateMBoosterSettings's "NEW placeholder" log and
+            // OnMBoosterSerialResolved's re-key log from the same session.
+            {
+                var fxLog = PeekMBoosterEffectTarget();
+                string Fmt(float[]? a) => a == null ? "null" : "[" + string.Join(",", a) + "]";
+                MozaLog.Info($"[AZOM\\mBooster] RefreshMBoosterTab seeding: profile='{currentProfileName}' identity='{selected.Identity}' pedalIdx={_mboosterEffectPedalIndex} "
+                    + $"CurveY={Fmt(fxLog?.CurveY)} CurveX={Fmt(fxLog?.CurveX)} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
+            }
             using (_suppressor.Begin())
             {
                 // Role is seeded per-row by the device rows block above (each
