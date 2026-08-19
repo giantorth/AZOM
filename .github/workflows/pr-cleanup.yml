@@ -1,6 +1,6 @@
 name: PR Cleanup
 
-# Separate from pr-build.yml on purpose: a `paths` filter would also gate the
+# Separate from build.yml on purpose: a `paths` filter would also gate the
 # `closed` event, and cleanup must never be skipped by a filter mismatch.
 on:
   pull_request:
@@ -11,8 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # Fork PRs never had releases published.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # No fork guard: a maintainer can publish releases for a fork PR via /build
+    # (pr-command.yml) or a workflow_dispatch, so fork PRs need cleaning too.
+    # The tag pattern below is already scoped to this PR number, and a PR with
+    # no releases just iterates an empty list.
     steps:
       - name: Delete this PR's releases and tags
         env:
