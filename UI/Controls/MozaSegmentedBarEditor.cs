@@ -498,8 +498,30 @@ namespace MozaControls
                 Point p1 = pts[i];
                 Point p2 = pts[i + 1];
                 Point p3 = (i + 2 < n) ? pts[i + 2] : pts[n - 1];
-                Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
-                Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
+                Point c1, c2;
+                if (p1.Y == p2.Y)
+                {
+                    // A flat run (both endpoints at the same height — the
+                    // plateau segments in Recompute's 6-point layout) must
+                    // stay flat. Reaching past it to p0/p3 at a DIFFERENT
+                    // height (the neighbouring divider transition) leaks a
+                    // phantom slope into this segment's own tangent,
+                    // drawing a small dip/bump right at the plateau's edge
+                    // instead of a straight line — exactly the artifact
+                    // visible right before/after each divider. Force a
+                    // zero-slope tangent instead; the transition segment on
+                    // the other side of the divider still computes its own
+                    // tangent correctly, since IT reaches back into a flat
+                    // neighbour that's at the SAME height as its own near
+                    // endpoint.
+                    c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y);
+                    c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y);
+                }
+                else
+                {
+                    c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
+                    c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
+                }
                 fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
             }
         }
