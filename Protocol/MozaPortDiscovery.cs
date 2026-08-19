@@ -11,11 +11,27 @@ using Microsoft.Win32;
 
 namespace MozaPlugin.Protocol
 {
+    /// <summary>Where the current port list came from.</summary>
+    public enum MozaDiscoverySource
+    {
+        /// <summary>Nothing usable — the serial-probe fallback is the only option.</summary>
+        None = 0,
+        /// <summary>Windows <c>Enum\USB</c> registry walk (native Windows).</summary>
+        Registry,
+        /// <summary>Linux sysfs through Wine's unix drive (Wine/Proton).</summary>
+        Sysfs,
+    }
+
     /// <summary>
-    /// Process-wide MOZA port discovery via the Windows registry (usbser.sys layout),
-    /// cross-referenced against <see cref="SerialPort.GetPortNames"/> to drop ghost
-    /// entries. Replaces the prior WMI reflection path; serial-probe fallback in
-    /// <see cref="MozaSerialConnection"/> kicks in only when the registry is empty.
+    /// Process-wide MOZA port discovery. Two sources fill the same
+    /// <see cref="PortInfo"/> shape so every consumer is platform-agnostic:
+    /// the Windows registry (usbser.sys layout, cross-referenced against
+    /// <see cref="SerialPort.GetPortNames"/> to drop ghost entries), and Linux
+    /// sysfs via <see cref="LinuxUsbEnumerator"/> under Wine/Proton, where the
+    /// registry has no <c>Enum\USB</c> tree at all. Replaces the prior WMI
+    /// reflection path; the serial-probe fallback in
+    /// <see cref="MozaSerialConnection"/> kicks in only when neither source
+    /// produced anything (<see cref="IsAuthoritative"/> false).
     /// </summary>
     public sealed class MozaPortDiscovery
     {
@@ -45,8 +61,19 @@ namespace MozaPlugin.Protocol
             // unrelated instance IDs (see docs/protocol/devices/mbooster.md).
             public readonly string ContainerId;          // "{4d36e978-...}"
             public readonly MozaDeviceCategory Category; // derived from Pid via MozaUsbIds.Categorize
+            // Openable device path, e.g. @"Z:\dev\ttyACM2". Set only by the sysfs
+            // source: under Wine the COM name cannot be resolved to a tty (the
+            // dosdevices symlink target is unreadable from inside the prefix), so
+            // the connection opens this path directly via WineDevicePathMozaPort.
+            // Empty on Windows, where PortName is the thing to open.
+            public readonly string DevicePath;
+            // USB iSerialNumber. The per-unit half of the durable id; empty when
+            // the device reports none, or on Windows (the registry walk doesn't
+            // read it — Windows already has a stable InstanceId).
+            public readonly string Serial;
 
-            public PortInfo(string portName, ushort vid, ushort pid, string friendlyName, string instanceId, string containerId = "")
+            public PortInfo(string portName, ushort vid, ushort pid, string friendlyName, string instanceId,
+                            string containerId = "", string devicePath = "", string serial = "")
             {
                 PortName = portName;
                 Vid = vid;
@@ -54,6 +81,8 @@ namespace MozaPlugin.Protocol
                 FriendlyName = friendlyName ?? string.Empty;
                 InstanceId = instanceId ?? string.Empty;
                 ContainerId = containerId ?? string.Empty;
+                DevicePath = devicePath ?? string.Empty;
+                Serial = serial ?? string.Empty;
                 Category = MozaUsbIds.Categorize(pid);
             }
         }
@@ -62,6 +91,7 @@ namespace MozaPlugin.Protocol
         private long _cacheTimestamp;                                  // 0 = uninitialised
         private IReadOnlyList<PortInfo> _cachedPorts = Array.Empty<PortInfo>();
         private string _lastSummary = "(not yet enumerated)";
+        private MozaDiscoverySource _lastSource = MozaDiscoverySource.None;
         private int _hasLoggedFirstSuccess; // 0 or 1, atomic
         // Unknown-PID first-sighting log gate. Guarded by _cacheLock so a
         // concurrent cache refresh doesn't double-log the same PID.
@@ -79,7 +109,14 @@ namespace MozaPlugin.Protocol
                     return _cachedPorts;
             }
 
-            var ports = EnumerateFromRegistry();
+            // Wine/Proton has no Enum\USB tree, so the registry walk is dead
+            // there; sysfs carries the same identity. Native Windows never
+            // reaches the sysfs branch (WineHost.UnixRoot is null).
+            bool useSysfs = LinuxUsbEnumerator.Available;
+            var ports = useSysfs ? EnumerateFromSysfs() : EnumerateFromRegistry();
+            var source = ports.Count > 0
+                ? (useSysfs ? MozaDiscoverySource.Sysfs : MozaDiscoverySource.Registry)
+                : MozaDiscoverySource.None;
             var summary = SummarizePorts(ports);
 
             // Collect first-sighting unknown PIDs while holding the lock,
@@ -92,6 +129,7 @@ namespace MozaPlugin.Protocol
                 _cachedPorts = ports;
                 _cacheTimestamp = Stopwatch.GetTimestamp();
                 _lastSummary = summary;
+                _lastSource = source;
 
                 for (int i = 0; i < ports.Count; i++)
                 {
@@ -119,10 +157,13 @@ namespace MozaPlugin.Protocol
             // First successful enumeration logs at Info so the user sees one
             // line in their support-bundle log confirming detection worked.
             // Subsequent enumerations log at Debug to avoid flooding.
+            string sourceLabel = useSysfs
+                ? $"sysfs ({WineHost.Describe()})"
+                : "registry";
             if (ports.Count > 0 && Interlocked.Exchange(ref _hasLoggedFirstSuccess, 1) == 0)
-                MozaLog.Info($"[AZOM] MOZA detection: source=registry, {summary}");
+                MozaLog.Info($"[AZOM] MOZA detection: source={sourceLabel}, {summary}");
             else
-                MozaLog.DebugIfChanged("port-discovery", $"[AZOM] MOZA detection: source=registry, {summary}");
+                MozaLog.DebugIfChanged("port-discovery", $"[AZOM] MOZA detection: source={sourceLabel}, {summary}");
 
             return ports;
         }
@@ -140,6 +181,51 @@ namespace MozaPlugin.Protocol
             for (int i = 0; i < all.Count; i++)
                 if (pidFilter(all[i].Pid)) matched.Add(all[i]);
             return matched;
+        }
+
+        /// <summary>Which source filled the most recent enumeration.</summary>
+        public MozaDiscoverySource Source
+        {
+            get { Enumerate(); lock (_cacheLock) return _lastSource; }
+        }
+
+        /// <summary>
+        /// True when a real device source answered, i.e. the port list is the
+        /// authoritative answer and the serial-probe fallback has nothing to add.
+        /// False means neither the registry nor sysfs produced anything, which is
+        /// the only case where blind probing is still worth doing.
+        /// </summary>
+        public bool IsAuthoritative => Source != MozaDiscoverySource.None;
+
+        /// <summary>
+        /// Stable per-unit identity that survives re-enumeration, replug and COM/tty
+        /// renumbering — the key lanes persist instead of a port name. Prefers the USB
+        /// serial number; falls back to the bus/instance path for devices that report
+        /// none.
+        /// </summary>
+        public static string DurableId(in PortInfo info)
+        {
+            string head = $"{info.Vid:X4}:{info.Pid:X4}";
+            if (!string.IsNullOrEmpty(info.Serial)) return $"{head}:{info.Serial}";
+            if (!string.IsNullOrEmpty(info.InstanceId)) return $"{head}:bus={info.InstanceId}";
+            return $"{head}:port={info.PortName}";
+        }
+
+        /// <summary>Find the currently-present device carrying <paramref name="durableId"/>.</summary>
+        public bool TryGetByDurableId(string durableId, out PortInfo info)
+        {
+            info = default;
+            if (string.IsNullOrEmpty(durableId)) return false;
+            var all = Enumerate();
+            for (int i = 0; i < all.Count; i++)
+            {
+                if (string.Equals(DurableId(all[i]), durableId, StringComparison.OrdinalIgnoreCase))
+                {
+                    info = all[i];
+                    return true;
+                }
+            }
+            return false;
         }
 
         public bool TryGetByPort(string portName, out PortInfo info)
@@ -196,12 +282,46 @@ namespace MozaPlugin.Protocol
                 _cacheTimestamp = 0;
                 _cachedPorts = Array.Empty<PortInfo>();
             }
+            // Derived from the same enumeration — drop it together or the labels
+            // outlive the ports they name.
+            WineComNameResolver.Invalidate();
         }
 
         /// <summary>Human-readable single-line summary of the most recent enumeration. UI binding.</summary>
         public string LastEnumerationSummary
         {
             get { lock (_cacheLock) return _lastSummary; }
+        }
+
+        /// <summary>
+        /// Wine/Proton source. <c>PortName</c> becomes the tty name ("ttyACM2") —
+        /// it stays the process-wide dedup/display key — and <c>DevicePath</c>
+        /// carries what to open. <c>InstanceId</c>/<c>ContainerId</c> both carry
+        /// the USB bus path, which has exactly the Container ID semantic (one
+        /// value shared by every interface of one physical device), so the
+        /// mBooster CDC-to-HID pairing keeps working.
+        /// </summary>
+        private static IReadOnlyList<PortInfo> EnumerateFromSysfs()
+        {
+            var nodes = LinuxUsbEnumerator.Enumerate();
+            var results = new List<PortInfo>(nodes.Count);
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var n = nodes[i];
+                string friendly = n.Product.Length > 0
+                    ? $"{n.Product} ({n.TtyName})"
+                    : $"MOZA CDC ({n.TtyName})";
+                results.Add(new PortInfo(
+                    n.TtyName, n.Vid, n.Pid, friendly,
+                    instanceId: n.BusPath,
+                    // Prefer the USB serial: it is the one identity the HID side
+                    // can also read under Wine, which is what pairs an mBooster's
+                    // axis stream to this CDC lane. Bus path when there is none.
+                    containerId: n.Serial.Length > 0 ? n.Serial : n.BusPath,
+                    devicePath: n.DevicePath,
+                    serial: n.Serial));
+            }
+            return results;
         }
 
         private static IReadOnlyList<PortInfo> EnumerateFromRegistry()

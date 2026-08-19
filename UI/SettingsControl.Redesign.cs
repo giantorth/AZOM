@@ -408,11 +408,21 @@ namespace MozaPlugin
             SteeringArcViz.Angle = valid ? degrees : 0;
         }
 
+        // Under Wine the port key is the tty name; append the COM name Wine gave
+        // it so the pill still matches what other tools show. Windows returns the
+        // port name unchanged.
+        private static string DescribePort(string? portName)
+        {
+            if (string.IsNullOrEmpty(portName)) return "—";
+            string? com = global::MozaPlugin.Protocol.WineComNameResolver.ResolveComName(portName!);
+            return com == null ? portName! : $"{portName} ({com})";
+        }
+
         private void UpdateConnectionPill()
         {
             if (ConnectionPill == null) return;
             ConnectionPill.IsConnected = _data.IsConnected;
-            ConnectionPill.PortName = _plugin.Connection?.LastPortName ?? "—";
+            ConnectionPill.PortName = DescribePort(_plugin.Connection?.LastPortName);
             if (!_data.IsConnected)
             {
                 ConnectionPill.StatusText = global::MozaPlugin.Resources.Strings.Status_Disconnected;

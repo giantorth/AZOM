@@ -50,18 +50,20 @@ namespace MozaPlugin.UI
         {
             var sb = new StringBuilder();
             var ports = MozaPortDiscovery.Instance.Enumerate();
+            var source = MozaPortDiscovery.Instance.Source;
             string fallbackState;
             if (plugin.Settings.DisableSerialProbeFallback)
                 fallbackState = "DISABLED";
-            else if (ports.Count > 0)
-                fallbackState = "armed (probes only unclassified COM ports)";
+            else if (source != MozaDiscoverySource.None)
+                fallbackState = "not used (enumeration is authoritative)";
             else
-                fallbackState = "armed (active — registry empty)";
-            sb.AppendLine($"Source:         Registry  (probe fallback: {fallbackState})");
+                fallbackState = "armed (active — no device source)";
+            sb.AppendLine($"Source:         {source}  (probe fallback: {fallbackState})");
+            sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
 
             if (ports.Count == 0)
             {
-                sb.AppendLine("Discovered:     (no MOZA devices in registry)");
+                sb.AppendLine($"Discovered:     (no MOZA devices — source {source})");
             }
             else
             {
@@ -69,7 +71,14 @@ namespace MozaPlugin.UI
                 for (int i = 0; i < ports.Count; i++)
                 {
                     var p = ports[i];
-                    sb.AppendLine($"  {p.PortName,-6} VID 0x{p.Vid:X4}  PID 0x{p.Pid:X4}  {p.FriendlyName}");
+                    sb.AppendLine($"  {p.PortName,-8} VID 0x{p.Vid:X4}  PID 0x{p.Pid:X4}  {p.FriendlyName}");
+                    // Second line only carries what the sysfs source adds; on
+                    // Windows every field below is empty and the line is skipped.
+                    if (p.DevicePath.Length > 0 || p.Serial.Length > 0)
+                    {
+                        string com = Protocol.WineComNameResolver.ResolveComName(p.PortName) ?? "(unresolved)";
+                        sb.AppendLine($"           dev {p.DevicePath}  serial {p.Serial}  bus {p.InstanceId}  wine COM {com}");
+                    }
                 }
             }
 

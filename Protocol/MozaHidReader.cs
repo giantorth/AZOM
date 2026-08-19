@@ -453,6 +453,17 @@ namespace MozaPlugin.Protocol
                     // so the registry can pair this axis stream to its CDC lane.
                     try { mBoosterContainerId = MozaPortDiscovery.Instance.GetHidContainerId(device.DevicePath ?? ""); }
                     catch { }
+                    if (mBoosterContainerId.Length == 0)
+                    {
+                        // No Container ID: Wine has no Enum\HID registry at all,
+                        // and some Windows driver stacks omit the value. The USB
+                        // serial is the same on both interfaces of one device and
+                        // is what the sysfs source publishes as the CDC-side
+                        // ContainerId, so it pairs them. On Windows this is a
+                        // harmless no-op — a serial never matches a Container GUID.
+                        try { mBoosterContainerId = device.GetSerialNumber() ?? ""; }
+                        catch { }
+                    }
                     MozaLog.Debug($"[AZOM/mBooster] {identity}: {axisUsages.Count} axis/axes " +
                         $"[{string.Join(", ", axisUsages.Select(u => $"0x{u & 0xFFFF:X2}"))}] container='{mBoosterContainerId}'");
                 }

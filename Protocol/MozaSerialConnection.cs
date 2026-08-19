@@ -261,6 +261,21 @@ namespace MozaPlugin.Protocol
             get => _lastPortName;
             set => _lastPortName = value;
         }
+
+        private string? _lastDeviceId;
+
+        /// <summary>
+        /// Durable identity (<c>VID:PID:serial</c>) of the last device that
+        /// connected successfully — see <see cref="MozaPortDiscovery.DurableId"/>.
+        /// Persisted by the plugin alongside <see cref="LastPortName"/> and
+        /// preferred over it on reconnect, because a tty/COM name is only stable
+        /// until the next replug while this is not.
+        /// </summary>
+        public string? LastDeviceId
+        {
+            get => _lastDeviceId;
+            set => _lastDeviceId = value;
+        }
         private volatile bool _shutdownRequested;
 
         // Consecutive I/O error tracking. After sleep/resume the SerialPort handle
@@ -306,8 +321,9 @@ namespace MozaPlugin.Protocol
         public string CaptureLabel { get; set; } = "wheelbase";
 
         /// <summary>
-        /// The HID Product ID discovered from WMI during device enumeration.
-        /// Null if PID could not be determined (e.g. probe-based discovery under Wine).
+        /// USB Product ID from device enumeration (the Windows registry, or sysfs
+        /// under Wine/Proton). Null only when neither source saw the device and it
+        /// was found by the serial probe, which carries no identity.
         /// </summary>
         public string? DiscoveredPid { get; private set; }
 
@@ -510,38 +526,57 @@ namespace MozaPlugin.Protocol
             if (_running || _port != null)
                 Disconnect();
 
-            // Try the cached port first, gated on registry confirming it still
-            // belongs to a MOZA device of the right family. _activePorts guards
-            // against same-process sibling-connection double-open on Wine ptys.
+            // Cached-identity fast path. The durable id is tried FIRST because it
+            // survives the device landing on a different tty/COM after a replug —
+            // the port name only survives until then. Both are gated on
+            // _activePorts, which guards same-process sibling double-open (Wine
+            // ptys have no O_EXCL).
             string? preferredPort = _lastPortName;
-            if (_lastPortName != null
-                && !_activePorts.ContainsKey(_lastPortName))
+            if (_lastDeviceId != null
+                && MozaPortDiscovery.Instance.TryGetByDurableId(_lastDeviceId, out var known)
+                && (_pidFilter == null || _pidFilter(FormatPid(known.Pid)))
+                && !_activePorts.ContainsKey(known.PortName))
+            {
+                DiscoveredPid = FormatPid(known.Pid);
+                if (TryOpen(known.PortName, known.DevicePath))
+                    return true;
+                // Enumeration already proved this is the right device for this
+                // lane, so re-running discovery would pick the same one and open
+                // it a second time this tick. Let the 5 s reconnect timer retry.
+                MozaLog.Debug(
+                    $"[AZOM] Cached device {_lastDeviceId} present on {known.PortName} but failed to open — retrying next tick");
+                return false;
+            }
+            else if (_lastPortName != null
+                     && !_activePorts.ContainsKey(_lastPortName))
             {
                 if (MozaPortDiscovery.Instance.TryGetByPort(_lastPortName, out var info)
                     && (_pidFilter == null || _pidFilter(FormatPid(info.Pid))))
                 {
                     DiscoveredPid = FormatPid(info.Pid);
-                    if (TryOpen(_lastPortName))
+                    if (TryOpen(_lastPortName, info.DevicePath))
                         return true;
                     MozaLog.Debug(
                         $"[AZOM] Cached port {_lastPortName} validated but failed to open — clearing");
                     preferredPort = null;
                     _lastPortName = null;
+                    _lastDeviceId = null;
                 }
-                else if (MozaPortDiscovery.Instance.Enumerate().Count > 0)
+                else if (MozaPortDiscovery.Instance.IsAuthoritative)
                 {
-                    // Registry is live and doesn't list the cached port as a
-                    // matching MOZA device — genuinely stale.
+                    // A real device source answered and doesn't list the cached
+                    // port as a matching MOZA device — genuinely stale.
                     MozaLog.Debug(
-                        $"[AZOM] Cached port {_lastPortName} no longer matches a MOZA device in the registry — clearing");
+                        $"[AZOM] Cached port {_lastPortName} no longer matches a MOZA device ({MozaPortDiscovery.Instance.Source}) — clearing");
                     preferredPort = null;
                     _lastPortName = null;
+                    _lastDeviceId = null;
                 }
-                // Empty registry (Wine/Proton) can't validate the cached port;
-                // keep it — FindMozaPort's probe revalidates it first.
+                // No source at all: nothing can validate the cached port, so keep
+                // it — FindMozaPort's probe revalidates it first.
             }
 
-            var (portName, pid, viaHubProbe) = FindMozaPort(
+            var (portName, pid, viaHubProbe, devicePath) = FindMozaPort(
                 _pidFilter, _probeTarget, preferredPort, _disableProbeFallback,
                 CaptureLabel, () => _shutdownRequested);
             if (portName == null)
@@ -551,15 +586,20 @@ namespace MozaPlugin.Protocol
                 DiscoveredPid = pid;
             HubProbeSucceeded = viaHubProbe;
 
-            return TryOpen(portName);
+            return TryOpen(portName, devicePath);
         }
 
-        private bool TryOpen(string portName)
+        // devicePath is set only by the sysfs source (Wine/Proton): there the COM
+        // name is unknowable, so we open the unix device node directly. Empty on
+        // Windows, where portName IS the thing to open.
+        private bool TryOpen(string portName, string? devicePath = null)
         {
             try
             {
-                var sp = new SerialPortMozaPort(portName, MozaProtocol.BaudRate);
-                return FinishOpen(sp, portName);
+                IMozaPort port = string.IsNullOrEmpty(devicePath)
+                    ? (IMozaPort)new SerialPortMozaPort(portName, MozaProtocol.BaudRate)
+                    : new WineDevicePathMozaPort(devicePath!);
+                return FinishOpen(port, portName);
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -630,6 +670,12 @@ namespace MozaPlugin.Protocol
             }
 
             _lastPortName = portName;
+            // Re-derive the durable identity from whichever source is live, so a
+            // reconnect can find this device again after it lands on a different
+            // tty/COM. Left untouched when no source can classify the port (the
+            // probe-only fallback), where the port name is all we have.
+            if (MozaPortDiscovery.Instance.TryGetByPort(portName, out var openedInfo))
+                _lastDeviceId = MozaPortDiscovery.DurableId(openedInfo);
             _activePorts[portName] = 1;
             Interlocked.Exchange(ref _consecutiveIoErrors, 0);
             Interlocked.Exchange(ref _portFailureLogged, 0);
@@ -1283,11 +1329,13 @@ namespace MozaPlugin.Protocol
         }
 
         /// <summary>
-        /// Locate a MOZA device: (1) registry walk (no serial bytes), (2) probe fallback
-        /// against unclassified ports only. Registry-classified mismatches are skipped.
+        /// Locate a MOZA device: (1) enumeration — registry on Windows, sysfs under
+        /// Wine/Proton — with no serial bytes written, (2) probe fallback against
+        /// unclassified ports only, and only when enumeration can be incomplete
+        /// (never under sysfs). Classified mismatches are skipped.
         /// <paramref name="preferredPort"/> tilts toward the saved port on multi-rig setups.
         /// </summary>
-        private static (string? PortName, string? Pid, bool ViaHubProbe) FindMozaPort(
+        private static (string? PortName, string? Pid, bool ViaHubProbe, string? DevicePath) FindMozaPort(
             Func<string?, bool>? pidFilter,
             MozaProbeTarget probeTarget,
             string? preferredPort,
@@ -1359,15 +1407,36 @@ namespace MozaPlugin.Protocol
                     }
                 }
                 MozaLog.Debug(
-                    $"[AZOM] Found MOZA device on {chosen.PortName} PID={FormatPid(chosen.Pid)} (registry)");
-                return (chosen.PortName, FormatPid(chosen.Pid), false);
+                    $"[AZOM] Found MOZA device on {chosen.PortName} PID={FormatPid(chosen.Pid)} " +
+                    $"({MozaPortDiscovery.Instance.Source})");
+                return (chosen.PortName, FormatPid(chosen.Pid), false, chosen.DevicePath);
+            }
+
+            // sysfs enumerates the USB bus itself, so a MOZA that is attached is
+            // in the list above by construction — a probe can only find OTHER
+            // vendors' hardware, and opening that is the exact failure this
+            // source exists to end. It is also the only correct stop here: under
+            // sysfs PortName is a tty name, so the COM-keyed probe-eligibility
+            // narrowing further down can never fire and the sweep would run over
+            // every COM symlink in the prefix.
+            //
+            // The registry deliberately does NOT stop here. It lists only devices
+            // that bound usbser, so a MOZA behind a different driver is invisible
+            // to it and the probe still adds information; Windows keeps the
+            // existing per-port narrowing below.
+            if (MozaPortDiscovery.Instance.Source == MozaDiscoverySource.Sysfs)
+            {
+                MozaLog.DebugIfChanged($"probe-skip-enumerated:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] No matching MOZA device among the {allRegistryPorts.Count} " +
+                    "enumerated by sysfs — not probing");
+                return (null, null, false, null);
             }
 
             if (disableProbeFallback?.Invoke() == true)
             {
                 MozaLog.DebugIfChanged($"probe-skip-disabled:{laneLabel}",
                     $"[AZOM] [{laneLabel}] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
-                return (null, null, false);
+                return (null, null, false, null);
             }
 
             // Probe-based discovery: try opening each COM port and sending a Moza read command.
@@ -1416,7 +1485,7 @@ namespace MozaPlugin.Protocol
             {
                 MozaLog.DebugIfChanged($"probe-skip-classified:{laneLabel}",
                     $"[AZOM] [{laneLabel}] Registry classifies all {ports.Length} COM port(s); none match this connection's PID filter — skipping probe (trust registry)");
-                return (null, null, false);
+                return (null, null, false, null);
             }
 
             if (allRegistryPorts.Count == 0)
@@ -1436,16 +1505,16 @@ namespace MozaPlugin.Protocol
 
             // Per-port registry guard: unclassified → probe, matching → claim,
             // mismatching → caller skips. Shared by AB9 and BaseAndHub branches.
-            bool RegistrySaysSkip(string port, out (string?, string?, bool) decided)
+            bool RegistrySaysSkip(string port, out (string?, string?, bool, string?) decided)
             {
-                decided = (null, null, false);
+                decided = (null, null, false, null);
                 if (!registryByPort.TryGetValue(port, out var info)) return false;
                 string pidStr = FormatPid(info.Pid);
                 if (pidFilter == null || pidFilter(pidStr))
                 {
                     MozaLog.Debug(
                         $"[AZOM] Port {port} already classified by registry as PID={pidStr} ({MozaUsbIds.Describe(info.Pid)}) — claiming without probe");
-                    decided = (port, pidStr, false);
+                    decided = (port, pidStr, false, info.DevicePath);
                     return true;
                 }
                 MozaLog.Debug(
@@ -1464,7 +1533,7 @@ namespace MozaPlugin.Protocol
                 // The multi-device registry path is registry-only by design —
                 // if the registry doesn't see the device we don't probe.
                 MozaLog.Debug("[AZOM] mBooster probe fallback is disabled by design (registry-only discovery)");
-                return (null, null, false);
+                return (null, null, false, null);
             }
 
             if (probeTarget == MozaProbeTarget.Ab9)
@@ -1475,7 +1544,7 @@ namespace MozaPlugin.Protocol
                 // ports are skipped entirely (no base probe written).
                 foreach (var port in ports)
                 {
-                    if (cancel?.Invoke() == true) return (null, null, false);
+                    if (cancel?.Invoke() == true) return (null, null, false, null);
                     if (IsHeldByPeer(port)) continue;
                     if (RegistrySaysSkip(port, out var decided))
                     {
@@ -1495,12 +1564,12 @@ namespace MozaPlugin.Protocol
                     if (ab9Resp)
                     {
                         MozaLog.Info($"[AZOM] Found Moza AB9 shifter on {port} (probe)");
-                        return (port, null, false);
+                        return (port, null, false, null);
                     }
                 }
 
                 MozaLog.DebugIfChanged($"ab9-probe:{laneLabel}", "[AZOM] No AB9 device found on any COM port");
-                return (null, null, false);
+                return (null, null, false, null);
             }
 
             if (probeTarget == MozaProbeTarget.HubOnly)
@@ -1511,7 +1580,7 @@ namespace MozaPlugin.Protocol
                 // and registry-classified non-hub ports via RegistrySaysSkip.
                 foreach (var port in ports)
                 {
-                    if (cancel?.Invoke() == true) return (null, null, false);
+                    if (cancel?.Invoke() == true) return (null, null, false, null);
                     if (IsHeldByPeer(port)) continue;
                     if (RegistrySaysSkip(port, out var decided))
                     {
@@ -1523,12 +1592,12 @@ namespace MozaPlugin.Protocol
                     if (responded)
                     {
                         MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe, dedicated hub connection)");
-                        return (port, null, true);
+                        return (port, null, true, null);
                     }
                 }
 
                 MozaLog.Debug("[AZOM] No Moza hub found on any COM port (dedicated hub connection)");
-                return (null, null, false);
+                return (null, null, false, null);
             }
 
             // BaseAndHub: two-pass probe — bases first, then hubs. v0.7.0 sent both
@@ -1537,7 +1606,7 @@ namespace MozaPlugin.Protocol
             // cycle timing left the base unresponsive after the wrong message hit it.
             foreach (var port in ports)
             {
-                if (cancel?.Invoke() == true) return (null, null, false);
+                if (cancel?.Invoke() == true) return (null, null, false, null);
                 if (IsHeldByPeer(port)) continue;
                 if (RegistrySaysSkip(port, out var decided))
                 {
@@ -1549,14 +1618,14 @@ namespace MozaPlugin.Protocol
                 if (responded)
                 {
                     MozaLog.Info($"[AZOM] Found Moza base on {port} (probe)");
-                    return (port, null, false);
+                    return (port, null, false, null);
                 }
                 if (!reachable) unreachable.Add(port);
             }
 
             foreach (var port in ports)
             {
-                if (cancel?.Invoke() == true) return (null, null, false);
+                if (cancel?.Invoke() == true) return (null, null, false, null);
                 if (unreachable.Contains(port)) continue;
                 if (IsHeldByPeer(port)) continue;
                 // Pass 1 already short-circuited on registry-matching ports
@@ -1568,14 +1637,14 @@ namespace MozaPlugin.Protocol
                 if (responded)
                 {
                     MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe)");
-                    return (port, null, true);
+                    return (port, null, true, null);
                 }
             }
 
             // Drop to Debug — reconnect timer fires every 5s, so Info-level
             // would flood the log when no device is plugged in.
             MozaLog.Debug("[AZOM] No MOZA device found on any COM port");
-            return (null, null, false);
+            return (null, null, false, null);
         }
 
         // ProbeKind, the probe frames, and the open+probe core live in the

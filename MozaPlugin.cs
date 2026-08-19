@@ -1077,6 +1077,11 @@ namespace MozaPlugin
                 // each radar build so a restart is verifiable from the log.
                 MozaLog.Info("[AZOM] BUILD radar-2026-06-29Y: suppress radar/track-map channels (patch/Location*, patch/riN) from the channel mapper UI");
 
+                // Host platform decides the device-discovery source (registry vs
+                // sysfs) and how ports are opened, so record it once per Init —
+                // it is the first thing to check on any Linux detection report.
+                MozaLog.Info($"[AZOM] Host: {Protocol.WineHost.Describe()}");
+
                 MozaLog.WireDebugEnabled = _settings.VerboseWireDebugLog;
 
                 // Bridge-format JSONL wire trace at SimHub/Logs/moza-wire-*.jsonl.
@@ -1229,6 +1234,8 @@ namespace MozaPlugin
                         disableProbeFallback);
                     if (!string.IsNullOrEmpty(_settings.LastWheelbasePort))
                         _connection.LastPortName = _settings.LastWheelbasePort;
+                    if (!string.IsNullOrEmpty(_settings.LastWheelbaseDeviceId))
+                        _connection.LastDeviceId = _settings.LastWheelbaseDeviceId;
                     s_persistentConnection = _connection;
                 }
                 _connection.MessageReceived += OnMessageReceived;
@@ -1239,6 +1246,8 @@ namespace MozaPlugin
                 _ab9Manager = new MozaAb9DeviceManager(disableProbeFallback);
                 if (!string.IsNullOrEmpty(_settings.LastAb9Port))
                     _ab9Manager.Connection.LastPortName = _settings.LastAb9Port;
+                if (!string.IsNullOrEmpty(_settings.LastAb9DeviceId))
+                    _ab9Manager.Connection.LastDeviceId = _settings.LastAb9DeviceId;
                 _ab9Manager.MessageReceived += OnAb9MessageReceived;
 
                 // Dedicated connection for a standalone-USB CM2 (PID 0x0025), so it
@@ -1246,6 +1255,8 @@ namespace MozaPlugin
                 _dashboardManager = new MozaDashboardDeviceManager();
                 if (!string.IsNullOrEmpty(_settings.LastDashboardPort))
                     _dashboardManager.Connection.LastPortName = _settings.LastDashboardPort;
+                if (!string.IsNullOrEmpty(_settings.LastDashboardDeviceId))
+                    _dashboardManager.Connection.LastDeviceId = _settings.LastDashboardDeviceId;
                 _dashboardManager.MessageReceived += OnDashboardMessageReceived;
                 _dashboardManager.Connection.Disconnected += OnDashboardDisconnected;
 
@@ -1258,6 +1269,8 @@ namespace MozaPlugin
                 _hubManager = new MozaHubDeviceManager();
                 if (!string.IsNullOrEmpty(_settings.LastHubPort))
                     _hubManager.Connection.LastPortName = _settings.LastHubPort;
+                if (!string.IsNullOrEmpty(_settings.LastHubDeviceId))
+                    _hubManager.Connection.LastDeviceId = _settings.LastHubDeviceId;
                 _hubManager.MessageReceived += OnHubMessageReceived;
                 _hubManager.Connection.Disconnected += OnHubDisconnected;
 
@@ -1268,6 +1281,8 @@ namespace MozaPlugin
                 _baseManager = new MozaBaseDeviceManager();
                 if (!string.IsNullOrEmpty(_settings.LastBaseAuxPort))
                     _baseManager.Connection.LastPortName = _settings.LastBaseAuxPort;
+                if (!string.IsNullOrEmpty(_settings.LastBaseAuxDeviceId))
+                    _baseManager.Connection.LastDeviceId = _settings.LastBaseAuxDeviceId;
                 _baseManager.MessageReceived += OnBaseMessageReceived;
                 _baseManager.Connection.Disconnected += OnBaseDisconnected;
 
@@ -4254,16 +4269,22 @@ namespace MozaPlugin
             catch { /* never break SimHub's scanner */ }
         }
 
-        // A port is ours when a plugin connection holds it, the registry
-        // classifies it as a MOZA composite (Windows), or it matches one of the
-        // per-lane persisted last-good ports — the only identity available under
-        // Wine/Proton, where the registry walk is empty.
+        // A port is ours when a plugin connection holds it, a device source
+        // classifies it as a MOZA composite, it is the COM name Wine assigned to a
+        // MOZA tty, or it matches one of the per-lane persisted last-good ports.
+        //
+        // The COM-label check is what keeps the veto working under Wine: there the
+        // plugin opens the tty by unix path and never learns a COM name from the
+        // connection, so without it SimHub's own scanner would happily open the
+        // port we are holding (wine ptys have no O_EXCL).
         private string? DescribeMozaPortClaim(string port)
         {
             if (MozaSerialConnection.IsPortHeld(port))
                 return "MOZA (in use)";
             if (MozaPortDiscovery.Instance.TryGetByPort(port, out var info))
                 return $"MOZA {MozaUsbIds.Describe(info.Pid)}";
+            if (Protocol.WineComNameResolver.IsMozaComName(port))
+                return "MOZA (wine device)";
             var s = _settings;
             if (s != null)
             {
@@ -4470,27 +4491,30 @@ namespace MozaPlugin
                 _connectionCoordinator?.MigratePrimaryToHubIfNeeded();
                 _connectionCoordinator?.MigratePrimaryToWheelbaseIfNeeded();
             }
-            // AB9 probe is microseconds when registry is populated.
-            // On Wine/Proton (no registry) the fallback would scan
-            // every wine COM symlink and lock up SimHub; suppress when
-            // registry is empty. DisableAb9Detection wins regardless.
-            bool registryHasMoza =
-                Protocol.MozaPortDiscovery.Instance.Enumerate().Count > 0;
+            // Dedicated lanes run only against an authoritative device source —
+            // the Windows registry, or Linux sysfs under Wine/Proton. Without one
+            // each lane would fall back to a blind sweep of every wine COM
+            // symlink, which locks up SimHub and opens other vendors' hardware.
+            // (This used to test the registry alone, which is always empty on
+            // Wine — it silently disabled every lane below on Linux.)
+            // DisableAb9Detection wins regardless.
+            bool deviceSourceLive =
+                Protocol.MozaPortDiscovery.Instance.IsAuthoritative;
             if (!_settings.DisableAb9Detection
-                && registryHasMoza
+                && deviceSourceLive
                 && !_ab9Manager.IsConnected)
                 _connectionCoordinator?.TryConnectAb9();
 
-            // Standalone-USB CM2 on its own port (0x0025) — same Wine guard.
-            if (registryHasMoza && !_dashboardManager.IsConnected)
+            // Standalone-USB CM2 on its own port (0x0025) — same gate.
+            if (deviceSourceLive && !_dashboardManager.IsConnected)
                 _connectionCoordinator?.TryConnectDashboard();
 
-            // Universal Hub on its own port (0x0020) — registry-only, same
-            // Wine guard. The hub-only case is handled by the primary
+            // Universal Hub on its own port (0x0020) — enumeration-only, same
+            // gate. The hub-only case is handled by the primary
             // (BaseAndHub) connection; this dedicated connection only takes
             // a hub the primary didn't claim (i.e. a base is the primary),
             // and no-ops when the hub port is already held by the primary.
-            if (registryHasMoza && !_hubManager.IsConnected)
+            if (deviceSourceLive && !_hubManager.IsConnected)
                 _connectionCoordinator?.TryConnectHub();
 
             // Dedicated base-aux pipe — ONLY after a DELIBERATE base→hub
@@ -4503,7 +4527,7 @@ namespace MozaPlugin
             // the primary stuck on the hub (wheel still works via the hub,
             // but the port is mislabeled "Wheelbase"). The latch is set only
             // by a real migration, so a transient hub latch never trips it.
-            if (registryHasMoza && _connectionCoordinator?.WheellessBasePort != null && !_baseManager.IsConnected)
+            if (deviceSourceLive && _connectionCoordinator?.WheellessBasePort != null && !_baseManager.IsConnected)
                 _connectionCoordinator?.TryConnectBase();
 
             // Slice I: reconnect-timer mBooster Refresh re-enabled.
@@ -4514,9 +4538,9 @@ namespace MozaPlugin
             try { NudgeRoutedMBoosterProbes(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe nudge: {ex.Message}"); }
 
-            // Standalone pedals/handbrake on their own ports (registry-
-            // only, same Wine guard as the other dedicated lanes).
-            if (registryHasMoza)
+            // Standalone pedals/handbrake on their own ports (enumeration-
+            // only, same device-source gate as the other dedicated lanes).
+            if (deviceSourceLive)
             {
                 try { _peripheralRegistry?.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral refresh: {ex.Message}"); }

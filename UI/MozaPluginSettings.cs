@@ -141,6 +141,18 @@ namespace MozaPlugin
         // Port the dedicated base-aux pipe last bound (broken base + wheel on hub).
         public string LastBaseAuxPort { get; set; } = "";
 
+        // Durable device identity per lane (VID:PID:serial — see
+        // MozaPortDiscovery.DurableId), saved alongside the port name and tried
+        // first on reconnect. A port name only holds until the device is replugged
+        // somewhere else; this holds across that, which is what makes reconnect
+        // deterministic under Wine/Proton where tty numbering moves. Empty = none
+        // saved yet.
+        public string LastWheelbaseDeviceId { get; set; } = "";
+        public string LastAb9DeviceId { get; set; } = "";
+        public string LastDashboardDeviceId { get; set; } = "";
+        public string LastHubDeviceId { get; set; } = "";
+        public string LastBaseAuxDeviceId { get; set; } = "";
+
         // Hard opt-out of the serial-probe fallback. Default behaviour
         // (false) is registry-first: if the registry-based MOZA USB
         // discovery returns matching ports, those are used and no probe

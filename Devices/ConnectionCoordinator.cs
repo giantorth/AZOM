@@ -101,6 +101,21 @@ namespace MozaPlugin.Devices
             && (MozaUsbIds.IsHubPid(_connection.DiscoveredPid)
                 || (_connection.DiscoveredPid == null && _connection.HubProbeSucceeded));
 
+        /// <summary>
+        /// Save a lane's durable device identity beside its port name. Called on
+        /// both the success and the stale-clear path of every lane: the connection
+        /// nulls its id together with its port name, so one unconditional call
+        /// keeps the two in step. Preferred over the port name on reconnect,
+        /// because the port name only holds until the device is replugged.
+        /// </summary>
+        private void PersistDeviceId(MozaSerialConnection conn, Func<string> get, Action<string> set)
+        {
+            string id = conn.LastDeviceId ?? "";
+            if (get() == id) return;
+            set(id);
+            _plugin.ScheduleSave();
+        }
+
         internal void TryConnect()
         {
             if (Interlocked.CompareExchange(ref _connectingFlag, 1, 0) != 0)
@@ -165,6 +180,9 @@ namespace MozaPlugin.Devices
                     _plugin.Settings.LastWheelbasePort = "";
                     _plugin.ScheduleSave();
                 }
+                PersistDeviceId(_connection,
+                    () => _plugin.Settings.LastWheelbaseDeviceId,
+                    v => _plugin.Settings.LastWheelbaseDeviceId = v);
             }
             finally
             {
@@ -250,6 +268,9 @@ namespace MozaPlugin.Devices
                 _plugin.Settings.LastAb9Port = "";
                 _plugin.ScheduleSave();
             }
+            PersistDeviceId(_ab9Manager.Connection,
+                () => _plugin.Settings.LastAb9DeviceId,
+                v => _plugin.Settings.LastAb9DeviceId = v);
         }
 
         /// <summary>Open the standalone CM2's dedicated port (PID 0x0025) and, on the
@@ -275,6 +296,9 @@ namespace MozaPlugin.Devices
                 _plugin.Settings.LastDashboardPort = "";
                 _plugin.ScheduleSave();
             }
+            PersistDeviceId(_dashboardManager.Connection,
+                () => _plugin.Settings.LastDashboardDeviceId,
+                v => _plugin.Settings.LastDashboardDeviceId = v);
         }
 
         /// <summary>
@@ -303,6 +327,9 @@ namespace MozaPlugin.Devices
                 _plugin.Settings.LastHubPort = "";
                 _plugin.ScheduleSave();
             }
+            PersistDeviceId(_hubManager.Connection,
+                () => _plugin.Settings.LastHubDeviceId,
+                v => _plugin.Settings.LastHubDeviceId = v);
         }
 
         /// <summary>
@@ -332,6 +359,9 @@ namespace MozaPlugin.Devices
                 _plugin.Settings.LastBaseAuxPort = "";
                 _plugin.ScheduleSave();
             }
+            PersistDeviceId(_baseManager.Connection,
+                () => _plugin.Settings.LastBaseAuxDeviceId,
+                v => _plugin.Settings.LastBaseAuxDeviceId = v);
         }
 
         /// <summary>Clear all base→hub migration state — the grace-window stamp,
@@ -384,9 +414,11 @@ namespace MozaPlugin.Devices
                 return;
             }
 
-            // Registry must categorize ports (real-HW Windows). Empty = Wine/Proton.
+            // Needs a source that categorizes ports by PID — the Windows registry
+            // or sysfs under Wine/Proton. Without one there is nothing to migrate
+            // between, so leave the probe path alone.
             var ports = MozaPortDiscovery.Instance.Enumerate();
-            if (ports.Count == 0) return;
+            if (!MozaPortDiscovery.Instance.IsAuthoritative) return;
 
             // Arm/measure the grace window: the base must sit wheel-less for
             // BaseWheelGraceMs before we consider it broken. Stamp on first sight.
@@ -402,15 +434,20 @@ namespace MozaPlugin.Devices
             // dedicated hub manager — free it first (mirrors how the wheelbase
             // migration frees the hub at the symmetric site).
             string? hubPort = null;
+            string hubDeviceId = "";
             foreach (var p in ports)
             {
                 if (p.Category != MozaDeviceCategory.Hub) continue;
                 hubPort = p.PortName;
+                hubDeviceId = MozaPortDiscovery.DurableId(p);
                 break;
             }
             if (hubPort == null) return;
 
             string basePort = _connection.LastPortName ?? "";
+            // The primary is still on the base here, so its durable id IS the
+            // base's — hand it to the pipe that inherits the base.
+            string baseDeviceId = _connection.LastDeviceId ?? "";
 
             MozaLog.Info(
                 $"[AZOM] Base on {basePort} (PID={_connection.DiscoveredPid}) has no wheel but " +
@@ -431,6 +468,8 @@ namespace MozaPlugin.Devices
             _wheellessBasePort = string.IsNullOrEmpty(basePort) ? null : basePort;
             if (!string.IsNullOrEmpty(basePort))
                 _baseManager.Connection.LastPortName = basePort;
+            if (!string.IsNullOrEmpty(baseDeviceId))
+                _baseManager.Connection.LastDeviceId = baseDeviceId;
 
             // Point the primary directly at the hub port and rebind. The primary's
             // PID filter accepts the hub PID (same as the hub-only case), so the
@@ -439,6 +478,7 @@ namespace MozaPlugin.Devices
             // it self-heals via MigratePrimaryToWheelbase if the base is fixed.
             _connection.Disconnect();
             _connection.LastPortName = hubPort;
+            _connection.LastDeviceId = string.IsNullOrEmpty(hubDeviceId) ? null : hubDeviceId;
 
             // The base is no longer the primary's device; its detection + ownership
             // must re-land on the base-aux pipe. Clear base flags so the base-aux
@@ -483,10 +523,11 @@ namespace MozaPlugin.Devices
             if (MozaPlugin.IsShuttingDown) return;
             if (_connection == null || !_connection.IsConnected) return;
 
-            // Only meaningful when the registry can categorize ports (real-HW
-            // Windows). Empty registry = Wine/Proton → leave the probe path alone.
+            // Only meaningful when a source can categorize ports by PID — the
+            // Windows registry or sysfs under Wine/Proton. Neither → leave the
+            // probe path alone.
             var ports = MozaPortDiscovery.Instance.Enumerate();
-            if (ports.Count == 0) return;
+            if (!MozaPortDiscovery.Instance.IsAuthoritative) return;
 
             // Already on a wheelbase → correctly bound, nothing to do.
             if (MozaUsbIds.Categorize(_connection.DiscoveredPid) == MozaDeviceCategory.Wheelbase)
@@ -535,9 +576,12 @@ namespace MozaPlugin.Devices
             // can't immediately re-grab the hub. FindMozaPort's wheel-location
             // rule then selects the wheelbase.
             _connection.LastPortName = null;
-            if (!string.IsNullOrEmpty(_plugin.Settings.LastWheelbasePort))
+            _connection.LastDeviceId = null;
+            if (!string.IsNullOrEmpty(_plugin.Settings.LastWheelbasePort)
+                || !string.IsNullOrEmpty(_plugin.Settings.LastWheelbaseDeviceId))
             {
                 _plugin.Settings.LastWheelbasePort = "";
+                _plugin.Settings.LastWheelbaseDeviceId = "";
                 _plugin.ScheduleSave();
             }
 
