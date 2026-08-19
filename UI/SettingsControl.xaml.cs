@@ -145,9 +145,26 @@ namespace MozaPlugin
             // WPF can fire Loaded more than once if the control is reparented
             // (SimHub's tab containers do this during settings-panel layout).
             // Calling Start() twice would double the tick rate.
+            bool wasRunning = _refreshTimer.IsEnabled;
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
             if (!_steeringAngleTimer.IsEnabled) _steeringAngleTimer.Start();
             if (_bandwidthTimer != null && !_bandwidthTimer.IsEnabled) _bandwidthTimer.Start();
+
+            // A genuine (re)load — not just a redundant Loaded firing while
+            // everything's already running — means this control's timers were
+            // stopped (OnUnloadedStopTimers) for however long it was off-screen
+            // (navigated away to another plugin's page, or the settings window
+            // was closed). RefreshMBoosterTab never ran during that window, so
+            // if the active SimHub profile changed while this page was hidden,
+            // waiting for _refreshTimer's first post-reload tick would show up
+            // to 500ms of the PREVIOUS profile's mBooster values the instant the
+            // tab becomes visible again. Force one immediate, synchronous
+            // reseed instead of waiting for that first tick.
+            if (!wasRunning)
+            {
+                _mboosterUiSeeded = false;
+                RefreshMBoosterTab();
+            }
         }
 
         private void OnUnloadedStopTimers(object sender, RoutedEventArgs e)
@@ -2936,6 +2953,26 @@ namespace MozaPlugin
             // instead of here — this 500ms pass felt sluggish for direct
             // pedal feedback.
 
+            // Resynced on EVERY pass, not gated by the seed-once latch below —
+            // both depend on state that can resolve strictly AFTER the tab's
+            // first seed: the pedal's Role may still be sitting on a fresh,
+            // Disabled-default MBoosterDeviceSettings if this first seed raced
+            // OnMBoosterSerialResolved (which migrates the real saved settings
+            // in under the device's serial key, asynchronously, once the
+            // serial has actually been read back over the wire — see
+            // MozaPlugin.GetOrCreateMBoosterSettings/OnMBoosterSerialResolved);
+            // AxisTypes (passive-pedal detection) similarly only populates once
+            // the 0x0E diagnostic arrives. Neither call bumps _mboosterUiSeeded
+            // above, and re-selecting the identity string never changes once
+            // that race resolves, so gating these behind the seed-once latch
+            // left a pedal that's genuinely Brake (or genuinely active)
+            // permanently showing as if it weren't, from first tab-open until
+            // the user forced a reseed some other way (switching pedals/
+            // profiles). Cheap, idempotent Visibility pushes — safe every tick,
+            // same reasoning as the per-row Role/IsSelected resync above.
+            UpdateMBoosterEffectPassiveState();
+            UpdateMBoosterConfigVisibilityForRole();
+
             // Re-seed when the active profile or the selected device changed
             // since the last seed — otherwise the gate below keeps the
             // previously-seeded values on screen while edits write to the
@@ -2960,8 +2997,6 @@ namespace MozaPlugin
                 // settled on. (Test toggles are never persisted;
                 // SeedMBoosterEffectControls always clears them.)
                 SeedMBoosterEffectControls(PeekMBoosterEffectTarget());
-                UpdateMBoosterEffectPassiveState();
-                UpdateMBoosterConfigVisibilityForRole();
                 MBoosterBrakeFadeEnable.IsChecked = s.BrakeFade?.Enabled ?? false;
                 MBoosterBrakeFadeOnsetSlider.Value = s.BrakeFade?.BrakeFadeOnsetC ?? 550;
                 SetValueText(MBoosterBrakeFadeOnsetValue, MBoosterBrakeFadeOnsetSlider.Value.ToString("F0"));
