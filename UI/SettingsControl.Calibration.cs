@@ -21,6 +21,7 @@ using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI
 {
@@ -105,7 +106,7 @@ namespace MozaPlugin.UI
             // right pedal. Coalesced rather than live-per-node now: these are
             // flash-backed registers and a node drag fires per pixel — the
             // device sees the settled shape ~400ms after the drag stops.
-            var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(s.CurveX, s.CurveY);
+            var resampled = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(s.CurveX, s.CurveY);
             QueueMBoosterCalibPush($"curve-{prefix}", (c, dev) =>
             {
                 for (int i = 0; i < 5; i++)
@@ -121,10 +122,10 @@ namespace MozaPlugin.UI
             var c = CurrentMBoosterController();
             if (s == null || c == null) return null;
             int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
-            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, _mboosterEffectPedalIndex, axisCount);
-            return role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? "throttle"
-                 : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? "brake"
-                 : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? "clutch" : null;
+            var role = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(s, _mboosterEffectPedalIndex, axisCount);
+            return role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? "throttle"
+                 : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? "brake"
+                 : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? "clutch" : null;
         }
 
         private void MBoosterY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterY1Value, "", v => SetMBoosterCurveY(0, v));
@@ -231,14 +232,14 @@ namespace MozaPlugin.UI
         /// these to the wrong physical pedal. Falls back to the axis device
         /// until the map resolves. (Direction/Min/Max/output-curve stay on the
         /// host 0x12, which aggregates the output mapping.)</summary>
-        private static byte MBoosterCalibDevice(global::MozaPlugin.Devices.MBoosterDeviceController? controller, int axisIndex)
+        private static byte MBoosterCalibDevice(global::MozaPlugin.Devices.MBooster.MBoosterDeviceController? controller, int axisIndex)
         {
             if (controller == null) return global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
             int axisCount = controller.AxisCount > 0 ? controller.AxisCount : 1;
-            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(controller.CurrentSettings, axisIndex, axisCount);
-            int roleIdx = role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? 0
-                        : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? 1
-                        : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
+            var role = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(controller.CurrentSettings, axisIndex, axisCount);
+            int roleIdx = role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? 0
+                        : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? 1
+                        : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? 2 : -1;
             return controller.MotorDeviceForRole(roleIdx, axisIndex);
         }
 

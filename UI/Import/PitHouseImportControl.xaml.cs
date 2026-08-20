@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using MozaPlugin.Devices;
 using MozaPlugin.Resources;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI.Import
 {

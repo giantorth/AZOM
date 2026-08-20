@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.MBooster
 {
     /// <summary>
     /// Shared bounds for the Pedal Feel "Start/End of Travel (mm)" range

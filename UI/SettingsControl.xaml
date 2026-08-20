@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              xmlns:ctrl="clr-namespace:MozaControls"
-             xmlns:devices="clr-namespace:MozaPlugin.Devices"
+             xmlns:mbooster="clr-namespace:MozaPlugin.Devices.MBooster"
              xmlns:ui="clr-namespace:MozaPlugin.UI"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
              Padding="0"
@@ -2054,20 +2054,20 @@
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
-                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
-                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
-                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
-                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
-                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  Divider1Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampPressedPlot_ValuesChanged"/>
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingReleased}" Style="{StaticResource SectionTitleText}" Margin="0,16,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampReleasedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
-                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
-                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
-                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
-                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
-                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  Divider1Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampReleasedPlot_ValuesChanged"/>
                                 </StackPanel>
                             </ctrl:SectionCard>

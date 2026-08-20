@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.MBooster
 {
     /// <summary>
     /// Owns the lifecycle of one Moza mBooster Pedals unit on its own COM port:

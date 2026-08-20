@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.MBooster
 {
     /// <summary>
     /// 50 Hz motor-frame producer + 500 ms keepalive for one mBooster device.

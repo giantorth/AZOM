@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.MBooster
 {
     /// <summary>
     /// Per-effect waveform synthesis for the Moza mBooster vibration motor.

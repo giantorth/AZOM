@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.MBooster
 {
     /// <summary>
     /// Multi-device owner for Moza mBooster Pedals (PID <c>0x0008</c>).

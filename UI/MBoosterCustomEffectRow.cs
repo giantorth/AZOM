@@ -5,6 +5,7 @@ using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
 using SimHub.Plugins.OutputPlugins.Dash.GLCDTemplating;
 using SimHub.Plugins.OutputPlugins.Dash.TemplatingCommon;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI
 {

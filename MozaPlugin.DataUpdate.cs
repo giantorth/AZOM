@@ -23,6 +23,7 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin
 {

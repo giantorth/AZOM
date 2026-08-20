@@ -26,6 +26,7 @@ using Timer = System.Timers.Timer;
 using MozaPlugin.Telemetry.Display;
 using MozaPlugin.UI;
 using MozaPlugin.Integration;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin
 {

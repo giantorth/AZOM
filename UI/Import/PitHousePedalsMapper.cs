@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI.Import
 {

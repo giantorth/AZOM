@@ -21,6 +21,7 @@ using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI
 {
@@ -193,7 +194,7 @@ namespace MozaPlugin.UI
                             // all 3 GenericDesktop axes even with only one pedal
                             // plugged in, so raw axisCount would silently override
                             // that pedal's own Role with the axis-order default.
-                            var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, connectedAxes.Count);
+                            var role = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, axis, connectedAxes.Count);
                             bool isSelected = string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                                 && axis == _mboosterEffectPedalIndex;
                             _mboosterDeviceRows.Add(new MBoosterDeviceRow(c.Identity, axis, label, isSelected, role,
@@ -214,7 +215,7 @@ namespace MozaPlugin.UI
                         if (rowController != null)
                             for (int axis = 0; axis < axisCount; axis++)
                                 if (rowController.IsAxisConnected(axis)) connectedAxisCount++;
-                        row.RoleIndex = (int)global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, connectedAxisCount);
+                        row.RoleIndex = (int)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, connectedAxisCount);
                         row.IsSelected = string.Equals(row.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                             && row.AxisIndex == _mboosterEffectPedalIndex;
                         // DisplayName is per-profile like every other mBooster
@@ -350,7 +351,7 @@ namespace MozaPlugin.UI
             {
                 var seeded = new MBoosterRole[axisCount];
                 for (int i = 0; i < axisCount; i++)
-                    seeded[i] = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, i, axisCount);
+                    seeded[i] = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(s, i, axisCount);
                 s.AxisRoles = roles = seeded;
             }
             if (axisIndex >= 0 && axisIndex < roles.Length)

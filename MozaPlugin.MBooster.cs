@@ -23,6 +23,7 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin
 {
@@ -311,7 +312,7 @@ namespace MozaPlugin
             for (int a = 0; a < roles.Length; a++)
             {
                 bool aConnected = a < connected.Length && connected[a];
-                if (aConnected || roles[a] == global::MozaPlugin.Devices.MBoosterRole.Disabled) continue;
+                if (aConnected || roles[a] == global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled) continue;
                 for (int b = 0; b < roles.Length; b++)
                 {
                     if (b == a || roles[b] != roles[a]) continue;
@@ -321,7 +322,7 @@ namespace MozaPlugin
                             $"[AZOM/mBooster] {shortId}: cleared stale '{roles[a]}' role from axis {a} " +
                             $"in profile '{profileName}' — the device reports no pedal wired there and " +
                             $"the wired pedal on axis {b} holds that role");
-                        roles[a] = global::MozaPlugin.Devices.MBoosterRole.Disabled;
+                        roles[a] = global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled;
                         changed = true;
                         break;
                     }

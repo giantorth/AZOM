@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.Hardware
 {
@@ -45,21 +46,21 @@ namespace MozaPlugin.Hardware
             // MBoosterDeviceController.SoleConnectedAxis.
             var connectedAxes = controller.ConnectedAxes;
             int soleAxis = controller.SoleConnectedAxis();
-            for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBoosterDeviceController.MaxAxes; axis++)
+            for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBooster.MBoosterDeviceController.MaxAxes; axis++)
             {
                 if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
                     continue;
-                var role = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResolveAxisRole(s, axis, axisCount);
+                var role = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(s, axis, axisCount);
                 string? prefix =
-                    role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? "throttle"
-                    : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? "brake"
-                    : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? "clutch"
+                    role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? "throttle"
+                    : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? "brake"
+                    : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? "clutch"
                     : null;
                 if (prefix == null) continue;
 
                 // This pedal's full config: master flat fields (axis 0) or its
                 // per-pedal entry. An unconfigured chained pedal writes nothing.
-                global::MozaPlugin.Devices.IMBoosterPedalConfig cfg;
+                global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig cfg;
                 if (axis == 0) cfg = s;
                 else if (s.Pedals != null && s.Pedals.TryGetValue(axis, out var p) && p != null) cfg = p;
                 else if (axis == soleAxis) cfg = s;
@@ -77,9 +78,9 @@ namespace MozaPlugin.Hardware
                 // doesn't match the HID axis order, so an axis-index device
                 // sends these writes to the wrong physical pedal. Falls back to
                 // the axis mapping (0x12 for a standalone) until the map resolves.
-                int roleIdx = role == global::MozaPlugin.Devices.MBoosterRole.Throttle ? 0
-                            : role == global::MozaPlugin.Devices.MBoosterRole.Brake ? 1
-                            : role == global::MozaPlugin.Devices.MBoosterRole.Clutch ? 2 : -1;
+                int roleIdx = role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? 0
+                            : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? 1
+                            : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? 2 : -1;
                 byte dev = controller.MotorDeviceForRole(roleIdx, axis);
 
                 if (cfg.Direction >= 0) { controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev); wroteAnyCalibration = true; }
@@ -92,7 +93,7 @@ namespace MozaPlugin.Hardware
                     // CurveX has been horizontally dragged (see
                     // MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints) —
                     // identity when it hasn't.
-                    var resampled = global::MozaPlugin.Devices.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(cfg.CurveX, cfg.CurveY);
+                    var resampled = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints(cfg.CurveX, cfg.CurveY);
                     for (int k = 0; k < 5; k++)
                         controller.SendFloatWrite($"mbooster-{prefix}-y{k + 1}", resampled[k], dev);
                 }
@@ -153,12 +154,12 @@ namespace MozaPlugin.Hardware
                     || sd.Divider1Released >= 0 || sd.Divider2Released >= 0
                     || sd.Seg1Released >= 0 || sd.Seg2Released >= 0 || sd.Seg3Released >= 0))
                 {
-                    var c = global::MozaPlugin.Devices.MBoosterUiConstants.SegDampSegDefaultPct;
+                    var c = global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SegDampSegDefaultPct;
                     var frame = global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
-                        sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
-                        sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
-                        sd.Divider1Released >= 0 ? sd.Divider1Released : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
-                        sd.Divider2Released >= 0 ? sd.Divider2Released : global::MozaPlugin.Devices.MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
+                        sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
+                        sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
+                        sd.Divider1Released >= 0 ? sd.Divider1Released : global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
+                        sd.Divider2Released >= 0 ? sd.Divider2Released : global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
                         sd.Seg1Pressed >= 0 ? sd.Seg1Pressed : c,
                         sd.Seg1Released >= 0 ? sd.Seg1Released : c,
                         sd.Seg2Pressed >= 0 ? sd.Seg2Pressed : c,
@@ -169,7 +170,7 @@ namespace MozaPlugin.Hardware
                     controller.SendOneShot(frame);
                     wroteAnyCalibration = true;
                 }
-                if (role == global::MozaPlugin.Devices.MBoosterRole.Brake)
+                if (role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0)
                     {

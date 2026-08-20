@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using MozaPlugin.Devices;
 using Newtonsoft.Json;
 using SimHub.Plugins.ProfilesCommon;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.Settings
 {

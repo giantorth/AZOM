@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI
 {
@@ -299,7 +300,7 @@ namespace MozaPlugin.UI
         /// this is the only place a bundle records what the user configured.
         /// </summary>
         private static void AppendMBoosterPedalConfig(
-            StringBuilder sb, MBoosterDeviceController d, Devices.MBoosterDeviceSettings? s)
+            StringBuilder sb, MBoosterDeviceController d, Devices.MBooster.MBoosterDeviceSettings? s)
         {
             var types = d.AxisTypes;
             sb.AppendLine(

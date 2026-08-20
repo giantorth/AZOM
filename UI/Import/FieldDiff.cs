@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI.Import
 {
