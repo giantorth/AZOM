@@ -24,6 +24,7 @@ using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
 using MozaPlugin.Telemetry.Display;
+using MozaPlugin.UI;
 
 namespace MozaPlugin
 {
@@ -154,10 +155,10 @@ namespace MozaPlugin
         // graph's existing staircase without adding real resolution.
         private const int TempHistorySamples = 600;
         private const int TempHistoryIntervalMs = 500;
-        private readonly Diagnostics.TemperatureHistory _tempHistory =
-            new Diagnostics.TemperatureHistory(TempHistorySamples);
+        private readonly UI.TemperatureHistory _tempHistory =
+            new UI.TemperatureHistory(TempHistorySamples);
         private Timer _tempHistoryTimer = null!;
-        internal Diagnostics.TemperatureHistory TemperatureHistory => _tempHistory;
+        internal UI.TemperatureHistory TemperatureHistory => _tempHistory;
         // CAS re-entry guard: a 5 s reconnect tick can outlast its interval
         // (probe fallback ~600 ms/port under Wine, Disconnect joins at 1 s) —
         // overlapping ticks must not run TryConnect* concurrently on a lane.

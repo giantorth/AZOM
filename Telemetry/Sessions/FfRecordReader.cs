@@ -1,4 +1,4 @@
-namespace MozaPlugin.Protocol
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Inbound counterpart to <see cref="SessionPropertyPushBuilder.WrapFfRecord"/>:

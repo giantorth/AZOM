@@ -4,6 +4,7 @@ using System.Threading;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.TestMode;
+using MozaPlugin.Telemetry;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -29,7 +30,7 @@ namespace MozaPlugin.Telemetry.Frames
         private int _tierDefBlindSentRounds;
         private int _tierDefBlindLastTickCount;
         private static int TierDefBlindMaxRounds
-            => global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs.Length;
+            => global::MozaPlugin.Telemetry.RetryBackoff.TierDefBlindMs.Length;
 
         // Tier-def binding completeness (last emission). Channels whose URL
         // isn't in the wheel's catalog get chIndex=0 → wheel can't bind them.
@@ -673,7 +674,7 @@ namespace MozaPlugin.Telemetry.Frames
                 _tierDefBlindFrames = null;
                 return;
             }
-            var schedule = global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs;
+            var schedule = global::MozaPlugin.Telemetry.RetryBackoff.TierDefBlindMs;
             int gateMs = schedule[Math.Min(_tierDefBlindSentRounds, schedule.Length - 1)];
             if (Environment.TickCount - _tierDefBlindLastTickCount < gateMs) return;
 

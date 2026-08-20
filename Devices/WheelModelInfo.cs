@@ -122,7 +122,7 @@ namespace MozaPlugin.Devices
         /// the rim turns. When <c>true</c>, the plugin exposes the rotation-mode
         /// control (off / smooth / immediate) and pushes the mode via the
         /// session-0x02 FF property record (<c>kind=5</c>,
-        /// <see cref="Protocol.SessionPropertyPushBuilder.KindDashDisplayRotation"/>).
+        /// <see cref="Sessions.SessionPropertyPushBuilder.KindDashDisplayRotation"/>).
         /// Only the VGS (Vision GS) is known to have the sensor; other display
         /// wheels ignore the push. Default <c>false</c>; flip to <c>true</c> on any
         /// model confirmed to carry the rotation IMU.

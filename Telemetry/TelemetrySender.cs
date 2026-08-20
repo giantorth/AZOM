@@ -196,8 +196,8 @@ namespace MozaPlugin.Telemetry
 
         // Per-chunk retransmit until fc:00 ack drains the queue.
         // See docs/protocol/sessions/chunk-format.md.
-        private readonly global::MozaPlugin.Diagnostics.SessionRetransmitter _retransmitter
-            = new global::MozaPlugin.Diagnostics.SessionRetransmitter();
+        private readonly global::MozaPlugin.Telemetry.Sessions.SessionRetransmitter _retransmitter
+            = new global::MozaPlugin.Telemetry.Sessions.SessionRetransmitter();
 
         // Property-push coalescing moved to PropertyPushQueue.
 

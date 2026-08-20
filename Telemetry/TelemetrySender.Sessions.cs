@@ -94,7 +94,7 @@ namespace MozaPlugin.Telemetry
             get => _session01OutboundSeq;
             set => _session01OutboundSeq = value;
         }
-        internal global::MozaPlugin.Diagnostics.SessionRetransmitter Retransmitter => _retransmitter;
+        internal global::MozaPlugin.Telemetry.Sessions.SessionRetransmitter Retransmitter => _retransmitter;
         internal void SendAndTrackChunkInternal(byte[] frame) => SendAndTrackChunk(frame);
         internal MultiStreamProfile? ProfileRef => _profile;
 
@@ -294,11 +294,11 @@ namespace MozaPlugin.Telemetry
         {
             if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
 
-            byte[] init2 = global::MozaPlugin.Protocol.SessionPropertyPushBuilder
+            byte[] init2 = global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder
                 .BuildSessionInitField2Body();
             _propertyPushQueue.SendBody(init2);
 
-            byte[] init7 = global::MozaPlugin.Protocol.SessionPropertyPushBuilder
+            byte[] init7 = global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder
                 .BuildSessionInitField7Body();
             _propertyPushQueue.SendBody(init7);
 
@@ -399,7 +399,7 @@ namespace MozaPlugin.Telemetry
             if (minutes < 1) minutes = 1;
             ulong ms = (ulong)minutes * 60_000UL;
             SendSessionPropertyU64(
-                global::MozaPlugin.Protocol.SessionPropertyPushBuilder.KindDashStandbyMs,
+                global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder.KindDashStandbyMs,
                 ms);
         }
 
@@ -418,7 +418,7 @@ namespace MozaPlugin.Telemetry
             if (mode < 0) mode = 0;
             if (mode > 2) mode = 2;
             SendSessionPropertyU8(
-                global::MozaPlugin.Protocol.SessionPropertyPushBuilder.KindDashDisplayRotation,
+                global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder.KindDashDisplayRotation,
                 (byte)mode);
         }
 

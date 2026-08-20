@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin.Diagnostics
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Thread-safe rolling history of wheelbase temperatures (MCU / MOSFET /

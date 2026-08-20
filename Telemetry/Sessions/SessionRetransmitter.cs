@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace MozaPlugin.Diagnostics
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Reliable-stream retransmit queue for SerialStream session-data chunks

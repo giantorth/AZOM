@@ -111,7 +111,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
             SendSessionPropertyU32(
-                global::MozaPlugin.Protocol.SessionPropertyPushBuilder.KindDashBrightness,
+                global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder.KindDashBrightness,
                 (uint)percent);
         }
 
@@ -152,7 +152,7 @@ namespace MozaPlugin.Telemetry
                 return false;
             }
 
-            byte[] body = global::MozaPlugin.Protocol.SessionPropertyPushBuilder
+            byte[] body = global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder
                 .BuildDashboardSwitchBody(slotIndex);
             _propertyPushQueue.SendBody(body);
             // Arm the UI cooldown (IsInSilenceCooldown) and the

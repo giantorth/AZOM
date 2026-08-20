@@ -1,4 +1,4 @@
-namespace MozaPlugin.Protocol
+namespace MozaPlugin.Telemetry
 {
     /// <summary>
     /// Retry-backoff schedules for the telemetry pipeline. Centralised so

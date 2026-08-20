@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin.Protocol
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Session-0x01 host→wheel property push records (ff-tagged format):
