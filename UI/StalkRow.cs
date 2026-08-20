@@ -4,7 +4,7 @@ using System.ComponentModel;
 using MozaPlugin.Devices.StalksTruckSim;
 using MozaPlugin.Resources;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// One selectable assignment in the Stalks truck-sim button-map editor: an

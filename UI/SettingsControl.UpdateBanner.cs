@@ -11,7 +11,7 @@ using MozaPlugin.Resources;
 using MozaPlugin.UI;
 using MozaPlugin.UI.UpdateCheck;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl that owns the in-plugin
     // update-notification surface: the "update available" banner inside the

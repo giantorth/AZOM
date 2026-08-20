@@ -1,4 +1,4 @@
-<Window x:Class="MozaPlugin.ColorPickerDialog"
+<Window x:Class="MozaPlugin.UI.ColorPickerDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctrl="clr-namespace:MozaControls"

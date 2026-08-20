@@ -6,7 +6,7 @@ using System.Windows.Shapes;
 using MozaPlugin.Devices;
 using MozaPlugin.Resources;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Settings tabs for the passive HGP (H-pattern) and SGP (sequential) shifters.

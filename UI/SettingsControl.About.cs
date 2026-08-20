@@ -22,7 +22,7 @@ using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     public partial class SettingsControl : UserControl
     {

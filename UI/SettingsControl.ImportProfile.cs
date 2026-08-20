@@ -1,7 +1,7 @@
 using System;
 using MozaPlugin.UI.Import;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Partial-class continuation of <see cref="SettingsControl"/> that holds

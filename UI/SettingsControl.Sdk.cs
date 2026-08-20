@@ -11,7 +11,7 @@ using MozaPlugin.Sdk;
 using MozaPlugin.Sdk.Coap;
 using MozaPlugin.Resources;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl that holds wiring for the
     // CoAP tab. Stream 7 is now live — the Recent Requests list pulls from

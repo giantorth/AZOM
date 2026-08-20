@@ -13,7 +13,7 @@ using MozaPlugin.Resources;
 using MozaPlugin.UI;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl that holds wiring for the
     // 2026-05 redesign (new top bar, status bar, SectionCard-wrapped sections,
