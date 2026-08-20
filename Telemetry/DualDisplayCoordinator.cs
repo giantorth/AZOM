@@ -1,6 +1,7 @@
 using System;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Telemetry
 {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Extensions
 {
     /// <summary>
     /// Wheel-specific settings stored in SimHub device profiles.

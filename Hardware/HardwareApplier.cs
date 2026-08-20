@@ -2,6 +2,7 @@ using System;
 using MozaPlugin.Devices;
 using MozaPlugin.Settings;
 using MozaPlugin.Devices.Led;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Hardware
 {

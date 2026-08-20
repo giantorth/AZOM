@@ -22,6 +22,7 @@ using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
 using MozaPlugin.Settings;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.UI
 {

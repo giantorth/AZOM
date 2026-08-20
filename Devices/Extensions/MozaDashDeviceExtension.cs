@@ -10,7 +10,7 @@ using SimHub.Plugins.Devices.DeviceExtensions;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using MozaPlugin.Devices.Led;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Extensions
 {
     /// <summary>
     /// SimHub device extension for MOZA Dashboard.

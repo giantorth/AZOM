@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using MozaPlugin.Protocol;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Devices
 {

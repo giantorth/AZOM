@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using SimHub.Plugins.Devices;
 using SimHub.Plugins.Devices.DeviceExtensions;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Extensions
 {
     /// <summary>
     /// Tells SimHub to attach MozaWheelDeviceExtension to MOZA wheel devices.

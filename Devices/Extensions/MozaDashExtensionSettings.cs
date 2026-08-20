@@ -1,7 +1,7 @@
 using System;
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Extensions
 {
     /// <summary>
     /// Dashboard-specific settings stored in SimHub device profiles.

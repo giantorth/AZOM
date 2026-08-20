@@ -25,6 +25,7 @@ using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
 using MozaPlugin.Integration;
 using MozaPlugin.Devices.MBooster;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin
 {

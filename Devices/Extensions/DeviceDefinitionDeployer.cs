@@ -7,7 +7,7 @@ using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using Newtonsoft.Json.Linq;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Extensions
 {
     /// <summary>
     /// Writes SimHub device definitions (<c>device.json</c>) into

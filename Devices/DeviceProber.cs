@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Devices
 {

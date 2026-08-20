@@ -1,6 +1,6 @@
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Extensions
 {
     /// <summary>
     /// Wheel-base ambient LED settings stored in SimHub device profiles.
