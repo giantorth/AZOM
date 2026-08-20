@@ -10,8 +10,8 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
 using MozaPlugin.Telemetry.TestMode;
 using MozaPlugin.Telemetry.TileServer;
-using MozaPlugin.Telemetry.Watchdog;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Telemetry.Lifecycle;
 
 namespace MozaPlugin.Telemetry
 {
@@ -58,7 +58,7 @@ namespace MozaPlugin.Telemetry
         private readonly PropertyPushQueue _propertyPushQueue;
         private readonly Frames.TierDefinitionEmitter _tierDefEmitter;
         internal Frames.TierDefinitionEmitter TierDefEmitter => _tierDefEmitter;
-        private readonly Inbound.TelemetryInboundDispatcher _inboundDispatcher;
+        private readonly Lifecycle.TelemetryInboundDispatcher _inboundDispatcher;
         internal Display.WheelSlotTracker SlotTracker => _slotTracker;
 
         // ── Property/TierDef accessors ───────────────────────────────────
@@ -192,7 +192,7 @@ namespace MozaPlugin.Telemetry
         /// <summary>True once the wheel has device-inited sess=0x09 (type=0x81)
         /// this Start cycle — the wheel's own "session layer engaged" signal.
         /// Never true across the stale-session wedge (the stale instance only
-        /// emits keepalives); reset per Start via <see cref="Watchdog.DisplayWatchdog.Reset"/>.</summary>
+        /// emits keepalives); reset per Start via <see cref="Lifecycle.DisplayWatchdog.Reset"/>.</summary>
         internal bool WheelReadyObserved => _sessionLife._wheelReadyObserved;
         // Written on tick/start threads, read per inbound chunk on the serial
         // read thread — Interlocked (x86 64-bit).

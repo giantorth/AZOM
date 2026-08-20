@@ -5,7 +5,7 @@ using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
 
-namespace MozaPlugin.Telemetry.Inbound
+namespace MozaPlugin.Telemetry.Lifecycle
 {
     /// <summary>
     /// Routes inbound 0xC3 / device 0x71 chunks: fc:00 acks, 7c:00 device-init

@@ -1,6 +1,6 @@
 using MozaPlugin.Telemetry.TestMode;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.TestMode
 {
     /// <summary>
     /// Synthetic value source for the "Send Test Pattern" button on the standalone

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Frames;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Sessions
 {
     /// <summary>
     /// Coalescing queue for wheel-integrated dashboard FF property pushes

@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Telemetry.Watchdog
+namespace MozaPlugin.Telemetry.Lifecycle
 {
     /// <summary>
     /// Unified, content-aware display watchdog. Replaces the five former

@@ -3,8 +3,8 @@ using System.Diagnostics;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
-using MozaPlugin.Telemetry.Protocol;
 using MozaPlugin.Telemetry.TestMode;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.Frames
 {

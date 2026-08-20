@@ -10,7 +10,6 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
 using MozaPlugin.Telemetry.TestMode;
 using MozaPlugin.Telemetry.TileServer;
-using MozaPlugin.Telemetry.Watchdog;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin.Telemetry
@@ -309,7 +308,7 @@ namespace MozaPlugin.Telemetry
         /// When true, the inbound dispatcher accepts only frames whose device id
         /// matches this sender's target exactly (no CM2 fan-in) — required when two
         /// pipelines share one connection so each consumes only its own device's
-        /// replies. See <see cref="Inbound.TelemetryInboundDispatcher"/>.
+        /// replies. See <see cref="Lifecycle.TelemetryInboundDispatcher"/>.
         /// </summary>
         public volatile bool StrictInboundFilter;
 

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace MozaPlugin.Telemetry.Protocol
+namespace MozaPlugin.Telemetry.Frames
 {
     // Single source of truth for every compression code observed in PitHouse traffic.
     // Old code spread bit-width / encoder / test-range maps across three files

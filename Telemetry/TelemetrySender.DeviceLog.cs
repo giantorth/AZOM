@@ -10,7 +10,6 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
 using MozaPlugin.Telemetry.TestMode;
 using MozaPlugin.Telemetry.TileServer;
-using MozaPlugin.Telemetry.Watchdog;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin.Telemetry

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MozaPlugin.Telemetry.Dashboard;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.TestMode
 {
     /// <summary>
     /// Single-switch auto test harness driven by <see cref="TelemetrySender"/>.

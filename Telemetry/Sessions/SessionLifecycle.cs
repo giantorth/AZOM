@@ -27,7 +27,7 @@ namespace MozaPlugin.Telemetry.Sessions
 
         // Port probing state. _lastAckedSeq=-1 signals "ack present but seq unknown"
         // (5-byte fc:00 form). See docs/protocol/sessions/chunk-format.md.
-        // Written directly by Inbound.TelemetryInboundDispatcher on the serial
+        // Written directly by Lifecycle.TelemetryInboundDispatcher on the serial
         // read thread; volatile, never lock these.
         internal volatile byte _lastAckedSession;
         internal volatile int _lastAckedSeq = -1;
@@ -61,7 +61,7 @@ namespace MozaPlugin.Telemetry.Sessions
         private readonly System.Collections.Generic.Dictionary<byte, int> _contigAckSeqBySession
             = new System.Collections.Generic.Dictionary<byte, int>();
 
-        /// <summary>Latch set by <see cref="Inbound.TelemetryInboundDispatcher"/>
+        /// <summary>Latch set by <see cref="Lifecycle.TelemetryInboundDispatcher"/>
         /// the first time the wheel pushes a spontaneous sess=0x09 device-init
         /// (type=0x81). Consumed by <see cref="ProbeAndOpenSessions"/> to detect
         /// the slow-bring-up hot-attach case where the wheel's session layer
@@ -75,7 +75,7 @@ namespace MozaPlugin.Telemetry.Sessions
         }
 
         /// <summary>Clear the wheel-ready latch — called at Start/Stop
-        /// boundaries via <see cref="Watchdog.DisplayWatchdog.Reset"/>
+        /// boundaries via <see cref="Lifecycle.DisplayWatchdog.Reset"/>
         /// so a subsequent reconnect re-arms detection from a clean slate.</summary>
         internal void ResetWheelReadyObserved() => _wheelReadyObserved = false;
 

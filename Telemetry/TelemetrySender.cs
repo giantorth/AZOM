@@ -10,8 +10,8 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
 using MozaPlugin.Telemetry.TestMode;
 using MozaPlugin.Telemetry.TileServer;
-using MozaPlugin.Telemetry.Watchdog;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Telemetry.Lifecycle;
 
 namespace MozaPlugin.Telemetry
 {
@@ -945,7 +945,7 @@ namespace MozaPlugin.Telemetry
             _catalogParser.SetArmCountProvider(() => _hotSwitch.ArmCount);
             _propertyPushQueue = new PropertyPushQueue(this);
             _tierDefEmitter = new Frames.TierDefinitionEmitter(this);
-            _inboundDispatcher = new Inbound.TelemetryInboundDispatcher(this);
+            _inboundDispatcher = new Lifecycle.TelemetryInboundDispatcher(this);
             _sessionLife = new Sessions.SessionLifecycle(this);
             _rpc = new RpcCallChannel(
                 connection,

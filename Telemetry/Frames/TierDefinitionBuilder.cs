@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
-using MozaPlugin.Telemetry.Protocol;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.Frames
 {

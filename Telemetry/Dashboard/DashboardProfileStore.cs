@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using MozaPlugin.Telemetry.Protocol;
 using MozaPlugin.Telemetry.TestMode;
 using Newtonsoft.Json.Linq;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.Dashboard
 {
