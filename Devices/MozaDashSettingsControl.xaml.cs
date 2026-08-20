@@ -160,7 +160,7 @@ namespace MozaPlugin.Devices
             {
                 byte r = dialog.SelectedR, g = dialog.SelectedG, b = dialog.SelectedB;
                 string cmdName = $"{info.CommandPrefix}{info.Index + 1}";
-                _plugin.WriteColorIfDashDetected(cmdName, r, g, b);
+                _plugin.HardwareApplier.WriteColorIfDashDetected(cmdName, r, g, b);
                 info.ColorSource[info.Index][0] = r;
                 info.ColorSource[info.Index][1] = g;
                 info.ColorSource[info.Index][2] = b;
@@ -223,7 +223,7 @@ namespace MozaPlugin.Devices
             {
                 r = dialog.SelectedR; g = dialog.SelectedG; b = dialog.SelectedB;
                 string cmdName = $"{info.CommandPrefix}{info.Index + 1}";
-                _plugin.WriteColorIfDashDetected(cmdName, r, g, b);
+                _plugin.HardwareApplier.WriteColorIfDashDetected(cmdName, r, g, b);
 
                 int packed = (r << 16) | (g << 8) | b;
                 _plugin.UpdateActiveProfile(p =>
@@ -318,7 +318,7 @@ namespace MozaPlugin.Devices
             int stored = IndicatorMode.ToDashStored((IndicatorDisplayMode)display);
             _data!.DashRpmIndicatorMode = stored;
             _plugin.UpdateActiveProfile(p => p.DashRpmIndicatorMode = stored);
-            _plugin.WriteIfDashDetected("dash-rpm-indicator-mode", stored);
+            _plugin.HardwareApplier.WriteIfDashDetected("dash-rpm-indicator-mode", stored);
             _plugin.SaveSettings();
         }
 
@@ -328,7 +328,7 @@ namespace MozaPlugin.Devices
             int val = DashRpmDisplayCombo.SelectedIndex;
             _data!.DashRpmDisplayMode = val;
             _plugin.UpdateActiveProfile(p => p.DashRpmDisplayMode = val);
-            _plugin.WriteIfDashDetected("dash-rpm-display-mode", val);
+            _plugin.HardwareApplier.WriteIfDashDetected("dash-rpm-display-mode", val);
             _plugin.SaveSettings();
         }
 
@@ -340,7 +340,7 @@ namespace MozaPlugin.Devices
             int stored = IndicatorMode.ToDashStored((IndicatorDisplayMode)display);
             _data!.DashFlagsIndicatorMode = stored;
             _plugin.UpdateActiveProfile(p => p.DashFlagsIndicatorMode = stored);
-            _plugin.WriteIfDashDetected("dash-flags-indicator-mode", stored);
+            _plugin.HardwareApplier.WriteIfDashDetected("dash-flags-indicator-mode", stored);
             _plugin.SaveSettings();
         }
 
@@ -351,7 +351,7 @@ namespace MozaPlugin.Devices
             DashRpmBrightnessValue.Text = $"{val}";
             _data!.DashRpmBrightness = val;
             _plugin.UpdateActiveProfile(p => p.DashRpmBrightness = val);
-            _plugin.WriteIfDashDetected("dash-rpm-brightness", val);
+            _plugin.HardwareApplier.WriteIfDashDetected("dash-rpm-brightness", val);
             _plugin.SaveSettings();
         }
 
@@ -362,7 +362,7 @@ namespace MozaPlugin.Devices
             DashFlagsBrightnessValue.Text = $"{val}";
             _data!.DashFlagsBrightness = val;
             _plugin.UpdateActiveProfile(p => p.DashFlagsBrightness = val);
-            _plugin.WriteIfDashDetected("dash-flags-brightness", val);
+            _plugin.HardwareApplier.WriteIfDashDetected("dash-flags-brightness", val);
             _plugin.SaveSettings();
         }
 

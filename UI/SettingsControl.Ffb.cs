@@ -33,16 +33,16 @@ namespace MozaPlugin
         // actions so the button macros and the bindings drive identical values.
         private static readonly string[] EqCommands = BaseSettingCatalog.EqRegisterCommands;
 
-        private void Eq1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq1Value, "%", v => { _data.Equalizer1 = v; _plugin.WriteIfBaseConnected(EqCommands[0], v); });
-        private void Eq2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq2Value, "%", v => { _data.Equalizer2 = v; _plugin.WriteIfBaseConnected(EqCommands[1], v); });
-        private void Eq3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq3Value, "%", v => { _data.Equalizer3 = v; _plugin.WriteIfBaseConnected(EqCommands[2], v); });
-        private void Eq4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq4Value, "%", v => { _data.Equalizer4 = v; _plugin.WriteIfBaseConnected(EqCommands[3], v); });
-        private void Eq5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq5Value, "%", v => { _data.Equalizer5 = v; _plugin.WriteIfBaseConnected(EqCommands[4], v); });
-        private void Eq6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq6Value, "%", v => { _data.Equalizer6 = v; _plugin.WriteIfBaseConnected(EqCommands[5], v); });
-        private void Eq7Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq7Value, "%", v => { _data.Equalizer7 = v; _plugin.WriteIfBaseConnected(EqCommands[6], v); });
-        private void Eq8Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq8Value, "%", v => { _data.Equalizer8 = v; _plugin.WriteIfBaseConnected(EqCommands[7], v); });
-        private void Eq9Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq9Value, "%", v => { _data.Equalizer9 = v; _plugin.WriteIfBaseConnected(EqCommands[8], v); });
-        private void Eq10Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq10Value, "%", v => { _data.Equalizer10 = v; _plugin.WriteIfBaseConnected(EqCommands[9], v); });
+        private void Eq1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq1Value, "%", v => { _data.Equalizer1 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[0], v); });
+        private void Eq2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq2Value, "%", v => { _data.Equalizer2 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[1], v); });
+        private void Eq3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq3Value, "%", v => { _data.Equalizer3 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[2], v); });
+        private void Eq4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq4Value, "%", v => { _data.Equalizer4 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[3], v); });
+        private void Eq5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq5Value, "%", v => { _data.Equalizer5 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[4], v); });
+        private void Eq6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq6Value, "%", v => { _data.Equalizer6 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[5], v); });
+        private void Eq7Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq7Value, "%", v => { _data.Equalizer7 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[6], v); });
+        private void Eq8Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq8Value, "%", v => { _data.Equalizer8 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[7], v); });
+        private void Eq9Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq9Value, "%", v => { _data.Equalizer9 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[8], v); });
+        private void Eq10Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, Eq10Value, "%", v => { _data.Equalizer10 = v; _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[9], v); });
 
         // 10-band mappings in FREQUENCY order (5/10/15/25/30/40/50/60/80/100 Hz)
         // — the new registers interleave. Keep in sync with the FfbEqualizer10
@@ -93,7 +93,7 @@ namespace MozaPlugin
                 Eq6Slider.Value = p[5]; Eq6Value.Text = $"{p[5]}%"; _data.Equalizer6 = p[5];
             }
             for (int i = 0; i < 6; i++)
-                _plugin.WriteIfBaseConnected(EqCommands[i], p[i]);
+                _plugin.HardwareApplier.WriteIfBaseConnected(EqCommands[i], p[i]);
             _plugin.SaveSettings();
         }
 
@@ -112,7 +112,7 @@ namespace MozaPlugin
                 }
             }
             for (int i = 0; i < 10; i++)
-                _plugin.WriteIfBaseConnected(Eq10Commands[i], p[i]);
+                _plugin.HardwareApplier.WriteIfBaseConnected(Eq10Commands[i], p[i]);
             _plugin.SaveSettings();
         }
 
@@ -136,7 +136,7 @@ namespace MozaPlugin
 
             int sensitivity = 10 + 4 * n;
             _data.RoadSensitivity = sensitivity;
-            _plugin.WriteIfBaseConnected("base-road-sensitivity", sensitivity);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-road-sensitivity", sensitivity);
 
             int[] p = EqSensitivityPresets[n];
             if (_data.BaseSupportsEq10)
@@ -179,11 +179,11 @@ namespace MozaPlugin
                 FfbCurveY5Slider.Value = p[4]; FfbCurveY5Value.Text = $"{p[4]}"; _data.FfbCurveY5 = p[4];
             }
             // Always write fixed X breakpoints first
-            _plugin.WriteIfBaseConnected("base-ffb-curve-x1", 20); _plugin.WriteIfBaseConnected("base-ffb-curve-x2", 40);
-            _plugin.WriteIfBaseConnected("base-ffb-curve-x3", 60); _plugin.WriteIfBaseConnected("base-ffb-curve-x4", 80);
-            _plugin.WriteIfBaseConnected("base-ffb-curve-y1", p[0]); _plugin.WriteIfBaseConnected("base-ffb-curve-y2", p[1]);
-            _plugin.WriteIfBaseConnected("base-ffb-curve-y3", p[2]); _plugin.WriteIfBaseConnected("base-ffb-curve-y4", p[3]);
-            _plugin.WriteIfBaseConnected("base-ffb-curve-y5", p[4]);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x1", 20); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x2", 40);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x3", 60); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x4", 80);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y1", p[0]); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y2", p[1]);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y3", p[2]); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y4", p[3]);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y5", p[4]);
             _plugin.SaveSettings();
         }
 
@@ -192,15 +192,15 @@ namespace MozaPlugin
         private void FfbCurvePreset_Exponential(object s, RoutedEventArgs e) => ApplyFfbCurvePreset(FfbCurvePresets[2]);
         private void FfbCurvePreset_Parabolic(object s, RoutedEventArgs e) => ApplyFfbCurvePreset(FfbCurvePresets[3]);
 
-        private void FfbCurveX1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX1Value, "", v => { _data.FfbCurveX1 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-x1", v); });
-        private void FfbCurveX2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX2Value, "", v => { _data.FfbCurveX2 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-x2", v); });
-        private void FfbCurveX3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX3Value, "", v => { _data.FfbCurveX3 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-x3", v); });
-        private void FfbCurveX4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX4Value, "", v => { _data.FfbCurveX4 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-x4", v); });
-        private void FfbCurveY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY1Value, "", v => { _data.FfbCurveY1 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-y1", v); });
-        private void FfbCurveY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY2Value, "", v => { _data.FfbCurveY2 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-y2", v); });
-        private void FfbCurveY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY3Value, "", v => { _data.FfbCurveY3 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-y3", v); });
-        private void FfbCurveY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY4Value, "", v => { _data.FfbCurveY4 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-y4", v); });
-        private void FfbCurveY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY5Value, "", v => { _data.FfbCurveY5 = v; _plugin.WriteIfBaseConnected("base-ffb-curve-y5", v); });
+        private void FfbCurveX1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX1Value, "", v => { _data.FfbCurveX1 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x1", v); });
+        private void FfbCurveX2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX2Value, "", v => { _data.FfbCurveX2 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x2", v); });
+        private void FfbCurveX3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX3Value, "", v => { _data.FfbCurveX3 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x3", v); });
+        private void FfbCurveX4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveX4Value, "", v => { _data.FfbCurveX4 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x4", v); });
+        private void FfbCurveY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY1Value, "", v => { _data.FfbCurveY1 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y1", v); });
+        private void FfbCurveY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY2Value, "", v => { _data.FfbCurveY2 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y2", v); });
+        private void FfbCurveY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY3Value, "", v => { _data.FfbCurveY3 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y3", v); });
+        private void FfbCurveY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY4Value, "", v => { _data.FfbCurveY4 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y4", v); });
+        private void FfbCurveY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, FfbCurveY5Value, "", v => { _data.FfbCurveY5 = v; _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y5", v); });
 
         // ===== Bluetooth + Base Calibration =====
 
@@ -209,13 +209,13 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = BluetoothCheck.IsChecked == true ? 0 : 85;
             _data.BleMode = val;
-            _plugin.WriteIfBaseConnected("main-set-ble-mode", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-ble-mode", val);
             _plugin.SaveSettings();
         }
 
         private void BaseCalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            _plugin.WriteIfBaseConnected("base-calibration", 1);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-calibration", 1);
             BaseCalibrateStatus.Text = Strings.Status_CalibrationSent;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             timer.Tick += (s, _) => { BaseCalibrateStatus.Text = ""; ((DispatcherTimer)s!).Stop(); };

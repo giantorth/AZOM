@@ -117,58 +117,6 @@ namespace MozaPlugin
             catch (Exception ex) { MozaLog.Warn("[AZOM] DashboardSelectionChanged subscriber threw: " + ex.Message); }
         }
 
-        // ===== HardwareApplier shims (external API surface) =====
-        // Keep callsites in Devices/UI files compiling without churn.
-        internal void WriteIfWheelDetected(string command, int value) => _hardwareApplier.WriteIfWheelDetected(command, value);
-        internal void WriteIfDashDetected(string command, int value) => _hardwareApplier.WriteIfDashDetected(command, value);
-        internal void WriteIfBaseConnected(string command, int value) => _hardwareApplier.WriteIfBaseConnected(command, value);
-        internal void WriteFloatIfBaseConnected(string command, int value) => _hardwareApplier.WriteFloatIfBaseConnected(command, value);
-        internal void ReadIfBaseConnected(string command) => _hardwareApplier.ReadIfBaseConnected(command);
-        internal void WriteIfHandbrakeDetected(string command, int value) => _hardwareApplier.WriteIfHandbrakeDetected(command, value);
-        internal void WriteFloatIfHandbrakeDetected(string command, int value) => _hardwareApplier.WriteFloatIfHandbrakeDetected(command, value);
-        internal void WriteIfPedalsDetected(string command, int value) => _hardwareApplier.WriteIfPedalsDetected(command, value);
-        internal void WriteFloatIfPedalsDetected(string command, int value) => _hardwareApplier.WriteFloatIfPedalsDetected(command, value);
-        internal void WriteIfHgpDetected(string command, int value) => _hardwareApplier.WriteIfHgpDetected(command, value);
-        internal void WriteIfSgpDetected(string command, int value) => _hardwareApplier.WriteIfSgpDetected(command, value);
-        internal void ReadIfHgpDetected(string command) => _hardwareApplier.ReadIfHgpDetected(command);
-        internal void WriteArrayIfSgpDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfSgpDetected(command, payload);
-        internal void WriteIfBaseAmbientSupported(string command, int value) => _hardwareApplier.WriteIfBaseAmbientSupported(command, value);
-        internal void WriteColorIfWheelDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfWheelDetected(command, r, g, b);
-        internal void WriteColorIfDashDetected(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfDashDetected(command, r, g, b);
-        internal void WriteColorIfBaseAmbientSupported(string command, byte r, byte g, byte b) => _hardwareApplier.WriteColorIfBaseAmbientSupported(command, r, g, b);
-        internal void WriteArrayIfWheelDetected(string command, byte[] payload) => _hardwareApplier.WriteArrayIfWheelDetected(command, payload);
-        internal void ApplyWheelToHardware(MozaProfile? profile) => _hardwareApplier.ApplyWheelToHardware(profile);
-        internal void ApplyDashToHardware(MozaProfile? profile) => _hardwareApplier.ApplyDashToHardware(profile);
-        internal void ApplyBaseToHardware(MozaProfile? profile) => _hardwareApplier.ApplyBaseToHardware(profile);
-        internal void ApplyBaseAmbientToHardware(MozaProfile? profile) => _hardwareApplier.ApplyBaseAmbientToHardware(profile);
-        internal void ApplyHandbrakeToHardware(MozaProfile? profile) => _hardwareApplier.ApplyHandbrakeToHardware(profile);
-        internal void ApplyPedalsToHardware(MozaProfile? profile) => _hardwareApplier.ApplyPedalsToHardware(profile);
-        internal void ApplyHgpToHardware(MozaProfile? profile) => _hardwareApplier.ApplyHgpToHardware(profile);
-        internal void ApplySgpToHardware(MozaProfile? profile) => _hardwareApplier.ApplySgpToHardware(profile);
-        internal void ApplyAb9ToHardware(MozaProfile? profile) => _hardwareApplier.ApplyAb9ToHardware(profile);
-        internal void ApplyWheelExtensionSettings(MozaWheelExtensionSettings extSettings, string? pageModelPrefix = null) => _hardwareApplier.ApplyWheelExtensionSettings(extSettings, pageModelPrefix);
-        /// <summary>
-        /// LED-colour write from UI handlers, gated on the live telemetry pipeline (see
-        /// <see cref="Hardware.HardwareApplier.WriteLedColorIfWheelDetected"/>). Skip
-        /// during active telemetry so per-click cmd 0x27 / cmd 0x1F writes don't
-        /// flicker the live overlay; the persisted overlay (set by the caller) is
-        /// pushed via the next ApplyWheelToHardware after telemetry stops.
-        /// </summary>
-        internal void WriteLedColorIfWheelDetected(string command, byte r, byte g, byte b, Devices.LedKind kind)
-            => _hardwareApplier.WriteLedColorIfWheelDetected(command, r, g, b, kind);
-        /// <summary>
-        /// Re-push the stored static palette for an LED group from MozaData to
-        /// the wheel's EEPROM. Called from the per-group mode combo handlers on
-        /// transition to Static (val=2) to bring EEPROM back in sync with any
-        /// edits the user made while the group was in SimHub mode (those edits
-        /// land in _data + overlay but the wheel write is suppressed by the
-        /// per-group gate in WriteLedColorIfWheelDetected).
-        /// </summary>
-        internal void RepushStaticPalette(Devices.LedKind kind) => _hardwareApplier.RepushStaticPalette(kind);
-        internal void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings) => _hardwareApplier.ApplyDashExtensionSettings(extSettings);
-        internal void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings) => _hardwareApplier.ApplyBaseExtensionSettings(extSettings);
-        internal void ClearLedsOnHardware() => _hardwareApplier.ClearLedsOnHardware();
-
         /// <summary>Re-apply the current Stalks mode + truck-sim config to the live
         /// controller. Call from the settings UI after editing + SaveSettings().</summary>
         internal void ApplyStalksSettings()

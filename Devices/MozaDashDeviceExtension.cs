@@ -140,7 +140,7 @@ namespace MozaPlugin.Devices
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin != null)
-                    plugin.ApplyDashExtensionSettings(_settings);
+                    plugin.HardwareApplier.ApplyDashExtensionSettings(_settings);
             }
         }
 

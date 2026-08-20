@@ -39,8 +39,8 @@ namespace MozaPlugin
             RotationValue.Text = $"{deg}°";
             _data.Limit = raw;
             _data.MaxAngle = raw;
-            _plugin.WriteIfBaseConnected("base-limit", raw);
-            _plugin.WriteIfBaseConnected("base-max-angle", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-limit", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-max-angle", raw);
             _plugin.SaveSettings();
 
             // Diagnostic — confirms the value reached the active profile.
@@ -73,8 +73,8 @@ namespace MozaPlugin
                 // Phase 1: ask the base what it actually stored. The replies
                 // land in _data.Limit/_data.MaxAngle and the refresh tick
                 // snaps the slider to device truth.
-                _plugin.ReadIfBaseConnected("base-limit");
-                _plugin.ReadIfBaseConnected("base-max-angle");
+                _plugin.HardwareApplier.ReadIfBaseConnected("base-limit");
+                _plugin.HardwareApplier.ReadIfBaseConnected("base-max-angle");
                 _rotationReadbackLogPhase = true;
                 _rotationReadbackTimer.Interval = TimeSpan.FromMilliseconds(500);
                 return;
@@ -95,7 +95,7 @@ namespace MozaPlugin
             int raw = pct * 10;
             FfbStrengthValue.Text = $"{pct}%";
             _data.FfbStrength = raw;
-            _plugin.WriteIfBaseConnected("base-ffb-strength", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-strength", raw);
             _plugin.SaveSettings();
         }
 
@@ -106,7 +106,7 @@ namespace MozaPlugin
             int raw = display * 10;                       // wire value 0-100
             InterpolationValue.Text = $"{display}";
             _data.Interpolation = raw;
-            _plugin.WriteIfBaseConnected("main-set-interpolation", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-interpolation", raw);
             _plugin.SaveSettings();
         }
 
@@ -116,7 +116,7 @@ namespace MozaPlugin
             int val = (int)Math.Round(e.NewValue);
             TorqueValue.Text = $"{val}%";
             _data.Torque = val;
-            _plugin.WriteIfBaseConnected("base-torque", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-torque", val);
             _plugin.SaveSettings();
         }
 
@@ -126,7 +126,7 @@ namespace MozaPlugin
             int val = PerformanceOutputCombo.SelectedIndex;
             if (val < 0) return;
             _data.TempStrategy = val;
-            _plugin.WriteIfBaseConnected("base-temp-strategy", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-temp-strategy", val);
             _plugin.SaveSettings();
         }
 
@@ -136,7 +136,7 @@ namespace MozaPlugin
             int val = (int)Math.Round(e.NewValue);
             GearshiftVibrationValue.Text = val.ToString();
             _data.GearshiftVibration = val;
-            _plugin.WriteIfBaseConnected("base-gearshift-vibration", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-gearshift-vibration", val);
             _plugin.SaveSettings();
         }
 
@@ -170,7 +170,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = FfbReverseCheck.IsChecked == true ? 1 : 0;
             _data.FfbReverse = val;
-            _plugin.WriteIfBaseConnected("base-ffb-reverse", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-reverse", val);
             _plugin.SaveSettings();
         }
 
@@ -179,7 +179,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = ProtectionCheck.IsChecked == true ? 1 : 0;
             _data.Protection = val;
-            _plugin.WriteIfBaseConnected("base-protection", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-protection", val);
             _plugin.SaveSettings();
         }
 
@@ -188,7 +188,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = SoftLimitRetainCheck.IsChecked == true ? 1 : 0;
             _data.SoftLimitRetain = val;
-            _plugin.WriteIfBaseConnected("base-soft-limit-retain", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-soft-limit-retain", val);
             _plugin.SaveSettings();
         }
 
@@ -197,7 +197,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = StandbyCheck.IsChecked == true ? 1 : 0;
             _data.WorkMode = val;
-            _plugin.WriteIfBaseConnected("main-set-work-mode", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", val);
             _plugin.SaveSettings();
         }
 
@@ -250,7 +250,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = LedStatusCheck.IsChecked == true ? 1 : 0;
             _data.LedStatus = val;
-            _plugin.WriteIfBaseConnected("main-set-led-status", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-led-status", val);
             _plugin.SaveSettings();
         }
 

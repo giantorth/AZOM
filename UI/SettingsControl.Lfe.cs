@@ -641,7 +641,7 @@ namespace MozaPlugin
             int raw = pct * 10;
             SpeedValue.Text = $"{pct}%";
             _data.Speed = raw;
-            _plugin.WriteIfBaseConnected("base-speed", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-speed", raw);
             _plugin.SaveSettings();
         }
 
@@ -652,7 +652,7 @@ namespace MozaPlugin
             int raw = pct * 10;
             DamperValue.Text = $"{pct}%";
             _data.Damper = raw;
-            _plugin.WriteIfBaseConnected("base-damper", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-damper", raw);
             _plugin.SaveSettings();
         }
 
@@ -663,7 +663,7 @@ namespace MozaPlugin
             int raw = pct * 10;
             FrictionValue.Text = $"{pct}%";
             _data.Friction = raw;
-            _plugin.WriteIfBaseConnected("base-friction", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-friction", raw);
             _plugin.SaveSettings();
         }
 
@@ -674,7 +674,7 @@ namespace MozaPlugin
             int raw = val * 10;
             InertiaValue.Text = $"{val}";
             _data.Inertia = raw;
-            _plugin.WriteIfBaseConnected("base-inertia", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-inertia", raw);
             _plugin.SaveSettings();
         }
 
@@ -685,7 +685,7 @@ namespace MozaPlugin
             int raw = pct * 10;
             SpringValue.Text = $"{pct}%";
             _data.Spring = raw;
-            _plugin.WriteIfBaseConnected("base-spring", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-spring", raw);
             _plugin.SaveSettings();
         }
 
@@ -696,7 +696,7 @@ namespace MozaPlugin
             int raw = (int)Math.Round(pct * 2.55);
             GameDamperValue.Text = $"{pct}%";
             _data.GameDamper = raw;
-            _plugin.WriteIfBaseConnected("main-set-damper-gain", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-damper-gain", raw);
             _plugin.SaveSettings();
         }
 
@@ -707,7 +707,7 @@ namespace MozaPlugin
             int raw = (int)Math.Round(pct * 2.55);
             GameFrictionValue.Text = $"{pct}%";
             _data.GameFriction = raw;
-            _plugin.WriteIfBaseConnected("main-set-friction-gain", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-friction-gain", raw);
             _plugin.SaveSettings();
         }
 
@@ -718,7 +718,7 @@ namespace MozaPlugin
             int raw = (int)Math.Round(pct * 2.55);
             GameInertiaValue.Text = $"{pct}%";
             _data.GameInertia = raw;
-            _plugin.WriteIfBaseConnected("main-set-inertia-gain", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-inertia-gain", raw);
             _plugin.SaveSettings();
         }
 
@@ -729,7 +729,7 @@ namespace MozaPlugin
             int raw = (int)Math.Round(pct * 2.55);
             GameSpringValue.Text = $"{pct}%";
             _data.GameSpring = raw;
-            _plugin.WriteIfBaseConnected("main-set-spring-gain", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-spring-gain", raw);
             _plugin.SaveSettings();
         }
 
@@ -739,7 +739,7 @@ namespace MozaPlugin
             int val = (int)Math.Round(e.NewValue);
             SpeedDampingValue.Text = $"{val}%";
             _data.SpeedDamping = val;
-            _plugin.WriteIfBaseConnected("base-speed-damping", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-speed-damping", val);
             _plugin.SaveSettings();
         }
 
@@ -749,7 +749,7 @@ namespace MozaPlugin
             int val = (int)Math.Round(e.NewValue);
             SpeedDampingPointValue.Text = $"{val} kph";
             _data.SpeedDampingPoint = val;
-            _plugin.WriteIfBaseConnected("base-speed-damping-point", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-speed-damping-point", val);
             _plugin.SaveSettings();
         }
 
@@ -759,7 +759,7 @@ namespace MozaPlugin
             int val = (int)Math.Round(e.NewValue);
             NaturalInertiaValue.Text = $"{val}";
             _data.NaturalInertia = val;
-            _plugin.WriteIfBaseConnected("base-natural-inertia", val);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-natural-inertia", val);
             _plugin.SaveSettings();
         }
 
@@ -770,7 +770,7 @@ namespace MozaPlugin
             int raw = (int)Math.Round(display * (400.0 / 9.0) - (400.0 / 9.0) + 100.0);
             SoftLimitStiffnessValue.Text = $"{display}";
             _data.SoftLimitStiffness = raw;
-            _plugin.WriteIfBaseConnected("base-soft-limit-stiffness", raw);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-soft-limit-stiffness", raw);
             _plugin.SaveSettings();
         }
 

@@ -100,7 +100,7 @@ namespace MozaPlugin.Devices
             _applied = -1;
             if (!weStandbyed || !_detectionState.BaseDetected) return;
             if (_data != null) _data.WorkMode = 0;
-            _plugin.WriteIfBaseConnected("main-set-work-mode", 0);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
             MozaLog.Info("[AZOM] Auto-standby disabled — waking base");
         }
 
@@ -149,7 +149,7 @@ namespace MozaPlugin.Devices
 
             _applied = desired;
             if (_data != null) _data.WorkMode = desired; // keep the UI toggle in sync
-            _plugin.WriteIfBaseConnected("main-set-work-mode", desired);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", desired);
             MozaLog.Info($"[AZOM] Auto-standby: {(desired == 1 ? $"standby (idle {idleMs / 1000}s >= {timeoutMin}m)" : "wake (active)")}");
         }
 

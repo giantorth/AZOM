@@ -221,7 +221,7 @@ namespace MozaPlugin.Devices
                     $"{dashPid} ({MozaUsbIds.Describe(dashPid)}; {reason})");
             }
 
-            try { _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dashboard profile apply skipped: {ex.Message}"); }
 
             try

@@ -142,7 +142,7 @@ namespace MozaPlugin
 
             // 2. Persist settings and clear LEDs while connection is still alive.
             try { this.SaveCommonSettings("MozaPluginSettings", _settings); } catch { }
-            try { ClearLedsOnHardware(); } catch { }
+            try { _hardwareApplier?.ClearLedsOnHardware(); } catch { }
 
             // 3. Detach event subscriptions so any in-flight callback from a still-running
             //    background thread (HID/serial reader) cannot reach the plugin during teardown.

@@ -513,9 +513,9 @@ skipReadByMode:
                             : LedKind.None,
                 };
                 if (kind != LedKind.None)
-                    _plugin.WriteLedColorIfWheelDetected(cmdName, r, g, b, kind);
+                    _plugin.HardwareApplier.WriteLedColorIfWheelDetected(cmdName, r, g, b, kind);
                 else
-                    _plugin.WriteColorIfWheelDetected(cmdName, r, g, b);
+                    _plugin.HardwareApplier.WriteColorIfWheelDetected(cmdName, r, g, b);
             }
             // B4: atomic 3-byte write — Display() may read this slot's RGB triplet
             // concurrently for the "default during telemetry" override path
@@ -645,7 +645,7 @@ skipReadByMode:
             {
                 int ledIdx = startIdx + i;
                 // Wheel-LED write + live-cache invalidation.
-                _plugin.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{ledIdx + 1}", r, g, b, LedKind.Knob);
+                _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{ledIdx + 1}", r, g, b, LedKind.Knob);
                 // B4: atomic 3-byte write.
                 _data.WriteLedColor(_data.KnobRingColors[ledIdx], r, g, b);
             }
@@ -1082,11 +1082,11 @@ skipReadByMode:
             int val = WheelTelemetryModeCombo.SelectedIndex;
             _data!.WheelTelemetryMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelTelemetryMode = val);
-            _plugin.WriteIfWheelDetected("wheel-telemetry-mode", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-telemetry-mode", val);
             // Transition to Static: re-push stored palette so EEPROM picks up
             // edits the user made while the group was in SimHub mode (writes
             // were suppressed by the per-group gate in HardwareApplier).
-            if (val == 2) _plugin.RepushStaticPalette(LedKind.Rpm);
+            if (val == 2) _plugin.HardwareApplier.RepushStaticPalette(LedKind.Rpm);
             _plugin.SaveSettings();
         }
 
@@ -1102,7 +1102,7 @@ skipReadByMode:
             _data!.WheelTelemetryIdleEffect = val;
             var idle = _plugin.GetOrCreateActiveWheelIdle();
             if (idle != null) idle.TelemetryEffect = val;
-            _plugin.WriteIfWheelDetected("wheel-telemetry-idle-effect", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-telemetry-idle-effect", val);
             UpdateIdleSpeedRowVisibility();
             _plugin.SaveSettings();
         }
@@ -1115,7 +1115,7 @@ skipReadByMode:
             _data!.WheelButtonsIdleEffect = val;
             var idle = _plugin.GetOrCreateActiveWheelIdle();
             if (idle != null) idle.ButtonsEffect = val;
-            _plugin.WriteIfWheelDetected("wheel-buttons-idle-effect", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-buttons-idle-effect", val);
             UpdateIdleSpeedRowVisibility();
             _plugin.SaveSettings();
         }
@@ -1128,7 +1128,7 @@ skipReadByMode:
             _data!.WheelKnobIdleEffect = val;
             var idle = _plugin.GetOrCreateActiveWheelIdle();
             if (idle != null) idle.KnobEffect = val;
-            _plugin.WriteIfWheelDetected("wheel-knob-idle-effect", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-idle-effect", val);
             UpdateIdleSpeedRowVisibility();
             _plugin.SaveSettings();
         }
@@ -1147,7 +1147,7 @@ skipReadByMode:
             if (idle != null) idle.TelemetrySpeedMs = ms;
             int effect = _data.WheelTelemetryIdleEffect;
             if (effect >= 2)
-                _plugin.WriteArrayIfWheelDetected("wheel-telemetry-idle-interval", BuildIdleSpeedPayload(effect, ms));
+                _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-telemetry-idle-interval", BuildIdleSpeedPayload(effect, ms));
             _plugin.SaveSettings();
         }
 
@@ -1161,7 +1161,7 @@ skipReadByMode:
             if (idle != null) idle.ButtonsSpeedMs = ms;
             int effect = _data.WheelButtonsIdleEffect;
             if (effect >= 2)
-                _plugin.WriteArrayIfWheelDetected("wheel-buttons-idle-interval", BuildIdleSpeedPayload(effect, ms));
+                _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-buttons-idle-interval", BuildIdleSpeedPayload(effect, ms));
             _plugin.SaveSettings();
         }
 
@@ -1175,7 +1175,7 @@ skipReadByMode:
             if (idle != null) idle.KnobSpeedMs = ms;
             int effect = _data.WheelKnobIdleEffect;
             if (effect >= 2)
-                _plugin.WriteArrayIfWheelDetected("wheel-knob-idle-interval", BuildIdleSpeedPayload(effect, ms));
+                _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-knob-idle-interval", BuildIdleSpeedPayload(effect, ms));
             _plugin.SaveSettings();
         }
 
@@ -1186,8 +1186,8 @@ skipReadByMode:
             if (val < 0) return;
             _data!.WheelKnobLedMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobLedMode = val);
-            _plugin.WriteIfWheelDetected("wheel-knob-led-mode", val);
-            if (val == 2) _plugin.RepushStaticPalette(LedKind.Knob);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-led-mode", val);
+            if (val == 2) _plugin.HardwareApplier.RepushStaticPalette(LedKind.Knob);
             _plugin.SaveSettings();
         }
 
@@ -1224,8 +1224,8 @@ skipReadByMode:
             if (val < 0) return;
             _data!.WheelButtonsLedMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelButtonsLedMode = val);
-            _plugin.WriteIfWheelDetected("wheel-buttons-led-mode", val);
-            if (val == 2) _plugin.RepushStaticPalette(LedKind.Button);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-buttons-led-mode", val);
+            if (val == 2) _plugin.HardwareApplier.RepushStaticPalette(LedKind.Button);
             _plugin.SaveSettings();
         }
 
@@ -1240,7 +1240,7 @@ skipReadByMode:
             _data!.WheelIdleMode = val;
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
             if (sleep != null) sleep.Mode = val;
-            _plugin.WriteIfWheelDetected("wheel-idle-mode", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-idle-mode", val);
             UpdateSleepSpeedRowVisibility();
             _plugin.SaveSettings();
         }
@@ -1259,7 +1259,7 @@ skipReadByMode:
             int prev = sleep?.TimeoutMin ?? -2;
             if (sleep != null) sleep.TimeoutMin = minutes;
             MozaLog.Info($"[AZOM] SLEEP-USER: bundle.TimeoutMin {prev} -> {minutes} (from dropdown handler, sleep={(sleep==null?"null":"ok")})");
-            _plugin.WriteIfWheelDetected("wheel-idle-timeout", minutes);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-idle-timeout", minutes);
             _plugin.SaveSettings();
         }
 
@@ -1273,7 +1273,7 @@ skipReadByMode:
             if (sleep != null) sleep.SpeedMs = ms;
             int mode = _data.WheelIdleMode;
             if (mode >= 2)
-                _plugin.WriteArrayIfWheelDetected("wheel-idle-speed", BuildIdleSpeedPayload(mode, ms));
+                _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-idle-speed", BuildIdleSpeedPayload(mode, ms));
             _plugin.SaveSettings();
         }
 
@@ -1294,7 +1294,7 @@ skipReadByMode:
             int packed = (r << 16) | (g << 8) | b;
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
             if (sleep != null) sleep.Color = new[] { packed };
-            _plugin.WriteColorIfWheelDetected("wheel-idle-color", r, g, b);
+            _plugin.HardwareApplier.WriteColorIfWheelDetected("wheel-idle-color", r, g, b);
             _plugin.SaveSettings();
         }
 
@@ -1330,7 +1330,7 @@ skipReadByMode:
             int raw = stored + 1;
             _data!.WheelRpmIndicatorMode = stored;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelRpmIndicatorMode = stored);
-            _plugin.WriteIfWheelDetected("wheel-rpm-indicator-mode", raw);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-rpm-indicator-mode", raw);
             _plugin.SaveSettings();
         }
 

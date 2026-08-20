@@ -142,7 +142,7 @@ namespace MozaPlugin.Devices
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin != null)
-                    plugin.ApplyBaseExtensionSettings(_settings);
+                    plugin.HardwareApplier.ApplyBaseExtensionSettings(_settings);
             }
         }
 

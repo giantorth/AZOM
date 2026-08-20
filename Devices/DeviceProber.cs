@@ -312,7 +312,7 @@ namespace MozaPlugin.Devices
 
             if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                 _plugin.DeviceDefinitionDeployed = true;
-            _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             MozaLog.Info(bridgedDash
                 ? "[AZOM] Dashboard detected (bridged dash at 0x14 — provisionally deployed the CM2 profile, probing display identity)"
                 : "[AZOM] Dashboard detected");
@@ -340,7 +340,7 @@ namespace MozaPlugin.Devices
             // a null/stale owner. First responder across the base + hub pipes wins.
             _detectionState.HandbrakeOwner = _deviceManager;
             _detectionState.HandbrakeDetected = true;
-            _plugin.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
                 _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
             MozaLog.Info("[AZOM] Handbrake detected");
@@ -356,7 +356,7 @@ namespace MozaPlugin.Devices
             // prober, hub pipe for the dedicated hub prober.
             _detectionState.PedalsOwner = _deviceManager;
             _detectionState.PedalsDetected = true;
-            _plugin.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
                 _deviceManager.ReadSettings(PedalsSettingsReadCommands);
             MozaLog.Info("[AZOM] Pedals detected");
@@ -383,7 +383,7 @@ namespace MozaPlugin.Devices
             if (_detectionState.HgpDetected) return;
             _detectionState.HgpOwner = _deviceManager;
             _detectionState.HgpDetected = true;
-            _plugin.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads) _deviceManager.ReadSettings(HgpSettingsReadCommands);
             MozaLog.Info("[AZOM] HGP shifter detected");
         }
@@ -393,7 +393,7 @@ namespace MozaPlugin.Devices
             if (_detectionState.SgpDetected) return;
             _detectionState.SgpOwner = _deviceManager;
             _detectionState.SgpDetected = true;
-            _plugin.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
             MozaLog.Info("[AZOM] SGP shifter detected");
         }
@@ -625,7 +625,7 @@ namespace MozaPlugin.Devices
                         _detectionState.BaseAmbientLedSupported = true;
                         if (DeviceDefinitionDeployer.DeployBaseAmbient(_connection.DiscoveredPid))
                             _plugin.DeviceDefinitionDeployed = true;
-                        _plugin.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         MozaLog.Info(
                             $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}')");
@@ -653,7 +653,7 @@ namespace MozaPlugin.Devices
                     if (_data.BaseSupportsEq10 && !_detectionState.BaseEq10Probed)
                     {
                         _detectionState.BaseEq10Probed = true;
-                        _plugin.ApplyBaseToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyBaseToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseEq10ReadCommands);
                     }
                     break;
@@ -982,7 +982,7 @@ namespace MozaPlugin.Devices
                             // never fires there. Without this re-apply the meter is never
                             // put into telemetry LED mode and its RPM/flag LEDs stay dark
                             // (KS+CM2 bundle 2026-06-06: zero group-0x32 frames on the wire).
-                            try { _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+                            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
                             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
                         }
                         // Re-arm the wedge-recovery one-shot now that we know
@@ -1058,7 +1058,7 @@ namespace MozaPlugin.Devices
                         // and keeps both branches symmetric.
                         _plugin.NoteWheelDetected();
                         _deviceManager.LockWheelId(deviceId);
-                        _plugin.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSetting("wheel-model-name");
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");

@@ -125,7 +125,7 @@ namespace MozaPlugin
         {
             _plugin.AddAction("AZOM.ClearLeds", (a, b) =>
             {
-                _plugin.ClearLedsOnHardware();
+                _plugin.HardwareApplier.ClearLedsOnHardware();
                 MozaLog.Debug("[AZOM] LEDs cleared via action");
             });
 
@@ -218,7 +218,7 @@ namespace MozaPlugin
             _plugin.AddAction("AZOM.WorkModeOff", (a, b) =>
             {
                 if (_plugin.Data != null) _plugin.Data.WorkMode = 1;
-                _plugin.WriteIfBaseConnected("main-set-work-mode", 1);
+                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 1);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode off (standby) via action");
             });
@@ -227,7 +227,7 @@ namespace MozaPlugin
             _plugin.AddAction("AZOM.WorkModeOn", (a, b) =>
             {
                 if (_plugin.Data != null) _plugin.Data.WorkMode = 0;
-                _plugin.WriteIfBaseConnected("main-set-work-mode", 0);
+                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode on via action");
             });
@@ -239,7 +239,7 @@ namespace MozaPlugin
                 if (data == null) return;
                 int val = data.WorkMode != 0 ? 0 : 1;
                 data.WorkMode = val;
-                _plugin.WriteIfBaseConnected("main-set-work-mode", val);
+                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", val);
                 _plugin.SaveSettings();
                 MozaLog.Debug($"[AZOM] Work mode {(val == 0 ? "on" : "off (standby)")} via action");
             });
@@ -267,7 +267,7 @@ namespace MozaPlugin
             // button, cf. SettingsControl.BaseCalibrateButton_Click).
             _plugin.AddAction("AZOM.CalibrateCenter", (a, b) =>
             {
-                _plugin.WriteIfBaseConnected("base-calibration", 1);
+                _plugin.HardwareApplier.WriteIfBaseConnected("base-calibration", 1);
                 MozaLog.Debug("[AZOM] Base center calibration via action");
             });
         }
@@ -411,7 +411,7 @@ namespace MozaPlugin
             int val = on ? def.OnValue : def.OffValue;
             if (def.Get(data) == val) return; // already there — no flash write
             def.Set(data, val);
-            _plugin.WriteIfBaseConnected(def.Command, val);
+            _plugin.HardwareApplier.WriteIfBaseConnected(def.Command, val);
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] {def.Name} → {(on ? "on" : "off")} via action");
         }
@@ -441,7 +441,7 @@ namespace MozaPlugin
             int raw = def.ToRaw(next);
             def.SetRaw(data, raw);
             foreach (var cmd in def.Commands)
-                _plugin.WriteIfBaseConnected(cmd, raw);
+                _plugin.HardwareApplier.WriteIfBaseConnected(cmd, raw);
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] {def.Name} → {next} via action");
         }
@@ -466,7 +466,7 @@ namespace MozaPlugin
 
             int sensitivity = BaseSettingCatalog.RoadSensitivityRawFromPreset(next);
             data.RoadSensitivity = sensitivity;
-            _plugin.WriteIfBaseConnected("base-road-sensitivity", sensitivity);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-road-sensitivity", sensitivity);
 
             int[] preset = BaseSettingCatalog.EqSensitivityPresets[next];
             if (data.BaseSupportsEq10)
@@ -474,7 +474,7 @@ namespace MozaPlugin
                 for (int i = 0; i < 10; i++)
                 {
                     BaseSettingCatalog.SetEqRegister(data, BaseSettingCatalog.Eq10FreqOrderRegisters[i], preset[i]);
-                    _plugin.WriteIfBaseConnected(BaseSettingCatalog.Eq10FreqOrderCommands[i], preset[i]);
+                    _plugin.HardwareApplier.WriteIfBaseConnected(BaseSettingCatalog.Eq10FreqOrderCommands[i], preset[i]);
                 }
             }
             else
@@ -483,7 +483,7 @@ namespace MozaPlugin
                 {
                     int v = preset[BaseSettingCatalog.Eq6FreqColumns[i]];
                     BaseSettingCatalog.SetEqRegister(data, i, v);
-                    _plugin.WriteIfBaseConnected(BaseSettingCatalog.EqRegisterCommands[i], v);
+                    _plugin.HardwareApplier.WriteIfBaseConnected(BaseSettingCatalog.EqRegisterCommands[i], v);
                 }
             }
             _plugin.SaveSettings();
@@ -516,7 +516,7 @@ namespace MozaPlugin
             if (val == current) return; // saturated — skip the redundant flash write
             if (_plugin.Data != null) _plugin.Data.WheelClutchPoint = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
-            _plugin.WriteIfWheelDetected("wheel-clutch-point", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-clutch-point", val);
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] Clutch split point → {val}% via action");
         }

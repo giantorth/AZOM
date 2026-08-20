@@ -69,7 +69,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = HandbrakeModeCombo.SelectedIndex;
             _data.HandbrakeMode = val;
-            _plugin.WriteIfHandbrakeDetected("handbrake-mode", val);
+            _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-mode", val);
             _plugin.SaveSettings();
         }
 
@@ -79,7 +79,7 @@ namespace MozaPlugin
             int val = (int)Math.Round(e.NewValue);
             HandbrakeThresholdValue.Text = $"{val}%";
             _data.HandbrakeButtonThreshold = val;
-            _plugin.WriteIfHandbrakeDetected("handbrake-button-threshold", val);
+            _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-button-threshold", val);
             _plugin.SaveSettings();
         }
 
@@ -88,7 +88,7 @@ namespace MozaPlugin
             if (_suppressEvents) return;
             int val = HandbrakeDirectionCheck.IsChecked == true ? 1 : 0;
             _data.HandbrakeDirection = val;
-            _plugin.WriteIfHandbrakeDetected("handbrake-direction", val);
+            _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-direction", val);
             _plugin.SaveSettings();
         }
 
@@ -113,7 +113,7 @@ namespace MozaPlugin
                 HbY5Slider.Value = p[4]; HbY5Value.Text = $"{p[4]}"; _data.HandbrakeCurve[4] = p[4];
             }
             for (int i = 0; i < 5; i++)
-                _plugin.WriteFloatIfHandbrakeDetected($"handbrake-y{i + 1}", p[i]);
+                _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected($"handbrake-y{i + 1}", p[i]);
             _plugin.SaveSettings();
         }
 
@@ -122,13 +122,13 @@ namespace MozaPlugin
         private void HbCurvePreset_Exponential(object s, RoutedEventArgs e) => ApplyHbCurvePreset(HbCurvePresets[2]);
         private void HbCurvePreset_Parabolic(object s, RoutedEventArgs e) => ApplyHbCurvePreset(HbCurvePresets[3]);
 
-        private void HandbrakeMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, HandbrakeMinSlider, _data.HandbrakeMax, isMin: true, HandbrakeMinValue, v => { _data.HandbrakeMin = v; _plugin.WriteIfHandbrakeDetected("handbrake-min", v); });
-        private void HandbrakeMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, HandbrakeMaxSlider, _data.HandbrakeMin, isMin: false, HandbrakeMaxValue, v => { _data.HandbrakeMax = v; _plugin.WriteIfHandbrakeDetected("handbrake-max", v); });
-        private void HbY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY1Value, "", v => { _data.HandbrakeCurve[0] = v; _plugin.WriteFloatIfHandbrakeDetected("handbrake-y1", v); });
-        private void HbY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY2Value, "", v => { _data.HandbrakeCurve[1] = v; _plugin.WriteFloatIfHandbrakeDetected("handbrake-y2", v); });
-        private void HbY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY3Value, "", v => { _data.HandbrakeCurve[2] = v; _plugin.WriteFloatIfHandbrakeDetected("handbrake-y3", v); });
-        private void HbY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY4Value, "", v => { _data.HandbrakeCurve[3] = v; _plugin.WriteFloatIfHandbrakeDetected("handbrake-y4", v); });
-        private void HbY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY5Value, "", v => { _data.HandbrakeCurve[4] = v; _plugin.WriteFloatIfHandbrakeDetected("handbrake-y5", v); });
+        private void HandbrakeMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, HandbrakeMinSlider, _data.HandbrakeMax, isMin: true, HandbrakeMinValue, v => { _data.HandbrakeMin = v; _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-min", v); });
+        private void HandbrakeMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, HandbrakeMaxSlider, _data.HandbrakeMin, isMin: false, HandbrakeMaxValue, v => { _data.HandbrakeMax = v; _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-max", v); });
+        private void HbY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY1Value, "", v => { _data.HandbrakeCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y1", v); });
+        private void HbY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY2Value, "", v => { _data.HandbrakeCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y2", v); });
+        private void HbY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY3Value, "", v => { _data.HandbrakeCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y3", v); });
+        private void HbY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY4Value, "", v => { _data.HandbrakeCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y4", v); });
+        private void HbY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY5Value, "", v => { _data.HandbrakeCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y5", v); });
 
         private const int CalibrationSeconds = 5;
 
@@ -162,8 +162,8 @@ namespace MozaPlugin
 
         private void HbCalStartButton_Click(object sender, RoutedEventArgs e) =>
             RunCalibrationCountdown(HbCalStartButton, HbCalStatus, Strings.Hint_CalibrateHandbrake,
-                () => _plugin.WriteIfHandbrakeDetected("handbrake-cal-start", 1),
-                () => _plugin.WriteIfHandbrakeDetected("handbrake-cal-stop", 1));
+                () => _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-cal-start", 1),
+                () => _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-cal-stop", 1));
 
     }
 }

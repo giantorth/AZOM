@@ -598,7 +598,7 @@ namespace MozaPlugin
             else
             {
                 _reconnectTimer.Stop();
-                ClearLedsOnHardware();
+                _hardwareApplier.ClearLedsOnHardware();
                 _telemetrySender?.Stop();
                 _connection?.Disconnect();
                 // Deliberate disable — clear any classified failure so the UI

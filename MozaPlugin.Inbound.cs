@@ -386,7 +386,7 @@ namespace MozaPlugin
             if (rising)
             {
                 DetectionState.Ab9Detected = true;
-                ApplyAb9ToHardware(_settings?.ProfileStore?.CurrentProfile);
+                _hardwareApplier.ApplyAb9ToHardware(_settings?.ProfileStore?.CurrentProfile);
             }
 
             MozaLog.Debug($"[AZOM/AB9] {r.Name} = {r.IntValue}");

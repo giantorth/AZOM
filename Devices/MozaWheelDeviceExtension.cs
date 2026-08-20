@@ -267,7 +267,7 @@ namespace MozaPlugin.Devices
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin != null)
-                    plugin.ApplyWheelExtensionSettings(_settings, _expectedModelPrefix);
+                    plugin.HardwareApplier.ApplyWheelExtensionSettings(_settings, _expectedModelPrefix);
             }
         }
 

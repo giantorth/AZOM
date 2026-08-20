@@ -160,7 +160,7 @@ namespace MozaPlugin.Devices
             if (val < 0) return;
             _data!.BaseAmbientIndicatorState = val;
             _plugin.UpdateActiveProfile(p => p.BaseAmbientIndicatorState = val);
-            _plugin.WriteIfBaseAmbientSupported("base-ambient-indicator-state", val);
+            _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-indicator-state", val);
             _plugin.SaveSettings();
         }
 
@@ -172,7 +172,7 @@ namespace MozaPlugin.Devices
             int deviceMode = MapStandbyUiToDevice(uiIndex);
             _data!.BaseAmbientStandbyMode = deviceMode;
             _plugin.UpdateActiveProfile(p => p.BaseAmbientStandbyMode = deviceMode);
-            _plugin.WriteIfBaseAmbientSupported("base-ambient-standby-mode", deviceMode);
+            _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-standby-mode", deviceMode);
             _plugin.SaveSettings();
         }
 
@@ -183,7 +183,7 @@ namespace MozaPlugin.Devices
             if (val < 0) return;
             _data!.BaseAmbientSleepMode = val;
             _plugin.UpdateActiveProfile(p => p.BaseAmbientSleepMode = val);
-            _plugin.WriteIfBaseAmbientSupported("base-ambient-sleep-mode", val);
+            _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-sleep-mode", val);
             _plugin.SaveSettings();
         }
 
@@ -194,7 +194,7 @@ namespace MozaPlugin.Devices
             BrightnessValue.Text = $"{val}";
             _data!.BaseAmbientBrightness = val;
             _plugin.UpdateActiveProfile(p => p.BaseAmbientBrightness = val);
-            _plugin.WriteIfBaseAmbientSupported("base-ambient-brightness", val);
+            _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-brightness", val);
             _plugin.SaveSettings();
         }
 
@@ -205,7 +205,7 @@ namespace MozaPlugin.Devices
             SleepTimeoutValue.Text = $"{val}";
             _data!.BaseAmbientSleepTimeout = val;
             _plugin.UpdateActiveProfile(p => p.BaseAmbientSleepTimeout = val);
-            _plugin.WriteIfBaseAmbientSupported("base-ambient-sleep-timeout", val);
+            _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-sleep-timeout", val);
             _plugin.SaveSettings();
         }
 
@@ -232,7 +232,7 @@ namespace MozaPlugin.Devices
             if (dialog.ShowDialog() == true)
             {
                 byte r = dialog.SelectedR, g = dialog.SelectedG, b = dialog.SelectedB;
-                _plugin.WriteColorIfBaseAmbientSupported(command, r, g, b);
+                _plugin.HardwareApplier.WriteColorIfBaseAmbientSupported(command, r, g, b);
                 target[0] = r; target[1] = g; target[2] = b;
                 swatch.Background = new SolidColorBrush(Color.FromRgb(r, g, b));
                 persistPacked((r << 16) | (g << 8) | b);

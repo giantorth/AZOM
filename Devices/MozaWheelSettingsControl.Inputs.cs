@@ -130,7 +130,7 @@ namespace MozaPlugin.Devices
             _data.WheelPaddlesMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelPaddlesMode = val);
             ApplyPaddleVisibility(val);
-            _plugin.WriteIfWheelDetected("wheel-paddles-mode", val + 1);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-paddles-mode", val + 1);
             _plugin.SaveSettings();
         }
 
@@ -144,7 +144,7 @@ namespace MozaPlugin.Devices
         private void WiPaddleCalStartButton_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            _plugin.WriteIfWheelDetected("wheel-paddles-calibration", 1);  // start
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 1);  // start
 
             WiPaddleCalStartButton.IsEnabled = false;
             _paddleCalRemaining = PaddleCalSeconds;
@@ -165,7 +165,7 @@ namespace MozaPlugin.Devices
                 }
                 _paddleCalTimer?.Stop();
                 _paddleCalTimer = null;
-                _plugin?.WriteIfWheelDetected("wheel-paddles-calibration", 2);  // save
+                _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 2);  // save
                 WiPaddleCalStatus.Text = global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateDone;
                 WiPaddleCalStartButton.IsEnabled = true;
             };
@@ -179,7 +179,7 @@ namespace MozaPlugin.Devices
             WiClutchPointValue.Text = $"{val}%";
             _data.WheelClutchPoint = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
-            _plugin.WriteIfWheelDetected("wheel-clutch-point", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-clutch-point", val);
             _plugin.SaveSettings();
         }
 
@@ -189,7 +189,7 @@ namespace MozaPlugin.Devices
             int val = WiKnobModeCombo.SelectedIndex;
             _data.WheelKnobMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobMode = val);
-            _plugin.WriteIfWheelDetected("wheel-knob-mode", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-mode", val);
             _plugin.SaveSettings();
         }
 
@@ -209,7 +209,7 @@ namespace MozaPlugin.Devices
             // index is the logical knob (LED/UI order); the wire command addresses
             // the firmware signal-mode index, which differs on the KS Pro.
             int fwIndex = _plugin.WheelModelInfo?.SignalModeFirmwareIndex(index) ?? index;
-            _plugin.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value);
+            _plugin.HardwareApplier.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value);
             _plugin.SaveSettings();
         }
 
@@ -222,7 +222,7 @@ namespace MozaPlugin.Devices
             if (val < 0) return; // fires during refresh
             _data.WheelStickMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
-            _plugin.WriteIfWheelDetected("wheel-stick-mode", val * 256);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-stick-mode", val * 256);
             _plugin.SaveSettings();
         }
 
@@ -232,7 +232,7 @@ namespace MozaPlugin.Devices
             int val = WiStickModeCombo.SelectedIndex;
             _data.WheelStickMode = val;
             _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
-            _plugin.WriteIfWheelDetected("wheel-stick-mode-new", val);
+            _plugin.HardwareApplier.WriteIfWheelDetected("wheel-stick-mode-new", val);
             _plugin.SaveSettings();
         }
 

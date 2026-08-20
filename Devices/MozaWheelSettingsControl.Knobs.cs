@@ -324,7 +324,7 @@ namespace MozaPlugin.Devices
                 // telemetry are safe — the next live frame overpaints. Cache
                 // invalidation forces the live pipeline to re-send rather than
                 // dedup'ing against the stale frame.
-                _plugin.WriteLedColorIfWheelDetected($"wheel-knob{knob + 1}-active-color", r, g, b, LedKind.Knob);
+                _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob{knob + 1}-active-color", r, g, b, LedKind.Knob);
                 // Wheel-LED fields aren't captured by MozaProfile.CaptureFromCurrent —
                 // UI handlers must push into the wheel overlay directly, otherwise
                 // ApplyWheelToHardware on the next tick writes the stale overlay
@@ -345,7 +345,7 @@ namespace MozaPlugin.Devices
                 // B4: atomic 3-byte write — races against serial read thread.
                 _data.WriteLedColor(_data.KnobRingColors[absIdx], r, g, b);
                 // A4: gated wheel-LED write — see OnPaletteColorPicked active branch above.
-                _plugin.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{absIdx + 1}", r, g, b, LedKind.Knob);
+                _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{absIdx + 1}", r, g, b, LedKind.Knob);
                 PersistKnobRingColors();
                 _plugin.SaveSettings();
             }
@@ -401,7 +401,7 @@ namespace MozaPlugin.Devices
                 // B4: atomic 3-byte write.
                 _data.WriteLedColor(_data.WheelKnobPrimaryColors[k], srcActive[0], srcActive[1], srcActive[2]);
                 // Wheel-LED write + live-cache invalidation (see WriteLedColorIfWheelDetected).
-                _plugin.WriteLedColorIfWheelDetected($"wheel-knob{k + 1}-active-color", srcActive[0], srcActive[1], srcActive[2], LedKind.Knob);
+                _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob{k + 1}-active-color", srcActive[0], srcActive[1], srcActive[2], LedKind.Knob);
                 // Copy ring (slot by slot — destination may have a different LED count)
                 int dstStart = _plugin.WheelModelInfo?.KnobRingStartIndex(k) ?? (k * 12);
                 int dstLedCount = _plugin.WheelModelInfo?.KnobRingLeds != null && k < _plugin.WheelModelInfo.KnobRingLeds.Length
@@ -416,7 +416,7 @@ namespace MozaPlugin.Devices
                     // B4: atomic 3-byte write.
                     _data.WriteLedColor(_data.KnobRingColors[dstAbs], c[0], c[1], c[2]);
                     // Wheel-LED write + live-cache invalidation (see WriteLedColorIfWheelDetected).
-                    _plugin.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{dstAbs + 1}", c[0], c[1], c[2], LedKind.Knob);
+                    _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{dstAbs + 1}", c[0], c[1], c[2], LedKind.Knob);
                 }
             }
             // Pack the full per-knob active colour array into the overlay once

@@ -44,7 +44,7 @@ namespace MozaPlugin
                 MessageBoxImage.Warning);
             if (result != MessageBoxResult.Yes)
                 return;
-            _plugin.WriteIfBaseConnected("main-soft-reboot", 1);
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-soft-reboot", 1);
         }
 
         // ===== Options tab =====
