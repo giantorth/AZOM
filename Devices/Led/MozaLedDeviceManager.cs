@@ -10,7 +10,7 @@ using SerialDash;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Led
 {
     /// <summary>
     /// Which sub-component of the wheel LED state is being invalidated. Used to tell

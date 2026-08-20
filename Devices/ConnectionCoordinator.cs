@@ -85,7 +85,7 @@ namespace MozaPlugin.Devices
         /// port (the <c>_activePorts</c> guard blocks a second open). Without this,
         /// nothing reads <c>hub-port1-power</c>, so <c>IsHubConnected</c> never flips,
         /// <c>Data.IsConnected</c> stays false, and the SimHub LED pipeline's
-        /// connected-gate (<see cref="Devices.MozaLedDeviceManager.Display"/>)
+        /// connected-gate (<see cref="Devices.Led.MozaLedDeviceManager.Display"/>)
         /// suppresses every frame — the wheel sits on its static EEPROM colours.
         ///
         /// Registry-based setups expose the hub PID on <c>DiscoveredPid</c>;

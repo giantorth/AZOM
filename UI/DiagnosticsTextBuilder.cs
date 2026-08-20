@@ -6,6 +6,7 @@ using System.Text;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 using MozaPlugin.Devices.MBooster;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.UI
 {

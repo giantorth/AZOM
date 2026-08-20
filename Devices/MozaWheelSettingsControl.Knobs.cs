@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using MozaControls;
 using MozaPlugin.Settings;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.Devices
 {

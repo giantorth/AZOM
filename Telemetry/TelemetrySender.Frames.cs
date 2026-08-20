@@ -11,6 +11,7 @@ using MozaPlugin.Telemetry.Sessions;
 using MozaPlugin.Telemetry.TestMode;
 using MozaPlugin.Telemetry.TileServer;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.Telemetry
 {
@@ -431,7 +432,7 @@ namespace MozaPlugin.Telemetry
                 // MozaWheelSettingsControl.cs:1180 and HardwareApplier.cs:181;
                 // the widget-poll slot has no business reasserting 0 on top.
                 int s = slot - 74;
-                bool liveActive = Devices.MozaLedDeviceManager.IsLiveAnywhere();
+                bool liveActive = Devices.Led.MozaLedDeviceManager.IsLiveAnywhere();
                 frame = s switch
                 {
                     2 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),

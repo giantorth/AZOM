@@ -1,6 +1,7 @@
 using System;
 using MozaPlugin.Devices;
 using MozaPlugin.Settings;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.Hardware
 {

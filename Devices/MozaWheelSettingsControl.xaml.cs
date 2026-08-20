@@ -17,6 +17,7 @@ using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
 using static MozaPlugin.Devices.WheelUi.WheelUiHelpers;
 using MozaPlugin.Settings;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.Devices
 {

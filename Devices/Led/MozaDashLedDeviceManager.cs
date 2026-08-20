@@ -8,7 +8,7 @@ using SerialDash;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Led
 {
     /// <summary>
     /// A virtual ILedDeviceManager for the MOZA CM2/CM1 dashboard.

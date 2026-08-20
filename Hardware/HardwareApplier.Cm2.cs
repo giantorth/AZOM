@@ -28,7 +28,7 @@ namespace MozaPlugin.Hardware
         /// device — the same place the dedicated _cm2Sender lives:
         ///   • standalone-USB CM2 → dedicated pipe, dev 0x12
         ///   • base-bridged dash (e.g. CM1) → main pipe, dev 0x14
-        /// Called from <see cref="Devices.MozaDashLedDeviceManager"/> per frame.
+        /// Called from <see cref="Devices.Led.MozaDashLedDeviceManager"/> per frame.
         /// </summary>
         internal bool WriteDashLedBitmask(int bitmask)
         {

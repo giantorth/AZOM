@@ -6,7 +6,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using BA63Driver.Mapper;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Led
 {
     /// <summary>
     /// Version shims that let one DLL drive SimHub's LED pipeline across host builds

@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Led
 {
     /// <summary>
     /// Reflection swap of SimHub's <c>LedModuleSettings.DeviceDriver</c> (the

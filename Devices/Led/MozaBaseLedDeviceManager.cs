@@ -6,7 +6,7 @@ using SerialDash;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Led
 {
     /// <summary>
     /// Virtual ILedDeviceManager for the wheel-base ambient LED strips

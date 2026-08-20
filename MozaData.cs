@@ -1,4 +1,5 @@
 using System;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin
 {
@@ -801,7 +802,7 @@ namespace MozaPlugin
             // responses arrive leaves `_data` at hardcoded defaults and the
             // swatches come up empty on a profile with no saved colors.
             if (_ledColorEditArmed
-                && Devices.MozaLedDeviceManager.IsLiveAnywhere()
+                && Devices.Led.MozaLedDeviceManager.IsLiveAnywhere()
                 && IsWheelLedColorCommand(commandName))
                 return;
 
