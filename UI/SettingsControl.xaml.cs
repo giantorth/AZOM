@@ -2889,8 +2889,36 @@ namespace MozaPlugin
                         _mboosterEffectPedalIndex = sameDeviceRetargetAxis;
                     else
                     {
+                        // First-ever selection (a brand-new SettingsControl, or
+                        // the previously-selected device vanished entirely) —
+                        // this used to always land on axis 0, even when axis 0
+                        // isn't actually wired (a standalone unit's sole pedal
+                        // commonly reports on a non-zero axis — see the
+                        // ConnectedAxes-based retarget above, and
+                        // MBoosterDeviceController's own ConnectedAxes doc
+                        // comment). Connectivity is frequently ALREADY known at
+                        // this point from the persisted cache (seeded well
+                        // before the live "PD Linked" diagnostic confirms it —
+                        // see MozaPlugin.LookupMBoosterKnownPedals), so defaulting
+                        // to axis 0 blindly showed this device's (often
+                        // long-stale/orphaned) axis-0 flat-field data — e.g. a
+                        // Sim Input Mapping/Pedal Feel curve nobody's touched in
+                        // ages — until a later refresh tick corrected the axis
+                        // once the live diagnostic caught up. Pick the first
+                        // known-connected axis instead, same as the retarget
+                        // logic above; fall back to axis 0 only when
+                        // connectivity isn't known yet at all.
                         _mboosterSelectedIdentity = devices[0].Identity;
-                        _mboosterEffectPedalIndex = 0;
+                        var initialConnected = devices[0].ConnectedAxes;
+                        int initialAxis = 0;
+                        if (initialConnected != null)
+                        {
+                            for (int axis = 0; axis < initialConnected.Length; axis++)
+                            {
+                                if (initialConnected[axis]) { initialAxis = axis; break; }
+                            }
+                        }
+                        _mboosterEffectPedalIndex = initialAxis;
                     }
                 }
 
