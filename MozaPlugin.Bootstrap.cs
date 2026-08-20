@@ -72,6 +72,7 @@ namespace MozaPlugin
                     () => new MozaPluginSettings { TelemetryEnabledDefaultForNewWheels = true });
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
+                _updateCheck = new UpdateCheckCoordinator(this);
 
                 // Sweep leftover install artifacts before doing anything
                 // heavyweight. After a successful in-app update + SimHub
@@ -190,12 +191,12 @@ namespace MozaPlugin
 
                 // Fire-and-forget update check against the GitHub Releases API.
                 // Throttled to once per 24h (LastUpdateCheckUtc) and deduped
-                // per-process (s_updateCheckStarted) so SimHub game switches
+                // per-process so SimHub game switches
                 // don't multiply network calls. Persist-then-render: the
                 // result lands in _settings.LastSeenLatestVersion and the
                 // About-tab banner reads it on next open. Failures are silent
                 // here — the user-facing "Check now" button surfaces errors.
-                MaybeStartUpdateCheck();
+                _updateCheck.MaybeStart();
 
                 // Read SimHub's global temperature unit preference (set at first launch)
                 var tempUnit = pluginManager.GetPropertyValue("DataCorePlugin.GameData.TemperatureUnit");

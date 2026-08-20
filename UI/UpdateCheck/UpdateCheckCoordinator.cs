@@ -1,59 +1,57 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
-using System.Windows.Media;
-using GameReaderCommon;
 using SimHub.Plugins;
-using MozaPlugin.Devices;
-using MozaPlugin.Devices.StalksTruckSim;
-using MozaPlugin.Hardware;
-using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
-using MozaPlugin.Settings;
-using MozaPlugin.Telemetry;
-using MozaPlugin.Telemetry.Dashboard;
-using MozaPlugin.Telemetry.Era;
-using MozaPlugin.Telemetry.Frames;
-using MozaPlugin.Telemetry.TileServer;
-using MozaPlugin.UI.UpdateCheck;
-using Timer = System.Timers.Timer;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI.UpdateCheck
 {
-    public partial class MozaPlugin
+    /// <summary>
+    /// Schedules the startup update check. Extracted from MozaPlugin — see
+    /// MozaPlugin.Bootstrap.cs for the Init call site.
+    /// </summary>
+    internal sealed class UpdateCheckCoordinator
     {
+        private readonly MozaPlugin _plugin;
 
-        // Kicks off the background GitHub Releases query on a thread-pool
-        // thread, with a 24h throttle (LastUpdateCheckUtc) and a per-process
-        // dedupe (s_updateCheckStarted). Returns immediately; the result is
-        // persisted into _settings on completion. Failures swallow silently
-        // — the user can still trigger a foreground check from the About tab.
-        private void MaybeStartUpdateCheck()
+        // Per-process dedupe so a SimHub game switch (which re-runs Init)
+        // doesn't re-query GitHub. Static by design: it must outlive the
+        // plugin instance, not the coordinator.
+        private static bool s_started;
+
+        internal UpdateCheckCoordinator(MozaPlugin plugin)
+        {
+            _plugin = plugin;
+        }
+
+        /// <summary>
+        /// Kicks off the background GitHub Releases query on a thread-pool
+        /// thread, with a 24h throttle (LastUpdateCheckUtc) and a per-process
+        /// dedupe. Returns immediately; the result is persisted into settings
+        /// on completion. Failures swallow silently — the user can still
+        /// trigger a foreground check from the About tab.
+        /// </summary>
+        internal void MaybeStart()
         {
             try
             {
-                if (_settings == null || !_settings.UpdateCheckEnabled) return;
-                if (s_updateCheckStarted) return;
+                var settings = _plugin._settings;
+                if (settings == null || !settings.UpdateCheckEnabled) return;
+                if (s_started) return;
                 // A PR channel tracks a moving head — a version cached in a
                 // prior session may be stale, and the tracked PR may have
                 // closed since. Re-check PR channels on every launch (still
-                // once per process via s_updateCheckStarted); stable versions
-                // are directly comparable and keep the 24h throttle.
-                if (!UpdateCheckService.TryParsePrChannelId(_settings.UpdateChannelId, out _)
-                    && DateTime.UtcNow - _settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
+                // once per process via s_started); stable versions are
+                // directly comparable and keep the 24h throttle.
+                if (!UpdateCheckService.TryParsePrChannelId(settings.UpdateChannelId, out _)
+                    && DateTime.UtcNow - settings.LastUpdateCheckUtc < TimeSpan.FromHours(24))
                 {
                     MozaLog.Debug("[UpdateCheck] skipped — last check less than 24h ago");
                     return;
                 }
-                s_updateCheckStarted = true;
+                s_started = true;
 
-                var channelId = _settings.UpdateChannelId;
+                var channelId = settings.UpdateChannelId;
                 _ = Task.Run(async () =>
                 {
                     try
@@ -61,7 +59,7 @@ namespace MozaPlugin
                         var fetch = await UpdateCheckService
                             .FetchSnapshotAsync(CancellationToken.None)
                             .ConfigureAwait(false);
-                        _settings.LastUpdateCheckUtc = DateTime.UtcNow;
+                        settings.LastUpdateCheckUtc = DateTime.UtcNow;
 
                         if (fetch.Snapshot != null)
                         {
@@ -75,9 +73,9 @@ namespace MozaPlugin
                                 MozaLog.Info(
                                     $"[UpdateCheck] channel {channelId} is gone; falling back to stable");
                                 channelId = UpdateCheckService.StableChannelId;
-                                _settings.UpdateChannelId = channelId;
-                                _settings.UpdateChannelLabel = "";
-                                _settings.LastSkippedVersion = "";
+                                settings.UpdateChannelId = channelId;
+                                settings.UpdateChannelLabel = "";
+                                settings.LastSkippedVersion = "";
                                 result = UpdateCheckService.ResolveChannel(
                                     snap, channelId, out _);
                             }
@@ -88,7 +86,7 @@ namespace MozaPlugin
                                 {
                                     if (ch.Number == prNumber)
                                     {
-                                        _settings.UpdateChannelLabel = string.Format(
+                                        settings.UpdateChannelLabel = string.Format(
                                             Strings.Option_ReleaseChannelPr, ch.Number, ch.Title);
                                         break;
                                     }
@@ -97,10 +95,10 @@ namespace MozaPlugin
 
                             if (result.Success && !string.IsNullOrEmpty(result.LatestVersion))
                             {
-                                _settings.LastSeenLatestVersion = result.LatestVersion;
-                                _settings.LastSeenReleaseUrl = result.ReleaseUrl;
-                                _settings.LastSeenAssetUrl = result.AssetUrl;
-                                _settings.LastSeenReleaseNotes = result.ReleaseNotes;
+                                settings.LastSeenLatestVersion = result.LatestVersion;
+                                settings.LastSeenReleaseUrl = result.ReleaseUrl;
+                                settings.LastSeenAssetUrl = result.AssetUrl;
+                                settings.LastSeenReleaseNotes = result.ReleaseNotes;
                                 MozaLog.Debug(
                                     $"[UpdateCheck] {channelId}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
                             }
@@ -111,7 +109,7 @@ namespace MozaPlugin
                                 $"[UpdateCheck] {channelId} failed: {fetch.ErrorKind} {fetch.ErrorMessage}");
                         }
 
-                        try { this.SaveCommonSettings("MozaPluginSettings", _settings); }
+                        try { _plugin.SaveCommonSettings("MozaPluginSettings", settings); }
                         catch { /* persistence is best-effort */ }
 
                         // Repaint the settings pane if it's open so a fresh

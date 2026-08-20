@@ -120,15 +120,6 @@ namespace MozaPlugin
         // wire and would otherwise leave tabs hidden until SimHub restarts.
         private static DeviceDetectionState? s_persistentDetectionState;
 
-        // Update-check dedupe: the GitHub Releases query is per-process, not
-        // per-plugin-Init. SimHub reloads the plugin on every game switch, so
-        // without this guard a user switching games could burn through the
-        // unauthenticated GitHub rate limit (60 req/hr per IP). Set once
-        // when the check kicks off in Init; never cleared. The "Check now"
-        // button in the About tab is the only way to force a re-check within
-        // the same SimHub process lifetime.
-        private static bool s_updateCheckStarted;
-
         private MozaSerialConnection _connection = null!;
         private MozaData _data = null!;
         private MozaDeviceManager _deviceManager = null!;
@@ -280,6 +271,9 @@ namespace MozaPlugin
         // see Settings/ProfileCoordinator.cs. Constructed right after _settings
         // loads, before any serial/timer callback can hit the shims below.
         private ProfileCoordinator _profileCoordinator = null!;
+        // Startup GitHub Releases check (24h throttle + per-process dedupe) —
+        // see UI/UpdateCheck/UpdateCheckCoordinator.cs.
+        private UpdateCheckCoordinator _updateCheck = null!;
 
         private TelemetrySender? _telemetrySender;
 
