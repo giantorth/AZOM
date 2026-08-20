@@ -2340,13 +2340,47 @@ namespace MozaPlugin
                 var dict = profile.MBoosterSettings;
 
                 // Lazily migrate a transient transport-keyed entry to the serial
-                // key in the current profile. A serial-keyed entry, if one
-                // already exists (the user's saved config from a prior session),
-                // wins — the transport entry is a just-created placeholder.
+                // key in the current profile.
+                //
+                // A brand-new transport-keyed placeholder gets created (below)
+                // the instant the device is first detected, BEFORE its serial
+                // has been read back — this is normal and happens every single
+                // session. If the user starts editing (dragging a curve node,
+                // say) in the brief window before OnMBoosterSerialResolved
+                // fires and migrates it, those edits land on THIS placeholder.
+                // The old version of this migration always kept whichever
+                // object was ALREADY under the serial key and silently deleted
+                // the transport-keyed one — meaning a live edit made in that
+                // window was discarded outright, with no warning, the moment
+                // the serial resolved (bug: a real drag-tested curve edit
+                // vanished, reverting to whatever stale data pre-dated it, even
+                // though the whole session shut down cleanly afterwards).
+                //
+                // Fix: an untouched placeholder (see IsUntouchedMBoosterPlaceholder)
+                // still loses to whatever's already at the serial key, same as
+                // before. But once the transport-keyed entry holds real,
+                // user-visible data, it wins — it can only have gotten that data
+                // via a live edit moments ago (it started as an empty placeholder
+                // THIS session), so it's the freshest thing we know about. Only
+                // log (not silently overwrite) when the serial-keyed side ALSO
+                // already holds real data — a genuine two-real-datasets conflict
+                // this heuristic can't perfectly resolve, but at least it's now
+                // visible instead of an invisible, permanent data loss.
                 if (!string.Equals(original, key, StringComparison.OrdinalIgnoreCase)
                     && dict.TryGetValue(original, out var stale))
                 {
-                    if (!dict.ContainsKey(key)) dict[key] = stale;
+                    bool staleUntouched = IsUntouchedMBoosterPlaceholder(stale);
+                    bool keyHasEntry = dict.TryGetValue(key, out var existing);
+                    if (!keyHasEntry)
+                    {
+                        dict[key] = stale;
+                    }
+                    else if (!staleUntouched)
+                    {
+                        if (!IsUntouchedMBoosterPlaceholder(existing))
+                            MozaLog.Warn($"[AZOM\\mBooster] GetOrCreateMBoosterSettings: BOTH the transport-keyed entry ('{original}') and the serial-keyed entry ('{key}') hold real data in profile '{profile.Name}' — keeping the transport-keyed (more recently touched) one; the serial-keyed one's prior values are discarded.");
+                        dict[key] = stale;
+                    }
                     dict.Remove(original);
                 }
 
@@ -2364,6 +2398,40 @@ namespace MozaPlugin
                 }
                 return s;
             }
+        }
+
+        /// <summary>
+        /// True if every field GetOrCreateMBoosterSettings's re-key migration
+        /// cares about is still at its untouched sentinel/default — i.e. this
+        /// looks exactly like the placeholder GetOrCreateMBoosterSettings
+        /// itself creates for a just-detected device, not something a user
+        /// (or an import/migration) has actually written real values into.
+        /// Used to decide which of two colliding entries (transport-keyed vs
+        /// serial-keyed) is safe to discard during migration — see the caller.
+        /// Deliberately does NOT check the effect settings (Abs/Lockup/etc.)
+        /// or CustomEffects: those aren't part of the bug this guards against,
+        /// and their own field-level defaults are less clear-cut, so skipping
+        /// them only makes this check slightly less strict, never wrong in a
+        /// way that would newly discard real data it didn't already discard.
+        /// </summary>
+        private static bool IsUntouchedMBoosterPlaceholder(MBoosterDeviceSettings s)
+        {
+            return s.Role == global::MozaPlugin.Devices.MBoosterRole.Disabled
+                && s.AxisRoles == null
+                && s.Direction < 0 && s.Min < 0 && s.Max < 0
+                && s.CurveY == null && s.CurveX == null
+                && s.SensorOutputRatioPct < 0 && s.MaxThresholdKg < 0
+                && s.InputCurveY == null && s.InputCurveX == null
+                && s.DeadzoneKg < 0 && s.MaxForceKg < 0
+                && s.TravelStartMm < 0 && s.TravelEndMm < 0
+                && s.EndstopFrontStiffness < 0 && s.EndstopEndStiffness < 0
+                && s.NaturalFrictionPct < 0
+                && string.IsNullOrEmpty(s.DisplayName)
+                && (s.Pedals == null || s.Pedals.Count == 0)
+                && s.SegmentedDamping.Divider1Pressed < 0 && s.SegmentedDamping.Divider2Pressed < 0
+                && s.SegmentedDamping.Seg1Pressed < 0 && s.SegmentedDamping.Seg2Pressed < 0 && s.SegmentedDamping.Seg3Pressed < 0
+                && s.SegmentedDamping.Divider1Released < 0 && s.SegmentedDamping.Divider2Released < 0
+                && s.SegmentedDamping.Seg1Released < 0 && s.SegmentedDamping.Seg2Released < 0 && s.SegmentedDamping.Seg3Released < 0;
         }
 
         /// <summary>
