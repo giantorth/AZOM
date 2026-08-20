@@ -141,16 +141,16 @@ namespace MozaPlugin.Telemetry
             var plugin = MozaPlugin.Instance;
             int oneHzEvery = Math.Max(1, (int)Math.Round(1000.0 / TickIntervalMs));
             bool testMode = plugin?.DashboardTestPatternActive ?? false;
-            bool probe = plugin?.Fsr1ProbeActive ?? false;
+            bool probe = plugin?.Fsr1Probe.Active ?? false;
 
             // What drives the wheel this tick: live telemetry, the test sweep, or the byte
             // probe. When none are active we normally just keepalive — but if the channel-
-            // mapping panel's byte preview is open (Fsr1VizActive) we still flow through to
+            // mapping panel's byte preview is open (Fsr1Probe.VizActive) we still flow through to
             // compute and publish a viz snapshot from live game data, so the preview stays
             // live while the user edits with telemetry-send toggled off. Wheel streaming is
             // skipped in that case (vizOnly), so nothing is actually pushed to the screen.
             bool streamLive = (plugin?.ActiveTelemetryEnabled ?? false) || testMode || probe;
-            bool vizOnly = !streamLive && (plugin?.Fsr1VizActive ?? false);
+            bool vizOnly = !streamLive && (plugin?.Fsr1Probe.VizActive ?? false);
             if (!streamLive && !vizOnly)
             {
                 if (_tickCounter % oneHzEvery == 0)
@@ -276,9 +276,9 @@ namespace MozaPlugin.Telemetry
             //    pulse, including low bytes (which sweep 0→255 — small but clearly moving).
             long probeRamp = DashboardTestPattern.NowMs() / 3 % 512;   // 0..511 over ~1.5 s
             int probeValue = (int)(probeRamp < 256 ? probeRamp : 511 - probeRamp); // triangle 0..255..0
-            var fieldProbe = probe ? plugin?.Fsr1FieldProbeTarget() : null;
+            var fieldProbe = probe ? plugin?.Fsr1Probe.FieldProbeTarget() : null;
             (byte probeType, int probeOff) = (probe && fieldProbe == null)
-                ? (plugin?.Fsr1ProbeTarget() ?? ((byte)0, -1)) : ((byte)0, -1);
+                ? (plugin?.Fsr1Probe.Target() ?? ((byte)0, -1)) : ((byte)0, -1);
 
             byte[] RecordFor(Fsr1Dashboard dash)
             {
@@ -421,7 +421,7 @@ namespace MozaPlugin.Telemetry
 
             // Live numeric viz: publish a snapshot of the active record set's real telemetry
             // values for the channel-mapping panel's byte strip (only while it asks for it).
-            if (plugin != null && plugin.Fsr1VizActive)
+            if (plugin != null && plugin.Fsr1Probe.VizActive)
             {
                 // UI-only preview — must never take down the streaming tick if one record's
                 // partition is malformed. Isolate it so the wheel keeps updating regardless.
@@ -431,7 +431,7 @@ namespace MozaPlugin.Telemetry
                     var records = new Fsr1VizRecord[vizSet.Length];
                     for (int i = 0; i < vizSet.Length; i++)
                         records[i] = BuildVizRecord(vizSet[i]);
-                    plugin.SetFsr1VizSnapshot(new Fsr1VizSnapshot(records));
+                    plugin.Fsr1Probe.SetVizSnapshot(new Fsr1VizSnapshot(records));
                 }
                 catch (Exception ex)
                 {

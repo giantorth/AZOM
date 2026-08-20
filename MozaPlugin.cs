@@ -274,6 +274,9 @@ namespace MozaPlugin
         // Startup GitHub Releases check (24h throttle + per-process dedupe) —
         // see UI/UpdateCheck/UpdateCheckCoordinator.cs.
         private UpdateCheckCoordinator _updateCheck = null!;
+        // FSR1 decode probes + live byte-strip viz — see Diagnostics/Fsr1ProbeTool.cs.
+        private Diagnostics.Fsr1ProbeTool _fsr1Probe = null!;
+        internal Diagnostics.Fsr1ProbeTool Fsr1Probe => _fsr1Probe;
 
         private TelemetrySender? _telemetrySender;
 
@@ -720,7 +723,7 @@ namespace MozaPlugin
             _dashboardTestPattern = on;
             if (_telemetrySender != null) _telemetrySender.TestMode = on;
             if (_cm2Sender != null) _cm2Sender.TestMode = on;
-            if (on) { _fsr1ProbeStep = -1; _fsr1FieldProbe = null; } // exclusive with both probes
+            if (on) _fsr1Probe?.DisarmAll(); // exclusive with both probes
         }
 
         // Build the 3-byte payload shared by per-effect speed commands:

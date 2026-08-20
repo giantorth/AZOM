@@ -73,6 +73,7 @@ namespace MozaPlugin
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
                 _updateCheck = new UpdateCheckCoordinator(this);
+                _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
 
                 // Sweep leftover install artifacts before doing anything
                 // heavyweight. After a successful in-app update + SimHub

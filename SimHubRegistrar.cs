@@ -257,8 +257,8 @@ namespace MozaPlugin
             // screen (mirrors the ◀/▶ buttons on the Dashboard Telemetry card).
             _plugin.AddAction("AZOM.Fsr1ProbeToggle", (a, b) =>
             {
-                _plugin.SetFsr1Probe(!_plugin.Fsr1ProbeActive);
-                MozaLog.Debug($"[AZOM] FSR1 byte probe {(_plugin.Fsr1ProbeActive ? "on" : "off")} via action");
+                _plugin.Fsr1Probe.SetProbe(!_plugin.Fsr1Probe.Active);
+                MozaLog.Debug($"[AZOM] FSR1 byte probe {(_plugin.Fsr1Probe.Active ? "on" : "off")} via action");
             });
             _plugin.AddAction("AZOM.Fsr1ProbeNext", (a, b) => StepFsr1Probe(+1));
             _plugin.AddAction("AZOM.Fsr1ProbePrev", (a, b) => StepFsr1Probe(-1));
@@ -639,9 +639,9 @@ namespace MozaPlugin
         private void StepFsr1Probe(int delta)
         {
             if (!_plugin.IsFsr1DisplayWheel) return;
-            if (!_plugin.Fsr1ProbeActive) _plugin.SetFsr1Probe(true);
-            else _plugin.StepFsr1Probe(delta);
-            MozaLog.Debug($"[AZOM] FSR1 byte probe → {_plugin.Fsr1ProbeTargetLabel()} via action");
+            if (!_plugin.Fsr1Probe.Active) _plugin.Fsr1Probe.SetProbe(true);
+            else _plugin.Fsr1Probe.Step(delta);
+            MozaLog.Debug($"[AZOM] FSR1 byte probe → {_plugin.Fsr1Probe.TargetLabel()} via action");
         }
 
         // Cycle the displayed dashboard to the next/previous page, wrapping around.

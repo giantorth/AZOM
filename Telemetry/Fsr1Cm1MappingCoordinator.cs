@@ -138,10 +138,10 @@ namespace MozaPlugin.Telemetry
         internal int GetActiveFsr1Index()
         {
             // While the byte probe is armed it pins the page so a mid-sweep page-report
-            // can't scramble stepping (see MozaPlugin.Fsr1ProbeFrozenIndex). The driver,
+            // can't scramble stepping (see MozaPlugin.Fsr1Probe.FrozenIndex). The driver,
             // probe target, channel UI, and label all read through here, so they stay in
             // agreement on the frozen page for the probe's lifetime.
-            int frozen = _plugin.Fsr1ProbeFrozenIndex;
+            int frozen = _plugin.Fsr1Probe.FrozenIndex;
             if (frozen >= 0) return frozen;
             return RawActiveFsr1Index();
         }

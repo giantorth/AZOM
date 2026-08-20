@@ -73,7 +73,7 @@ namespace MozaPlugin.Devices.WheelUi
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             StopMappingValueTimer();
-            try { _plugin?.SetFsr1VizActive(false); } catch { }
+            try { _plugin?.Fsr1Probe.SetVizActive(false); } catch { }
             _refreshTimer.Stop();
             // InitTelemetryUI is one-shot (guarded by _telemetryUIInitialized) but the two
             // lifecycle bits above (value timer + viz publishing) are torn down on every
@@ -318,7 +318,7 @@ namespace MozaPlugin.Devices.WheelUi
                 StartMappingValueTimer();
                 // Ask the FSR1 driver to publish live numeric snapshots; the 2 Hz value
                 // timer reads them into the byte strip. No-op for non-FSR1 wheels.
-                _plugin.SetFsr1VizActive(true);
+                _plugin.Fsr1Probe.SetVizActive(true);
             }
         }
 
@@ -641,7 +641,7 @@ namespace MozaPlugin.Devices.WheelUi
             TelemetryProfileCombo.IsEnabled = selectorReady;
 
             // Single-byte probe diagnostic: FSR1-only, live whenever its driver runs.
-            bool probeOn = _plugin?.Fsr1ProbeActive ?? false;
+            bool probeOn = _plugin?.Fsr1Probe.Active ?? false;
             var probeVis = fsr1 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             Fsr1ProbeBtn.Visibility = probeVis;
             Fsr1ProbeBtn.IsEnabled = fsr1Running;
@@ -651,7 +651,7 @@ namespace MozaPlugin.Devices.WheelUi
             Fsr1ProbeNextBtn.Visibility = stepVis;
             Fsr1ProbeLabel.Visibility = stepVis;
             if (probeOn)
-                Fsr1ProbeLabel.Text = _plugin?.Fsr1ProbeTargetLabel() ?? "—";
+                Fsr1ProbeLabel.Text = _plugin?.Fsr1Probe.TargetLabel() ?? "—";
 
             // Refresh profile info — auto-renegotiate may have swapped
             // the profile on a background thread after a dashboard switch.
@@ -934,21 +934,21 @@ namespace MozaPlugin.Devices.WheelUi
         private void Fsr1ProbeToggle_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            _plugin.SetFsr1Probe(!_plugin.Fsr1ProbeActive);
+            _plugin.Fsr1Probe.SetProbe(!_plugin.Fsr1Probe.Active);
             RefreshTelemetryStatus();
         }
 
         private void Fsr1ProbePrev_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            _plugin.StepFsr1Probe(-1);
+            _plugin.Fsr1Probe.Step(-1);
             RefreshTelemetryStatus();
         }
 
         private void Fsr1ProbeNext_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-            _plugin.StepFsr1Probe(+1);
+            _plugin.Fsr1Probe.Step(+1);
             RefreshTelemetryStatus();
         }
 
@@ -1003,7 +1003,7 @@ namespace MozaPlugin.Devices.WheelUi
         private void UpdateFsr1Viz()
         {
             if (_plugin == null || Fsr1VizPanel == null) return;
-            var records = _plugin.GetFsr1VizSnapshot()?.Records;
+            var records = _plugin.Fsr1Probe.GetVizSnapshot()?.Records;
             if (records == null || records.Length == 0)
             {
                 if (_fsr1VizRows.Count > 0) _fsr1VizRows.Clear();
@@ -1138,7 +1138,7 @@ namespace MozaPlugin.Devices.WheelUi
             // lights exactly the box(es) it feeds — stepping the edges moves the lit
             // box live. Cleared on Commit/Cancel below.
             if (row.IsFsr1 && !string.IsNullOrEmpty(row.RecordKey) && !string.IsNullOrEmpty(row.FieldId))
-                _plugin?.SetFsr1FieldProbe(row.RecordKey, row.FieldId);
+                _plugin?.Fsr1Probe.SetFieldProbe(row.RecordKey, row.FieldId);
             // Focus the filter once the row's editor container is realized.
             Dispatcher.BeginInvoke(new Action(() => FocusInlineFilter(row)), DispatcherPriority.Render);
         }
@@ -1147,14 +1147,14 @@ namespace MozaPlugin.Devices.WheelUi
         {
             if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
             row.CommitEdit();
-            if (row.IsFsr1) _plugin?.ClearFsr1FieldProbe();
+            if (row.IsFsr1) _plugin?.Fsr1Probe.ClearFieldProbe();
         }
 
         private void CancelMapping_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.Tag is not ChannelMappingRow row) return;
             row.CancelEdit();
-            if (row.IsFsr1) _plugin?.ClearFsr1FieldProbe();
+            if (row.IsFsr1) _plugin?.Fsr1Probe.ClearFieldProbe();
         }
 
         // Advanced edit: open SimHub's own formula editor (BindingEditor) against the
@@ -1227,7 +1227,7 @@ namespace MozaPlugin.Devices.WheelUi
 
             // Rebuild the list so the reset row re-seeds from catalog defaults; the
             // field-probe (if armed) is released by the repopulate's editor teardown.
-            _plugin.ClearFsr1FieldProbe();
+            _plugin.Fsr1Probe.ClearFieldProbe();
             PopulateChannelMappingList();
             TelemetryMappingStatus.Text = $"Reset field at {DateTime.Now:HH:mm:ss}";
         }
