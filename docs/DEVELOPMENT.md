@@ -124,7 +124,33 @@ Notes:
 
 ### Partial-class splits
 
-- **`UI/SettingsControl`** (plugin pane): `SettingsControl.xaml.cs` (main: tab refresh tick, base/pedals/options handlers, diagnostics), `.UpdateBanner.cs` (status-hint banners, update notifications, restart-required flow), `.Redesign.cs` (custom-control initialization/theming), `.Sdk.cs` (SDK tab handlers), `.ImportProfile.cs` (profile import dialog). The PitHouse preset wizard (`UI/Import/`) accepts both legacy raw-JSON presets and the ZIP-wrapped `.mzpreset` container PitHouse 1.4+ writes (a zip holding `preset.json` + `metadata.json`); `PitHousePresetArchive` unwraps it, detecting the container by content (ZIP magic) rather than extension, so both read paths (`PitHousePresetReader` + `PitHouseFolderScanner`) stay format-agnostic. `deviceType` picks the mapper — `PitHouseMotorMapper` (wheelbase → `MozaProfile`), and for `Pedals` one of two: `PitHousePedalsMapper` (mBooster — per-pedal settings rows, subject-role detection, retargetable via the "Apply to" combo) or `PitHouseCrpPedalsMapper` (CRP/CRP2/SRP — one device with all three pedals, calibration on `MozaProfile.Pedals*`, nothing to retarget). The wizard routes on the preset's own `devices` list, falling back to the mBooster path — see [`docs/protocol/devices/mbooster.md`](protocol/devices/mbooster.md#crp--crp2--srp-presets--the-passive-pedal-route).
+- **`UI/SettingsControl`** (plugin pane) — one partial per tab or concern; `SettingsControl.xaml.cs` itself holds only the fields, constructor and Loaded/Unloaded timer wiring:
+
+  | File | Owns |
+  |---|---|
+  | `.xaml.cs` | fields, ctor, `OnLoadedStartTimers` / `OnUnloadedStopTimers`, `Instance` |
+  | `.Refresh.cs` | the 500 ms refresh tick, `RefreshDisplay`, `RefreshBaseTab`, HID input displays |
+  | `.BaseTab.cs` | base slider handlers, checkbox handlers, RPM range |
+  | `.Lfe.cs` | wheelbase LFE effects (base fw ≥ 1.2.10.10) |
+  | `.Ffb.cs` | FFB equalizer + FFB curve + Bluetooth/base calibration |
+  | `.Handbrake.cs` | handbrake range, curve, calibration |
+  | `.Pedals.cs` | pedals tab |
+  | `.Hub.cs` | hub tab |
+  | `.Options.cs` | options tab, profile system, telemetry toggles, connection toggle |
+  | `.About.cs` | about-tab link handlers |
+  | `.Ab9.cs` | AB9 active-shifter tab |
+  | `.MBooster.cs` | mBooster tab (multi-device, multi-pedal row selection) |
+  | `.Effects.cs` | custom effects (experimental) |
+  | `.Calibration.cs` | calibration (experimental) |
+  | `.SliderHelpers.cs` | generic slider-handler helpers + keyed slider value box |
+  | `.Sdk.cs` | SDK tab handlers |
+  | `.UpdateBanner.cs` | status-hint banners, update notifications, restart-required flow |
+  | `.Redesign.cs` | custom-control initialization/theming |
+  | `.BugReport.cs` | diagnostics bundle + bug-report upload |
+  | `.Shifter.cs` / `.Stalks.cs` | HGP/SGP shifter tabs; truck-sim stalks |
+  | `.ImportProfile.cs` | profile import dialog |
+
+  The PitHouse preset wizard (`UI/Import/`) accepts both legacy raw-JSON presets and the ZIP-wrapped `.mzpreset` container PitHouse 1.4+ writes (a zip holding `preset.json` + `metadata.json`); `PitHousePresetArchive` unwraps it, detecting the container by content (ZIP magic) rather than extension, so both read paths (`PitHousePresetReader` + `PitHouseFolderScanner`) stay format-agnostic. `deviceType` picks the mapper — `PitHouseMotorMapper` (wheelbase → `MozaProfile`), and for `Pedals` one of two: `PitHousePedalsMapper` (mBooster — per-pedal settings rows, subject-role detection, retargetable via the "Apply to" combo) or `PitHouseCrpPedalsMapper` (CRP/CRP2/SRP — one device with all three pedals, calibration on `MozaProfile.Pedals*`, nothing to retarget). The wizard routes on the preset's own `devices` list, falling back to the mBooster path — see [`docs/protocol/devices/mbooster.md`](protocol/devices/mbooster.md#crp--crp2--srp-presets--the-passive-pedal-route).
 - **`Devices/MozaWheelSettingsControl`** (per-wheel device page): `.xaml.cs` (main refresh tick, telemetry section, RPM/Buttons/Flag swatches), `.Inputs.cs` (live paddles/buttons display + input-mode handlers), `.Knobs.cs` (knob ring grid + signal-mode editor). The dashboard combo / channel mapper sections live in the shared `Devices/WheelUi/DashboardManagementControl` (Dashboard tab); the upload + on-wheel file-inventory (Enable/Delete) sections live in the sibling `Devices/WheelUi/DashboardFilesControl` (Files tab). Both are self-contained (own 500 ms refresh timer, Loaded/Unloaded-gated) and hosted by both the wheel and dash pages.
 
 ## Architecture
