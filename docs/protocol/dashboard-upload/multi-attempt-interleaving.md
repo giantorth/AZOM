@@ -18,7 +18,7 @@ attempt or to extend the same deflate stream.
 
 ### Sim parsing strategy
 
-`_parse_upload_6b` in [`sim/wheel_sim.py`](../../../sim/wheel_sim.py)
+`_parse_upload_6b` in [`sim/wheel_sim.py`](https://github.com/giantorth/moza-simulator)
 implements a greedy walk that filters across attempt boundaries:
 
 | Step | Operation | Purpose |

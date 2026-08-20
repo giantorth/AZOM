@@ -21,7 +21,7 @@ current value. Sub-cmd `0x4F 0X` is the read-companion of `0x4E 0X`
 `9F` = `0x1F | 0x80`; `0x21` = nibble-swap of `0x12`.
 
 **Verified sub-cmds and response shapes** (from
-[`sim/wheel_sim.py`](../../../sim/wheel_sim.py) `_HUB_CFG_VALUES`,
+[`sim/wheel_sim.py`](https://github.com/giantorth/moza-simulator) `_HUB_CFG_VALUES`,
 captures: `pithouse-switch-list-delete-upload-reupload.pcapng`,
 `moza-startup.pcapng`, `putOnWheelAndOpenPitHouse.pcapng`):
 

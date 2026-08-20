@@ -92,37 +92,67 @@ Notes:
 
 | Path | Contents |
 |---|---|
-| `MozaPlugin.cs` | Plugin entry point / orchestrator (`IPlugin`, `IDataPlugin`, `IWPFSettingsV2`): Init/DataUpdate/End lifecycle, timers, serial message dispatch, PollStatus, collaborator construction, forwarder shims |
-| `MozaData.cs` | Thread-safe data model (~80 volatile fields) for every device value + HID input positions; `UpdateFromCommand`/`UpdateFromArray` map parsed responses to fields |
-| `MozaDeviceManager.cs` | High-level read/write API per connection: wheel ID cycling (23→21→19), paced read batches, presence probes |
-| `SimHubRegistrar.cs` | SimHub `AZOM.*` property delegates + button-bindable actions (step/cycle/toggle) |
-| `BaseSettingCatalog.cs` | Declarative table of every wheelbase setting (command, `MozaData` accessors, display range, scale, step sizes) that `SimHubRegistrar` expands into `AZOM.*` properties and step/toggle actions; also the shared road-sensitivity/EQ preset data |
-| `Protocol/` | Serial transport: `MozaSerialConnection` (threads, framing, 0x7E stuffing, write lanes), `MozaPortDiscovery` (device enumeration, registry + sysfs sources), `WineHost`/`LinuxUsbEnumerator`/`WineComNameResolver`/`WineDevicePathMozaPort`/`WineNativeExec` (Wine/Proton discovery + transport + native-exec), `MozaUsbIds` (PID inventory), `MozaCommandDatabase` (200+ commands), `MozaResponseParser`, `MozaProtocol` (constants/checksums), `MozaHidReader`, `PendingResponseTracker`, `WriteBudget`, `ConnectionFailure`, `SessionPropertyPushBuilder`/`FfRecordReader` (FF-record write/read) |
-| `Devices/` | Device detection + per-device managers and SimHub device extensions: `DeviceProber`, `DeviceDetectionState`, `ConnectionCoordinator`, `WheelModelInfo`, `MozaDeviceConstants`, AB9 / Hub / Dashboard / Base / mBooster / standalone-peripheral managers, wheel/dash/base extensions + LED managers + device settings controls, `DeviceDefinitionDeployer`, `WheelUi/` helpers |
-| `Telemetry/` | Dashboard telemetry pipeline: `TelemetrySender` (orchestrator) + collaborators in subdirectories (see [Architecture](#architecture)); FSR1/CM1 display drivers; `DashboardBindingCoordinator`, `DualDisplayCoordinator`, `Fsr1Cm1MappingCoordinator`, `SimHubPropertyResolver`, `ChannelCatalogParser`, `ConfigJsonClient`, `PropertyPushQueue` |
-| `Telemetry/Frames/` | Frame building: `TierDefinitionBuilder`/`TierDefinitionEmitter`, `TelemetryFrameBuilder`, `TelemetryFrameCache`, `TelemetryEncoder`, `TelemetryBitWriter`, `GameDataSnapshot`, `StringValueBuilder`, `PropertyCoercion`, `TrackMapTransform` |
-| `Telemetry/Sessions/` | Session layer: `SessionLifecycle` (open/close state machine), `SessionRegistry`, `SessionDispatcher`, `SessionDataReassembler`, `RpcCallChannel`, `FfRecordStream` (inbound FF-record reassembly, paired with `Protocol/FfRecordReader`) |
-| `Telemetry/Dashboard/` | Dashboard library + upload/download: `DashboardProfileStore`, `DashboardCache`, `WheelUploadCoordinator`, `DashboardDownloader`, `FileTransferBuilder`, `WheelStateParser`/`WheelDashboardState` |
-| `Telemetry/Lifecycle/` | Pipeline lifecycle state machines: `SilenceGate`, `HotSwitchCoordinator`, `RecoveryDispatcher`, `CatalogResyncProbe`, `PostSwitchCatalogConvergence` |
-| `Telemetry/Inbound/` | `TelemetryInboundDispatcher` — inbound 0xC3 routing (acks, device-init, per-session data) |
-| `Telemetry/Watchdog/` | `DisplayWatchdog` — unified content-aware engagement verdict + close-storm backstop + sess=0x09/configJson transmit nudges |
-| `Telemetry/Display/`, `Era/`, `TestMode/`, `TileServer/`, `Protocol/` | `WheelSlotTracker`; era policy (`MozaWheelEra`/`EraPolicy`); test-signal generator/catalog; tile-server state build/parse; `CompressionTable` |
-| `Hardware/` | `HardwareApplier` — every hardware-side write path (`Apply*ToHardware`, detection-gated `WriteIf*` family) |
-| `Settings/` | `ProfileCoordinator` (persistence + profile system + per-wheel-page accessors) |
-| `UI/` | Plugin settings pane (`SettingsControl` + partials), profile model (`MozaProfile`/`MozaProfileStore`/`MozaPluginSettings`), status hints, diagnostics text/bundle, custom controls (`UI/Controls/`), update check (`UI/UpdateCheck/`) |
-| `Sdk/` | Third-party SDK emulation: CoAP server (`MozaSdkCoapServer`), `CoapStubManager` (PitHouse-impersonation child process), `PitHouseUdp/` control server, CBOR codec. `CoapStub/` (separate console project) is the stub executable |
-| `Diagnostics/` | `MozaLog` (ring-buffered log wrapper), `SerialTrafficCapture` (frame ring + JSONL wire-trace sink), `SessionRetransmitter`, `FirmwareDebugLog`, `DeviceLogStore`/`DeviceLogParser` (display application log), `CaptureRedactor` |
-| `ControlMapper/` | SimHub Control Mapper variant-provider integration — see [`docs/controlmapper.md`](controlmapper.md) |
+| `MozaPlugin.cs` + `MozaPlugin.*.cs` | Plugin entry point (`IPlugin`, `IDataPlugin`, `IWPFSettingsV2`), split into partials by concern — see [Partial-class splits](#partial-class-splits). The root `.cs` holds the class declaration, field block, `DataUpdate`, `End` and the accessor surface |
+| `MozaData.cs` | Thread-safe data model (~200 volatile fields) for every device value + HID input positions; `UpdateFromCommand`/`UpdateFromArray` map parsed responses to fields. Stays at the root in `namespace MozaPlugin` because every sub-namespace reads it without a `using` |
+| `Protocol/` | Serial transport only: `MozaSerialConnection` (threads, framing, 0x7E stuffing, write lanes), `MozaPortDiscovery` (device enumeration, registry + sysfs sources), `WineHost`/`LinuxUsbEnumerator`/`WineComNameResolver`/`WineDevicePathMozaPort`/`WineNativeExec` (Wine/Proton discovery + transport + native-exec), `MozaUsbIds` (PID inventory), `MozaCommandDatabase` (200+ commands), `MozaResponseParser`, `MozaProtocol` (constants/checksums), `MozaHidReader`, `PendingResponseTracker`, `WriteBudget`, `ConnectionFailure` |
+| `Devices/` | Connection + detection: `DeviceProber`, `DeviceDetectionState`, `ConnectionCoordinator`, `MozaDeviceManager` (per-connection read/write API), the per-lane `Moza{Base,Hub,Dashboard,Ab9}DeviceManager`, standalone-peripheral registry/controller, `WheelModelInfo`, `MozaDeviceConstants`, `GearshiftDetector`, `StandbyCoordinator` |
+| `Devices/MBooster/` | mBooster subsystem: `MBoosterDeviceController`, `MBoosterEffectWorker`, `MBoosterEffectSynthesizer`, `MBoosterTypes`, `MozaMBoosterRegistry` |
+| `Devices/Led/` | SimHub LED integration: `Moza{,Dash,Base}LedDeviceManager`, `LedDriverInjection`, `SimHubLedCompat` |
+| `Devices/Haptics/` | Host-rendered haptics loops: `Ab9EngineVibrationWorker`, `BaseLfeEffectWorker`, `EngineVibrationMath` |
+| `Devices/Extensions/` | SimHub device-extension plumbing: `Moza{Wheel,Dash,Base}DeviceExtension` + their `*ExtensionSettings`, `DeviceDefinitionDeployer`, `MozaDeviceExtensionFilter` |
+| `Devices/Ui/` | Per-device WPF pages: `Moza{Wheel,Dash,Base}SettingsControl`, the shared `DashboardManagementControl` / `DashboardFilesControl`, channel-mapping rows, `WheelUiHelpers` |
+| `Devices/StalksTruckSim/` | Truck-sim stalk controller + action mapping |
+| `Telemetry/` | Dashboard telemetry pipeline: `TelemetrySender` (orchestrator, split into partials) + `DashboardBindingCoordinator`, `DualDisplayCoordinator`, `Fsr1Cm1MappingCoordinator`, `ChannelMappingCoordinator`, `SimHubPropertyResolver`, `RetryBackoff` |
+| `Telemetry/Frames/` | Frame building: `TierDefinitionBuilder`/`TierDefinitionEmitter`, `TelemetryFrameBuilder`, `TelemetryFrameCache`, `TelemetryEncoder`, `CompressionTable`, `TelemetryBitWriter`, `GameDataSnapshot`, `StringValueBuilder`, `PropertyCoercion`, `TrackMapTransform`, `ChannelCatalogParser` |
+| `Telemetry/Sessions/` | Session layer: `SessionLifecycle` (open/close state machine), `SessionRegistry`, `SessionDispatcher`, `SessionDataReassembler`, `RpcCallChannel`, `FfRecordStream` + `FfRecordReader`, `SessionPropertyPushBuilder`, `SessionRetransmitter`, `PropertyPushQueue` |
+| `Telemetry/Dashboard/` | Dashboard library + upload/download: `DashboardProfileStore`, `DashboardCache`, `WheelUploadCoordinator`, `DashboardDownloader`, `FileTransferBuilder`, `ConfigJsonClient`, `WheelStateParser`/`WheelDashboardState` |
+| `Telemetry/Display/` | Standalone (non-tier-def) display drivers: `Fsr1DisplayDriver`/`Emitter`/`DashboardCatalog`, `Cm1DisplayDriver`/`Emitter`/`DashboardCatalog`, `Fsr1VizSnapshot`, `WheelSlotTracker` |
+| `Telemetry/Lifecycle/` | Pipeline lifecycle: `HotSwitchCoordinator`, `RecoveryDispatcher`, `CatalogResyncProbe`, `PostSwitchCatalogConvergence`, `SilenceGate`, `TelemetryInboundDispatcher` (inbound 0xC3 routing), `DisplayWatchdog` (engagement verdict + close-storm backstop) |
+| `Telemetry/Era/`, `TestMode/`, `TileServer/` | Era policy (`MozaWheelEra`/`EraPolicy`); test-signal generator/catalog + the dashboard test pattern and switch auto-test; tile-server state build/parse |
+| `Hardware/` | `HardwareApplier` (partials: core, `.Cm2`, `.MBooster`) — every hardware-side write path: `Apply*ToHardware`, the detection-gated `WriteIf*` family, CM2 write routing; plus `ProcessResponsivenessManager` (EcoQoS opt-out + timer resolution) |
+| `Settings/` | The whole settings domain: `MozaPluginSettings`, `MozaProfile`, `MozaProfileStore`, `BaseSettingCatalog`, `ProfileCoordinator` (persistence + profile system + per-wheel-page accessors) |
+| `Integration/` | SimHub-registration surfaces: `SimHubRegistrar` (`AZOM.*` properties + button actions), `ControlMapperBridge` + `MozaVariantProvider` (see [`docs/controlmapper.md`](controlmapper.md)), `MozaShakeItDeviceRegistry` + `MozaWheelbaseLfeChannelsProvider` |
+| `UI/` | Plugin settings pane (`SettingsControl` + partials), status hints, diagnostics text/bundle, `TemperatureHistory`, custom controls (`UI/Controls/`, `namespace MozaControls`), PitHouse import wizard (`UI/Import/`), update check (`UI/UpdateCheck/`) |
+| `Sdk/` | Third-party SDK emulation: `SdkLifecycleCoordinator` (owns the servers + stub child process), CoAP server (`MozaSdkCoapServer`), `CoapStubManager`, `PitHouseUdp/` control server, CBOR codec, `Resources/` URI handlers. `CoapStub/` (separate console project) is the stub executable |
+| `Diagnostics/` | `MozaLog` (ring-buffered log wrapper), `SerialTrafficCapture` (frame ring + JSONL wire-trace sink), `FirmwareDebugLog`, `DeviceLogStore`/`DeviceLogParser` (display application log), `CaptureRedactor`, `Fsr1ProbeTool` |
 | `Resources/` | i18n: `Strings.resx` + 12 locale variants, hand-edited `Strings.Designer.cs`, `LanguageResolver` |
 | `DeviceTemplates/` | Embedded SimHub Device Builder `device.json` definitions, deployed lazily on first detection; `Thumbnails/` holds the product renders (per-wheel + CM2 dash) deployed alongside them as `thumbnail.png` sidecars |
 | `Data/` | `Telemetry.json` — 400+ channel definitions (URL, compression, package_level, default `simhub_property`/`simhub_scale`) |
-| `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`) |
+| `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`). **Frozen path** — see [CLAUDE.md](../CLAUDE.md) |
 | `docs/` | This guide, protocol reference (`docs/protocol/`), SimHub internals notes (`simhub.md`), capture workflow (`usb-capture.md`) |
-| `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …) |
+| `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …). Capture dir comes from `MOZA_TRACE_DIR` |
 | _(moved out)_ | The Python wheel/device emulator + USB-gadget bridge rig now lives in its own project: [giantorth/moza-simulator](https://github.com/giantorth/moza-simulator) |
 | `libs/SimHub/` | Reference-only SimHub DLLs, auto-updated by CI |
 
 ### Partial-class splits
+
+Three classes are large enough to be split across files. All three are one class —
+partials share fields, so a member can move between these files freely without any
+signature change. See [CLAUDE.md](../CLAUDE.md) for when to prefer a partial file over
+extracting a collaborator.
+
+- **`MozaPlugin`** (plugin entry point):
+
+  | File | Owns |
+  |---|---|
+  | `MozaPlugin.cs` | class declaration, static + instance field block, `DataUpdate`, `End`, `GetWPFSettingsControl`, accessor surface |
+  | `.Bootstrap.cs` | `Init` and `CleanupPartialInit` — construction and teardown ordering |
+  | `.Polling.cs` | the four timer bodies and `PollStatusCore` |
+  | `.Inbound.cs` | `OnMessageReceived`, presence-probe ACK routing, AB9 inbound |
+  | `.Shutdown.cs` | `End`'s ordered teardown, `ProcessExit` handling |
+  | `.HostHooks.cs` | power-mode changes, SerialDash port-scan veto |
+  | `.DataUpdate.cs` | the per-tick game-data fan-out |
+  | `.MBooster.cs` | mBooster device coordination (settings, serial/connectivity resolve, routed probes, axis-role healing) |
+  | `.Cm2Routing.cs` | CM2 presence predicates + meter firmware-era detection |
+  | `.ChannelMapping.cs` | property-resolver forwarders and the NCalc formula plumbing |
+  | `.Diagnostics.cs` | display-running predicates + the read-only diagnostics surface |
+  | `.Haptics.cs` | LFE test triggers + the ShakeIt channel bridge |
+  | `.Shims.cs` | the remaining forwarder facade to extracted collaborators |
+
+- **`Telemetry/TelemetrySender`** (telemetry orchestrator): `.cs` (fields, ctor, `Rebind`, `Dispose`, nested `TierState`), `.Lifecycle.cs` (`Start`/`StartInner`/`Stop`), `.Tick.cs` (the timer loop and per-tick emitters), `.CatalogSync.cs` (resync probe, subscription growth, post-switch convergence), `.Subscription.cs`, `.Profile.cs`, `.Sessions.cs`, `.DashCommands.cs`, `.Library.cs` (configJson + library sync), `.Session09.cs`, `.DeviceLog.cs`, `.Frames.cs`.
+
+- **`Hardware/HardwareApplier`**: `.cs` (the `Apply*ToHardware` + `WriteIf*` families), `.Cm2.cs` (CM2 write routing), `.MBooster.cs` (mBooster calibration writes).
+
 
 - **`UI/SettingsControl`** (plugin pane) — one partial per tab or concern; `SettingsControl.xaml.cs` itself holds only the fields, constructor and Loaded/Unloaded timer wiring:
 
@@ -151,7 +181,7 @@ Notes:
   | `.ImportProfile.cs` | profile import dialog |
 
   The PitHouse preset wizard (`UI/Import/`) accepts both legacy raw-JSON presets and the ZIP-wrapped `.mzpreset` container PitHouse 1.4+ writes (a zip holding `preset.json` + `metadata.json`); `PitHousePresetArchive` unwraps it, detecting the container by content (ZIP magic) rather than extension, so both read paths (`PitHousePresetReader` + `PitHouseFolderScanner`) stay format-agnostic. `deviceType` picks the mapper — `PitHouseMotorMapper` (wheelbase → `MozaProfile`), and for `Pedals` one of two: `PitHousePedalsMapper` (mBooster — per-pedal settings rows, subject-role detection, retargetable via the "Apply to" combo) or `PitHouseCrpPedalsMapper` (CRP/CRP2/SRP — one device with all three pedals, calibration on `MozaProfile.Pedals*`, nothing to retarget). The wizard routes on the preset's own `devices` list, falling back to the mBooster path — see [`docs/protocol/devices/mbooster.md`](protocol/devices/mbooster.md#crp--crp2--srp-presets--the-passive-pedal-route).
-- **`Devices/MozaWheelSettingsControl`** (per-wheel device page): `.xaml.cs` (main refresh tick, telemetry section, RPM/Buttons/Flag swatches), `.Inputs.cs` (live paddles/buttons display + input-mode handlers), `.Knobs.cs` (knob ring grid + signal-mode editor). The dashboard combo / channel mapper sections live in the shared `Devices/WheelUi/DashboardManagementControl` (Dashboard tab); the upload + on-wheel file-inventory (Enable/Delete) sections live in the sibling `Devices/WheelUi/DashboardFilesControl` (Files tab). Both are self-contained (own 500 ms refresh timer, Loaded/Unloaded-gated) and hosted by both the wheel and dash pages.
+- **`Devices/Ui/MozaWheelSettingsControl`** (per-wheel device page): `.xaml.cs` (main refresh tick, telemetry section, RPM/Buttons/Flag swatches), `.Inputs.cs` (live paddles/buttons display + input-mode handlers), `.Knobs.cs` (knob ring grid + signal-mode editor). The dashboard combo / channel mapper sections live in the shared `Devices/Ui/DashboardManagementControl` (Dashboard tab); the upload + on-wheel file-inventory (Enable/Delete) sections live in the sibling `Devices/Ui/DashboardFilesControl` (Files tab). Both are self-contained (own 500 ms refresh timer, Loaded/Unloaded-gated) and hosted by both the wheel and dash pages.
 
 ## Architecture
 
@@ -179,10 +209,10 @@ The two orchestrators — `MozaPlugin.cs` and `Telemetry/TelemetrySender.cs` —
 | `Telemetry/DualDisplayCoordinator.cs` | CM2/CM1 dual-display pipelines: `EnsureCm2Pipeline`, the CM1 discriminator, FSR1/CM1 driver start/stop |
 | `Telemetry/Fsr1Cm1MappingCoordinator.cs` | FSR1/CM1 field mappings + active dashboard index store + `Table 7 Param 6` page-report follow |
 | `Telemetry/SimHubPropertyResolver.cs` | `ResolveAsDouble`/`AsString`, `@internal/` channels, property-name enumeration |
-| `SimHubRegistrar.cs` | `AZOM.*` property delegates (live state reads at invoke time) + action registration |
-| `Devices/Ab9EngineVibrationWorker.cs` | The 91 Hz host-rendered AB9 engine-vibration loop |
-| `Devices/BaseLfeEffectWorker.cs` | The 50 Hz host-rendered wheelbase LFE loop (complex gearshift / engine / ABS, cmd `0x2D/0x77`, fw ≥ 1.2.10.10) |
-| `ControlMapper/ControlMapperBridge.cs` | Control Mapper variant-provider registration + workarounds — see [`docs/controlmapper.md`](controlmapper.md) |
+| `Integration/SimHubRegistrar.cs` | `AZOM.*` property delegates (live state reads at invoke time) + action registration |
+| `Devices/Haptics/Ab9EngineVibrationWorker.cs` | The 91 Hz host-rendered AB9 engine-vibration loop |
+| `Devices/Haptics/BaseLfeEffectWorker.cs` | The 50 Hz host-rendered wheelbase LFE loop (complex gearshift / engine / ABS, cmd `0x2D/0x77`, fw ≥ 1.2.10.10) |
+| `Integration/ControlMapperBridge.cs` | Control Mapper variant-provider registration + workarounds — see [`docs/controlmapper.md`](controlmapper.md) |
 
 `TelemetrySender` collaborators (constructed in its ctor):
 
@@ -251,7 +281,7 @@ On host **sleep/resume** the wheel firmware power-cycles and silently tears down
 - `OnMessageReceived` (serial read thread): captures firmware-debug 0x0E lines (also wheel-alive evidence + FSR1/CM1 page-report + rim attach/detach parsing), filters session/control frames the telemetry dispatcher owns, routes presence-probe ACKs to `OnPresenceProbeAck`, then parses via `MozaResponseParser` → `MozaData` → `DeviceProber.DetectDevices`.
 - `PollStatus` (5 s): hub/base-aux polls, dual-display ticks, wheel hot-swap miss counter + PitHouse-parity wheel maintenance (presence probe, param poll, 0x43 keepalive, model recheck), presence probes for undetected devices, display re-probe + 60 s display-wedge watchdog (one-shot forced reconnect), knob-ring capability read, hub port-power polls.
 - `CheckGearshiftEvent`/`CheckAb9GearshiftEvent` (per `DataUpdate`): debounced gearshift vibration triggers; neutral transitions suppressed by default.
-- Button-bindable actions + `AZOM.*` properties live in `SimHubRegistrar.cs`, most of them generated from the `BaseSettingCatalog.cs` table (one row per wheelbase setting → one property + four step actions, or three toggle actions); the user-facing action list is in [README.md § SimHub Actions](../README.md#simhub-actions). Adding a wheelbase setting to the SimHub surface is a one-row change — the row's display range and scale **must** match the corresponding Base-tab slider handler in `UI/SettingsControl.xaml.cs`, since both write the same parameter-store slot.
+- Button-bindable actions + `AZOM.*` properties live in `Integration/SimHubRegistrar.cs`, most of them generated from the `Settings/BaseSettingCatalog.cs` table (one row per wheelbase setting → one property + four step actions, or three toggle actions); the user-facing action list is in [README.md § SimHub Actions](../README.md#simhub-actions). Adding a wheelbase setting to the SimHub surface is a one-row change — the row's display range and scale **must** match the corresponding Base-tab slider handler in `UI/SettingsControl.BaseTab.cs`, since both write the same parameter-store slot.
 
 ### Serial protocol layer (`Protocol/`)
 
@@ -298,7 +328,7 @@ On host **sleep/resume** the wheel firmware power-cycles and silently tears down
 
 Key supporting pieces:
 
-- `TelemetryFrameBuilder` / `TelemetryEncoder` / `TelemetryBitWriter` / `GameDataSnapshot` — bit-packed value-frame assembly; `Telemetry/Protocol/CompressionTable.cs` is the canonical compression-code map.
+- `TelemetryFrameBuilder` / `TelemetryEncoder` / `TelemetryBitWriter` / `GameDataSnapshot` — bit-packed value-frame assembly; `Telemetry/Frames/CompressionTable.cs` is the canonical compression-code map.
 - `DashboardProfileStore` — parses `.mzdash` files, seeds channel mappings from `Data/Telemetry.json`, produces stable dashboard keys, and synthesizes catalog-only profiles via `BuildProfileFromCatalog`.
 - **Catalog-only mode**: with no mzdash folder configured, `MaybeSwapProfileForCatalog` synthesizes a `"WheelCatalog"` profile from `ChannelCatalogParser.LiveCatalog` once the wheel commits a tier-def generation, re-synthesizing when the catalog count or END marker advances; mzdash profiles are never replaced.
 - `ChannelCatalogParser` — per-session buffers with seq dedup + CRC32 validation, four URL encoding forms (full, `0x01` prefix, `\1`/`\p` abbreviations, back-references), live-set tracking per END-marker generation. Full details: [`protocol/tier-definition/session-02-channel-catalog.md`](protocol/tier-definition/session-02-channel-catalog.md).
@@ -317,7 +347,7 @@ Key supporting pieces:
 - UI render reads from saved state (overlay/bundles), not `_data` — `_data` mirrors transient device responses and drifts (see `MozaWheelSettingsControl.MergeOverlayIntoData`).
 - Custom WPF control library (`UI/Controls/` + `Themes/`): `SectionCard`, `SegmentedControl`, `OffOnToggle`, `PaletteStrip` (+ `ColorPickerDialog` custom chip), `KnobRingViz`, `BandwidthSparkline`, `ConnectionPill`, `MozaCurveEditor` (draggable-node output curve; `AllowHorizontalDrag` enables X-breakpoint edits — used by the wheelbase FFB output curve, where `LockLastNodeX` pins the last point at input=100 since the base has `base-ffb-curve-x1..x4` but no x5, and by the mBooster curve, which resamples its dragged X to fixed breakpoints host-side; also the FFB equalizer via style), `SteeringArc`, `TemperatureGraph`. Styles in `Themes/Generic.xaml`, tokens in `Themes/MozaTheme.xaml`, icons in `Themes/MozaIcons.xaml`.
 
-### Profile system (`UI/MozaProfile.cs`, `UI/MozaProfileStore.cs`, `UI/MozaPluginSettings.cs`)
+### Profile system (`Settings/MozaProfile.cs`, `Settings/MozaProfileStore.cs`, `Settings/MozaPluginSettings.cs`)
 
 Per-game configuration snapshots on SimHub's `ProfileBase`. State is split across four storage tiers:
 
@@ -368,7 +398,7 @@ A user may drive **both** a wheel screen and a separate dash concurrently, each 
 
 The **CM1** does not speak tier-def — it is driven by a flat keyed value stream on group 0x35 (`<2-byte key><BE float32>` records), with the same 0x32/0x81 switch + `Table 7 Param 6` page-report family as the FSR1. Wire decode: [`protocol/devices/dash-0x14.md`](protocol/devices/dash-0x14.md) § "CM1 Racing Dash"; emitter verified byte-exact against `FSR1_CM1.pcapng`.
 
-- **Driver:** `Telemetry/Cm1DisplayDriver.cs` (~50 ms tick, dash-lane slots) streams the flat `Cm1DashboardCatalog` field set via `Cm1DisplayEmitter`.
+- **Driver:** `Telemetry/Display/Cm1DisplayDriver.cs` (~50 ms tick, dash-lane slots) streams the flat `Cm1DashboardCatalog` field set via `Cm1DisplayEmitter`.
 - **Discriminator** (`DualDisplayCoordinator.TickCm1Discriminator`, per PollStatus tick): classifies a bridged dash on **positive evidence only**. It re-probes the CM1-exclusive group-0x0E param register (`MozaDeviceManager.SendCm1ParamProbe`, untracked) ~1 Hz; a 0x8E answer (routed via `MozaPlugin.OnMessageReceived` → `NoteDashParamReadAnswered`) latches CM1 after a 5 s settle, and a tier-def catalog (`CatalogCount > 0`) proves CM2 and drops the `_cm2Sender`'s suppressed engagement watchdog. There is deliberately **no** no-catalog timeout — absence of a catalog equally describes a slow/starved CM2, and that fallback is what once mislabeled real CM2s; an unclassified dash just stays in discrimination. Latching deploys the CM1 device definition, deletes the speculative CM2 copy `MarkDashDetected` wrote (`RemoveSpeculativeCm2Dashboard`, guarded so a real USB 0x0025 CM2 is never deleted), stops any tier-def sender, and starts the CM1 driver. `DashIsCm1` is **session-only** — re-derived each boot, never persisted.
   - The decision is anchored on the **bridged dash's own presence**, not on a running pipeline: a live tier-def `_cm2Sender` only supplies the `CatalogCount` fast path (and while one is cold-starting the discriminator waits for it to reach Active before anchoring its clock). Identification is therefore independent of `ActiveDashTelemetryEnabled` and of any wheel — a dash whose lane the user turned off, or a hub-only / wheel-less rig, still classifies correctly and just doesn't stream. Gating identification on that sender is what left a hub-bridged CM1 permanently wearing the CM2 device definition (bundle MGXWJ3YH). The current state is reported on the Diagnostics tab's `Dash class:` line.
 - **Mapping/UI:** flat field mappings under `Cm1PageGuid` (`MozaProfile.Cm1FieldMappings`), page index in `Cm1ActiveDashboardByGuid`; the dash page switches to CM1 mode rows. Field semantics are best-effort — the catalog ships blank defaults the user assigns.
@@ -377,7 +407,7 @@ The **CM1** does not speak tier-def — it is driven by a flat keyed value strea
 
 The FSR V1 (model-name `FSR`, hw `RS21-D03*`) uses a fundamentally different transport: the host pushes pre-computed display field values as fixed-schema group-0x42 records at ~28 Hz; there is no catalog, no tier-def, no session 0x02. Full wire decode: [`protocol/devices/wheel-0x17.md`](protocol/devices/wheel-0x17.md) § Group 0x42. Distinct from FSR V2 (`W13`), which is a standard tier-def wheel.
 
-- **Detection & routing:** `WheelModelInfo.KnownModels` entry `("FSR", "FSR V1", …, hasDisplay: false)` deliberately keeps the tier-def pipeline/display probe/wedge watchdog off; `MozaPlugin.IsFsr1DisplayWheel` is the routing flag. The push runs in the standalone `Telemetry/Fsr1DisplayDriver` (own ~35 ms timer) so a dash pipeline can run concurrently; `DualDisplayCoordinator.StartFsr1DriverIfNeeded()` starts/stops it.
+- **Detection & routing:** `WheelModelInfo.KnownModels` entry `("FSR", "FSR V1", …, hasDisplay: false)` deliberately keeps the tier-def pipeline/display probe/wedge watchdog off; `MozaPlugin.IsFsr1DisplayWheel` is the routing flag. The push runs in the standalone `Telemetry/Display/Fsr1DisplayDriver` (own ~35 ms timer) so a dash pipeline can run concurrently; `DualDisplayCoordinator.StartFsr1DriverIfNeeded()` starts/stops it.
 - **Catalog/emitter:** `Fsr1DashboardCatalog.cs` (per record type: field defs with offsets/encoding/capability/default property + the partial page-index → record-type map) and `Fsr1DisplayEmitter.cs` (startup declaration sweep, live records, 0x43 keepalive, the `g32/81` select command) — byte-exact-verified against captures.
 - **Switching, both directions:** host→wheel via group 0x32 cmd 0x81 BE32 page index 0..18 (dropdown → `SetActiveFsr1Index(idx, sendToWheel:true)`, drained by the driver); wheel→host via the `Table 7, Param 6 Written: <idx>` firmware log (HID combo switches included), parsed by `Fsr1Cm1MappingCoordinator.TryFollowFsr1DashboardLog` so the plugin auto-follows.
 - **User mapping:** per wheel-GUID → record-key → field in `MozaProfile.Fsr1DashboardMappings` with per-field input-scale min/max, edited in the standard channel mapper (`ChannelMappingRowFactory.BuildFromFsr1Catalog`).
@@ -426,7 +456,7 @@ User-visible strings live in `Resources/Strings.resx` (English neutral/master) p
 When adding a new setting that is written to the device, it must also be saved/restored with the profile system. Pick the storage tier first — see the four-tier classification in [Profile system](#profile-system-uimozaprofilecs-uimozaprofilestorecs-uimozapluginsettingscs) — then walk:
 
 1. **`Protocol/MozaCommandDatabase.cs`** — add the command definition (name, device, read/write groups, command ID, payload size, type).
-2. **`MozaDeviceManager.cs`** — add the device type mapping in `GetDeviceId()` if it's a new device.
+2. **`Devices/MozaDeviceManager.cs`** — add the device type mapping in `GetDeviceId()` if it's a new device.
 3. **`Protocol/MozaProtocol.cs`** — add device ID / group constants if needed.
 4. **`MozaData.cs`** — add volatile field(s) and `UpdateFromCommand` case(s).
 5. **`Devices/DeviceProber.cs`** — add to the appropriate per-device read array so it's read after detection; add detection logic in `DetectDevices()` if needed. Push the new value through the matching `Apply*ToHardware` method in `Hardware/HardwareApplier.cs` (sentinel-guard the write: `if (value >= 0) …`). Wheel-overlay fields source from `Eff(overlay?.X ?? -1, profile.X)`; profile-level from `profile.X`; per-wheel-page from the matching `*ByPageGuid` dict.
@@ -445,7 +475,7 @@ When adding a new setting that is written to the device, it must also be saved/r
 
 Every setting that writes to the device on UI change must round-trip through profiles or the per-wheel-page dicts — a transient-only field is lost on game/profile switch.
 
-**Host-rendered settings** (e.g. AB9 engine vibration, the wheelbase LFE effects in `Devices/BaseLfeEffectWorker.cs`) skip steps 1–4 entirely: no command-DB entry, no `MozaData` field, no probe — just the profile property + UI, with the periodic worker reading the profile on its next tick. **One-shot host-side config writes that ARE device-persisted but bypass the command DB** (e.g. AB9 gear-shift intensity) follow 6–8 plus an explicit `Send*` call in both the UI handler and `ApplyAb9ToHardware`. New host-rendered *stream* lanes need a `StreamKind` slot in `Protocol/MozaSerialConnection.cs` — bump `StreamSlotCount` and add the member past the LED lanes (the static ctor asserts the regions fit).
+**Host-rendered settings** (e.g. AB9 engine vibration, the wheelbase LFE effects in `Devices/Haptics/BaseLfeEffectWorker.cs`) skip steps 1–4 entirely: no command-DB entry, no `MozaData` field, no probe — just the profile property + UI, with the periodic worker reading the profile on its next tick. **One-shot host-side config writes that ARE device-persisted but bypass the command DB** (e.g. AB9 gear-shift intensity) follow 6–8 plus an explicit `Send*` call in both the UI handler and `ApplyAb9ToHardware`. New host-rendered *stream* lanes need a `StreamKind` slot in `Protocol/MozaSerialConnection.cs` — bump `StreamSlotCount` and add the member past the LED lanes (the static ctor asserts the regions fit).
 
 ### Settings storage and migration
 
@@ -498,7 +528,7 @@ The canonical wire reference is [`docs/protocol/`](protocol/). Load-bearing fact
 
 **Important:** build against the newest supported SimHub — the PluginSdk ships older DLLs missing newer interface members, causing `TypeLoadException` at runtime. Always update `libs/SimHub/` from an actual SimHub installation (`libs/SimHub/VERSION` records which one).
 
-**Running on older SimHub builds.** Compiling against the newest DLLs bakes that build's signatures into the IL, so a host whose contract differs fails at *load* time, not compile time — and the break runs in both directions. SimHub 9.12.0 is the live example: it added an `overrideState` colour layer (the dashboard "Device LEDs override" component), which changed `ILedDeviceManager.Display` (a sixth `Func<Color[]>`) and `LedDeviceState`'s constructor (a matching `Color[]`). Two shapes of fix, both in [`Devices/SimHubLedCompat.cs`](../Devices/SimHubLedCompat.cs) and its callers:
+**Running on older SimHub builds.** Compiling against the newest DLLs bakes that build's signatures into the IL, so a host whose contract differs fails at *load* time, not compile time — and the break runs in both directions. SimHub 9.12.0 is the live example: it added an `overrideState` colour layer (the dashboard "Device LEDs override" component), which changed `ILedDeviceManager.Display` (a sixth `Func<Color[]>`) and `LedDeviceState`'s constructor (a matching `Color[]`). Two shapes of fix, both in [`Devices/Led/SimHubLedCompat.cs`](../Devices/Led/SimHubLedCompat.cs) and its callers:
 
 - **Interface members** — declare *both* overloads on the implementing class. Implicit interface implementations are bound by the CLR at type-load time by name and signature, so each host picks the overload its own interface declares. The compat overload must be marked `virtual` by hand: only a public **virtual** method can fill an interface slot (ECMA-335 II.12.2), and Roslyn marks only the overload matching the compile-time interface. A non-virtual compat overload compiles and looks right while the old host still throws `TypeLoadException`.
 - **Constructors / concrete methods** — a direct `new` bakes one signature in, so build the call once through reflection and bind arguments to the host's parameters by name (`SimHubLedCompat.CreateState`). Parameters the host doesn't declare are dropped; ones we don't recognise take their own declared default.

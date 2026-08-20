@@ -140,7 +140,7 @@ unique `7e 1b 43 17 7c 00 01 01 ...` (size=8) and `7e 1f 43 17 7c 00 01 01
 ...` (size=12) frames matching the moved property's value. Sim does not
 emit these — they originate from PitHouse, confirmed by `_record(tag,
 frame)` only being called on inbound frames in
-[`../../sim/wheel_sim.py:3383`](../../../sim/wheel_sim.py).
+[`../../sim/wheel_sim.py:3383`](https://github.com/giantorth/moza-simulator).
 
 ## Cross-references
 

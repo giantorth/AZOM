@@ -28,7 +28,7 @@ specific kind values, their bodies, and the protocol timing.
 
 ## Wire-frame envelope
 
-Verified against `Protocol/SessionPropertyPushBuilder.WrapFfRecord`:
+Verified against `Telemetry/Sessions/SessionPropertyPushBuilder.WrapFfRecord`:
 
 ```
 [0xFF]                    — sentinel (1 byte)
@@ -112,7 +112,7 @@ Field layout (verified by cross-capture diff):
 
 **Note**: bytes 12..15 vary across captures and are NOT constant. They may be
 a checksum of the first 12 bytes, or a session-specific salt the wheel
-verifies. Plugin's current `Protocol/SessionPropertyPushBuilder.BuildSessionInitField2Body`
+verifies. Plugin's current `Telemetry/Sessions/SessionPropertyPushBuilder.BuildSessionInitField2Body`
 emits the current Unix time at offsets 0..3, zeros at 4..11, and bytes
 `90 9d ff ff` at 12..15 — but this puts the magic in the wrong slot
 (should be at 8..11) and omits any CRC/salt at 12..15. **TODO**: re-derive
@@ -145,7 +145,7 @@ Field layout:
 |  8..11 |    4 | magic / checksum | always `83 18 92 0e` (LE 0x0E921883). Static across  |
 |        |      |                  | captures, so this is NOT a session-derived hash.     |
 
-`Protocol/SessionPropertyPushBuilder.BuildSessionInitField7Body(slotIndex)`
+`Telemetry/Sessions/SessionPropertyPushBuilder.BuildSessionInitField7Body(slotIndex)`
 puts an arbitrary slot index at offset 4..7 and zero at 8..11 — diverging
 from PitHouse's static body. **TODO**: pin this body to the static bytes
 above and verify against another fresh capture before committing.

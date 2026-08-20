@@ -9,8 +9,8 @@ Threshold, Engine) per the documented protocol.
 **Multi-device:** the plugin supports more than one mBooster on the
 same host concurrently (one each for throttle / brake / clutch is the
 canonical layout). Each unit gets its own [`MozaSerialConnection`](../../../Protocol/MozaSerialConnection.cs)
-under [`MBoosterDeviceController`](../../../Devices/MBoosterDeviceController.cs);
-all controllers are owned by [`MozaMBoosterRegistry`](../../../Devices/MozaMBoosterRegistry.cs).
+under [`MBoosterDeviceController`](../../../Devices/MBooster/MBoosterDeviceController.cs);
+all controllers are owned by [`MozaMBoosterRegistry`](../../../Devices/MBooster/MozaMBoosterRegistry.cs).
 
 ## Reference protocol
 
@@ -19,7 +19,7 @@ The user-supplied protocol note in
 is the authoritative wire-format reference. It includes verified
 known-good frames against real hardware captures + the host-side
 synthesizer formulas the plugin reproduces verbatim (see
-[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)).
+[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)).
 
 The plugin-side implementation diverges from the protocol note in only
 two ways:
@@ -300,7 +300,7 @@ they aren't coalesced.
 
 ## Effect synthesis
 
-[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)
+[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
 reproduces protocol note § 4 verbatim:
 
 | Effect    | Waveform                                                    |
@@ -841,7 +841,7 @@ already built for the telemetry channel-mapper, applied to
 own copy of the sync/serialize logic
 (`Expression`/`ApplyEditedFormula`/`MakeExpression`/
 `ApplyStoredToExpression`/`SerializeExpression`) mirroring
-`Devices/WheelUi/ChannelMappingRow.cs` line-for-line minus the FSR1/CM1
+`Devices/Ui/ChannelMappingRow.cs` line-for-line minus the FSR1/CM1
 boundary-stepper baggage that doesn't apply here:
 
 - **Pencil** → the simple inline editor: a filterable, virtualized list
@@ -1740,12 +1740,12 @@ equivalent of `ImportPlan.TouchedMBoosters`.
 ## Source-of-truth files in this repo
 
 - Protocol primitives — [`Protocol/MozaMBoosterProtocol.cs`](../../../Protocol/MozaMBoosterProtocol.cs)
-- Effect synthesis — [`Devices/MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)
-- Settings types — [`Devices/MBoosterTypes.cs`](../../../Devices/MBoosterTypes.cs)
-- Per-device controller — [`Devices/MBoosterDeviceController.cs`](../../../Devices/MBoosterDeviceController.cs)
-- 50 Hz effect worker — [`Devices/MBoosterEffectWorker.cs`](../../../Devices/MBoosterEffectWorker.cs)
-- Multi-device registry — [`Devices/MozaMBoosterRegistry.cs`](../../../Devices/MozaMBoosterRegistry.cs)
+- Effect synthesis — [`Devices/MBooster/MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
+- Settings types — [`Devices/MBooster/MBoosterTypes.cs`](../../../Devices/MBooster/MBoosterTypes.cs)
+- Per-device controller — [`Devices/MBooster/MBoosterDeviceController.cs`](../../../Devices/MBooster/MBoosterDeviceController.cs)
+- 50 Hz effect worker — [`Devices/MBooster/MBoosterEffectWorker.cs`](../../../Devices/MBooster/MBoosterEffectWorker.cs)
+- Multi-device registry — [`Devices/MBooster/MozaMBoosterRegistry.cs`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
-- Profile storage — [`UI/MozaProfile.cs`](../../../UI/MozaProfile.cs) (`MBoosterSettings` dict)
+- Profile storage — [`Settings/MozaProfile.cs`](../../../Settings/MozaProfile.cs) (`MBoosterSettings` dict)
 - UI tab — [`UI/SettingsControl.xaml`](../../../UI/SettingsControl.xaml) (`MBoosterTab`) + handlers in `SettingsControl.xaml.cs` under "mBooster tab — multi-device"
 - PitHouse preset import — [`UI/Import/PitHousePedalsMapper.cs`](../../../UI/Import/PitHousePedalsMapper.cs) (mBooster) + [`UI/Import/PitHouseCrpPedalsMapper.cs`](../../../UI/Import/PitHouseCrpPedalsMapper.cs) (CRP/SRP) + wizard [`UI/Import/PitHouseImportControl.xaml.cs`](../../../UI/Import/PitHouseImportControl.xaml.cs)

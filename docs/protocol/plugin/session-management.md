@@ -24,7 +24,7 @@ USB packet with both opens.
 Wheel emits `type=0x81` opens during connect for `0x04`, `0x06`, `0x08`,
 `0x09`, `0x0A` (older firmware) or `0x05`/`0x07`/`0x09`/`0x0A` (KS Pro on
 Universal Hub). The inbound handler
-[`TelemetryInboundDispatcher.HandleDeviceInit`](../../../Telemetry/Inbound/TelemetryInboundDispatcher.cs)
+[`TelemetryInboundDispatcher.HandleDeviceInit`](../../../Telemetry/Lifecycle/TelemetryInboundDispatcher.cs)
 (subscribed from `TelemetrySender`) handles each (illustrative):
 
 ```csharp
@@ -168,7 +168,7 @@ sends an ACK for every received chunk, not cumulatively.
 
 ### Source
 
-[`Telemetry/Inbound/TelemetryInboundDispatcher.cs`](../../../Telemetry/Inbound/TelemetryInboundDispatcher.cs)
+[`Telemetry/Lifecycle/TelemetryInboundDispatcher.cs`](../../../Telemetry/Lifecycle/TelemetryInboundDispatcher.cs)
 (`OnMessageDuringPreamble`, `HandleDeviceInit`).
 [`Telemetry/TelemetrySender.cs`](../../../Telemetry/TelemetrySender.cs)
 (`SendSessionOpen`, `SendSessionAck`, `SendSessionClose`).
