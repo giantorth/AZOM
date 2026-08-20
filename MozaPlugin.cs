@@ -41,44 +41,16 @@ namespace MozaPlugin
         // One-shot guard so the stale-instance DataUpdate fallback warns once.
         private bool _warnedStaleDataFeed;
 
-        // Auto-standby reconcile state (see ApplyAutoStandby). Work Mode standby
-        // fully powers down the wheel/display, so it must only engage after a
-        // genuine idle period — never immediately, never on startup, and never
-        // while the user is using the wheel or the plugin UI.
-        //
-        // DataUpdate stamps the feed timestamp + last GameRunning; a fresh feed
-        // with GameRunning means a game is active (DataUpdate goes quiet when no
-        // game runs, so a stale feed implies no game). _autoStandbyLastActivityTicks
-        // is the last-activity clock — bumped by a running game, by physical HID
-        // input (wheel/pedals/buttons past a deadband), and by UI interaction
-        // (NotifyUserActivity). Standby engages only once now-lastActivity exceeds
-        // the user's timeout AND no game is active. _autoStandbyApplied caches the
-        // last value written so the reconcile is idempotent (writes only on change).
-        private long _autoStandbyLastDataUpdateTicks;
-        private volatile bool _autoStandbyLastGameRunning;
-        private long _autoStandbyLastActivityTicks; // 0 until first reconcile (lazy baseline)
-        private volatile int _autoStandbyApplied = -1; // -1 unknown / 0 active / 1 standby
-        private const long AutoStandbyFeedStaleMs = 3000;
+        // Auto-standby (idle-timeout Work Mode standby) + the HID-activity
+        // baseline that feeds it — see Devices/StandbyCoordinator.cs.
+        private StandbyCoordinator? _standby;
 
-        // True while a game is actively feeding telemetry: a fresh DataUpdate (within
-        // AutoStandbyFeedStaleMs) AND GameRunning. DataUpdate goes quiet when no game
-        // runs, so a stale feed means no game even if the last GameRunning we saw was
-        // true. GameRunning stays true through menus/pauses, so this spans the whole
-        // session. The LED keepalive reads this to never let the wheel sleep mid-game.
-        public bool IsGameActive
-        {
-            get
-            {
-                long lastFeed = Interlocked.Read(ref _autoStandbyLastDataUpdateTicks);
-                bool feedFresh = (DateTime.UtcNow.Ticks - lastFeed) <= AutoStandbyFeedStaleMs * TimeSpan.TicksPerMillisecond;
-                return feedFresh && _autoStandbyLastGameRunning;
-            }
-        }
-        // HID-activity baseline (last sampled positions; change past the deadband
-        // counts as physical use). _asHidBaselined gates the first sample so it
-        // seeds the baseline instead of registering as activity.
-        private bool _asHidBaselined;
-        private int _asSteer = -1, _asThrottle, _asBrake, _asClutch, _asHandbrake, _asLeftPaddle, _asRightPaddle, _asButtonHash;
+        // True while a game is actively feeding telemetry. The LED keepalive reads
+        // this to never let the wheel sleep mid-game; false before Init completes.
+        public bool IsGameActive => _standby?.IsGameActive ?? false;
+
+        /// <summary>Auto-standby coordinator. Null until Init constructs it.</summary>
+        internal StandbyCoordinator? Standby => _standby;
 
         // AppDomain.ProcessExit registration is one-shot per process. End()
         // intentionally leaves the persistent wire alive across plugin

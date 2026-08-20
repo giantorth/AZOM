@@ -251,7 +251,7 @@ namespace MozaPlugin
             // Auto-standby backstop: enters standby when idle (covers the case
             // where SimHub stops calling DataUpdate with no game running) and
             // re-applies the desired work mode after a base reconnect.
-            ApplyAutoStandby();
+            _standby?.Apply();
 
             // Hot-swap detection: track whether the locked wheel is still responding
             // and periodically verify the model name hasn't changed.

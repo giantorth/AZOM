@@ -131,9 +131,9 @@ namespace MozaPlugin
             // auto-standby never powers the wheel down mid-configuration.
             // Preview (tunneling) events fire on the root first regardless of
             // which child handles them.
-            PreviewMouseDown  += (s, ev) => _plugin?.NotifyUserActivity();
-            PreviewKeyDown    += (s, ev) => _plugin?.NotifyUserActivity();
-            PreviewMouseWheel += (s, ev) => _plugin?.NotifyUserActivity();
+            PreviewMouseDown  += (s, ev) => _plugin?.Standby?.NotifyUserActivity();
+            PreviewKeyDown    += (s, ev) => _plugin?.Standby?.NotifyUserActivity();
+            PreviewMouseWheel += (s, ev) => _plugin?.Standby?.NotifyUserActivity();
 
             RequestAllSettings();
         }

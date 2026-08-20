@@ -214,7 +214,7 @@ namespace MozaPlugin
                 // it to sleep. The timeout value is left as-is for next time.
                 _plugin.Settings.AutoStandbyWhenNoGame = false;
                 _plugin.SaveSettings();
-                _plugin.CancelAutoStandby();
+                _plugin.Standby?.Cancel();
             }
             else
             {
@@ -223,8 +223,8 @@ namespace MozaPlugin
                 _plugin.SaveSettings();
                 // Selecting a timeout counts as activity so we never standby
                 // immediately; the idle timer starts fresh from here.
-                _plugin.NotifyUserActivity();
-                _plugin.ApplyAutoStandby();
+                _plugin.Standby?.NotifyUserActivity();
+                _plugin.Standby?.Apply();
             }
         }
 
