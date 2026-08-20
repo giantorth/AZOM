@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Telemetry.Display;
 
 namespace MozaPlugin.Diagnostics
 {

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Windows.Media;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Telemetry.Display;
 
 namespace MozaPlugin.Devices.WheelUi
 {

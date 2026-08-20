@@ -5,7 +5,7 @@ using System.Timers;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>
     /// Standalone driver for the CM1 base-bridged dash (group-0x35 keyed value stream,

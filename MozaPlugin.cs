@@ -23,6 +23,7 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Telemetry.Display;
 
 namespace MozaPlugin
 {
@@ -244,7 +245,7 @@ namespace MozaPlugin
 
         // Standalone FSR V1 group-0x42 display driver (dev 0x17), independent of the
         // tier-def _telemetrySender so an FSR1 screen + a CM2 dash run concurrently.
-        internal Telemetry.Fsr1DisplayDriver? _fsr1Driver;
+        internal Telemetry.Display.Fsr1DisplayDriver? _fsr1Driver;
 
         // Dedicated tier-def sender that drives a CM2 dash whenever a CM2 is present —
         // regardless of the wheel (display wheel, screenless wheel, or no wheel at all).
@@ -254,7 +255,7 @@ namespace MozaPlugin
 
         // Standalone CM1 base-bridged dash driver (group-0x35 → dev 0x14). Used instead
         // of the tier-def _cm2Sender when a bridged dash is a CM1 (no tier-def catalog).
-        internal Telemetry.Cm1DisplayDriver? _cm1Driver;
+        internal Telemetry.Display.Cm1DisplayDriver? _cm1Driver;
         // True if Init reused the persistent connection/sender from a
         // prior plugin instance. End() respects this flag and skips
         // disposing them so the next Init can pick up where we left off.

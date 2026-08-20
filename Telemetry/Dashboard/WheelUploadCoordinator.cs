@@ -5,6 +5,7 @@ using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
+using MozaPlugin.Telemetry.Display;
 
 namespace MozaPlugin.Telemetry.Dashboard
 {

@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>
     /// Immutable snapshot of the numeric data the FSR1 display driver is currently

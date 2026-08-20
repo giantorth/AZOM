@@ -2,6 +2,7 @@ using System;
 using SimHub.Plugins;
 using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Telemetry.Display;
 
 namespace MozaPlugin
 {

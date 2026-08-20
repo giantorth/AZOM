@@ -1,7 +1,7 @@
 using System;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>
     /// Builds the group-<c>0x42</c> fixed-schema display records for the FSR V1

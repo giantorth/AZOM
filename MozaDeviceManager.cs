@@ -249,7 +249,7 @@ namespace MozaPlugin
         /// display capability — the documented screenless hazard is the 11-frame
         /// display PROBE (<see cref="SendDisplayProbe()"/>), not this single-byte
         /// keepalive. The FSR1 path streams its own via
-        /// <see cref="Telemetry.Fsr1DisplayDriver"/>; callers exclude FSR1 to
+        /// <see cref="Telemetry.Display.Fsr1DisplayDriver"/>; callers exclude FSR1 to
         /// avoid a double-send.
         /// </summary>
         public void SendWheelKeepalive()

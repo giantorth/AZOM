@@ -17,6 +17,7 @@ using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using MozaPlugin.Settings;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Telemetry.Display;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
@@ -290,7 +291,7 @@ namespace MozaPlugin
         internal void ClearFsr1FieldOverrides(string recordKey) => _fsr1Cm1Mapping.ClearFsr1FieldOverrides(recordKey);
         internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId)
         {
-            var dash = Telemetry.Fsr1DashboardCatalog.ByKey(recordKey);
+            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
             if (dash == null || string.IsNullOrEmpty(fieldId)) return null;
             foreach (var f in dash.Fields)
                 if (f.FieldId == fieldId) return f;

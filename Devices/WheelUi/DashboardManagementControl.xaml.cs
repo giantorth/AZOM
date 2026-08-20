@@ -338,8 +338,8 @@ namespace MozaPlugin.Devices.WheelUi
                 using (_suppressor.Begin())
                 {
                     TelemetryProfileCombo.Items.Clear();
-                    int min = global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MinDashboardIndex;
-                    int max = global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MaxDashboardIndex;
+                    int min = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MinDashboardIndex;
+                    int max = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex;
                     for (int i = min; i <= max; i++)
                         TelemetryProfileCombo.Items.Add($"Dashboard {i}");
                     int active = _plugin.GetActiveCm1Index();
@@ -362,7 +362,7 @@ namespace MozaPlugin.Devices.WheelUi
                 using (_suppressor.Begin())
                 {
                     TelemetryProfileCombo.Items.Clear();
-                    int max = global::MozaPlugin.Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex;
+                    int max = global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
                     for (int i = 0; i <= max; i++)
                         TelemetryProfileCombo.Items.Add($"Dashboard {i + 1}");
                     int active = _plugin.GetActiveFsr1Index();
@@ -786,9 +786,9 @@ namespace MozaPlugin.Devices.WheelUi
             // because the wheel may itself be an FSR1 (this is the dash page).
             if (IsCm1)
             {
-                int min = global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MinDashboardIndex;
+                int min = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MinDashboardIndex;
                 int page = idx + min;
-                if (idx >= 0 && page <= global::MozaPlugin.Telemetry.Cm1DisplayEmitter.MaxDashboardIndex)
+                if (idx >= 0 && page <= global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex)
                 {
                     _plugin.SetActiveCm1Index(page, sendToWheel: true);
                     PopulateChannelMappingList();
@@ -801,7 +801,7 @@ namespace MozaPlugin.Devices.WheelUi
             // (index = combo position). The wheel switches its displayed page.
             if (!IsCm2Target && _plugin.IsFsr1DisplayWheel)
             {
-                if (idx >= 0 && idx <= global::MozaPlugin.Telemetry.Fsr1DisplayEmitter.MaxDashboardIndex)
+                if (idx >= 0 && idx <= global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex)
                 {
                     _plugin.SetActiveFsr1Index(idx, sendToWheel: true);
                     TelemetryMappingStatus.Text = $"Switched to Dashboard {idx + 1}";
@@ -1325,7 +1325,7 @@ namespace MozaPlugin.Devices.WheelUi
         // when the row sits at the field's catalog default so it prunes cleanly.
         private static double? Cm1ScaleOverride(ChannelMappingRow row)
         {
-            var f = Telemetry.Cm1DashboardCatalog.ByFieldId(row.FieldId);
+            var f = Telemetry.Display.Cm1DashboardCatalog.ByFieldId(row.FieldId);
             double defScale = f?.Scale ?? 1.0;
             return row.Scale != defScale ? row.Scale : (double?)null;
         }

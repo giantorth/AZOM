@@ -5,7 +5,7 @@ using System.Timers;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>
     /// Standalone driver for the FSR V1 group-0x42 display push (dev 0x17). Runs on

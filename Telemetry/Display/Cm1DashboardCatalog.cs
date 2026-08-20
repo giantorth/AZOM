@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>
     /// One field in the CM1 base-bridged dash's group-0x35 value stream. The CM1 does

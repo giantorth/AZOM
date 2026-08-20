@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>Byte encoding of a group-0x42 field. Width fixes the field's
     /// full-scale capability (<see cref="Fsr1FieldDef.CapabilityMax"/>).</summary>

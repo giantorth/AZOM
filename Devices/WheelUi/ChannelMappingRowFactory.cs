@@ -65,13 +65,13 @@ namespace MozaPlugin.Devices.WheelUi
             // Fsr1ActiveIndexChanged. Fall back to all live dashboards when the active
             // page's type isn't in the decoded index→type map.
             int activeIdx = plugin.GetActiveFsr1Index();
-            var active = Telemetry.Fsr1DashboardCatalog.ByIndex(activeIdx);
+            var active = Telemetry.Display.Fsr1DashboardCatalog.ByIndex(activeIdx);
             bool followingActive = active.Length > 0;
-            var dashes = followingActive ? active : Telemetry.Fsr1DashboardCatalog.LiveDashboards;
+            var dashes = followingActive ? active : Telemetry.Display.Fsr1DashboardCatalog.LiveDashboards;
             foreach (var dash in dashes)
             {
                 // One row per user-mappable catalog field, in wire order.
-                var slots = Telemetry.Fsr1DashboardCatalog.ResolvePartition(dash);
+                var slots = Telemetry.Display.Fsr1DashboardCatalog.ResolvePartition(dash);
                 for (int i = 0; i < slots.Count; i++)
                 {
                     var slot = slots[i];
@@ -79,11 +79,11 @@ namespace MozaPlugin.Devices.WheelUi
                     var enc = slot.Enc;
                     if (!f.IsUserMappable) continue;   // protocol anchor — not mappable
                     var m = plugin.GetFsr1FieldMapping(dash.Key, f.FieldId);
-                    bool direct = f.Kind == Telemetry.Fsr1FieldKind.Direct;
+                    bool direct = f.Kind == Telemetry.Display.Fsr1FieldKind.Direct;
                     bool packed = !slot.IsByteAligned;
                     long cap = packed
-                        ? Telemetry.Fsr1DashboardCatalog.BitOutputMax(slot.BitWidth, f.FullScale)
-                        : Telemetry.Fsr1DashboardCatalog.OutputMaxFor(enc, f.FullScale);
+                        ? Telemetry.Display.Fsr1DashboardCatalog.BitOutputMax(slot.BitWidth, f.FullScale)
+                        : Telemetry.Display.Fsr1DashboardCatalog.OutputMaxFor(enc, f.FullScale);
                     rows.Add(new ChannelMappingRow
                     {
                         AllProperties = props,
@@ -113,7 +113,7 @@ namespace MozaPlugin.Devices.WheelUi
 
         /// <summary>
         /// Build rows for a CM1 base-bridged dash (group-0x35) — the flat
-        /// <see cref="Telemetry.Cm1DashboardCatalog"/> field set. Each row maps a 16-bit
+        /// <see cref="Telemetry.Display.Cm1DashboardCatalog"/> field set. Each row maps a 16-bit
         /// field key to a SimHub property; values are streamed as big-endian float32.
         /// Default mappings are blank (best-effort labels only) so users assign channels.
         /// </summary>
@@ -123,7 +123,7 @@ namespace MozaPlugin.Devices.WheelUi
             var engine = plugin.ChannelFormulaEngine;
             var props = plugin.GetAllSimHubPropertyNames();
             var rows = new List<ChannelMappingRow>();
-            foreach (var f in Telemetry.Cm1DashboardCatalog.Fields)
+            foreach (var f in Telemetry.Display.Cm1DashboardCatalog.Fields)
             {
                 var m = plugin.GetCm1FieldMapping(f.FieldId);
                 rows.Add(new ChannelMappingRow

@@ -620,10 +620,10 @@ namespace MozaPlugin
                 }
                 // FSR V1 display driver — own timer/lane on the wheelbase connection,
                 // started lazily once an FSR1 wheel is detected (StartFsr1DriverIfNeeded).
-                _fsr1Driver = new Telemetry.Fsr1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);
+                _fsr1Driver = new Telemetry.Display.Fsr1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);
                 // CM1 base-bridged dash driver — own timer/lane on the wheelbase connection,
                 // started lazily once a bridged dash is confirmed CM1 (TickCm1Discriminator).
-                _cm1Driver = new Telemetry.Cm1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);
+                _cm1Driver = new Telemetry.Display.Cm1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);
                 // Propagate the hot-renegotiation feature flag from settings.
                 // Reading from settings here (rather than via a callback) is
                 // fine because the flag is JSON-ignored and only set

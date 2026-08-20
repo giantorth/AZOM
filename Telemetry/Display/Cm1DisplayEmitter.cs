@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Protocol;
 
-namespace MozaPlugin.Telemetry
+namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>
     /// Builds the group-<c>0x35</c> keyed value-stream frames for the CM1 base-bridged
