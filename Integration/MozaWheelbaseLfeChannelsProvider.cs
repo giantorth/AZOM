@@ -8,7 +8,7 @@ using SimHub.Plugins.DataPlugins.ShakeItV3.EffectsContainers;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Settings;
 using SimHub.Plugins.Devices;
 
-namespace MozaPlugin.ShakeIt
+namespace MozaPlugin.Integration
 {
     /// <summary>
     /// ShakeIt Motors channels provider for the wheelbase LFE (cmd 0x2D/0x77,

@@ -3,7 +3,7 @@ using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 using SimHub.Plugins.OutputPlugins.ControlRemapper.Variants;
 
-namespace MozaPlugin.ControlMapper
+namespace MozaPlugin.Integration
 {
     /// <summary>
     /// Reports the currently-attached MOZA wheel model as an

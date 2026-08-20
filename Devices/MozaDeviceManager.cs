@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using MozaPlugin.Protocol;
 
 
-namespace MozaPlugin
+namespace MozaPlugin.Devices
 {
     /// <summary>
     /// Handles reading and writing settings to Moza devices.

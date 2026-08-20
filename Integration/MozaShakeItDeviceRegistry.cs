@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SimHub.Plugins.Devices;
 
-namespace MozaPlugin.ShakeIt
+namespace MozaPlugin.Integration
 {
     /// <summary>
     /// Registers the "MOZA Wheelbase LFE" haptics device in SimHub's device

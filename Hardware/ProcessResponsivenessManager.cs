@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace MozaPlugin
+namespace MozaPlugin.Hardware
 {
     /// <summary>
     /// Keeps the host process responsive while SimHub is the *background* app during

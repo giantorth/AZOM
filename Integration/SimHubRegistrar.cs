@@ -3,8 +3,9 @@ using SimHub.Plugins;
 using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Display;
+using MozaPlugin.Settings;
 
-namespace MozaPlugin
+namespace MozaPlugin.Integration
 {
     /// <summary>
     /// SimHub property + action registration for the plugin: the AZOM.*

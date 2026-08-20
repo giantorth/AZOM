@@ -3,7 +3,7 @@ using System.Collections;
 using System.Reflection;
 using SimHub.Plugins;
 
-namespace MozaPlugin.ControlMapper
+namespace MozaPlugin.Integration
 {
     /// <summary>
     /// Reflection-based plumbing that registers a

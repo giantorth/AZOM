@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin
+namespace MozaPlugin.Settings
 {
     /// <summary>
     /// Declarative table of every wheelbase setting reachable from a SimHub

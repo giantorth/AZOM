@@ -74,7 +74,7 @@ namespace MozaPlugin
                     foreach (var d in dp.GetDevices())
                     {
                         if (d?.DeviceDescriptor?.DeviceTypeID is string id && id.Length != 0 &&
-                            id.IndexOf(ShakeIt.MozaShakeItDeviceRegistry.WheelbaseDeviceTypeId, StringComparison.OrdinalIgnoreCase) >= 0)
+                            id.IndexOf(Integration.MozaShakeItDeviceRegistry.WheelbaseDeviceTypeId, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
                     }
                     return false;

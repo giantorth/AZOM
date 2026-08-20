@@ -23,6 +23,7 @@ using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
+using MozaPlugin.Integration;
 
 namespace MozaPlugin
 {
@@ -572,7 +573,7 @@ namespace MozaPlugin
                 {
                     try
                     {
-                        _controlMapperBridge = new ControlMapper.ControlMapperBridge();
+                        _controlMapperBridge = new Integration.ControlMapperBridge();
                         if (!_controlMapperBridge.TryRegister(_pluginManager))
                             _controlMapperRetryTicks = ControlMapperRegisterRetryTickBudget;
                     }
