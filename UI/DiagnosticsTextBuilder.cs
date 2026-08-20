@@ -60,6 +60,8 @@ namespace MozaPlugin.UI
                 fallbackState = "armed (active — no device source)";
             sb.AppendLine($"Source:         {source}  (probe fallback: {fallbackState})");
             sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
+            if (Protocol.WineHost.IsWine)
+                sb.AppendLine($"Native exec:    {(Protocol.WineNativeExec.Available ? "available" : "UNAVAILABLE (no cold-start warm-up)")}  last: {Protocol.WineNativeExec.LastRun}");
 
             if (ports.Count == 0)
             {

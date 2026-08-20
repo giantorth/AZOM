@@ -26,6 +26,12 @@ namespace MozaPlugin.Protocol
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = false)]
         private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
 
+        [DllImport("kernel32.dll", SetLastError = false)]
+        private static extern IntPtr GetProcessHeap();
+
+        [DllImport("kernel32.dll", SetLastError = false)]
+        private static extern bool HeapFree(IntPtr heap, uint flags, IntPtr mem);
+
         private delegate IntPtr WineGetVersionDelegate();
         private delegate void WineGetHostVersionDelegate(out IntPtr sysname, out IntPtr release);
 
@@ -87,6 +93,47 @@ namespace MozaPlugin.Protocol
             string rel = unixPath.Replace('/', sep);
             if (rel.Length == 0 || rel[0] != sep) rel = sep + rel;
             return root + rel;
+        }
+
+        /// <summary>
+        /// Resolve a DOS path to the host's unix path via
+        /// <c>kernel32!wine_get_unix_file_name</c>, e.g. <c>Z:\dev\ttyACM2</c> →
+        /// <c>/dev/ttyACM2</c>. Null on native Windows or when the export is
+        /// unavailable. This is the authoritative conversion — do not hand-strip
+        /// the drive letter, the unix drive is not required to be Z: and
+        /// non-unix drives map into the prefix.
+        /// </summary>
+        public static string? ToUnixPath(string dosPath)
+        {
+            if (string.IsNullOrEmpty(dosPath)) return null;
+            try
+            {
+                IntPtr kernel32 = GetModuleHandle("kernel32.dll");
+                if (kernel32 == IntPtr.Zero) return null;
+                IntPtr p = GetProcAddress(kernel32, "wine_get_unix_file_name");
+                if (p == IntPtr.Zero) return null;
+
+                var toUnix = (WineGetUnixFileNameDelegate)Marshal.GetDelegateForFunctionPointer(
+                    p, typeof(WineGetUnixFileNameDelegate));
+                IntPtr res = toUnix(dosPath);
+                if (res == IntPtr.Zero) return null;
+                try
+                {
+                    string unix = Marshal.PtrToStringAnsi(res) ?? string.Empty;
+                    return unix.Length == 0 ? null : unix;
+                }
+                finally
+                {
+                    // Wine HeapAllocs the result on the process heap and hands
+                    // ownership over. This runs per port open now, not once.
+                    try { HeapFree(GetProcessHeap(), 0, res); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[AZOM] wine_get_unix_file_name('{dosPath}'): {ex.GetType().Name}: {ex.Message}");
+                return null;
+            }
         }
 
         /// <summary>One-line platform summary for the log and the diagnostics dump.</summary>
@@ -187,30 +234,12 @@ namespace MozaPlugin.Protocol
         // its parent. Only the dosdevices COM-label resolver needs this.
         private static string? FindPrefixRoot()
         {
-            try
-            {
-                IntPtr kernel32 = GetModuleHandle("kernel32.dll");
-                if (kernel32 == IntPtr.Zero) return null;
-                IntPtr p = GetProcAddress(kernel32, "wine_get_unix_file_name");
-                if (p == IntPtr.Zero) return null;
-
-                var toUnix = (WineGetUnixFileNameDelegate)Marshal.GetDelegateForFunctionPointer(
-                    p, typeof(WineGetUnixFileNameDelegate));
-                IntPtr res = toUnix(@"C:\");
-                if (res == IntPtr.Zero) return null;
-                string driveC = Marshal.PtrToStringAnsi(res) ?? string.Empty;
-                if (driveC.Length == 0) return null;
-
-                driveC = driveC.TrimEnd('/');
-                int slash = driveC.LastIndexOf('/');
-                if (slash <= 0) return null;
-                return driveC.Substring(0, slash);
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Debug($"[AZOM] wine_get_unix_file_name: {ex.GetType().Name}: {ex.Message}");
-                return null;
-            }
+            string? driveC = ToUnixPath(@"C:\");
+            if (driveC == null) return null;
+            driveC = driveC.TrimEnd('/');
+            int slash = driveC.LastIndexOf('/');
+            if (slash <= 0) return null;
+            return driveC.Substring(0, slash);
         }
     }
 }

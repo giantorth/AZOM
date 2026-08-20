@@ -45,6 +45,7 @@ namespace MozaPlugin.Protocol
         public WineDevicePathMozaPort(string devicePath)
         {
             _path = devicePath;
+            WarmUpEndpoint(devicePath);
             MozaLog.Debug("[AZOM] WineDevicePathPort: CreateFile");
             IntPtr h = CreateFileW(devicePath, GENERIC_READ | GENERIC_WRITE, 0, IntPtr.Zero,
                 OPEN_EXISTING, 0, IntPtr.Zero);
@@ -63,6 +64,42 @@ namespace MozaPlugin.Protocol
                 throw;
             }
             MozaLog.Debug("[AZOM] WineDevicePathPort: comm configured");
+        }
+
+        /// <summary>
+        /// Native (non-Wine) open + termios of the tty before Wine touches it.
+        ///
+        /// <para>On a freshly-powered base, Wine's first comm-config IOCTL after
+        /// CreateFile blocks FOREVER on a not-yet-fully-enumerated CDC-ACM
+        /// endpoint, and that wedges the shared wineserver — every later open
+        /// hangs and SimHub freezes. A native open + tcsetattr is hang-safe and
+        /// performs the CDC SET_LINE_CODING that completes the endpoint setup,
+        /// after which the Wine path sails through. <c>stty</c> is exactly that
+        /// (it opens O_RDONLY|O_NONBLOCK, then tcgetattr/tcsetattr) and ships
+        /// with coreutils and busybox alike. See
+        /// <c>docs/linux-cold-start-fix.md</c>.</para>
+        ///
+        /// <para><c>-hupcl</c> is load-bearing: without it stty's own close drops
+        /// DTR, adding a modem-line toggle immediately before our open.</para>
+        ///
+        /// <para>A non-zero exit is fine (the open will fail on its own and the
+        /// reconnect timer retries). A TIMEOUT is not: the native side wedging is
+        /// the one state in which entering Wine's comm-config is unsafe, so we
+        /// refuse the open and let the 5 s reconnect try again.</para>
+        /// </summary>
+        private static void WarmUpEndpoint(string devicePath)
+        {
+            if (!WineNativeExec.Available) return;
+            string? node = WineHost.ToUnixPath(devicePath);
+            if (string.IsNullOrEmpty(node)) return;
+
+            var r = WineNativeExec.Run(
+                new[] { "stty", "-F", node!, "115200", "raw", "-echo", "clocal", "-hupcl" },
+                timeoutMs: 3000);
+            if (r.Outcome == NativeSpawnOutcome.TimedOut)
+                throw new IOException($"native warm-up of {node} did not return — refusing the Wine open");
+            if (r.Outcome == NativeSpawnOutcome.Completed)
+                MozaLog.Debug($"[AZOM] WineDevicePathPort: warmed {node} (status 0x{r.Status:X}, {r.ElapsedMs} ms)");
         }
 
         // MozaSerialConnection.TryOpen classifies open failures by exception
