@@ -350,7 +350,7 @@ namespace MozaPlugin.Devices
                 {
                     _lastBitmask = bitmask;
                     _lastSendTime = now;
-                    plugin.WriteDashLedBitmask(bitmask);
+                    plugin.HardwareApplier.WriteDashLedBitmask(bitmask);
                     _bitmaskSends++;
                     Interlocked.Exchange(ref _lastBitmaskSendUtcTicks, now.Ticks);
                 }
@@ -391,7 +391,7 @@ namespace MozaPlugin.Devices
                     Array.Copy(rgb, _lastFlagRgb, rgb.Length);
                     _lastFlagPrimed = true;
                     _lastFlagSendTime = now;
-                    plugin.WriteDashFlagColors(rgb);
+                    plugin.HardwareApplier.WriteDashFlagColors(rgb);
                     _flagSends++;
                 }
 
@@ -458,7 +458,7 @@ namespace MozaPlugin.Devices
             }
             _lastBitmask = active;
             _lastSendTime = now;
-            plugin.WriteCm2LiveLedBitmask(
+            plugin.HardwareApplier.WriteCm2LiveLedBitmask(
                 MozaLedDeviceManager.BuildWindowedBitmaskBytes(active, NewEraStripWindow));
             _bitmaskSends++;
             Interlocked.Exchange(ref _lastBitmaskSendUtcTicks, now.Ticks);
@@ -484,7 +484,7 @@ namespace MozaPlugin.Devices
                     chunk[j * 4 + 2] = c.G;
                     chunk[j * 4 + 3] = c.B;
                 }
-                plugin.WriteCm2LiveLedColorChunk(chunk, chunkIdx);
+                plugin.HardwareApplier.WriteCm2LiveLedColorChunk(chunk, chunkIdx);
                 _rpmColorSends++;
                 chunkIdx++;
             }
@@ -511,7 +511,7 @@ namespace MozaPlugin.Devices
                     || c.B != _lastRpmColors[i].B)
                 {
                     _lastRpmColors[i] = c;
-                    plugin.WriteDashRpmColor(i, c.R, c.G, c.B);
+                    plugin.HardwareApplier.WriteDashRpmColor(i, c.R, c.G, c.B);
                     _rpmColorSends++;
                 }
             }

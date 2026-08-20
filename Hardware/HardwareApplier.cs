@@ -9,26 +9,31 @@ namespace MozaPlugin.Hardware
     /// family. Profile + per-page overlay are the source of truth; writes are
     /// detection-gated and sentinel-guarded.
     /// </summary>
-    internal sealed class HardwareApplier
+    internal sealed partial class HardwareApplier
     {
         private readonly MozaPlugin _plugin;
         private readonly MozaData _data;
         private readonly MozaDeviceManager _deviceManager;
         private readonly MozaAb9DeviceManager _ab9Manager;
         private readonly DeviceDetectionState _detectionState;
+        // Dedicated pipe for a standalone-USB CM2 dashboard — the CM2 write
+        // routing in HardwareApplier.Cm2.cs picks between this and _deviceManager.
+        private readonly MozaDashboardDeviceManager _dashboardManager;
 
         public HardwareApplier(
             MozaPlugin plugin,
             MozaData data,
             MozaDeviceManager deviceManager,
             MozaAb9DeviceManager ab9Manager,
-            DeviceDetectionState detectionState)
+            DeviceDetectionState detectionState,
+            MozaDashboardDeviceManager dashboardManager)
         {
             _plugin = plugin;
             _data = data;
             _deviceManager = deviceManager;
             _ab9Manager = ab9Manager;
             _detectionState = detectionState;
+            _dashboardManager = dashboardManager;
         }
 
         // ── Write-on-change cache for persistent (flash-backed) wheel settings ──
@@ -853,23 +858,23 @@ namespace MozaPlugin.Hardware
             // telemetry mode so screen widgets + LED ramp follow value frames.
             // TODO(cm2): cm2-normal-mode 1 vs 2 visually similar in CM2.md
             // lab — confirm 1 is the correct SimHub-mode value via capture.
-            _plugin.WriteCm2Config("cm2-normal-mode", 1);
-            _plugin.WriteCm2Config("cm2-rpm-group-mode", 1);
-            _plugin.WriteCm2Config("cm2-flag-group-mode", 1);
+            WriteCm2Config("cm2-normal-mode", 1);
+            WriteCm2Config("cm2-rpm-group-mode", 1);
+            WriteCm2Config("cm2-flag-group-mode", 1);
 
             // RPM regulation mode + thresholds. CM2.md notes percent-vs-absolute
             // encoding is not independently verified, so we write BOTH (percent
             // mode + percent thresholds, plus absolute thresholds derived from
             // MaxRpm) and let the firmware honour whichever it actually uses.
             // TODO(cm2): confirm regulation-mode encoding via capture.
-            _plugin.WriteCm2Config("cm2-rpm-regulation-mode", 0);
+            WriteCm2Config("cm2-rpm-regulation-mode", 0);
 
             // Default percent ramp: 50,55,60,…,95 covering the upper half of
             // the rev range. CM2 has 16 physical LEDs but the firmware accepts
             // a 10-entry percent ramp (one entry per "rung"; the firmware
             // interpolates across physical positions).
             byte[] percentRamp = new byte[] { 50, 55, 60, 65, 70, 75, 80, 85, 90, 95 };
-            _plugin.WriteCm2Config("cm2-rpm-percent-thresholds", percentRamp);
+            WriteCm2Config("cm2-rpm-percent-thresholds", percentRamp);
 
             // Absolute thresholds derived from MaxRpm (fallback 8000 per
             // CM2.md). Each rung gets (rpm * (i+1) / 10) so the 10 thresholds
@@ -880,7 +885,7 @@ namespace MozaPlugin.Hardware
             for (byte i = 0; i < 10; i++)
             {
                 int threshold = (int)((long)maxRpm * (i + 1) / 10);
-                _plugin.WriteCm2Config($"cm2-rpm-absolute-threshold{i + 1}", threshold);
+                WriteCm2Config($"cm2-rpm-absolute-threshold{i + 1}", threshold);
             }
 
             // Indicator brightness — authoritative path for CM2. Reuse the
@@ -888,7 +893,7 @@ namespace MozaPlugin.Hardware
             // does not double up; the legacy dash-rpm-brightness write above
             // is kept for compatibility.
             if (profile.DashRpmBrightness >= 0)
-                _plugin.WriteCm2Config("cm2-indicator-brightness", profile.DashRpmBrightness);
+                WriteCm2Config("cm2-indicator-brightness", profile.DashRpmBrightness);
 
             // STANDBY per-LED colors only (idle appearance, shown when no game
             // is running). rs21_parameter.db: SetIndicatorGroupStandbyModeColor
@@ -905,7 +910,7 @@ namespace MozaPlugin.Hardware
                 for (int i = 0; i < rpmCount; i++)
                 {
                     var rgb = MozaProfile.UnpackColor(profile.DashRpmColors[i]);
-                    _plugin.WriteCm2Config($"cm2-stored-color{i + 1}", new byte[] { rgb[0], rgb[1], rgb[2] });
+                    WriteCm2Config($"cm2-stored-color{i + 1}", new byte[] { rgb[0], rgb[1], rgb[2] });
                 }
             }
             if (profile.DashFlagColors != null)
@@ -914,7 +919,7 @@ namespace MozaPlugin.Hardware
                 for (int i = 0; i < flagCount; i++)
                 {
                     var rgb = MozaProfile.UnpackColor(profile.DashFlagColors[i]);
-                    _plugin.WriteCm2Config($"cm2-stored-color{i + 11}", new byte[] { rgb[0], rgb[1], rgb[2] });
+                    WriteCm2Config($"cm2-stored-color{i + 11}", new byte[] { rgb[0], rgb[1], rgb[2] });
                 }
             }
         }
