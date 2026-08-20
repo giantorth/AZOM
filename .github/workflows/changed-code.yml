@@ -78,7 +78,7 @@ jobs:
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             case "$f" in
-              *.cs|*.csproj|*.sln|*.xaml|*.resx|libs/*|DeviceTemplates/*|Resources/*)
+              *.cs|*.csproj|*.sln|*.xaml|*.resx|libs/*|DeviceTemplates/*|Resources/*|Data/*|Themes/*)
                 build "source changed: ${f}" ;;
             esac
           done <<<"$files"

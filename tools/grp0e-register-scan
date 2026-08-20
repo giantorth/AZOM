@@ -17,7 +17,7 @@ from pathlib import Path
 from collections import defaultdict, Counter
 
 sys.path.insert(0, str(Path(__file__).parent))
-from moza_bridge import load_bridge
+from moza_bridge import load_bridge, BRIDGE_DIR
 
 
 def find_sess01_anchor(frames):
@@ -143,7 +143,7 @@ def main():
     ap.add_argument("--window", type=float, default=10.0)
     args = ap.parse_args()
 
-    base = Path("/home/rorth/src/moza-simhub-plugin/sim/logs")
+    base = BRIDGE_DIR
     if args.path:
         paths = [base / args.path if not Path(args.path).is_absolute() else Path(args.path)]
     else:

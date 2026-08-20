@@ -9,8 +9,8 @@ centre 0x167). A car matches if relZ within --ztol m and relHead within --htol d
 
 Usage: python tools/radar_match.py <plugin.jsonl> <pithouse.jsonl>
 """
-import sys, json, struct, bisect, argparse
-sys.path.insert(0, '/home/rorth/src/moza-simhub-plugin/tools')
+import os, sys, json, struct, bisect, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import radar_verify as rv
 
 WRAP = (1 << 20) / rv.RADAR_Z_SCALE

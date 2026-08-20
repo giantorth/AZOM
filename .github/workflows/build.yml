@@ -16,6 +16,8 @@ on:
       - "libs/**"
       - "DeviceTemplates/**"
       - "Resources/**"
+      - "Data/**"
+      - "Themes/**"
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
@@ -27,6 +29,8 @@ on:
       - "libs/**"
       - "DeviceTemplates/**"
       - "Resources/**"
+      - "Data/**"
+      - "Themes/**"
   workflow_dispatch:
 
 concurrency:

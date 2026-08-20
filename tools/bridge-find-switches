@@ -8,7 +8,7 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path.home() / "src/moza-simhub-plugin/tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from moza_bridge import load_bridge, BRIDGE_DIR
 
 for capfile in sorted(BRIDGE_DIR.glob("bridge-*.jsonl")):

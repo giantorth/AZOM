@@ -15,6 +15,8 @@ on:
       - "libs/**"
       - "DeviceTemplates/**"
       - "Resources/**"
+      - "Data/**"
+      - "Themes/**"
   # Escape hatch for PRs opened with GITHUB_TOKEN (the SimHub-bump bot):
   # those never fire pull_request workflows, so build them by hand.
   workflow_dispatch:

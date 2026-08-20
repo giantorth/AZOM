@@ -81,7 +81,8 @@ def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--ours", default=None, help="Our wire trace (latest if omitted)")
-    ap.add_argument("--pithouse", default="/home/rorth/src/moza-simhub-plugin/sim/logs/bridge-20260514-170002.jsonl")
+    ap.add_argument("--pithouse", required=True,
+                    help="PitHouse bridge JSONL capture (see MOZA_TRACE_DIR)")
     ap.add_argument("--window", type=float, default=3.5, help="seconds after sess=01 open to inspect")
     args = ap.parse_args()
 

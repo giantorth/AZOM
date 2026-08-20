@@ -100,7 +100,7 @@ Notes:
 | `Protocol/` | Serial transport: `MozaSerialConnection` (threads, framing, 0x7E stuffing, write lanes), `MozaPortDiscovery` (device enumeration, registry + sysfs sources), `WineHost`/`LinuxUsbEnumerator`/`WineComNameResolver`/`WineDevicePathMozaPort`/`WineNativeExec` (Wine/Proton discovery + transport + native-exec), `MozaUsbIds` (PID inventory), `MozaCommandDatabase` (200+ commands), `MozaResponseParser`, `MozaProtocol` (constants/checksums), `MozaHidReader`, `PendingResponseTracker`, `WriteBudget`, `ConnectionFailure`, `SessionPropertyPushBuilder`/`FfRecordReader` (FF-record write/read) |
 | `Devices/` | Device detection + per-device managers and SimHub device extensions: `DeviceProber`, `DeviceDetectionState`, `ConnectionCoordinator`, `WheelModelInfo`, `MozaDeviceConstants`, AB9 / Hub / Dashboard / Base / mBooster / standalone-peripheral managers, wheel/dash/base extensions + LED managers + device settings controls, `DeviceDefinitionDeployer`, `WheelUi/` helpers |
 | `Telemetry/` | Dashboard telemetry pipeline: `TelemetrySender` (orchestrator) + collaborators in subdirectories (see [Architecture](#architecture)); FSR1/CM1 display drivers; `DashboardBindingCoordinator`, `DualDisplayCoordinator`, `Fsr1Cm1MappingCoordinator`, `SimHubPropertyResolver`, `ChannelCatalogParser`, `ConfigJsonClient`, `PropertyPushQueue` |
-| `Telemetry/Frames/` | Frame building: `TierDefinitionBuilder`/`TierDefinitionEmitter`, `TelemetryFrameBuilder`, `TelemetryFrameCache`, `TelemetryEncoder`, `TelemetryBitWriter`, `GameDataSnapshot`, `StringValueBuilder`, `PropertyCoercion` |
+| `Telemetry/Frames/` | Frame building: `TierDefinitionBuilder`/`TierDefinitionEmitter`, `TelemetryFrameBuilder`, `TelemetryFrameCache`, `TelemetryEncoder`, `TelemetryBitWriter`, `GameDataSnapshot`, `StringValueBuilder`, `PropertyCoercion`, `TrackMapTransform` |
 | `Telemetry/Sessions/` | Session layer: `SessionLifecycle` (open/close state machine), `SessionRegistry`, `SessionDispatcher`, `SessionDataReassembler`, `RpcCallChannel`, `FfRecordStream` (inbound FF-record reassembly, paired with `Protocol/FfRecordReader`) |
 | `Telemetry/Dashboard/` | Dashboard library + upload/download: `DashboardProfileStore`, `DashboardCache`, `WheelUploadCoordinator`, `DashboardDownloader`, `FileTransferBuilder`, `WheelStateParser`/`WheelDashboardState` |
 | `Telemetry/Lifecycle/` | Pipeline lifecycle state machines: `SilenceGate`, `HotSwitchCoordinator`, `RecoveryDispatcher`, `CatalogResyncProbe`, `PostSwitchCatalogConvergence` |
@@ -108,7 +108,7 @@ Notes:
 | `Telemetry/Watchdog/` | `DisplayWatchdog` — unified content-aware engagement verdict + close-storm backstop + sess=0x09/configJson transmit nudges |
 | `Telemetry/Display/`, `Era/`, `TestMode/`, `TileServer/`, `Protocol/` | `WheelSlotTracker`; era policy (`MozaWheelEra`/`EraPolicy`); test-signal generator/catalog; tile-server state build/parse; `CompressionTable` |
 | `Hardware/` | `HardwareApplier` — every hardware-side write path (`Apply*ToHardware`, detection-gated `WriteIf*` family) |
-| `Settings/` | `SettingsMigrator` (schema v0→v9), `ProfileCoordinator` (persistence + profile system + per-wheel-page accessors) |
+| `Settings/` | `ProfileCoordinator` (persistence + profile system + per-wheel-page accessors) |
 | `UI/` | Plugin settings pane (`SettingsControl` + partials), profile model (`MozaProfile`/`MozaProfileStore`/`MozaPluginSettings`), status hints, diagnostics text/bundle, custom controls (`UI/Controls/`), update check (`UI/UpdateCheck/`) |
 | `Sdk/` | Third-party SDK emulation: CoAP server (`MozaSdkCoapServer`), `CoapStubManager` (PitHouse-impersonation child process), `PitHouseUdp/` control server, CBOR codec. `CoapStub/` (separate console project) is the stub executable |
 | `Diagnostics/` | `MozaLog` (ring-buffered log wrapper), `SerialTrafficCapture` (frame ring + JSONL wire-trace sink), `SessionRetransmitter`, `FirmwareDebugLog`, `DeviceLogStore`/`DeviceLogParser` (display application log), `CaptureRedactor` |
@@ -149,7 +149,6 @@ The two orchestrators — `MozaPlugin.cs` and `Telemetry/TelemetrySender.cs` —
 | `Devices/ConnectionCoordinator.cs` | Primary connect + AB9/CM2/hub/base-aux dedicated lanes, base↔hub primary migration state machine, hub/base pipe polling + inbound scoping |
 | `Hardware/HardwareApplier.cs` | Every hardware write path: `ApplyProfileHardware`, the per-device `Apply*ToHardware` methods, detection-gated `WriteIf*`/`WriteColorIf*`/`WriteArrayIf*` family, owner-routed pedal/handbrake writes, model-capability LED gating |
 | `Settings/ProfileCoordinator.cs` | Settings persistence (debounced save, clear/reset), profile-store init/subscription, `ApplyProfile`, the per-wheel-page accessor family (`ActiveTelemetry*`, overlay, sleep/idle bundles, era), wheel-reported seed methods |
-| `Settings/SettingsMigrator.cs` | Schema v0→v9 migration + profile baseline seeding |
 | `Telemetry/DashboardBindingCoordinator.cs` | Dashboard binding: telemetry settings push, kind=4 emission for profile-driven switches, wheel-initiated switch handling, lifecycle gates, pending-apply retry |
 | `Telemetry/DualDisplayCoordinator.cs` | CM2/CM1 dual-display pipelines: `EnsureCm2Pipeline`, the CM1 discriminator, FSR1/CM1 driver start/stop |
 | `Telemetry/Fsr1Cm1MappingCoordinator.cs` | FSR1/CM1 field mappings + active dashboard index store + `Table 7 Param 6` page-report follow |
@@ -408,7 +407,7 @@ When adding a new setting that is written to the device, it must also be saved/r
 6. **Storage** by tier:
    - **Per-game baseline** → property on `MozaProfile`, copy in `CopyProfilePropertiesFrom()`. Only add a `CaptureFromCurrent()` line if the value flows from device reads; UI-edited fields are written by handlers directly and capture would clobber them.
    - **Per-(profile × wheel-page)** → property on `WheelOverride`, copy in `WheelOverride.Clone()`. No capture.
-   - **Per-wheel-page** → a `Dictionary<Guid, …>ByPageGuid` on `MozaPluginSettings` + a `MozaPlugin` accessor resolving the current page GUID + a `SettingsMigrator` step draining any legacy fields; bump `SettingsSchemaVersion`.
+   - **Per-wheel-page** → a `Dictionary<Guid, …>ByPageGuid` on `MozaPluginSettings` + a `MozaPlugin` accessor resolving the current page GUID. Legacy-field draining is no longer needed — the historic v2–v9 migrator has been removed.
    - **Plugin-global** → property on `MozaPluginSettings`.
 7. **XAML** — add UI controls to `SettingsControl.xaml` or the matching device settings control.
 8. **UI handler** by tier:
@@ -424,15 +423,16 @@ Every setting that writes to the device on UI change must round-trip through pro
 
 ### Settings storage and migration
 
-`MozaPluginSettings.SettingsSchemaVersion` gates `Settings/SettingsMigrator.MigrateToSchemaV2`, which runs every step forward in one pass:
+Settings are split across `MozaPluginSettings` (plugin-global values plus the per-wheel-page `*ByPageGuid` dicts), `MozaProfile` (per-game baseline) and `WheelOverride` (per-profile × wheel-page).
 
-- v2: legacy UID-keyed slots → `WheelOverridesByPageGuid` / `TelemetryChannelMappings`.
-- v3: flat telemetry fields → overlays.
-- v4/v5/v6: mzdash folder / telemetry-enabled / era lifted off the overlay into the per-wheel-page dicts.
-- v7: per-profile baseline reseed (repair pass).
-- v8/v9: sleep and idle bundles lifted into `WheelSleepByPageGuid` / `WheelIdleByPageGuid`.
+**There is no schema-version counter and no migrator class.** The historic v2–v9 `SettingsMigrator` and the `[JsonExtensionData]` legacy-key mechanism it relied on have both been removed now that the destination dicts are the only storage. Migrations are written inline in `Init` (`MozaPlugin.cs`), each guarded by its own sentinel so it runs exactly once:
 
-`WheelOverride.LegacyJsonFields` (`[JsonExtensionData(WriteData = false)]`) preserves removed JSON keys through deserialization so each step can drain them. Use `MozaDeviceConstants.ResolveWheelGuid(prefix)` to map a model prefix to a page GUID — never hard-code GUIDs. The device-JSON → plugin-settings drain is one-shot, gated by `WheelExtensionDrained` with fill-only semantics, because SimHub doesn't reliably re-serialize device JSON before shutdown.
+- the legacy Stable/Dev update-channel enum drains when `UpdateChannelId` is still empty (retired Dev users land on Stable with a cleared `LastSeen*` cache);
+- the `VerboseWireDebugLog` default flip is gated by the dedicated `VerboseWireDebugLogDefaultMigrated` bool, so anyone who re-enables it afterwards keeps it.
+
+Follow that pattern for new migrations: put the sentinel next to the setting it guards, drain in `Init`, and never read the legacy field again. Value-level coercion belongs with its owner instead — e.g. `ProfileCoordinator.MigrateStoredEra` folds unknown/retired stored era values back to `MozaWheelEra.Auto` so the wheel is re-probed rather than pinned to a hallucinated era.
+
+Use `MozaDeviceConstants.ResolveWheelGuid(prefix)` to map a model prefix to a page GUID — never hard-code GUIDs. The device-JSON → plugin-settings drain is one-shot, gated by `WheelExtensionDrained` with fill-only semantics, because SimHub doesn't reliably re-serialize device JSON before shutdown.
 
 ### Adding a new telemetry channel
 
