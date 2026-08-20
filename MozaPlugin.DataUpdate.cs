@@ -68,8 +68,7 @@ namespace MozaPlugin
             _cm2Sender?.SetGameRunning(data.GameRunning);
             _cm1Driver?.UpdateGameData(data.NewData);
             _cm1Driver?.SetGameRunning(data.GameRunning);
-            CheckGearshiftEvent(data);
-            CheckAb9GearshiftEvent(data);
+            _gearshift?.Tick(data);
 
             // Push SimHub's shared/master LED brightness to the wheel firmware group
             // brightness (rpm/buttons/knobs) when the user moves the slider. The wheel

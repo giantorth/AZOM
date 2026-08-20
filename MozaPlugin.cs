@@ -154,6 +154,9 @@ namespace MozaPlugin
         // access.
         // Owns the servers, the stub child process and their lifecycle gate —
         // see Sdk/SdkLifecycleCoordinator.cs. Null until Init constructs it.
+        // Gear-change edge detection for wheelbase + AB9 one-shot shift effects —
+        // see Devices/GearshiftDetector.cs.
+        private GearshiftDetector? _gearshift;
         private Sdk.SdkLifecycleCoordinator? _sdk;
         /// <summary>SDK-emulation lifecycle (CoAP server, stub child, UDP control
         /// server). Null until Init constructs it.</summary>

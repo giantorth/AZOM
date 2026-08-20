@@ -533,6 +533,7 @@ namespace MozaPlugin
                 _hidReader.Start();
                 _propertyResolver = new SimHubPropertyResolver(_pluginManager, _data, _hidReader);
                 _hardwareApplier = new HardwareApplier(this, _data, _deviceManager, _ab9Manager, DetectionState);
+                _gearshift = new GearshiftDetector(this, _data, _deviceManager, _ab9Manager, DetectionState);
                 _deviceProber = new DeviceProber(this, _connection, _deviceManager, _data, DetectionState);
                 // Now that the hardware applier exists, do the initial standalone
                 // peripheral walk — surfaces a pedal set / handbrake attached
