@@ -88,10 +88,7 @@ namespace MozaPlugin
             // rest of the wire stack disposes those out from under it. The
             // PitHouse UDP control server holds the same references and uses
             // the same shutdown pattern.
-            try { _sdkServer?.Stop(); _sdkServer?.Dispose(); _sdkServer = null; }
-            catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
-            try { _controlUdpServer?.Stop(); _controlUdpServer?.Dispose(); _controlUdpServer = null; }
-            catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
+            _sdk?.StopServers();
 
             // Decide up-front whether the persistent wire will survive this
             // teardown — same condition the dispose step below uses. We need
@@ -120,27 +117,11 @@ namespace MozaPlugin
             try { _cm1Driver?.Dispose(); } catch { }
             _cm1Driver = null;
 
-            // When keepWireAlive=true we just drop the instance ref; the
-            // persistent static keeps the child process alive for the next
-            // plugin instance to reuse via the IsRunning check in Init.
-            // When the wire is being torn down (true cold-start reset, not a
-            // game switch), stop the stub too and clear the static.
-            if (keepWireAlive)
-            {
-                _sdkStubManager = null;
-            }
-            else
-            {
-                // Bounded so the End() flow (often runs on the SimHub UI
-                // thread) can't get pinned by a Wine-side wedge in
-                // Process.Kill / JobObject.Dispose.
-                try { _sdkStubManager?.TryStop(1500); }
-                catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
-                if (_sdkStubManager != null
-                    && ReferenceEquals(_sdkStubManager, s_persistentSdkStubManager))
-                    s_persistentSdkStubManager = null;
-                _sdkStubManager = null;
-            }
+            // Persistent-stub policy on End: keepWireAlive drops only the
+            // instance ref (next Init reuses the live child); a true cold-start
+            // reset stops the stub and clears the static. See
+            // Sdk/SdkLifecycleCoordinator.ReleaseStubOnEnd.
+            _sdk?.ReleaseStubOnEnd(keepWireAlive);
 
             if (keepWireAlive)
             {
@@ -332,7 +313,7 @@ namespace MozaPlugin
             // times out the JobObject's KILL_ON_JOB_CLOSE backstops the
             // child cleanup on process exit, and the next launch's
             // orphan sweep handles the case where even that didn't fire.
-            try { s_persistentSdkStubManager?.TryStop(1500); }
+            try { Sdk.SdkLifecycleCoordinator.StopPersistentStub(); }
             catch { }
         }
     }

@@ -364,7 +364,7 @@ namespace MozaPlugin
             // thread; the 500 ms RefreshSdkTabTick renders the resulting status.
             System.Threading.Tasks.Task.Run(() =>
             {
-                try { _plugin.SetSdkEmulationEnabled(on); }
+                try { _plugin.SdkLifecycle?.SetEmulationEnabled(on); }
                 catch { /* helper logs its own failures; status reflects them */ }
             });
             RefreshSdkStatus();
@@ -380,7 +380,7 @@ namespace MozaPlugin
             _plugin.SaveSettings();
             System.Threading.Tasks.Task.Run(() =>
             {
-                try { _plugin.SetUdpControlEnabled(on); }
+                try { _plugin.SdkLifecycle?.SetUdpControlEnabled(on); }
                 catch { /* helper logs its own failures; status reflects them */ }
             });
             RefreshSdkStatus();

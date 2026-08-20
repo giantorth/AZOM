@@ -80,20 +80,6 @@ namespace MozaPlugin
         private bool _asHidBaselined;
         private int _asSteer = -1, _asThrottle, _asBrake, _asClutch, _asHandbrake, _asLeftPaddle, _asRightPaddle, _asButtonHash;
 
-        // CoAP stub child-process manager. Persistent for the same reason the
-        // wire is: stopping and restarting the stub on every plugin reload is
-        // wasted work (the stub is a long-lived "PitHouse impersonator" child
-        // process with no per-plugin-instance state) AND under Wine/Proton the
-        // teardown path (Process.Kill + JobObject.Dispose) intermittently
-        // hangs — observed 2026-05-25: End() on the SECOND game switch wedged
-        // in CoapStubManager.Stop() between RestoreRegistryRedirect (logged)
-        // and the "CoAP stub stopped" line (never logged). Leaving the stub
-        // alive across reloads avoids the unsafe teardown path entirely.
-        //
-        // Disposed on full process exit (OnAppDomainProcessExit) AND on cold-
-        // start re-entry when SdkEmulationEnabled was toggled off.
-        private static Sdk.CoapStubManager? s_persistentSdkStubManager;
-
         // AppDomain.ProcessExit registration is one-shot per process. End()
         // intentionally leaves the persistent wire alive across plugin
         // reloads (game switches) — the wheel never sees the 10–14 s
@@ -166,15 +152,12 @@ namespace MozaPlugin
         // require a plugin restart to toggle (no runtime enable/disable —
         // see Init()). Null when disabled, so the UI tab uses null-conditional
         // access.
-        private Sdk.MozaSdkCoapServer? _sdkServer;
-        private Sdk.PitHouseUdp.MozaControlUdpServer? _controlUdpServer;
-        private Sdk.CoapStubManager? _sdkStubManager;
-        // Serializes runtime start/stop of the SDK-emulation surface so the
-        // live UI toggles (which fire on the WPF thread, off-loaded to the
-        // ThreadPool) can't race Init()/End() or each other. Guards the
-        // _sdkServer / _controlUdpServer / _sdkStubManager fields and the
-        // s_persistentSdkStubManager static during transitions.
-        private readonly object _sdkLifecycleGate = new object();
+        // Owns the servers, the stub child process and their lifecycle gate —
+        // see Sdk/SdkLifecycleCoordinator.cs. Null until Init constructs it.
+        private Sdk.SdkLifecycleCoordinator? _sdk;
+        /// <summary>SDK-emulation lifecycle (CoAP server, stub child, UDP control
+        /// server). Null until Init constructs it.</summary>
+        internal Sdk.SdkLifecycleCoordinator? SdkLifecycle => _sdk;
         internal global::MozaPlugin.Protocol.PendingResponseTracker PendingResponses { get; }
             = new global::MozaPlugin.Protocol.PendingResponseTracker();
         // Internal: ProfileCoordinator.ClearSettings replaces this field with a
@@ -503,20 +486,26 @@ namespace MozaPlugin
         /// Surfaced for the Settings UI's SDK tab to read its status and
         /// recent-requests buffer.
         /// </summary>
-        internal Sdk.MozaSdkCoapServer? SdkServer => _sdkServer;
+        internal Sdk.MozaSdkCoapServer? SdkServer => _sdk?.Server;
 
         /// <summary>
         /// PitHouse-compatible plain-UDP control server (port 40288 by default).
         /// Started/stopped alongside <see cref="SdkServer"/> — both are part of
         /// the third-party SDK emulation surface.
         /// </summary>
-        internal Sdk.PitHouseUdp.MozaControlUdpServer? ControlUdpServer => _controlUdpServer;
+        internal Sdk.PitHouseUdp.MozaControlUdpServer? ControlUdpServer => _sdk?.ControlUdpServer;
 
         /// <summary>
         /// Live CoAP-stub child-process manager when SDK emulation is
         /// enabled; null otherwise. Same UI consumer as <see cref="SdkServer"/>.
         /// </summary>
-        internal Sdk.CoapStubManager? SdkStubManager => _sdkStubManager;
+        internal Sdk.CoapStubManager? SdkStubManager => _sdk?.StubManager;
+
+        internal MozaHidReader HidReader => _hidReader;
+
+        /// <summary>Live truck-sim stalk controller (for the settings UI's
+        /// "Re-sync wipers" action). Null until Init runs.</summary>
+        internal StalksTruckSimController StalksController => _stalksController;
 
         /// <summary>True if the wheel's internal Display sub-device responded to probe.
         /// Accepts any populated identity field — some wheels (e.g. W17) return an

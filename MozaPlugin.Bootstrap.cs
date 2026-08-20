@@ -701,8 +701,9 @@ namespace MozaPlugin
                 // mid-session toggle take exactly the same code path. Each
                 // helper catches its own failures so one bad port doesn't take
                 // the other down.
-                SetSdkEmulationEnabled(_settings.SdkEmulationEnabled);
-                SetUdpControlEnabled(_settings.UdpControlEnabled);
+                _sdk = new Sdk.SdkLifecycleCoordinator(_data, _hardwareApplier);
+                _sdk.SetEmulationEnabled(_settings.SdkEmulationEnabled);
+                _sdk.SetUdpControlEnabled(_settings.UdpControlEnabled);
             }
             catch (Exception ex)
             {
@@ -756,23 +757,11 @@ namespace MozaPlugin
 
             // Tear down SDK emulation BEFORE the wire / data layers so the
             // CoAP receive thread can't dispatch into half-disposed handlers.
-            try { _sdkServer?.Stop(); _sdkServer?.Dispose(); _sdkServer = null; }
-            catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
-            try { _controlUdpServer?.Stop(); _controlUdpServer?.Dispose(); _controlUdpServer = null; }
-            catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
-            // Mirror End()'s persistent-stub policy: if this Init reused the
-            // persistent stub, do NOT Stop it here — the next Init expects to
-            // inherit it. Only drop our local ref. Disposal gated on
-            // !ReferenceEquals matches the connection/sender pattern above.
-            // Bounded TryStop so a Wine-side wedge can't block CleanupPartialInit.
-            bool ownStubManager = _sdkStubManager != null
-                && !ReferenceEquals(_sdkStubManager, s_persistentSdkStubManager);
-            if (ownStubManager)
-            {
-                try { _sdkStubManager?.TryStop(1500); }
-                catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
-            }
-            _sdkStubManager = null;
+            // ReleaseStubAfterFailedInit mirrors End()'s persistent-stub policy —
+            // see Sdk/SdkLifecycleCoordinator.cs. Null when Init threw before
+            // the coordinator was constructed.
+            _sdk?.StopServers();
+            _sdk?.ReleaseStubAfterFailedInit();
 
             // Mirror End()'s detach: these are subscribed early in Init (before
             // throw-prone steps), and _telemetrySender may be the process-lifetime
