@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.UI;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

@@ -1,4 +1,5 @@
 using System;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

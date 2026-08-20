@@ -5,7 +5,7 @@ using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.UI.UpdateCheck;
 
-namespace MozaPlugin
+namespace MozaPlugin.Settings
 {
     /// <summary>
     /// Persisted plugin settings. Saved/loaded via SimHub's ReadCommonSettings/SaveCommonSettings.

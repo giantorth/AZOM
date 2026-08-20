@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using MozaPlugin.Telemetry.Display;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Telemetry
 {

@@ -1,6 +1,6 @@
 using SimHub.Plugins.ProfilesCommon;
 
-namespace MozaPlugin
+namespace MozaPlugin.Settings
 {
     /// <summary>
     /// Manages Moza device profiles using SimHub's native profile system.

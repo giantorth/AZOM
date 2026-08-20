@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

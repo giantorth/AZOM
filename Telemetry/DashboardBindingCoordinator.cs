@@ -8,6 +8,7 @@ using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Telemetry
 {

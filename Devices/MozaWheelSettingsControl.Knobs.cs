@@ -6,6 +6,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using MozaControls;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

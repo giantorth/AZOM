@@ -17,6 +17,7 @@ using SimHub.Plugins.OutputPlugins.EditorControls;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 using static MozaPlugin.UI.UiHelpers;
 using static MozaPlugin.Devices.WheelUi.WheelUiHelpers;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices.WheelUi
 {

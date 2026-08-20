@@ -16,6 +16,7 @@ using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
 using static MozaPlugin.Devices.WheelUi.WheelUiHelpers;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

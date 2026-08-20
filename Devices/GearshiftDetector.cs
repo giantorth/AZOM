@@ -1,6 +1,7 @@
 using System;
 using GameReaderCommon;
 using MozaPlugin.UI;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

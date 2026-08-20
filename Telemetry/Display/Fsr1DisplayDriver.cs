@@ -5,6 +5,7 @@ using System.Timers;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.TestMode;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Telemetry.Display
 {

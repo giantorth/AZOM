@@ -1,3 +1,5 @@
+using MozaPlugin.Settings;
+
 namespace MozaPlugin.Devices
 {
     /// <summary>

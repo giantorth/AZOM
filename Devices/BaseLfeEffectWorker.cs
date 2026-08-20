@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using MozaPlugin.Protocol;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices
 {

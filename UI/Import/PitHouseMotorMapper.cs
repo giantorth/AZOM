@@ -3,6 +3,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using MozaPlugin.Devices;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.UI.Import
 {

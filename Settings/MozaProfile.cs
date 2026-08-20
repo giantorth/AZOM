@@ -5,7 +5,7 @@ using MozaPlugin.Devices;
 using Newtonsoft.Json;
 using SimHub.Plugins.ProfilesCommon;
 
-namespace MozaPlugin
+namespace MozaPlugin.Settings
 {
     /// <summary>
     /// Per-wheel-page overlay layered on top of a <see cref="MozaProfile"/>'s
