@@ -94,7 +94,7 @@ namespace MozaPlugin.Protocol
             var ttyNames = new List<string>();
             foreach (var dir in ttyDirs)
             {
-                string name = Path.GetFileName(dir);
+                string name = LeafName(dir);
                 if (name.StartsWith("ttyACM", StringComparison.Ordinal)
                     || name.StartsWith("ttyUSB", StringComparison.Ordinal))
                     ttyNames.Add(name);
@@ -195,7 +195,7 @@ namespace MozaPlugin.Protocol
 
             foreach (var entry in entries)
             {
-                string name = Path.GetFileName(entry);
+                string name = LeafName(entry);
                 if (name.IndexOf(':') >= 0) continue;   // interface, not a device
                 ushort vid = ReadHexUshort(Path.Combine(entry, "idVendor"), 0);
                 if (vid != MozaVid) continue;
@@ -211,7 +211,14 @@ namespace MozaPlugin.Protocol
 
         // Which of these identical devices owns <tty>? Ask each device's
         // interface children whether they carry it. This is the only path in
-        // the file with a ':' in it, so it is fully isolated.
+        // the file with a ':' in it, so it is fully isolated — and it is the
+        // only one that must go through raw Win32: under SimHub's AppDomain
+        // .NET's FileIOPermission path emulation rejects a ':' outside the
+        // drive with NotSupportedException, which Directory.Exists swallows
+        // into a silent false. Wine itself resolves the path correctly
+        // (GetFileAttributesW returns the directory bit), so the P/Invoke is
+        // what makes this walk work at all rather than always falling through
+        // to ordinal pairing.
         private static bool TryResolveOwningDevice(List<UsbDevice> candidates, string tty, out UsbDevice found)
         {
             found = UsbDevice.Empty;
@@ -225,9 +232,11 @@ namespace MozaPlugin.Protocol
                     string devDir = Path.Combine(root, c.BusPath);
                     foreach (var ifaceDir in Directory.GetDirectories(devDir))
                     {
-                        string ifaceName = Path.GetFileName(ifaceDir);
+                        string ifaceName = LeafName(ifaceDir);
                         if (ifaceName.IndexOf(':') < 0) continue;
-                        if (Directory.Exists(Path.Combine(ifaceDir, "tty", tty)))
+                        // Concatenate, don't Path.Combine — keep the colon path
+                        // away from every managed path API on the way to Win32.
+                        if (DirectoryExistsRaw(ifaceDir + "\\tty\\" + tty))
                         {
                             found = c;
                             return true;
@@ -291,6 +300,38 @@ namespace MozaPlugin.Protocol
                     && ushort.TryParse(parts[1], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out pid);
             }
             return false;
+        }
+
+        private const uint INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF;
+        private const uint FILE_ATTRIBUTE_DIRECTORY = 0x10;
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetFileAttributesW(string path);
+
+        /// <summary>Directory.Exists for a path .NET's permission emulation
+        /// refuses to normalise (a ':' outside the drive). Wine resolves it
+        /// correctly; only the managed layer objects.</summary>
+        private static bool DirectoryExistsRaw(string path)
+        {
+            try
+            {
+                uint attr = GetFileAttributesW(path);
+                return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            }
+            catch { return false; }
+        }
+
+        private static readonly char[] s_pathSeps = { '\\', '/' };
+
+        // Path.GetFileName treats ':' as the VOLUME separator, so on a sysfs
+        // interface dir it returns "1.0" rather than "1-0:1.0" — silently
+        // defeating every colon-based filter in this file. Split on directory
+        // separators only.
+        private static string LeafName(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            int i = path.LastIndexOfAny(s_pathSeps);
+            return i < 0 ? path : path.Substring(i + 1);
         }
 
         private static string ReadText(string path)
