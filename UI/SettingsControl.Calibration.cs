@@ -483,7 +483,7 @@ namespace MozaPlugin
             var c = CurrentMBoosterController();
             var s = CurrentMBoosterSettings();
             if (c == null || s == null) return;
-            _plugin.ApplyMBoosterToHardware(c, s);
+            _plugin.HardwareApplier.ApplyMBoosterToHardware(c, s);
         }
 
         // ------- Language picker (Options tab) -------

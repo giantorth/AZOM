@@ -1372,7 +1372,7 @@ namespace MozaPlugin.Hardware
             foreach (var controller in registry.Devices)
             {
                 var s = _plugin.GetOrCreateMBoosterSettings(controller.Identity);
-                _plugin.ApplyMBoosterToHardware(controller, s);
+                ApplyMBoosterToHardware(controller, s);
             }
         }
 

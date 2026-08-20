@@ -73,7 +73,7 @@ namespace MozaPlugin.UI.Import
         /// <summary>
         /// mBooster controllers whose settings were touched by one or more
         /// diffs in this plan. After all diffs have been applied, the caller
-        /// must invoke <c>MozaPlugin.ApplyMBoosterToHardware(controller,
+        /// must invoke <c>HardwareApplier.ApplyMBoosterToHardware(controller,
         /// controller.CurrentSettings)</c> on each to push the new
         /// calibration to the device — the standard
         /// <c>ApplyProfileHardware</c> path does not cover mBooster.
