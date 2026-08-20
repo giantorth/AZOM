@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using MozaPlugin.Devices.WheelUi;
+using MozaPlugin.Devices.Ui;
 using MozaPlugin.Resources;
 using MozaPlugin.Telemetry.Dashboard;
 using SimHub.Plugins.OutputPlugins.Dash.GLCDTemplating;

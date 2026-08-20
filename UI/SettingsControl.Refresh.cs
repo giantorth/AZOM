@@ -21,6 +21,7 @@ using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
+using MozaPlugin.Devices.Ui;
 
 namespace MozaPlugin.UI
 {
@@ -135,7 +136,7 @@ namespace MozaPlugin.UI
             // Phase 6: fan out live HID data to the per-device wheel control's
             // Inputs sub-tab so its paddle bars + active-button text update at
             // the same 30 Hz cadence as the (now hidden) plugin-pane controls.
-            try { global::MozaPlugin.Devices.MozaWheelSettingsControl.Instance?.PushInputsLiveData(_data); }
+            try { global::MozaPlugin.Devices.Ui.MozaWheelSettingsControl.Instance?.PushInputsLiveData(_data); }
             catch { }
         }
 

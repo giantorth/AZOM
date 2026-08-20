@@ -8,7 +8,7 @@ using MozaPlugin.UI;
 using MozaPlugin.Resources;
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Ui
 {
     public partial class MozaBaseSettingsControl : UserControl
     {

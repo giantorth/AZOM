@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using static MozaPlugin.UI.UiHelpers;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Ui
 {
     // Wheel-input controls (paddles · joystick) that used to live in the
     // plugin-pane WheelTab. The plugin pane keeps its controls hidden so its

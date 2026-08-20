@@ -1,6 +1,6 @@
 using System;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Haptics
 {
     /// <summary>
     /// Shared math for the "engine vibration" effect across the three FFB

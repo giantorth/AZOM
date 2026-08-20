@@ -5,7 +5,7 @@ using System.Windows.Media;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Display;
 
-namespace MozaPlugin.Devices.WheelUi
+namespace MozaPlugin.Devices.Ui
 {
     /// <summary>
     /// Bindable view-model for one streamed FSR1 record in the live byte-strip

@@ -16,10 +16,10 @@ using SimHub.Plugins.OutputPlugins.Dash.GLCDTemplating;
 using SimHub.Plugins.OutputPlugins.EditorControls;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 using static MozaPlugin.UI.UiHelpers;
-using static MozaPlugin.Devices.WheelUi.WheelUiHelpers;
+using static MozaPlugin.Devices.Ui.WheelUiHelpers;
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices.WheelUi
+namespace MozaPlugin.Devices.Ui
 {
     /// <summary>
     /// Shared dashboard-management surface (dash selection + channel mapping +

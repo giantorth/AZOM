@@ -5,7 +5,7 @@ using MozaPlugin.Telemetry;
 using SimHub.Plugins.OutputPlugins.Dash.GLCDTemplating;
 using SimHub.Plugins.OutputPlugins.Dash.TemplatingCommon;
 
-namespace MozaPlugin.Devices.WheelUi
+namespace MozaPlugin.Devices.Ui
 {
     /// <summary>
     /// Row backing the per-wheel telemetry channel-mapping list. Holds the

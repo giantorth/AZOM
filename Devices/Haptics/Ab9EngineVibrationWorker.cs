@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Haptics
 {
     /// <summary>
     /// Background worker that drives the AB9 host-rendered engine-vibration

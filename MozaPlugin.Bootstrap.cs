@@ -26,6 +26,7 @@ using Timer = System.Timers.Timer;
 using MozaPlugin.Integration;
 using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Devices.Extensions;
+using MozaPlugin.Devices.Haptics;
 
 namespace MozaPlugin
 {

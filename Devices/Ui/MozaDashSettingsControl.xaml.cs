@@ -8,8 +8,9 @@ using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
 using MozaPlugin.Resources;
 using MozaPlugin.Settings;
+using MozaPlugin.Devices.Ui;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Ui
 {
     public partial class MozaDashSettingsControl : UserControl
     {
@@ -35,8 +36,8 @@ namespace MozaPlugin.Devices
                 InitializeComponent();
                 // This control configures the CM2 dash pipeline (its own sender +
                 // CM2-keyed mappings), independent of the wheel page.
-                DashMgmtHostCm2.Content = new WheelUi.DashboardManagementControl { IsCm2Target = true };
-                DashFilesHostCm2.Content = new WheelUi.DashboardFilesControl { IsCm2Target = true };
+                DashMgmtHostCm2.Content = new Ui.DashboardManagementControl { IsCm2Target = true };
+                DashFilesHostCm2.Content = new Ui.DashboardFilesControl { IsCm2Target = true };
 
                 if (ResolvePlugin())
                     BuildColorSwatches();

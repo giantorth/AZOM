@@ -1,4 +1,4 @@
-<UserControl x:Class="MozaPlugin.Devices.MozaBaseSettingsControl"
+<UserControl x:Class="MozaPlugin.Devices.Ui.MozaBaseSettingsControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctrl="clr-namespace:MozaControls"

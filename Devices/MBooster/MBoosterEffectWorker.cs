@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using MozaPlugin.Protocol;
+using MozaPlugin.Devices.Haptics;
 
 namespace MozaPlugin.Devices.MBooster
 {

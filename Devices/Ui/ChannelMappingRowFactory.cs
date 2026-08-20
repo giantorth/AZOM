@@ -4,7 +4,7 @@ using System.Linq;
 using MozaPlugin.Telemetry.Dashboard;
 using SimHub.Plugins.OutputPlugins.Dash.TemplatingCommon;
 
-namespace MozaPlugin.Devices.WheelUi
+namespace MozaPlugin.Devices.Ui
 {
     /// <summary>
     /// Builds <see cref="ChannelMappingRow"/> lists for the per-wheel

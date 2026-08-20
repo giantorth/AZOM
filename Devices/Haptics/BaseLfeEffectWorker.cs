@@ -4,7 +4,7 @@ using System.Threading;
 using MozaPlugin.Protocol;
 using MozaPlugin.Settings;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Haptics
 {
     /// <summary>
     /// Renders the three host-rendered wheelbase LFE channels (Engine / ABS /

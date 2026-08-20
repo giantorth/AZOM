@@ -9,6 +9,7 @@ using SimHub.Plugins.Devices;
 using SimHub.Plugins.Devices.DeviceExtensions;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using MozaPlugin.Devices.Led;
+using MozaPlugin.Devices.Ui;
 
 namespace MozaPlugin.Devices.Extensions
 {

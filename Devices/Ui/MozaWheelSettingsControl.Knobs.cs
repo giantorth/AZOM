@@ -9,7 +9,7 @@ using MozaControls;
 using MozaPlugin.Settings;
 using MozaPlugin.Devices.Led;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Ui
 {
     // Phase 7 knob page: per-knob KnobRingViz (ring slot count tracks the
     // wheel's per-knob LED count — 12 for most knobs, 8 for the KS Pro middle

@@ -9,17 +9,17 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MozaControls;
-using MozaPlugin.Devices.WheelUi;
+using MozaPlugin.Devices.Ui;
 using MozaPlugin.Resources;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
-using static MozaPlugin.Devices.WheelUi.WheelUiHelpers;
+using static MozaPlugin.Devices.Ui.WheelUiHelpers;
 using MozaPlugin.Settings;
 using MozaPlugin.Devices.Led;
 
-namespace MozaPlugin.Devices
+namespace MozaPlugin.Devices.Ui
 {
     public partial class MozaWheelSettingsControl : UserControl
     {
@@ -1072,7 +1072,7 @@ skipReadByMode:
         // timer touches ~30 swatches per tick — without the cache that's 60
         // SolidColorBrush allocations/sec doing nothing useful since most colors
         // don't change between ticks.
-        // s_brushCache moved to WheelUi/WheelUiHelpers.
+        // s_brushCache moved to Ui/WheelUiHelpers.
 
         // SetComboSafe, Clamp moved to UI/UiHelpers.
 

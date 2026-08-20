@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace MozaPlugin.Devices.WheelUi
+namespace MozaPlugin.Devices.Ui
 {
     /// <summary>
     /// Static helpers shared by the per-wheel settings UI: brush caching for

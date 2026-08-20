@@ -9,7 +9,7 @@ using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
 using MozaPlugin.Resources;
 
-namespace MozaPlugin.Devices.WheelUi
+namespace MozaPlugin.Devices.Ui
 {
     /// <summary>
     /// Files tab: dashboard upload + on-device dashboard inventory

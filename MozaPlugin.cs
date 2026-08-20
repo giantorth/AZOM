@@ -27,6 +27,7 @@ using MozaPlugin.Telemetry.Display;
 using MozaPlugin.UI;
 using MozaPlugin.Integration;
 using MozaPlugin.Devices.MBooster;
+using MozaPlugin.Devices.Haptics;
 
 namespace MozaPlugin
 {
