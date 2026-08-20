@@ -633,7 +633,7 @@ namespace MozaPlugin
             = new Dictionary<string, MBoosterDeviceSettings>(StringComparer.OrdinalIgnoreCase);
 
         // ===== Active dashboard for this game profile =====
-        // Stable key in the same format MozaPlugin.GetActiveDashboardKeyCandidates() emits:
+        // Stable key in the same format ChannelMappingCoordinator.GetActiveDashboardKeyCandidates() emits:
         //   "wheel:<configJsonId>"     — wheel-resident dashboard, stable across re-uploads
         //   "file:<filename>:<sha1-8>" — custom .mzdash file
         //   "builtin:<name>"           — embedded plugin profile
@@ -651,7 +651,7 @@ namespace MozaPlugin
 
         // ===== Telemetry channel mappings (profile × wheel-page × dashboard × channel) =====
         // Outer key  = wheel page DescriptorUniqueId GUID
-        // Middle key = dashboard identity (see MozaPlugin.GetActiveDashboardKeyCandidates)
+        // Middle key = dashboard identity (see ChannelMappingCoordinator.GetActiveDashboardKeyCandidates)
         // Inner key  = channel URL (e.g. "v1/gameData/Rpm")
         // Value      = SimHub property path (empty = use Telemetry.json default)
         //
@@ -893,7 +893,7 @@ namespace MozaPlugin
         /// </summary>
         /// <param name="activeDashboardKey">
         /// Identity of the currently-loaded dashboard, in the same format
-        /// <see cref="MozaPlugin.GetActiveDashboardKeyCandidates"/> returns.
+        /// <see cref="Telemetry.ChannelMappingCoordinator.GetActiveDashboardKeyCandidates"/> returns.
         /// Pass <c>null</c> to leave <see cref="TelemetryDashboardKey"/> untouched
         /// (e.g. when the plugin can't resolve a key — early init, no profile loaded).
         /// </param>

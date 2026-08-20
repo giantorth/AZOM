@@ -33,7 +33,7 @@ namespace MozaPlugin.Settings
             string? activeDashKey = null;
             try
             {
-                var cands = _plugin.GetActiveDashboardKeyCandidates();
+                var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
                 if (cands.Count > 0) activeDashKey = cands[0];
             }
             catch { /* candidate resolver is conservative; ignore early-init errors */ }
@@ -142,7 +142,7 @@ namespace MozaPlugin.Settings
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
             // The profile store holds a static snapshot of the master-mapper default
             // overrides — re-push so the now-empty set replaces the cleared ones.
-            _plugin.PushGlobalChannelDefaults();
+            _plugin.ChannelMapping.PushGlobalDefaults();
             InitProfileSystem();
         }
 

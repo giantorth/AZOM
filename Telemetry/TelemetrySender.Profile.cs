@@ -322,7 +322,7 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>
         /// Fixed dashboard-key list this sender uses to look up channel mappings
-        /// (null = the wheel's GetActiveDashboardKeyCandidates). A CM2 sender uses a
+        /// (null = the wheel's ChannelMappingCoordinator.GetActiveDashboardKeyCandidates). A CM2 sender uses a
         /// single fixed key since it catalog-synthesises one dashboard.
         /// </summary>
         internal System.Collections.Generic.IReadOnlyList<string>? MappingDashKeys;

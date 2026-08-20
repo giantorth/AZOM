@@ -220,7 +220,7 @@ namespace MozaPlugin.UI
             string value = string.Equals(row.SimHubProperty, row.DefaultProperty, StringComparison.Ordinal)
                 ? ""
                 : row.SimHubProperty;
-            _plugin.SetGlobalChannelDefault(row.Url, value);
+            _plugin.ChannelMapping.SetGlobalDefault(row.Url, value);
             ScheduleReResolve();
             RefreshOverriddenCount();
         }
@@ -247,7 +247,7 @@ namespace MozaPlugin.UI
         private void FlushReResolve()
         {
             _reResolveDebounce?.Stop();
-            try { _plugin.ReResolveAllChannelMappings(); }
+            try { _plugin.ChannelMapping.ReResolveAll(); }
             catch (Exception ex) { MozaLog.Warn("[AZOM] master mapper re-resolve failed: " + ex.Message); }
         }
 
@@ -329,7 +329,7 @@ namespace MozaPlugin.UI
 
         private void ResetAll_Click(object sender, RoutedEventArgs e)
         {
-            _plugin.ClearGlobalChannelDefaults();
+            _plugin.ChannelMapping.ClearGlobalDefaults();
             // Re-seed the rows from their pristine defaults without re-firing the
             // per-row persist path 450 times — the store is already cleared.
             foreach (var r in _allRows)

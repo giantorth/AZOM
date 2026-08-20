@@ -1072,11 +1072,11 @@ namespace MozaPlugin.Devices.WheelUi
             // value until the next telemetry restart. CM2 targets its own sender/keys.
             var resetSender = IsCm2Target ? _plugin.ActiveCm2Sender : null;
             foreach (var row in _channelRows)
-                _plugin.UpdateActiveChannelMapping(row.Url, "", resetSender);
+                _plugin.ChannelMapping.UpdateActive(row.Url, "", resetSender);
             if (IsCm2Target)
-                _plugin.ClearCurrentDashboardMappings(MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey);
+                _plugin.ChannelMapping.ClearCurrentDashboard(MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey);
             else
-                _plugin.ClearCurrentDashboardMappings();
+                _plugin.ChannelMapping.ClearCurrentDashboard();
             PopulateChannelMappingList();
             TelemetryMappingStatus.Text = $"Reset to defaults at {DateTime.Now:HH:mm:ss}";
         }
@@ -1297,10 +1297,10 @@ namespace MozaPlugin.Devices.WheelUi
             if (e.PropertyName != nameof(ChannelMappingRow.SimHubProperty)) return;
             if (string.IsNullOrEmpty(row.Url)) return;
             if (IsCm2Target)
-                _plugin.SetChannelMapping(row.Url, row.SimHubProperty,
+                _plugin.ChannelMapping.Set(row.Url, row.SimHubProperty,
                     MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
             else
-                _plugin.SetChannelMapping(row.Url, row.SimHubProperty);
+                _plugin.ChannelMapping.Set(row.Url, row.SimHubProperty);
             TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";
         }
 

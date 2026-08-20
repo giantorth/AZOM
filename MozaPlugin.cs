@@ -44,6 +44,10 @@ namespace MozaPlugin
         // Auto-standby (idle-timeout Work Mode standby) + the HID-activity
         // baseline that feeds it — see Devices/StandbyCoordinator.cs.
         private StandbyCoordinator? _standby;
+        // Per-channel + global-default SimHub property mapping —
+        // see Telemetry/ChannelMappingCoordinator.cs.
+        private ChannelMappingCoordinator _channelMapping = null!;
+        internal ChannelMappingCoordinator ChannelMapping => _channelMapping;
 
         // True while a game is actively feeding telemetry. The LED keepalive reads
         // this to never let the wheel sleep mid-game; false before Init completes.

@@ -858,7 +858,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// <see cref="ChannelDefinition.SimHubProperty"/> by channel URL. Entries
         /// with an empty/whitespace value are ignored (the channel keeps its
         /// JSON default). To revert a user override, remove the entire dashboard
-        /// entry from the settings map (see <c>ClearCurrentDashboardMappings</c>).
+        /// entry from the settings map (see <c>ChannelMappingCoordinator.ClearCurrentDashboard</c>).
         /// Unknown URLs are ignored.
         /// </summary>
         public static void ApplyUserMappings(MultiStreamProfile? profile,

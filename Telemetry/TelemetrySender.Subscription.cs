@@ -460,7 +460,7 @@ namespace MozaPlugin.Telemetry
             if (plugin == null) return 0;
             var channelMap = plugin.GetActiveChannelMappings(MappingPageGuid);
             if (channelMap == null) return 0;
-            var keys = MappingDashKeys ?? plugin.GetActiveDashboardKeyCandidates();
+            var keys = MappingDashKeys ?? plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
             foreach (var dashKey in keys)
             {
                 if (channelMap.TryGetValue(dashKey, out var overrides) && overrides != null)
@@ -479,7 +479,7 @@ namespace MozaPlugin.Telemetry
         ///
         /// The catalog-only synth (<see cref="MaybeSwapProfileForCatalog"/>)
         /// applies user mappings keyed on the active dashboard key, which
-        /// <see cref="MozaPlugin.GetActiveDashboardKeyCandidates"/> resolves from
+        /// <see cref="Telemetry.ChannelMappingCoordinator.GetActiveDashboardKeyCandidates"/> resolves from
         /// the wheel's configJson (the wheel:&lt;id&gt; candidate). On cold start
         /// the wheel's catalog burst can land BEFORE its configJson burst
         /// (verified: catalog at T, configJson ~1.2 s later), so the first synth

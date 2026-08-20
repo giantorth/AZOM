@@ -72,6 +72,7 @@ namespace MozaPlugin
                     () => new MozaPluginSettings { TelemetryEnabledDefaultForNewWheels = true });
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
+                _channelMapping = new ChannelMappingCoordinator(this);
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
 
@@ -103,7 +104,7 @@ namespace MozaPlugin
                 // Publish the master-mapper default overrides before anything can
                 // build a profile, so the first cold-start tier-def already carries
                 // them (no dashboard switch needed to pick them up).
-                PushGlobalChannelDefaults();
+                _channelMapping.PushGlobalDefaults();
 
                 // Migrate the legacy Stable/Dev update channel enum to the
                 // channel-id scheme. The dev channel is gone (dev-latest is no
