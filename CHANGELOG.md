@@ -2,6 +2,14 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.5.7]
+
+### Changed
+- **Fixed antivirus false positive.** Windows Defender incorrectly flagged 1.5.6 as a virus. 
+  The plugin was never unsafe — SimHub 9.12 LED compatibility built code on the fly at startup, 
+  which Defender's heuristics mistake for malware. Now supports all versions without runtime 
+  code generation.
+
 ## [1.5.6]
 
 ### Fixed

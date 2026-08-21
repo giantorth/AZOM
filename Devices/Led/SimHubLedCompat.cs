@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using BA63Driver.Mapper;
 
@@ -24,6 +23,13 @@ namespace MozaPlugin.Devices.Led
     /// at type-load time by name and signature, so each host binds the overload its own
     /// interface declares. The constructor half is handled here, because a direct
     /// <c>new</c> bakes one signature into the IL.
+    ///
+    /// The constructor is invoked late-bound via <see cref="ConstructorInfo.Invoke(object[])"/>
+    /// rather than through a compiled expression tree. Both bind by parameter name and
+    /// degrade the same way, but <c>Expression.Compile()</c> emits IL at runtime, and a
+    /// plugin DLL that generates code trips Defender's ML heuristics (Wacatac.H!ml) —
+    /// see docs/DEVELOPMENT.md. Cost is one boxed argument array per state build, on the
+    /// LED display path only.
     /// </summary>
     internal static class SimHubLedCompat
     {
@@ -33,13 +39,68 @@ namespace MozaPlugin.Devices.Led
         /// </summary>
         internal static readonly Func<Color[]> NoOverrides = () => Array.Empty<Color>();
 
-        private delegate LedDeviceState StateFactory(
-            Color[] ledsState, Color[] buttonsState, Color[] encodersState,
-            Color[] matrixState, Color[] rawState, Color[] overrideState,
-            double rpmBrightness, double buttonsBrightness,
-            double encodersBrightness, double matrixBrightness);
+        // Our ten logical arguments, in the order CreateState takes them. The map below
+        // is expressed as indices into this list.
+        private static readonly string[] OurArgNames =
+        {
+            "ledsState", "buttonsState", "encodersState", "matrixState", "rawState",
+            "overrideState", "rpmBrightness", "buttonsBrightness", "encodersBrightness",
+            "matrixBrightness",
+        };
 
-        private static readonly StateFactory s_create = BuildStateFactory();
+        private static readonly ConstructorInfo s_ctor;
+
+        // One entry per host constructor parameter: an index into OurArgNames, or -1 to
+        // take the constant in s_fallbacks at the same position.
+        private static readonly int[] s_argMap;
+        private static readonly object?[] s_fallbacks;
+
+        static SimHubLedCompat()
+        {
+            // Widest public constructor: the one carrying every channel the host knows.
+            s_ctor = typeof(LedDeviceState)
+                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+                .OrderByDescending(c => c.GetParameters().Length)
+                .First();
+
+            var ours = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < OurArgNames.Length; i++) ours[OurArgNames[i]] = i;
+
+            var pars = s_ctor.GetParameters();
+            s_argMap = new int[pars.Length];
+            s_fallbacks = new object?[pars.Length];
+
+            var ourTypes = new[]
+            {
+                typeof(Color[]), typeof(Color[]), typeof(Color[]), typeof(Color[]),
+                typeof(Color[]), typeof(Color[]), typeof(double), typeof(double),
+                typeof(double), typeof(double),
+            };
+
+            for (int i = 0; i < pars.Length; i++)
+            {
+                var p = pars[i];
+                if (p.Name != null && ours.TryGetValue(p.Name, out int ourIdx)
+                    && ourTypes[ourIdx] == p.ParameterType)
+                {
+                    s_argMap[i] = ourIdx;
+                    continue;
+                }
+
+                // A parameter we don't recognise takes its own declared default, so a
+                // future constructor change degrades to "that channel is empty" rather
+                // than failing to load.
+                s_argMap[i] = -1;
+                s_fallbacks[i] = p.HasDefaultValue
+                    ? p.DefaultValue
+                    : DefaultOf(p.ParameterType);
+            }
+        }
+
+        // Boxed default for any type, without emitting code: a fresh one-element array
+        // is zero-initialised, so reading element 0 boxes default(T).
+        private static object? DefaultOf(Type t)
+            => t.IsValueType ? Array.CreateInstance(t, 1).GetValue(0) : null;
 
         /// <summary>
         /// Build a <see cref="LedDeviceState"/> against whatever constructor the loaded
@@ -50,59 +111,28 @@ namespace MozaPlugin.Devices.Led
             Color[] matrixState, Color[] rawState, Color[] overrideState,
             double rpmBrightness = 1.0, double buttonsBrightness = 1.0,
             double encodersBrightness = 1.0, double matrixBrightness = 1.0)
-            => s_create(ledsState, buttonsState, encodersState, matrixState, rawState,
-                        overrideState, rpmBrightness, buttonsBrightness,
-                        encodersBrightness, matrixBrightness);
-
-        /// <summary>
-        /// Compile a constructor call once, binding our arguments to the host's parameters
-        /// by name. A parameter we don't recognise takes its own declared default (or
-        /// <c>default(T)</c>), so a future constructor change degrades to "that channel is
-        /// empty" rather than failing to load.
-        /// </summary>
-        private static StateFactory BuildStateFactory()
         {
-            var ledsState = Expression.Parameter(typeof(Color[]), "ledsState");
-            var buttonsState = Expression.Parameter(typeof(Color[]), "buttonsState");
-            var encodersState = Expression.Parameter(typeof(Color[]), "encodersState");
-            var matrixState = Expression.Parameter(typeof(Color[]), "matrixState");
-            var rawState = Expression.Parameter(typeof(Color[]), "rawState");
-            var overrideState = Expression.Parameter(typeof(Color[]), "overrideState");
-            var rpmBrightness = Expression.Parameter(typeof(double), "rpmBrightness");
-            var buttonsBrightness = Expression.Parameter(typeof(double), "buttonsBrightness");
-            var encodersBrightness = Expression.Parameter(typeof(double), "encodersBrightness");
-            var matrixBrightness = Expression.Parameter(typeof(double), "matrixBrightness");
-
-            var ours = new ParameterExpression[]
+            var map = s_argMap;
+            var args = new object?[map.Length];
+            for (int i = 0; i < map.Length; i++)
             {
-                ledsState, buttonsState, encodersState, matrixState, rawState, overrideState,
-                rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness,
-            };
-            var byName = ours.ToDictionary(p => p.Name!, StringComparer.Ordinal);
-
-            // Widest public constructor: the one carrying every channel the host knows.
-            var ctor = typeof(LedDeviceState)
-                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
-                .OrderByDescending(c => c.GetParameters().Length)
-                .First();
-
-            var args = new List<Expression>();
-            foreach (var p in ctor.GetParameters())
-            {
-                if (p.Name != null && byName.TryGetValue(p.Name, out var ours2)
-                    && ours2.Type == p.ParameterType)
+                switch (map[i])
                 {
-                    args.Add(ours2);
-                    continue;
+                    case 0: args[i] = ledsState; break;
+                    case 1: args[i] = buttonsState; break;
+                    case 2: args[i] = encodersState; break;
+                    case 3: args[i] = matrixState; break;
+                    case 4: args[i] = rawState; break;
+                    case 5: args[i] = overrideState; break;
+                    case 6: args[i] = rpmBrightness; break;
+                    case 7: args[i] = buttonsBrightness; break;
+                    case 8: args[i] = encodersBrightness; break;
+                    case 9: args[i] = matrixBrightness; break;
+                    default: args[i] = s_fallbacks[i]; break;
                 }
-
-                object? fallback = p.HasDefaultValue ? p.DefaultValue
-                    : p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType)
-                    : null;
-                args.Add(Expression.Constant(fallback, p.ParameterType));
             }
 
-            return Expression.Lambda<StateFactory>(Expression.New(ctor, args), ours).Compile();
+            return (LedDeviceState)s_ctor.Invoke(args);
         }
     }
 }

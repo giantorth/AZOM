@@ -1,6 +1,8 @@
 name: Changed Code
 
-# Reusable gate shared by build.yml and pr-build.yml.
+# Reusable gate called by build.yml, and only for `pull_request:
+# synchronize` — every other event short-circuits to `true` below, so
+# calling it elsewhere just burns a runner to echo a constant.
 #
 # A `paths:` filter on a `pull_request` trigger matches the PR's *cumulative*
 # diff, not the commits that were just pushed. So once a PR touches source,
@@ -73,8 +75,8 @@ jobs:
           echo "Files changed in ${BEFORE:0:7}..${AFTER:0:7}:"
           printf '%s\n' "${files:-  (none)}" | sed 's/^/  /'
 
-          # Mirrors the `paths:` filters in build.yml and pr-build.yml — the
-          # three lists must stay in sync.
+          # Mirrors the two `paths:` filters in build.yml — all three lists
+          # must stay in sync.
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             case "$f" in
