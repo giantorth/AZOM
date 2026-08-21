@@ -51,8 +51,9 @@ namespace MozaPlugin.Protocol
         private const uint UsageSlider = 0x00010036; // GenericDesktop.Slider → clutch   (kernel: ABS_THROTTLE)
         private const uint UsageDial   = 0x00010037; // GenericDesktop.Dial   → handbrake (Wine maps ABS_RUDDER here)
         private const uint UsageSimRud = 0x000200BA; // Simulation.Rudder     → handbrake (native Windows)
+        private const uint UsageSimThr = 0x000200BB; // Simulation.Throttle   → clutch   (winebus udev backend maps ABS_THROTTLE here)
 
-        private static readonly uint[] TrackedUsages = { UsageX, UsageY, UsageZ, UsageRx, UsageRy, UsageRz, UsageSlider, UsageDial, UsageSimRud };
+        private static readonly uint[] TrackedUsages = { UsageX, UsageY, UsageZ, UsageRx, UsageRy, UsageRz, UsageSlider, UsageDial, UsageSimRud, UsageSimThr };
 
         private readonly MozaData _data;
         private Thread? _thread;
@@ -300,6 +301,10 @@ namespace MozaPlugin.Protocol
                     if (!isMBooster && !isStandard) continue;
 
                     var usages = new Dictionary<uint, (int min, int max)>();
+                    // Usages the filter below rejects, logged so a support bundle
+                    // shows axes the plugin ignored (e.g. Wine renaming an axis to
+                    // a Simulation-page usage) instead of just omitting them.
+                    var dropped = new HashSet<uint>();
                     var descriptor = dev.GetReportDescriptor();
                     foreach (var item in descriptor.DeviceItems)
                     {
@@ -318,10 +323,16 @@ namespace MozaPlugin.Protocol
                                     bool tracked = Array.IndexOf(TrackedUsages, usage) >= 0;
                                     if (tracked || isButton || (isMBooster && isAxis))
                                         usages[usage] = (dataItem.LogicalMinimum, dataItem.LogicalMaximum);
+                                    else
+                                        dropped.Add(usage);
                                 }
                             }
                         }
                     }
+                    if (dropped.Count > 0)
+                        MozaLog.Debug(
+                            $"[AZOM] HID descriptor PID {pid:X4}: {dropped.Count} untracked usage(s): " +
+                            string.Join(", ", dropped.OrderBy(u => u).Take(24).Select(u => $"0x{u:X8}")));
                     if (usages.Count > 0)
                     {
                         var kind = isMBooster ? MozaHidClass.MBooster
@@ -616,6 +627,7 @@ namespace MozaPlugin.Protocol
                                             case UsageRy:     _data.LeftPaddlePosition     = pct; break;
                                             case UsageRz:     _data.BrakePosition          = pct; break;
                                             case UsageSlider: _data.ClutchPosition         = pct; break;
+                                            case UsageSimThr: _data.ClutchPosition         = pct; break;
                                             case UsageDial:   _data.HandbrakePosition      = pct; break;
                                             case UsageSimRud: _data.HandbrakePosition      = pct; break;
                                         }
