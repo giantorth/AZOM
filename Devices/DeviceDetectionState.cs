@@ -77,6 +77,15 @@ namespace MozaPlugin.Devices
         // Edge guard: log the resolved base firmware once per base detect (three
         // probes race for the answer — see DeviceProber's base-fw-version case).
         public volatile bool BaseFwVersionLogged;
+        // Retry budget for the base-fw-version burst on the 5 s poll tick, spent
+        // only while the version is still unknown. The detect-time burst rides the
+        // BaseAmbientProbed latch, so a base that drops all three replies would
+        // otherwise stay LFE-dead for the session. Not volatile: the only
+        // incrementing writer is the poll timer (via Interlocked.Increment, which
+        // needs a by-ref field), and the connect/detect reset paths store 0. A
+        // stale read costs at most one extra probe round, which is why no stronger
+        // ordering is bought here.
+        public int BaseFwVersionProbeRetries;
 
         public volatile bool Group3ColorsRead;
         public volatile string LastKnownWheelModel = "";

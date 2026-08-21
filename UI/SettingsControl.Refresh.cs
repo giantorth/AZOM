@@ -266,7 +266,12 @@ namespace MozaPlugin.UI
             // additionally, full-width below, only on LFE-capable firmware.
             // Hide the LFE tab while the ShakeIt haptics device is deployed — that
             // device owns the LFE output, so the two must not both edit the base.
-            bool lfeSupported = _data.BaseSupportsLfe && _plugin?.IsShakeItLfeDeviceDeployed != true;
+            // Stamp the cache while we're on the UI thread — the diagnostics dump
+            // (built off the bundle writer's thread) can't enumerate SimHub's
+            // device collection itself.
+            bool? shakeItLfeDeployed = _plugin?.IsShakeItLfeDeviceDeployed;
+            if (_plugin != null) _plugin.ShakeItLfeDeviceDeployedCached = shakeItLfeDeployed;
+            bool lfeSupported = _data.BaseSupportsLfe && shakeItLfeDeployed != true;
             BaseLfeTab.Visibility = lfeSupported
                 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             if (lfeSupported)

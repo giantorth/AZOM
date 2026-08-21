@@ -251,6 +251,18 @@ which returns the hardware model string (`RS21-D05-MC WB`), not a numeric versio
 > query at dev `0x13` (`base-fw-version-b`) — and takes the first answer, with
 > `0x12` winning if more than one lands. Which of the three an R12 answers, if
 > any, is not yet confirmed on hardware.
+>
+> The detect-time burst rides the `BaseAmbientProbed` latch and so fires exactly
+> once; in that bundle it was also *never retried*, because the read was tracked
+> against a `PendingResponseTracker` that `MozaPlugin.Instance` had not published
+> yet (fixed by constructor injection in the same commit). Since a lost reply
+> costs the whole session — no LFE, no 10-band EQ, no "Wheelbase LFE haptics"
+> device — `PollStatusCore` now re-issues all three probes on its 5 s tick while
+> `BaseFwVersion == 0`, up to 5 rounds (~25 s past detect), on the pipe that owns
+> the base. The resolved state is reported in the diagnostics bundle's
+> `=== Base identity ===` section (`FW (numeric)` + which probe answered), which
+> is what distinguishes a **silent** base from a genuinely old one — both read
+> `LFE support: no`.
 
 The 4 version bytes are in **wire order `[major, minor, build, patch]`** — MOZA's
 PitHouse UI displays the last two swapped: wire `01 02 18 09` is shown `1.2.9.24`,

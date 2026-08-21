@@ -526,6 +526,33 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Ask for the numeric base firmware version (dev 0x12, group 0x04) — the
+        /// sole gate for the wheelbase LFE effects and the 10-band EQ
+        /// (<see cref="MozaData.BaseSupportsLfe"/>). Three shots because a silent
+        /// base disables both outright: the canonical 0x12 request PitHouse sends,
+        /// the same request in its zero-length form, and the same query at dev
+        /// 0x13. An R12 (RS21-D07) on LFE-capable firmware answers none of them at
+        /// 0x12 in the len-4 form — see MozaCommandDatabase.
+        ///
+        /// <para>Called at base detect and, while the version is still unknown,
+        /// re-called from <c>PollStatusCore</c> — the detect-time burst rides the
+        /// <c>BaseAmbientProbed</c> latch, so without the retry a base that drops
+        /// all three replies stays LFE-dead for the whole session with nothing
+        /// re-asking.</para>
+        /// </summary>
+        /// <param name="via">Pipe to ask on. Null → this prober's own manager.
+        /// The poll-tick retry passes <c>DetectionState.BaseOwner</c> so a base
+        /// sitting on the dedicated base-aux pipe (post base→hub migration) is
+        /// asked there rather than on the now-hub-bound primary.</param>
+        internal void SendBaseFwVersionProbes(MozaDeviceManager? via = null)
+        {
+            var dm = via ?? _deviceManager;
+            dm.ReadSetting("base-fw-version");
+            dm.SendBaseFwVersionShortProbe();
+            dm.ReadSetting("base-fw-version-b");
+        }
+
+        /// <summary>
         /// Auto-detect connected devices based on response commands.
         /// First sight of a known response flips the matching detection flag
         /// and queues per-device settings reads + Apply*ToHardware.
@@ -616,17 +643,7 @@ namespace MozaPlugin.Devices
                     _deviceManager.ReadSetting("base-hw-sub");
                     _deviceManager.ReadSetting("base-mcu-uid");
                     _deviceManager.ReadSetting("base-identity-11");
-                    // Numeric firmware version (dev 0x12, group 0x04) — gates the
-                    // wheelbase LFE effects via MozaData.BaseSupportsLfe. Three
-                    // shots because a silent base disables LFE outright and this
-                    // read is issued exactly once per detection: the canonical
-                    // 0x12 request PitHouse sends, the same request in its
-                    // zero-length form, and the same query at dev 0x13. An R12
-                    // (RS21-D07) on LFE-capable firmware answers none of them at
-                    // 0x12 in the len-4 form — see MozaCommandDatabase.
-                    _deviceManager.ReadSetting("base-fw-version");
-                    _deviceManager.SendBaseFwVersionShortProbe();
-                    _deviceManager.ReadSetting("base-fw-version-b");
+                    SendBaseFwVersionProbes();
                 }
             }
 

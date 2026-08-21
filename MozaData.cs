@@ -393,6 +393,19 @@ namespace MozaPlugin
         private static volatile int s_baseFwVersion;
         public int BaseFwVersion { get => s_baseFwVersion; set => s_baseFwVersion = value; }
 
+        // Human-readable note on which base-fw probe answered, or "unanswered".
+        // Static for the same reason as the version itself. A bug bundle needs this
+        // to tell a SILENT base apart from a genuinely old one — both leave
+        // BaseSupportsLfe false, and only one of them is a bug (bundle 65HZBQJT: an
+        // R12 whose dev-0x12 group-0x04 probe was never answered at all, which took
+        // hex archaeology on the wire capture to establish).
+        private static volatile string s_baseFwVersionSource = "unanswered";
+        public string BaseFwVersionSource
+        {
+            get => s_baseFwVersionSource;
+            set => s_baseFwVersionSource = value ?? "unanswered";
+        }
+
         // Minimum base firmware for the wheelbase LFE effects (complex gearshift,
         // engine vibration, ABS). Captured on 1.2.10.10; the prior non-LFE build
         // was 1.2.9.24.
@@ -1019,8 +1032,27 @@ namespace MozaPlugin
                 // build) — swap data[2]/data[3] — so the >= threshold compare in
                 // BaseSupportsLfe orders pre-LFE (1.2.9.24) BELOW LFE (1.2.10.10).
                 // Packing in raw wire order would misgate (0x01021809 > 0x01020A0A).
+                //
+                // BaseFwVersionSource records which probe won, for the diagnostics
+                // dump. Both dev-0x12 request shapes (len-4 and the zero-length
+                // short form) parse under the name "base-fw-version", so it names
+                // the DEVICE, not the request shape; the reply payload length rides
+                // along so a bundle can show whether the two ever differ.
                 if (data.Length >= 4)
+                {
                     BaseFwVersion = (data[0] << 24) | (data[1] << 16) | (data[3] << 8) | data[2];
+                    BaseFwVersionSource = commandName == "base-fw-version"
+                        ? $"base-fw-version (dev 0x12, {data.Length}B reply)"
+                        : $"base-fw-version-b (dev 0x13, {data.Length}B reply)";
+                }
+                else if (BaseFwVersion == 0)
+                {
+                    // Answered, but too short to decode — materially different from
+                    // "unanswered" when triaging why LFE is off. Only recorded while
+                    // the version is still unknown, so a runt reply can't overwrite
+                    // the note for a probe that already succeeded.
+                    BaseFwVersionSource = $"{commandName} answered with {data.Length}B — too short to decode";
+                }
             }
             else if (commandName == "wheel-identity-11")
             {

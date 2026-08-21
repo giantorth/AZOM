@@ -620,6 +620,7 @@ namespace MozaPlugin
                 DetectionState.BaseAmbientProbed = false;
                 DetectionState.BaseEq10Probed = false;
                 DetectionState.BaseFwVersionLogged = false;
+                DetectionState.BaseFwVersionProbeRetries = 0;
                 _data.BaseModelName = "";
                 DetectionState.NewWheelDetected = false;
                 DetectionState.OldWheelDetected = false;

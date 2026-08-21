@@ -62,7 +62,27 @@ namespace MozaPlugin
             _baseLfeWorker != null && _data.BaseSupportsLfe
             && DetectionState.BaseDetected && _deviceManager?.IsConnected == true;
 
-        /// <summary>True when a "MOZA Wheelbase LFE" haptics device instance is deployed in SimHub's device list, regardless of enable/game state — the LFE tab hides while it is, so the two sources can't both edit the base. UI-thread callers only (enumerates SimHub's WPF-owned device collection).</summary>
+        /// <summary>The four <see cref="IsBaseLfeHapticsReady"/> conjuncts, broken out for the diagnostics dump so a bundle names which one is false instead of just reporting the device disconnected. Kept beside the predicate so the two can't drift.</summary>
+        internal (bool Worker, bool Firmware, bool BaseDetected, bool PipeConnected) BaseLfeHapticsReadyParts =>
+            (_baseLfeWorker != null, _data.BaseSupportsLfe,
+             DetectionState.BaseDetected, _deviceManager?.IsConnected == true);
+
+        // Last value IsShakeItLfeDeviceDeployed returned, stamped by the settings
+        // pane's 500 ms refresh (the one UI-thread caller). Read by the diagnostics
+        // dump, which the bug-report bundle writer builds off an arbitrary thread —
+        // enumerating SimHub's WPF-owned device collection from there is exactly
+        // what the getter's UI-thread-only note forbids. Stale-by-500ms is fine for
+        // a diagnostics line; -1 = the pane has never refreshed, so unknown.
+        private volatile int _shakeItLfeDeviceDeployedCache = -1;
+
+        /// <summary>Last <see cref="IsShakeItLfeDeviceDeployed"/> reading taken on the UI thread, or null if the settings pane has never refreshed. Safe from any thread.</summary>
+        internal bool? ShakeItLfeDeviceDeployedCached
+        {
+            get { int v = _shakeItLfeDeviceDeployedCache; return v < 0 ? (bool?)null : v != 0; }
+            set { _shakeItLfeDeviceDeployedCache = value == null ? -1 : (value.Value ? 1 : 0); }
+        }
+
+        /// <summary>True when a "MOZA Wheelbase LFE" haptics device instance is deployed in SimHub's device list, regardless of enable/game state — the LFE tab hides while it is, so the two sources can't both edit the base. UI-thread callers only (enumerates SimHub's WPF-owned device collection); off-thread readers use <see cref="ShakeItLfeDeviceDeployedCached"/>.</summary>
         internal bool IsShakeItLfeDeviceDeployed
         {
             get

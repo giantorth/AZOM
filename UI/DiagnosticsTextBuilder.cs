@@ -417,6 +417,61 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Base (wheelbase MCU) identity + the firmware-gated capability state.
+        /// The numeric base firmware is the SOLE gate for the wheelbase LFE effects
+        /// and the 10-band FFB equalizer (<see cref="MozaData.BaseSupportsLfe"/>),
+        /// and nothing else in a bundle reports it — diagnosing bundle 65HZBQJT
+        /// (an R12 that never answers the dev-0x12 group-0x04 probe) needed hex
+        /// archaeology on the wire capture. <c>FW (numeric)</c> plus its source is
+        /// what tells a SILENT base apart from a genuinely old one; both read
+        /// "LFE: no", and only one of them is a bug.
+        /// </summary>
+        public static string BuildBaseIdentity(MozaPlugin plugin, MozaData d)
+        {
+            // No base on the bus (standalone CM2 dash, hub-only rig, wheel-only
+            // bench). Say so rather than printing a page of blanks — but keep the
+            // stale numeric version visible, since it is static-backed and a
+            // leftover value is itself worth seeing.
+            if (plugin?.DetectionState?.BaseDetected != true
+                && string.IsNullOrEmpty(d.BaseModelName) && string.IsNullOrEmpty(d.BaseSwVersion))
+                return $"(no wheelbase detected)  FW (numeric): {d.BaseFwVersionText} via {d.BaseFwVersionSource}";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Model:          {Blank(d.BaseModelName)}");
+            sb.AppendLine($"FW (sw):        {Blank(d.BaseSwVersion)}");
+            sb.AppendLine($"HW version:     {Blank(d.BaseHwVersion)}");
+            sb.AppendLine($"HW sub:         {Blank(d.BaseHwSubVersion)}");
+            sb.AppendLine($"MCU UID:        {RedactBytes(d.BaseMcuUid)}");
+            sb.AppendLine($"Identity-11:    {Hex(d.BaseIdentity11)}");
+            sb.AppendLine($"FW (numeric):   {d.BaseFwVersionText}  via {d.BaseFwVersionSource}");
+
+            var detection = plugin?.DetectionState;
+            if (detection != null)
+                sb.AppendLine($"FW re-probes:   {detection.BaseFwVersionProbeRetries} retry round(s) spent");
+
+            sb.AppendLine($"LFE support:    {(d.BaseSupportsLfe ? "yes" : "no")}  (needs >= 1.2.10.10)");
+            sb.AppendLine($"EQ bands:       {(d.BaseSupportsEq10 ? 10 : 6)}  (same firmware gate as LFE)");
+
+            if (plugin != null)
+            {
+                var p = plugin.BaseLfeHapticsReadyParts;
+                sb.AppendLine(
+                    $"LFE haptics:    {(plugin.IsBaseLfeHapticsReady ? "ready" : "not ready")} " +
+                    $"(worker={YesNo(p.Worker)} fw={YesNo(p.Firmware)} " +
+                    $"baseDetected={YesNo(p.BaseDetected)} pipe={YesNo(p.PipeConnected)})");
+                // Cached on the UI thread — the getter enumerates SimHub's device
+                // collection and can't run from the bundle writer's thread. When it
+                // is deployed the plugin's own LFE tab hides, so a "where did my LFE
+                // tab go" report is answered by this line alone.
+                bool? deployed = plugin.ShakeItLfeDeviceDeployedCached;
+                sb.Append($"ShakeIt device: {(deployed == null ? "unknown (settings pane never opened)" : deployed.Value ? "deployed (plugin LFE tab hidden)" : "not deployed")}");
+            }
+            return sb.ToString();
+        }
+
+        private static string YesNo(bool v) => v ? "yes" : "no";
+
         /// <summary>Diagnostics block for the CM2 dashboard. Reports the wheelbase PID,
         /// the standalone-USB dashboard connection, whether a CM2 is present (and its
         /// wire dev_id), the MAIN sender's target dev_id, and the dedicated _cm2Sender

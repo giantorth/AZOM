@@ -197,6 +197,46 @@ namespace MozaPlugin
             catch (Exception ex) { MozaLog.Warn($"[AZOM] Temp-history sample failed: {ex.Message}"); }
         }
 
+        // Attempts spent on the base-fw-version retry burst before giving up.
+        // ~5 × the 5 s poll interval ≈ 25 s past base detect, at three small
+        // frames per round — enough to ride out a busy cold-start, cheap enough
+        // that a genuinely mute base costs 15 frames total and then goes quiet.
+        private const int BaseFwVersionProbeRetryLimit = 5;
+
+        /// <summary>
+        /// Re-ask for the numeric base firmware while it is still unknown. The
+        /// detect-time burst in <see cref="DeviceProber.SendBaseFwVersionProbes"/>
+        /// rides the <c>BaseAmbientProbed</c> latch and fires exactly once, so a
+        /// base that drops all three replies would leave
+        /// <see cref="MozaData.BaseSupportsLfe"/> false — no LFE effects, no LFE
+        /// haptics device, no 10-band EQ — for the whole session with nothing
+        /// re-asking. Bundle 65HZBQJT is that failure on an R12.
+        /// </summary>
+        private void TickBaseFwVersionRetry()
+        {
+            if (!DetectionState.BaseDetected) return;
+            // The poll timer starts before Init finishes wiring _data/_deviceProber.
+            var data = _data;
+            if (data == null || data.BaseFwVersion != 0) return;
+            if (DetectionState.BaseFwVersionProbeRetries >= BaseFwVersionProbeRetryLimit) return;
+            // Ask on whichever pipe detected the base (primary normally, base-aux
+            // after a base→hub migration) — HardwareApplier routes base writes the
+            // same way.
+            var owner = DetectionState.BaseOwner ?? _deviceManager;
+            if (owner == null || !owner.IsConnected) return;
+
+            int attempt = Interlocked.Increment(ref DetectionState.BaseFwVersionProbeRetries);
+            _deviceProber?.SendBaseFwVersionProbes(owner);
+            MozaLog.Debug(
+                $"[AZOM] Base firmware still unknown — re-probing " +
+                $"({attempt}/{BaseFwVersionProbeRetryLimit})");
+            if (attempt >= BaseFwVersionProbeRetryLimit)
+                MozaLog.Info(
+                    "[AZOM] Base firmware unanswered after " +
+                    $"{BaseFwVersionProbeRetryLimit} retries — LFE effects and the " +
+                    "10-band EQ stay disabled (needs >= 1.2.10.10)");
+        }
+
         private void PollStatus(object sender, ElapsedEventArgs e)
         {
             if (IsShuttingDown) return;
@@ -221,6 +261,8 @@ namespace MozaPlugin
             // Likewise the dedicated base-aux pipe (post base→hub migration) is
             // polled independently for base temps/state. No-op unless connected.
             _connectionCoordinator?.PollBaseAux();
+
+            TickBaseFwVersionRetry();
 
             // CM2 / dashboard-pipeline reconcile runs REGARDLESS of the wheelbase
             // connection. DECOUPLED: a standalone-USB CM2 is driven by the dedicated

@@ -2,6 +2,23 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.6.0]
+
+### Fixed
+
+- **A wheelbase that doesn't answer the firmware question is asked again.** The wheelbase's
+  firmware version is what unlocks the LFE haptics and the 10-band equalizer, and it was asked
+  for exactly once when the base was found. A base that missed that one question kept both
+  features switched off for the rest of the session, with no way back short of a restart. It is
+  now re-asked for the next ~25 seconds.
+
+### Changed
+
+- **The diagnostics report now includes the wheelbase itself.** A new "Base identity" section
+  reports the base model and firmware — including whether the firmware question was ever
+  answered — plus whether LFE haptics and the 10-band equalizer are unlocked and, when they
+  aren't, which condition is failing.
+
 ## [1.5.7]
 
 ### Changed
