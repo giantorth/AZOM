@@ -204,6 +204,11 @@ namespace MozaPlugin.Devices.Led
 
         private bool _wasConnected;
 
+        // The MozaPlugin instance this driver last saw. SimHub's game-switch plugin
+        // reload builds a new MozaPlugin, but this driver is owned by the device
+        // extension and survives — so a reload is invisible to _wasConnected.
+        private MozaPlugin? _lastPluginInstance;
+
         // Shared/master LED-brightness tracking. SimHub's per-device master slider is
         // LedModuleSettings.GlobalBrightnessPreset.Brightness (0..100) — the value the
         // per-channel Display() factors are all scaled by. We publish settled changes
@@ -234,6 +239,26 @@ namespace MozaPlugin.Devices.Led
         /// </summary>
         internal void UpdateConnectionState()
         {
+            // Plugin-reload edge. SimHub swaps in a new MozaPlugin on a game switch
+            // while this driver (and its device extension) lives on, and the outgoing
+            // End() blanked the wheel LEDs on the still-open wire via
+            // HardwareApplier.ClearLedsOnHardware. Every cache below therefore
+            // describes a state the wheel no longer holds, and the change-detection
+            // guards in Display() would suppress the first re-send. Detection never
+            // dropped, so _wasConnected sees no edge — key off plugin identity
+            // instead and treat it exactly like a reconnect. Null (the window
+            // between End() and Init()) is not an edge.
+            var plugin = MozaPlugin.Instance;
+            if (plugin != null && !ReferenceEquals(plugin, _lastPluginInstance))
+            {
+                if (_lastPluginInstance != null)
+                {
+                    MozaLog.Debug("[AZOM] LED driver: plugin instance changed (reload) — re-arming LED caches");
+                    ResetCachedLedState();
+                }
+                _lastPluginInstance = plugin;
+            }
+
             bool connected = IsConnected();
             if (connected == _wasConnected) return;
             _wasConnected = connected;
@@ -244,23 +269,34 @@ namespace MozaPlugin.Devices.Led
             }
             else
             {
-                // Reset cached state so everything re-initializes on reconnect
-                _lastLeds = null;
-                _lastButtons = null;
-                _lastKnobs = null;
-                _lastFlagColorsPrimed = false;
-                _lastRpmBitmask = -1;
-                _lastButtonBitmask = -1;
-                _lastKnobBitmask = -1;
-                _lastKnobRawColors = null;
-                _lastKnobColorChangeTime = DateTime.MinValue;
-                _knobStaticHoldReleased = false;
-                _rpmChangedUtc = _rpmFedUtc = DateTime.MinValue;
-                _btnChangedUtc = _btnFedUtc = DateTime.MinValue;
-                _knobDrivenUtc = _knobFedUtc = DateTime.MinValue;
-                _ledsAwake = false;
+                ResetCachedLedState();
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        /// <summary>
+        /// Drop every cached LED frame / bitmask / keepalive stamp so the next
+        /// <c>Display()</c> re-initializes from scratch. Also clears the ES wake
+        /// latch, so the <c>0x3FF</c> → <c>0</c> live-LED-mode pulse is re-issued.
+        /// Called on a detection-loss edge and on a plugin-reload edge — both leave
+        /// these caches describing hardware state that no longer holds.
+        /// </summary>
+        private void ResetCachedLedState()
+        {
+            _lastLeds = null;
+            _lastButtons = null;
+            _lastKnobs = null;
+            _lastFlagColorsPrimed = false;
+            _lastRpmBitmask = -1;
+            _lastButtonBitmask = -1;
+            _lastKnobBitmask = -1;
+            _lastKnobRawColors = null;
+            _lastKnobColorChangeTime = DateTime.MinValue;
+            _knobStaticHoldReleased = false;
+            _rpmChangedUtc = _rpmFedUtc = DateTime.MinValue;
+            _btnChangedUtc = _btnFedUtc = DateTime.MinValue;
+            _knobDrivenUtc = _knobFedUtc = DateTime.MinValue;
+            _ledsAwake = false;
         }
 
         public bool IsConnected() => IsModelConnected(MozaPlugin.Instance, ExpectedModelPrefix);

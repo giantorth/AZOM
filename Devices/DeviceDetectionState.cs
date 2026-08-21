@@ -80,6 +80,12 @@ namespace MozaPlugin.Devices
 
         public volatile bool Group3ColorsRead;
         public volatile string LastKnownWheelModel = "";
+        // Wheel bus address the prober locked (0 = never locked). MozaDeviceManager's
+        // _wheelDeviceId is per-instance and defaults to 0x17, but the detected flags
+        // above ride this bag across a persistent-wire plugin reload — so the id has
+        // to ride with them, or the reload's fresh manager silently addresses every
+        // "wheel" command at 0x17 (dead LEDs on ES, which locks 0x13).
+        public volatile byte LastKnownWheelDeviceId;
         public int WheelPollMisses;
 
         // Flips true when a wheel on a new-protocol-only id (0x17/0x15) ends up
@@ -133,6 +139,7 @@ namespace MozaPlugin.Devices
             BaseEq10Probed = false;
             NewWheelDetected = false;
             OldWheelDetected = false;
+            LastKnownWheelDeviceId = 0;
             HandbrakeDetected = false;
             PedalsDetected = false;
             HubDetected = false;
@@ -161,6 +168,7 @@ namespace MozaPlugin.Devices
             Group3ColorsRead = false;
             WheelPollMisses = 0;
             LastKnownWheelModel = "";
+            LastKnownWheelDeviceId = 0;
             NewWheelActingOldProtocol = false;
             NewWheelActingOldModel = "";
         }

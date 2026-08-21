@@ -321,6 +321,46 @@ namespace MozaPlugin
 
                 _deviceManager = new MozaDeviceManager(_connection, PendingResponses);
 
+                // Persistent-wire reload: the detection bag adopted above already
+                // says the wheel is detected, so PollStatus's ProbeWheelDetection
+                // gate never re-probes and ConnectionCoordinator's probe never runs
+                // either (it hangs off Connect(), and the port is already open). The
+                // fresh manager would keep addressing "wheel" commands at its 0x17
+                // default — every wheel read/write lost on a wheel that locked
+                // elsewhere (ES = 0x13, and 0x15). Restore the id the prior instance
+                // locked; the RPM LED bitmask rides that same address.
+                if (_usingPersistentWire)
+                {
+                    // Gate on the detected flags too, never on the id alone: locking the
+                    // manager while the bag says "undetected" would wedge detection —
+                    // ProbeWheelDetection is gated on the flags, and once the manager
+                    // thinks it has locked, its own guard makes the probe a no-op, so
+                    // nothing would ever detect the wheel again.
+                    bool wheelKnown = DetectionState.NewWheelDetected || DetectionState.OldWheelDetected;
+                    byte savedWheelId = DetectionState.LastKnownWheelDeviceId;
+                    if (wheelKnown && savedWheelId != 0)
+                    {
+                        _deviceManager.LockWheelId(savedWheelId);
+                    }
+                    else if (wheelKnown)
+                    {
+                        // Detected with no id to restore. Unreachable via DeviceProber
+                        // (it sets both together), but mis-targeting silently for the
+                        // instance's whole life is far worse than paying a re-probe.
+                        MozaLog.Warn("[AZOM] Persistent wire: wheel detected with no locked " +
+                                     "device id — clearing wheel detection so it re-probes");
+                        // ResetWheel clears DashDetected unconditionally; re-assert it.
+                        // The wire is demonstrably open here, and a bus CM2 hangs off
+                        // the CONNECTION, not the rim — dropping it would have the
+                        // periodic EnsureCm2Pipeline reconcile tear down a healthy
+                        // dashboard (see ResetWheelDetection's preserveDash).
+                        bool preserveDash = DetectionState.DashDetected;
+                        DetectionState.ResetWheel();
+                        if (preserveDash)
+                            DetectionState.DashDetected = true;
+                    }
+                }
+
                 _ab9Manager = new MozaAb9DeviceManager(disableProbeFallback);
                 if (!string.IsNullOrEmpty(_settings.LastAb9Port))
                     _ab9Manager.Connection.LastPortName = _settings.LastAb9Port;

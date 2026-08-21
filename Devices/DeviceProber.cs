@@ -276,6 +276,22 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Lock the responding wheel id on BOTH the device manager (per-instance)
+        /// and the detection bag (survives a persistent-wire plugin reload). The
+        /// manager's default is 0x17, so a wheel that answers elsewhere — ES on the
+        /// base bus 0x13, or 0x15 — loses every "wheel"-class read/write on the next
+        /// Init unless the reload can restore the id it locked here.
+        /// <see cref="_drivesTelemetry"/> keeps the hub / base-aux probers from
+        /// publishing an id for a pipe that isn't the wheel's.
+        /// </summary>
+        private void LockWheelId(byte deviceId)
+        {
+            _deviceManager.LockWheelId(deviceId);
+            if (_drivesTelemetry)
+                _detectionState.LastKnownWheelDeviceId = deviceId;
+        }
+
+        /// <summary>
         /// Log a device identity/capability echo, suppressing verbatim repeats.
         /// These values are constants of the attached hardware — they only change
         /// on a hot-swap — but the read commands are re-issued on every detection
@@ -666,7 +682,7 @@ namespace MozaPlugin.Devices
                         // Stamp first-detect time for the display-wedge watchdog
                         // (PollStatus bounds the post-detect display-boot wait).
                         _plugin.NoteWheelDetected();
-                        _deviceManager.LockWheelId(deviceId);
+                        LockWheelId(deviceId);
                         // Don't apply here — page GUID isn't resolvable until
                         // wheel-model-name arrives. Apply runs in the
                         // wheel-model-name case below.
@@ -730,7 +746,7 @@ namespace MozaPlugin.Devices
                     {
                         _detectionState.NewWheelDetected = true;
                         _plugin.NoteWheelDetected();
-                        _deviceManager.LockWheelId(deviceId);
+                        LockWheelId(deviceId);
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
                         // FSR V1 never answers serial-a/b (0x10/00,01) or the
@@ -1058,7 +1074,7 @@ namespace MozaPlugin.Devices
                         // only and never runs for old wheels; the timestamp is cheap
                         // and keeps both branches symmetric.
                         _plugin.NoteWheelDetected();
-                        _deviceManager.LockWheelId(deviceId);
+                        LockWheelId(deviceId);
                         _plugin.HardwareApplier.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSetting("wheel-model-name");
                         _deviceManager.ReadSetting("wheel-sw-version");

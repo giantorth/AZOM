@@ -643,6 +643,7 @@ namespace MozaPlugin
                 Interlocked.Exchange(ref _telemetryStartRequested, 0);
                 DetectionState.WheelPollMisses = 0;
                 DetectionState.LastKnownWheelModel = "";
+                DetectionState.LastKnownWheelDeviceId = 0;
                 MozaLog.Info("[AZOM] Connection disabled");
             }
         }
