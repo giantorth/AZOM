@@ -88,6 +88,48 @@ Notes:
 - **Release**: Pushing a `v*` tag (e.g., `v0.2.0`) builds a Release and publishes a GitHub Release with the DLL (device definitions are embedded in the DLL). It also repoints the legacy `dev-latest` tag at the new stable so plugins still on the retired dev channel get offered the upgrade out.
 - **SimHub dependency updates**: A daily workflow checks for new SimHub releases and creates a PR to update `libs/SimHub/`.
 
+### Paths that can't move
+
+Most of the tree can be rearranged freely — the csproj is SDK-style and globs its sources,
+so moving a `.cs` or `.xaml` needs no project-file edit. These are the exceptions, and
+several of them **fail silently at runtime rather than at build time**:
+
+| Path | Why it's pinned |
+|---|---|
+| `Themes/Generic.xaml` | `Properties/AssemblyInfo.cs` declares `[assembly: ThemeInfo(…, SourceAssembly)]`, so WPF resolves `UI/Controls/` default styles from the resource URI `Themes/Generic.xaml`, derived from that file's path relative to the project dir. Move it and custom controls render unstyled with **no build error**. The same file is also the only source of `ComVisible` and the assembly `Guid` — it looks vestigial because `GenerateAssemblyInfo=false`, but it isn't. |
+| `Themes/*` generally | 22 hardcoded `pack://application:,,,/MozaPlugin;component/Themes/…` URIs. |
+| `UI/Controls/` namespace | Stays `MozaControls`, not `MozaPlugin.UI.Controls` — five XAML files hard-code `xmlns:ctrl="clr-namespace:MozaControls"`. |
+| `Resources/Strings*.resx` | 13 `<EmbeddedResource Update="…">` entries with explicit `ManifestResourceName`. MSBuild does **not** error on a non-matching `Update`; the resx silently gets a default manifest name and `Strings.Designer.cs` fails at runtime. |
+| `CoapStub/`, `tools/` | Pinned by `<DefaultItemExcludes>`. Move either and its `.cs` files get swept into the net48 compile — `tools/simhub-compat` is net9.0 and breaks the build. |
+| `libs/`, `DeviceTemplates/`, `Resources/`, `Data/`, `Themes/` | Named literally in the CI `paths:` filters, which are duplicated in **four** places: `build.yml` (×2), `pr-build.yml`, and a shell `case` in `changed-code.yml`. Keep all four in sync or pushes stop triggering builds. |
+| `MozaData.cs` | Stays at the repo root in `namespace MozaPlugin`. 110 files read it, and since every sub-namespace is a child of `MozaPlugin` they resolve it with no `using` at all. |
+
+`obj/` caches a BAML tree, so an **incremental build silently misses a broken XAML type
+reference**. Always `rm -rf obj bin` before trusting a build after moving or renaming XAML.
+
+### Splitting a large class
+
+There are no unit tests — no xunit/NUnit/MSTest anywhere (`Telemetry/TestMode/*` and
+`DashboardTestPattern.cs` are runtime test-signal *features*). Verification is build, deploy,
+hardware smoke test. That shapes which of the two splitting styles to reach for:
+
+- **`<Type>.<Area>.cs` partial files** for ordering-sensitive orchestration — anything
+  touching `Init`/`DataUpdate`/`End`, inbound message routing, or poll ticks, where
+  construction order, teardown order and event-subscription windows are load-bearing. A
+  partial split cannot change semantics.
+- **`internal sealed class <Area>Coordinator`** for self-contained clusters, following
+  `Devices/ConnectionCoordinator.cs`: constructor injection with `MozaPlugin plugin` first,
+  constructed in `Init()`, with a comment at the field declaration pointing at the new file.
+
+Note what the coordinator pattern does *not* do: coordinators hold `MozaPlugin _plugin` and
+call back through it, so it relocates code without decoupling it. Prefer moving a member to
+its rightful owner (e.g. a hardware write to `HardwareApplier`) over adding another
+forwarding shim to `MozaPlugin`.
+
+**Cautionary precedent:** extracting a `SessionLifecycleCoordinator` out of
+`Telemetry/TelemetrySender.cs` hung the plugin on game switch and had to be reverted. If you
+touch session lifecycle, test a game switch explicitly.
+
 ## Repository Map
 
 | Path | Contents |
@@ -118,7 +160,7 @@ Notes:
 | `Resources/` | i18n: `Strings.resx` + 12 locale variants, hand-edited `Strings.Designer.cs`, `LanguageResolver` |
 | `DeviceTemplates/` | Embedded SimHub Device Builder `device.json` definitions, deployed lazily on first detection; `Thumbnails/` holds the product renders (per-wheel + CM2 dash) deployed alongside them as `thumbnail.png` sidecars |
 | `Data/` | `Telemetry.json` — 400+ channel definitions (URL, compression, package_level, default `simhub_property`/`simhub_scale`) |
-| `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`). **Frozen path** — see [CLAUDE.md](../CLAUDE.md) |
+| `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`). **Frozen path** — see [Paths that can't move](#paths-that-cant-move) |
 | `docs/` | This guide, protocol reference (`docs/protocol/`), SimHub internals notes (`simhub.md`), capture workflow (`usb-capture.md`) |
 | `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …). Capture dir comes from `MOZA_TRACE_DIR` |
 | _(moved out)_ | The Python wheel/device emulator + USB-gadget bridge rig now lives in its own project: [giantorth/moza-simulator](https://github.com/giantorth/moza-simulator) |
@@ -128,7 +170,7 @@ Notes:
 
 Three classes are large enough to be split across files. All three are one class —
 partials share fields, so a member can move between these files freely without any
-signature change. See [CLAUDE.md](../CLAUDE.md) for when to prefer a partial file over
+signature change. See [Splitting a large class](#splitting-a-large-class) for when to prefer a partial file over
 extracting a collaborator.
 
 - **`MozaPlugin`** (plugin entry point):
