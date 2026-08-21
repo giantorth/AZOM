@@ -522,7 +522,10 @@ namespace MozaPlugin.Telemetry
         /// This rebinds each live channel by URL to catalog-default + active overrides,
         /// RESETTING stale prior-dashboard overrides on channels the new dashboard does
         /// not map (the correctness gain over <see cref="ReapplyUserChannelMappingsAfterConfigJson"/>,
-        /// which only adds overrides). No Profile setter, no frame-builder rebuild
+        /// which only adds overrides). Property AND scale are copied: an override forces
+        /// scale 1 (<c>DashboardProfileStore.ResolveDefaultBinding</c>), so carrying only
+        /// the property would leave the prior dashboard's scale on the new binding.
+        /// No Profile setter, no frame-builder rebuild
         /// (the builder reads SimHubProperty live per frame), no wire writes — so the
         /// value stream picks up the new bindings on the next frame and the wedge can't
         /// fire. No-op until the wheel has committed a catalog generation.
@@ -552,13 +555,15 @@ namespace MozaPlugin.Telemetry
             if (resolved?.Tiers == null || resolved.Tiers.Count == 0) return;
             ApplyUserChannelMappings(resolved);
 
-            var byUrl = new System.Collections.Generic.Dictionary<string, string>(
+            var byUrl = new System.Collections.Generic.Dictionary<string, (string prop, double scale)>(
                 System.StringComparer.OrdinalIgnoreCase);
             foreach (var t in resolved.Tiers)
                 foreach (var ch in t.Channels)
-                    if (!string.IsNullOrEmpty(ch.Url)) byUrl[ch.Url] = ch.SimHubProperty ?? "";
+                    if (!string.IsNullOrEmpty(ch.Url))
+                        byUrl[ch.Url] = (ch.SimHubProperty ?? "", ch.SimHubPropertyScale);
             foreach (var sc in resolved.StringChannels)
-                if (!string.IsNullOrEmpty(sc.Url)) byUrl[sc.Url] = sc.SimHubProperty ?? "";
+                if (!string.IsNullOrEmpty(sc.Url))
+                    byUrl[sc.Url] = (sc.SimHubProperty ?? "", sc.SimHubPropertyScale);
 
             // Copy resolved bindings onto the LIVE profile's existing channel objects
             // in place (reference-atomic string writes; same pattern as
@@ -569,20 +574,25 @@ namespace MozaPlugin.Telemetry
                 foreach (var ch in t.Channels)
                 {
                     if (DashboardProfileStore.IsInternalChannel(ch.SimHubProperty)) continue;
-                    if (ch.Url != null && byUrl.TryGetValue(ch.Url, out var p)
-                        && !string.Equals(ch.SimHubProperty ?? "", p, StringComparison.Ordinal))
+                    if (ch.Url != null && byUrl.TryGetValue(ch.Url, out var b)
+                        && (!string.Equals(ch.SimHubProperty ?? "", b.prop, StringComparison.Ordinal)
+                            || !ch.SimHubPropertyScale.Equals(b.scale)))
                     {
-                        ch.SimHubProperty = p;
+                        // Scale first — see ChannelDefinition.SimHubPropertyScale.
+                        ch.SimHubPropertyScale = b.scale;
+                        ch.SimHubProperty = b.prop;
                         changed++;
                     }
                 }
             foreach (var sc in profile.StringChannels)
             {
                 if (DashboardProfileStore.IsInternalChannel(sc.SimHubProperty)) continue;
-                if (sc.Url != null && byUrl.TryGetValue(sc.Url, out var p)
-                    && !string.Equals(sc.SimHubProperty ?? "", p, StringComparison.Ordinal))
+                if (sc.Url != null && byUrl.TryGetValue(sc.Url, out var b)
+                    && (!string.Equals(sc.SimHubProperty ?? "", b.prop, StringComparison.Ordinal)
+                        || !sc.SimHubPropertyScale.Equals(b.scale)))
                 {
-                    sc.SimHubProperty = p;
+                    sc.SimHubPropertyScale = b.scale;
+                    sc.SimHubProperty = b.prop;
                     changed++;
                 }
             }

@@ -10,7 +10,11 @@ namespace MozaPlugin.Telemetry
     ///
     /// <para>Resolution order, highest first: per-dashboard override (profile ×
     /// page × dashboard × channel) → global default → <c>simhub_property</c> from
-    /// Data/Telemetry.json.</para>
+    /// Data/Telemetry.json. Either override level also forces the channel's scale to
+    /// 1 — Telemetry.json's <c>simhub_scale</c> is calibrated for its own property, so
+    /// inheriting it silently zeroed integer channels and saturated the percent ones
+    /// (see <c>DashboardProfileStore.ResolveDefaultBinding</c>). A user whose source
+    /// unit differs converts with a formula, e.g. <c>[MyPlugin.Boost0to1]*100</c>.</para>
     ///
     /// <para>All the dictionaries here are copy-on-write: the serial-read and
     /// tick threads walk them mid-apply (ApplyUserChannelMappings) and the save
@@ -93,20 +97,40 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Live-rewire a channel's <see cref="ChannelDefinition.SimHubProperty"/>
-        /// in place; new value applies on the next telemetry frame. Safe while running.
+        /// Live-rewire a channel's <see cref="ChannelDefinition.SimHubProperty"/> and
+        /// scale in place; new values apply on the next telemetry frame. Safe while
+        /// running.
+        ///
+        /// <para>An override drops the Telemetry.json scale (it is calibrated for the
+        /// JSON property — see <c>DashboardProfileStore.ResolveDefaultBinding</c>). An
+        /// EMPTY <paramref name="propertyPath"/> means revert-to-default and restores
+        /// the channel's default binding, property AND scale, instead of blanking the
+        /// property — blanking dropped the channel onto the <c>SimHubField</c> snapshot
+        /// path in the wrong unit until the next profile build (ErsState → ErsPercent
+        /// 0-100 into a 4-bit field).</para>
         /// </summary>
         internal void UpdateActive(string channelUrl, string propertyPath, TelemetrySender? sender = null)
         {
             var profile = (sender ?? _plugin.TelemetrySender)?.Profile;
             if (profile == null || string.IsNullOrEmpty(channelUrl)) return;
             string trimmed = (propertyPath ?? "").Trim();
+            double scale = 1.0;
+            if (trimmed.Length == 0
+                && _plugin.DashProfileStore.TryResolveDefaultBinding(
+                    channelUrl, out var defaultProperty, out var defaultScale))
+            {
+                trimmed = defaultProperty;
+                scale = defaultScale;
+            }
             foreach (var tier in profile.Tiers)
             {
                 foreach (var ch in tier.Channels)
                 {
-                    if (string.Equals(ch.Url, channelUrl, StringComparison.OrdinalIgnoreCase))
-                        ch.SimHubProperty = trimmed;
+                    if (!string.Equals(ch.Url, channelUrl, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    // Scale first — see ChannelDefinition.SimHubPropertyScale.
+                    ch.SimHubPropertyScale = scale;
+                    ch.SimHubProperty = trimmed;
                 }
             }
         }

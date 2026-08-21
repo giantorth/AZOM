@@ -66,19 +66,41 @@ namespace MozaPlugin.Telemetry.Dashboard
             s_defaultOverrides = copy.Count > 0 ? copy : null;
         }
 
-        /// <summary>The effective default SimHub property for a channel: the global
-        /// override when one is set, else Telemetry.json's own <c>simhub_property</c>.
+        /// <summary>The effective default binding for a channel: the global override
+        /// when one is set, else Telemetry.json's own <c>simhub_property</c> + <c>simhub_scale</c>.
         /// Plugin-locked <c>@internal/</c> channels are never overridable (same rule as
-        /// <see cref="ApplyUserMappings"/>).</summary>
-        private static string DefaultPropertyFor(string url, TelemetryChannelInfo info)
+        /// <see cref="ApplyUserMappings"/>).
+        ///
+        /// <para>An override replaces the JSON property, so the JSON's scale — calibrated
+        /// for THAT property's units — must NOT ride along: it silently zeroed integer
+        /// channels (ErsState is uint3/4-bit with scale 0.01, so any mapped value under
+        /// 100 truncated to 0 — bundle 5TE3ZTTR) and saturated the ×100 percent channels.
+        /// An override supplies the value in the channel's own wire unit; a formula
+        /// (<c>[prop]*100</c>) converts when the source unit differs.</para></summary>
+        private static (string property, double scale) ResolveDefaultBinding(
+            string url, TelemetryChannelInfo info)
         {
+            double jsonScale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
             string json = info.SimHubProperty ?? "";
-            if (IsInternalChannel(json)) return json;
+            if (IsInternalChannel(json)) return (json, jsonScale);
             var ov = s_defaultOverrides;
             if (ov != null && !string.IsNullOrEmpty(url)
                 && ov.TryGetValue(url, out var p) && !string.IsNullOrWhiteSpace(p))
-                return p.Trim();
-            return json;
+                return (p.Trim(), 1.0);
+            return (json, jsonScale);
+        }
+
+        /// <summary>The effective default binding for a channel URL, for callers that
+        /// have no <c>TelemetryChannelInfo</c> (the UI's reset-to-default path). False
+        /// when the URL isn't declared in Telemetry.json.</summary>
+        internal bool TryResolveDefaultBinding(string url, out string property, out double scale)
+        {
+            property = "";
+            scale = 1.0;
+            if (string.IsNullOrEmpty(url)) return false;
+            if (!GetTelemetryMap().TryGetValue(url, out var info)) return false;
+            (property, scale) = ResolveDefaultBinding(url, info);
+            return true;
         }
 
         /// <summary>One Telemetry.json channel as the master channel mapper sees it.
@@ -149,10 +171,10 @@ namespace MozaPlugin.Telemetry.Dashboard
         // ChannelDefinition to MultiStreamProfile.StringChannels.
         private static ChannelDefinition BuildStringChannel(string url, TelemetryChannelInfo info)
         {
-            double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+            var (property, scale) = ResolveDefaultBinding(url, info);
             return BuildStringChannel(
                 url, info.Name, info.Compression, info.Field,
-                DefaultPropertyFor(url, info), scale, info.PackageLevel,
+                property, scale, info.PackageLevel,
                 info.Range, info.DataType);
         }
 
@@ -401,7 +423,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         continue;
                     }
                     int bitWidth = CompressionTable.TryGetByName(info.Compression, out var ct) ? ct.BitWidth : 32;
-                    double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+                    var (property, scale) = ResolveDefaultBinding(url, info);
                     ch = new ChannelDefinition
                     {
                         Name = info.Name,
@@ -409,7 +431,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         Compression = info.Compression,
                         BitWidth = bitWidth,
                         SimHubField = info.Field,
-                        SimHubProperty = DefaultPropertyFor(url, info),
+                        SimHubProperty = property,
                         SimHubPropertyScale = scale,
                         PackageLevel = packageLevel,
                         TestSignal = TestSignalCatalog.Resolve(info.Name, info.Range, info.DataType, info.Compression),
@@ -760,10 +782,9 @@ namespace MozaPlugin.Telemetry.Dashboard
                                 compression = info.Compression;
                                 bitWidth = CompressionTable.TryGetByName(compression, out var ct3) ? ct3.BitWidth : 32;
                                 field = info.Field;
-                                property = DefaultPropertyFor(url, info);
+                                (property, scale) = ResolveDefaultBinding(url, info);
                                 level = info.PackageLevel;
                                 chName = info.Name;
-                                scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
                                 rangeStr = info.Range;
                                 dataType = info.DataType;
                             }
@@ -855,8 +876,10 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>
         /// Apply a per-channel user mapping to a loaded profile, overriding
-        /// <see cref="ChannelDefinition.SimHubProperty"/> by channel URL. Entries
-        /// with an empty/whitespace value are ignored (the channel keeps its
+        /// <see cref="ChannelDefinition.SimHubProperty"/> by channel URL — and resetting
+        /// <see cref="ChannelDefinition.SimHubPropertyScale"/> to 1, since the JSON scale
+        /// is calibrated for the JSON property (see <see cref="ResolveDefaultBinding"/>).
+        /// Entries with an empty/whitespace value are ignored (the channel keeps its
         /// JSON default). To revert a user override, remove the entire dashboard
         /// entry from the settings map (see <c>ChannelMappingCoordinator.ClearCurrentDashboard</c>).
         /// Unknown URLs are ignored.
@@ -874,14 +897,22 @@ namespace MozaPlugin.Telemetry.Dashboard
                     if (IsInternalChannel(ch.SimHubProperty)) continue;
 
                     if (overrides.TryGetValue(ch.Url, out var path) && !string.IsNullOrWhiteSpace(path))
+                    {
+                        // Scale before property: a tick landing mid-edit then sees the
+                        // OLD property at scale 1 for one frame, never a torn double.
+                        ch.SimHubPropertyScale = 1.0;
                         ch.SimHubProperty = path.Trim();
+                    }
                 }
             }
             foreach (var ch in profile.StringChannels)
             {
                 if (IsInternalChannel(ch.SimHubProperty)) continue;
                 if (overrides.TryGetValue(ch.Url, out var path) && !string.IsNullOrWhiteSpace(path))
+                {
+                    ch.SimHubPropertyScale = 1.0;
                     ch.SimHubProperty = path.Trim();
+                }
             }
         }
 
@@ -996,7 +1027,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (!byLevel.ContainsKey(level))
                     byLevel[level] = new List<ChannelDefinition>();
 
-                double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+                var (property, scale) = ResolveDefaultBinding(url, info);
                 byLevel[level].Add(new ChannelDefinition
                 {
                     Name                = info.Name,
@@ -1004,7 +1035,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     Compression         = info.Compression,
                     BitWidth            = bits,
                     SimHubField         = info.Field,
-                    SimHubProperty      = DefaultPropertyFor(url, info),
+                    SimHubProperty      = property,
                     SimHubPropertyScale = scale,
                     PackageLevel        = level,
                     TestSignal          = TestSignalCatalog.Resolve(info.Name, info.Range, info.DataType, info.Compression),

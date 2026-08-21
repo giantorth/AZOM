@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using MozaPlugin.Telemetry.TestMode;
 
 namespace MozaPlugin.Telemetry.Dashboard
@@ -36,9 +38,25 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// Multiplier applied to the resolved SimHub property value before encoding.
         /// Used to reconcile SimHub's unit convention with the channel's compression
         /// expectation (e.g. Throttle/Brake are 0–100 in SimHub but <c>float_001</c>
-        /// expects 0–1, so the default scale is 0.01).
+        /// expects 0–1, so the default scale is 0.01). A user mapping overriding
+        /// <see cref="SimHubProperty"/> resets this to 1 — the JSON scale is calibrated
+        /// for the JSON property (see <c>DashboardProfileStore.ResolveDefaultBinding</c>).
+        ///
+        /// <para>Written live by the UI / mapping-apply paths while the telemetry tick
+        /// reads it per frame, and the project targets x86 where an 8-byte field access
+        /// is not guaranteed atomic — so the backing store is a <c>long</c> accessed
+        /// through <see cref="Interlocked"/>, same rule as the session timestamps (see
+        /// DEVELOPMENT.md § Threading model). Writers set the scale BEFORE the property,
+        /// so a tick landing mid-edit sees one frame of the old property at the new
+        /// scale rather than a torn value.</para>
         /// </summary>
-        public double SimHubPropertyScale { get; set; } = 1.0;
+        public double SimHubPropertyScale
+        {
+            get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _simHubPropertyScaleBits));
+            set => Interlocked.Exchange(ref _simHubPropertyScaleBits,
+                BitConverter.DoubleToInt64Bits(value));
+        }
+        private long _simHubPropertyScaleBits = BitConverter.DoubleToInt64Bits(1.0);
 
         /// <summary>Telemetry tier (ms update interval, e.g. 30, 500, 2000).</summary>
         public int PackageLevel { get; set; } = 30;
