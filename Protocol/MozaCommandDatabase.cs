@@ -499,7 +499,16 @@ namespace MozaPlugin.Protocol
             // Generic device-type identity probe (grp 0x04, same shape as wheel-device-type:
             // reply `01 02 XX 06`). Fired at a base/hub-relayed shifter to tell HGP from SGP
             // where the PID isn't visible — a positive identity answer, not a timeout.
+            // Measured `01 02 08 01` on an HGP behind an R5 (bundle 32ZD7KHW).
             AddCommand("shifter-device-type", "shifter", 4, 0xFF, new byte[] { }, 0, "array");
+            // Shared identity groups, same shapes as the wheel/pedals blocks above. A
+            // relayed pedal set at 0x19 answers these, so a shifter at 0x1A plausibly
+            // does too — an answer would carry a self-describing model string and retire
+            // the device-type magic value as the HGP/SGP discriminator. Registered so the
+            // reply is NAMED rather than falling through the group bucket to wheel-*
+            // (the parser's dev-0x1A hint does the rest); logged by DeviceProber.
+            AddCommand("shifter-model-name",  "shifter", 7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("shifter-hw-version",  "shifter", 8, 0xFF, new byte[] { 1 }, 0, "array");
             // Calibration (write-only, grp 0x54). Best-effort: present in foxblat
             // serial.yml + SDK ShifterCalibrateStart/Finish, absent from the local
             // parameter DB; gated on detection like handbrake calibration.

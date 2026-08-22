@@ -14,6 +14,67 @@ The plugin implements these as the `shifter-*` command family
 ([`Protocol/MozaCommandDatabase.cs`](../../../Protocol/MozaCommandDatabase.cs)); config surface
 via the standalone-peripheral lane + a "Shifter" settings tab.
 
+## Telling HGP from SGP
+
+On its own USB port the two are told apart by **PID** (`0x001E` vs `0x0023`) and nothing else is
+needed. Behind a base/hub there is no PID, both answer at bus id `0x1A`, and the only measured
+discriminator is the generic device-type identity reply.
+
+### The `0x51` settings block does NOT discriminate — measured on a relayed HGP
+
+Bundle `32ZD7KHW` (2026-08-21, ES wheel on an R5 base, HGP on the base's RJ11 shifter port,
+no standalone shifter present) has a base-relayed **HGP** answering **every** group `0x51`
+read, including the two the tables above list as SGP-only:
+
+| cmd | name | HGP reply (`d1 a1 …`) |
+|-----|------|------------------------|
+| `01` | hid-mode | `00 00` |
+| `02` | shifter-type / apply-mode | `00 00` (= H-pattern, matching the confirmed polarity) |
+| `03` | brightness | `00 00` |
+| `04` | colors | `00 00` |
+| `05` | direction | `00 00` |
+| `06` | paddle-sync | `00 01` |
+
+Writes on `0x52` are acked the same way — `52 1a 03` (brightness) and `52 1a 04` (colors) both
+returned `d2 a1 …` acks on this HGP, and the shifter's own group `0x0E` debug stream (device
+byte `a1`) echoed `param_manage.c:346 Table 9, Param … Written`, so those writes reached
+**EEPROM table 9** rather than being dropped. The HGP therefore stores the LED params it has no
+LEDs for; whether that is literally the same firmware image as the SGP is not established, but
+the settings surface is indistinguishable over the wire.
+
+**Consequence:** a brightness read is *not* an SGP identification. `DeviceProber` used to latch
+SGP on this reply, which is why this HGP was reported as an SGP; the model is now decided by the
+device-type reply below, and a brightness answer counts only as "a shifter on this pipe is
+answering settings reads".
+
+### Group `0x04` device-type — the one signal that differed
+
+Same bundle, request `7e 00 04 1a`, reply `84 a1 01 02 08 01`:
+
+| Device | dev-type (`01 02 [DT_2] [DT_3]`) | Source |
+|---|---|---|
+| HGP behind an R5 base | `01 02 08 01` | bundle `32ZD7KHW`, 2026-08-21 |
+| SGP behind a base/hub | **unmeasured** | — |
+
+Format and per-device caveats: [`../identity/dev-type-table.md`](../identity/dev-type-table.md).
+`DeviceProber.HgpDeviceType` holds this value and latches HGP on a match, SGP on anything else.
+The relayed **SGP** value is still unknown, so "dev-type `08 01` ⇒ HGP" is a positive HGP match
+only — the SGP half is elimination, not measurement, and is tracked in
+[`../open-questions.md`](../open-questions.md) § Relayed HGP/SGP discriminator. A relayed shifter
+also answers a presence probe (`7e 00 00 1a` → `80 a1`), which says a shifter is attached but not
+which one.
+
+A relayed pedal set at `0x19` answers the same identity groups as the wheel (see
+[`../identity/pedal-0x19.md`](../identity/pedal-0x19.md) § Parser routing), so `ProbeRelayedShifter`
+now also reads model-name (`0x07 01`) and hw-version (`0x08 01`) at `0x1A` and logs whatever comes
+back — `7e 01 07 1a 01 ae` / `7e 01 08 1a 01 af`, untracked, first two probe rounds only. Whether
+`0x1A` answers them is **unmeasured**; a self-describing name string would retire the dev-type
+magic value entirely.
+
+Note that MOZA's own model has **one** shifter product: `rs21_parameter.db` `ServiceParameter`
+rows all sit under `pithouse://classify.moza-racing.com/Product/Shifter`, LED params included —
+there is no separate HGP/SGP category. The HGP/SGP split is plugin-side.
+
 ## H-Pattern Shifter (Device `0x1A` / 26)
 
 ### Group `0x51` / `0x52` (81 / 82) — Settings

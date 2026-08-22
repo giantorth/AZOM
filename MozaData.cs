@@ -504,6 +504,12 @@ namespace MozaPlugin
         // `01 02 XX 06`) from a base/hub-relayed shifter, used to tell HGP from SGP
         // where the PID isn't visible. Model-agnostic — it's what RESOLVES the model.
         public volatile byte[] RelayShifterDeviceType = System.Array.Empty<byte>();
+        // Relay-only scratch: model-name (grp 0x07) / hw-version (grp 0x08) replies from
+        // a base/hub-relayed shifter, if it answers those groups at all. Model-agnostic
+        // like RelayShifterDeviceType — logged by DeviceProber so a support bundle shows
+        // whether 0x1A self-describes; nothing depends on them yet.
+        public volatile string RelayShifterModelName = string.Empty;
+        public volatile string RelayShifterHwVersion = string.Empty;
 
         private ShifterState? ShifterFor(Devices.ShifterModelKind model) =>
             model == Devices.ShifterModelKind.Hgp ? ShifterHgp :
@@ -547,6 +553,16 @@ namespace MozaPlugin
             if (name == "shifter-device-type")
             {
                 if (arrayValue != null) RelayShifterDeviceType = (byte[])arrayValue.Clone();
+                return true;
+            }
+            if (name == "shifter-model-name" || name == "shifter-hw-version")
+            {
+                if (arrayValue != null)
+                {
+                    var s = ParseNullTerminatedString(arrayValue);
+                    if (name == "shifter-model-name") RelayShifterModelName = s;
+                    else RelayShifterHwVersion = s;
+                }
                 return true;
             }
             UpdateShifter(model, name, intValue);

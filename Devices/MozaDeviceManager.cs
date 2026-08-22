@@ -158,6 +158,19 @@ namespace MozaPlugin.Devices
             SendRawProbe(0x11, deviceId, new byte[] { 0x04 });                   // identity-11
         }
 
+        /// <summary>Model-name (grp 0x07 cmd 01) + hw-version (grp 0x08 cmd 01) reads at an
+        /// explicit device id — the two identity groups <see cref="SendPithouseIdentityProbe"/>
+        /// doesn't cover. UNTRACKED on purpose: this is an exploratory probe at a relayed
+        /// sub-device that may not implement the groups at all, and a tracked read retries
+        /// for the life of the connection (<c>ReadRetryMaxAttempts</c> is int.MaxValue), so
+        /// a silent device would carry a permanent unanswered-pending entry.</summary>
+        public void SendNameIdentityProbe(byte deviceId)
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(0x07, deviceId, new byte[] { 0x01 });   // model name
+            SendRawProbe(0x08, deviceId, new byte[] { 0x01 });   // hardware version
+        }
+
         /// <summary>
         /// Probe the wheel's Display sub-device via the group 0x43 wrapper (same
         /// frames PitHouse sends, mirrored from <see cref="Telemetry.TelemetrySender.SendDisplayProbe"/>).

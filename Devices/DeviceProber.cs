@@ -416,39 +416,92 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>A base/hub-relayed shifter (single 0x1A bus, no PID) can't be told
-        /// apart at first sight, so probe the two model resolvers: the SGP answers a
-        /// brightness read; the HGP answers the generic device-type identity. Both are
-        /// positive signals — no timeout. No-op once THIS pipe's model is latched — a
-        /// shifter detected elsewhere (e.g. a standalone-USB HGP) says nothing about
-        /// what's behind this base/hub and must not suppress the probe.</summary>
+        /// apart at first sight, so probe the generic device-type identity — the ONE
+        /// signal measured to differ (see <see cref="HgpDeviceType"/>). The settings
+        /// block does NOT discriminate: an HGP behind an R5 answered every group 0x51
+        /// read including brightness and colors, and acked writes to both (bundle
+        /// 32ZD7KHW) — see docs/protocol/devices/shifter-0x1A.md § Telling HGP from SGP.
+        /// The name/hw-version reads are exploratory and untracked; they cost two frames
+        /// and would retire the device-type magic value if 0x1A self-describes.
+        /// No-op once THIS pipe's model is latched — a shifter detected elsewhere (e.g.
+        /// a standalone-USB HGP) says nothing about what's behind this base/hub and must
+        /// not suppress the probe.</summary>
         public void ProbeRelayedShifter()
         {
             if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
-            _deviceManager.ReadSetting("shifter-brightness");
+            _relayShifterProbeRounds++;
             _deviceManager.ReadSetting("shifter-device-type");
+            // Exploratory, so only the first couple of rounds (one repeat in case the
+            // first pair is dropped) — repeating a probe nothing depends on would just
+            // add two frames per PollStatus tick.
+            if (_relayShifterProbeRounds <= 2)
+                _deviceManager.SendNameIdentityProbe(MozaProtocol.DeviceHPattern);
+            // Liveness read, NOT identification — see the shifter-brightness case in
+            // DetectDevices. It has to be a command whose reply doesn't re-enter this
+            // method (shifter-direction does, via its own case), and both models answer
+            // it, so it is the evidence the fallback below keys off.
+            _deviceManager.ReadSetting("shifter-brightness");
+            // Fallback for firmware that answers the settings block but not group 0x04:
+            // once the device-type read has gone unanswered across this many probe rounds
+            // (PollStatus re-fires the presence probe every tick while the model is
+            // Unknown), resolve by elimination off any settings answer. Without it such a
+            // shifter would show no tab at all — the pre-2026-07 behaviour was to always
+            // show one. Deliberately NOT the first-round default: group 0x04 at 0x1A is
+            // answered by both bases seen so far (R5 here, R12 per base-fw-version-b), so
+            // the normal path is the identity reply, not this. Attempted once: if the latch
+            // doesn't land (another pipe already owns the SGP), re-logging it every tick
+            // adds nothing, and the owner gate above lets this pipe resolve normally if
+            // that other shifter goes away.
+            if (!_relayShifterFallbackTried
+                && _relayShifterProbeRounds > RelayShifterDeviceTypeGraceRounds
+                && _relayShifterAnsweredSettingsRead)
+            {
+                _relayShifterFallbackTried = true;
+                MozaLog.Info("[AZOM] Relayed shifter answered settings reads but never the " +
+                    $"group 0x04 device-type after {_relayShifterProbeRounds} probe rounds — " +
+                    "resolving as SGP by elimination");
+                MarkSgpDetected();
+            }
         }
 
-        // The HGP's grp-0x04 device-type reply, awaiting one hardware measurement:
-        // read the "Shifter device-type reply = [...]" log line off a base/hub-relayed
-        // HGP and set this. null = relayed HGP stays unresolved (its tab hidden) rather
-        // than guess. The standalone lane (PID) and the relayed SGP (brightness) don't
-        // need it.
-        private static readonly byte[]? HgpDeviceType = null;
+        // The HGP's grp-0x04 device-type reply, measured 2026-08-21 on a base-relayed HGP
+        // (ES + R5, bundle 32ZD7KHW): `84 a1 01 02 08 01`. A relayed SGP's value has never
+        // been measured, so this is a positive HGP match only — see
+        // docs/protocol/open-questions.md § Relayed HGP/SGP discriminator. The standalone
+        // lane doesn't need it (PID 0x001E / 0x0023 settle the model).
+        private static readonly byte[] HgpDeviceType = { 0x01, 0x02, 0x08, 0x01 };
+
+        // How many ProbeRelayedShifter rounds to wait for a group-0x04 answer before
+        // falling back to elimination. Rounds are driven by the PollStatus presence probe
+        // (~5 s apart), so this is a handful of seconds, not a race with the first reply.
+        private const int RelayShifterDeviceTypeGraceRounds = 3;
+        private int _relayShifterProbeRounds;
+        // Set by any group-0x51 settings answer from this pipe's shifter. Evidence that a
+        // shifter is there and talking — NOT evidence of which model, which is exactly the
+        // conflation that made a relayed HGP report as an SGP.
+        private bool _relayShifterAnsweredSettingsRead;
+        // Edge guard so the elimination fallback logs + latches at most once per pipe.
+        // NOT a "stop probing" latch: the owner gate at the top of ProbeRelayedShifter is
+        // the only thing that ends the probe, so a pipe whose shifter is replaced still
+        // re-resolves once the flags clear.
+        private bool _relayShifterFallbackTried;
 
         /// <summary>Resolve a base/hub-relayed shifter's model from the generic
-        /// device-type identity reply. Logs the raw reply so a support bundle reveals
-        /// the HGP/SGP discriminator, then latches HGP on a positive match. A prior
-        /// brightness answer already positively identifies THIS pipe's SGP, so never
-        /// overrides it (an SGP on another pipe doesn't block resolution here).</summary>
+        /// device-type identity reply — the authoritative discriminator on a lane with no
+        /// PID. Logs the raw reply either way so a support bundle always carries the
+        /// evidence. A match latches HGP; anything else latches SGP by elimination, since
+        /// 0x1A is the shifter's exclusive bus id and there are only two passive models.
+        /// No-op once THIS pipe's model is latched.</summary>
         private void ResolveRelayedShifterModelFromDeviceType()
         {
             var dt = _data.RelayShifterDeviceType;
             if (dt == null || dt.Length == 0) return;
+            bool isHgp = BytesEqual(dt, HgpDeviceType);
             MozaLog.Info($"[AZOM] Shifter device-type reply = [{System.BitConverter.ToString(dt)}] " +
-                "(HGP/SGP identity discriminator; relayed lane)");
+                $"(HGP/SGP identity discriminator; relayed lane) → {(isHgp ? "HGP" : "SGP")}");
             if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
-            if (HgpDeviceType != null && BytesEqual(dt, HgpDeviceType))
-                MarkHgpDetected();
+            if (isHgp) MarkHgpDetected();
+            else MarkSgpDetected();
         }
 
         private static bool BytesEqual(byte[] a, byte[] b)
@@ -1151,6 +1204,7 @@ namespace MozaPlugin.Devices
                 // First evidence of a base/hub-relayed shifter — probe the model
                 // resolvers. No-op on the standalone lane (already latched by PID).
                 case "shifter-direction":
+                    _relayShifterAnsweredSettingsRead = true;
                     ProbeRelayedShifter();
                     break;
 
@@ -1163,17 +1217,33 @@ namespace MozaPlugin.Devices
                         $"({_detectionState.ShifterModelForOwner(_deviceManager)} lane, dev {deviceId})");
                     break;
 
-                // Only the SGP answers a brightness read — a positive SGP identification
-                // on a relayed pipe (the standalone lane knows this from the PID instead).
+                // A brightness answer is NOT an SGP identification — a relayed HGP answers
+                // it too (0x00), and acks brightness/colors writes, because it stores the
+                // same EEPROM table-9 params with no LEDs wired to them (bundle 32ZD7KHW).
+                // Latching SGP here is what reported that HGP as an SGP. It counts only as
+                // "a shifter on this pipe is answering settings reads", the fallback
+                // evidence in ProbeRelayedShifter; the model comes from device-type. The
+                // value itself is stored by the owner-aware TryUpdateShifter on the inbound
+                // path, and re-read by the per-model list once the model latches.
                 case "shifter-brightness":
-                    MarkSgpDetected();
-                    _data.UpdateShifter(ShifterModelKind.Sgp, "shifter-brightness", value);
+                    _relayShifterAnsweredSettingsRead = true;
                     break;
 
                 // Generic device-type identity reply from a relayed shifter — the
-                // positive HGP signal (SGP is already caught by its brightness answer).
+                // authoritative HGP/SGP discriminator on a lane with no PID.
                 case "shifter-device-type":
                     ResolveRelayedShifterModelFromDeviceType();
+                    break;
+
+                // Exploratory identity reads fired alongside the device-type probe. Logged
+                // raw: a self-describing name string at 0x1A would replace the device-type
+                // magic value as the discriminator (docs/protocol/open-questions.md
+                // § Relayed HGP/SGP discriminator). Nothing depends on them yet.
+                case "shifter-model-name":
+                    MozaLog.Info($"[AZOM] Shifter model-name reply = \"{_data.RelayShifterModelName}\" (relayed lane)");
+                    break;
+                case "shifter-hw-version":
+                    MozaLog.Info($"[AZOM] Shifter hw-version reply = \"{_data.RelayShifterHwVersion}\" (relayed lane)");
                     break;
 
                 case "hub-port1-power":
