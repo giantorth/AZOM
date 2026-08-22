@@ -90,6 +90,9 @@ namespace MozaPlugin.UI
             sb.AppendLine("=== Wheel identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState));
             sb.AppendLine();
+            sb.AppendLine("=== Wheel LED zones ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelLedZones(_plugin, _data));
+            sb.AppendLine();
             sb.AppendLine("=== Base identity ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildBaseIdentity(_plugin, _data));
             sb.AppendLine();

@@ -128,17 +128,30 @@ namespace MozaPlugin
         // Deliberately excludes the composite-key params (idle-speed = mode<<32|ms,
         // idle-color = packed RGB) and every colour ARRAY — a mis-encoded prime there
         // would silently swallow a real user edit.
-        private static readonly System.Collections.Generic.HashSet<string> s_primableWheelCfg =
-            new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal)
+        // Maps the READBACK command name to the cfg-cache key (== the WRITE command name).
+        // They're the same for most settings, but not all: rpm display mode reads on
+        // 'wheel-get-rpm-display-mode' and writes on 'wheel-set-rpm-display-mode', so a
+        // set keyed on either name alone silently primes nothing.
+        private static readonly System.Collections.Generic.Dictionary<string, string> s_primableWheelCfg =
+            new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.Ordinal)
             {
-                "wheel-idle-mode", "wheel-idle-timeout",
-                "wheel-telemetry-idle-effect", "wheel-buttons-idle-effect", "wheel-knob-idle-effect",
-                "wheel-telemetry-mode", "wheel-buttons-led-mode", "wheel-knob-led-mode",
-                "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-knob-ring-brightness",
-                "wheel-rpm-indicator-mode", "wheel-rpm-display-mode",
+                ["wheel-idle-mode"]               = "wheel-idle-mode",
+                ["wheel-idle-timeout"]            = "wheel-idle-timeout",
+                ["wheel-telemetry-idle-effect"]   = "wheel-telemetry-idle-effect",
+                ["wheel-buttons-idle-effect"]     = "wheel-buttons-idle-effect",
+                ["wheel-knob-idle-effect"]        = "wheel-knob-idle-effect",
+                ["wheel-telemetry-mode"]          = "wheel-telemetry-mode",
+                ["wheel-buttons-led-mode"]        = "wheel-buttons-led-mode",
+                ["wheel-knob-led-mode"]           = "wheel-knob-led-mode",
+                ["wheel-rpm-brightness"]          = "wheel-rpm-brightness",
+                ["wheel-buttons-brightness"]      = "wheel-buttons-brightness",
+                ["wheel-knob-brightness"]         = "wheel-knob-brightness",
+                ["wheel-rpm-indicator-mode"]      = "wheel-rpm-indicator-mode",
+                ["wheel-get-rpm-display-mode"]    = "wheel-set-rpm-display-mode",
             };
 
-        private static bool IsPrimableWheelCfg(string name) => s_primableWheelCfg.Contains(name);
+        private static bool TryPrimableWheelCfgKey(string name, out string cacheKey) =>
+            s_primableWheelCfg.TryGetValue(name, out cacheKey);
         // One-shot log edge for the param-storm suspend (see PollStatusCore).
         private bool _paramStormLogged;
     }

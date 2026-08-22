@@ -225,6 +225,29 @@ namespace MozaPlugin.Devices.Led
         private int _masterBriPublished = -1;
         private const double MasterBrightnessDebounceMs = 350.0;
 
+        // Per-zone firmware-brightness tracking, one slot per wheel LED group that has
+        // its own 1B [G] FF register: 0 = rpm (group 0), 1 = buttons (group 1),
+        // 2 = knob rings (group 3). The value comes from the EFFECTIVE factor SimHub
+        // hands Display() for that zone (globalMaster/100 x zoneBalance/100), so
+        // round(factor * 100) is the firmware percentage. Same discipline as the master
+        // tracker above — first observation is a baseline that is never written, a zone
+        // only engages once the user moves it off that baseline, and changes are
+        // debounced so a drag lands one flash write rather than one per tick.
+        private const int ZoneRpm = 0;
+        private const int ZoneButtons = 1;
+        private const int ZoneKnob = 2;
+        private const int ZoneCount = 3;
+        private readonly bool[] _zoneBriSeeded = new bool[ZoneCount];
+        private readonly int[] _zoneBriBaseline = { -1, -1, -1 };
+        private readonly bool[] _zoneEngaged = new bool[ZoneCount];
+        private readonly int[] _zoneBriRaw = { -1, -1, -1 };
+        private readonly DateTime[] _zoneBriRawUtc =
+            { DateTime.MinValue, DateTime.MinValue, DateTime.MinValue };
+        private readonly int[] _zoneBriPublished = { -1, -1, -1 };
+        // Last-seen firmware LED mode per group, for the live-cache invalidation edge.
+        private int _lastButtonsLedMode = int.MinValue;
+        private int _lastKnobLedMode = int.MinValue;
+
         public event EventHandler? BeforeDisplay;
         public event EventHandler? AfterDisplay;
         public event EventHandler? OnConnect;
@@ -531,6 +554,32 @@ namespace MozaPlugin.Devices.Led
                 // master change is caught even while the wheel sits idle.
                 TrackMasterBrightness(plugin);
 
+                // Same for the per-zone "Brightness limiter and balance" sliders — the
+                // effective factors already carry the master term, so each zone's
+                // firmware register gets master x balance. Also before the early-returns:
+                // a Static-mode zone sends no live frames at all, and its slider must
+                // still reach the register (that is the whole point of the zone push).
+                if (isNewWheel)
+                    TrackZoneBrightness(plugin, rpmBrightness, buttonsBrightness, encodersBrightness);
+
+                // A group's LED mode swaps ownership between the live pipeline (mode 1 =
+                // SimHub) and the firmware's static palette (0 = Off, 2 = Static). Drop the
+                // live cache on every transition so the first frame after a switch back to
+                // SimHub mode actually goes out instead of dedup'ing against a frame the
+                // wheel stopped showing while it was rendering its palette.
+                int btnLedMode = plugin.Data.WheelButtonsLedMode;
+                if (btnLedMode != _lastButtonsLedMode)
+                {
+                    _lastButtonsLedMode = btnLedMode;
+                    InvalidateLiveCache(LedKind.Button);
+                }
+                int knobLedMode = plugin.Data.WheelKnobLedMode;
+                if (knobLedMode != _lastKnobLedMode)
+                {
+                    _lastKnobLedMode = knobLedMode;
+                    InvalidateLiveCache(LedKind.Knob);
+                }
+
                 // Merge SimHub's two physical-index colour layers (Individual LEDs on
                 // rawState, dashboard "Device LEDs override" components on overrideState)
                 // over the per-segment logical channels. Physical order per device.json:
@@ -630,12 +679,13 @@ namespace MozaPlugin.Devices.Led
                 // Per-frame brightness from SimHub's wheel LED-brightness slider.
                 // Scales the outgoing RGB rather than writing the wheel's stored
                 // firmware brightness — see ScaleColorsForBrightness for why.
-                // MasterCompensated divides the master back out once the firmware
-                // group brightness is tracking it (WheelLedMasterBrightness >= 0), so
-                // the master — a hardware master control that also scales these live
-                // frames — isn't applied twice.
+                // ZoneCompensated divides the firmware value back out once this zone's
+                // group brightness is tracking the slider, so the register — a hardware
+                // dimmer that also scales these live frames — isn't applied twice.
                 rpmColors = ScaleColorsForBrightness(
-                    rpmColors, MasterCompensated(rpmBrightness, plugin.WheelLedMasterBrightness));
+                    rpmColors,
+                    ZoneCompensated(rpmBrightness,
+                        plugin.WheelLedAppliedBrightnessRpm, plugin.WheelLedMasterBrightness));
 
                 // --- RPM LEDs ---
                 bool rpmChanged = !ColorsEqual(rpmColors, _lastLeds);
@@ -757,7 +807,8 @@ namespace MozaPlugin.Devices.Led
                 // before the model-name response arrives would push wrong-index state that
                 // the cache then treats as current, leaving the wheel misaligned until a
                 // power cycle or forced color change.
-                if (isNewWheel && buttonColors.Length > 0 && modelInfo != null)
+                if (isNewWheel && buttonColors.Length > 0 && modelInfo != null
+                    && GroupRendersLiveFrames(btnLedMode))
                 {
                     // "Default during telemetry" override: per-button flags (Data.WheelButtonDefaultDuringTelemetry)
                     // replace 'off' (0,0,0) in the incoming SimHub frame with the button's configured static color.
@@ -802,7 +853,9 @@ namespace MozaPlugin.Devices.Led
                     // slider). Applied after the default-during-telemetry
                     // override so the static fallback colours dim too.
                     buttonColors = ScaleColorsForBrightness(
-                        buttonColors, MasterCompensated(buttonsBrightness, plugin.WheelLedMasterBrightness));
+                        buttonColors,
+                        ZoneCompensated(buttonsBrightness,
+                            plugin.WheelLedAppliedBrightnessButtons, plugin.WheelLedMasterBrightness));
 
                     bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
                     bool shouldSendButtons = !ledThrottled && (buttonsChanged || (!limitUpdates && forceRefresh && AnyLit(buttonColors)));
@@ -851,7 +904,8 @@ namespace MozaPlugin.Devices.Led
                 // so SimHub's "Individual LEDs Exclusive" mode — which passes Color[0]
                 // on the encoders callback — still drives knob LEDs through the
                 // merged array.
-                if (isNewWheel && modelInfo != null && modelInfo.KnobCount > 0 && encoderColors.Length > 0)
+                if (isNewWheel && modelInfo != null && modelInfo.KnobCount > 0 && encoderColors.Length > 0
+                    && GroupRendersLiveFrames(knobLedMode))
                 {
                     // SimHub is feeding the knob channel this frame (lit or black) — stamp
                     // it so the keepalive holds the knob "off" while the effect runs and
@@ -872,7 +926,9 @@ namespace MozaPlugin.Devices.Led
 
                     // Per-frame brightness (SimHub's encoders/knob LED-brightness slider).
                     knobColors = ScaleColorsForBrightness(
-                        knobColors, MasterCompensated(encodersBrightness, plugin.WheelLedMasterBrightness));
+                        knobColors,
+                        ZoneCompensated(encodersBrightness,
+                            plugin.WheelLedAppliedBrightnessKnob, plugin.WheelLedMasterBrightness));
 
                     int count = Math.Min(knobColors.Length, knobCount);
                     int knobBitmask = 0;
@@ -1022,7 +1078,12 @@ namespace MozaPlugin.Devices.Led
                     ResendRpmFlags(plugin, isNewWheel, isOldWheel);
                     NoteLiveSend();
                 }
-                if (isNewWheel && _lastButtons != null && (gameActive || AnyLit(_lastButtons) || WithinHold(kaNow, _btnChangedUtc, holdSec))
+                // Mode predicate here too: a group in Off/Static renders its stored
+                // palette and discards live frames, so re-feeding them is pure wire
+                // traffic. (The transition edge above also nulls the cache, so this is
+                // the belt to that braces.)
+                if (isNewWheel && _lastButtons != null && GroupRendersLiveFrames(btnLedMode)
+                    && (gameActive || AnyLit(_lastButtons) || WithinHold(kaNow, _btnChangedUtc, holdSec))
                     && (kaNow - _btnFedUtc).TotalSeconds >= KeepaliveIntervalSeconds)
                 {
                     _btnFedUtc = kaNow; _lastSendTime = kaNow;
@@ -1030,6 +1091,7 @@ namespace MozaPlugin.Devices.Led
                     NoteLiveSend();
                 }
                 if (isNewWheel && _lastKnobs != null && modelInfo?.KnobCount > 0
+                    && GroupRendersLiveFrames(knobLedMode)
                     && (gameActive || AnyLit(_lastKnobs) || WithinHold(kaNow, _knobDrivenUtc, holdSec))
                     && (kaNow - _knobFedUtc).TotalSeconds >= KeepaliveIntervalSeconds)
                 {
@@ -1206,6 +1268,103 @@ namespace MozaPlugin.Devices.Led
                 plugin.WheelLedMasterBrightness = cur;
             }
         }
+
+        /// <summary>
+        /// Observe SimHub's per-zone "Brightness limiter and balance" sliders and publish
+        /// settled changes to <see cref="MozaPlugin.WheelLedBrightnessRpm"/> /
+        /// <c>…Buttons</c> / <c>…Knob</c> so the data thread can write each zone's own
+        /// firmware register (<c>1B [G] FF</c>, G = 0/1/3). The factors arrive already
+        /// multiplied by the global master (<c>GetEffectiveButtonsBrightness()</c> etc.),
+        /// so <c>round(factor * 100)</c> is the firmware percentage for that zone and the
+        /// global slider keeps working through the same path.
+        ///
+        /// Why this exists: before it, the per-zone sliders were consumed ONLY as
+        /// per-frame RGB scaling of live colour frames, so a zone the firmware renders
+        /// from its static palette (Button / Knob LED mode = Static) had no reachable
+        /// dimmer at all — its slider looked dead while the live-driven RPM zone's worked.
+        ///
+        /// Discipline mirrors <see cref="TrackMasterBrightness"/>: the first observation
+        /// per zone is a BASELINE that is never written (connecting must not overwrite the
+        /// wheel's device-stored brightness), a zone stays silent until the user moves it
+        /// off that baseline, and publishes are debounced so a drag costs one flash write.
+        /// New-protocol wheels only — ES/ESX have a single legacy brightness register and
+        /// ride <see cref="MozaPlugin.WheelLedMasterBrightnessRaw"/> instead.
+        /// </summary>
+        private void TrackZoneBrightness(
+            MozaPlugin plugin, double rpmFactor, double buttonsFactor, double encodersFactor)
+        {
+            if (TrackOneZone(ZoneRpm, rpmFactor, out int rpm)) plugin.WheelLedBrightnessRpm = rpm;
+            if (TrackOneZone(ZoneButtons, buttonsFactor, out int btn)) plugin.WheelLedBrightnessButtons = btn;
+            if (TrackOneZone(ZoneKnob, encodersFactor, out int knob)) plugin.WheelLedBrightnessKnob = knob;
+        }
+
+        /// <summary>True (with the value to publish) when this zone's settled brightness
+        /// changed. See <see cref="TrackZoneBrightness"/> for the baseline/engage rules.</summary>
+        private bool TrackOneZone(int zone, double factor, out int value)
+        {
+            value = -1;
+            if (double.IsNaN(factor) || double.IsInfinity(factor)) return false;
+            int cur = (int)Math.Round(factor * 100.0);
+            if (cur < 0) cur = 0; else if (cur > 100) cur = 100;
+
+            if (!_zoneBriSeeded[zone])
+            {
+                _zoneBriSeeded[zone] = true;
+                _zoneBriBaseline[zone] = cur;
+                _zoneBriRaw[zone] = cur;
+                _zoneBriPublished[zone] = cur;
+                return false;
+            }
+            if (!_zoneEngaged[zone])
+            {
+                if (cur == _zoneBriBaseline[zone]) return false;
+                _zoneEngaged[zone] = true;
+            }
+
+            var now = DateTime.UtcNow;
+            if (cur != _zoneBriRaw[zone])
+            {
+                _zoneBriRaw[zone] = cur;
+                _zoneBriRawUtc[zone] = now;
+            }
+            if (cur == _zoneBriPublished[zone]
+                || (now - _zoneBriRawUtc[zone]).TotalMilliseconds < MasterBrightnessDebounceMs)
+                return false;
+
+            _zoneBriPublished[zone] = cur;
+            value = cur;
+            return true;
+        }
+
+        /// <summary>
+        /// Per-frame factor for one zone with the firmware's own dimming divided back out.
+        /// Once <see cref="TrackZoneBrightness"/> has this zone's register tracking its
+        /// slider, the firmware applies that percentage to the live frame buffer AND the
+        /// static palette, so applying it in software too would dim twice.
+        /// <paramref name="zoneApplied"/> is what the applier actually wrote for THIS zone
+        /// (-1 = never written, or the zone has no writable register on this wheel); in
+        /// that case we fall back to <see cref="MasterCompensated"/> so the pre-feature
+        /// master-only behaviour is preserved. Result is clamped downstream in
+        /// <see cref="ScaleColorsForBrightness"/>.
+        /// </summary>
+        private static double ZoneCompensated(double effectiveFactor, int zoneApplied, int master)
+        {
+            if (zoneApplied < 0) return MasterCompensated(effectiveFactor, master);
+            if (zoneApplied > 0) return effectiveFactor * 100.0 / zoneApplied;
+            return effectiveFactor;
+        }
+
+        /// <summary>
+        /// Does this group's firmware LED mode render the LIVE frame buffer? Modes are
+        /// 0 = Off, 1 = SimHub, 2 = Static (see the wheel page's Button/Knob LED Mode
+        /// selector); only mode 1 consumes the <c>19 [G]</c>/<c>1A [G]</c> live frames —
+        /// in Off/Static the firmware renders its stored palette and discards them.
+        ///
+        /// <c>-1</c> (mode not yet read back from the wheel, the state at every cold
+        /// connect) must return TRUE: treating unknown as "not SimHub" would blank
+        /// button and knob LEDs for every user until the readback lands.
+        /// </summary>
+        private static bool GroupRendersLiveFrames(int groupMode) => groupMode != 0 && groupMode != 2;
 
         /// <summary>
         /// Compensate SimHub's per-frame LED-brightness factor for the wheel firmware

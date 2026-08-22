@@ -296,8 +296,8 @@ namespace MozaPlugin
             // (idle-speed / idle-color pack mode+ms and RGB into composite keys; they
             // are left alone rather than risk a mis-encoded prime silently swallowing a
             // real user change.) See HardwareApplier.PrimeWheelCfgFromDevice.
-            if (r.Name != null && r.IntValue >= 0 && IsPrimableWheelCfg(r.Name))
-                _hardwareApplier.PrimeWheelCfgFromDevice(r.Name, r.IntValue);
+            if (r.Name != null && r.IntValue >= 0 && TryPrimableWheelCfgKey(r.Name, out var primeKey))
+                _hardwareApplier.PrimeWheelCfgFromDevice(primeKey, r.IntValue);
 
             // Extended LED group presence: any response from a group proves it exists.
             if (r.Name != null)

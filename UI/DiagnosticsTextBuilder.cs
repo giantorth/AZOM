@@ -418,6 +418,91 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
+        /// Wheel LED groups: firmware mode + brightness per zone, next to what SimHub's
+        /// "Brightness limiter and balance" sliders asked for and what the change gate
+        /// believes is on the wheel.
+        ///
+        /// Why this section exists: bundle GY9RWKMR ("button + knob brightness sliders do
+        /// nothing" on a CS Pro) needed a hand-decode of the raw wire capture to find that
+        /// the two zones were in Static mode with their registers at 5 % and 10 % while the
+        /// plugin's cache said 100. Every number needed for that verdict is here.
+        /// </summary>
+        public static string BuildWheelLedZones(MozaPlugin plugin, MozaData d)
+        {
+            if (plugin == null || d == null) return "(no plugin instance)";
+
+            var model = plugin.WheelModelInfo;
+            if (model == null)
+                return "(wheel model not resolved yet — LED zone layout unknown)";
+
+            string Bri(int v) => v < 0 ? "—" : v.ToString(CultureInfo.InvariantCulture);
+            string Cfg(string key)
+            {
+                var (cached, desired) = plugin.HardwareApplier?.WheelCfgDiag(key) ?? (null, null);
+                string c = cached.HasValue ? cached.Value.ToString(CultureInfo.InvariantCulture) : "—";
+                string w = desired.HasValue ? desired.Value.ToString(CultureInfo.InvariantCulture) : "—";
+                return $"{c}/{w}";
+            }
+            // 0=Off, 1=SimHub, 2=Static; -1 = not read back from the wheel yet.
+            string Mode(int v) => v switch
+            {
+                0 => "0 off",
+                1 => "1 simhub",
+                2 => "2 static",
+                _ => "—",
+            };
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Layout:         rpm={model.RpmLedCount} buttons={model.ButtonLedCount} "
+                          + $"knobs={model.KnobCount} ring={model.KnobRingLedTotal} "
+                          + $"flags={(model.HasFlagLeds ? "yes" : "no")}");
+            int mask = plugin.DetectionState?.WheelLedGroupMask ?? 0;
+            var present = new List<string>();
+            for (int g = 2; g <= 4; g++) if ((mask & (1 << g)) != 0) present.Add(g.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine($"Extended groups:0x{mask:X2}  present={JoinList(present)}  (2 single, 3 rotary, 4 ambient)");
+            sb.AppendLine($"Master slider:  {Bri(plugin.WheelLedMasterBrightness)}"
+                          + $"   ES raw: {Bri(plugin.WheelLedMasterBrightnessRaw)}");
+            // The per-wheel-page overlay is where the LED modes and per-zone brightness
+            // actually live. If it doesn't resolve, ApplyWheelToHardware sees -1 for all
+            // of them and writes nothing — indistinguishable, without this line, from a
+            // wheel that simply already matched.
+            var pageGuid = plugin.GetCurrentWheelPageGuid();
+            var overlay = plugin.GetCurrentWheelOverlay(plugin.Settings?.ProfileStore?.CurrentProfile);
+            sb.AppendLine($"Wheel page:     {(pageGuid.HasValue ? pageGuid.Value.ToString().Substring(0, 8) : "unresolved")}"
+                          + $"  overlay={(overlay != null ? "yes" : "no")}"
+                          + (overlay != null
+                             ? $"  want modes rpm={Bri(overlay.WheelTelemetryMode)} "
+                               + $"btn={Bri(overlay.WheelButtonsLedMode)} knob={Bri(overlay.WheelKnobLedMode)}"
+                               + $"  want bri rpm={Bri(overlay.WheelRpmBrightness)} "
+                               + $"btn={Bri(overlay.WheelButtonsBrightness)} knob={Bri(overlay.WheelKnobRingBrightness)}"
+                             : ""));
+            // Header and rows share one width table so the columns line up. mode next to
+            // mode-cache/want is the load-bearing pair: a wheel reporting Static while the
+            // plugin wants SimHub means the mode write never landed, and the firmware is
+            // discarding that group's live colour stream.
+            string Row(string zone, string mode, string modeCfg, string idle,
+                       string wheelBri, string slider, string applied, string briCfg)
+                => $"  {zone,-21}{mode,-10}{modeCfg,-12}{idle,5}{wheelBri,8}{slider,8}{applied,9}  {briCfg}";
+
+            sb.AppendLine(Row("zone", "mode", "mode c/w", "idle", "wheel", "slider", "applied", "bri c/w"));
+            sb.AppendLine(Row("0 rpm      1B 00 FF", Mode(d.WheelTelemetryMode),
+                Cfg("wheel-telemetry-mode"), Bri(d.WheelTelemetryIdleEffect),
+                Bri(d.WheelRpmBrightness), Bri(plugin.WheelLedBrightnessRpm),
+                Bri(plugin.WheelLedAppliedBrightnessRpm), Cfg("wheel-rpm-brightness")));
+            sb.AppendLine(Row("1 buttons  1B 01 FF", Mode(d.WheelButtonsLedMode),
+                Cfg("wheel-buttons-led-mode"), Bri(d.WheelButtonsIdleEffect),
+                Bri(d.WheelButtonsBrightness), Bri(plugin.WheelLedBrightnessButtons),
+                Bri(plugin.WheelLedAppliedBrightnessButtons), Cfg("wheel-buttons-brightness")));
+            sb.AppendLine(Row("3 knob     1B 03 FF", Mode(d.WheelKnobLedMode),
+                Cfg("wheel-knob-led-mode"), Bri(d.WheelKnobIdleEffect),
+                Bri(d.KnobRingBrightness), Bri(plugin.WheelLedBrightnessKnob),
+                Bri(plugin.WheelLedAppliedBrightnessKnob), Cfg("wheel-knob-brightness")));
+            sb.Append($"Flags (meter):  wheel={Bri(d.WheelFlagsBrightness)} "
+                      + $"cache/want={Cfg("dash-flags-brightness")}  (dev 0x14, not a wheel LED group)");
+            return sb.ToString();
+        }
+
+        /// <summary>
         /// Base (wheelbase MCU) identity + the firmware-gated capability state.
         /// The numeric base firmware is the SOLE gate for the wheelbase LFE effects
         /// and the 10-band FFB equalizer (<see cref="MozaData.BaseSupportsLfe"/>),

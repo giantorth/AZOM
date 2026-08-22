@@ -197,6 +197,30 @@ namespace MozaPlugin
         // group brightness (rpm/buttons/knobs) equally via ApplyMasterWheelLedBrightness.
         internal volatile int WheelLedMasterBrightness = -1;
         private int _masterLedBrightnessApplied = -2; // DataUpdate-thread-local change gate
+        // Per-zone LED brightness (SimHub's "Brightness limiter and balance" panel:
+        // Telemetry Leds / Buttons / Encoders). SimHub hands Display() an EFFECTIVE
+        // factor per zone (globalMaster/100 x zoneBalance/100), so round(factor*100) is
+        // that zone's firmware value for cmd 1B [G] FF (G = 0 rpm, 1 buttons, 3 knob).
+        // The wheel LED driver publishes settled values here off the LED thread;
+        // DataUpdate applies them on the data thread via ApplyWheelLedZoneBrightness.
+        // -1 = the user has not moved that zone's slider, so the wheel's device-stored
+        // brightness is left untouched. Without this the per-zone sliders could only
+        // scale LIVE colour frames, so a zone rendering its static palette (Button /
+        // Knob LED mode = Static) had no reachable dimmer at all.
+        internal volatile int WheelLedBrightnessRpm = -1;
+        internal volatile int WheelLedBrightnessButtons = -1;
+        internal volatile int WheelLedBrightnessKnob = -1;
+        // Mirror of what the applier believes is actually in the zone's firmware
+        // register (-1 = never written / zone not writable on this wheel). The LED
+        // driver divides its per-frame factor by this so the firmware's dimming is not
+        // applied a second time in software. Written on the data thread by
+        // ApplyWheelLedZoneBrightness, read per-frame on the LED thread.
+        internal volatile int WheelLedAppliedBrightnessRpm = -1;
+        internal volatile int WheelLedAppliedBrightnessButtons = -1;
+        internal volatile int WheelLedAppliedBrightnessKnob = -1;
+        private int _zoneLedBrightnessApplied0 = -2;  // DataUpdate-thread-local change gates
+        private int _zoneLedBrightnessApplied1 = -2;
+        private int _zoneLedBrightnessApplied3 = -2;
         // Old-protocol (ES/ESX) master brightness: the LED thread publishes the LIVE
         // slider value here (0..100, -1 until first moved); the steady 250 ms poll
         // timer settle-detects + writes wheel-old-rpm-brightness. Old wheels can't use

@@ -86,6 +86,22 @@ namespace MozaPlugin
                     _hardwareApplier?.ApplyMasterWheelLedBrightness(masterLedBri);
             }
 
+            // Per-zone brightness (SimHub's "Brightness limiter and balance" sliders).
+            // Same data-thread + cfg-cache discipline as the master above, one register
+            // per zone so moving one balance slider writes only that zone.
+            int zoneRpmBri  = WheelLedBrightnessRpm;
+            int zoneBtnBri  = WheelLedBrightnessButtons;
+            int zoneKnobBri = WheelLedBrightnessKnob;
+            if (zoneRpmBri != _zoneLedBrightnessApplied0
+                || zoneBtnBri != _zoneLedBrightnessApplied1
+                || zoneKnobBri != _zoneLedBrightnessApplied3)
+            {
+                _zoneLedBrightnessApplied0 = zoneRpmBri;
+                _zoneLedBrightnessApplied1 = zoneBtnBri;
+                _zoneLedBrightnessApplied3 = zoneKnobBri;
+                _hardwareApplier?.ApplyWheelLedZoneBrightness(zoneRpmBri, zoneBtnBri, zoneKnobBri);
+            }
+
             // Hand the latest RPM, MaxRpm + engine-on flag to the AB9 engine-vib
             // worker. GameRunning stays true while paused or in menu, so we'd
             // keep streaming buzz frames the whole time the user is in the

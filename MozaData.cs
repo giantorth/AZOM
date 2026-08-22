@@ -208,12 +208,18 @@ namespace MozaPlugin
         public volatile int Interpolation;
 
         // ===== Wheel LED settings =====
-        public volatile int WheelTelemetryMode;     // 0=Off, 1=Telemetry, 2=Static
+        // Per-group LED mode: 0=Off, 1=SimHub/Telemetry, 2=Static. -1 = NOT YET READ
+        // BACK from the wheel — the sentinel every other layer already uses (profile,
+        // overlay, extension settings). It must not default to 0: "Off" is a real user
+        // choice that suppresses the live colour stream for that group, so a 0 default
+        // would blank button and knob LEDs on every cold connect until the readback
+        // landed. Consumers gate on an explicit 0/2 and treat -1 as "no opinion".
+        public volatile int WheelTelemetryMode = -1;
         public volatile int WheelTelemetryIdleEffect;
         public volatile int WheelButtonsIdleEffect;
         public volatile int WheelKnobIdleEffect;
-        public volatile int WheelKnobLedMode;
-        public volatile int WheelButtonsLedMode;
+        public volatile int WheelKnobLedMode = -1;
+        public volatile int WheelButtonsLedMode = -1;
         // Per-group idle-effect SPEED (cmd 0x1E [group] [effect_id] [BE u16 ms]).
         // We track only the last ms value committed for each group; the effect_id
         // byte is always paired from the corresponding *IdleEffect field at write
