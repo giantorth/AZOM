@@ -118,6 +118,15 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // slow-bring-up wheels (CS-Pro / Universal Hub).
             if (data[4] == _sender.MgmtPort && _sender.MgmtPort != 0)
                 _sender.Watchdog.NoteSession01Engaged();
+            // Same proof on the FlagByte lane. Separate `if` (not `else`) so a
+            // Form-A wheel with FlagByte == MgmtPort stamps both. Without this
+            // the tier-def lane's only liveness input was the wheel's own
+            // type=0x01 push, which it stops for minutes at a time on a
+            // perfectly healthy session — bundle VG9V7XB2 (W18/R12,
+            // 2026-08-22): 356 acks here inside the 123 s window
+            // DisplayWatchdog Context C called dead, six restarts in 24 min.
+            if (data[4] == _sender.FlagByte && _sender.FlagByte != 0)
+                _sender.Watchdog.NoteSession02Ack();
             _sender.AckReceived.Set();
         }
 

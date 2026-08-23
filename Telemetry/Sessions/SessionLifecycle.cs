@@ -60,6 +60,20 @@ namespace MozaPlugin.Telemetry.Sessions
         private readonly object _contigAckLock = new object();
         private readonly System.Collections.Generic.Dictionary<byte, int> _contigAckSeqBySession
             = new System.Collections.Generic.Dictionary<byte, int>();
+        // Seqs received ABOVE the current contiguous high — i.e. chunks that
+        // arrived while a hole was still open. Kept so the chunk that finally
+        // fills the hole can ack straight through everything already in hand
+        // instead of acking only itself. Without this, one out-of-order chunk
+        // costs a full retransmit of every chunk above it: bundle VG9V7XB2
+        // (W18/R12, 2026-08-22) had seq 0x0b land ~15 ms after 0x0c..0x15, the
+        // ack pinned at 0x0a, and the wheel re-sent 0x0c..0x1f 1.27 s later —
+        // which its own port-2 congestion control logged as Loss: 68.75%,
+        // shrinking Window to 5 and stretching its send interval.
+        // Guarded by _contigAckLock; bounded so a pathological gap can't grow
+        // it without limit (past the cap we simply degrade to dup-acking).
+        private readonly System.Collections.Generic.Dictionary<byte, System.Collections.Generic.HashSet<int>>
+            _aheadSeqsBySession = new System.Collections.Generic.Dictionary<byte, System.Collections.Generic.HashSet<int>>();
+        private const int MaxAheadSeqsPerSession = 256;
 
         /// <summary>Latch set by <see cref="Lifecycle.TelemetryInboundDispatcher"/>
         /// the first time the wheel pushes a spontaneous sess=0x09 device-init
@@ -81,12 +95,15 @@ namespace MozaPlugin.Telemetry.Sessions
 
         /// <summary>Gap-aware ack-seq for a catalog-bearing session during the
         /// binding phase. Advances on contiguous seqs, acks retransmits of
-        /// already-seen seqs specifically, and on a gap (a dropped catalog
+        /// already-seen seqs specifically, and on a gap (a missing catalog
         /// chunk) re-acks the last CONTIGUOUS seq instead of acking past the
         /// hole — so we never tell the wheel we received chunks we didn't, and
-        /// it gets a chance to resend. Once Active (steady-state telemetry) it
-        /// acks the seq verbatim, preserving the existing specific-seq behaviour
-        /// (a dropped keepalive must not stall the ack). Reset per session open.</summary>
+        /// it gets a chance to resend. Chunks that arrive above an open hole are
+        /// remembered, so the chunk that closes the hole acks through all of
+        /// them at once and the wheel re-sends nothing it already delivered.
+        /// Once Active (steady-state telemetry) it acks the seq verbatim,
+        /// preserving the existing specific-seq behaviour (a dropped keepalive
+        /// must not stall the ack). Reset per session open.</summary>
         internal ushort GapAwareCatalogAckSeq(byte session, int seq)
         {
             if (_sender.StateIsActive)
@@ -94,15 +111,29 @@ namespace MozaPlugin.Telemetry.Sessions
             lock (_contigAckLock)
             {
                 int contig = _contigAckSeqBySession.TryGetValue(session, out var c) ? c : -1;
-                if (contig < 0 || seq == contig + 1)
-                {
-                    _contigAckSeqBySession[session] = seq;   // first frame, or in-order
-                    return (ushort)seq;
-                }
                 if (seq <= contig)
                     return (ushort)seq;                      // retransmit of an acked seq
-                // seq > contig + 1: chunk(s) between contig and seq dropped on RX.
-                // Dup-ack the last contiguous seq; do NOT advance past the hole.
+                if (contig < 0 || seq == contig + 1)
+                {
+                    contig = seq;                            // first frame, or in-order
+                    // Drain everything this chunk unblocks: out-of-order arrival
+                    // only delays the ack, it must not force a resend.
+                    if (_aheadSeqsBySession.TryGetValue(session, out var ahead))
+                    {
+                        while (ahead.Remove(contig + 1)) contig++;
+                    }
+                    _contigAckSeqBySession[session] = contig;
+                    return (ushort)contig;
+                }
+                // seq > contig + 1: chunk(s) between contig and seq missing so
+                // far. Hold the cumulative ack at the last contiguous seq, but
+                // remember this one so closing the hole acks straight through.
+                if (!_aheadSeqsBySession.TryGetValue(session, out var set))
+                {
+                    set = new System.Collections.Generic.HashSet<int>();
+                    _aheadSeqsBySession[session] = set;
+                }
+                if (set.Count < MaxAheadSeqsPerSession) set.Add(seq);
                 return (ushort)contig;
             }
         }
@@ -112,13 +143,21 @@ namespace MozaPlugin.Telemetry.Sessions
         /// SendSessionOpen and the StartInner reset.</summary>
         internal void ResetContigAck(byte session)
         {
-            lock (_contigAckLock) _contigAckSeqBySession.Remove(session);
+            lock (_contigAckLock)
+            {
+                _contigAckSeqBySession.Remove(session);
+                _aheadSeqsBySession.Remove(session);
+            }
         }
 
         /// <summary>StartInner reset: drop every session's contiguous-ack baseline.</summary>
         internal void ClearContigAck()
         {
-            lock (_contigAckLock) _contigAckSeqBySession.Clear();
+            lock (_contigAckLock)
+            {
+                _contigAckSeqBySession.Clear();
+                _aheadSeqsBySession.Clear();
+            }
         }
 
         /// <summary>Stop() teardown: reset the ack latch so a stale signal can't

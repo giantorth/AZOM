@@ -630,6 +630,15 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        /// <summary>Host-sent data chunks on a session this Start cycle. Read by
+        /// <see cref="Lifecycle.DisplayWatchdog"/> Context C so it never judges a
+        /// lane the host has not actually driven.</summary>
+        internal int SessionOutboundCount(byte session)
+        {
+            lock (_sessionCounts)
+                return _sessionCounts.TryGetValue(session, out var pair) ? pair.Out : 0;
+        }
+
         // Upload-session dir-listing tracking is owned by _uploader; expose
         // its refresh flag here for the diag tab via a thin pass-through.
         public bool Session04DirListingRefreshed => _uploader?.DirListingRefreshed ?? false;

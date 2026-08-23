@@ -26,12 +26,15 @@ namespace MozaPlugin.Telemetry.Lifecycle
     /// (WheelReportedSlot never converging to LastEmittedKind4Slot).
     ///
     /// Engaged is therefore defined by POSITIVE proof, never by filler:
-    ///   (A) catalog present  AND  configJson device-init/state present, AND
-    ///   (B) the slot round-trips — after the host emits a kind=4 to slot N,
-    ///       WheelReportedSlot reaches N within SlotRoundTripWindowMs.
+    ///   (A) catalog present  AND  configJson device-init/state present.
+    ///   (B) the slot round-trip is POSITIVE confirmation only and no longer
+    ///       gates the verdict — the wheel's reported slot is authoritative and
+    ///       a mismatch never restarts (see EvaluateEngagement Context B).
     /// Filler acks/keepalives and inbound stalls are consumed only as liveness
     /// inputs that REINFORCE a content-absent verdict; they never clear one and
-    /// never fire alone against a content-proven wheel.
+    /// never fire alone against a content-proven wheel. The one place liveness
+    /// stands alone is Context C (binding-channel death), and there it means
+    /// TOTAL silence on the lane — no pushed data AND no acks of our own sends.
     ///
     /// Threading: state is touched from the serial-read thread (Note*/Handle*),
     /// the tick-timer ThreadPool thread (TickDisplayWatchdog), and the Stop
@@ -57,12 +60,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
         // the CS-Pro / Universal-Hub slow bring-up where the wheel takes
         // 12-15 s after device-lock to start acking + announcing.
         private const int EngagementGraceMs = 20_000;
-        // After the host emits a kind=4 to slot N, the wheel must report slot N
-        // within this window or the round-trip is judged failed. 4× the
-        // PostSwitchCatalogConvergence sample interval (3 s) and well under its
-        // 30 s deadline; a healthy switch settles in <=1.5 s, so this never
-        // clips a slow-but-healthy bind.
-        private const int SlotRoundTripWindowMs = 12_000;
         // A not-engaged verdict must persist this long before it escalates to a
         // restart, so a momentary gap mid-catalog-push can't trigger one.
         private const int NotEngagedConfirmMs = 3_000;
@@ -70,24 +67,23 @@ namespace MozaPlugin.Telemetry.Lifecycle
         // RecoveryDispatcher.DebounceMs); avoids recomputing/log-spamming a
         // verdict while our own restart is settling.
         private const int RestartCooldownMs = 30_000;
-        // Liveness staleness thresholds (reinforcement inputs). PH bridge
-        // captures show p999 inter-frame gap of 14 s (sess=0x02) / ~5 s
-        // (sess=0x01); 20 s leaves headroom past legitimate quiet.
-        private const int S02StallThresholdMs = 20_000;
-        private const int S01StallThresholdMs = 20_000;
         // Binding-channel death (Context C): the resolved tier-def session has
-        // carried NO inbound for this long while the mirror session stayed
-        // demonstrably alive. Healthy cadence on the tier-def session is ~4 s
-        // keepalives, so 120 s is ~30 missed periods — far past any legitimate
-        // idle gap, small next to the 27 min the 2026-07-24 wedge sat unseen.
+        // carried NO inbound of ANY kind — pushed data chunks or fc:00 acks of
+        // our own sends — for this long while the mirror session stayed
+        // demonstrably alive.
+        //
+        // The wheel's own type=0x01 push cadence on this lane is NOT a
+        // heartbeat and must never be the sole liveness input: bundle
+        // VG9V7XB2 (W18/R12, 2026-08-22) shows it pushing a 4-byte all-zero
+        // filler in bursts of 3 at ~3.91 s roughly every 15 s, then stopping
+        // for 126 s at a stretch while the session is fully healthy — 811 host
+        // chunks acked 356 times in the same window. Hence the ack stamp; see
+        // NoteSession02Ack.
         private const int TierDefSessionDeadThresholdMs = 120_000;
         // The corroborating mirror session must have inbound at least this
         // fresh, so a dead cable / vanished port (both sessions quiet) can
         // never fire this rule — that is the connection layer's job.
         private const int MirrorSessionFreshMs = 30_000;
-        // Don't trust inbound-bytes liveness on mgmt while a wheel-initiated
-        // CLOSE is recent — the close is the wheel rejecting the session.
-        private const int S01PostCloseSettleMs = 15_000;
 
         // ── liveness / rejection feeder state (Interlocked on 64-bit) ─────
         private long _session01EngagedUtcTicks;
@@ -95,6 +91,11 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private long _session01LastCloseUtcTicks;
         private long _session02FirstInboundUtcTicks;
         private long _session02LastInboundUtcTicks;
+        // Last fc:00 ack the wheel sent on the FlagByte lane. Kept SEPARATE
+        // from _session02LastInboundUtcTicks so the engagement latch stays
+        // data-only ("positive proof, never filler"); only Context C's
+        // liveness test fuses the two.
+        private long _session02LastAckUtcTicks;
         private int _activeStateEnteredTickCount;
 
         // ── unified verdict state ─────────────────────────────────────────
@@ -202,6 +203,17 @@ namespace MozaPlugin.Telemetry.Lifecycle
             Interlocked.Exchange(ref _session02LastInboundUtcTicks, now);
         }
 
+        /// <summary>Called for every wheel fc:00 ack on sess=FlagByte (0x02).
+        /// Lane liveness ONLY — the mirror of the mgmt lane's ack feed in
+        /// <see cref="NoteSession01Engaged"/>: an ack proves the wheel still
+        /// holds the session open and is servicing our sends even when it has
+        /// nothing of its own to push. Deliberately does NOT touch
+        /// _session02FirstInboundUtcTicks — that latch is the engagement gate
+        /// and stays data-only, so filler can never satisfy it. Consumed only
+        /// by Context C's liveness test.</summary>
+        public void NoteSession02Ack() =>
+            Interlocked.Exchange(ref _session02LastAckUtcTicks, DateTime.UtcNow.Ticks);
+
         /// <summary>Stamp the emit time + slot for every host kind=4
         /// (SendDashboardSwitch). Anchors the slot round-trip window in
         /// <see cref="EvaluateEngagement"/>.</summary>
@@ -245,8 +257,9 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 Interlocked.Exchange(ref _session01EngagedUtcTicks, 0);
             if (session == _sender.FlagByte && Interlocked.Read(ref _session02FirstInboundUtcTicks) != 0)
                 Interlocked.Exchange(ref _session02FirstInboundUtcTicks, 0);
-            // Stamp the mgmt close time unconditionally — the verdict reads this
-            // to refuse trusting inbound-bytes liveness for S01PostCloseSettleMs.
+            // Stamp the mgmt close time unconditionally. No consumer today —
+            // the post-close settle window it fed was removed with the rest of
+            // the unread threshold constants; kept as a cheap observation point.
             if (session == _sender.MgmtPort)
                 Interlocked.Exchange(ref _session01LastCloseUtcTicks, DateTime.UtcNow.Ticks);
 
@@ -328,6 +341,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             Interlocked.Exchange(ref _session01LastCloseUtcTicks, 0);
             Interlocked.Exchange(ref _session02FirstInboundUtcTicks, 0);
             Interlocked.Exchange(ref _session02LastInboundUtcTicks, 0);
+            Interlocked.Exchange(ref _session02LastAckUtcTicks, 0);
             _activeStateEnteredTickCount = 0;
 
             Interlocked.Exchange(ref _lastKind4EmitUtcTicks, 0);
@@ -444,7 +458,9 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // Context C — binding-channel liveness (binding dead under a green
             // dashboard). Fires when the resolved tier-def session has carried
             // ZERO inbound past the threshold while the mirror session proves
-            // the wheel and wire alive. Two confirmed true positives:
+            // the wheel and wire alive. "Inbound" means ANY wheel utterance on
+            // the lane: a pushed type=0x01 chunk OR an fc:00 ack of one of our
+            // sends. Two confirmed true positives:
             //   • 2026-07-24: wheel power-cycled under an Active sender — 0x01
             //     dead 27 min, 0x02 chatty, every content check green off
             //     caches, display dead until a manual toggle.
@@ -455,20 +471,34 @@ namespace MozaPlugin.Telemetry.Lifecycle
             //     time; with it warn-only (08-01) the drop was permanent.
             // History: briefly downgraded to warn-only on 2026-07-31 after
             // misreading the kind=4 echo as proof of a working display — the
-            // "false positive" wasn't one. A genuinely bound display keeps the
-            // tier-def session's inbound stamp fresh (13 min of healthy play
-            // between fires, zero re-fires); do not neuter this again without a
-            // confirmed healthy-display fire. Both-quiet (cable pull) stays
+            // "false positive" wasn't one. Both-quiet (cable pull) stays
             // excluded via the mirror freshness gate — connection layer's job.
+            //
+            // 2026-08-22, bundle VG9V7XB2 (W18/R12, AC): the confirmed
+            // healthy-display fire the note above asked for. The rule fired six
+            // times in 24 min on a working dashboard, blanking it ~13 s each
+            // time, because the tier-def stamp was fed ONLY by wheel-pushed
+            // type=0x01 chunks while the mgmt stamp was fed by acks too. In the
+            // 123 s the rule called dead, sess=0x02 carried 811 host chunks,
+            // 356 wheel acks (the last 0.8 s before the restart) and a steady
+            // 1 Hz 7c:23 display-state push — only the wheel's own filler push
+            // had stopped. The lane's liveness therefore fuses data + acks.
+            // Teeth retained: a wheel that power-cycles or drops the session
+            // stops acking the ~800 chunks/2 min we push at it, so both stamps
+            // go stale and this still fires.
             {
                 byte tierDefSes = _sender.ResolveTierDefSession();
                 bool tierDefIsFlag = tierDefSes == _sender.FlagByte
                     && _sender.FlagByte != _sender.MgmtPort;
+                // Both lanes are measured the same way: newest of (pushed data,
+                // ack). _session01LastInboundUtcTicks is already fed by both.
                 long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
-                long s02 = Interlocked.Read(ref _session02LastInboundUtcTicks);
+                long s02 = Math.Max(
+                    Interlocked.Read(ref _session02LastInboundUtcTicks),
+                    Interlocked.Read(ref _session02LastAckUtcTicks));
                 long deadStamp = tierDefIsFlag ? s02 : s01;
                 long aliveStamp = tierDefIsFlag ? s01 : s02;
-                // Never-seen inbound this Start cycle counts from Active entry.
+                // Never-heard-from this Start cycle counts from Active entry.
                 long deadAgeMs = deadStamp != 0
                     ? (nowUtc - deadStamp) / TimeSpan.TicksPerMillisecond
                     : Environment.TickCount - _activeStateEnteredTickCount;
@@ -478,12 +508,28 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 if (deadAgeMs >= TierDefSessionDeadThresholdMs
                     && aliveAgeMs <= MirrorSessionFreshMs)
                 {
-                    byte mirrorSes = tierDefIsFlag ? _sender.MgmtPort : _sender.FlagByte;
-                    return (true,
-                        $"binding channel dead: no inbound on tier-def session 0x{tierDefSes:X2} " +
-                        $"for {deadAgeMs / 1000}s while sess=0x{mirrorSes:X2} stayed live " +
-                        $"(inbound {aliveAgeMs / 1000}s ago) — binding lost under a green dashboard " +
-                        "(wheel reboot, or the post-game-switch value-feed drop)");
+                    // Silence is only evidence of a dead binding once we have
+                    // actually driven the lane. Without this guard a lane the
+                    // host never sent on restarts every ~120 s forever — the
+                    // Active-entry fallback above re-anchors on each restart and
+                    // the spacing stays under both RecoveryDispatcher caps, so it
+                    // never escalates to Park either. Evaluated here, not in the
+                    // condition, so the lock is taken only on the firing path;
+                    // falling through leaves the checks below this block intact.
+                    int hostSends = _sender.SessionOutboundCount(tierDefSes);
+                    if (deadStamp != 0 || hostSends > 0)
+                    {
+                        byte mirrorSes = tierDefIsFlag ? _sender.MgmtPort : _sender.FlagByte;
+                        string span = deadStamp != 0
+                            ? $"for {deadAgeMs / 1000}s"
+                            : $"at all this Start cycle ({deadAgeMs / 1000}s since Active)";
+                        return (true,
+                            $"binding channel dead: no inbound (data or ack) on tier-def " +
+                            $"session 0x{tierDefSes:X2} {span} across {hostSends} host sends, " +
+                            $"while sess=0x{mirrorSes:X2} stayed live " +
+                            $"(inbound {aliveAgeMs / 1000}s ago) — binding lost under a green " +
+                            "dashboard (wheel reboot, or the post-game-switch value-feed drop)");
+                    }
                 }
             }
 
@@ -814,13 +860,22 @@ namespace MozaPlugin.Telemetry.Lifecycle
             long nowUtc = DateTime.UtcNow.Ticks;
             long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
             long s02 = Interlocked.Read(ref _session02LastInboundUtcTicks);
+            long s02ack = Interlocked.Read(ref _session02LastAckUtcTicks);
             string age(long stamp) => stamp == 0
                 ? "never"
                 : $"{(nowUtc - stamp) / TimeSpan.TicksPerSecond}s";
+            // Which lane Context C currently judges flips with
+            // ResolveTierDefSession(), so name it here — otherwise the s01/s02
+            // ages below can't be read against the restart verdict.
+            byte tierDefSes = _sender.ResolveTierDefSession();
+            byte mirrorSes = tierDefSes == _sender.FlagByte && _sender.FlagByte != _sender.MgmtPort
+                ? _sender.MgmtPort
+                : _sender.FlagByte;
             return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip} " +
                    $"s09devinit={(_sender.WheelReadyObserved ? "yes" : "no")} " +
                    $"s09rounds={_s09RetryRounds}/{S09RetryMaxRounds} " +
-                   $"s01inbound={age(s01)} s02inbound={age(s02)})";
+                   $"s01inbound={age(s01)} s02inbound={age(s02)} s02ack={age(s02ack)} " +
+                   $"watchdogLane=tierDef:0x{tierDefSes:X2}/mirror:0x{mirrorSes:X2})";
         }
 
         // ───── Helpers ────────────────────────────────────────────────────

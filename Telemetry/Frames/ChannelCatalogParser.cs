@@ -76,6 +76,17 @@ namespace MozaPlugin.Telemetry.Frames
         // would have stayed indefinitely. Dropping the noise lets the next
         // legitimate catalog burst start clean.
         private readonly Dictionary<byte, int> _lastAppendTickMs = new();
+        // Per-session Environment.TickCount of last PROGRESS — a parse pass in
+        // which this session yielded at least one valid catalog record. Seeded
+        // on first append so a session that never parses anything still has a
+        // clock. This, not _lastAppendTickMs, is what the stale-garbage cleanup
+        // measures: bundle VG9V7XB2 (W18/R12, 2026-08-22) had the wheel's
+        // device-log FF records riding sess=0x01 at ~1 Hz, so the arrival-based
+        // test never went stale and the buffer grew 2713 → 5003 B in three
+        // minutes with full=prefix=abbr=backref=0 throughout — heading for the
+        // destructive ClearOverflowingSessions wipe at 64 kB. Bytes arriving is
+        // not progress; records parsing is.
+        private readonly Dictionary<byte, int> _lastProgressTickMs = new();
         // Threshold above which a no-progress session buffer is considered
         // stale noise rather than in-flight catalog data. Set to 30 s — well
         // above any plausible wheel inter-chunk gap during an actual catalog
@@ -372,6 +383,10 @@ namespace MozaPlugin.Telemetry.Frames
                 for (int i = 0; i < length; i++)
                     buf.Add(chunkBytes[offset + i]);
                 _lastAppendTickMs[session] = Environment.TickCount;
+                // Seed the progress clock on first sight of the session so a
+                // buffer that never parses a record still ages out.
+                if (!_lastProgressTickMs.ContainsKey(session))
+                    _lastProgressTickMs[session] = Environment.TickCount;
                 // Scan the FULL session buffer (not just the new chunk —
                 // the END marker may straddle chunk boundaries) for the
                 // most recent tag 0x06 size=4 record and capture its u32
@@ -444,6 +459,7 @@ namespace MozaPlugin.Telemetry.Frames
                 // session, retransmit memory should not bleed across.
                 _highestSeqAppended.Clear();
                 _lastAppendTickMs.Clear();
+                _lastProgressTickMs.Clear();
             }
             _lastParseLen = 0;
         }
@@ -483,6 +499,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _sessionOrder.RemoveAt(i);
                     _highestSeqAppended.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
+                    _lastProgressTickMs.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
                         $"[AZOM] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
@@ -1265,14 +1282,23 @@ namespace MozaPlugin.Telemetry.Frames
                     $"distinct-idx={parsed.Count}");
             }
 
-            // Stale-garbage cleanup. Sessions that produced zero valid records
-            // (full+prefix+abbr+backref == 0) AND haven't been appended to in
-            // StaleGarbageThresholdMs are holding non-catalog noise — drop them
-            // so the parser doesn't keep emitting the same backrefFail/sizeReject
-            // counters on every pass, and so subsequent legitimate catalog
-            // chunks start from a clean buffer. Sessions that previously
-            // contributed valid records have those records preserved in
-            // _catalog, so clearing the buffer loses nothing recoverable.
+            // Stale-garbage cleanup. Sessions that have produced zero valid
+            // records (full+prefix+abbr+backref == 0) for StaleGarbageThresholdMs
+            // are holding non-catalog noise — drop them so the parser doesn't
+            // keep emitting the same backrefFail/sizeReject counters on every
+            // pass, and so subsequent legitimate catalog chunks start from a
+            // clean buffer. Sessions that previously contributed valid records
+            // have those records preserved in _catalog, so clearing the buffer
+            // loses nothing recoverable.
+            //
+            // The clock is PROGRESS (_lastProgressTickMs), not arrival. An
+            // arrival-based test only catches a session that also goes quiet;
+            // a wheel that keeps pushing non-catalog bytes on a catalog session
+            // — device-log FF records on sess=0x01, ~1 Hz — resets an
+            // arrival clock forever and the buffer grows unbounded until the
+            // destructive 64 kB ClearOverflowingSessions wipe. Progress-based
+            // subsumes the arrival case: a quiet no-record buffer makes no
+            // progress either.
             // The pre-scan-skipped sessions (no URL/END at all) are NOT in
             // perSessionStats, so iterate _sessionOrder directly and check
             // staleness for any buffer with no current-pass valid records.
@@ -1289,6 +1315,11 @@ namespace MozaPlugin.Telemetry.Frames
                 foreach (var kv in validRecordsBySession)
                     if (kv.Value) _sessionsWithValidUrls.Add(kv.Key);
 
+                // Refresh the progress clock for every session that yielded a
+                // record on this pass, BEFORE the drop scan below.
+                foreach (var kv in validRecordsBySession)
+                    if (kv.Value) _lastProgressTickMs[kv.Key] = nowTick;
+
                 for (int i = _sessionOrder.Count - 1; i >= 0; i--)
                 {
                     byte sess = _sessionOrder[i];
@@ -1298,19 +1329,24 @@ namespace MozaPlugin.Telemetry.Frames
                     // skipped (no URL/END found) — treat as "no valid records".
                     if (validRecordsBySession.TryGetValue(sess, out bool hadValid) && hadValid)
                         continue;
-                    if (!_lastAppendTickMs.TryGetValue(sess, out int lastAppend))
+                    if (!_lastProgressTickMs.TryGetValue(sess, out int lastProgress))
                         continue;
-                    int ageMs = nowTick - lastAppend;
+                    int ageMs = nowTick - lastProgress;
                     if (ageMs < StaleGarbageThresholdMs)
                         continue;
+                    int idleMs = _lastAppendTickMs.TryGetValue(sess, out int lastAppend)
+                        ? nowTick - lastAppend
+                        : -1;
                     int wiped = sBuf.Count;
                     _buffersBySession.Remove(sess);
                     _sessionOrder.RemoveAt(i);
                     _highestSeqAppended.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
+                    _lastProgressTickMs.Remove(sess);
                     MozaLog.Debug(
                         $"[AZOM] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
-                        $"({wiped}B, no valid records, last append {ageMs / 1000}s ago) — " +
+                        $"({wiped}B, no valid records for {ageMs / 1000}s, last append " +
+                        $"{(idleMs < 0 ? "n/a" : idleMs / 1000 + "s")} ago) — " +
                         "wheel sent non-catalog bytes that the parser has been re-rejecting.");
                 }
             }

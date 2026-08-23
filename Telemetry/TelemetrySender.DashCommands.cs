@@ -63,8 +63,32 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         private void SendAndTrackChunk(byte[] frame)
         {
+            NoteOutboundChunk(frame);
             _connection.Send(frame);
             _retransmitter.Track(frame);
+        }
+
+        /// <summary>Count a host-sent <c>7c:00 type=01</c> session data chunk
+        /// against its session. Feeds the Diagnostics "Session traffic" table
+        /// (its Out column read 0 for every session until this existed) and,
+        /// more importantly, gives <see cref="Lifecycle.DisplayWatchdog"/>'s
+        /// Context C a denominator: "no inbound on this lane" is only evidence
+        /// of a dead binding once we have actually driven the lane.
+        ///
+        /// Covers the two telemetry chunk wrappers (this and
+        /// <see cref="SendRawFrame"/>), which between them carry every tier-def,
+        /// string-value and property-push chunk on the mgmt / tier-def lanes.
+        /// The uploader / downloader / RPC lanes send straight through
+        /// <c>ConnectionRef.Send</c> and are not counted.</summary>
+        private void NoteOutboundChunk(byte[] frame)
+        {
+            // 7E [N] 43 <dev> 7C 00 [session] [type=01] [seq lo] [seq hi] …
+            if (frame != null && frame.Length >= 10
+                && frame[0] == MozaProtocol.MessageStart
+                && frame[4] == 0x7C && frame[5] == 0x00 && frame[7] == 0x01)
+            {
+                BumpSessionCount(frame[6], outbound: true);
+            }
         }
 
         /// <summary>Config-session variant: tracked regardless of target
@@ -272,6 +296,10 @@ namespace MozaPlugin.Telemetry
         internal int Session09InboundSeq => _session09InboundSeq;
         internal int CatalogCount => _catalogParser?.Count ?? 0;
         internal bool HasActiveSubscription => _activeSubscription != null;
-        internal void SendRawFrame(byte[] frame) => _connection.Send(frame);
+        internal void SendRawFrame(byte[] frame)
+        {
+            NoteOutboundChunk(frame);
+            _connection.Send(frame);
+        }
     }
 }
