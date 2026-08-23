@@ -792,6 +792,12 @@ namespace MozaPlugin.UI
                 $"Bandwidth:          out={budget.BytesLastSec,5} B/s ({budget.PercentBudget,3}% of {budgetTargetBytes}B target, peak={budget.PeakBurstBytes})");
             sb.AppendLine(
                 $"WireErrors:         drops={errs.FramesDropped} cksumFail={errs.ChecksumFailures} frameErr={errs.FrameErrors} resync={errs.FrameStartScanResyncs}");
+            sb.AppendLine(
+                $"  FrameStartScan:   lenReject={errs.LengthRejects} stuffedPairSkip={errs.StuffedPairSkips}");
+            sb.AppendLine(
+                $"  ReadCadence:      maxReadBytes={errs.MaxBytesToRead} saturatedReads={errs.FullReads} "
+                + $"maxReadGap={errs.MaxReadGapMs}ms dispatchQueuePeak={errs.RxQueueHighWater} "
+                + $"dispatchDrops={errs.RxQueueDrops}");
             // Resync skip-size distribution. Helps tell single-byte stray
             // padding (USB / driver idle bytes — harmless) from multi-byte
             // gaps (wire corruption — worth investigating). drops=0
@@ -868,6 +874,15 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"Parser: buf={pd.BufferBytes}B (last parsed {pd.LastParsedBufferBytes}B) " +
                 $"crcRejects={pd.CrcRejects} lastActivity={activity}");
+            // The list below is the CURRENT generation (LiveCatalog). Name the
+            // union size too, so a shrinking catalog after a dash switch reads
+            // as "new generation is smaller" rather than "we lost channels".
+            if (pd.MergedCatalogCount > 0 && pd.MergedCatalogCount != pd.LiveCatalogCount)
+            {
+                sb.AppendLine(
+                    $"  (showing current generation: {pd.LiveCatalogCount} of "
+                    + $"{pd.MergedCatalogCount} URLs seen across all generations this connection)");
+            }
 
             var catalog = plugin.WheelChannelCatalogForDiagnostics;
             if (catalog != null && catalog.Count > 0)

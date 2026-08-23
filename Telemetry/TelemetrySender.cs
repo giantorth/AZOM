@@ -834,8 +834,19 @@ namespace MozaPlugin.Telemetry
         // for fallback gating). Value-frame paths use _policy.Encoding ==
         // TierDefEncoding.V0Url instead of ProtocolVersion == 0.
 
-        /// <summary>Channel URLs reported by the wheel during session startup. Null until parsed.</summary>
-        public System.Collections.Generic.IReadOnlyList<string>? WheelChannelCatalog => _catalogParser.Catalog;
+        /// <summary>Channel URLs for the dashboard the wheel currently has
+        /// loaded. LiveCatalog, not Catalog, for the same reason
+        /// <see cref="Frames.TierDefinitionEmitter"/> uses it: Catalog is the
+        /// never-pruned union of every generation this connection has seen, so
+        /// after a dashboard switch it still carries the previous dash's URLs at
+        /// any index the new generation didn't overwrite. Rendering that union
+        /// made the diagnostics tab and the channel-mapper show one URL at two
+        /// indices — bundles EJ92X08Y / W0V1PF9V (2026-08-23) showed Gear at
+        /// idx 5 and 8 and SpeedKmh at 7 and 9 when the wheel had only
+        /// advertised each once. Falls back to the union before the first
+        /// generation commits. Null until parsed.</summary>
+        public System.Collections.Generic.IReadOnlyList<string>? WheelChannelCatalog =>
+            _catalogParser.LiveCatalog ?? _catalogParser.Catalog;
 
         /// <summary>Raw .mzdash file content for upload to the wheel. Set by
         /// ApplyTelemetrySettings; consumed by WheelUploadCoordinator.</summary>

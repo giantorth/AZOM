@@ -84,6 +84,21 @@ namespace MozaPlugin.Telemetry.Lifecycle
         // fresh, so a dead cable / vanished port (both sessions quiet) can
         // never fire this rule — that is the connection layer's job.
         private const int MirrorSessionFreshMs = 30_000;
+        // Post-switch variant of the binding-death threshold. Right after we
+        // re-bind the display, total silence on the tier-def lane is the switch
+        // having failed, not an idle gap — so 120 s of dead dashboard is the
+        // wrong price. Bundle W0V1PF9V (W17/CS-Pro, 2026-08-23, "broke dash on
+        // game change"): Dirt Rally → Automobilista 2 switched to slot 7 at
+        // 22:52:35, the lane answered until 22:52:45.873, then went totally
+        // silent — no pushed chunk and no ack — for the remaining 98 s of the
+        // capture while the host pushed 129 chunks into it and the wheel stayed
+        // stuck reporting slot 18. A healthy switch never does this: the lane
+        // keeps acking throughout the reload. Same evidence bar as the steady-
+        // state rule (no data AND no acks, mirror demonstrably alive, and we
+        // must actually have sent on the lane), just a shorter fuse while a
+        // switch we initiated is still settling.
+        private const int PostSwitchWindowMs = 90_000;
+        private const int PostSwitchTierDefDeadMs = 30_000;
 
         // ── liveness / rejection feeder state (Interlocked on 64-bit) ─────
         private long _session01EngagedUtcTicks;
@@ -505,7 +520,15 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 long aliveAgeMs = aliveStamp != 0
                     ? (nowUtc - aliveStamp) / TimeSpan.TicksPerMillisecond
                     : long.MaxValue;
-                if (deadAgeMs >= TierDefSessionDeadThresholdMs
+                // A switch we emitted recently shortens the fuse — see
+                // PostSwitchTierDefDeadMs.
+                long lastKind4 = Interlocked.Read(ref _lastKind4EmitUtcTicks);
+                bool postSwitch = lastKind4 != 0
+                    && (nowUtc - lastKind4) / TimeSpan.TicksPerMillisecond <= PostSwitchWindowMs;
+                long deadThresholdMs = postSwitch
+                    ? PostSwitchTierDefDeadMs
+                    : TierDefSessionDeadThresholdMs;
+                if (deadAgeMs >= deadThresholdMs
                     && aliveAgeMs <= MirrorSessionFreshMs)
                 {
                     // Silence is only evidence of a dead binding once we have
@@ -524,11 +547,11 @@ namespace MozaPlugin.Telemetry.Lifecycle
                             ? $"for {deadAgeMs / 1000}s"
                             : $"at all this Start cycle ({deadAgeMs / 1000}s since Active)";
                         return (true,
-                            $"binding channel dead: no inbound (data or ack) on tier-def " +
-                            $"session 0x{tierDefSes:X2} {span} across {hostSends} host sends, " +
-                            $"while sess=0x{mirrorSes:X2} stayed live " +
-                            $"(inbound {aliveAgeMs / 1000}s ago) — binding lost under a green " +
-                            "dashboard (wheel reboot, or the post-game-switch value-feed drop)");
+                            $"binding channel dead{(postSwitch ? " right after a switch" : "")}: " +
+                            $"no inbound (data or ack) on tier-def session 0x{tierDefSes:X2} " +
+                            $"{span} across {hostSends} host sends, while sess=0x{mirrorSes:X2} " +
+                            $"stayed live (inbound {aliveAgeMs / 1000}s ago) — binding lost under " +
+                            "a green dashboard (wheel reboot, or the post-game-switch value-feed drop)");
                     }
                 }
             }
@@ -680,6 +703,22 @@ namespace MozaPlugin.Telemetry.Lifecycle
         {
             if (_s09ScreenlessParked) return;
             if (_sender.DisplayDetected) return;
+            // The sender's own latch is set ONLY by the wheel's one-shot 0x87
+            // identity reply, which it sends once in answer to a 0x07 query. If
+            // that reply lands before the sender is listening, the latch stays
+            // false for the whole session and nothing re-queries — so it is not
+            // sufficient evidence of a screenless wheel on its own. The device
+            // prober's identity read is the corroborating source, and
+            // MozaPlugin.IsDisplayDetected already fuses both.
+            //
+            // Bundle TFYW9H33 (W17/CS-Pro, 2026-08-23, "no display"): the 0x87
+            // reply arrived at 10:01:41.296, one millisecond after the sender
+            // logged "deferring telemetry start until display probe completes",
+            // so it was never handled. Diagnostics then read
+            // "DisplayDetected: sender=False probe=True" while the identity
+            // block plainly showed "W17 Display" — and this parked a wheel that
+            // has a screen, blaming a hardware trait rather than the race.
+            if (MozaPlugin.Instance?.IsDisplayDetected == true) return;
             _s09ScreenlessParked = true;
             _sender.Recovery.Park(
                 $"Screenless wheel — no display sub-device after {S09RetryMaxRounds} sess=0x09 rounds; " +

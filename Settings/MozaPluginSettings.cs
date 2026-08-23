@@ -307,6 +307,18 @@ namespace MozaPlugin.Settings
         [Newtonsoft.Json.JsonIgnore]
         public bool EnableHotRenegotiation { get; set; } = true;
 
+        /// <summary>Wine/Proton only: when sysfs has identified the MOZA tty AND
+        /// Wine's dosdevices mapping resolves its COM name, open through
+        /// <c>SerialPortMozaPort</c> (64 KB receive buffer, reads not gated on
+        /// ClearCommError) instead of the raw device path. sysfs still supplies the
+        /// identity, so no blind COM probing happens either way.
+        ///
+        /// <para>Escape hatch, default on. .NET SerialPort.Open under Wine has a
+        /// history of native SIGSEGV on freshly-powered CDC-ACM ports — the stty
+        /// warm-up runs first to prevent that, but a segfault is not catchable, so
+        /// set this false to force the raw device path if opens start crashing.</para></summary>
+        public bool PreferComPortOnWine { get; set; } = true;
+
         /// <summary>
         /// Persisted slot the auto-test most recently switched TO. On next
         /// run the harness picks the OTHER of {Core, Grids} so each launch

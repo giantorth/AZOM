@@ -87,7 +87,7 @@ namespace MozaPlugin.Protocol
         /// the one state in which entering Wine's comm-config is unsafe, so we
         /// refuse the open and let the 5 s reconnect try again.</para>
         /// </summary>
-        private static void WarmUpEndpoint(string devicePath)
+        internal static void WarmUpEndpoint(string devicePath)
         {
             if (!WineNativeExec.Available) return;
             string? node = WineHost.ToUnixPath(devicePath);
@@ -170,6 +170,11 @@ namespace MozaPlugin.Protocol
         }
 
         public bool IsOpen => !_closed && _handle != INVALID_HANDLE;
+
+        // ConfigureComm sets ReadIntervalTimeout=MAXDWORD with both read-total
+        // timeouts at 0 — the Win32 idiom for "return whatever is buffered, never
+        // block". So ReadFile here is safe to call unconditionally.
+        public bool ReadReturnsImmediately => true;
 
         public int BytesToRead
         {

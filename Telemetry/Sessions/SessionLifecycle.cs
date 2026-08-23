@@ -111,6 +111,15 @@ namespace MozaPlugin.Telemetry.Sessions
             lock (_contigAckLock)
             {
                 int contig = _contigAckSeqBySession.TryGetValue(session, out var c) ? c : -1;
+                // Wheel restarted its outbound counter (or the 16-bit seq
+                // wrapped): every subsequent seq would read as a retransmit and
+                // the contiguous head would never advance again. Re-base.
+                if (contig >= 0 && seq < contig - MaxAheadSeqsPerSession)
+                {
+                    _contigAckSeqBySession.Remove(session);
+                    _aheadSeqsBySession.Remove(session);
+                    contig = -1;
+                }
                 if (seq <= contig)
                     return (ushort)seq;                      // retransmit of an acked seq
                 if (contig < 0 || seq == contig + 1)

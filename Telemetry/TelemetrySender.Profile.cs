@@ -385,6 +385,7 @@ namespace MozaPlugin.Telemetry
         // arriving (BufferLength>0), being rejected (CrcRejects>0), or simply
         // never reaching the catalog session in the first place (LastActivity
         // is "never").
+        internal int CatalogLiveCount => _catalogParser.LiveCount;
         internal int CatalogBufferLength => _catalogParser.BufferLength;
         internal int CatalogLastParsedBufferLen => _catalogParser.LastParsedBufferLen;
         internal int CatalogLastActivityTickMs => _catalogParser.LastActivityMs;

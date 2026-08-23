@@ -239,7 +239,29 @@ namespace MozaPlugin.Protocol
             driveC = driveC.TrimEnd('/');
             int slash = driveC.LastIndexOf('/');
             if (slash <= 0) return null;
-            return driveC.Substring(0, slash);
+            string parent = driveC.Substring(0, slash);
+
+            // wine_get_unix_file_name does NOT resolve the dosdevices symlink: it
+            // answers "<prefix>/dosdevices/c:" for C:\, so stripping one component
+            // lands on <prefix>/dosdevices, not the prefix. Strip that too.
+            //
+            // This was silent for a long time because nothing consumed PrefixRoot.
+            // The first consumer (WineComNameResolver) then built
+            // "<prefix>/dosdevices" + "/dosdevices/comNN" and searched a directory
+            // that does not exist — visible in a live log as
+            // "searched .../richard-burns-rally/dosdevices/dosdevices".
+            //
+            // Both spellings are tolerated: a Wine build that DOES resolve the
+            // symlink answers "<prefix>/drive_c", whose parent is already the
+            // prefix root, so only trim when the tail actually is dosdevices.
+            const string DosDevices = "/dosdevices";
+            if (parent.EndsWith(DosDevices, StringComparison.OrdinalIgnoreCase))
+            {
+                int cut = parent.Length - DosDevices.Length;
+                if (cut <= 0) return null;
+                parent = parent.Substring(0, cut);
+            }
+            return parent.Length > 0 ? parent : null;
         }
     }
 }

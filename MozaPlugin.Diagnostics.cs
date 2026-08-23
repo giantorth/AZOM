@@ -89,17 +89,18 @@ namespace MozaPlugin
 
         // Catalog-parser internals for the diag tab. Surfaces buffer/parse/CRC
         // counters so we can tell at a glance why a missing catalog is missing.
-        internal (int BufferBytes, int LastParsedBufferBytes, int CrcRejects, int LastActivityMsAgo)
+        internal (int BufferBytes, int LastParsedBufferBytes, int CrcRejects, int LastActivityMsAgo,
+                  int LiveCatalogCount, int MergedCatalogCount)
             CatalogParserDiagnostics
         {
             get
             {
                 var s = _telemetrySender;
-                if (s == null) return (0, 0, 0, -1);
+                if (s == null) return (0, 0, 0, -1, 0, 0);
                 int lastAct = s.CatalogLastActivityTickMs;
                 int ago = lastAct == 0 ? -1 : Environment.TickCount - lastAct;
                 return (s.CatalogBufferLength, s.CatalogLastParsedBufferLen,
-                        s.CatalogCrcRejects, ago);
+                        s.CatalogCrcRejects, ago, s.CatalogLiveCount, s.CatalogCount);
             }
         }
 

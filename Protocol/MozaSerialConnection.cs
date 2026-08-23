@@ -184,6 +184,37 @@ namespace MozaPlugin.Protocol
         private volatile IMozaPort? _port;
         private Thread? _readThread;
         private Thread? _writeThread;
+        private Thread? _dispatchThread;
+
+        // Inbound dispatch queue. The read loop must NEVER run subscriber code:
+        // every handler (session-ack round-trip, catalog append + full-buffer
+        // END scan, FF-record reassembly, log writes) ran inline on the read
+        // thread, so any one of them stalling stopped reception outright. On the
+        // Wine device path a stalled read loses bytes: bundles 7H89M4JA /
+        // EJ92X08Y / 15YZY7Z4 / W0V1PF9V / EKJXHSV9 (Wine 10.0) show RX going
+        // deaf for 0.6-2.0 s while TX keeps running at ~100 frames/s, then a
+        // burst of 4 frames in one millisecond with sequence numbers missing —
+        // and resync counts of 56-465. The same plugin on native Windows
+        // (bundle VG9V7XB2) reports resync=0. Decoupling reception from
+        // dispatch keeps the drain rate independent of handler cost.
+        //
+        // Single consumer thread, so frame ORDER is preserved — session chunk
+        // reassembly depends on it. Bounded and drop-on-full rather than
+        // block-on-full: blocking the producer would reintroduce the very stall
+        // this exists to prevent. Drops are counted and surfaced.
+        private readonly System.Collections.Concurrent.ConcurrentQueue<byte[]> _rxQueue
+            = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
+        private readonly AutoResetEvent _rxSignal = new AutoResetEvent(false);
+        private int _rxQueueDepth;
+        private int _rxQueueHighWater;
+        private int _rxQueueDrops;
+        private const int RxQueueCapacity = 4096;
+
+        // Read-cadence instrumentation. Proves (or refutes) "the read thread
+        // could not keep up" from a bundle instead of by inference.
+        private int _maxBytesToRead;      // largest BytesToRead ever observed
+        private int _fullReadCount;       // reads clamped to the 4096B scratch = we were behind
+        private int _maxReadGapMs;        // longest gap between successive non-empty reads
         // Ports with a probe thread that timed out and was ABANDONED (its
         // SerialPort.Open() is still blocked in a Wine syscall). We must NOT
         // close/dispose that SerialPort from another thread — doing so mid-Open
@@ -220,6 +251,16 @@ namespace MozaPlugin.Protocol
         // same diagnostics surface as the other wire errors.
         private int _frameErrors;
         private int _frameStartScanResyncs;
+        // Frame-start candidates rejected because the LEN byte was implausible.
+        // This path used to `continue` silently, so a stream full of false 0x7E
+        // locks showed up as a huge `resync` count with frameErr/cksumFail near
+        // zero and no way to tell why — bundles 15YZY7Z4 / W0V1PF9V
+        // (2026-08-23) read resync=278/465 against only 8 rejections total.
+        private int _lengthRejects;
+        // Doubled 0x7E skipped during a frame-start scan. A stuffed body byte
+        // can never begin a frame, so this counts false locks AVOIDED; a high
+        // value against a low resync count means the resync logic is working.
+        private int _stuffedPairSkips;
         // Resync histogram by skip-byte count. Buckets [0]=1B, [1]=2B,
         // [2]=3-4B, [3]=5-8B, [4]=9-16B, [5]=17-32B, [6]=33-64B, [7]=>64B.
         // Lets diagnostics show "are resyncs single stray bytes (USB padding)
@@ -358,7 +399,14 @@ namespace MozaPlugin.Protocol
                     Interlocked.CompareExchange(ref _frameErrors, 0, 0),
                     Interlocked.CompareExchange(ref _frameStartScanResyncs, 0, 0),
                     histo,
-                    samples);
+                    samples,
+                    Interlocked.CompareExchange(ref _lengthRejects, 0, 0),
+                    Interlocked.CompareExchange(ref _stuffedPairSkips, 0, 0),
+                    Interlocked.CompareExchange(ref _maxBytesToRead, 0, 0),
+                    Interlocked.CompareExchange(ref _fullReadCount, 0, 0),
+                    Interlocked.CompareExchange(ref _maxReadGapMs, 0, 0),
+                    Interlocked.CompareExchange(ref _rxQueueHighWater, 0, 0),
+                    Interlocked.CompareExchange(ref _rxQueueDrops, 0, 0));
             }
         }
 
@@ -378,16 +426,45 @@ namespace MozaPlugin.Protocol
             /// <summary>Most recent skipped-byte samples, hex-formatted
             /// ("3B: 00 41 0B"). Oldest first, newest last. Capped to 16.</summary>
             public readonly string[] RecentResyncSamples;
+            /// <summary>Frame-start candidates rejected for an implausible LEN
+            /// byte. Large relative to <see cref="FrameErrors"/> +
+            /// <see cref="ChecksumFailures"/> means most resyncs are false 0x7E
+            /// locks, not a genuinely corrupt line.</summary>
+            public readonly int LengthRejects;
+            /// <summary>Stuffed 0x7E pairs stepped over during a frame-start
+            /// scan — false locks avoided.</summary>
+            public readonly int StuffedPairSkips;
+            /// <summary>Largest number of bytes a single read actually
+            /// returned — how deep the driver queue got while we were away.</summary>
+            public readonly int MaxBytesToRead;
+            /// <summary>Reads that came back completely full, i.e. more was
+            /// queued than one pass could take.</summary>
+            public readonly int FullReads;
+            /// <summary>Longest gap between successive non-empty reads.</summary>
+            public readonly int MaxReadGapMs;
+            /// <summary>Deepest the inbound dispatch queue got.</summary>
+            public readonly int RxQueueHighWater;
+            /// <summary>Frames dropped because the dispatch queue was full.</summary>
+            public readonly int RxQueueDrops;
 
             public WireErrorCounters(int dropped, int cksum, int frameErrors, int resync,
-                int[] histo, string[] samples)
+                int[] histo, string[] samples, int lengthRejects = 0, int stuffedPairSkips = 0,
+                int maxBytesToRead = 0, int fullReads = 0, int maxReadGapMs = 0,
+                int rxQueueHighWater = 0, int rxQueueDrops = 0)
             {
+                MaxBytesToRead = maxBytesToRead;
+                FullReads = fullReads;
+                MaxReadGapMs = maxReadGapMs;
+                RxQueueHighWater = rxQueueHighWater;
+                RxQueueDrops = rxQueueDrops;
                 FramesDropped = dropped;
                 ChecksumFailures = cksum;
                 FrameErrors = frameErrors;
                 FrameStartScanResyncs = resync;
                 ResyncSkipHistogram = histo;
                 RecentResyncSamples = samples;
+                LengthRejects = lengthRejects;
+                StuffedPairSkips = stuffedPairSkips;
             }
         }
 
@@ -596,9 +673,46 @@ namespace MozaPlugin.Protocol
         {
             try
             {
-                IMozaPort port = string.IsNullOrEmpty(devicePath)
-                    ? (IMozaPort)new SerialPortMozaPort(portName, MozaProtocol.BaudRate)
-                    : new WineDevicePathMozaPort(devicePath!);
+                IMozaPort port;
+                if (string.IsNullOrEmpty(devicePath))
+                {
+                    port = new SerialPortMozaPort(portName, MozaProtocol.BaudRate);
+                }
+                else
+                {
+                    // Wine/Proton. sysfs already told us WHICH tty is the MOZA, so
+                    // there is no blind probing either way; the only question is how
+                    // to open it. Prefer the COM name when Wine's dosdevices mapping
+                    // resolves — SerialPortMozaPort gets a 64 KB ReadBufferSize and
+                    // does not gate reads on ClearCommError, which is the difference
+                    // between resync=0 and resync 53-465 on the same hardware.
+                    // The native stty warm-up still runs first: it is what makes the
+                    // freshly-enumerated CDC-ACM endpoint safe to open at all.
+                    string? com = WineComNameResolver.ResolveComName(portName);
+                    port = null!;
+                    if (!string.IsNullOrEmpty(com)
+                        && MozaPlugin.Instance?.Settings?.PreferComPortOnWine != false)
+                    {
+                        try
+                        {
+                            WineDevicePathMozaPort.WarmUpEndpoint(devicePath!);
+                            port = new SerialPortMozaPort(com!, MozaProtocol.BaudRate);
+                            MozaLog.Debug(
+                                $"[AZOM] Wine open: {portName} → {com} via SerialPort "
+                                + "(buffered read path)");
+                        }
+                        catch (Exception ex)
+                        {
+                            MozaLog.Debug(
+                                $"[AZOM] Wine open: {com} via SerialPort failed "
+                                + $"({ex.GetType().Name}: {ex.Message}) — falling back to "
+                                + "the device path");
+                            port = null!;
+                        }
+                    }
+                    if (port == null)
+                        port = new WineDevicePathMozaPort(devicePath!);
+                }
                 return FinishOpen(port, portName);
             }
             catch (UnauthorizedAccessException ex)
@@ -651,19 +765,27 @@ namespace MozaPlugin.Protocol
             int gen = Interlocked.Increment(ref _ioGeneration);
             _readThread = new Thread(() => ReadLoop(gen)) { IsBackground = true, Name = "MozaSerialRead" };
             _writeThread = new Thread(() => WriteLoop(gen)) { IsBackground = true, Name = "MozaSerialWrite" };
+            _dispatchThread = new Thread(() => DispatchLoop(gen))
+                { IsBackground = true, Name = "MozaSerialDispatch" };
+            // Fresh generation starts with an empty queue — a frame from the
+            // previous open must never reach the new one's subscribers.
+            DrainRxQueue();
 
             try
             {
                 _readThread.Start();
                 _writeThread.Start();
+                _dispatchThread.Start();
             }
             catch
             {
                 // If either start failed, tear down: signal stop, join whichever started,
                 // close port, then rethrow so the caller logs it.
                 _running = false;
+                try { _rxSignal.Set(); } catch { }
                 try { _readThread?.Join(500); } catch { }
                 try { _writeThread?.Join(500); } catch { }
+                try { _dispatchThread?.Join(500); } catch { }
                 try { _port?.Close(); } catch { }
                 _port = null;
                 throw;
@@ -714,8 +836,67 @@ namespace MozaPlugin.Protocol
             if (lastPort != null)
                 _activePorts.TryRemove(lastPort, out _);
 
+            // Wake the dispatch thread so it observes the generation bump
+            // instead of sitting on its 20 ms wait.
+            try { _rxSignal.Set(); } catch (ObjectDisposedException) { }
             _readThread?.Join(1000);
             _writeThread?.Join(1000);
+            _dispatchThread?.Join(1000);
+            DrainRxQueue();
+        }
+
+        private void DrainRxQueue()
+        {
+            while (_rxQueue.TryDequeue(out _)) { }
+            Interlocked.Exchange(ref _rxQueueDepth, 0);
+        }
+
+        /// <summary>Hand a decoded frame to the dispatch thread. Never blocks:
+        /// on a full queue the frame is dropped and counted, because stalling
+        /// the read thread is strictly worse than losing one frame.</summary>
+        private void EnqueueForDispatch(byte[] data)
+        {
+            int depth = Interlocked.Increment(ref _rxQueueDepth);
+            if (depth > RxQueueCapacity)
+            {
+                Interlocked.Decrement(ref _rxQueueDepth);
+                int drops = Interlocked.Increment(ref _rxQueueDrops);
+                if (drops == 1 || drops % 500 == 0)
+                {
+                    MozaLog.Warn(
+                        $"[AZOM] Inbound dispatch queue full ({RxQueueCapacity}) — dropped "
+                        + $"{drops} frame(s). A subscriber is not keeping up with reception.");
+                }
+                return;
+            }
+            int hw = Volatile.Read(ref _rxQueueHighWater);
+            if (depth > hw) Interlocked.CompareExchange(ref _rxQueueHighWater, depth, hw);
+            _rxQueue.Enqueue(data);
+            try { _rxSignal.Set(); } catch (ObjectDisposedException) { }
+        }
+
+        /// <summary>Drains <see cref="_rxQueue"/> and runs the subscribers. One
+        /// thread, so frames reach handlers in wire order. A handler that throws
+        /// is logged and skipped — previously such an exception unwound into the
+        /// read loop's catch and was misreported as a serial I/O failure, which
+        /// tore down a perfectly healthy port.</summary>
+        private void DispatchLoop(int gen)
+        {
+            while (_running && gen == Volatile.Read(ref _ioGeneration))
+            {
+                if (!_rxQueue.TryDequeue(out var data))
+                {
+                    try { _rxSignal.WaitOne(20); }
+                    catch (ObjectDisposedException) { return; }
+                    continue;
+                }
+                Interlocked.Decrement(ref _rxQueueDepth);
+                try { MessageReceived?.Invoke(data); }
+                catch (Exception ex)
+                {
+                    MozaLog.Error($"[AZOM] Inbound handler threw: {ex.Message}");
+                }
+            }
         }
 
         public void Send(byte[] message)
@@ -889,6 +1070,7 @@ namespace MozaPlugin.Protocol
             // doesn't allocate a fresh byte[] on the high-frequency RX path. Only
             // the per-frame `data` copy handed to subscribers is freshly allocated.
             byte[] destuff = new byte[256];
+            int lastReadTickMs = 0;
 
             while (_running && gen == Volatile.Read(ref _ioGeneration))
             {
@@ -922,31 +1104,70 @@ namespace MozaPlugin.Protocol
                         continue;
                     }
 
-                    // Wine SerialPort.Read blocks for full count; poll BytesToRead instead.
-                    int avail = port.BytesToRead;
+                    // .NET SerialPort.Read blocks until a byte arrives or
+                    // ReadTimeout expires, so THAT path must be gated on
+                    // BytesToRead. The Wine device path must NOT be: its
+                    // COMMTIMEOUTS are set to return-immediately, so ReadFile
+                    // already yields whatever is queued, and its BytesToRead is
+                    // ClearCommError/COMSTAT.cbInQue — an ioctl Wine
+                    // under-reports, and which this wrapper reports as 0 whenever
+                    // the call fails. Gating on it suppresses reads that would
+                    // have succeeded, and the tty buffer then overruns.
+                    //
+                    // This is the v1.5.0 regression on Linux/Wine rigs: v1.5.0
+                    // opened EVERY port through SerialPortMozaPort (.NET
+                    // SerialPort, 64 KB ReadBufferSize, never gated on cbInQue),
+                    // so it never hit this. WineDevicePathMozaPort arrived after
+                    // v1.5.0 and inherited the gate. Signature across five
+                    // CS-Pro bundles: maxBytesToRead=278 alongside
+                    // maxReadGap=3796ms, resync 29-465, and clustered loss of
+                    // sess 0x01/0x02 chunks — including the wheel's post-switch
+                    // catalog push, which is why a dashboard switch stopped
+                    // refreshing the catalog and left the dash dead. Same plugin
+                    // on native Windows reports resync=0.
+                    int avail = port.ReadReturnsImmediately ? tmp.Length : port.BytesToRead;
                     if (avail == 0)
                     {
-                        // Half-open-tty detector: if the wheel has talked before
-                        // but has now been silent past ReadIdleDeadMs, the port
-                        // is dead-but-IsOpen (BytesToRead==0 forever, no throw),
-                        // which the count-only PortDeadThreshold can't catch.
-                        // Force a reconnect. (Skipped until first inbound so a
-                        // never-engaged port doesn't self-trip.)
-                        long lastRx = Interlocked.Read(ref _lastRxUtcTicks);
-                        if (lastRx != 0
-                            && (DateTime.UtcNow.Ticks - lastRx) > ReadIdleDeadMs * TimeSpan.TicksPerMillisecond)
-                        {
-                            Interlocked.Exchange(ref _lastRxUtcTicks, 0);
-                            HandleIoFailure("ReadIdle",
-                                new IOException($"No inbound for >{ReadIdleDeadMs}ms while port open — half-open tty"));
-                            continue;
-                        }
-                        Thread.Sleep(2);
+                        OnIdleRead();
                         continue;
                     }
                     if (avail > tmp.Length) avail = tmp.Length;
+                    int nowMs = Environment.TickCount;
+                    if (lastReadTickMs != 0)
+                    {
+                        int gapMs = nowMs - lastReadTickMs;
+                        int maxGap = Volatile.Read(ref _maxReadGapMs);
+                        if (gapMs > maxGap)
+                            Interlocked.CompareExchange(ref _maxReadGapMs, gapMs, maxGap);
+                    }
+                    lastReadTickMs = nowMs;
                     int n = port.Read(tmp, 0, avail);
-                    if (n <= 0) continue;
+                    // Measure what the port ACTUALLY handed back. The old
+                    // maxBytesToRead/fullReads pair measured `avail`, which on the
+                    // return-immediately path is just tmp.Length — our own
+                    // constant echoing back, telling us nothing. A read that comes
+                    // back full means more was queued than one pass could take,
+                    // i.e. we are behind and the driver buffer is filling.
+                    if (n > 0)
+                    {
+                        int maxSeen = Volatile.Read(ref _maxBytesToRead);
+                        if (n > maxSeen)
+                            Interlocked.CompareExchange(ref _maxBytesToRead, n, maxSeen);
+                        // Saturation means we filled the SCRATCH buffer, not that we
+                        // took everything on offer: the gated path asks for exactly
+                        // BytesToRead, so "n >= avail" is trivially true there and the
+                        // counter read 3407 on a connection with zero loss.
+                        if (n >= tmp.Length) Interlocked.Increment(ref _fullReadCount);
+                    }
+                    // Return-immediately ports report "nothing buffered" as a
+                    // zero-length read rather than BytesToRead==0, so the idle
+                    // bookkeeping has to run from here too or the half-open-tty
+                    // detector never fires on that path.
+                    if (n <= 0)
+                    {
+                        OnIdleRead();
+                        continue;
+                    }
                     for (int i = 0; i < n; i++)
                         rx.Add(tmp[i]);
                     Interlocked.Exchange(ref _consecutiveIoErrors, 0);
@@ -958,9 +1179,36 @@ namespace MozaPlugin.Protocol
                     while (cursor < rx.Count)
                     {
                         int frameStart = cursor;
-                        // Scan for frame start 0x7E
-                        while (frameStart < rx.Count && rx[frameStart] != MozaProtocol.MessageStart)
-                            frameStart++;
+                        // Scan for frame start 0x7E, skipping stuffed pairs.
+                        //
+                        // A doubled 0x7E on the wire is a BODY byte (StuffFrame
+                        // emits 7E 7E for a payload 0x7E) and can never begin a
+                        // frame: the writer leaves the LEN byte unstuffed, so a
+                        // genuine start is `7E <len>` and would need len == 0x7E
+                        // (126) to look like a pair. The largest inbound LEN in
+                        // any capture on record is 0x3F, half that. Landing on
+                        // the first byte of a stuffed pair used to produce a
+                        // false lock that claimed a 129-byte frame and ate the
+                        // real frames behind it — the 58-byte high-entropy
+                        // device-log chunks on sess=0x01 carry stuffed pairs
+                        // constantly, which is where the clustered chunk loss in
+                        // bundles 15YZY7Z4 / W0V1PF9V came from.
+                        while (frameStart < rx.Count)
+                        {
+                            if (rx[frameStart] != MozaProtocol.MessageStart)
+                            {
+                                frameStart++;
+                                continue;
+                            }
+                            if (frameStart + 1 < rx.Count
+                                && rx[frameStart + 1] == MozaProtocol.MessageStart)
+                            {
+                                frameStart += 2;
+                                Interlocked.Increment(ref _stuffedPairSkips);
+                                continue;
+                            }
+                            break;
+                        }
                         if (frameStart > cursor)
                         {
                             int skipped = frameStart - cursor;
@@ -983,6 +1231,31 @@ namespace MozaPlugin.Protocol
                             // a few thousand times per session.
                             int sampleLen = Math.Min(skipped, 12);
                             var sb = new System.Text.StringBuilder(2 + sampleLen * 3);
+                            // Trailing bytes of whatever we parsed LAST, before the
+                            // skipped run. Without this a resync sample cannot
+                            // distinguish the two causes, which need opposite fixes:
+                            //   • we over-consumed — the skipped run then begins with
+                            //     a LEN byte and decodes as a well-formed frame whose
+                            //     only missing byte is its 0x7E start (e.g.
+                            //     "03 A5 91 01 00 00 C5"), and prev ends with the
+                            //     0x7E we swallowed;
+                            //   • the peer emitted bytes that are not in a frame at
+                            //     all — prev ends on a valid frame's checksum and the
+                            //     skipped run is foreign.
+                            // resync>0 with frameErr=cksumFail=lenReject=0 says no
+                            // frame was ever REJECTED, so one of these two is
+                            // happening and the counters alone cannot say which.
+                            int back = Math.Min(6, cursor);
+                            if (back > 0)
+                            {
+                                sb.Append("prev:");
+                                for (int k = cursor - back; k < cursor; k++)
+                                {
+                                    sb.Append(' ');
+                                    sb.Append(rx[k].ToString("X2"));
+                                }
+                                sb.Append(" | ");
+                            }
                             sb.Append(skipped);
                             sb.Append("B:");
                             for (int k = 0; k < sampleLen; k++)
@@ -1041,7 +1314,11 @@ namespace MozaPlugin.Protocol
                         {
                             // Invalid length — skip this start byte and resync on
                             // the next 0x7E. Common at connect when junk precedes
-                            // real frames.
+                            // real frames, and the usual outcome of a false lock
+                            // inside a high-entropy payload (~22% of random bytes
+                            // exceed 200). Counted so a bundle can distinguish
+                            // "noisy line" from "we keep mis-locking".
+                            Interlocked.Increment(ref _lengthRejects);
                             cursor = frameStart + 1;
                             continue;
                         }
@@ -1158,8 +1435,10 @@ namespace MozaPlugin.Protocol
                                 $"[AZOM] WIRE sess=0x{sess:X2} type=0x{type:X2} seq={seqWire} " +
                                 $"totalLen={data.Length} payload={bodyLen}B first8={first8}");
                         }
+                        // Capture stays on the read thread so wire-trace
+                        // timestamps remain reception times, not dispatch times.
                         SerialTrafficCapture.Instance.RecordRx(CaptureLabel, data);
-                        MessageReceived?.Invoke(data);
+                        EnqueueForDispatch(data);
                         // Move cursor past the consumed wire bytes.
                         cursor = wirePos;
                     }
@@ -1182,6 +1461,27 @@ namespace MozaPlugin.Protocol
                     Thread.Sleep(100);
                 }
             }
+        }
+
+        /// <summary>Idle-read bookkeeping shared by the gated and
+        /// return-immediately read paths: runs the half-open-tty detector, then
+        /// paces the poll. If the wheel has talked before but has now been
+        /// silent past <c>ReadIdleDeadMs</c>, the port is dead-but-IsOpen (no
+        /// throw, nothing readable) which the count-only PortDeadThreshold can't
+        /// catch — force a reconnect. Skipped until the first inbound so a
+        /// never-engaged port doesn't self-trip.</summary>
+        private void OnIdleRead()
+        {
+            long lastRx = Interlocked.Read(ref _lastRxUtcTicks);
+            if (lastRx != 0
+                && (DateTime.UtcNow.Ticks - lastRx) > ReadIdleDeadMs * TimeSpan.TicksPerMillisecond)
+            {
+                Interlocked.Exchange(ref _lastRxUtcTicks, 0);
+                HandleIoFailure("ReadIdle",
+                    new IOException($"No inbound for >{ReadIdleDeadMs}ms while port open — half-open tty"));
+                return;
+            }
+            Thread.Sleep(2);
         }
 
         private void WriteLoop(int gen)
@@ -1741,6 +2041,9 @@ namespace MozaPlugin.Protocol
         {
             _shutdownRequested = true;
             Disconnect();
+            // After Disconnect has joined the dispatch thread; the enqueue and
+            // wait paths both tolerate ObjectDisposedException regardless.
+            try { _rxSignal.Dispose(); } catch { }
         }
     }
 }

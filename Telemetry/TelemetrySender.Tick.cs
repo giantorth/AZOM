@@ -367,7 +367,10 @@ namespace MozaPlugin.Telemetry
         private void TickAbsorbCatalogIfChanged()
         {
             int curLen = _catalogParser.BufferLength;
-            if (curLen > _catalogParser.LastParsedBufferLen)
+            // Also parse when chunks are parked behind a hole: in that state the
+            // buffer does NOT grow, so the growth test alone would never fire and
+            // the reassembler's stall escape could never run.
+            if (curLen > _catalogParser.LastParsedBufferLen || _catalogParser.HasPendingChunks)
             {
                 // TryParse internally trims bytes up to the last committed
                 // END marker, so in normal operation buffers stay bounded
