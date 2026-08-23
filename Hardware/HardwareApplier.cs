@@ -1063,13 +1063,69 @@ namespace MozaPlugin.Hardware
             // Per-section gate only — see ApplyWheelToHardware comment for why
             // _data.IsConnected was dropped here.
             if (!_detectionState.BaseAmbientLedSupported) return;
-            if (profile.BaseAmbientBrightness     >= 0) BaseManager.WriteSetting("base-ambient-brightness", profile.BaseAmbientBrightness);
+            // Brightness is percent: clamp so a profile written by an older build
+            // (whose slider went to 255) cannot push an out-of-range value.
+            if (profile.BaseAmbientBrightness     >= 0) BaseManager.WriteSetting("base-ambient-brightness", System.Math.Min(100, profile.BaseAmbientBrightness));
             if (profile.BaseAmbientStandbyMode    >= 0) BaseManager.WriteSetting("base-ambient-standby-mode", profile.BaseAmbientStandbyMode);
             if (profile.BaseAmbientIndicatorState >= 0) BaseManager.WriteSetting("base-ambient-indicator-state", profile.BaseAmbientIndicatorState);
             if (profile.BaseAmbientSleepMode      >= 0) BaseManager.WriteSetting("base-ambient-sleep-mode", profile.BaseAmbientSleepMode);
             if (profile.BaseAmbientSleepTimeout   >= 0) BaseManager.WriteSetting("base-ambient-sleep-timeout", profile.BaseAmbientSleepTimeout);
             if (profile.BaseAmbientStartupColor   >= 0) WritePackedColor("base-ambient-startup-color", profile.BaseAmbientStartupColor);
             if (profile.BaseAmbientShutdownColor  >= 0) WritePackedColor("base-ambient-shutdown-color", profile.BaseAmbientShutdownColor);
+
+            // Per-mode animation intervals (modes 2..5 only — off and constant
+            // have no register) and the sleep breathing speed.
+            if (profile.BaseAmbientStandbyIntervals != null)
+            {
+                for (int mode = 2; mode <= 5 && mode < profile.BaseAmbientStandbyIntervals.Length; mode++)
+                {
+                    int ms = profile.BaseAmbientStandbyIntervals[mode];
+                    if (ms >= 0)
+                        BaseManager.WriteSetting($"base-ambient-standby-interval-mode{mode}", ms);
+                }
+            }
+            if (profile.BaseAmbientSleepBreathInterval >= 0)
+                BaseManager.WriteSetting("base-ambient-sleep-breath-interval", profile.BaseAmbientSleepBreathInterval);
+
+            ApplyBaseAmbientPalettes(profile);
+        }
+
+        /// <summary>
+        /// Push the per-LED idle (standby modes 1 + 2) and sleep palettes. Only
+        /// entries the user has actually set (>= 0) are written, so an untouched
+        /// profile leaves the firmware's stored colours alone.
+        ///
+        /// Each command carries its own mode byte, so all three palettes can be
+        /// written regardless of which standby mode is currently active — the
+        /// device stores them independently. Only the palette of the *active*
+        /// mode is visible, which is a display consequence, not a write gate.
+        /// </summary>
+        private void ApplyBaseAmbientPalettes(MozaProfile profile)
+        {
+            int ledsPerStrip = Devices.BaseModelInfo.LedsPerStrip(_data.BaseModelName);
+            int stride = Devices.BaseModelInfo.MaxLedsPerStrip;
+
+            for (int strip = 0; strip < 2; strip++)
+            {
+                for (int led = 0; led < ledsPerStrip; led++)
+                {
+                    int i = strip * stride + led;
+                    WritePaletteEntry(profile.BaseAmbientIdleColorsConstant, i,
+                        $"base-ambient-led-color-strip{strip}-mode1-led{led}");
+                    WritePaletteEntry(profile.BaseAmbientIdleColorsBreath, i,
+                        $"base-ambient-led-color-strip{strip}-mode2-led{led}");
+                    WritePaletteEntry(profile.BaseAmbientSleepColors, i,
+                        $"base-ambient-sleep-led-color-strip{strip}-led{led}");
+                }
+            }
+        }
+
+        private void WritePaletteEntry(int[]? palette, int index, string command)
+        {
+            if (palette == null || index < 0 || index >= palette.Length) return;
+            int packed = palette[index];
+            if (packed < 0) return;
+            WritePackedColor(command, packed);
         }
 
         /// <summary>Push handbrake settings. No-op unless detected.</summary>
@@ -2090,8 +2146,9 @@ namespace MozaPlugin.Hardware
             byte r = (byte)((packed >> 16) & 0xFF);
             byte g = (byte)((packed >> 8) & 0xFF);
             byte b = (byte)(packed & 0xFF);
-            // Only the base-ambient startup/shutdown colours route here — target
-            // the base-owning pipe (see BaseManager).
+            // Only base-ambient colours route here (startup/shutdown plus the
+            // per-LED idle/sleep palettes) — target the base-owning pipe (see
+            // BaseManager).
             BaseManager.WriteColor(command, r, g, b);
         }
 

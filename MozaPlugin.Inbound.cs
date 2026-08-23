@@ -273,6 +273,21 @@ namespace MozaPlugin
                 {
                     _data.BaseModelName = baseName;
                     MozaLog.Debug($"[AZOM] Base identity: {baseName}");
+
+                    // The ambient device definition's LED count comes from this
+                    // string (strip length is per model). DeviceProber reads the
+                    // model before the ambient capability probe so it is normally
+                    // known at deploy time, but a dropped or reordered reply would
+                    // leave the definition on the fallback geometry — re-deploy
+                    // once the real name lands. Idempotent: the deployer's
+                    // staleness check no-ops when the count already matches.
+                    if (DetectionState.BaseAmbientLedSupported
+                        && Devices.BaseModelInfo.IsKnown(baseName))
+                    {
+                        if (Devices.Extensions.DeviceDefinitionDeployer.DeployBaseAmbient(
+                                _deviceManager?.Connection?.DiscoveredPid, baseName))
+                            DeviceDefinitionDeployed = true;
+                    }
                 }
                 return;
             }

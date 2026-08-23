@@ -765,4 +765,12 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ ΑΝΑ LED</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Αδράνεια · Σταθερό</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Αδράνεια · Αναπνοή</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Ύπνος · Αναπνοή</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Ταχύτητα κίνησης (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Ταχύτητα αναπνοής (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>ΕΦΕ ΑΔΡΑΝΕΙΑΣ</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Κίνηση αδράνειας</value></data>
 </root>

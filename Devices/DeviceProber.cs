@@ -210,7 +210,33 @@ namespace MozaPlugin.Devices
             "base-ambient-sleep-timeout",
             "base-ambient-startup-color",
             "base-ambient-shutdown-color",
+            "base-ambient-sleep-breath-interval",
+            "base-ambient-standby-interval-mode2",
+            "base-ambient-standby-interval-mode3",
+            "base-ambient-standby-interval-mode4",
+            "base-ambient-standby-interval-mode5",
         };
+
+        /// <summary>
+        /// Per-LED palette reads for a base with <paramref name="ledsPerStrip"/> LEDs
+        /// per strip: both idle palettes (standby modes 1 and 2) plus the sleep
+        /// palette, across both strips. 6 reads per LED, so 36 on a 6-LED base and
+        /// 54 on a 9-LED one. Modes 3–5 have no palette and are not read.
+        /// </summary>
+        internal static string[] BaseAmbientPerLedReadCommands(int ledsPerStrip)
+        {
+            var list = new List<string>(ledsPerStrip * 6);
+            for (int strip = 0; strip < 2; strip++)
+            {
+                for (int mode = 1; mode <= 2; mode++)
+                    for (int led = 0; led < ledsPerStrip; led++)
+                        list.Add($"base-ambient-led-color-strip{strip}-mode{mode}-led{led}");
+
+                for (int led = 0; led < ledsPerStrip; led++)
+                    list.Add($"base-ambient-sleep-led-color-strip{strip}-led{led}");
+            }
+            return list.ToArray();
+        }
 
         internal static readonly string[] HandbrakeSettingsReadCommands = new[]
         {
@@ -671,8 +697,16 @@ namespace MozaPlugin.Devices
                 if (!_detectionState.BaseAmbientProbed)
                 {
                     _detectionState.BaseAmbientProbed = true;
-                    _deviceManager.ReadSetting("base-ambient-brightness");
+                    // Model name FIRST, ambient capability second. The device
+                    // answers FIFO, so this ordering is what makes
+                    // MozaData.BaseModelName populated by the time the ambient
+                    // reply lands — and the ambient reply is what deploys the
+                    // SimHub device definition, whose LED count depends on the
+                    // model (6 LEDs/strip on R16 Ultra vs 9 elsewhere). Probe
+                    // the other way round and the definition is written with
+                    // the fallback geometry. See BaseModelInfo.
                     _deviceManager.ReadSettingForDevice("wheel-model-name", MozaProtocol.DeviceMain);
+                    _deviceManager.ReadSetting("base-ambient-brightness");
                     // Base-identity probes (dev 0x13 direct). Populates
                     // MozaData.BaseMcuUid / BaseSwVersion / BaseHwVersion /
                     // BaseHwSubVersion / BaseModelName / BaseIdentity11 so
@@ -710,12 +744,18 @@ namespace MozaPlugin.Devices
                     if (!_detectionState.BaseAmbientLedSupported)
                     {
                         _detectionState.BaseAmbientLedSupported = true;
-                        if (DeviceDefinitionDeployer.DeployBaseAmbient(_connection.DiscoveredPid))
+                        if (DeviceDefinitionDeployer.DeployBaseAmbient(
+                                _connection.DiscoveredPid, _data.BaseModelName))
                             _plugin.DeviceDefinitionDeployed = true;
                         _plugin.HardwareApplier.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
+                        // Per-LED palettes, sized to the detected strip length so a
+                        // 6-LED base never asks for LEDs 6..8.
+                        int ledsPerStrip = BaseModelInfo.LedsPerStrip(_data.BaseModelName);
+                        _deviceManager.ReadSettings(BaseAmbientPerLedReadCommands(ledsPerStrip));
                         MozaLog.Info(
-                            $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}')");
+                            $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}', "
+                            + $"{ledsPerStrip} LEDs/strip)");
                     }
                     break;
 

@@ -766,4 +766,12 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>MÀU THEO TỪNG LED</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Chờ · Cố định</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Chờ · Nhịp thở</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Ngủ · Nhịp thở</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Tốc độ hiệu ứng (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Tốc độ nhịp thở (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>HIỆU ỨNG CHỜ</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hiệu ứng khi chờ</value></data>
 </root>

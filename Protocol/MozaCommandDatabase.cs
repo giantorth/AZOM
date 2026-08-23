@@ -719,11 +719,12 @@ namespace MozaPlugin.Protocol
             // capture-verified one and the only one the firmware honours.
             AddCommand("base-ambient-brightness", "main", 0x22, 0x20, new byte[] { 0x1F, 0xFF }, 1, "int");
 
-            // Per-LED static colors. cmd `0x20 [strip] [mode] [led]` + RGB.
-            // strip = 0/1, mode = 1 (constant) / 2 (breath), led = 0..8.
-            // Only LedDeviceManager + UI path that touches all 36 needs these
-            // registered; we add them now so any future per-LED settings UI
-            // can use them without revisiting the database.
+            // Per-LED idle palette. cmd `0x20 [strip] [mode] [led]` + RGB.
+            // The mode byte is the STANDBY-MODE number the palette belongs to,
+            // not a constant/breath enum: only modes 1 (constant) and 2
+            // (breathing) store a palette, since cycle/rainbow/flow generate
+            // their own colours. Registered for led 0..8 — the largest strip
+            // any base uses; a 6-LED base simply never addresses 6..8.
             for (byte strip = 0; strip < 2; strip++)
                 for (byte mode = 1; mode <= 2; mode++)
                     for (byte led = 0; led < 9; led++)
@@ -734,9 +735,12 @@ namespace MozaPlugin.Protocol
 
             AddCommand("base-ambient-sleep-mode",      "main", 0x22, 0x20, new byte[] { 0x21 }, 1, "int");
             AddCommand("base-ambient-sleep-timeout",   "main", 0x22, 0x20, new byte[] { 0x22 }, 2, "int");
-            AddCommand("base-ambient-breath-interval", "main", 0x22, 0x20, new byte[] { 0x23, 0x01 }, 2, "int");
+            // Speed of the SLEEP breathing effect — NOT the standby breath speed,
+            // which is `1E 02`. Selector is the sleep-mode number (1 = breathe).
+            AddCommand("base-ambient-sleep-breath-interval", "main", 0x22, 0x20, new byte[] { 0x23, 0x01 }, 2, "int");
 
-            // Per-LED sleep colors. cmd `0x25 [strip] 0x01 [led]` + RGB.
+            // Per-LED sleep palette. cmd `0x25 [strip] [sleep-mode] [led]` + RGB;
+            // sleep-mode 1 (breathe) is the only value with a stored palette.
             for (byte strip = 0; strip < 2; strip++)
                 for (byte led = 0; led < 9; led++)
                     AddCommand(

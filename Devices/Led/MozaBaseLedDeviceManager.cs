@@ -9,13 +9,14 @@ using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 namespace MozaPlugin.Devices.Led
 {
     /// <summary>
-    /// Virtual ILedDeviceManager for the wheel-base ambient LED strips
-    /// (R21 / R25 / R27 family — 18 LEDs total across two physical 9-LED
-    /// strips on the base body). Receives 18 colors from SimHub's Display()
-    /// pipeline; splits LEDs 0–8 onto strip 0 and 9–17 onto strip 1; sends
-    /// per-LED color chunks (cmd 0x1A, 4-byte-per-LED [idx, R, G, B], up to
-    /// 5 LEDs / 20 bytes per chunk) and a 9-bit-per-strip bitmask
-    /// (cmd 0x1B, 4-byte LE u32). Group 0x20 device 0x12.
+    /// Virtual ILedDeviceManager for the wheel-base ambient LED strips (two
+    /// physical strips on the base body). Strip length is per base model —
+    /// 6 LEDs on an R16 Ultra, 9 on R21/R25/R27 — resolved at send time from
+    /// <see cref="BaseModelInfo"/>. Receives TotalLeds colors from SimHub's
+    /// Display() pipeline; splits the first half onto strip 0 and the second
+    /// onto strip 1; sends per-LED color chunks (cmd 0x1A, 4-byte-per-LED
+    /// [idx, R, G, B], up to 5 LEDs / 20 bytes per chunk) and a per-strip
+    /// bitmask (cmd 0x1B, 4-byte LE u32). Group 0x20 device 0x12.
     ///
     /// Per-frame brightness scaling uses SimHub's rpmBrightness (0..1);
     /// the firmware also applies its own stored brightness setting on top.
@@ -30,9 +31,16 @@ namespace MozaPlugin.Devices.Led
     /// </summary>
     internal class MozaBaseLedDeviceManager : ILedDeviceManager
     {
-        // Two physical strips of 9 LEDs each, addressed independently.
-        public const int LedsPerStrip = 9;
-        public const int TotalLeds = LedsPerStrip * 2;
+        // Two physical strips, addressed independently. Length is per base
+        // model (BaseModelInfo) — 6 on R16 Ultra, 9 on R21/R25/R27 — so it is
+        // resolved per frame from the detected model name rather than fixed.
+        // Falls back to the 9-LED layout while the model name is unknown,
+        // which is the pre-existing behaviour.
+        private static int CurrentLedsPerStrip
+            => BaseModelInfo.LedsPerStrip(MozaPlugin.Instance?.Data?.BaseModelName);
+
+        /// <summary>Total LEDs SimHub is asked to render for this base.</summary>
+        internal static int CurrentTotalLeds => CurrentLedsPerStrip * 2;
 
         private LedDeviceState _lastState = SimHubLedCompat.CreateState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
@@ -177,20 +185,23 @@ namespace MozaPlugin.Devices.Led
                     ledColors, buttonColors, encoderColors, matrixColors, rawColors, overrideColors,
                     rpmBrightness, buttonsBrightness, encodersBrightness, matrixBrightness);
 
+                int ledsPerStrip = CurrentLedsPerStrip;
+                int totalLeds = ledsPerStrip * 2;
+
                 // Merge SimHub's physical-index colour layers (Individual LEDs on
                 // rawState, dashboard "Device LEDs override" components on
-                // overrideState) over the contiguous 18-LED telemetry strip — same
+                // overrideState) over the contiguous telemetry strip — same
                 // ApplyOverrides pattern used by wheel + dashboard managers, raw
                 // first then override on top (PhysicalMapper.GetColor blend order).
                 if (rawColors.Length > 0)
                 {
                     ledColors = MozaLedDeviceManager.ApplyOverrides(
-                        ledColors, rawColors, 0, TotalLeds);
+                        ledColors, rawColors, 0, totalLeds);
                 }
                 if (overrideColors.Length > 0)
                 {
                     ledColors = MozaLedDeviceManager.ApplyOverrides(
-                        ledColors, overrideColors, 0, TotalLeds);
+                        ledColors, overrideColors, 0, totalLeds);
                 }
 
                 var plugin = MozaPlugin.Instance;
@@ -236,8 +247,10 @@ namespace MozaPlugin.Devices.Led
                 var now = DateTime.UtcNow;
                 bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
                 bool sent0 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 0, sourceOffset: 0,
+                    ledsPerStrip: ledsPerStrip,
                     alwaysResendBitmask: alwaysResendBitmask, keepaliveDue: keepaliveDue);
-                bool sent1 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: LedsPerStrip,
+                bool sent1 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: ledsPerStrip,
+                    ledsPerStrip: ledsPerStrip,
                     alwaysResendBitmask: alwaysResendBitmask, keepaliveDue: keepaliveDue);
                 if (sent0 || sent1)
                     _lastSendTime = now;
@@ -251,13 +264,14 @@ namespace MozaPlugin.Devices.Led
         // Returns true if a bitmask frame was sent for this strip (change or
         // keepalive) so the caller can advance the shared keepalive timer.
         private bool ProcessStrip(MozaPlugin plugin, Color[] ledColors, double brightness,
-            int stripIndex, int sourceOffset, bool alwaysResendBitmask, bool keepaliveDue)
+            int stripIndex, int sourceOffset, int ledsPerStrip,
+            bool alwaysResendBitmask, bool keepaliveDue)
         {
-            // Materialise the 9 colors for this strip with brightness applied.
-            // Source array may be shorter than expected — pad with black so
-            // the bitmask + chunk shape is always strip-complete.
-            var stripColors = new Color[LedsPerStrip];
-            int available = Math.Max(0, Math.Min(LedsPerStrip, ledColors.Length - sourceOffset));
+            // Materialise this strip's colors with brightness applied. Source
+            // array may be shorter than expected — pad with black so the
+            // bitmask + chunk shape is always strip-complete.
+            var stripColors = new Color[ledsPerStrip];
+            int available = Math.Max(0, Math.Min(ledsPerStrip, ledColors.Length - sourceOffset));
             for (int i = 0; i < available; i++)
             {
                 var c = ledColors[sourceOffset + i];
@@ -269,7 +283,7 @@ namespace MozaPlugin.Devices.Led
 
             // Build bitmask: bit N set = LED N is non-black.
             int bitmask = 0;
-            for (int i = 0; i < LedsPerStrip; i++)
+            for (int i = 0; i < ledsPerStrip; i++)
             {
                 var c = stripColors[i];
                 if (c.R > 0 || c.G > 0 || c.B > 0)
@@ -298,50 +312,51 @@ namespace MozaPlugin.Devices.Led
             return false;
         }
 
-        // Send a strip's 9 colors as two cmd-0x1A chunks: LEDs 0..4 (5
-        // entries = 20-byte payload, wire N=22) then LEDs 5..8 (4 entries =
-        // 16-byte payload, wire N=18). No trailing padding entry on chunk 2.
+        // Send a strip's colors as cmd-0x1A chunks of at most 5 entries
+        // ([idx, R, G, B] each, so 20 bytes of LED data per chunk). Chunk 1
+        // carries LEDs 0..4; chunk 2 carries whatever remains, so its shape
+        // follows strip length: 4 entries / wire N=18 on a 9-LED strip,
+        // 1 entry / wire N=6 on the R16 Ultra's 6-LED strip. A strip of 5 or
+        // fewer LEDs sends no chunk 2 at all.
         //
-        // Earlier revisions appended a [0xFF, 0, 0, 0] padding entry to pad
-        // chunk 2 to 20 bytes, mirroring the wheel-side trick that hides
-        // zero-pad bytes from the wheel firmware's "interpret-as-set-LED-0-
-        // black" bug. The base firmware behaves differently: with that
-        // padding entry present, bitmask=0x01 (light only LED 0) silently
-        // produced no LEDs lit; 2+ active bits worked normally. PitHouse's
-        // R25 capture (2026-05-05) sends chunk 2 at exactly N=18 with no
-        // padding, so we match that wire format precisely.
+        // Chunk 2 must NOT be padded to 20 bytes. The wheel-LED command
+        // (0x19) needs a [0xFF, 0, 0, 0] trailing entry to hide zero-pad
+        // bytes from the wheel firmware's "interpret-as-set-LED-0-black" bug.
+        // The base firmware behaves differently: with that padding entry
+        // present, bitmask=0x01 (light only LED 0) silently produced no LEDs
+        // lit; 2+ active bits worked normally. Both the R25 (2026-05-05) and
+        // R16 Ultra (2026-08-22) captures send chunk 2 at exactly the
+        // remaining LED count with no padding.
         private static void SendColorChunks(MozaPlugin plugin, Color[] strip, int stripIndex)
         {
             string command = stripIndex == 0
                 ? "base-ambient-rpm-colors-strip0"
                 : "base-ambient-rpm-colors-strip1";
 
-            var chunk1 = new byte[20];
-            for (int i = 0; i < 5; i++)
-            {
-                int o = i * 4;
-                chunk1[o]     = (byte)i;
-                chunk1[o + 1] = strip[i].R;
-                chunk1[o + 2] = strip[i].G;
-                chunk1[o + 3] = strip[i].B;
-            }
-            plugin.DeviceManager.WriteArray(command, chunk1);
+            const int MaxEntriesPerChunk = 5;
+            int total = strip.Length;
 
-            var chunk2 = new byte[16];
-            for (int i = 0; i < 4; i++)
+            for (int first = 0; first < total; first += MaxEntriesPerChunk)
             {
-                int led = 5 + i;
-                int o = i * 4;
-                chunk2[o]     = (byte)led;
-                chunk2[o + 1] = strip[led].R;
-                chunk2[o + 2] = strip[led].G;
-                chunk2[o + 3] = strip[led].B;
+                int count = Math.Min(MaxEntriesPerChunk, total - first);
+                var chunk = new byte[count * 4];
+                for (int i = 0; i < count; i++)
+                {
+                    int led = first + i;
+                    int o = i * 4;
+                    chunk[o]     = (byte)led;
+                    chunk[o + 1] = strip[led].R;
+                    chunk[o + 2] = strip[led].G;
+                    chunk[o + 3] = strip[led].B;
+                }
+                plugin.DeviceManager.WriteArray(command, chunk);
             }
-            plugin.DeviceManager.WriteArray(command, chunk2);
         }
 
-        // Send a strip's 9-bit bitmask as a 4-byte LE u32 (high bits zero).
-        // 4-byte form per docs/protocol/leds/base-ambient-0x20-0x22.md.
+        // Send a strip's bitmask as a 4-byte LE u32 (high bits zero). Payload
+        // width is always 4 bytes regardless of strip length; the used width
+        // is the LED count (0x3F max on 6 LEDs, 0x1FF on 9).
+        // Per docs/protocol/leds/base-ambient-0x20-0x22.md.
         private static void SendBitmask(MozaPlugin plugin, int stripIndex, int bitmask)
         {
             string command = stripIndex == 0

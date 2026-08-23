@@ -161,7 +161,13 @@ namespace MozaPlugin.Devices.Extensions
             foreach (var (deviceName, resource, guid, pid, thumbnailKey) in resources)
             {
                 total++;
-                if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey))
+                // The ambient strip is the one templated definition whose LED count
+                // varies by base model; the dashes are fixed-geometry.
+                int? ledCount = string.Equals(deviceName, BaseAmbientDeviceName, StringComparison.Ordinal)
+                    ? BaseModelInfo.TotalLeds(MozaPlugin.Instance?.Data?.BaseModelName)
+                    : (int?)null;
+                if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey,
+                        telemetryLedCount: ledCount))
                     written++;
             }
 
@@ -345,9 +351,52 @@ namespace MozaPlugin.Devices.Extensions
         /// base-ambient-brightness read probe in MozaPlugin) — bases without
         /// it (R9/R12) should never see this file deployed.
         /// </summary>
-        public static bool DeployBaseAmbient(string? discoveredPid)
+        /// <summary>
+        /// Deploy the wheelbase ambient-strip definition. <paramref name="baseModelName"/>
+        /// is the firmware model string (group 0x07 @ dev 0x12); it selects the LED
+        /// count, since strip length is per model and the device exposes no geometry
+        /// register. An empty/unknown name falls back to the 9-per-strip layout.
+        /// </summary>
+        public static bool DeployBaseAmbient(string? discoveredPid, string? baseModelName = null)
             => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid, MozaDeviceConstants.BaseAmbientGuid,
-                thumbnailKey: BaseAmbientThumbnailKey);
+                thumbnailKey: BaseAmbientThumbnailKey,
+                telemetryLedCount: BaseModelInfo.TotalLeds(baseModelName));
+
+        // Rewrite the ambient definition's LED geometry: the logical telemetry LED
+        // count, the physical mapping's RepeatCount, and the length of the physical
+        // Items array (one real mapping plus empty placeholders, one per LED).
+        private static string PatchTelemetryLedCount(string json, int ledCount, string deviceName)
+        {
+            try
+            {
+                var doc = JObject.Parse(json);
+
+                var logical = doc.SelectToken("LedsFeature.LogicalTelemetryLeds") as JObject;
+                if (logical != null)
+                    logical["LedCount"] = ledCount;
+
+                if (doc.SelectToken("LedsFeature.PhysicalLedsMappings.Items") is JArray items && items.Count > 0)
+                {
+                    if (items[0] is JObject first && first["RepeatCount"] != null)
+                        first["RepeatCount"] = ledCount;
+
+                    while (items.Count > ledCount)
+                        items.RemoveAt(items.Count - 1);
+                    while (items.Count < ledCount)
+                        items.Add(new JObject());
+                }
+
+                MozaLog.Debug($"[AZOM] Patched {deviceName} telemetry LED count to {ledCount}");
+                return doc.ToString();
+            }
+            catch (Exception ex)
+            {
+                // A parse failure here must not block deployment — ship the
+                // template unpatched rather than no definition at all.
+                MozaLog.Warn($"[AZOM] Could not patch LED count for '{deviceName}', using template as-is: {ex.Message}");
+                return json;
+            }
+        }
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,
             int rpmCount, bool hasFlagLeds, int buttonCount, int knobCount, int browSegmentSize, string? discoveredPid,
@@ -694,7 +743,7 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid, string expectedDescriptorId,
-            bool force = false, string? thumbnailKey = null)
+            bool force = false, string? thumbnailKey = null, int? telemetryLedCount = null)
         {
             try
             {
@@ -759,6 +808,18 @@ namespace MozaPlugin.Devices.Extensions
                             if (existingSchema < templateSchema)
                                 stale = true;
                         }
+
+                        // Geometry guard: the base ambient definition's LED count is
+                        // patched per base model (6 vs 9 LEDs per strip), so a file
+                        // written for a different base — or by a plugin build that
+                        // hardcoded 18 — has to be rewritten.
+                        if (!stale && telemetryLedCount.HasValue)
+                        {
+                            int existingLeds = existing
+                                .SelectToken("LedsFeature.LogicalTelemetryLeds.LedCount")?.Value<int>() ?? -1;
+                            if (existingLeds != telemetryLedCount.Value)
+                                stale = true;
+                        }
                     }
                     catch (Exception parseEx)
                     {
@@ -805,6 +866,9 @@ namespace MozaPlugin.Devices.Extensions
                         json = json.Replace("__DETECT_PID__", FallbackPid);
                         MozaLog.Debug($"[AZOM] No PID discovered, using fallback {FallbackPid} for {deviceName}");
                     }
+
+                    if (telemetryLedCount.HasValue)
+                        json = PatchTelemetryLedCount(json, telemetryLedCount.Value, deviceName);
 
                     File.WriteAllText(deviceJsonPath, json);
                 }

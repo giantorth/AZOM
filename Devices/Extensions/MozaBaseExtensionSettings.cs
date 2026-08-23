@@ -10,8 +10,8 @@ namespace MozaPlugin.Devices.Extensions
     /// </summary>
     public class MozaBaseExtensionSettings
     {
-        public int BaseAmbientBrightness { get; set; } = -1;       // 0..255 wire range
-        public int BaseAmbientStandbyMode { get; set; } = -1;      // 0=const, 1=?, 2=breath, 3=cycle, 4=rainbow, 5=flow
+        public int BaseAmbientBrightness { get; set; } = -1;       // 0..100 (percent)
+        public int BaseAmbientStandbyMode { get; set; } = -1;      // 0=off, 1=constant, 2=breathing, 3=cycle, 4=rainbow, 5=sand flow
         public int BaseAmbientIndicatorState { get; set; } = -1;   // 0/1
         public int BaseAmbientSleepMode { get; set; } = -1;        // 0/1
         public int BaseAmbientSleepTimeout { get; set; } = -1;

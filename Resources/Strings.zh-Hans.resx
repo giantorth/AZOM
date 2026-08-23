@@ -766,4 +766,12 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>单颗灯珠颜色</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>待机 · 常亮</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>待机 · 呼吸</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>睡眠 · 呼吸</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>动画速度 (毫秒)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>呼吸速度 (毫秒)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>待机效果</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>待机动画</value></data>
 </root>

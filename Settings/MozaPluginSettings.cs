@@ -90,14 +90,15 @@ namespace MozaPlugin.Settings
         // own pipeline, independent of the wheel's selection. Empty = catalog default.
         public string Cm2SelectedDashboard { get; set; } = "";
 
-        // Wheelbase ambient LED settings (R21/R25/R27 family — 18 LEDs / 2 strips).
-        // Defaults match observed R25 capture (rainbow mode, brightness 100,
-        // startup/shutdown #66B8FF). See docs/protocol/leds/base-ambient-0x20-0x22.md.
-        public int BaseAmbientBrightness { get; set; } = 100;       // 0..255 wire range; UI exposes 0..100 mapped
+        // Wheelbase ambient LED settings (2 strips; strip length per base model,
+        // see BaseModelInfo). Defaults match observed R25 capture (rainbow mode,
+        // brightness 100, startup/shutdown #66B8FF).
+        // See docs/protocol/leds/base-ambient-0x20-0x22.md.
+        public int BaseAmbientBrightness { get; set; } = 100;       // percent, 0..100
         public int BaseAmbientStandbyMode { get; set; } = 4;        // 4 = rainbow
         public int BaseAmbientIndicatorState { get; set; } = 1;     // on
-        public int BaseAmbientSleepMode { get; set; } = 1;          // enabled
-        public int BaseAmbientSleepTimeout { get; set; } = 15;
+        public int BaseAmbientSleepMode { get; set; } = 1;          // sleep effect: 1 = breathe
+        public int BaseAmbientSleepTimeout { get; set; } = 15;      // minutes
         public int BaseAmbientStartupColor { get; set; } = 0x66B8FF;
         public int BaseAmbientShutdownColor { get; set; } = 0x66B8FF;
 

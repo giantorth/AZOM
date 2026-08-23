@@ -828,5 +828,13 @@ namespace MozaPlugin.Resources
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
         public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
         public static string Label_EqSensitivity => Get("Label_EqSensitivity");
+        public static string Section_PerLedColors => Get("Section_PerLedColors");
+        public static string Label_IdleConstant => Get("Label_IdleConstant");
+        public static string Label_IdleBreathing => Get("Label_IdleBreathing");
+        public static string Label_SleepBreathing => Get("Label_SleepBreathing");
+        public static string SliderLabel_StandbySpeedMs => Get("SliderLabel_StandbySpeedMs");
+        public static string SliderLabel_SleepSpeedMs => Get("SliderLabel_SleepSpeedMs");
+        public static string Section_IdleEffect => Get("Section_IdleEffect");
+        public static string SliderLabel_IdleAnimation => Get("SliderLabel_IdleAnimation");
     }
 }

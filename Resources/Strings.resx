@@ -373,7 +373,7 @@
   <data name="Option_On" xml:space="preserve"><value>On</value></data>
   <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>Standby Animation</value></data>
   <data name="Option_Constant" xml:space="preserve"><value>Constant</value></data>
-  <data name="Option_Breath" xml:space="preserve"><value>Breath</value></data>
+  <data name="Option_Breath" xml:space="preserve"><value>Breathe</value></data>
   <data name="Option_Cycle" xml:space="preserve"><value>Cycle</value></data>
   <data name="Option_Rainbow" xml:space="preserve"><value>Rainbow</value></data>
   <data name="Option_Flow" xml:space="preserve"><value>Flow</value></data>
@@ -777,4 +777,12 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR closed — switched to Stable</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// per-band gain · 100% = neutral · 500% = max boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSITIVITY</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>PER-LED COLORS</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Idle · Constant</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Idle · Breathe</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Sleep · Breathe</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Animation speed (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Breathing speed (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>IDLE EFFECT</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Idle Animation</value></data>
 </root>

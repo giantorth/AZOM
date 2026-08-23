@@ -750,4 +750,12 @@
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Bark Arf!</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>WOOF PER PUP!</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Nap · Barff!</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Nap · Howl!</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Snooze · Howl!</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Zoomies speed (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Panting speed (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>NAPTIME WOOF</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Naptime Wiggle</value></data>
 </root>

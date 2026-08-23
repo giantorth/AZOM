@@ -766,4 +766,12 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>LED-FARBEN EINZELN</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Ruhe · Konstant</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Ruhe · Atmen</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Schlaf · Atmen</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Animationsgeschwindigkeit (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Atemgeschwindigkeit (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>RUHE-EFFEKT</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Ruhe-Animation</value></data>
 </root>

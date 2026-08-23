@@ -692,6 +692,19 @@ namespace MozaPlugin.Settings
         public int BaseAmbientStartupColor { get; set; } = -1;   // packed RGB
         public int BaseAmbientShutdownColor { get; set; } = -1;  // packed RGB
 
+        // Per-LED palettes, packed RGB, flat with a fixed stride of
+        // BaseModelInfo.MaxLedsPerStrip (index = strip * stride + led) so an
+        // entry keeps meaning across 6- and 9-LED bases. -1 = not set, and
+        // entries past the real strip length stay unused.
+        public int[]? BaseAmbientIdleColorsConstant { get; set; }
+        public int[]? BaseAmbientIdleColorsBreath { get; set; }
+        public int[]? BaseAmbientSleepColors { get; set; }
+
+        // Animation interval per standby mode, indexed by mode 0..5 (only 2..5
+        // have a register). -1 = not set.
+        public int[]? BaseAmbientStandbyIntervals { get; set; }
+        public int BaseAmbientSleepBreathInterval { get; set; } = -1;  // ms
+
         // ===== Gearshift event tuning (per-profile) =====
         // Plugin-side gearshift event coalescing. Moved out of MozaPluginSettings
         // 2026-05-14 since users want per-game tuning (H-pattern vs paddles).
@@ -881,6 +894,11 @@ namespace MozaPlugin.Settings
             BaseAmbientSleepTimeout = p.BaseAmbientSleepTimeout;
             BaseAmbientStartupColor = p.BaseAmbientStartupColor;
             BaseAmbientShutdownColor = p.BaseAmbientShutdownColor;
+            BaseAmbientIdleColorsConstant = CloneArray(p.BaseAmbientIdleColorsConstant);
+            BaseAmbientIdleColorsBreath = CloneArray(p.BaseAmbientIdleColorsBreath);
+            BaseAmbientSleepColors = CloneArray(p.BaseAmbientSleepColors);
+            BaseAmbientStandbyIntervals = CloneArray(p.BaseAmbientStandbyIntervals);
+            BaseAmbientSleepBreathInterval = p.BaseAmbientSleepBreathInterval;
 
             // Gearshift
             GearshiftVibrateOnNeutral = p.GearshiftVibrateOnNeutral;

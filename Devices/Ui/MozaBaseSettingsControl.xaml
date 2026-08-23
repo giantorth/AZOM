@@ -88,8 +88,18 @@
 
             <StackPanel x:Name="BasePanel" Visibility="Collapsed">
 
-                <ctrl:SectionCard Title="{x:Static res:Strings.Section_Mode}" Icon="{StaticResource IconBolt}">
-                    <StackPanel>
+                <!-- Mode + brightness side by side: both are single-control cards.
+                     Same two-column pattern as SettingsControl's Core Settings /
+                     Gearshift pair — equal * columns, 7px inner gutter each side,
+                     14px bottom margin so the next card does not touch. -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_Mode}"
+                                      Icon="{StaticResource IconBolt}" Margin="0,0,7,14">
                         <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="{x:Static res:Strings.SliderLabel_IndicatorState}" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="IndicatorStateCombo" Width="140" SelectionChanged="IndicatorStateCombo_Changed">
@@ -97,9 +107,33 @@
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_On}"/>
                             </ComboBox>
                         </StackPanel>
+                    </ctrl:SectionCard>
+
+                    <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_Brightness}"
+                                      Icon="{StaticResource IconLed}" Margin="7,0,0,14">
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Brightness}" Style="{StaticResource FieldLabel}"/>
+                            <Slider Grid.Column="1" x:Name="BrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrightnessSlider_ValueChanged"/>
+                            <TextBox Grid.Column="2" x:Name="BrightnessValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=BrightnessSlider}" Text="100"/>
+                        </Grid>
+                    </ctrl:SectionCard>
+                </Grid>
+
+                <!-- Idle effect: the animation selector, its speed (1E [mode])
+                     and that mode's per-LED palette. Speed hides for off and
+                     constant (no interval register); the palette hides for
+                     off/cycle/rainbow/flow (no stored palette). -->
+                <ctrl:SectionCard Title="{x:Static res:Strings.Section_IdleEffect}" Icon="{StaticResource IconLed}">
+                    <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="{x:Static res:Strings.SliderLabel_StandbyAnimation}" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Text="{x:Static res:Strings.SliderLabel_IdleAnimation}" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="StandbyModeCombo" Width="140" SelectionChanged="StandbyModeCombo_Changed">
+                                <ComboBoxItem Content="{x:Static res:Strings.Option_Off}"/>
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Constant}"/>
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Breath}"/>
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Cycle}"/>
@@ -107,29 +141,28 @@
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Flow}"/>
                             </ComboBox>
                         </StackPanel>
+                        <Grid x:Name="StandbySpeedRow" Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_StandbySpeedMs}" Style="{StaticResource FieldLabel}"/>
+                            <Slider Grid.Column="1" x:Name="StandbySpeedSlider" Style="{StaticResource SettingSlider}" Minimum="100" Maximum="10000" TickFrequency="1" ValueChanged="StandbySpeedSlider_ValueChanged"/>
+                            <TextBox Grid.Column="2" x:Name="StandbySpeedValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=StandbySpeedSlider}" Text="2500"/>
+                        </Grid>
+                        <StackPanel x:Name="IdleLedPanel" Margin="0,4,0,0"/>
                     </StackPanel>
-                </ctrl:SectionCard>
-
-                <ctrl:SectionCard Title="{x:Static res:Strings.Section_Brightness}" Icon="{StaticResource IconLed}">
-                    <Grid Margin="0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Brightness}" Style="{StaticResource FieldLabel}"/>
-                        <Slider Grid.Column="1" x:Name="BrightnessSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="255" TickFrequency="1" ValueChanged="BrightnessSlider_ValueChanged"/>
-                        <TextBox Grid.Column="2" x:Name="BrightnessValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=BrightnessSlider}" Text="100"/>
-                    </Grid>
                 </ctrl:SectionCard>
 
                 <ctrl:SectionCard Title="{x:Static res:Strings.Section_Sleep}" Icon="{StaticResource IconMisc}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="{x:Static res:Strings.SliderLabel_SleepMode}" Style="{StaticResource FieldLabel}"/>
+                            <!-- Effect selector, not an enable: 0 = disabled, 1 = breathe. -->
                             <ComboBox x:Name="SleepModeCombo" Width="140" SelectionChanged="SleepModeCombo_Changed">
                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Disabled}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Enabled}"/>
+                                <ComboBoxItem Content="{x:Static res:Strings.Option_Breath}"/>
                             </ComboBox>
                         </StackPanel>
                         <Grid Margin="0,4">
@@ -139,9 +172,24 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SleepTimeout}" Style="{StaticResource FieldLabel}"/>
-                            <Slider Grid.Column="1" x:Name="SleepTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="120" TickFrequency="1" ValueChanged="SleepTimeoutSlider_ValueChanged"/>
+                            <Slider Grid.Column="1" x:Name="SleepTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="1" ValueChanged="SleepTimeoutSlider_ValueChanged"/>
                             <TextBox Grid.Column="2" x:Name="SleepTimeoutValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=SleepTimeoutSlider}" Text="15"/>
                         </Grid>
+                        <!-- Sleep breathing speed (0x23 [sleep-mode]) — only
+                             meaningful while the sleep effect is breathing. -->
+                        <Grid x:Name="SleepSpeedRow" Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SleepSpeedMs}" Style="{StaticResource FieldLabel}"/>
+                            <Slider Grid.Column="1" x:Name="SleepSpeedSlider" Style="{StaticResource SettingSlider}" Minimum="100" Maximum="10000" TickFrequency="1" ValueChanged="SleepSpeedSlider_ValueChanged"/>
+                            <TextBox Grid.Column="2" x:Name="SleepSpeedValue" Style="{StaticResource SliderValueEditBox}" ui:SliderValueBox.Slider="{Binding ElementName=SleepSpeedSlider}" Text="2500"/>
+                        </Grid>
+                        <!-- Sleep palette (25 [strip] 01 [led]) — only while the
+                             sleep effect is breathing. -->
+                        <StackPanel x:Name="SleepLedPanel" Margin="0,4,0,0"/>
                     </StackPanel>
                 </ctrl:SectionCard>
 
