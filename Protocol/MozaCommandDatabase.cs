@@ -186,6 +186,19 @@ namespace MozaPlugin.Protocol
 
             // ===== WHEEL IDENTITY (read-only, bytes=0 → request sends cmd ID only) =====
             AddCommand("wheel-model-name",  "wheel",  7, 0xFF, new byte[] { 1 }, 0, "array");
+            // Base model name at dev 0x12 (e.g. "R16 Black # MOT-3-V01"). MUST be
+            // DeviceType "main": MozaResponseParser hints every dev-0x12 reply as
+            // "main" and drops commands whose DeviceType differs, so reading this
+            // via wheel-model-name retargeted at 0x12 produced a reply that matched
+            // nothing and left MozaData.BaseModelName permanently empty. That name
+            // is what selects the ambient strip geometry (BaseModelInfo), so an
+            // empty value silently fell back to the 9-LED layout.
+            // Read in two 16-byte chunks and stitched by the inbound handler:
+            // chunk 1 alone is truncated ("R16 Black # MOT-"), which is enough for
+            // the geometry prefix but would put a cut-off product name into the
+            // CoAP device manifest.
+            AddCommand("main-model-name",   "main",   7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("main-model-name-b", "main",   7, 0xFF, new byte[] { 2 }, 0, "array");
             AddCommand("wheel-sw-version",  "wheel", 15, 0xFF, new byte[] { 1 }, 0, "array");
             AddCommand("wheel-hw-version",  "wheel",  8, 0xFF, new byte[] { 1 }, 0, "array");
             AddCommand("wheel-hw-sub",      "wheel",  8, 0xFF, new byte[] { 2 }, 0, "array");

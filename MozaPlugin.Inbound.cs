@@ -28,6 +28,11 @@ namespace MozaPlugin
 {
     public partial class MozaPlugin
     {
+        // Base model-name halves (dev 0x12 group 0x07 cmd 0x01 / 0x02), stitched
+        // into MozaData.BaseModelName as they arrive. Held here because this
+        // handler is the only thing that composes them.
+        private volatile string? _baseModelChunk1;
+        private volatile string? _baseModelChunk2;
 
         private void OnMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: false);
 
@@ -263,16 +268,30 @@ namespace MozaPlugin
                 }
             }
 
-            // Base identity reads share grp/cmd shape with wheel identity;
-            // disambiguate by device id (base=0x12, wheel=0x13/15/17).
-            if (r.Name == "wheel-model-name" && r.DeviceId == MozaProtocol.DeviceMain
+            // Base model name (dev 0x12, group 0x07), arriving as two 16-byte
+            // chunks. Needs "main"-typed commands: the parser hints every dev-0x12
+            // reply as "main" and drops commands whose DeviceType differs, so the
+            // wheel-typed command retargeted at 0x12 never matched and this field
+            // stayed empty.
+            if ((r.Name == "main-model-name" || r.Name == "main-model-name-b")
                 && r.ArrayValue != null)
             {
-                var baseName = MozaData.ParseNullTerminatedString(r.ArrayValue);
+                var chunk = MozaData.ParseNullTerminatedString(r.ArrayValue);
+                if (r.Name == "main-model-name") _baseModelChunk1 = chunk;
+                else _baseModelChunk2 = chunk;
+
+                var baseName = ((_baseModelChunk1 ?? string.Empty) + (_baseModelChunk2 ?? string.Empty)).Trim();
                 if (!string.IsNullOrEmpty(baseName) && _data.BaseModelName != baseName)
                 {
                     _data.BaseModelName = baseName;
                     MozaLog.Debug($"[AZOM] Base identity: {baseName}");
+
+                    // Latch the strip geometry as soon as the model is recognised.
+                    // BaseModelName itself is blanked by ClearWheelIdentity on any
+                    // rim swap or transient reconnect, so the emitter must not keep
+                    // re-deriving from it.
+                    if (Devices.BaseModelInfo.IsKnown(baseName))
+                        _data.BaseAmbientLedsPerStrip = Devices.BaseModelInfo.LedsPerStrip(baseName);
 
                     // The ambient device definition's LED count comes from this
                     // string (strip length is per model). DeviceProber reads the

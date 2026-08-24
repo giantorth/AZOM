@@ -130,7 +130,7 @@ namespace MozaPlugin.Devices.Ui
             if (_data == null) return;
 
             int standbyMode = _data.BaseAmbientStandbyMode;
-            int ledsPerStrip = BaseModelInfo.LedsPerStrip(_data.BaseModelName);
+            int ledsPerStrip = _data.ResolvedAmbientLedsPerStrip;
 
             bool standbyAnimated = standbyMode >= 2 && standbyMode <= 5;
             StandbySpeedRow.Visibility = standbyAnimated ? Visibility.Visible : Visibility.Collapsed;

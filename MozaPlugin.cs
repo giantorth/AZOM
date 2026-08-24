@@ -646,6 +646,8 @@ namespace MozaPlugin
                 DetectionState.BaseFwVersionLogged = false;
                 DetectionState.BaseFwVersionProbeRetries = 0;
                 _data.BaseModelName = "";
+                _baseModelChunk1 = null;
+                _baseModelChunk2 = null;
                 DetectionState.NewWheelDetected = false;
                 DetectionState.OldWheelDetected = false;
                 WheelModelInfo = null;

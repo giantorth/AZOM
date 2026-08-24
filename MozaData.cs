@@ -388,9 +388,40 @@ namespace MozaPlugin
         public readonly byte[][] BaseAmbientIdleColorsConstant = InitBaseAmbientPalette();
         public readonly byte[][] BaseAmbientIdleColorsBreath = InitBaseAmbientPalette();
         public readonly byte[][] BaseAmbientSleepColors = InitBaseAmbientPalette();
-        // Diagnostic only — stitched from group 0x07 cmd 0x01 + cmd 0x02 reads
-        // against dev 0x12 (e.g. "R25 Black # MOT-1 -V01"). Not used for gating.
+        // Stitched from group 0x07 cmd 0x01 + cmd 0x02 reads against dev 0x12
+        // (e.g. "R16 Black # MOT-3-V01"). Selects the ambient strip geometry via
+        // BaseModelInfo — see BaseAmbientLedsPerStrip below.
         public volatile string BaseModelName = "";
+
+        // Resolved ambient LEDs-per-strip, latched once the base model name is
+        // known. 0 = not resolved yet.
+        //
+        // STATIC-backed and deliberately NOT cleared by ClearWheelIdentity, for
+        // the same reason as BaseFwVersion: that method fires on rim swaps AND
+        // transient reconnects, where the BASE is unchanged — but it blanks
+        // BaseModelName. The LED emitter picks its chunk shapes and bitmask width
+        // from this every frame, so losing it mid-session silently reverted a
+        // 6-LED base to the 9-LED wire layout: chunk 2 addressed LEDs 5..8, and
+        // the three that don't exist went dark while the bar spread over 9
+        // positions instead of 6 (bundle JCFNRS7W).
+        private static volatile int s_baseAmbientLedsPerStrip;
+        public int BaseAmbientLedsPerStrip
+        {
+            get => s_baseAmbientLedsPerStrip;
+            set => s_baseAmbientLedsPerStrip = value;
+        }
+
+        /// <summary>
+        /// Ambient LEDs per strip to use right now: the latched value when the
+        /// model has been identified, else derived from whatever model name is
+        /// currently held (which falls back to the 9-LED default when empty).
+        /// Every ambient consumer — wire emitter, UI, device definition — must go
+        /// through this rather than reading BaseModelName directly.
+        /// </summary>
+        public int ResolvedAmbientLedsPerStrip
+            => s_baseAmbientLedsPerStrip > 0
+                ? s_baseAmbientLedsPerStrip
+                : Devices.BaseModelInfo.LedsPerStrip(BaseModelName);
         // ===== Base identity (device 0x13 — direct probes, mirror of the
         // Wheel identity fields). Populated by base-model-name / base-sw-version
         // / base-hw-version / base-hw-sub / base-mcu-uid / base-identity-11

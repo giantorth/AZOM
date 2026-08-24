@@ -36,8 +36,12 @@ namespace MozaPlugin.Devices.Led
         // resolved per frame from the detected model name rather than fixed.
         // Falls back to the 9-LED layout while the model name is unknown,
         // which is the pre-existing behaviour.
+        // Via MozaData's latch, NOT BaseModelInfo(BaseModelName) — that string is
+        // blanked by ClearWheelIdentity on rim swaps and transient reconnects,
+        // which silently reverted this emitter to the 9-LED layout mid-session.
         private static int CurrentLedsPerStrip
-            => BaseModelInfo.LedsPerStrip(MozaPlugin.Instance?.Data?.BaseModelName);
+            => MozaPlugin.Instance?.Data?.ResolvedAmbientLedsPerStrip
+               ?? BaseModelInfo.DefaultLedsPerStrip;
 
         /// <summary>Total LEDs SimHub is asked to render for this base.</summary>
         internal static int CurrentTotalLeds => CurrentLedsPerStrip * 2;

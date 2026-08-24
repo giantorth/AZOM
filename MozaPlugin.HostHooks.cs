@@ -164,6 +164,8 @@ namespace MozaPlugin
         {
             DetectionState.ResetAll();
             if (_data != null) _data.BaseModelName = "";
+            _baseModelChunk1 = null;
+            _baseModelChunk2 = null;
         }
 
         internal void ResetWheelDetection(string reason)

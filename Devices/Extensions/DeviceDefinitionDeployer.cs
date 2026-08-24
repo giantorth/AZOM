@@ -164,7 +164,7 @@ namespace MozaPlugin.Devices.Extensions
                 // The ambient strip is the one templated definition whose LED count
                 // varies by base model; the dashes are fixed-geometry.
                 int? ledCount = string.Equals(deviceName, BaseAmbientDeviceName, StringComparison.Ordinal)
-                    ? BaseModelInfo.TotalLeds(MozaPlugin.Instance?.Data?.BaseModelName)
+                    ? (MozaPlugin.Instance?.Data?.ResolvedAmbientLedsPerStrip ?? BaseModelInfo.DefaultLedsPerStrip) * 2
                     : (int?)null;
                 if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey,
                         telemetryLedCount: ledCount))

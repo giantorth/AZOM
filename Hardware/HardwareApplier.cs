@@ -1102,7 +1102,7 @@ namespace MozaPlugin.Hardware
         /// </summary>
         private void ApplyBaseAmbientPalettes(MozaProfile profile)
         {
-            int ledsPerStrip = Devices.BaseModelInfo.LedsPerStrip(_data.BaseModelName);
+            int ledsPerStrip = _data.ResolvedAmbientLedsPerStrip;
             int stride = Devices.BaseModelInfo.MaxLedsPerStrip;
 
             for (int strip = 0; strip < 2; strip++)

@@ -705,7 +705,8 @@ namespace MozaPlugin.Devices
                     // model (6 LEDs/strip on R16 Ultra vs 9 elsewhere). Probe
                     // the other way round and the definition is written with
                     // the fallback geometry. See BaseModelInfo.
-                    _deviceManager.ReadSettingForDevice("wheel-model-name", MozaProtocol.DeviceMain);
+                    _deviceManager.ReadSetting("main-model-name");
+                    _deviceManager.ReadSetting("main-model-name-b");
                     _deviceManager.ReadSetting("base-ambient-brightness");
                     // Base-identity probes (dev 0x13 direct). Populates
                     // MozaData.BaseMcuUid / BaseSwVersion / BaseHwVersion /
@@ -751,7 +752,7 @@ namespace MozaPlugin.Devices
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         // Per-LED palettes, sized to the detected strip length so a
                         // 6-LED base never asks for LEDs 6..8.
-                        int ledsPerStrip = BaseModelInfo.LedsPerStrip(_data.BaseModelName);
+                        int ledsPerStrip = _data.ResolvedAmbientLedsPerStrip;
                         _deviceManager.ReadSettings(BaseAmbientPerLedReadCommands(ledsPerStrip));
                         MozaLog.Info(
                             $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}', "
