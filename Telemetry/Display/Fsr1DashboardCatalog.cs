@@ -346,14 +346,19 @@ namespace MozaPlugin.Telemetry.Display
                     // Damage boxes, in on-wheel gauge order: FL wing, FR wing, ICE, gearbox,
                     // REAR wing (tester-confirmed on dashboards 5/10 — the last three read one
                     // gauge earlier than the old labels claimed). Unlike the tyre boxes these
-                    // carry DAMAGE, not remaining %: 0 renders green and rises to red, so no
-                    // 100− inversion. FieldIds are historical, kept so existing profile
-                    // overrides stay attached to the same gauge.
+                    // carry DAMAGE, not remaining %, so no 100− inversion.
+                    // Five gauges onto SimHub's five generic damage channels, one each.
+                    // `CarDamage1..5` are the only damage channels on StatusDataBase —
+                    // Telemetry.json's WingWearFL/EngineWear/GearBoxWear point at
+                    // …FrontLeftWingDamage/…EngineDamage/…GearBoxDamage, which do not exist.
+                    // Which car part each channel carries is game-defined, so a game that
+                    // orders them differently needs a per-field remap. FieldIds are historical,
+                    // kept so existing profile overrides stay attached to the same gauge.
                     .U8("wwFL", "Front wing damage FL", G + "CarDamage1")
-                    .U8("wwFR", "Front wing damage FR", G + "CarDamage1")
-                    .U8("wwR", "ICE wear", "")
-                    .U8("engWear", "Gearbox wear", "")
-                    .U8("gbxWear", "Rear wing damage", G + "CarDamage2")
+                    .U8("wwFR", "Front wing damage FR", G + "CarDamage2")
+                    .U8("wwR", "ICE damage", G + "CarDamage3")
+                    .U8("engWear", "Gearbox damage", G + "CarDamage4")
+                    .U8("gbxWear", "Rear wing damage", G + "CarDamage5")
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
                     .U8("fuel", "Fuel remaining", G + "Fuel")
                     .GearDrsErs("gde")
@@ -548,7 +553,7 @@ namespace MozaPlugin.Telemetry.Display
                     .LightStageFlags(("rain", "Rain light", ""), ("wipers", "Wipers", ""),
                            ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("wiperCls", "Wiper class", "")
-                    .U8("redline", "Redline reached", "")
+                    .U8("redline", "Redline reached", G + "CarSettings_RPMRedLineReached")
                     .Done(),
             },
             new()
@@ -585,7 +590,7 @@ namespace MozaPlugin.Telemetry.Display
                     .LightStageFlags(("rain", "Rain light", ""), ("wipers", "Wipers", ""),
                            ("ign", "Ignition", G + "EngineIgnitionOn"), ("engine", "Engine on", G + "EngineStarted"), ("tyreType", "Tyre type", ""))
                     .U8("sector", "Sector", G + "CurrentSectorIndex")
-                    .U8("redline", "Redline reached", "")
+                    .U8("redline", "Redline reached", G + "CarSettings_RPMRedLineReached")
                     .Done(),
             },
         };
