@@ -1000,12 +1000,18 @@ on the pedal's own unit (`MotorDeviceForRole` — see
   editor) — a dragged last node lets "100% output" happen before "100%
   input," since the evaluator plateaus at the last node's Y beyond its X
   (same trick as before, just now the ONLY consumer of the shaped value
-  is AZOM's own telemetry, not a second wire push). Six wire breakpoints
-  `100/7 × k` for k=1..6 (≈14.29/28.57/42.86/57.14/71.43/85.71%) were kept
-  as the curve's fixed node-count reference/default shape even though
-  nothing sends them over the wire anymore — chosen to match what the
-  (now-removed) `curve7` mechanism's own selectors were, so a node that's
-  never been dragged renders identically to before.
+  is AZOM's own telemetry, not a second wire push). Default (un-dragged)
+  breakpoints are `100/6 × k` for k=1..6 (≈16.67/33.33/50/66.67/83.33/100%),
+  evenly spaced with the last node at exactly 100% — so an untouched
+  curve maps full input to full output, and "100% before 100%" only
+  happens once a user explicitly drags the last node inward. **Bug,
+  fixed**: this used to be `100/7 × k` (last node ~85.71%, not 100%),
+  inherited from matching the (now-removed, disproven) `curve7`
+  mechanism's own selectors purely so a never-dragged node would render
+  identically to the old experimental shape — which meant Linear (and
+  every other preset) topped out around 86% instead of reaching 100%.
+  `MozaPlugin.FixMBoosterCurveArraysSeventhsBug` is a one-shot migration
+  that repairs any profile that saved one of the old preset shapes.
 
 Both hardware calibrations use the shared `-1` "not yet set / no override"
 sentinel, so a fresh profile never overwrites what is already on the

@@ -1069,6 +1069,16 @@ namespace MozaPlugin
                     MigrateMBoosterCurveArraysTo6();
                 }
 
+                // Follow-up fix for the 100/7-breakpoint bug (see
+                // FixMBoosterCurveArraysSeventhsBug) — separate flag/pass so
+                // it also catches profiles that only clicked a preset button
+                // and never went through the 5->6 migration above.
+                if (!_settings.MBoosterCurveArraysFixedSeventhsBug)
+                {
+                    _settings.MBoosterCurveArraysFixedSeventhsBug = true;
+                    FixMBoosterCurveArraysSeventhsBug();
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
@@ -2736,7 +2746,7 @@ namespace MozaPlugin
                 var newY = new float[global::MozaPlugin.Devices.MBoosterUiConstants.SimInputMappingNodeCount];
                 for (int i = 0; i < newY.Length; i++)
                 {
-                    double x = (i + 1) * 100.0 / 7.0;
+                    double x = (i + 1) * 100.0 / 6.0;
                     newY[i] = (float)global::MozaPlugin.Devices.MozaMBoosterRegistry.EvaluateCurveArbitraryX(oldXs, cfg.CurveY, x);
                 }
                 cfg.CurveY = newY;
@@ -2751,6 +2761,78 @@ namespace MozaPlugin
                     newInput[i] = (float)global::MozaPlugin.Devices.MozaMBoosterRegistry.EvaluateCurveArbitraryX(LegacyMBoosterCurveDefaultX, cfg.InputCurveY, x);
                 }
                 cfg.InputCurveY = newInput;
+            }
+        }
+
+        // The Sim Input Mapping curve's default X breakpoints used to be
+        // 100/7 * k (last node ~85.7%, not 100% — see DefaultCurveX's
+        // history in Devices/MozaMBoosterRegistry.cs). Any profile that hit
+        // MBoosterCurveArraysMigratedTo6, or simply clicked a preset button,
+        // under that bug got a CurveY baked to one of these too-low shapes.
+        // Matched against UI.SettingsControl's MBoosterCurvePresets (old →
+        // new) so the follow-up migration below can restore the exact
+        // preset shape a user actually clicked, not just the default.
+        private static readonly float[][] OldMBoosterCurvePresetsSeventhsBug =
+        {
+            new float[] { 14, 29, 43, 57, 71, 86 }, // Linear
+            new float[] { 5, 12, 30, 70, 88, 95 },  // S Curve
+            new float[] { 4, 9, 16, 25, 41, 66 },   // Exponential
+            new float[] { 34, 59, 75, 84, 91, 96 }, // Parabolic
+        };
+        private static readonly float[][] NewMBoosterCurvePresetsSeventhsBug =
+        {
+            new float[] { 17, 33, 50, 67, 83, 100 }, // Linear
+            new float[] { 6, 16, 50, 84, 94, 100 },  // S Curve
+            new float[] { 5, 11, 20, 35, 61, 100 },  // Exponential
+            new float[] { 39, 65, 80, 89, 95, 100 }, // Parabolic
+        };
+
+        /// <summary>
+        /// One-shot follow-up migration (see
+        /// <see cref="MozaPluginSettings.MBoosterCurveArraysFixedSeventhsBug"/>):
+        /// a saved Sim Input Mapping curve that exactly matches one of the
+        /// old, too-low preset shapes (baked in by the 100/7 breakpoint bug,
+        /// either directly via a preset button or via
+        /// <see cref="MigrateMBoosterCurveArraysTo6"/> before this fix) is
+        /// swapped for the corresponding corrected shape. A curve the user
+        /// has since custom-dragged away from any preset is left alone —
+        /// the original 5-node source is long gone, so there's nothing
+        /// reliable to re-derive it from; a fresh Linear/S-Curve/etc. click
+        /// or a small manual touch-up fixes it going forward.
+        /// </summary>
+        private void FixMBoosterCurveArraysSeventhsBug()
+        {
+            var profiles = _settings?.ProfileStore?.Profiles;
+            if (profiles == null) return;
+            foreach (var profile in profiles)
+            {
+                if (profile?.MBoosterSettings == null) continue;
+                foreach (var device in profile.MBoosterSettings.Values)
+                {
+                    if (device == null) continue;
+                    FixOneMBoosterCurveSeventhsBug(device);
+                    if (device.Pedals != null)
+                        foreach (var pedal in device.Pedals.Values)
+                            if (pedal != null) FixOneMBoosterCurveSeventhsBug(pedal);
+                }
+            }
+        }
+
+        private static void FixOneMBoosterCurveSeventhsBug(global::MozaPlugin.Devices.IMBoosterPedalConfig cfg)
+        {
+            if (cfg.CurveX != null) return; // user has dragged X — not a stock preset shape
+            if (cfg.CurveY == null || cfg.CurveY.Length != global::MozaPlugin.Devices.MBoosterUiConstants.SimInputMappingNodeCount) return;
+            for (int p = 0; p < OldMBoosterCurvePresetsSeventhsBug.Length; p++)
+            {
+                var old = OldMBoosterCurvePresetsSeventhsBug[p];
+                bool match = true;
+                for (int i = 0; i < old.Length; i++)
+                    if (Math.Abs(cfg.CurveY[i] - old[i]) > 0.01f) { match = false; break; }
+                if (match)
+                {
+                    cfg.CurveY = (float[])NewMBoosterCurvePresetsSeventhsBug[p].Clone();
+                    return;
+                }
             }
         }
 

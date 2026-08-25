@@ -68,7 +68,7 @@ namespace MozaControls
         // AllowHorizontalDrag is true — 5-node curves default to the fixed
         // 20/40/60/80/100 breakpoints every other curve in this app uses;
         // the 6-node Sim Input Mapping curve overwrites X1-X6 from its own
-        // seeding code (100/7 * k for k=1..6) immediately on load, so X6's
+        // seeding code (100/6 * k for k=1..6) immediately on load, so X6's
         // own DP default below is cosmetic. A fresh instance renders
         // identically to one driven by NodeXFractions until the user
         // actually drags a node sideways. --------
@@ -77,7 +77,7 @@ namespace MozaControls
         public static readonly DependencyProperty X3Property = RegisterX(nameof(X3), 60);
         public static readonly DependencyProperty X4Property = RegisterX(nameof(X4), 80);
         public static readonly DependencyProperty X5Property = RegisterX(nameof(X5), 100);
-        public static readonly DependencyProperty X6Property = RegisterX(nameof(X6), 600.0 / 7.0);
+        public static readonly DependencyProperty X6Property = RegisterX(nameof(X6), 600.0 / 6.0);
 
         private static DependencyProperty RegisterX(string name, double dflt)
             => DependencyProperty.Register(name, typeof(double), typeof(MozaCurveEditor),
@@ -926,16 +926,27 @@ namespace MozaControls
             }
 
             // ---- Optional y=x identity / nominal line (output curves only) ----
-            // The line ends at the rightmost node's X (not the plot's right
-            // pixel edge) so the LINEAR preset's last dot lands exactly on
-            // the diagonal — the dots are pulled slightly inside the plot to
-            // avoid clipping, and the reference must follow them.
+            // Always the TRUE diagonal from data (0,0) to (100,100) — same
+            // 0.98 inset every node/anchor pixel position uses (so the line
+            // doesn't get clipped at the plot's true right edge), but that's
+            // a rendering-only margin, not a stand-in for data-space X.
+            // BUG (fixed): this used to end at the rightmost NODE's own
+            // fraction instead of a fixed 0.98 — harmless for curves whose
+            // last node always sits at data (100,100) by construction (FFB,
+            // Sim Input Mapping, Throttle/Brake/Clutch), but for a curve
+            // like Pedal Feel — AnchorAtTopRight, whose last DRAGGABLE node
+            // legitimately defaults short of 100% (e.g. ~98%) while the
+            // curve itself still runs on to a separate fixed (100,100)
+            // corner anchor — the old logic stopped the dashed reference
+            // short of that corner AND pinned its Y to YMax at the node's
+            // (too-far-left) X, producing a line that wasn't really y=x at
+            // all and visibly diverged from the actual plotted curve near
+            // the top-right (see linear.png).
             if (ShowIdentityLine)
             {
-                double rightFrac = Math.Max(0, Math.Min(1, nodeFracs[nodeCount - 1]));
                 var ident = new LineGeometry(
                     new Point(PadLeft, PadTop + plotH),
-                    new Point(PadLeft + rightFrac * plotW, PadTop));
+                    new Point(PadLeft + 0.98 * plotW, PadTop));
                 ident.Freeze();
                 SetValue(IdentityLineGeometryKey, ident);
             }

@@ -549,11 +549,16 @@ namespace MozaPlugin.Devices
         }
 
         // Default (un-dragged) node X breakpoints for the Sim Input Mapping
-        // output curve, 100/7 * k for k=1..6 — evenly spaced, ending short
-        // of 100% so the curve can plateau before full physical travel
-        // (see EvaluateCurveArbitraryX's "100% output before 100% input").
+        // output curve, 100/6 * k for k=1..6 — evenly spaced, last node at
+        // exactly 100% so an untouched curve maps full input to full output.
+        // (Previously 100/7 * k, inherited from the disproven/removed
+        // curve7 mechanism's selectors purely for cosmetic continuity — see
+        // docs/protocol/devices/mbooster.md "Sim Input Mapping" — which left
+        // the last node short at ~85.7%, so "100% output before 100% input"
+        // via EvaluateCurveArbitraryX's plateau only needs a user's explicit
+        // drag now, not an already-shortened default.)
         private static readonly float[] DefaultCurveX =
-            { 100f / 7f, 200f / 7f, 300f / 7f, 400f / 7f, 500f / 7f, 600f / 7f };
+            { 100f / 6f, 200f / 6f, 300f / 6f, 400f / 6f, 500f / 6f, 600f / 6f };
 
         // Default/un-dragged shape of the Pedal Feel curve's 6 nodes on
         // EITHER axis (mbooster-brake-feelcurve-1..6 for Y, cmdId 0xAB

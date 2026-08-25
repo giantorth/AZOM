@@ -276,6 +276,16 @@ namespace MozaPlugin
         // MozaPlugin.Init and MozaMBoosterRegistry.MigrateCurveArraysTo6.
         public bool MBoosterCurveArraysMigratedTo6 { get; set; }
 
+        // One-shot marker for the follow-up migration that fixes the Sim
+        // Input Mapping curve's default X breakpoints — they were 100/7 * k
+        // (last node ~85.7%, inherited from the disproven/removed curve7
+        // mechanism), capping Linear/preset/migrated curves at ~86% output
+        // instead of reaching 100%. Any profile already run through
+        // MBoosterCurveArraysMigratedTo6, or that clicked a preset button,
+        // baked in the too-low shape. See MozaPlugin.Init and
+        // FixMBoosterCurveArraysSeventhsBug.
+        public bool MBoosterCurveArraysFixedSeventhsBug { get; set; }
+
         // ~1/min pull of the wheel display's own log via session FF kind=14,
         // acked with kind=15 (which clears those lines on the device). No UI —
         // flip to false in MozaPluginSettings.json to stop the pull entirely.

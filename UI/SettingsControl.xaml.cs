@@ -4213,16 +4213,20 @@ namespace MozaPlugin
 
         // Sim Input Mapping output curve presets (6 nodes) — derived by
         // sampling the existing 5-point PedalCurvePresets shapes at this
-        // curve's own fixed breakpoints (100/7 * k for k=1..6, matching
+        // curve's own fixed breakpoints (100/6 * k for k=1..6, matching
         // MozaMBoosterRegistry.DefaultCurveX), not new hand-picked values.
         // Linear is the identity (Y[k] == breakpoint[k]), so it also serves
-        // as the default X breakpoints below.
+        // as the default X breakpoints below. (Previously 100/7 * k, which
+        // left the last breakpoint ~85.7% instead of 100% — see
+        // MozaMBoosterRegistry.DefaultCurveX's history — so Linear capped
+        // at ~86% instead of reaching 100%; MozaPlugin.FixMBoosterCurveArraysSeventhsBug
+        // migrates any profile that saved one of the old values below.)
         private static readonly int[][] MBoosterCurvePresets =
         {
-            new[] { 14, 29, 43, 57, 71, 86 }, // Linear
-            new[] { 5, 12, 30, 70, 88, 95 },  // S Curve
-            new[] { 4, 9, 16, 25, 41, 66 },   // Exponential
-            new[] { 34, 59, 75, 84, 91, 96 }, // Parabolic
+            new[] { 17, 33, 50, 67, 83, 100 }, // Linear
+            new[] { 6, 16, 50, 84, 94, 100 },  // S Curve
+            new[] { 5, 11, 20, 35, 61, 100 },  // Exponential
+            new[] { 39, 65, 80, 89, 95, 100 }, // Parabolic
         };
         private static readonly float[] MBoosterOutputCurveDefault =
             Array.ConvertAll(MBoosterCurvePresets[0], x => (float)x);

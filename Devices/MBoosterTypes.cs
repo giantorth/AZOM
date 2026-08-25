@@ -693,7 +693,8 @@ namespace MozaPlugin.Devices
 
         // X position (0..100) of each output-curve node, draggable in the
         // Sim Input Mapping curve editor. Null = default fixed breakpoints
-        // (100/7 * k for k=1..6 — see MozaMBoosterRegistry.DefaultCurveX).
+        // (100/6 * k for k=1..6, last node at 100% — see
+        // MozaMBoosterRegistry.DefaultCurveX).
         public float[]? CurveX { get; set; } = null;
 
         // Per-pedal calibration for the ADDITIONAL pedals on a chained mBooster
