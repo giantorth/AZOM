@@ -346,13 +346,19 @@ namespace MozaPlugin
             // Pedal Feel's curve is now a REAL hardware effect (see
             // MozaMBoosterRegistry.ComputeFeelCurve) — the device reshapes
             // the raw force before this HID read ever sees it, so AZOM has
-            // no live "input to that curve" value to plot; no marker shown.
+            // no live TRUE "input to that curve" value to plot (that would
+            // need the raw pre-reshape force, which AZOM never receives).
+            // Best available proxy: preCurve, the same post-reshape % the
+            // "Output Force" live label above this curve already estimates
+            // kg from — not positionally exact against the curve's own
+            // Deadzone-Max Force X axis, but enough to see live movement
+            // while testing instead of nothing at all.
             // The Sim Input Mapping curve is the opposite: purely host-side
             // (see EvaluateCurveArbitraryX), so its live marker uses
-            // preCurve — the already-hardware-shaped raw position that's
-            // actually fed INTO this curve, not pct (which is the curve's
-            // own output).
-            MBoosterInputCurveEditor.LiveX = double.NaN;
+            // preCurve exactly — the already-hardware-shaped raw position
+            // that's actually fed INTO this curve, not pct (which is the
+            // curve's own output).
+            MBoosterInputCurveEditor.LiveX = hidConnected ? preCurve : double.NaN;
             MBoosterCurveEditor.LiveX = preCurve;
 
             // Live "position % · kg force" readout above the Pedal Feel
