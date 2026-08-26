@@ -3172,8 +3172,45 @@ namespace MozaPlugin
             _plugin.SaveSettings();
             if (role != MBoosterRole.Disabled)
                 ClearDuplicateMBoosterRoleAssignments(identity, axisIndex, role);
+            // Throttle's Max Force/Deadzone range (4-20kg / 0-5kg) is
+            // narrower than every other role's — a pedal freshly reassigned
+            // to Throttle may still be carrying an out-of-range stored value
+            // from whatever role it had before (e.g. 140kg from Brake).
+            // Clamp it into range and re-push immediately, targeting THIS
+            // specific axis (not necessarily the one selected in the UI —
+            // see PushMBoosterFeelCurve's axis-explicit overload).
+            if (role == MBoosterRole.Throttle && controller != null)
+            {
+                var cfg = global::MozaPlugin.Devices.MozaMBoosterRegistry.GetOrCreatePedalConfig(s, axisIndex, controller.SoleConnectedAxis());
+                if (cfg != null)
+                {
+                    bool clamped = false;
+                    if (cfg.MaxForceKg >= 0)
+                    {
+                        float mf = Math.Max(MBoosterUiConstants.ThrottleMaxForceMinKg, Math.Min(MBoosterUiConstants.ThrottleMaxForceMaxKg, cfg.MaxForceKg));
+                        if (Math.Abs(mf - cfg.MaxForceKg) > 0.0001f) { cfg.MaxForceKg = mf; clamped = true; }
+                    }
+                    if (cfg.DeadzoneKg >= 0)
+                    {
+                        float dz = Math.Max(MBoosterUiConstants.ThrottleDeadzoneMinKg, Math.Min(MBoosterUiConstants.ThrottleDeadzoneMaxKg, cfg.DeadzoneKg));
+                        if (Math.Abs(dz - cfg.DeadzoneKg) > 0.0001f) { cfg.DeadzoneKg = dz; clamped = true; }
+                    }
+                    if (clamped)
+                    {
+                        _plugin.SaveSettings();
+                        PushMBoosterFeelCurve(cfg, controller, axisIndex);
+                    }
+                }
+            }
             if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase) && axisIndex == _mboosterEffectPedalIndex)
+            {
                 UpdateMBoosterConfigVisibilityForRole();
+                // Bounds just changed above — re-seed so a value that was
+                // just clamped (or simply out of the new role's range on
+                // screen) doesn't keep showing a stale number.
+                using (_suppressor.Begin())
+                    SeedMBoosterConfigControls(PeekMBoosterEffectTarget());
+            }
         }
 
         /// <summary>Bumps every OTHER known pedal row currently showing
@@ -3658,6 +3695,35 @@ namespace MozaPlugin
         {
             bool isBrake = MBoosterSelectedPedalRolePrefix() == "brake";
             MBoosterBrakeOnlyPanel.Visibility = isBrake ? Visibility.Visible : Visibility.Collapsed;
+
+            // Max Force/Deadzone slider bounds are role-scoped: a Throttle
+            // pedal is a much lighter spring than a brake's load cell, so it
+            // gets its own narrower range instead of the Brake-shaped
+            // 0-200kg/0-40kg. Set BEFORE SeedMBoosterConfigControls seeds the
+            // actual value (this method runs earlier in RefreshMBoosterTab —
+            // see call site) so the seeded value never gets silently clamped
+            // by stale bounds. Clutch keeps the Brake-shaped bounds for now
+            // (not yet requested — see _todo.md).
+            bool isThrottle = MBoosterSelectedPedalRolePrefix() == "throttle";
+            MBoosterMaxForceSlider.Minimum = isThrottle ? MBoosterUiConstants.ThrottleMaxForceMinKg : MBoosterUiConstants.BrakeMaxForceMinKg;
+            MBoosterMaxForceSlider.Maximum = isThrottle ? MBoosterUiConstants.ThrottleMaxForceMaxKg : MBoosterUiConstants.BrakeMaxForceMaxKg;
+            MBoosterDeadzoneSlider.Minimum = isThrottle ? MBoosterUiConstants.ThrottleDeadzoneMinKg : MBoosterUiConstants.BrakeDeadzoneMinKg;
+            MBoosterDeadzoneSlider.Maximum = isThrottle ? MBoosterUiConstants.ThrottleDeadzoneMaxKg : MBoosterUiConstants.BrakeDeadzoneMaxKg;
+
+            // Effects list is role-scoped too: ABS, Lockup, Threshold, and
+            // Brake Fade are all brake-specific (ABS/Lockup/Threshold trigger
+            // off brake signal or rewrite brake-only calibration; Brake Fade
+            // is hard-restricted to the Brake role at the worker level
+            // already — see MBoosterEffectWorker.Tick). Engine Vibration, TC,
+            // Wheel Spin, Gear Shift, G-Force, and Road Texture are already
+            // role-agnostic and fully functional on a Throttle pedal, so they
+            // stay visible. Brake and Clutch keep showing every card
+            // (Clutch's own effect set, e.g. bite point, isn't scoped yet).
+            var brakeOnlyEffectVisibility = isThrottle ? Visibility.Collapsed : Visibility.Visible;
+            MBoosterAbsExpander.Visibility = brakeOnlyEffectVisibility;
+            MBoosterLockupExpander.Visibility = brakeOnlyEffectVisibility;
+            MBoosterThresholdExpander.Visibility = brakeOnlyEffectVisibility;
+            MBoosterBrakeFadeExpander.Visibility = brakeOnlyEffectVisibility;
         }
 
         // Force every device-gated mBooster panel visible for the no-hardware
@@ -3676,6 +3742,17 @@ namespace MozaPlugin
             MBoosterDeadzoneMaxForcePanel.Visibility = Visibility.Visible;
             MBoosterNaturalFrictionPanel.Visibility = Visibility.Visible;
             MBoosterSegDampCard.Visibility = Visibility.Visible;
+            MBoosterAbsExpander.Visibility = Visibility.Visible;
+            MBoosterLockupExpander.Visibility = Visibility.Visible;
+            MBoosterThresholdExpander.Visibility = Visibility.Visible;
+            MBoosterBrakeFadeExpander.Visibility = Visibility.Visible;
+            // No real role to resolve without hardware — Brake-shaped bounds
+            // are as good a demo default as any (matches this panel's other
+            // "show everything" choices above).
+            MBoosterMaxForceSlider.Minimum = MBoosterUiConstants.BrakeMaxForceMinKg;
+            MBoosterMaxForceSlider.Maximum = MBoosterUiConstants.BrakeMaxForceMaxKg;
+            MBoosterDeadzoneSlider.Minimum = MBoosterUiConstants.BrakeDeadzoneMinKg;
+            MBoosterDeadzoneSlider.Maximum = MBoosterUiConstants.BrakeDeadzoneMaxKg;
 
             // Seed every control to its default once. The curve editors take no
             // node data of their own — they two-way bind to the hidden data-store
@@ -4513,7 +4590,20 @@ namespace MozaPlugin
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            PushMBoosterFeelCurve(s, controller, _mboosterEffectPedalIndex);
+        }
+
+        /// <summary>
+        /// Axis-explicit overload — used when the write must target a
+        /// SPECIFIC pedal that isn't necessarily the one currently selected
+        /// in the UI (e.g. clamping Max Force/Deadzone into range right after
+        /// a role change, before the user has selected that row). The
+        /// zero-arg overload above delegates here using the currently
+        /// selected controller/axis.
+        /// </summary>
+        private void PushMBoosterFeelCurve(IMBoosterPedalConfig s, global::MozaPlugin.Devices.MBoosterDeviceController controller, int axisIndex)
+        {
+            byte dev = MBoosterCalibDevice(controller, axisIndex);
             double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
             double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
             float[]? curveY = s.InputCurveY;

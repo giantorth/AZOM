@@ -1884,7 +1884,7 @@
                                                  bottom, matching the curve's bottom edge). -->
                                             <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0" HorizontalAlignment="Center">
                                                 <Slider x:Name="MBoosterDeadzoneSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
-                                                        Minimum="0" Maximum="40" TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
+                                                        TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
                                                 <TextBox x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
                                                          Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
                                                          HorizontalAlignment="Center" Width="44" Padding="2,2" Margin="0,8,0,0"
@@ -1899,7 +1899,7 @@
                                                  top). -->
                                             <StackPanel Grid.Row="1" Grid.Column="2" Margin="6,0,0,0" HorizontalAlignment="Center">
                                                 <Slider x:Name="MBoosterMaxForceSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
-                                                        Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
+                                                        TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
                                                 <TextBox x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
                                                          Tag="{Binding ElementName=MBoosterMaxForceSlider}"
                                                          HorizontalAlignment="Center" Width="44" Padding="2,2" Margin="0,8,0,0"
@@ -2141,7 +2141,7 @@
 
                             <StackPanel x:Name="MBoosterEffectsCardsPanel">
 
-                            <Expander Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterAbsExpander" Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterAbsEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterAbsEnable_Changed" Unchecked="MBoosterAbsEnable_Changed"/>
@@ -2324,7 +2324,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_Lockup}" IsExpanded="True" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterLockupExpander" Header="{x:Static res:Strings.Section_Lockup}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterLockupEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterLockupEnable_Changed" Unchecked="MBoosterLockupEnable_Changed"/>
@@ -2362,7 +2362,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_Threshold}" IsExpanded="True" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterThresholdExpander" Header="{x:Static res:Strings.Section_Threshold}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterThresholdEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterThresholdEnable_Changed" Unchecked="MBoosterThresholdEnable_Changed"/>
@@ -2481,7 +2481,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterBrakeFadeExpander" Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_BrakeFadeExperimental}"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">

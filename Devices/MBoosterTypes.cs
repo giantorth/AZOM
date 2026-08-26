@@ -18,6 +18,20 @@ namespace MozaPlugin.Devices
         public const float TravelMinGapMm = 3.8f;
         public const float TravelMaxGapMm = 32.1f;
 
+        // Pedal Feel Max Force/Deadzone slider bounds, role-scoped — a
+        // Throttle pedal is a much lighter spring than a brake's load cell,
+        // so it gets its own narrower range instead of the Brake-shaped
+        // 0-200kg/0-40kg. Selected in UpdateMBoosterConfigVisibilityForRole.
+        // Clutch keeps the Brake-shaped bounds for now (not yet requested).
+        public const float ThrottleMaxForceMinKg = 4f;
+        public const float ThrottleMaxForceMaxKg = 20f;
+        public const float ThrottleDeadzoneMinKg = 0f;
+        public const float ThrottleDeadzoneMaxKg = 5f;
+        public const float BrakeMaxForceMinKg = 0f;
+        public const float BrakeMaxForceMaxKg = 200f;
+        public const float BrakeDeadzoneMinKg = 0f;
+        public const float BrakeDeadzoneMaxKg = 40f;
+
         // Engine Vibration's hardware-safe frequency range. No longer a
         // user-facing slider bound — Engine's frequency is telemetry-derived
         // (see MBoosterEffectWorker.UpdateEngineRequest); these clamp the
