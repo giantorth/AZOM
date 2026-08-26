@@ -208,6 +208,11 @@ namespace MozaPlugin.Devices.Haptics
                 return;
             }
 
+            // LFE routed to SimHub's ShakeIt haptics: the plugin's own engine/ABS/
+            // gearshift modes must stay off the wire even between ShakeIt posts,
+            // or a lull in the effect stream would let them bleed through.
+            if (MozaPlugin.Instance?.WheelbaseLfeRoutedToShakeIt == true) { SilenceIfActive(); return; }
+
             // Feed paused/stopped → game-driven activation goes false (test
             // triggers still fire on their own deadlines).
             bool feedLive = _latestGameActive &&

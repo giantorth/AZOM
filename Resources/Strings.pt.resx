@@ -767,4 +767,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Velocidade da respiração (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>EFEITO INATIVO</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Animação inativa</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Fonte de LFE da base</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Separador LFE do plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requer o SimHub 9.12 ou posterior.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definição de dispositivo atualizada. Reinicie o SimHub para aplicar.</value></data>
 </root>

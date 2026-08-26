@@ -71,6 +71,7 @@ namespace MozaPlugin.UI
                 ConnectionToggle.IsChecked = plugin.ConnectionEnabled;
                 AutoApplyProfileCheck.IsChecked = plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
+                SyncWheelbaseLfeSourceCombo();
                 SyncAutoStandbyCombo();
                 LimitWheelUpdatesCheck.IsChecked = plugin.Settings.LimitWheelUpdates;
                 AlwaysResendBitmaskCheck.IsChecked = plugin.Settings.AlwaysResendBitmask;

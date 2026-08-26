@@ -108,13 +108,56 @@ namespace MozaPlugin.UI
 
             var wheelbasePid = DeviceDefinitionDeployer.ResolveWheelbasePid(_plugin.Connection);
             var deployed = DeviceDefinitionDeployer.DeployAllKnown(
-                wheelbasePid, DeviceDefinitionDeployer.ResolveDashboardPid(wheelbasePid));
+                wheelbasePid, DeviceDefinitionDeployer.ResolveDashboardPid(wheelbasePid),
+                _plugin.WheelbaseWantsShakeItHaptics);
 
             if (deployed.Written > 0)
                 _plugin.DeviceDefinitionDeployed = true;
 
             RedeployDefinitionsStatusText.Text = string.Format(
                 Strings.Status_RedeployedFmt, deployed.Written, deployed.Total, wheelbasePid);
+        }
+
+        /// <summary>
+        /// Seed the LFE-source selector and disable the ShakeIt option on a SimHub
+        /// that has no device haptics feature (pre-9.12) — the definition would
+        /// declare a block that build can't read.
+        /// </summary>
+        private void SyncWheelbaseLfeSourceCombo()
+        {
+            bool supported = Devices.Haptics.MozaBaseHapticsBridge.IsSupported;
+            WheelbaseLfeSourceCombo.IsEnabled = supported;
+
+            var source = _plugin.Settings.WheelbaseLfeSource;
+            if (!supported) source = WheelbaseLfeSource.PluginTab;
+            WheelbaseLfeSourceCombo.SelectedIndex = source == WheelbaseLfeSource.ShakeIt ? 1 : 0;
+
+            WheelbaseLfeSourceStatusText.Text = supported ? "" : Strings.Status_WheelbaseLfeShakeItUnavailable;
+        }
+
+        private void WheelbaseLfeSource_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+
+            var chosen = WheelbaseLfeSourceCombo.SelectedIndex == 1
+                ? WheelbaseLfeSource.ShakeIt
+                : WheelbaseLfeSource.PluginTab;
+            if (chosen == _plugin.Settings.WheelbaseLfeSource) return;
+
+            _plugin.Settings.WheelbaseLfeSource = chosen;
+            _plugin.SaveSettings();
+
+            // The choice IS the HapticsFeature block, so the definition has to be
+            // rewritten and SimHub restarted before it takes effect.
+            if (DeviceDefinitionDeployer.DeployForBaseModel(
+                    _plugin.Data?.BaseModelName,
+                    _plugin.Connection?.DiscoveredPid,
+                    _plugin.DetectionState.BaseAmbientLedSupported,
+                    _plugin.WheelbaseWantsShakeItHaptics))
+                _plugin.DeviceDefinitionDeployed = true;
+
+            WheelbaseLfeSourceStatusText.Text = _plugin.DeviceDefinitionDeployed
+                ? Strings.Status_WheelbaseLfeSourceRestartRequired : "";
         }
 
         private void ClearAllSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -134,6 +177,7 @@ namespace MozaPlugin.UI
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
+                SyncWheelbaseLfeSourceCombo();
                 LimitWheelUpdatesCheck.IsChecked = _plugin.Settings.LimitWheelUpdates;
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;

@@ -27,10 +27,16 @@ namespace MozaPlugin.Integration
     /// SimHub's <see cref="CreateDefaultActivationFor"/> hook has no channel index,
     /// so the default is seeded explicitly in <see cref="LoadDefaultPlatformSettings"/>.
     ///
-    /// Instantiated by SimHub via the generic new() constraint inside the
-    /// reflection-constructed device instance (see <see cref="MozaShakeItDeviceRegistry"/>)
-    /// — MUST stay public with a parameterless ctor, and MUST NOT touch plugin
-    /// state at construction time (may precede plugin Init).
+    /// Installed over SimHub's own <c>StandardProtocolMotorsChannelsSettingsProvider</c>
+    /// on the wheelbase device's Haptics section — see
+    /// <see cref="Devices.Haptics.MozaBaseHapticsBridge.TryInstallChannelsProvider"/>.
+    /// The declarative HapticsFeature path has no way to name a provider, and
+    /// SimHub's default one enables EVERY channel on every new effect, which on a
+    /// summing base is a silent 3× — so the swap is what keeps the defaults sane.
+    ///
+    /// Constructed by the bridge (and previously by SimHub via a generic new()
+    /// constraint) — MUST stay public with a parameterless ctor, and MUST NOT
+    /// touch plugin state at construction time (may precede plugin Init).
     /// </summary>
     public sealed class MozaWheelbaseLfeChannelsProvider : IShakeItChannelsInfoProvider
     {

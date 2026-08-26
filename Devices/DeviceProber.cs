@@ -632,6 +632,28 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Write (or refresh, or remove) this wheelbase's SimHub device definition.
+        /// Called from both capability replies — the ambient probe and the firmware
+        /// version — because either can be the one that changes the answer, and the
+        /// deployer's staleness check makes repeats free.
+        /// </summary>
+        private void DeployBaseDefinition(bool ambientDetected)
+        {
+            // Unknown until the firmware version answers. The ambient probe replies
+            // first, so passing plain false there stripped HapticsFeature and the
+            // version reply put it straight back — two writes and a restart banner
+            // on every boot.
+            bool? wantHaptics = _data.BaseFwVersion != 0
+                ? _plugin.WheelbaseWantsShakeItHaptics
+                : (bool?)null;
+
+            if (DeviceDefinitionDeployer.DeployForBaseModel(
+                    _data.BaseModelName, _connection.DiscoveredPid,
+                    ambientDetected, wantHaptics))
+                _plugin.DeviceDefinitionDeployed = true;
+        }
+
+        /// <summary>
         /// Auto-detect connected devices based on response commands.
         /// First sight of a known response flips the matching detection flag
         /// and queues per-device settings reads + Apply*ToHardware.
@@ -693,7 +715,7 @@ namespace MozaPlugin.Devices
                 // Capability probe for the wheelbase ambient strip — R21/R25/R27
                 // family replies on group 0xA2; R9/R12 silently drop the read.
                 // Reply is handled in the "base-ambient-brightness" case and
-                // gates DeviceDefinitionDeployer.DeployBaseAmbient.
+                // gates the wheelbase device definition's LED section.
                 if (!_detectionState.BaseAmbientProbed)
                 {
                     _detectionState.BaseAmbientProbed = true;
@@ -745,9 +767,7 @@ namespace MozaPlugin.Devices
                     if (!_detectionState.BaseAmbientLedSupported)
                     {
                         _detectionState.BaseAmbientLedSupported = true;
-                        if (DeviceDefinitionDeployer.DeployBaseAmbient(
-                                _connection.DiscoveredPid, _data.BaseModelName))
-                            _plugin.DeviceDefinitionDeployed = true;
+                        DeployBaseDefinition(ambientDetected: true);
                         _plugin.HardwareApplier.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         // Per-LED palettes, sized to the detected strip length so a
@@ -774,6 +794,12 @@ namespace MozaPlugin.Devices
                             $"(LFE effects {(_data.BaseSupportsLfe ? "supported" : "unsupported, needs >= 1.2.10.10")}) " +
                             $"via {commandName}");
                     }
+                    // LFE support is only known now, and it decides whether the
+                    // device definition carries a HapticsFeature block. This is
+                    // also the ONLY deploy trigger for a base with no ambient
+                    // strip — nothing else fires for an R5/R9/R12.
+                    DeployBaseDefinition(ambientDetected: _detectionState.BaseAmbientLedSupported);
+
                     // Deferred equalizer7-10 apply+read: the main base sweep runs
                     // before the firmware version is known, and old firmware never
                     // answers these registers. Writes queue before reads so the

@@ -3519,6 +3519,17 @@
                                     <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
                                               Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
                                 </StackPanel>
+                                <StackPanel x:Name="WheelbaseLfeSourceRow" Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_WheelbaseLfeSource}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:SegmentedControl x:Name="WheelbaseLfeSourceCombo" VerticalAlignment="Center"
+                                                           SelectionChanged="WheelbaseLfeSource_Changed">
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_WheelbaseLfeSourcePlugin}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_WheelbaseLfeSourceShakeIt}"/>
+                                    </ctrl:SegmentedControl>
+                                    <TextBlock x:Name="WheelbaseLfeSourceStatusText" Text=""
+                                               Style="{StaticResource MutedHintText}"
+                                               VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
 

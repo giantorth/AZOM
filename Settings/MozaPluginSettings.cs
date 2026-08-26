@@ -7,6 +7,15 @@ using MozaPlugin.UI.UpdateCheck;
 
 namespace MozaPlugin.Settings
 {
+    /// <summary>Which subsystem drives the wheelbase LFE oscillators.</summary>
+    public enum WheelbaseLfeSource
+    {
+        /// <summary>The plugin's own LFE tab (engine / ABS / gearshift effects).</summary>
+        PluginTab = 0,
+        /// <summary>SimHub's ShakeIt motors editor, via the base device's Haptics section.</summary>
+        ShakeIt = 1,
+    }
+
     /// <summary>
     /// Persisted plugin settings. Saved/loaded via SimHub's ReadCommonSettings/SaveCommonSettings.
     /// Stores values that the wheel doesn't retain between sessions.
@@ -281,6 +290,12 @@ namespace MozaPlugin.Settings
         // One-shot marker for the migration that clears the old serialized
         // VerboseWireDebugLog=true. See MozaPlugin.Init.
         public bool VerboseWireDebugLogDefaultMigrated { get; set; }
+
+        // Where wheelbase LFE effects come from. The plugin's own LFE tab and a
+        // SimHub ShakeIt haptics device would sum on the wire, so exactly one owns
+        // it. ShakeIt mode is what puts HapticsFeature in the base's device.json,
+        // so switching redeploys the definition and asks for a SimHub restart.
+        public WheelbaseLfeSource WheelbaseLfeSource { get; set; } = WheelbaseLfeSource.PluginTab;
 
         // ~1/min pull of the wheel display's own log via session FF kind=14,
         // acked with kind=15 (which clears those lines on the device). No UI —

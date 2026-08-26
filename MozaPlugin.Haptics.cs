@@ -13,6 +13,7 @@ using SimHub.Plugins;
 using MozaPlugin.Devices;
 using MozaPlugin.Devices.StalksTruckSim;
 using MozaPlugin.Hardware;
+using LfeSource = MozaPlugin.Settings.WheelbaseLfeSource;
 using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using MozaPlugin.Settings;
@@ -57,6 +58,13 @@ namespace MozaPlugin
         // live plugin through Instance; these forwarders keep the worker the
         // single wire owner.
 
+        /// <summary>True when the user routed wheelbase LFE to SimHub's ShakeIt motors editor rather than the plugin's own LFE tab.</summary>
+        internal bool WheelbaseLfeRoutedToShakeIt =>
+            Settings?.WheelbaseLfeSource == LfeSource.ShakeIt;
+
+        /// <summary>True when the base's device definition should carry a HapticsFeature block: LFE-capable firmware AND the user routed LFE to ShakeIt.</summary>
+        internal bool WheelbaseWantsShakeItHaptics => WheelbaseLfeRoutedToShakeIt && _data.BaseSupportsLfe;
+
         /// <summary>True when the wheelbase can accept ShakeIt-driven LFE frames (drives the haptics device's connected state).</summary>
         internal bool IsBaseLfeHapticsReady =>
             _baseLfeWorker != null && _data.BaseSupportsLfe
@@ -82,7 +90,7 @@ namespace MozaPlugin
             set { _shakeItLfeDeviceDeployedCache = value == null ? -1 : (value.Value ? 1 : 0); }
         }
 
-        /// <summary>True when a "MOZA Wheelbase LFE" haptics device instance is deployed in SimHub's device list, regardless of enable/game state — the LFE tab hides while it is, so the two sources can't both edit the base. UI-thread callers only (enumerates SimHub's WPF-owned device collection); off-thread readers use <see cref="ShakeItLfeDeviceDeployedCached"/>.</summary>
+        /// <summary>True when a wheelbase device carrying the ShakeIt Haptics section is present in SimHub's device list, regardless of enable/game state. Diagnostics only — the LFE tab is gated by <see cref="WheelbaseLfeRoutedToShakeIt"/>, not by device presence. UI-thread callers only (enumerates SimHub's WPF-owned device collection); off-thread readers use <see cref="ShakeItLfeDeviceDeployedCached"/>.</summary>
         internal bool IsShakeItLfeDeviceDeployed
         {
             get
@@ -93,8 +101,10 @@ namespace MozaPlugin
                     if (dp == null) return false;
                     foreach (var d in dp.GetDevices())
                     {
-                        if (d?.DeviceDescriptor?.DeviceTypeID is string id && id.Length != 0 &&
-                            id.IndexOf(Integration.MozaShakeItDeviceRegistry.WheelbaseDeviceTypeId, StringComparison.OrdinalIgnoreCase) >= 0)
+                        var id = d?.DeviceDescriptor?.DeviceTypeID;
+                        if (string.IsNullOrEmpty(id)) continue;
+                        if (Devices.MozaDeviceConstants.GetBaseModelPrefix(id!) is string prefix
+                            && prefix.Length != 0)
                             return true;
                     }
                     return false;
@@ -105,7 +115,13 @@ namespace MozaPlugin
 
         /// <summary>Latest ShakeIt per-oscillator (gain 0..1, freq Hz) for the three summed LFE slots — from the provider on the SimHub data thread.</summary>
         internal void PostShakeItLfeChannels(double g0, double f0, double g1, double f1, double g2, double f2)
-            => _baseLfeWorker?.PostShakeItChannels(g0, f0, g1, f1, g2, f2);
+        {
+            // Hard gate: with LFE routed to the plugin's own tab, a stray haptics
+            // device must not reach the wire — the worker's ShakeIt takeover would
+            // otherwise mute the user's configured effects.
+            if (!WheelbaseLfeRoutedToShakeIt) return;
+            _baseLfeWorker?.PostShakeItChannels(g0, f0, g1, f1, g2, f2);
+        }
 
         internal void ClearShakeItLfeChannels() => _baseLfeWorker?.ClearShakeItChannels();
 

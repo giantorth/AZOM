@@ -28,7 +28,7 @@ namespace MozaPlugin.Devices.Extensions
                 yield return typeof(MozaDashDeviceExtension);
             }
 
-            if (MozaDeviceConstants.IsBaseAmbientDevice(typeId))
+            if (MozaDeviceConstants.IsBaseDevice(typeId))
             {
                 yield return typeof(MozaBaseDeviceExtension);
             }

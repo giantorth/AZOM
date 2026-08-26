@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -76,8 +77,6 @@ namespace MozaPlugin.Devices.Ui
         {
             if (!ResolvePlugin())
             {
-                StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = Strings.Status_PluginNotLoaded;
                 BaseAmbientNotDetectedPanel.Visibility = Visibility.Visible;
                 BasePanel.Visibility = Visibility.Collapsed;
                 return;
@@ -86,11 +85,6 @@ namespace MozaPlugin.Devices.Ui
             // Detection-based (matches MozaBaseLedDeviceManager.IsConnected) so the
             // tab reflects detection independent of the lazily-injected LED driver.
             bool detected = _plugin!.IsBaseAmbientLedSupported;
-            StatusDot.Fill = detected ? Brushes.LimeGreen : Brushes.Red;
-            StatusText.Text = detected ? "Connected" : "Disconnected";
-            BaseModelText.Text = string.IsNullOrEmpty(_data!.BaseModelName)
-                ? "(unknown)"
-                : _data.BaseModelName;
 
             using (_suppressor.Begin())
             {
@@ -99,7 +93,9 @@ namespace MozaPlugin.Devices.Ui
 
                 if (detected)
                 {
-                    SetComboSafe(IndicatorStateCombo, Clamp(_data.BaseAmbientIndicatorState, 0, 1));
+                    // 0 off, 1 SimHub mode, 2 on — the selector index IS the register value
+                    // written to 0x1C.
+                    SetComboSafe(IndicatorStateCombo, Clamp(_data.BaseAmbientIndicatorState, 0, 2));
                     // Standby dropdown index == device mode: 0 off, 1 constant,
                     // 2 breathing, 3 color cycle, 4 rainbow, 5 sand flow.
                     SetComboSafe(StandbyModeCombo, Clamp(_data.BaseAmbientStandbyMode, 0, 5));
@@ -110,8 +106,6 @@ namespace MozaPlugin.Devices.Ui
                     SleepTimeoutSlider.Value = Clamp(_data.BaseAmbientSleepTimeout, 0, (int)SleepTimeoutSlider.Maximum);
                     SleepTimeoutValue.Text = $"{(int)SleepTimeoutSlider.Value}";
 
-                    UpdateSwatch(StartupColorSwatch, _data.BaseAmbientStartupColor);
-                    UpdateSwatch(ShutdownColorSwatch, _data.BaseAmbientShutdownColor);
 
                     RefreshEffectRows();
                     RefreshPerLedSwatches();
@@ -421,7 +415,7 @@ namespace MozaPlugin.Devices.Ui
             swatch.Background = new SolidColorBrush(Color.FromRgb(rgb[0], rgb[1], rgb[2]));
         }
 
-        private static void SetComboSafe(ComboBox combo, int index)
+        private static void SetComboSafe(Selector combo, int index)
         {
             if (index >= 0 && index < combo.Items.Count)
                 combo.SelectedIndex = index;
@@ -494,20 +488,6 @@ namespace MozaPlugin.Devices.Ui
             _plugin.UpdateActiveProfile(p => p.BaseAmbientSleepTimeout = val);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-sleep-timeout", val);
             _plugin.SaveSettings();
-        }
-
-        private void StartupColorSwatch_Click(object sender, MouseButtonEventArgs e)
-        {
-            ShowColorPicker(_data!.BaseAmbientStartupColor, "base-ambient-startup-color",
-                packed => _plugin!.UpdateActiveProfile(p => p.BaseAmbientStartupColor = packed),
-                StartupColorSwatch);
-        }
-
-        private void ShutdownColorSwatch_Click(object sender, MouseButtonEventArgs e)
-        {
-            ShowColorPicker(_data!.BaseAmbientShutdownColor, "base-ambient-shutdown-color",
-                packed => _plugin!.UpdateActiveProfile(p => p.BaseAmbientShutdownColor = packed),
-                ShutdownColorSwatch);
         }
 
         private void ShowColorPicker(byte[] target, string command, Action<int> persistPacked, Border swatch)

@@ -22,6 +22,11 @@ width; the frame shapes are identical.
 | R16 Ultra | `R16 Black # MOT-3-V01` | **6** | **12** | `0x3F` | 1 entry (LED 5), wire `N=6` | Measured 2026-08-22 + physical LED count confirmed |
 | R25 | `R25 Black # MOT-1 -V01` | 9 | 18 | `0x1FF` | 4 entries (LEDs 5–8), wire `N=18` | Measured 2026-05-05 |
 | R21, R27 | *(not captured)* | 9 | 18 | `0x1FF` | 4 entries (LEDs 5–8), wire `N=18` | Project owner confirms 9/side; no wire capture yet |
+| R3, R5, R9, R12 | e.g. `R5 Black # MOT-1` | **none** | — | — | — | No ambient strip; these bases silently drop the `0xA2` read |
+
+`Devices/BaseModelInfo.cs` is the code-side copy of this table (model token →
+friendly name → LEDs per strip, `0` meaning "no strip"). It also names the
+per-model SimHub device definition, so a token added here needs a row there.
 
 Three independent signals agree on the R16 Ultra's 6-per-strip geometry:
 
@@ -62,7 +67,7 @@ Selected commands:
 
 | Command | Cmd ID | Bytes | Type | Value semantics |
 |---------|--------|-------|------|-----------------|
-| `indicator-state` | `1C` | 1 | int | On (1) / off (0) |
+| `indicator-state` | `1C` | 1 | int | **Three states**, not a toggle: off / SimHub mode / on. Owner-reported (2026-08-25); the capture only ever showed `01`, which is why this was first recorded as on/off. The plugin writes the selector index (0/1/2) — the value↔state mapping past `01` is **unconfirmed by capture** |
 | `standby-mode` | `1D` | 1 | int | 0 = off, 1 = constant, 2 = breathing, 3 = color cycle, 4 = rainbow, 5 = sand flow — all measured, see [below](#standby-mode-details) |
 | `standby-interval` | `1E [mode]` | 2 | int | Per-mode interval in ms (big-endian u16). Each mode stores its own interval independently |
 | `brightness` | `1F FF` | 1 | int | **Percent, 0..100** — host UI "50%" writes `7E 03 20 12 1F FF 32` (R16 Ultra, 2026-08-22). DB lists `1F 02` but the wire uses `1F FF` |
@@ -71,8 +76,8 @@ Selected commands:
 | `sleep-timeout` | `22` | 2 | int | **Minutes**, BE u16 — confirmed by a two-point test, see [below](#sleep-timeout-is-minutes) |
 | `sleep-breath-interval` | `23 [sleep-mode]` | 2 | int | **Speed of the SLEEP breathing effect**, BE u16 ms — *not* the standby breath speed, which is `1E 02`. Only `23 01` observed. [Details](#0x23-is-the-sleep-breath-interval) |
 | `sleep-led-color` | `25 [strip] [sleep-mode] [led]` | 3 | array (RGB) | Per-LED colour of the sleep effect. Only `sleep-mode`=`01` (breathe) observed |
-| `startup-color` | `26` | 3 | array (RGB) | Color shown briefly at power-on |
-| `shutdown-color` | `27` | 3 | array (RGB) | Color shown at power-off |
+| `startup-color` | `26` | 3 | array (RGB) | Semantics **unverified** — the register reads back a real value, but the "power-on colour" reading is an interpretation, the setting has no observed effect, and Pit House exposes no such control (owner-reported 2026-08-25). Dropped from the plugin UI; the command and read remain |
+| `shutdown-color` | `27` | 3 | array (RGB) | Semantics **unverified** — see `startup-color` above. Dropped from the plugin UI; the command and read remain |
 
 ### Standby mode details
 

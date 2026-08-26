@@ -19,6 +19,14 @@ namespace MozaPlugin.Devices.Extensions
         public int BaseAmbientShutdownColor { get; set; } = -1;    // packed RGB
 
         /// <summary>
+        /// One-shot marker: the ShakeIt Haptics section's stock all-channels-on
+        /// defaults have been narrowed to a single oscillator for this device
+        /// instance. Persisted so the pass runs once on a fresh device and never
+        /// re-clobbers channel choices the user makes afterwards.
+        /// </summary>
+        public bool LfeChannelDefaultsNormalized { get; set; }
+
+        /// <summary>
         /// Capture current base ambient state from the plugin. When
         /// <paramref name="profile"/> is provided, prefer profile values over
         /// the flat-field fallback — the new R5 source of truth.

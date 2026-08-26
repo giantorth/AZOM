@@ -293,18 +293,20 @@ namespace MozaPlugin
                     if (Devices.BaseModelInfo.IsKnown(baseName))
                         _data.BaseAmbientLedsPerStrip = Devices.BaseModelInfo.LedsPerStrip(baseName);
 
-                    // The ambient device definition's LED count comes from this
-                    // string (strip length is per model). DeviceProber reads the
-                    // model before the ambient capability probe so it is normally
-                    // known at deploy time, but a dropped or reordered reply would
-                    // leave the definition on the fallback geometry — re-deploy
-                    // once the real name lands. Idempotent: the deployer's
-                    // staleness check no-ops when the count already matches.
-                    if (DetectionState.BaseAmbientLedSupported
-                        && Devices.BaseModelInfo.IsKnown(baseName))
+                    // This string NAMES the device definition and selects its LED
+                    // count, so nothing can be written until it lands. DeviceProber
+                    // reads the model before the capability probes so it is normally
+                    // known by then, but a dropped or reordered reply would leave the
+                    // base with no definition at all — deploy once the real name
+                    // arrives. Idempotent: the deployer's staleness check no-ops when
+                    // the file already matches.
+                    if (Devices.BaseModelInfo.IsKnown(baseName)
+                        && (DetectionState.BaseAmbientLedSupported || _data.BaseSupportsLfe))
                     {
-                        if (Devices.Extensions.DeviceDefinitionDeployer.DeployBaseAmbient(
-                                _deviceManager?.Connection?.DiscoveredPid, baseName))
+                        if (Devices.Extensions.DeviceDefinitionDeployer.DeployForBaseModel(
+                                baseName, _deviceManager?.Connection?.DiscoveredPid,
+                                DetectionState.BaseAmbientLedSupported,
+                                _data.BaseFwVersion != 0 ? WheelbaseWantsShakeItHaptics : (bool?)null))
                             DeviceDefinitionDeployed = true;
                     }
                 }

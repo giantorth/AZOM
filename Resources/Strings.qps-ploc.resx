@@ -758,4 +758,9 @@
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Panting speed (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>NAPTIME WOOF</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Naptime Wiggle</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Grrowl Yip Snarf Barff?</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Woof Arf Bork!</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Yap Yowff!</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Boof Grr Howl Barff Yip Arf!</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Snarf Bork Yowff Barff Grrowl Woof Yip Arf Boof!</value></data>
 </root>

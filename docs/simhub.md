@@ -946,15 +946,167 @@ Only two internal type names are load-bearing (`ShakeItV3DeviceInstance<,>`, `Mo
 
 attached via `AttachDelegate(name, GetType(), func)`, so the full readable names are `ShakeITMotorsV3Plugin.Export.<PropertyName>.<Placement>` and `ShakeITBSV3Plugin.Export.<PropertyName>.<Placement>` (`<Placement>` is the effect's `FFBPlacement`, e.g. `FrontLeft`; value is the effect's `LastOutput` level, 0–100). `GlobalGain` and `IsMuted` are exported per plugin as well. Pollable via `PluginManager.GetPropertyValue` or usable directly in any NCalc formula field — a zero-integration bridge at the cost of per-effect user setup, level-only (no frequency), and no channel mapping.
 
-### Device Builder: no haptics feature
+### Device Builder haptics (SimHub 9.12+)
 
-The `.shdd`/`.shdp` Device Builder feature set is definitively LEDs + Screen only:
+**Superseded finding.** Up to 9.11 the Device Builder feature set was LEDs + Screen only, and a
+declarative device could never appear in ShakeIt. **9.12.0 added a haptics feature block**, so a
+single `device.json` can now declare LEDs *and* motors. Verified by decompiling
+`SimHub.Plugins.dll` 9.12.0 (`ilspycmd -o <dir> -p libs/SimHub/SimHub.Plugins.dll -r libs/SimHub`).
 
 ```csharp
-[Flags] public enum DescriptorFeatures { None = 0, Screen = 2, LEDs = 4 }   // …Registry.DescriptorBuilder
+[Flags] public enum DescriptorFeatures        // …Registry.DescriptorBuilder
+{ None = 0, Screen = 2, LEDs = 4, Haptics = 8, Fans = 0x10, DataCommunication = 0x20 }
+
+public class HapticsFeature : FeatureBase     // …DescriptorBuilder.Haptics
+{
+    public int MotorsCount;        // clamped to 1..8 by the device extension; ctor default 6
+    public bool HasFrequency;      // ctor default true
+    public int MinimumFrequency;   // ctor default 1     — ShakeIt clamps tones to [min, max]
+    public int MaximumFrequency;   // ctor default 255
+}
 ```
 
-There is no Motors/Haptics feature block, so a declarative template device can never appear in ShakeIt — haptics devices must be code-registered via `IDeviceDescriptorsRegistry`, as separate device entries from any template-based LED/dash definitions the plugin also ships.
+`DescriptorContent.ShouldSerializeHapticsFeature()` gates serialization on `IsEnabled`, so a
+disabled feature block is **absent** from the JSON rather than present-and-false. The same is true
+of `LedsFeature`, `ScreenFeature`, `FansFeature` and `DataCommunicationFeature` — absent means off,
+and an omitted block round-trips cleanly.
+
+JSON shape (SimHub's own round-trip output, MOZA wheelbase, 9.12.0):
+
+```json
+"LedsFeature": { "…": "…", "IsEnabled": true },
+"HapticsFeature": {
+  "MotorsCount": 3, "HasFrequency": true,
+  "MinimumFrequency": 5, "MaximumFrequency": 200, "IsEnabled": true
+},
+"HardwareInterface": { "HardwareInterface": {
+  "TypeName": "LedsStandardHIDProtocol",
+  "HIDReportId": "0x68", "HIDFansReportId": "0x69", "HIDMotorsReportId": "0x6A",
+  "HIDReportSize": 64, "DeviceDetection": { "Vid": "0x346E", "Pid": "0x00" } } },
+"MinimumSimHubVersion": "9.12.0"
+```
+
+Two round-trip gotchas for a plugin that generates these files and compares them for staleness:
+
+- SimHub **normalises the PID hex** — a written `"0x0000"` comes back as `"0x00"`. Compare PIDs by
+  value, or an untouched definition reads as stale on every boot and the "restart SimHub" banner
+  never clears.
+- SimHub adds `LastModified` and drops disabled feature blocks. Compare semantic fields only.
+
+#### The composite restructure — LEDs stop without a connected primary
+
+This is the trap. `BuildDevice()` on the Device Builder descriptor rewires the composite as soon as
+**either** Haptics or Fans is enabled:
+
+```csharp
+bool flag2 = FansFeature.IsEnabled || HapticsFeature.IsEnabled;
+ledModuleDevice = new LedModuleDevice(...);
+if (flag2) {
+    ledModuleDevice.DisablePrimary();          // the LED module is no longer primary
+    ledModuleDevice.UseSharedConnection();
+    standardHidConnectionDevice = new StandardProtocolConnectionDevice(manager, vid, pid, …);
+}
+if (HapticsFeature.IsEnabled)
+    standardProtocolMotorsDeviceExtension = new StandardProtocolMotorsDeviceExtension(
+        () => standardHidConnectionDevice.GetRawDriverInstance() as IMotorsDriver,
+        MotorsCount, HasFrequency, MinimumFrequency, MaximumFrequency);
+```
+
+`StandardProtocolConnectionDevice.IsPrimary => true` and it becomes the composite's **only**
+primary. `CompositeDeviceInstance.DataUpdate` then splits primaries from the rest, and when a
+primary is not `Connected` it sets `PrimaryDeviceMissing = true` on every non-primary sub-device →
+`DeviceInstance.ShouldBeRunning()` returns false → `LedModuleDevice.DataUpdate` sets
+`ledModuleSettings.IsEnabled = false`.
+
+> **A plugin that adds `HapticsFeature` to an LED definition it drives through a virtual
+> `ILedDeviceManager` must ALSO make the connection sub-device report connected, or the LEDs go
+> dark.** A JSON-only change is not enough.
+
+`StandardProtocolConnectionDevice.Manager` is a public getter-only auto-property, so the swap goes
+through its `<Manager>k__BackingField` — the same reflection shape as the `LedModuleSettings.DeviceDriver`
+injection above. One swap covers both concerns: the motors extension resolves its driver lazily via
+`Manager.GetDriverInstance()`, so a manager whose `GetDriverInstance()` returns an `IMotorsDriver`
+receives the mixed motor values directly.
+
+Also implement **`IConnectableLedDeviceManager`** (`void EnsureConnected()`, one method) on the
+replacement manager. Without it, `StandardProtocolConnectionDevice.DataUpdate` calls
+`Manager.Display(6 × () => new Color[0], forceRefresh: false)` on **every tick**.
+
+#### The motors interface
+
+```csharp
+public interface IMotorsDriver : IUSBDriver, IDriver, IDisposable   // BA63Driver.Interfaces
+{ bool SendMotors(MotorStates states, bool forceRefresh); }
+// IDriver: bool IsConnected; string SerialNumber; string FirmwareVersion; void Clear();
+
+public class MotorStates { public MotorState[] States { get; } = new MotorState[8]; }
+public struct MotorState { public int Frequency; public double Gain; }   // Gain 0..1
+```
+
+`StandardProtocolMotorsDeviceExtension` (`CompositeCode/CompositeLabel = "Haptics"`) hosts a full
+`ShakeITV3PluginDevice` closed over `MotorsWithFrequencyOutputManager` +
+`StandardProtocolMotorsChannelsSettingsProvider`, so the device page gains the standard ShakeIt
+Effects / Controls tabs. Channels are named `"Motor 1".."Motor N"` and
+`HardwareFrequencyRange()` comes from the JSON's min/max — the declarative path gives no way to
+supply a custom `IShakeItChannelsInfoProvider`, so custom channel names and default activations do
+not survive a move from a code-registered device to a declared one.
+
+Its `GetDeviceState()` returns `Connected` only when the output manager is connected, which chains
+through `StandardProtocolSharedMotorsManager.IsConnected()` → the `IMotorsDriver`'s `IsConnected`.
+That state does **not** gate the LEDs — only the connection sub-device's does — so the motors
+driver can carry a narrower capability gate than the connection manager.
+
+**Alternative hook.** `StandardProtocolMotorsSharedDrivers` is a **public static** registry
+(`Register(string key, Func<IMotorsDriver>)`) keyed by a GUID the extension generates into its
+private `sharedDriverKey` field. Re-registering that key redirects the motors driver without
+touching the connection device — but the key needs reflection to read, and it does nothing about
+the connection-primary problem above, so the manager swap is the better single hook.
+
+Haptics devices can still be code-registered via `IDeviceDescriptorsRegistry` (§ above); that path
+is the only way to supply a custom channels provider.
+
+#### Channel activation defaults — three traps
+
+A declarative haptics device gets `StandardProtocolMotorsChannelsSettingsProvider`, and its
+per-effect channel defaults come out **all channels enabled**. On hardware that sums its channels
+into one actuator that is a silent multiplication. Three things make this harder to fix than it
+looks, all verified against 9.12.0 on real hardware:
+
+1. **The defaults key is hardcoded and not overridable.**
+   `MotorsWithFrequencyChannelsSettingsProvider.DefaultSettingsKey => "SimagicReactors"` is a plain
+   (non-virtual) property, and `StandardProtocolMotorsChannelsSettingsProvider` does not override
+   it. So *every* Device-Builder haptics device inherits Simagic's curated defaults from
+   `ShakeIt/EffectsDefaults/SimagicReactors/<ContainerType>.json`, which ship with SimHub and enable
+   every channel. Swapping in a custom `IShakeItChannelsInfoProvider` changes the key for later
+   `AddEffect` calls but does **not** retroactively touch a profile already seeded.
+
+2. **Activations are materialized lazily, long after the containers exist.**
+   A new device's 24-effect default profile is built during the motors sub-device's own
+   `LoadDefaultSettings`, but each effect's `DeviceChannelActivationSettings` is created on demand
+   — `MotorsWithFrequencyOutputManager.UpdateOutput` and the checkbox UI both call
+   `PlacementChannelsActivation.Get` → `GetOrAdd` → `CreateDefaultActivationFor`. Measured on an
+   R16: containers appear at t+0 ms, activations ~2 s later. Any pass that inspects the profile at
+   device-construction time sees containers with an empty settings store and concludes, wrongly,
+   that there is nothing to do.
+
+3. **`AbstractSettingsStore.Settings` is a public FIELD, not a property.**
+   ```csharp
+   public class AbstractSettingsStore { public List<AbstractSettingsBase> Settings = new(); }
+   ```
+   `EffectsContainerBase.SettingsStore` *is* a property, so a property-only reflection walk resolves
+   the store and then silently returns null for its contents — every effect looks like it has no
+   activation settings at all. Any reflection helper used here must fall back to fields.
+
+`LoadDefaultPlatformSettings` (the provider hook that *can* seed activations) only runs from
+`ShakeItProfile.AddEffect` and `IContainerGroupExtensions.ResetEffect` — never on profile load, and
+never for the stock default profile. So a custom provider fixes user-added effects only; the seeded
+defaults have to be rewritten directly. The MOZA plugin does that once per device instance
+(`MozaBaseHapticsBridge.NarrowStockChannelDefaults`), matching only the exact all-channels-on shape
+so a deliberate multi-channel choice is never clobbered.
+
+Note also that `MotorsOutputManagerBase.LoadDefaultPlatformSettings` computes an
+`EffectsDefaultsOverrides/<key>` path and then discards it — both file probes use the
+`EffectsDefaults` path. The overrides mechanism is dead in this version.
 
 ## Control Mapper Variant Providers
 

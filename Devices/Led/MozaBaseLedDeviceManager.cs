@@ -112,11 +112,38 @@ namespace MozaPlugin.Devices.Led
             }
         }
 
-        public bool IsConnected() => MozaPlugin.Instance?.IsBaseAmbientLedSupported ?? false;
+        /// <summary>
+        /// Model token the owning device definition was written for ("R16"), or
+        /// empty for the legacy shared definition. Definitions are per-model now,
+        /// so a leftover one for a base the user no longer runs must not drive the
+        /// attached base's strip with the wrong geometry.
+        /// </summary>
+        internal string ExpectedModelPrefix { get; set; } = "";
 
-        public string GetSerialNumber() => "MOZA-BASE-AMBIENT-VIRTUAL";
+        public bool IsConnected()
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || !plugin.IsBaseAmbientLedSupported) return false;
+            if (ExpectedModelPrefix.Length == 0) return true;   // legacy shared definition
 
-        public string GetFirmwareVersion() => "1.0";
+            // Empty while the base identity has not arrived yet — stay connected
+            // rather than blinking the strip off during a reconnect.
+            var attached = BaseModelInfo.ExtractPrefix(plugin.Data?.BaseModelName);
+            return attached.Length == 0
+                || string.Equals(attached, ExpectedModelPrefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Surfaced as "Serial number" on the LEDs tab's connection status. The base
+        // has no serial number as such, so its MCU UID is the closest real identity
+        // — better than a placeholder string, and it distinguishes two bases.
+        public string GetSerialNumber()
+        {
+            var uid = MozaPlugin.Instance?.Data?.BaseMcuUid;
+            return uid == null || uid.Length == 0 ? "" : BitConverter.ToString(uid).Replace("-", "");
+        }
+
+        // The base's real firmware, as read at group 0x04 — not the driver's version.
+        public string GetFirmwareVersion() => MozaPlugin.Instance?.Data?.BaseFwVersionText ?? "";
 
         public object GetDriverInstance() => this;
 

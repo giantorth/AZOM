@@ -774,4 +774,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>呼吸速度 (毫秒)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>待机效果</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>待机动画</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>轮基 LFE 来源</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>插件 LFE 选项卡</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>需要 SimHub 9.12 或更高版本。</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>设备定义已更新。请重启 SimHub 以应用。</value></data>
 </root>

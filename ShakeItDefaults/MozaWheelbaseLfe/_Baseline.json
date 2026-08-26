@@ -1,0 +1,130 @@
+{
+  "IsEnabled": false,
+  "SettingsStore": {
+    "Settings": [
+      {
+        "Channels": {
+          "All": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "Front": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "Rear": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "Left": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "Right": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "FrontLeft": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "FrontRight": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "RearLeft": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          },
+          "RearRight": {
+            "Channels": {
+              "0": {
+                "IsEnabled": true
+              },
+              "1": {
+                "IsEnabled": false
+              },
+              "2": {
+                "IsEnabled": false
+              }
+            }
+          }
+        },
+        "TypeName": "DeviceChannelActivationSettings"
+      }
+    ]
+  },
+  "Version": 1
+}

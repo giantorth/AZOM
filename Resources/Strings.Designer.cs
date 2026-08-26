@@ -836,5 +836,10 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_SleepSpeedMs => Get("SliderLabel_SleepSpeedMs");
         public static string Section_IdleEffect => Get("Section_IdleEffect");
         public static string SliderLabel_IdleAnimation => Get("SliderLabel_IdleAnimation");
+        public static string SliderLabel_WheelbaseLfeSource => Get("SliderLabel_WheelbaseLfeSource");
+        public static string Option_WheelbaseLfeSourcePlugin => Get("Option_WheelbaseLfeSourcePlugin");
+        public static string Option_WheelbaseLfeSourceShakeIt => Get("Option_WheelbaseLfeSourceShakeIt");
+        public static string Status_WheelbaseLfeShakeItUnavailable => Get("Status_WheelbaseLfeShakeItUnavailable");
+        public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
     }
 }

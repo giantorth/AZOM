@@ -773,4 +773,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>호흡 속도 (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>대기 효과</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>대기 애니메이션</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>휠베이스 LFE 소스</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>플러그인 LFE 탭</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>SimHub 9.12 이상이 필요합니다.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>장치 정의가 업데이트되었습니다. 적용하려면 SimHub를 다시 시작하세요.</value></data>
 </root>

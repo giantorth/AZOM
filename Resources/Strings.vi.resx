@@ -774,4 +774,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Tốc độ nhịp thở (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>HIỆU ỨNG CHỜ</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hiệu ứng khi chờ</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Nguồn LFE của đế lái</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Thẻ LFE của plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Cần SimHub 9.12 trở lên.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
 </root>

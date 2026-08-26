@@ -632,6 +632,7 @@ namespace MozaPlugin
                 // per-model deploy only reaches the attached wheel, so other
                 // wheels the user owns would never get a picture.
                 DeviceDefinitionDeployer.RefreshDeployedThumbnails();
+                Devices.Haptics.MozaLfeEffectDefaults.Deploy();
 
                 // Now safe to initialize the profile system — ApplyProfile (called
                 // by AutoApplyProfile on the initially selected game's profile)

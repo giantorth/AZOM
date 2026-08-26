@@ -38,7 +38,6 @@
 
             <Style TargetType="Button" BasedOn="{StaticResource MozaButton}"/>
             <Style TargetType="CheckBox" BasedOn="{StaticResource MozaCheckBox}"/>
-            <Style TargetType="ComboBox" BasedOn="{StaticResource MozaCombo}"/>
             <Style TargetType="Slider" BasedOn="{StaticResource MozaSlider}"/>
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
@@ -57,28 +56,6 @@
                  profile-not-added, telemetry parked/degraded) — surfaced here so
                  users who only visit the device page still see them. -->
             <ui:PluginBanners/>
-
-            <!-- Device header -->
-            <Border Background="{StaticResource BgCardBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="8"
-                    Padding="18,14" Margin="0,0,0,14">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="Gray"
-                                 VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        <TextBlock Text="{x:Static res:Strings.Section_BaseAmbientLeds}"
-                                   FontWeight="SemiBold" FontSize="14"
-                                   VerticalAlignment="Center" Margin="0,0,18,0"/>
-                        <TextBlock x:Name="StatusText" Style="{StaticResource MutedHintText}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{x:Static res:Strings.Label_BaseModel}" Style="{StaticResource KvKeyText}"/>
-                        <TextBlock x:Name="BaseModelText" Style="{StaticResource KvValueText}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
 
             <!-- Detection status -->
             <StackPanel x:Name="BaseAmbientNotDetectedPanel">
@@ -102,10 +79,11 @@
                                       Icon="{StaticResource IconBolt}" Margin="0,0,7,14">
                         <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="{x:Static res:Strings.SliderLabel_IndicatorState}" Style="{StaticResource FieldLabel}"/>
-                            <ComboBox x:Name="IndicatorStateCombo" Width="140" SelectionChanged="IndicatorStateCombo_Changed">
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Off}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_On}"/>
-                            </ComboBox>
+                            <ctrl:SegmentedControl x:Name="IndicatorStateCombo" SelectionChanged="IndicatorStateCombo_Changed">
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Off}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_SimHubMode}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_On}"/>
+                            </ctrl:SegmentedControl>
                         </StackPanel>
                     </ctrl:SectionCard>
 
@@ -132,14 +110,14 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="{x:Static res:Strings.SliderLabel_IdleAnimation}" Style="{StaticResource FieldLabel}"/>
-                            <ComboBox x:Name="StandbyModeCombo" Width="140" SelectionChanged="StandbyModeCombo_Changed">
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Off}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Constant}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Breath}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Cycle}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Rainbow}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Flow}"/>
-                            </ComboBox>
+                            <ctrl:SegmentedControl x:Name="StandbyModeCombo" SelectionChanged="StandbyModeCombo_Changed">
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Off}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Constant}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Breath}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Cycle}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Rainbow}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Flow}"/>
+                            </ctrl:SegmentedControl>
                         </StackPanel>
                         <Grid x:Name="StandbySpeedRow" Margin="0,4">
                             <Grid.ColumnDefinitions>
@@ -160,10 +138,10 @@
                         <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="{x:Static res:Strings.SliderLabel_SleepMode}" Style="{StaticResource FieldLabel}"/>
                             <!-- Effect selector, not an enable: 0 = disabled, 1 = breathe. -->
-                            <ComboBox x:Name="SleepModeCombo" Width="140" SelectionChanged="SleepModeCombo_Changed">
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Disabled}"/>
-                                <ComboBoxItem Content="{x:Static res:Strings.Option_Breath}"/>
-                            </ComboBox>
+                            <ctrl:SegmentedControl x:Name="SleepModeCombo" SelectionChanged="SleepModeCombo_Changed">
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Disabled}"/>
+                                <ListBoxItem Content="{x:Static res:Strings.Option_Breath}"/>
+                            </ctrl:SegmentedControl>
                         </StackPanel>
                         <Grid Margin="0,4">
                             <Grid.ColumnDefinitions>
@@ -193,24 +171,6 @@
                     </StackPanel>
                 </ctrl:SectionCard>
 
-                <ctrl:SectionCard Title="{x:Static res:Strings.Section_PowerOnOffColor}" Icon="{StaticResource IconPower}">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="{x:Static res:Strings.SliderLabel_StartupColor}" Style="{StaticResource FieldLabel}"/>
-                            <Border x:Name="StartupColorSwatch" Width="36" Height="36"
-                                    BorderBrush="{StaticResource BorderBrightBrush}" BorderThickness="1"
-                                    CornerRadius="4" Cursor="Hand" Background="Black"
-                                    MouseLeftButtonUp="StartupColorSwatch_Click"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="{x:Static res:Strings.SliderLabel_ShutdownColor}" Style="{StaticResource FieldLabel}"/>
-                            <Border x:Name="ShutdownColorSwatch" Width="36" Height="36"
-                                    BorderBrush="{StaticResource BorderBrightBrush}" BorderThickness="1"
-                                    CornerRadius="4" Cursor="Hand" Background="Black"
-                                    MouseLeftButtonUp="ShutdownColorSwatch_Click"/>
-                        </StackPanel>
-                    </StackPanel>
-                </ctrl:SectionCard>
             </StackPanel>
         </StackPanel>
     <!-- /ScrollViewer -->

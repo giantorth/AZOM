@@ -24,12 +24,15 @@ namespace MozaPlugin.Devices.Extensions
     {
         private const string DashCm2Resource = "MozaPlugin.Devices.DashCm2.device.json";
         private const string DashCm1Resource = "MozaPlugin.Devices.DashCm1.device.json";
-        private const string BaseAmbientResource = "MozaPlugin.Devices.WheelBase.device.json";
         private const string DashCm2DeviceName = "MOZA CM2 Racing Dash";
         private const string DashCm2ProductName = "CM2 Racing Dash";
         private const string DashCm1DeviceName = "MOZA CM1 Racing Dash";
         private const string DashCm1ProductName = "CM1 Racing Dash";
-        private const string BaseAmbientDeviceName = "MOZA Wheel Base";
+
+        // The single shared wheelbase definition wheelbases used before they got
+        // per-model ones. Deleted once a model-named definition lands, so SimHub
+        // doesn't offer two devices for the same PID.
+        private const string LegacyBaseDeviceName = "MOZA Wheel Base";
 
         // 0x0006 (R9 wheelbase) is the most common documented PID. The prior
         // 0x0004 placeholder doesn't match any known device. Used only when
@@ -49,11 +52,6 @@ namespace MozaPlugin.Devices.Extensions
         // arrives for the others.
         private const string DashCm2ThumbnailKey = "CM2";
         private const string DashCm1ThumbnailKey = "CM1";
-        // The shared "MOZA Wheel Base" definition covers the whole ambient-strip
-        // family (R21/R25/R27); the R21 render stands in for all of them for now.
-        // Named by the model whose art it is, so per-model routing can be added
-        // later without renaming (add R25U etc. keyed on the detected base).
-        private const string BaseAmbientThumbnailKey = "R21U";
 
         // Device name → thumbnail key for the template-based definitions that ship
         // art. Drives RefreshDeployedThumbnails' startup top-up; the per-detection
@@ -62,8 +60,31 @@ namespace MozaPlugin.Devices.Extensions
         {
             (DashCm2DeviceName, DashCm2ThumbnailKey),
             (DashCm1DeviceName, DashCm1ThumbnailKey),
-            (BaseAmbientDeviceName, BaseAmbientThumbnailKey),
         };
+
+        // Wheelbase model token → thumbnail resource key. Renders are named by the
+        // product they depict, which is not always the bare firmware token. Models
+        // absent here simply get no picture (same as most wheels).
+        private static readonly (string Prefix, string ThumbnailKey)[] BaseThumbnails =
+        {
+            ("R21", "R21U"),
+            ("R25", "R25U"),
+        };
+
+        // Wheelbase LFE haptics, as advertised to SimHub's ShakeIt motors editor.
+        // Three oscillators: the base runs exactly effect ids 0/1/2 concurrently
+        // and sums them in firmware (docs/protocol/devices/wheelbase-0x13.md).
+        // 5..200 Hz is the capture-verified band — ABS runs down to 5 Hz and the
+        // wire frequency field saturates at 200.
+        private const int BaseLfeMotorCount = 3;
+        private const int BaseLfeMinFrequency = 5;
+        private const int BaseLfeMaxFrequency = 200;
+
+        // HID report ids SimHub uses for the fans/motors channels of a
+        // LedsStandardHIDProtocol interface. Only meaningful when HapticsFeature
+        // is present; the plugin intercepts the values before they reach HID.
+        private const string HidFansReportId = "0x69";
+        private const string HidMotorsReportId = "0x6A";
 
         // Content version of the dynamically generated wheel device.json. Bump
         // when the generated body changes in a way that should re-deploy over an
@@ -74,6 +95,11 @@ namespace MozaPlugin.Devices.Extensions
         // RPM-only wheels (ES, bare CS) no longer emit a phantom button physical
         // LED (10 RPM was counted as 11) and disable the buttons-backlight section.
         private const int GeneratedWheelSchemaVersion = 3;
+
+        // Content version of the generated wheelbase device.json. Bump when the
+        // generated body changes in a way that must re-deploy over a file whose
+        // LED/haptics parameters are otherwise unchanged.
+        private const int GeneratedBaseSchemaVersion = 1;
 
         /// <summary>
         /// Deploy a dynamically generated device definition for a new-protocol wheel.
@@ -126,7 +152,7 @@ namespace MozaPlugin.Devices.Extensions
         /// anything the rim reports. Deploying for a wheel the user does not own
         /// is harmless — an unused entry in SimHub's device list.
         /// </summary>
-        public static DeployAllResult DeployAllKnown(string wheelbasePid, string dashboardPid)
+        public static DeployAllResult DeployAllKnown(string wheelbasePid, string dashboardPid, bool wheelbaseWantsHaptics = false)
         {
             int written = 0;
             int total = 0;
@@ -151,9 +177,26 @@ namespace MozaPlugin.Devices.Extensions
                     written++;
             }
 
+            // Wheelbase definitions, one per model that actually has an ambient
+            // strip. LFE support is firmware-gated and unknowable with no base
+            // attached, so the bulk path never invents a haptics-only definition
+            // for a model the user may not own — the live base-fw-version trigger
+            // writes those. The connected base still gets its real haptics state.
+            var connectedBasePrefix = BaseModelInfo.ExtractPrefix(MozaPlugin.Instance?.Data?.BaseModelName);
+            foreach (var (prefix, _, ledsPerStrip) in BaseModelInfo.KnownModels)
+            {
+                bool isConnected = string.Equals(prefix, connectedBasePrefix, StringComparison.OrdinalIgnoreCase);
+                bool wantHaptics = isConnected && wheelbaseWantsHaptics;
+                if (ledsPerStrip <= 0 && !wantHaptics)
+                    continue;
+
+                total++;
+                if (DeployBaseDefinition(prefix, wheelbasePid, ledsPerStrip > 0, wantHaptics, force: true))
+                    written++;
+            }
+
             var resources = new (string DeviceName, string Resource, string Guid, string Pid, string? ThumbnailKey)[]
             {
-                (BaseAmbientDeviceName, BaseAmbientResource, MozaDeviceConstants.BaseAmbientGuid,   wheelbasePid, BaseAmbientThumbnailKey),
                 (DashCm1DeviceName,     DashCm1Resource,     MozaDeviceConstants.DashCm1Guid,       wheelbasePid, DashCm1ThumbnailKey),
                 (DashCm2DeviceName,     DashCm2Resource,     MozaDeviceConstants.DashCm2Guid,       dashboardPid, DashCm2ThumbnailKey),
             };
@@ -161,13 +204,7 @@ namespace MozaPlugin.Devices.Extensions
             foreach (var (deviceName, resource, guid, pid, thumbnailKey) in resources)
             {
                 total++;
-                // The ambient strip is the one templated definition whose LED count
-                // varies by base model; the dashes are fixed-geometry.
-                int? ledCount = string.Equals(deviceName, BaseAmbientDeviceName, StringComparison.Ordinal)
-                    ? (MozaPlugin.Instance?.Data?.ResolvedAmbientLedsPerStrip ?? BaseModelInfo.DefaultLedsPerStrip) * 2
-                    : (int?)null;
-                if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey,
-                        telemetryLedCount: ledCount))
+                if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey))
                     written++;
             }
 
@@ -345,56 +382,286 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         /// <summary>
-        /// Deploy the embedded "Wheel Base" device definition exposing the
-        /// 18-LED ambient telemetry strip. Caller must have already verified
-        /// the connected base actually has the strip (via the
-        /// base-ambient-brightness read probe in MozaPlugin) — bases without
-        /// it (R9/R12) should never see this file deployed.
+        /// Deploy the SimHub device definition for the connected wheelbase.
+        /// <paramref name="baseModelName"/> is the firmware model string (group
+        /// 0x07 @ dev 0x12); it names the device and selects the ambient strip
+        /// length, since the base exposes no geometry register.
+        ///
+        /// Writes nothing when the model is unknown — the folder name IS the model
+        /// name, so an unidentified base must not be guessed into existence — or
+        /// when the base has neither an ambient strip nor enabled LFE, since a
+        /// featureless descriptor builds an empty composite that sits in SimHub
+        /// permanently "scanning". In the latter case a definition left over from
+        /// when the base DID have a capability is deleted instead.
         /// </summary>
-        /// <summary>
-        /// Deploy the wheelbase ambient-strip definition. <paramref name="baseModelName"/>
-        /// is the firmware model string (group 0x07 @ dev 0x12); it selects the LED
-        /// count, since strip length is per model and the device exposes no geometry
-        /// register. An empty/unknown name falls back to the 9-per-strip layout.
-        /// </summary>
-        public static bool DeployBaseAmbient(string? discoveredPid, string? baseModelName = null)
-            => DeployFromResource(BaseAmbientDeviceName, BaseAmbientResource, discoveredPid, MozaDeviceConstants.BaseAmbientGuid,
-                thumbnailKey: BaseAmbientThumbnailKey,
-                telemetryLedCount: BaseModelInfo.TotalLeds(baseModelName));
+        /// <param name="ambientDetected">The base answered the base-ambient-brightness
+        /// probe. ORed with the catalog so a strip the catalog doesn't know about
+        /// still produces a LED section.</param>
+        /// <param name="wantHaptics">Firmware supports LFE AND the user routed LFE
+        /// to SimHub's ShakeIt haptics rather than the plugin's own LFE tab.
+        /// <c>null</c> means the firmware version has not answered yet, so the
+        /// answer is unknown — whatever the file already says is kept. Writing
+        /// <c>false</c> there instead made every boot deploy twice (the ambient
+        /// probe answers before the version does), which raised the "restart
+        /// SimHub" banner on every single start.</param>
+        public static bool DeployForBaseModel(string? baseModelName, string? discoveredPid,
+            bool ambientDetected, bool? wantHaptics)
+        {
+            // Naming uses the raw token, so a base the catalog has never seen still
+            // gets a device — a generically-named one beats none at all. Geometry
+            // still comes from the catalog only, since strip length must never be
+            // guessed; an unknown base gets LEDs solely on the capability probe.
+            var token = BaseModelInfo.ExtractToken(baseModelName);
+            if (token.Length == 0)
+            {
+                MozaLog.Debug(
+                    "[AZOM] Base device definition deferred: model name not resolved yet " +
+                    $"(raw='{baseModelName}')");
+                return false;
+            }
 
-        // Rewrite the ambient definition's LED geometry: the logical telemetry LED
-        // count, the physical mapping's RepeatCount, and the length of the physical
-        // Items array (one real mapping plus empty placeholders, one per LED).
-        private static string PatchTelemetryLedCount(string json, int ledCount, string deviceName)
+            var known = BaseModelInfo.ExtractPrefix(baseModelName);
+            if (known.Length == 0)
+                MozaLog.Info(
+                    $"[AZOM] Wheelbase '{token}' is not in the model catalog — deploying a generic "
+                    + $"definition (LEDs only if the ambient probe answers, no product art)");
+
+            bool hasLeds = BaseModelInfo.HasAmbientLeds(known) || ambientDetected;
+            bool haptics = wantHaptics ?? ExistingHapticsState(
+                "MOZA " + BaseModelInfo.GetFriendlyName(token));
+
+            return DeployBaseDefinition(token, discoveredPid, hasLeds, haptics);
+        }
+
+        /// <summary>
+        /// Whether the already-deployed definition for this device carries a
+        /// HapticsFeature block. False when there is no file yet — a first deploy
+        /// with the firmware version still unknown writes no haptics, and the
+        /// version reply re-deploys with the real answer moments later.
+        /// </summary>
+        private static bool ExistingHapticsState(string deviceName)
         {
             try
             {
-                var doc = JObject.Parse(json);
+                var path = DeviceJsonPath(deviceName);
+                if (!File.Exists(path)) return false;
+                return FeatureEnabled(JObject.Parse(File.ReadAllText(path)), "HapticsFeature");
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
-                var logical = doc.SelectToken("LedsFeature.LogicalTelemetryLeds") as JObject;
-                if (logical != null)
-                    logical["LedCount"] = ledCount;
+        private static bool DeployBaseDefinition(string prefix, string? discoveredPid,
+            bool hasAmbientLeds, bool wantHaptics, bool force = false)
+        {
+            var deviceName = "MOZA " + BaseModelInfo.GetFriendlyName(prefix);
 
-                if (doc.SelectToken("LedsFeature.PhysicalLedsMappings.Items") is JArray items && items.Count > 0)
+            // Nothing for SimHub to drive — no LEDs, no motors. Emit no device,
+            // and clear one a previous capability state left behind.
+            if (!hasAmbientLeds && !wantHaptics)
+                return RemoveBaseDefinition(deviceName, "base has no ambient strip and LFE is not routed to SimHub");
+
+            int perStrip = BaseModelInfo.LedsPerStripForPrefix(prefix);
+            if (perStrip <= 0)
+                perStrip = BaseModelInfo.DefaultLedsPerStrip;
+            int ledCount = hasAmbientLeds ? perStrip * 2 : 0;
+
+            var guid = MozaDeviceConstants.ResolveBaseGuid(prefix);
+            var pid = discoveredPid ?? FallbackPid;
+            var thumbnailKey = BaseThumbnailKey(prefix);
+
+            try
+            {
+                var deviceDir = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User", deviceName);
+                var deviceJsonPath = Path.Combine(deviceDir, "device.json");
+                bool fileExists = File.Exists(deviceJsonPath);
+
+                if (fileExists && !force && !IsBaseDefinitionStale(
+                        deviceJsonPath, deviceName, guid, ledCount, wantHaptics, pid))
                 {
-                    if (items[0] is JObject first && first["RepeatCount"] != null)
-                        first["RepeatCount"] = ledCount;
-
-                    while (items.Count > ledCount)
-                        items.RemoveAt(items.Count - 1);
-                    while (items.Count < ledCount)
-                        items.Add(new JObject());
+                    // Current, but the artwork may still be missing.
+                    EnsureThumbnail(deviceDir, thumbnailKey);
+                    return false;
                 }
 
-                MozaLog.Debug($"[AZOM] Patched {deviceName} telemetry LED count to {ledCount}");
-                return doc.ToString();
+                Directory.CreateDirectory(deviceDir);
+                File.WriteAllText(deviceJsonPath,
+                    GenerateBaseDeviceJson(guid, BaseModelInfo.GetFriendlyName(prefix), ledCount, wantHaptics, pid));
+                EnsureThumbnail(deviceDir, thumbnailKey);
+
+                MozaLog.Info(
+                    $"[AZOM] {(fileExists ? "Refreshed" : "Deployed")} base device definition: {deviceName} " +
+                    $"(guid={guid}, leds={ledCount}, haptics={(wantHaptics ? BaseLfeMotorCount + " motors" : "off")}, " +
+                    $"pid={pid}; restart SimHub to pick it up)");
+
+                RemoveLegacyBaseDefinition();
+                return true;
             }
             catch (Exception ex)
             {
-                // A parse failure here must not block deployment — ship the
-                // template unpatched rather than no definition at all.
-                MozaLog.Warn($"[AZOM] Could not patch LED count for '{deviceName}', using template as-is: {ex.Message}");
-                return json;
+                MozaLog.Error($"[AZOM] Error deploying base device definition '{deviceName}': {ex.Message}");
+                return false;
+            }
+        }
+
+        // Rewrite when identity, content version, LED geometry, haptics parameters
+        // or PID drift. The haptics comparison is what makes a firmware upgrade
+        // that adds LFE (or a change of LFE routing) re-deploy the definition.
+        private static bool IsBaseDefinitionStale(string deviceJsonPath, string deviceName,
+            string guid, int ledCount, bool wantHaptics, string pid)
+        {
+            try
+            {
+                var existing = JObject.Parse(File.ReadAllText(deviceJsonPath));
+
+                if (!string.Equals(existing.SelectToken("DescriptorUniqueId")?.Value<string>(), guid,
+                        StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                if ((existing.SelectToken("SchemaVersion")?.Value<int>() ?? 0) < GeneratedBaseSchemaVersion)
+                    return true;
+
+                bool existingLeds = FeatureEnabled(existing, "LedsFeature");
+                if (existingLeds != (ledCount > 0))
+                    return true;
+                if (ledCount > 0
+                    && (existing.SelectToken("LedsFeature.LogicalTelemetryLeds.LedCount")?.Value<int>() ?? -1) != ledCount)
+                    return true;
+
+                if (FeatureEnabled(existing, "HapticsFeature") != wantHaptics)
+                    return true;
+                if (wantHaptics
+                    && ((existing.SelectToken("HapticsFeature.MotorsCount")?.Value<int>() ?? -1) != BaseLfeMotorCount
+                        || (existing.SelectToken("HapticsFeature.MinimumFrequency")?.Value<int>() ?? -1) != BaseLfeMinFrequency
+                        || (existing.SelectToken("HapticsFeature.MaximumFrequency")?.Value<int>() ?? -1) != BaseLfeMaxFrequency))
+                    return true;
+
+                return !PidEquals(
+                    existing.SelectToken("HardwareInterface.HardwareInterface.DeviceDetection.Pid")?.Value<string>(),
+                    pid);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not parse existing device.json for '{deviceName}', rewriting: {ex.Message}");
+                return true;
+            }
+        }
+
+        // SimHub omits a feature block entirely when it is disabled
+        // (ShouldSerialize<Feature>), so absent == off. A present block defaults to
+        // enabled when it carries no IsEnabled of its own.
+        private static bool FeatureEnabled(JObject device, string featureName)
+        {
+            var feature = device.SelectToken(featureName);
+            if (feature == null) return false;
+            return device.SelectToken(featureName + ".IsEnabled")?.Value<bool>() ?? true;
+        }
+
+        /// <summary>
+        /// Compare two device.json PID strings by value. SimHub normalises the hex
+        /// on its own round-trip ("0x0000" becomes "0x00"), so a textual compare
+        /// judges an untouched definition stale on every boot and leaves the
+        /// "restart SimHub" banner up permanently.
+        /// </summary>
+        private static bool PidEquals(string? a, string? b)
+        {
+            if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return TryParsePid(a, out int pa) && TryParsePid(b, out int pb) && pa == pb;
+        }
+
+        private static bool TryParsePid(string? text, out int value)
+        {
+            value = 0;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            var t = text!.Trim();
+            if (t.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                return int.TryParse(t.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value);
+            return int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+        }
+
+        /// <summary>
+        /// Art key for a wheelbase: its hardware revision code where we have art for
+        /// it, then the token map, then the bare token.
+        ///
+        /// The hardware code comes first because a model token is coarser than the
+        /// product — "R16" covers V1, V2 and the Ultra, which look nothing alike —
+        /// and the code is what actually identifies the unit. Everything unrecognised
+        /// degrades to the token, i.e. to the previous behaviour.
+        /// </summary>
+        private static string BaseThumbnailKey(string prefix)
+        {
+            var data = MozaPlugin.Instance?.Data;
+            var byHardware = BaseModelInfo.ThumbnailKeyForHardware(
+                BaseModelInfo.ExtractHardwareCode(data?.BaseSwVersion, data?.BaseHwVersion));
+            if (byHardware.Length != 0)
+                return byHardware;
+
+            foreach (var (p, key) in BaseThumbnails)
+            {
+                if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
+                    return key;
+            }
+            return prefix;
+        }
+
+        /// <summary>Delete a base definition folder, e.g. when the base turns out to
+        /// expose neither LEDs nor LFE. Returns true when something was removed, so
+        /// the caller raises the restart banner.</summary>
+        private static bool RemoveBaseDefinition(string deviceName, string reason)
+        {
+            try
+            {
+                var deviceDir = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User", deviceName);
+                if (!File.Exists(Path.Combine(deviceDir, "device.json")))
+                    return false;
+
+                Directory.Delete(deviceDir, recursive: true);
+                MozaLog.Info($"[AZOM] Removed base device definition '{deviceName}' ({reason}; restart SimHub to drop the entry)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not remove base device definition '{deviceName}': {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Drop the pre-per-model shared "MOZA Wheel Base" definition once a
+        /// model-named one exists, so SimHub doesn't offer two devices for the same
+        /// wheelbase. A device instance the user added under the old identity is
+        /// orphaned by this — they re-add the model-named device once.
+        /// </summary>
+        private static void RemoveLegacyBaseDefinition()
+        {
+            try
+            {
+                var deviceDir = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User", LegacyBaseDeviceName);
+                var deviceJsonPath = Path.Combine(deviceDir, "device.json");
+                if (!File.Exists(deviceJsonPath))
+                    return;
+
+                // Only the legacy shared identity. Anything else living under that
+                // folder name is not ours to delete.
+                string? existingGuid = JObject.Parse(File.ReadAllText(deviceJsonPath))
+                    .SelectToken("DescriptorUniqueId")?.Value<string>();
+                if (!string.Equals(existingGuid, MozaDeviceConstants.BaseAmbientGuid, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                Directory.Delete(deviceDir, recursive: true);
+                MozaLog.Info(
+                    "[AZOM] Removed the legacy shared 'MOZA Wheel Base' definition — this wheelbase now has a " +
+                    "model-named device; re-add it in SimHub's Devices page after restarting");
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not remove legacy base device definition: {ex.Message}");
             }
         }
 
@@ -526,7 +793,14 @@ namespace MozaPlugin.Devices.Extensions
                         EnsureThumbnail(deviceDir, prefix);
                 }
 
-                // Template-based definitions (dashes/base) that ship art — keyed by
+                foreach (var (prefix, friendlyName, _) in BaseModelInfo.KnownModels)
+                {
+                    var deviceDir = Path.Combine(userDefsDir, "MOZA " + friendlyName);
+                    if (File.Exists(Path.Combine(deviceDir, "device.json")))
+                        EnsureThumbnail(deviceDir, BaseThumbnailKey(prefix));
+                }
+
+                // Template-based definitions (the dashes) that ship art — keyed by
                 // device name, not a firmware prefix.
                 foreach (var (deviceName, thumbnailKey) in TemplateThumbnails)
                 {
@@ -728,6 +1002,102 @@ namespace MozaPlugin.Devices.Extensions
             return device.ToString(Newtonsoft.Json.Formatting.Indented);
         }
 
+        /// <summary>
+        /// Build a wheelbase device.json. <paramref name="ledCount"/> of 0 omits
+        /// <c>LedsFeature</c> entirely (a base with no ambient strip), and
+        /// <paramref name="withHaptics"/> false omits <c>HapticsFeature</c> —
+        /// SimHub's own serializer omits a disabled feature block the same way
+        /// (ShouldSerialize&lt;Feature&gt;), so an omitted block round-trips cleanly.
+        ///
+        /// HapticsFeature needs SimHub 9.12, so the minimum version moves with it.
+        /// The fans/motors HID report ids are required by the schema but never
+        /// reach the wire: the plugin swaps the composite's connection manager for
+        /// its own before any HID write happens (see MozaBaseHapticsBridge).
+        /// </summary>
+        private static string GenerateBaseDeviceJson(string guid, string productName, int ledCount, bool withHaptics, string pid)
+        {
+            var device = new JObject
+            {
+                ["DescriptorUniqueId"] = guid,
+                ["SchemaVersion"] = GeneratedBaseSchemaVersion,
+                ["MinimumSimHubVersion"] = withHaptics ? "9.12.0" : "9.11.8",
+                ["DeviceDescription"] = new JObject
+                {
+                    ["BrandName"] = "MOZA",
+                    ["ProductName"] = productName
+                }
+            };
+
+            if (ledCount > 0)
+            {
+                // The two ambient strips are one contiguous logical run, so a single
+                // physical mapping of RepeatCount = total, padded with one empty
+                // placeholder per remaining LED.
+                var physItems = new JArray
+                {
+                    new JObject
+                    {
+                        ["SourceRole"] = 1,
+                        ["SourceIndex"] = 0,
+                        ["RepeatCount"] = ledCount,
+                        ["RepeatMode"] = 1
+                    }
+                };
+                for (int i = 1; i < ledCount; i++)
+                    physItems.Add(new JObject());
+
+                device["LedsFeature"] = new JObject
+                {
+                    ["IsIndividualLedsSectionEnabled"] = false,
+                    ["PhysicalLedsMappings"] = new JObject { ["Items"] = physItems },
+                    ["LogicalTelemetryLeds"] = new JObject
+                    {
+                        ["LedCount"] = ledCount,
+                        ["Segments"] = new JArray(),
+                        ["IsEnabled"] = true
+                    },
+                    ["IsEnabled"] = true
+                };
+            }
+
+            if (withHaptics)
+            {
+                device["HapticsFeature"] = new JObject
+                {
+                    ["MotorsCount"] = BaseLfeMotorCount,
+                    ["HasFrequency"] = true,
+                    ["MinimumFrequency"] = BaseLfeMinFrequency,
+                    ["MaximumFrequency"] = BaseLfeMaxFrequency,
+                    ["IsEnabled"] = true
+                };
+            }
+
+            var hardware = new JObject
+            {
+                ["TypeName"] = "LedsStandardHIDProtocol",
+                ["IsSerialNumberPickerEnabled"] = false,
+                ["HIDUsagePage"] = "0xFF00",
+                ["HIDUsage"] = "0x77",
+                ["HIDReportId"] = "0x68",
+                ["HIDReportSize"] = 64,
+                ["DeviceDetection"] = new JObject
+                {
+                    ["Vid"] = "0x346E",
+                    ["Pid"] = pid
+                }
+            };
+            if (withHaptics)
+            {
+                hardware["HIDFansReportId"] = HidFansReportId;
+                hardware["HIDMotorsReportId"] = HidMotorsReportId;
+            }
+
+            device["HardwareInterface"] = new JObject { ["HardwareInterface"] = hardware };
+            device["IsLocked"] = true;
+
+            return device.ToString(Newtonsoft.Json.Formatting.Indented);
+        }
+
         // SimHub interprets a single Segments entry of Size N as a 3-LED brow
         // region carved from the LogicalTelemetryLeds strip. Both the legacy
         // hasFlagLeds path (extra 6 LEDs total, 3 per side) and the in-band
@@ -743,7 +1113,7 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         private static bool DeployFromResource(string deviceName, string resourceName, string? discoveredPid, string expectedDescriptorId,
-            bool force = false, string? thumbnailKey = null, int? telemetryLedCount = null)
+            bool force = false, string? thumbnailKey = null)
         {
             try
             {
@@ -778,8 +1148,11 @@ namespace MozaPlugin.Devices.Extensions
                             .SelectToken("DescriptorUniqueId")
                             ?.Value<string>();
                         string expectedPid = discoveredPid ?? FallbackPid;
+                        // PID compared by value: SimHub normalises the hex on its own
+                        // round-trip ("0x0000" -> "0x00"), and a textual compare would
+                        // judge an untouched file stale on every boot.
                         stale =
-                            !string.Equals(existingPid, expectedPid, StringComparison.OrdinalIgnoreCase)
+                            !PidEquals(existingPid, expectedPid)
                             || !string.Equals(existingDescriptorId, expectedDescriptorId, StringComparison.OrdinalIgnoreCase);
 
                         // CM-dash guard: a user-renamed JSON (ProductName changed
@@ -806,18 +1179,6 @@ namespace MozaPlugin.Devices.Extensions
                         {
                             int existingSchema = existing.SelectToken("SchemaVersion")?.Value<int>() ?? 0;
                             if (existingSchema < templateSchema)
-                                stale = true;
-                        }
-
-                        // Geometry guard: the base ambient definition's LED count is
-                        // patched per base model (6 vs 9 LEDs per strip), so a file
-                        // written for a different base — or by a plugin build that
-                        // hardcoded 18 — has to be rewritten.
-                        if (!stale && telemetryLedCount.HasValue)
-                        {
-                            int existingLeds = existing
-                                .SelectToken("LedsFeature.LogicalTelemetryLeds.LedCount")?.Value<int>() ?? -1;
-                            if (existingLeds != telemetryLedCount.Value)
                                 stale = true;
                         }
                     }
@@ -866,9 +1227,6 @@ namespace MozaPlugin.Devices.Extensions
                         json = json.Replace("__DETECT_PID__", FallbackPid);
                         MozaLog.Debug($"[AZOM] No PID discovered, using fallback {FallbackPid} for {deviceName}");
                     }
-
-                    if (telemetryLedCount.HasValue)
-                        json = PatchTelemetryLedCount(json, telemetryLedCount.Value, deviceName);
 
                     File.WriteAllText(deviceJsonPath, json);
                 }
