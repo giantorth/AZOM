@@ -457,6 +457,25 @@ namespace MozaPlugin.Devices
             double posPct = pos01 * 100.0;
             if (cfg != null)
             {
+                // Max Threshold — HOST-SIDE rescale. Raw HID 100% is the
+                // Pedal Feel curve's own hardware ceiling (Max Force's kg
+                // value — see MBoosterDeviceController.PushFeelCurveResync),
+                // NOT Max Threshold: the mbooster-brake-threshold wire write
+                // (cmdId 0xB3) does not reliably change that on-device, per
+                // hardware testing (bug bundle — "Max Threshold does
+                // nothing" investigation). Max Threshold is meant to be a
+                // purely host-side remap of the ALREADY-Max-Force-scaled raw
+                // position into "100% at Threshold's kg" for the sim, same
+                // category as Sim Input Mapping's CurveY/CurveX below (no
+                // wire command actually does the real work). Unset (-1) or
+                // non-positive Threshold is a no-op (ratio 1, same as
+                // Threshold == Max Force) so an uncustomized profile keeps
+                // its previous raw-passthrough behavior unchanged.
+                double maxForceKg = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200.0;
+                double thresholdKg = cfg.MaxThresholdKg > 0 ? cfg.MaxThresholdKg : maxForceKg;
+                if (Math.Abs(thresholdKg - maxForceKg) > 0.0001)
+                    posPct = Math.Min(100.0, posPct * (maxForceKg / thresholdKg));
+
                 // Store the pre-remap percent for EVERY axis so the UI's
                 // live curve markers follow whichever pedal is selected (axis 0
                 // also mirrored to LastRawPercentPreCurve for legacy callers).

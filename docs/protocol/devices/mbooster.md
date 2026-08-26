@@ -974,11 +974,27 @@ on the pedal's own unit (`MotorDeviceForRole` — see
   `raw = round(kg * 65536 / 200)`. Verified on two capture points (4 kg →
   1311 exactly; an unlabeled capture decoding to ~126 kg against an
   independently-reported real Pit House setting of ~125 kg). See
-  `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`. This
-  recalibrates the sensor's own full-scale range on the DEVICE — the raw
-  HID axis itself reads exactly `MaxThresholdKg` of force at 100% travel,
-  which is what the game reads directly (bypassing AZOM entirely) if it
-  binds to the pedal's raw joystick axis.
+  `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`.
+  **CORRECTED**: earlier text here claimed this write "recalibrates the
+  sensor's own full-scale range on the DEVICE" (raw HID axis reads
+  `MaxThresholdKg` of force at 100%). Hardware testing disproved that: the
+  write demonstrably reaches the device and reads back correctly (same
+  "write succeeds ⇒ assumed real" reasoning that also mis-closed the Max
+  Force "does nothing" reports twice — KY3HK4QP, 5VR5AQ8Y — before *that*
+  turned out to need the Pedal Feel curve to actually have a shape), but
+  changing it does not change how much force the raw HID axis needs to
+  reach 100%, confirmed with Max Force held constant and Threshold swept
+  full range both directions. The raw HID axis's 100% is actually **Max
+  Force's own kg ceiling** (the Pedal Feel curve's real hardware full
+  scale — see below). Max Threshold is therefore implemented **host-side**
+  instead (`MozaMBoosterRegistry.OnHidAxisUpdate`): it rescales the raw
+  position — already 0–100% of Max Force's span — into 0–100% of
+  Threshold's span (`posPct * (MaxForceKg / ThresholdKg)`, clamped to 100)
+  before the Sim Input Mapping curve ever sees it, the same category as
+  Sim Input Mapping's own CurveY/CurveX below (no wire command actually
+  does the real work). The `mbooster-brake-threshold` write is still sent
+  (harmless, matches whatever Pit House itself does with the field even if
+  it isn't the mechanism that matters) but AZOM no longer depends on it.
 - **Output curve** (`CurveY`/`CurveX`, 6 nodes + an implicit fixed origin
   at (0,0)) — **REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed
   **purely host-side, with no wire command at all**. It used to be

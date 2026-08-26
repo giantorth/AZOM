@@ -363,18 +363,21 @@ namespace MozaPlugin
 
             // Live "position % · kg force" readout above the Pedal Feel
             // curve editor (MBoosterPedalFeelLiveLabel). kg is an estimate,
-            // not a directly-read sensor value: the raw HID axis only ever
-            // reports a 0-100% position, calibrated so 100% == this pedal's
-            // Max Threshold force (see docs/protocol/devices/mbooster.md
-            // "Sim Input Mapping") — so force = pct/100 * that threshold.
-            // Resolution order matches the removed ResolveFullScaleKg: the
-            // user's own MaxThresholdKg override, else the device's own
-            // mbooster-brake-threshold read-back, else a 200kg last resort.
+            // not a directly-read sensor value: preCurve is now genuinely
+            // "% of Threshold's span" — MozaMBoosterRegistry.OnHidAxisUpdate
+            // host-side rescales the raw HID position (which is % of Max
+            // Force's own hardware ceiling) into that before storing it —
+            // see that method's comment for why this moved host-side
+            // (mbooster-brake-threshold's wire write doesn't reliably do it
+            // on-device). So force = pct/100 * that SAME threshold, using
+            // the identical fallback OnHidAxisUpdate uses: the user's own
+            // MaxThresholdKg override, else this pedal's own MaxForceKg
+            // (no-op case — see OnHidAxisUpdate), else a 200kg last resort.
             if (hidConnected)
             {
                 var cfg = PeekMBoosterEffectTarget();
-                double fullScaleKg = (cfg != null && cfg.MaxThresholdKg >= 0) ? cfg.MaxThresholdKg
-                    : (selected.DeviceReportedMaxThresholdKg > 0 ? selected.DeviceReportedMaxThresholdKg : 200.0);
+                double fullScaleKg = (cfg != null && cfg.MaxThresholdKg > 0) ? cfg.MaxThresholdKg
+                    : (cfg != null && cfg.MaxForceKg >= 0) ? cfg.MaxForceKg : 200.0;
                 double kg = preCurve / 100.0 * fullScaleKg;
                 MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_OutputForce}: {preCurve:F0}% · {kg:F1} kg";
             }
