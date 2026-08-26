@@ -280,9 +280,14 @@ namespace MozaPlugin.Devices.Ui
                     WiClutchPointValue.Text   = $"{clutchPoint}%";
 
                     bool perKnob = _data.WheelKnobSignalModeSupported;
-                    // Legacy "All Rotaries" panel now lives inside KNOB COLOURS card;
-                    // visible only when firmware does NOT support per-knob signal mode.
-                    WiKnobModeLegacyPanel.Visibility = perKnob ? Visibility.Collapsed : Visibility.Visible;
+                    // Legacy "All Rotaries" panel lives in the knob settings card;
+                    // visible only when the wheel HAS encoders but does NOT support
+                    // per-knob signal mode. The encoder check is load-bearing now that
+                    // the card is no longer hidden wholesale on knob-LED-less rims —
+                    // without it, a wheel that answered neither read would still show
+                    // a selector that writes nowhere.
+                    WiKnobModeLegacyPanel.Visibility = (!perKnob && HasKnobEncoders())
+                        ? Visibility.Visible : Visibility.Collapsed;
                     if (perKnob)
                     {
                         // Per-knob mode: keep the hidden source-of-truth combos in sync;

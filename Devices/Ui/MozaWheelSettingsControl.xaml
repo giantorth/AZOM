@@ -513,10 +513,16 @@
                                 </Grid>
                             </StackPanel>
                         </ctrl:SectionCard>
+                    </StackPanel>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_KnobSettings}" Icon="{StaticResource IconKnob}">
-                            <StackPanel>
-                                <!-- Signal mode subsection -->
+                    <!-- Knob settings card — two independently gated subsections:
+                         SIGNAL MODE follows the wheel's rotary-ENCODER capability,
+                         COLOURS follows the knob-LED capability. A rim with encoders
+                         and no knob LEDs shows only the former. -->
+                    <ctrl:SectionCard x:Name="WiKnobSettingsCard" Visibility="Collapsed"
+                                      Title="{x:Static res:Strings.Section_KnobSettings}" Icon="{StaticResource IconKnob}">
+                        <StackPanel>
+                            <StackPanel x:Name="WiKnobSignalModeSection" Visibility="Collapsed">
                                 <TextBlock Style="{StaticResource SectionTitleText}" Margin="0,0,0,8">
                                     <Run Text="{x:Static res:Strings.Label_SignalMode}"/>
                                     <Run Text="{x:Static res:Strings.Subtitle_SignalMode}"
@@ -539,8 +545,9 @@
                                         <ListBoxItem Content="{x:Static res:Strings.Option_Knob}"/>
                                     </ctrl:SegmentedControl>
                                 </StackPanel>
+                            </StackPanel>
 
-                                <!-- Colours subsection -->
+                            <StackPanel x:Name="WiKnobColoursSection" Visibility="Collapsed">
                                 <TextBlock Style="{StaticResource SectionTitleText}" Margin="0,0,0,8">
                                     <Run Text="{x:Static res:Strings.Label_Colours}"/>
                                     <Run Text="{x:Static res:Strings.Subtitle_KnobColours}"
@@ -575,8 +582,8 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
-                        </ctrl:SectionCard>
-                    </StackPanel>
+                        </StackPanel>
+                    </ctrl:SectionCard>
 
                     <!-- Legacy panels kept as collapsed stubs so code-behind that
                          populates WheelKnobPanel + WheelKnobRingPanel still resolves. -->

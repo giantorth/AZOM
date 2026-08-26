@@ -55,7 +55,8 @@ namespace MozaPlugin.Devices
             "wheel-telemetry-mode",
             // Input modes — paddles/clutch/stick exist on every new-protocol wheel.
             // Knob input modes (wheel-knob-mode, wheel-knob-signal-modeN) are
-            // gated below on WheelModelInfo.KnobCount.
+            // deferred to BuildNewWheelLedReadCommands: they go only to models we
+            // have positively identified, so the param-fragile rims never see them.
             //
             // Sleep-light reads (wheel-idle-mode/timeout/speed/color) are
             // deliberately NOT here. This list is issued at first wheel-detect,
@@ -155,9 +156,31 @@ namespace MozaPlugin.Devices
                 cmds.Add("wheel-knob-led-mode");
                 if (info.HasSleepLight)
                     cmds.Add("wheel-knob-idle-effect");
-                // Knob input config (encoder signal mode per knob).
+            }
+
+            // Knob INPUT config (encoder signal mode: BUTTON vs KNOB). Deliberately not
+            // gated on KnobCount: that is the knob-LED capability, and most rims have
+            // rotary encoders with no configurable knob LEDs (KnobCount == 0) — gating
+            // these on it hid the signal-mode selector on every one of them. Issued for
+            // any POSITIVELY IDENTIFIED model; the two early returns above already keep
+            // the param-fragile rims out (FSR V1 reads nothing, and so does the bare
+            // "CS" shape), and an unidentified model stays out for the same reason the
+            // extended LED-group probes below do.
+            //
+            // A catalogued WheelModelInfo.KnobEncoderCount is authoritative and bounds
+            // the sweep exactly — matching PitHouse, which reads 2a [N] only up to the
+            // rim's real count (N=0..3 on a 4-encoder wheel; see
+            // docs/protocol/findings/2026-04-28-wheel-catalog-read.md). An uncatalogued
+            // model sweeps all five and lets the answers drive the UI. That discovery
+            // over-reports — firmware answers every index whether or not the encoder
+            // exists (KS: five answers, three knobs) — so it is a stopgap that keeps the
+            // selector reachable on an unmeasured rim, not a substitute for the count.
+            // A catalogued 0 means "confirmed no configurable encoders" and skips both.
+            if (!ReferenceEquals(info, WheelModelInfo.Default) && info.KnobEncoderCount != 0)
+            {
                 cmds.Add("wheel-knob-mode");
-                for (int i = 0; i < info.KnobCount && i < 5; i++)
+                int sweep = info.KnobEncoderCount > 0 ? System.Math.Min(info.KnobEncoderCount, 5) : 5;
+                for (int i = 0; i < sweep; i++)
                     cmds.Add($"wheel-knob-signal-mode{i}");
             }
 

@@ -743,11 +743,23 @@ namespace MozaPlugin.Hardware
                 // (logical->firmware index remapped) on those that report it. The UI
                 // only edits one family per wheel, so the overlay only carries the
                 // family this wheel supports — writing whatever is set is safe.
-                if (knobMode >= 0 && hasKnob && WheelCfgChangedForApply("wheel-knob-mode", knobMode))
+                //
+                // No hasKnob gate: that is the knob-LED capability, and most rims
+                // have encoders with no knob LEDs. The overlay is its own capability
+                // evidence here — it is keyed by the wheel's page GUID and has no
+                // profile baseline, so a value >= 0 means the user set it on THIS
+                // rim's page, which only happens when the UI offered the control,
+                // which only happens when the wheel answered the read. Same reasoning
+                // as the paddle/clutch/stick block below. A capability gate would
+                // also mis-fire on ordering: DeviceProber issues the signal-mode
+                // reads just BEFORE the first-sight ApplyProfile, so the answers land
+                // after this runs and the re-assert would be skipped on exactly the
+                // wheels that need it.
+                if (knobMode >= 0 && WheelCfgChangedForApply("wheel-knob-mode", knobMode))
                     _deviceManager.WriteSetting("wheel-knob-mode", knobMode);
-                if (hasKnob && ov?.WheelKnobSignalModes != null)
+                if (ov?.WheelKnobSignalModes != null)
                 {
-                    int nSig = Math.Min(model.KnobCount, ov.WheelKnobSignalModes.Length);
+                    int nSig = ov.WheelKnobSignalModes.Length;
                     for (int i = 0; i < nSig && i < 5; i++)
                     {
                         int sm = ov.WheelKnobSignalModes[i];

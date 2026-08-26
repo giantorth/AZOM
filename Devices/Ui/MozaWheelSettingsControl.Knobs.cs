@@ -166,6 +166,31 @@ namespace MozaPlugin.Devices.Ui
             _wiKnobsBuilt = true;
         }
 
+        // How many BUTTON/KNOB selectors this wheel gets. The catalogued
+        // WheelModelInfo.KnobEncoderCount is authoritative when present (>= 0),
+        // including the 0 case — firmware answers every wheel-knob-signal-mode index
+        // whether or not the encoder is there, so the read answers cannot be counted.
+        // Only an uncatalogued rim falls back to the sweep mask, which over-reports
+        // (KS: five answers, three knobs) but keeps the selector reachable until that
+        // model's real count is recorded. Deliberately NOT WheelModelInfo.KnobCount:
+        // that is the knob-LED capability and is 0 on most rims that do have encoders.
+        private int ResolveKnobEncoderCount()
+        {
+            int catalogued = _plugin?.WheelModelInfo?.KnobEncoderCount ?? -1;
+            if (catalogued >= 0) return Math.Min(catalogued, MozaData.WheelKnobMax);
+            int mask = _data?.WheelKnobSignalModeMask ?? 0;
+            int n = 0;
+            for (int i = 0; i < MozaData.WheelKnobMax; i++)
+                if ((mask & (1 << i)) != 0) n = i + 1;
+            return n;
+        }
+
+        // True when the wheel has any configurable rotary encoder — either per-knob
+        // (signal-mode answers) or the legacy wheel-wide wheel-knob-mode. A model
+        // catalogued with 0 encoders never reads either, so both stay false.
+        private bool HasKnobEncoders()
+            => ResolveKnobEncoderCount() > 0 || (_data?.WheelKnobModeSupported ?? false);
+
         // Called from RefreshInputsAndKnobsSignalMode — sync per-knob chip
         // visibility + selected index from _data, toggle the per-knob signal grid
         // vs the legacy "All Rotaries" panel based on firmware support, and hide
@@ -175,14 +200,18 @@ namespace MozaPlugin.Devices.Ui
             if (!_wiKnobsBuilt || _wiKnobSignalChips == null
                 || _wiKnobSignalCardWrappers == null || _data == null) return;
             bool perKnob = _data.WheelKnobSignalModeSupported;
-            int knobCount = _plugin?.WheelModelInfo?.KnobCount ?? 0;
-            // Toggle the whole per-knob grid: visible only when firmware supports
-            // per-knob mode AND there's at least one knob to show. Legacy mode
-            // hides the grid; the WiKnobModeLegacyPanel takes over (managed in
-            // MozaWheelSettingsControl.Inputs.cs).
+            int encoderCount = ResolveKnobEncoderCount();
+            // Size the grid to the encoders, not the LED knobs, so a 3-encoder rim
+            // fills the row instead of leaving two phantom columns.
             if (WiSignalModeGrid != null)
-                WiSignalModeGrid.Visibility = (perKnob && knobCount > 0)
+            {
+                int cols = Math.Max(1, encoderCount);
+                if (WiSignalModeGrid.Columns != cols) WiSignalModeGrid.Columns = cols;
+                // Legacy mode hides the grid; the WiKnobModeLegacyPanel takes over
+                // (managed in MozaWheelSettingsControl.Inputs.cs).
+                WiSignalModeGrid.Visibility = (perKnob && encoderCount > 0)
                     ? Visibility.Visible : Visibility.Collapsed;
+            }
             using (_suppressor.Begin())
             {
                 for (int k = 0; k < _wiKnobSignalChips.Length; k++)
@@ -190,7 +219,7 @@ namespace MozaPlugin.Devices.Ui
                     var chip = _wiKnobSignalChips[k];
                     var card = _wiKnobSignalCardWrappers[k];
                     int v = _data.WheelKnobSignalModes[k];
-                    bool present = k < knobCount;
+                    bool present = k < encoderCount;
                     // Show every present knob's selector once firmware reports
                     // per-knob support. A not-yet-read value (-1) leaves the chip
                     // unselected rather than hidden, so a partial/late read can't
@@ -213,10 +242,11 @@ namespace MozaPlugin.Devices.Ui
             if (!_wiKnobsBuilt || _wiKnobViz == null || _wiKnobViewWrappers == null || _data == null) return;
             // Match the visible-knob count so 4-knob wheels fill the full row
             // instead of leaving a phantom 5th column. UniformGrid otherwise
-            // reserves a slot for the collapsed 5th card.
+            // reserves a slot for the collapsed 5th card. The signal-mode grid
+            // sizes itself off the encoder count in SyncKnobSignalChips — the two
+            // counts differ on a rim whose encoders have no LED rings.
             int gridCols = Math.Max(1, knobCount);
             if (WiKnobsGrid != null && WiKnobsGrid.Columns != gridCols) WiKnobsGrid.Columns = gridCols;
-            if (WiSignalModeGrid != null && WiSignalModeGrid.Columns != gridCols) WiSignalModeGrid.Columns = gridCols;
             int max = _wiKnobViz.Length;
             for (int k = 0; k < max; k++)
             {

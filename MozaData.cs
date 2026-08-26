@@ -236,10 +236,39 @@ namespace MozaPlugin
         public volatile int WheelPaddlesMode;
         public volatile int WheelClutchPoint;
         public volatile int WheelKnobMode;
+        // True once the wheel has answered a wheel-knob-mode read. WheelKnobMode is a
+        // plain int defaulting to 0, so "answered 0 (Buttons)" and "never answered" are
+        // otherwise indistinguishable — and that distinction is what decides whether the
+        // legacy All-Rotaries selector is offered on a wheel with no per-knob support.
+        public volatile bool WheelKnobModeSupported;
         // Per-rotary-encoder signal mode (newer firmware). 0=Buttons, 1=Knob. -1 = unknown/no response yet.
         public readonly int[] WheelKnobSignalModes = { -1, -1, -1, -1, -1 };
         // True once at least one per-knob response has arrived, indicating firmware supports [42, N].
         public volatile bool WheelKnobSignalModeSupported;
+
+        // Bit n set => the wheel answered wheel-knob-signal-mode for LOGICAL knob n,
+        // i.e. that encoder exists and its input mode is configurable. This is the
+        // encoder capability; WheelModelInfo.KnobCount is the knob-LED capability and
+        // is 0 on most rims that do have encoders. Discovered by sweeping the reads
+        // (DeviceProber.BuildNewWheelLedReadCommands) rather than catalogued per model.
+        // Written on the serial read thread, read on the UI thread — Interlocked CAS,
+        // no lock, per the threading rules.
+        private int _wheelKnobSignalModeMask;
+
+        public int WheelKnobSignalModeMask => System.Threading.Volatile.Read(ref _wheelKnobSignalModeMask);
+
+        private void SetKnobSignalModePresent(int logicalKnob)
+        {
+            if (logicalKnob < 0 || logicalKnob >= WheelKnobMax) return;
+            int bit = 1 << logicalKnob;
+            int prev;
+            do
+            {
+                prev = _wheelKnobSignalModeMask;
+                if ((prev & bit) != 0) return;
+            } while (System.Threading.Interlocked.CompareExchange(
+                         ref _wheelKnobSignalModeMask, prev | bit, prev) != prev);
+        }
 
         // Store a wheel-knob-signal-mode{firmwareIndex} response into the slot for
         // the LOGICAL knob it controls. Most wheels are identity; the KS Pro
@@ -253,6 +282,7 @@ namespace MozaPlugin
                 .SignalModeLogicalKnob(firmwareIndex);
             if (logical >= 0 && logical < WheelKnobSignalModes.Length)
                 WheelKnobSignalModes[logical] = value;
+            SetKnobSignalModePresent(logical);
             WheelKnobSignalModeSupported = true;
         }
         public volatile int WheelStickMode;
@@ -809,7 +839,7 @@ namespace MozaPlugin
                 // (mode<<16)|ms is wrong. The array path extracts ms.
                 case "wheel-paddles-mode":           WheelPaddlesMode = value - 1; break; // raw 1/2/3 → display 0/1/2
                 case "wheel-clutch-point":           WheelClutchPoint = value; break;
-                case "wheel-knob-mode":              WheelKnobMode = value; break;
+                case "wheel-knob-mode":              WheelKnobMode = value; WheelKnobModeSupported = true; break;
                 case "wheel-knob-signal-mode0":      StoreKnobSignalMode(0, value); break;
                 case "wheel-knob-signal-mode1":      StoreKnobSignalMode(1, value); break;
                 case "wheel-knob-signal-mode2":      StoreKnobSignalMode(2, value); break;
@@ -1281,6 +1311,13 @@ namespace MozaPlugin
             WheelHwSubVersion = "";
             WheelSubDeviceCount = 0;
             WheelDevicePresence = 0;
+            // Knob-encoder capability is per-rim and must not survive a swap: a CS Pro's
+            // four answers would otherwise draw four selectors on a 2-encoder rim. The
+            // mode VALUES (WheelKnobSignalModes / WheelKnobMode) are deliberately left
+            // alone — the per-wheel overlay is their truth, not this mirror.
+            System.Threading.Interlocked.Exchange(ref _wheelKnobSignalModeMask, 0);
+            WheelKnobSignalModeSupported = false;
+            WheelKnobModeSupported = false;
             WheelMcuUid = System.Array.Empty<byte>();
             WheelDeviceType = System.Array.Empty<byte>();
             WheelCapabilities = System.Array.Empty<byte>();

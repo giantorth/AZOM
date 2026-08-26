@@ -456,6 +456,21 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Layout:         rpm={model.RpmLedCount} buttons={model.ButtonLedCount} "
                           + $"knobs={model.KnobCount} ring={model.KnobRingLedTotal} "
                           + $"flags={(model.HasFlagLeds ? "yes" : "no")}");
+            // Rotary encoders are a separate capability from knob LEDs (knobs= above is
+            // the LED-ring count and is 0 on most rims that do have encoders). Both
+            // numbers are printed because they disagree by design: the catalogued count
+            // is the truth, while the swept one over-reports — firmware answers every
+            // wheel-knob-signal-mode index whether or not the encoder exists. A
+            // "wrong number of BUTTON/KNOB selectors" report is triaged from this line:
+            // catalog=— means the model still needs its real count recorded.
+            int knobSigMask = d.WheelKnobSignalModeMask;
+            int swept = 0;
+            for (int k = 0; k < MozaData.WheelKnobMax; k++)
+                if ((knobSigMask & (1 << k)) != 0) swept = k + 1;
+            string catEnc = model.KnobEncoderCount >= 0
+                ? model.KnobEncoderCount.ToString(CultureInfo.InvariantCulture) : "—";
+            sb.AppendLine($"Knob encoders:  catalog={catEnc} swept={swept} mask=0x{knobSigMask:X2} "
+                          + $"knob-mode={(d.WheelKnobModeSupported ? "yes" : "no")}");
             int mask = plugin.DetectionState?.WheelLedGroupMask ?? 0;
             var present = new List<string>();
             for (int g = 2; g <= 4; g++) if ((mask & (1 << g)) != 0) present.Add(g.ToString(CultureInfo.InvariantCulture));

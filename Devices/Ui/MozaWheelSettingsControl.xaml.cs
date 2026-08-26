@@ -831,7 +831,12 @@ skipReadByMode:
                                      && ((_plugin?.IsFsr1DisplayWheel ?? false)
                                          || (_plugin?.ShouldDriveDashboard() ?? false));
                 bool showButtonsTab = newWheel && (modelInfoForTabs?.ButtonLedCount ?? 0) > 0;
-                bool showKnobsTab = newWheel && (modelInfoForTabs?.KnobCount ?? 0) > 0;
+                // Knobs tab covers two independent capabilities: knob LEDs
+                // (KnobCount) and configurable rotary encoders (what the wheel
+                // answered for wheel-knob-signal-mode / wheel-knob-mode). Either
+                // one earns the tab — most rims have encoders and no knob LEDs.
+                bool showKnobsTab = newWheel
+                                    && ((modelInfoForTabs?.KnobCount ?? 0) > 0 || HasKnobEncoders());
 
                 // Inputs is gated on THIS page's wheel being the attached one, like
                 // every other tab. Its handlers (paddles mode / clutch point /
@@ -962,7 +967,15 @@ skipReadByMode:
                     UpdateSwatches(_wheelRpmColorSwatches, rpmOverlay, rpmCount);
 
                     int knobCount = modelInfo?.KnobCount ?? 0;
+                    bool hasEncoders = HasKnobEncoders();
+                    // WheelKnobSection holds the two knob-LED cards (LED mode +
+                    // telemetry restore) — knob-LED capability only. The settings
+                    // card below carries both subsections and shows for either.
                     WheelKnobSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    WiKnobSettingsCard.Visibility = (knobCount > 0 || hasEncoders)
+                        ? Visibility.Visible : Visibility.Collapsed;
+                    WiKnobSignalModeSection.Visibility = hasEncoders ? Visibility.Visible : Visibility.Collapsed;
+                    WiKnobColoursSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
                     for (int i = 0; i < MozaData.WheelKnobMax; i++)
                     {
                         var vis = i < knobCount ? Visibility.Visible : Visibility.Collapsed;
