@@ -246,8 +246,22 @@ namespace MozaPlugin.Devices
         // Per-axis pre-input-curve percent (0..100) — the same signal as
         // LastRawPercentPreCurve (after deadzone/max-force, before the input
         // curve) but for EVERY pedal, so the settings tab's live curve markers
-        // track whichever pedal is selected, not just the master.
+        // track whichever pedal is selected, not just the master. NOTE: since
+        // MozaMBoosterRegistry.OnHidAxisUpdate added the host-side Max
+        // Threshold rescale, this is "% of Threshold's span" (the Sim Input
+        // Mapping curve's own input domain) — see LastAxisRawPercentPreThreshold
+        // below for the true raw reading (% of Max Force's span) instead.
         public readonly double[] LastAxisRawPercentPreCurve = new double[MaxAxes];
+
+        // Per-axis TRUE raw HID percent (0..100), captured BEFORE the host-side
+        // Max Threshold rescale (see MozaMBoosterRegistry.OnHidAxisUpdate) —
+        // i.e. genuinely "% of Max Force's own hardware ceiling", the physical
+        // force the user is actually applying to the pedal. This is the
+        // Pedal Feel curve's real input domain (Deadzone-Max Force span), and
+        // what the "Input Force" live label/marker should show — unlike
+        // LastAxisRawPercentPreCurve, which is now post-Threshold-rescale and
+        // represents the Sim Input Mapping curve's own (different) domain.
+        public readonly double[] LastAxisRawPercentPreThreshold = new double[MaxAxes];
 
         // Highest axis index + 1 the HID has reported for this lane: 1 for a
         // lone pedal, up to 3 for a full chain. 0 until the first axis update.

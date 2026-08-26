@@ -749,7 +749,7 @@
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Bark Arf!</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
-  <data name="Label_OutputForce" xml:space="preserve"><value>Wroof!</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Section_GForce" xml:space="preserve"><value>Yowl!</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Boof!</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Yap!</value></data>

@@ -770,7 +770,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR lukket — byttet til Stabil</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
-  <data name="Label_OutputForce" xml:space="preserve"><value>Utgangskraft</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Inngangskraft</value></data>
   <data name="Section_GForce" xml:space="preserve"><value>G-kraft (treghets-pedalfølelse) (eksperimentell)</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Maks pedalbevegelse (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Responshastighet (%)</value></data>

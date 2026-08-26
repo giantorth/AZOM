@@ -1875,7 +1875,7 @@
                                                  displays. kg is a computed estimate (raw position % scaled by
                                                  this pedal's own Max Threshold, i.e. what force reads 100%
                                                  travel), not a directly-read sensor value. -->
-                                            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MBoosterPedalFeelLiveLabel" Text="{x:Static res:Strings.Label_OutputForce}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MBoosterPedalFeelLiveLabel" Text="{x:Static res:Strings.Label_InputForce}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                                             <TextBlock Grid.Row="0" Grid.Column="2" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"
                                                        MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                                             <!-- Vertical Deadzone slider, same Height as the curve editor so its

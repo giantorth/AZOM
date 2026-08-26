@@ -764,7 +764,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
-  <data name="Label_OutputForce" xml:space="preserve"><value>출력 힘</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>입력 힘</value></data>
   <data name="Section_GForce" xml:space="preserve"><value>G포스 (관성 페달 느낌) (실험적)</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>최대 페달 이동 거리 (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>반응 속도 (%)</value></data>

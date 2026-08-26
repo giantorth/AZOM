@@ -342,48 +342,51 @@ namespace MozaPlugin
             int idx = _mboosterEffectPedalIndex;
             double preCurve = (idx >= 0 && idx < selected.LastAxisRawPercentPreCurve.Length)
                 ? selected.LastAxisRawPercentPreCurve[idx] : selected.LastRawPercentPreCurve;
+            // TRUE raw reading — % of Max Force's own hardware ceiling, i.e.
+            // the physical force the user is actually applying to the pedal,
+            // captured in OnHidAxisUpdate BEFORE the host-side Max Threshold
+            // rescale. This is the Pedal Feel curve's real input domain
+            // (Deadzone-Max Force span) and what "Input Force" should show —
+            // preCurve above is post-Threshold-rescale now (Sim Input
+            // Mapping's own, different domain), not this pedal's raw input.
+            double rawInput = (idx >= 0 && idx < selected.LastAxisRawPercentPreThreshold.Length)
+                ? selected.LastAxisRawPercentPreThreshold[idx] : 0.0;
 
             // Pedal Feel's curve is now a REAL hardware effect (see
             // MozaMBoosterRegistry.ComputeFeelCurve) — the device reshapes
             // the raw force before this HID read ever sees it, so AZOM has
             // no live TRUE "input to that curve" value to plot (that would
             // need the raw pre-reshape force, which AZOM never receives).
-            // Best available proxy: preCurve, the same post-reshape % the
-            // "Output Force" live label above this curve already estimates
-            // kg from — not positionally exact against the curve's own
-            // Deadzone-Max Force X axis, but enough to see live movement
-            // while testing instead of nothing at all.
+            // Best available proxy: rawInput — positionally correct against
+            // the curve's own Deadzone-Max Force X axis (unlike preCurve,
+            // which is now Threshold-rescaled and belongs to a different
+            // domain), even though it can't reflect the device's own
+            // internal reshaping.
             // The Sim Input Mapping curve is the opposite: purely host-side
             // (see EvaluateCurveArbitraryX), so its live marker uses
-            // preCurve exactly — the already-hardware-shaped raw position
-            // that's actually fed INTO this curve, not pct (which is the
-            // curve's own output).
-            MBoosterInputCurveEditor.LiveX = hidConnected ? preCurve : double.NaN;
+            // preCurve exactly — the already-hardware-shaped, Threshold-
+            // rescaled position that's actually fed INTO this curve, not
+            // pct (which is the curve's own output).
+            MBoosterInputCurveEditor.LiveX = hidConnected ? rawInput : double.NaN;
             MBoosterCurveEditor.LiveX = preCurve;
 
             // Live "position % · kg force" readout above the Pedal Feel
-            // curve editor (MBoosterPedalFeelLiveLabel). kg is an estimate,
-            // not a directly-read sensor value: preCurve is now genuinely
-            // "% of Threshold's span" — MozaMBoosterRegistry.OnHidAxisUpdate
-            // host-side rescales the raw HID position (which is % of Max
-            // Force's own hardware ceiling) into that before storing it —
-            // see that method's comment for why this moved host-side
-            // (mbooster-brake-threshold's wire write doesn't reliably do it
-            // on-device). So force = pct/100 * that SAME threshold, using
-            // the identical fallback OnHidAxisUpdate uses: the user's own
-            // MaxThresholdKg override, else this pedal's own MaxForceKg
-            // (no-op case — see OnHidAxisUpdate), else a 200kg last resort.
+            // curve editor (MBoosterPedalFeelLiveLabel) — the raw force the
+            // user is applying to the pedal, independent of Max Threshold's
+            // sim-facing output scaling. kg is an estimate, not a directly-
+            // read sensor value: rawInput/100 * Max Force's own kg ceiling
+            // (the reference its own 100% represents — see OnHidAxisUpdate),
+            // falling back to 200kg if Max Force itself is unset.
             if (hidConnected)
             {
                 var cfg = PeekMBoosterEffectTarget();
-                double fullScaleKg = (cfg != null && cfg.MaxThresholdKg > 0) ? cfg.MaxThresholdKg
-                    : (cfg != null && cfg.MaxForceKg >= 0) ? cfg.MaxForceKg : 200.0;
-                double kg = preCurve / 100.0 * fullScaleKg;
-                MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_OutputForce}: {preCurve:F0}% · {kg:F1} kg";
+                double fullScaleKg = (cfg != null && cfg.MaxForceKg >= 0) ? cfg.MaxForceKg : 200.0;
+                double kg = rawInput / 100.0 * fullScaleKg;
+                MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_InputForce}: {rawInput:F0}% · {kg:F1} kg";
             }
             else
             {
-                MBoosterPedalFeelLiveLabel.Text = Strings.Label_OutputForce;
+                MBoosterPedalFeelLiveLabel.Text = Strings.Label_InputForce;
             }
 
             // Effects card pedal trace — same 30 Hz cadence as the Inputs

@@ -758,7 +758,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR fechado — alterado para Estável</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// ganho por banda · 100% = neutro · 500% = reforço máx.</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILIDADE</value></data>
-  <data name="Label_OutputForce" xml:space="preserve"><value>Força de saída</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Força de entrada</value></data>
   <data name="Section_GForce" xml:space="preserve"><value>Força G (sensação inercial do pedal) (experimental)</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Curso máx. do pedal (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Velocidade de resposta (%)</value></data>

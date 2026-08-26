@@ -457,6 +457,13 @@ namespace MozaPlugin.Devices
             double posPct = pos01 * 100.0;
             if (cfg != null)
             {
+                // Capture the TRUE raw reading — % of Max Force's own
+                // hardware ceiling, i.e. the physical force the user is
+                // actually applying — BEFORE the Threshold rescale below
+                // changes posPct's meaning. Powers the "Input Force" live
+                // label/marker; see LastAxisRawPercentPreThreshold's doc.
+                if (axisIndex < c.LastAxisRawPercentPreThreshold.Length) c.LastAxisRawPercentPreThreshold[axisIndex] = posPct;
+
                 // Max Threshold — HOST-SIDE rescale. Raw HID 100% is the
                 // Pedal Feel curve's own hardware ceiling (Max Force's kg
                 // value — see MBoosterDeviceController.PushFeelCurveResync),

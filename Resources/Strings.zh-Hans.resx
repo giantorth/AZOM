@@ -765,7 +765,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
-  <data name="Label_OutputForce" xml:space="preserve"><value>输出力值</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>输入力值</value></data>
   <data name="Section_GForce" xml:space="preserve"><value>G力(惯性踏板手感)(实验性)</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>最大踏板行程 (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>响应速度 (%)</value></data>

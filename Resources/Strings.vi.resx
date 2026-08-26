@@ -765,7 +765,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
-  <data name="Label_OutputForce" xml:space="preserve"><value>Lực đầu ra</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Lực đầu vào</value></data>
   <data name="Section_GForce" xml:space="preserve"><value>Lực G (cảm giác bàn đạp quán tính) (thử nghiệm)</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Hành trình bàn đạp tối đa (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Tốc độ phản hồi (%)</value></data>
