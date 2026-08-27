@@ -1843,24 +1843,63 @@ namespace MozaPlugin.Hardware
                     int knobs = model.KnobCount;
                     if (knobs <= 0) return;
 
+                    // Unlike the RPM/button palettes — which DeviceProber reads back at
+                    // every detection, so _data always holds the wheel's own values —
+                    // the knob palettes are only read on Knobs-tab activation, and that
+                    // read is skipped while the group is in SimHub mode. So on the
+                    // transition INTO Static, _data can still be the all-black
+                    // InitColorArray default, and pushing it would erase the wheel's
+                    // stored palette instead of restoring the user's (bundle 0TWEX2AK:
+                    // "Static mode does not seem to work, all knobs go black").
+                    // Push only what the user actually has saved — the same overlay/
+                    // profile arrays ApplyWheelToHardware writes from — and when there
+                    // is nothing saved, read the wheel's values back to seed the UI and
+                    // write nothing.
+                    var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+                    var ov = _plugin.GetCurrentWheelOverlay(profile);
+                    int[]? savedPrimary = EffArr(ov?.WheelKnobPrimaryColors, profile?.WheelKnobPrimaryColors);
+                    int[]? savedRing    = EffArr(ov?.WheelKnobRingColors,    profile?.WheelKnobRingColors);
+
                     // Per-knob "Active" LED color (cmd 0x27 ROLE=0).
-                    var prim = _data.WheelKnobPrimaryColors;
-                    int primLen = Math.Min(prim.Length, knobs);
-                    for (int i = 0; i < primLen; i++)
+                    if (savedPrimary != null)
                     {
-                        var rgb = prim[i];
-                        _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
+                        int primLen = Math.Min(savedPrimary.Length, knobs);
+                        for (int i = 0; i < primLen; i++)
+                        {
+                            var rgb = MozaProfile.UnpackColor(savedPrimary[i]);
+                            _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
+                        }
+                    }
+                    else
+                    {
+                        for (int i = 0; i < knobs && i < 5; i++)
+                            _deviceManager.ReadSetting($"wheel-knob{i + 1}-active-color");
                     }
 
-                    // Per-ring-LED "background" color (cmd 0x1F 0x03 0x01).
+                    // Per-ring-LED "background" color (cmd 0x1F 0x03 0x01), indexed by
+                    // RING LED 0..KnobRingLedTotal-1 — NOT by knob. The old source,
+                    // _data.WheelKnobBackgroundColors, is a 5-entry per-KNOB scratch for
+                    // "fill ring with selected", so it wrote knob-indexed colours into
+                    // ring-LED slots and Min(5, KnobRingLedTotal) capped the sweep at the
+                    // first 5 LEDs — on a KS Pro (rings 12/12/8/12/12) that repainted
+                    // part of knob 1 and left the other 51 untouched.
                     if (model.KnobRingLeds != null && _detectionState.IsWheelLedGroupPresent(3))
                     {
-                        var bg = _data.WheelKnobBackgroundColors;
-                        int bgLen = Math.Min(bg.Length, model.KnobRingLedTotal);
-                        for (int i = 0; i < bgLen; i++)
+                        if (savedRing != null)
                         {
-                            var rgb = bg[i];
-                            _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                            int ringLen = Math.Min(savedRing.Length, model.KnobRingLedTotal);
+                            for (int i = 0; i < ringLen; i++)
+                            {
+                                var rgb = MozaProfile.UnpackColor(savedRing[i]);
+                                _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
+                            }
+                        }
+                        else
+                        {
+                            var reads = new string[model.KnobRingLedTotal];
+                            for (int i = 0; i < reads.Length; i++)
+                                reads[i] = $"wheel-knob-bg-color{i + 1}";
+                            _deviceManager.ReadSettingsPaced(reads);
                         }
                     }
                     MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);

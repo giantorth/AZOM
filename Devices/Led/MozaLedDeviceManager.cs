@@ -150,6 +150,25 @@ namespace MozaPlugin.Devices.Led
         private DateTime _lastKnobColorChangeTime = DateTime.MinValue;
         private bool _knobStaticHoldReleased;
 
+        // Unassigned-encoders detection. The generated device.json enables
+        // LogicalExtraSection for every wheel with knob LEDs, so SimHub hands back a
+        // full-length encoders array whether or not the user assigned anything to it —
+        // an unconfigured KS/CS Pro yields KnobCount blacks, indistinguishable from an
+        // effect sitting in its "off" state on any single frame. They differ over time:
+        // an effect lights, an unassigned channel never does. _knobChannelEverLit
+        // latches on the first lit frame (after which every pre-existing hold/release
+        // rule applies unchanged); _knobBlackSinceUtc stamps the start of the current
+        // unbroken black run so a channel that has never lit can be handed back to the
+        // wheel's stored palette instead of being pinned dark (bundle TMS4EP8B).
+        private bool _knobChannelEverLit;
+        private DateTime _knobBlackSinceUtc = DateTime.MinValue;
+        // How long an encoders channel that has NEVER lit may stay black before the live
+        // pipeline releases the rings. Covers an effect that starts in its off state
+        // (which lights well inside this) without leaving an unassigned channel dark for
+        // the session. Applies once per connection: after the release, only a genuinely
+        // lit frame re-claims the rings.
+        private const double KnobUnassignedGraceSeconds = 4.0;
+
         // Per-component bitmask tracking (avoid redundant bitmask sends)
         private int _lastRpmBitmask = -1;
         private int _lastButtonBitmask = -1;
@@ -316,6 +335,10 @@ namespace MozaPlugin.Devices.Led
             _lastKnobRawColors = null;
             _lastKnobColorChangeTime = DateTime.MinValue;
             _knobStaticHoldReleased = false;
+            // Detection-loss / reload re-opens the grace window: the next connection
+            // may be a differently-configured wheel or profile.
+            _knobChannelEverLit = false;
+            _knobBlackSinceUtc = DateTime.MinValue;
             _rpmChangedUtc = _rpmFedUtc = DateTime.MinValue;
             _btnChangedUtc = _btnFedUtc = DateTime.MinValue;
             _knobDrivenUtc = _knobFedUtc = DateTime.MinValue;
@@ -432,6 +455,10 @@ namespace MozaPlugin.Devices.Led
                 _lastKnobRawColors = null;
                 _lastKnobColorChangeTime = DateTime.MinValue;
                 _knobStaticHoldReleased = false;
+                // _knobChannelEverLit / _knobBlackSinceUtc deliberately survive: this
+                // runs when a STATIC write just repainted the rings, which is exactly
+                // when an unassigned encoders channel must not re-claim them with black.
+                // Only ResetCachedLedState (detection loss / reload) re-opens the window.
             }
             if ((kind & LedKind.Flag) != 0)
             {
@@ -944,8 +971,8 @@ namespace MozaPlugin.Devices.Led
                     // is all-black (an effect that starts in its "off" state). The old gate
                     // (knobBitmask != 0 || _lastKnobBitmask > 0) required a lit frame first,
                     // so a start-in-off animation was ignored until it lit once. The explicit
-                    // release paths (Default-during-telemetry toggle / static-hold timeout,
-                    // checked above) are what hand the ring back to its stored colours.
+                    // release paths (Default-during-telemetry toggle / static-hold timeout /
+                    // never-lit grace window) are what hand the ring back to its stored colours.
                     bool knobsActive = true;
 
                     // Static-hold restore (WheelKnobStaticTimeoutMs): when the live knob
@@ -955,6 +982,25 @@ namespace MozaPlugin.Devices.Led
                     // (_knobStaticHoldReleased) until the colours actually change, so we
                     // don't immediately re-engage on the very next identical frame.
                     var nowUtc = DateTime.UtcNow;
+
+                    // Track the current unbroken black run so an encoders channel that
+                    // has never lit can be told from an effect that is momentarily off.
+                    // A single lit frame latches _knobChannelEverLit for the rest of the
+                    // connection, after which knobsUnassigned is permanently false and
+                    // the release rules below behave exactly as before.
+                    if (knobBitmask != 0)
+                    {
+                        _knobChannelEverLit = true;
+                        _knobBlackSinceUtc = DateTime.MinValue;
+                    }
+                    else if (_knobBlackSinceUtc == DateTime.MinValue)
+                    {
+                        _knobBlackSinceUtc = nowUtc;
+                    }
+                    bool knobsUnassigned = !_knobChannelEverLit
+                        && _knobBlackSinceUtc != DateTime.MinValue
+                        && (nowUtc - _knobBlackSinceUtc).TotalSeconds >= KnobUnassignedGraceSeconds;
+
                     int knobStaticTimeoutMs = plugin.Data.WheelKnobStaticTimeoutMs;
                     if (!ColorsEqual(knobColors, _lastKnobRawColors))
                     {
@@ -968,9 +1014,12 @@ namespace MozaPlugin.Devices.Led
                     // Release telemetry ownership of the knobs (active_mask=0 AND
                     // window_mask=0 — exactly the form PitHouse uses; 286/286 knob writes
                     // are active=0/window=0) so the firmware renders the native per-position
-                    // colours. Two independent triggers:
+                    // colours. Three independent triggers:
                     //   • "Default during telemetry" toggle + the frame is fully off.
                     //   • Static-hold timeout above.
+                    //   • The encoders channel has never lit and its opening black run
+                    //     outlived the grace window — nothing is assigned to it, so
+                    //     driving it means pinning the rings dark for the session.
                     // These knobs store a separate colour per rotation position, so the only
                     // correct "show original" is to stop driving them entirely. A non-zero
                     // window leaves telemetry owning the knobs (all-off → dark), and sending
@@ -978,7 +1027,7 @@ namespace MozaPlugin.Devices.Led
                     // _lastKnobs/_lastKnobBitmask so the keepalive below doesn't re-claim the
                     // knobs; a returning (or changed) frame re-engages through the normal path.
                     bool releaseForOff = plugin.Data.WheelKnobDefaultDuringTelemetry && knobBitmask == 0;
-                    if (releaseForOff || knobStaticTimedOut)
+                    if (releaseForOff || knobStaticTimedOut || knobsUnassigned)
                     {
                         // Hand the ring back to its stored colours. Only emit the release
                         // frame (active=0/window=0) if we currently OWN the knobs; if we
