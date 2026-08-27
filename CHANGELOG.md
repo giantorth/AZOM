@@ -6,6 +6,19 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **Knob rings no longer go dark when nothing is assigned to them.** On a wheel with knob
+  LEDs (KS Pro, CS Pro) the plugin took ownership of every knob ring as soon as SimHub
+  offered the encoders channel — which it does whether or not you have put an effect on it —
+  and then held them black for the whole session. The rings now stay under the wheel's own
+  stored colours until something actually lights them, and are claimed the instant it does.
+
+- **Switching the knob LEDs to Static no longer blacks them out.** Turning the knob group to
+  Static re-sent a stored palette the plugin had never read back, so it pushed black over the
+  wheel's own colours; it also wrote knob-numbered colours into ring-LED slots, repainting a
+  few LEDs on the first knob and leaving the rest untouched. It now re-sends the palette you
+  actually saved, addresses every ring LED correctly, and reads the wheel's colours back
+  instead of overwriting them when you have none saved.
+
 - **A wheelbase that doesn't answer the firmware question is asked again.** The wheelbase's
   firmware version is what unlocks the LFE haptics and the 10-band equalizer, and it was asked
   for exactly once when the base was found. A base that missed that one question kept both

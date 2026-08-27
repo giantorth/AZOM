@@ -7,11 +7,19 @@
 -- Installation: copy to your Wireshark personal plugins folder, then
 --   Wireshark > Analyze > Reload Lua Plugins  (or restart Wireshark)
 --
--- Personal plugin folder locations:
---   Linux/Mac:  ~/.config/wireshark/plugins/
+-- Personal plugin folder (Help > About Wireshark > Folders shows the real one):
+--   Linux:      ~/.local/lib/wireshark/plugins/   (older builds: ~/.config/wireshark/plugins/)
+--   macOS:      ~/.local/lib/wireshark/plugins/
 --   Windows:    %APPDATA%\Wireshark\plugins\
 --
 -- Or ad-hoc:  tshark -X lua_script:moza_dissector.lua -r capture.pcapng -Y moza
+--
+-- CAUTION: an installed copy in the personal plugin folder SHADOWS
+-- `-X lua_script:` — Wireshark loads the folder first and the second
+-- Proto("moza") registration is silently dropped, so you get the installed
+-- version's output while thinking you tested the file you passed. When
+-- iterating, either keep the installed copy in sync or isolate the run
+-- (`HOME=$(mktemp -d) tshark -X lua_script:... `).
 --
 -- ── Frame format ───────────────────────────────────────────────────────────
 --   7E [N] [group] [device] [N-byte payload] [checksum]
@@ -129,18 +137,17 @@ local REQ_GROUPS = {
     [0x42] = "FSR1: Display Data Push",
     [0x43] = "Telemetry / SerialStream",
 
-    -- Groups present in captures but absent from docs/protocol/ and from
-    -- rs21_parameter.db-derived tables. Named "Undocumented" on purpose so an
-    -- analyst can tell a known-unknown from a table gap. Observed shapes:
-    --   0x21 -> dev 0x12: cmds 00 / 03 / `01 02 06 00 00 00`; 0xA1 replies carry
-    --           an 8-char ASCII serial and a `03 AA 55 01 90` constant
-    --   0x4C -> dev 0x12: 5-byte `07 00 00 00 00`
-    --   0x4D -> dev 0x12
-    --   0x5A -> dev 0x1B (handbrake): 1-byte cmd 00, 0xDA reply N=20
-    [0x21] = "Undocumented (dev 0x12)",
-    [0x4C] = "Undocumented (dev 0x12)",
-    [0x4D] = "Undocumented (dev 0x12)",
-    [0x5A] = "Undocumented (dev 0x1B handbrake)",
+    -- Observed on the wire but undecoded; see docs/protocol/open-questions.md.
+    --   0x21 -> dev 0x12 on the wheelbase pipe. One-shot per PitHouse connect:
+    --           `7E 01 21 12 03` -> `7E 05 A1 21 03 AA 55 01 90` (constant).
+    --   0x4C -> dev 0x12 on the MOZA Stalks pipe (PID 0x0024, model `S07`).
+    --           ~1 Hz `7E 05 4C 12 07 00 00 00 00` -> `7E 03 CC 21 07 00 00`.
+    --   0x5A -> dev 0x1B. The plugin's own handbrake presence poll
+    --           (TelemetryFrameCache.HandbrakePresenceFrame): 1-byte cmd 00,
+    --           0xDA reply is 20 bytes, contents undecoded.
+    [0x21] = "Main: one-shot probe (undecoded)",
+    [0x4C] = "Stalks: status poll (undecoded)",
+    [0x5A] = "Handbrake: presence poll",
 
     [0x46] = "E-Stop: Status Poll",
 
@@ -368,6 +375,15 @@ CMDS[0x41] = { ["fdde"] = "send-telemetry (enable)" }
 
 -- Group 0x46 / 0xC6 — E-Stop
 CMDS[0x46] = { ["00"] = "receive-status", ["01"] = "get-status" }
+
+-- Group 0x21 — one-shot main probe (undecoded, PitHouse-only)
+CMDS[0x21] = { ["03"] = "probe (reply AA 55 01 90)" }
+
+-- Group 0x4C — MOZA Stalks status poll (undecoded)
+CMDS[0x4C] = { ["07"] = "status poll" }
+
+-- Group 0x5A — handbrake presence poll (reply body undecoded)
+CMDS[0x5A] = { ["00"] = "presence" }
 
 -- Groups 0x51..0x54 — shifter (docs/protocol/devices/shifter-0x1A.md)
 local SHIFTER_CMDS = {
