@@ -183,6 +183,7 @@
   <data name="Label_Test" xml:space="preserve"><value>Test</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Lockup</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Threshold</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Bite Point</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Engine Vibration</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequency (hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Smoothness</value></data>

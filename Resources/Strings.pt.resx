@@ -169,6 +169,7 @@
   <data name="Label_Test" xml:space="preserve"><value>Teste</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Travamento</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Limiar</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Ponto de embreagem</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Vibração do motor</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequência (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Suavidade</value></data>

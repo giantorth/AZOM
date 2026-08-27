@@ -174,6 +174,7 @@
   <data name="Label_Test" xml:space="preserve"><value>Probar</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Bloqueo</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Umbral</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Punto de agarre</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Vibración del motor</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frecuencia (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Suavidad</value></data>

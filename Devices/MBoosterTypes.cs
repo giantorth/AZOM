@@ -19,14 +19,19 @@ namespace MozaPlugin.Devices
         public const float TravelMaxGapMm = 32.1f;
 
         // Pedal Feel Max Force/Deadzone slider bounds, role-scoped — a
-        // Throttle pedal is a much lighter spring than a brake's load cell,
-        // so it gets its own narrower range instead of the Brake-shaped
-        // 0-200kg/0-40kg. Selected in UpdateMBoosterConfigVisibilityForRole.
-        // Clutch keeps the Brake-shaped bounds for now (not yet requested).
+        // Throttle or Clutch pedal is a much lighter spring than a brake's
+        // load cell, so both get their own narrower Max Force range instead
+        // of the Brake-shaped 0-200kg (same 4-20kg for both — shared
+        // constant, not duplicated per role). Deadzone differs per role
+        // (Clutch's spring has more built-in play than Throttle's), so it
+        // stays a separate constant each. Selected in
+        // UpdateMBoosterConfigVisibilityForRole.
         public const float ThrottleMaxForceMinKg = 4f;
         public const float ThrottleMaxForceMaxKg = 20f;
         public const float ThrottleDeadzoneMinKg = 0f;
         public const float ThrottleDeadzoneMaxKg = 5f;
+        public const float ClutchDeadzoneMinKg = 0f;
+        public const float ClutchDeadzoneMaxKg = 8f;
         public const float BrakeMaxForceMinKg = 0f;
         public const float BrakeMaxForceMaxKg = 200f;
         public const float BrakeDeadzoneMinKg = 0f;
@@ -75,6 +80,19 @@ namespace MozaPlugin.Devices
         // MBoosterEffectSettings.TriggerLevelPct.
         public const float ThresholdTriggerMinPct = 50f;
         public const float ThresholdTriggerMaxPct = 100f;
+
+        // Bite Point's (Clutch-only) fixed frequency slider bounds — wider/
+        // lower than Threshold's, reaching down into a slower, more
+        // distinct pulse range.
+        public const float BitePointFreqMinHz = 2f;
+        public const float BitePointFreqMaxHz = 100f;
+
+        // Bite Point's Trigger Input Level slider bounds — full 0-100%
+        // range, unlike Threshold's 50-100%: a clutch's bite point can sit
+        // anywhere across the pedal's travel depending on the car. See
+        // MBoosterEffectWorker.UpdateBitePointRequest.
+        public const float BitePointTriggerMinPct = 0f;
+        public const float BitePointTriggerMaxPct = 100f;
 
         // Brake Fade's Onset Temperature slider bounds, in the same unit
         // BrakeTempC normalizes to (Celsius) — see
@@ -196,35 +214,45 @@ namespace MozaPlugin.Devices
         public int IntensityPct { get; set; } = 50; // 0..100
 
         // Fixed vibration frequency, in Hz. Consumed by ABS (5-30Hz), Lockup
-        // (10-100Hz), and Threshold (5-100Hz) — see MBoosterUiConstants for
-        // each effect's *FreqMinHz/MaxHz bounds. All four used to derive
-        // their frequency from telemetry (Engine: RPM; ABS: activation
-        // depth; Lockup/Threshold: brake position); ABS/Lockup/Threshold's
-        // mappings were replaced with this user-set fixed value as each was
-        // rebuilt. Engine has since reverted to its original RPM-derived
-        // model (see MBoosterEffectWorker.UpdateEngineRequest) — this field
-        // is unused for Engine, kept only so older saved profiles still
-        // deserialize.
+        // (10-100Hz), Threshold (5-100Hz), and Bite Point (2-100Hz) — see
+        // MBoosterUiConstants for each effect's *FreqMinHz/MaxHz bounds. All
+        // four used to derive their frequency from telemetry (Engine: RPM;
+        // ABS: activation depth; Lockup/Threshold: brake position);
+        // ABS/Lockup/Threshold's mappings were replaced with this user-set
+        // fixed value as each was rebuilt; Bite Point (Clutch-only) was
+        // built fixed-frequency from the start. Engine has since reverted
+        // to its original RPM-derived model (see
+        // MBoosterEffectWorker.UpdateEngineRequest) — this field is unused
+        // for Engine, kept only so older saved profiles still deserialize.
         public float FrequencyHz { get; set; } = 100;
 
-        // Pulse modulation depth, ABS-only for now, 0..100. Controls the
-        // depth of the sine ripple in MBoosterEffectSynthesizer.SynthesizeAbs:
-        // 100 (default) reproduces the exact original verified formula
-        // (0.9 + 0.1*sin, depth 0.1 — "do not modify without verifying
-        // against the protocol document"); 0 widens it to a full 0..1 swing
-        // (0.5 + 0.5*sin, matching Engine's shape) for a sharper, choppier
-        // pulse. Values between are a host-side interpolation, not from the
-        // protocol note. Default 100 preserves pre-existing behavior for
-        // profiles that predate this slider.
+        // Pulse modulation depth, ABS and Bite Point (Clutch-only), 0..100.
+        // Controls the depth of the sine ripple in
+        // MBoosterEffectSynthesizer.SynthesizeAbs/SynthesizeBitePoint (same
+        // formula, separate functions): 100 (default) reproduces the exact
+        // original verified formula (0.9 + 0.1*sin, depth 0.1 — "do not
+        // modify without verifying against the protocol document"); 0
+        // widens it to a full 0..1 swing (0.5 + 0.5*sin, matching Engine's
+        // shape) for a sharper, choppier pulse. Values between are a
+        // host-side interpolation, not from the protocol note. Default 100
+        // preserves pre-existing behavior for profiles that predate this
+        // slider.
         public int SmoothnessPct { get; set; } = 100;
 
-        // Threshold-only, 50..100 (MBoosterUiConstants.ThresholdTriggerMinPct/
+        // Threshold: 50..100 (MBoosterUiConstants.ThresholdTriggerMinPct/
         // MaxPct) — the brake position (%) at which the rising-edge trigger
-        // fires. The falling/release threshold stays a fixed 30 points
-        // below this (same hysteresis gap the original fixed 0.6/0.3
-        // thresholds had) rather than being independently configurable.
-        // Default 60 exactly reproduces the original verified trigger
-        // point. See MBoosterEffectWorker.UpdateThresholdRequest.
+        // fires (fires as brake pressure INCREASES past this level). Bite
+        // Point (Clutch-only): 0..100 (BitePointTriggerMinPct/MaxPct,
+        // full range — a clutch's bite point can sit anywhere across the
+        // pedal's travel, unlike a brake threshold) — the pedal position at
+        // which the FALLING-edge trigger fires (fires as the pedal
+        // RELEASES past this level, the opposite direction from Threshold,
+        // since a bite point is encountered letting the clutch up, not
+        // pressing it down; see MBoosterEffectWorker.UpdateBitePointRequest).
+        // Both keep the same fixed 30-point hysteresis gap between trigger
+        // and release rather than being independently configurable.
+        // Default 60 exactly reproduces Threshold's original verified
+        // trigger point. See MBoosterEffectWorker.UpdateThresholdRequest.
         public int TriggerLevelPct { get; set; } = 60;
 
         // Threshold-only, 0..100 — how much the pulse fades after its
@@ -439,6 +467,9 @@ namespace MozaPlugin.Devices
         MBoosterEffectSettings WheelSpin { get; set; }
         MBoosterEffectSettings GearShift { get; set; }
         MBoosterEffectSettings GForce { get; set; }
+        // Clutch-only — see MBoosterEffectWorker.UpdateBitePointRequest and
+        // MBoosterUiConstants.BitePointTriggerMinPct/MaxPct/FreqMinHz/MaxHz.
+        MBoosterEffectSettings BitePoint { get; set; }
         System.Collections.Generic.List<MBoosterCustomEffect> CustomEffects { get; set; }
     }
 
@@ -527,6 +558,9 @@ namespace MozaPlugin.Devices
         public MBoosterEffectSettings WheelSpin { get; set; } = new MBoosterEffectSettings { FrequencyHz = 30 };
         public MBoosterEffectSettings GearShift { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
         public MBoosterEffectSettings GForce { get; set; } = new MBoosterEffectSettings { MaxTravelMm = 10, ResponseSpeedPct = 50 };
+        // Clutch-only — see MBoosterDeviceSettings.BitePoint for the field
+        // rationale (same defaults).
+        public MBoosterEffectSettings BitePoint { get; set; } = new MBoosterEffectSettings { FrequencyHz = 40, TriggerLevelPct = 50, SmoothnessPct = 100 };
         public List<MBoosterCustomEffect> CustomEffects { get; set; } = new List<MBoosterCustomEffect>();
 
         public MBoosterPedalSettings Clone() =>
@@ -559,6 +593,7 @@ namespace MozaPlugin.Devices
                 WheelSpin = WheelSpin?.Clone() ?? new MBoosterEffectSettings(),
                 GearShift = GearShift?.Clone() ?? new MBoosterEffectSettings(),
                 GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
+                BitePoint = BitePoint?.Clone() ?? new MBoosterEffectSettings(),
                 CustomEffects = CustomEffects?.Select(c => c.Clone()).ToList() ?? new List<MBoosterCustomEffect>(),
             };
     }
@@ -643,6 +678,11 @@ namespace MozaPlugin.Devices
         // default to 60/20, exactly reproducing the original verified
         // 0.6-brake trigger and 80% sustain.
         public MBoosterEffectSettings Threshold { get; set; } = new MBoosterEffectSettings { FrequencyHz = 70, TriggerLevelPct = 60, DecayPct = 20 };
+        // Clutch-only — TriggerLevelPct defaults to a rough mid-travel
+        // guess (50), unlike Threshold's confirmed 60; a bite point varies
+        // by car and the user is expected to tune it. See
+        // MBoosterEffectWorker.UpdateBitePointRequest.
+        public MBoosterEffectSettings BitePoint { get; set; } = new MBoosterEffectSettings { FrequencyHz = 40, TriggerLevelPct = 50, SmoothnessPct = 100 };
         public MBoosterEffectSettings Engine    { get; set; } = new MBoosterEffectSettings { IntensityPct = 50 };
 
         // Road Texture (effect type 9) reuses IntensityPct and SmoothnessPct
@@ -863,6 +903,7 @@ namespace MozaPlugin.Devices
                 GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
+                BitePoint = BitePoint?.Clone() ?? new MBoosterEffectSettings(),
                 Engine = Engine?.Clone() ?? new MBoosterEffectSettings(),
                 RoadTexture = RoadTexture?.Clone() ?? new MBoosterEffectSettings(),
                 BrakeFade = BrakeFade?.Clone() ?? new MBoosterEffectSettings(),

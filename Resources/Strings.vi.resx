@@ -169,6 +169,7 @@
   <data name="Label_Test" xml:space="preserve"><value>Thử</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Khóa bánh</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Ngưỡng</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Điểm bắt côn</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Rung động cơ</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Tần số (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Độ mượt</value></data>

@@ -2426,6 +2426,70 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
+                            <Expander x:Name="MBoosterBitePointExpander" Header="{x:Static res:Strings.Section_BitePoint}" IsExpanded="True" Margin="0,0,0,10">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <ctrl:OffOnToggle x:Name="MBoosterBitePointEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterBitePointEnable_Changed" Unchecked="MBoosterBitePointEnable_Changed"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterBitePointTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterBitePointTestToggle_Changed" Unchecked="MBoosterBitePointTestToggle_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TriggerLevel}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointTriggerLevel" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointTriggerLevel_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointTriggerLevelValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointTriggerLevel}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
+                                        <TextBlock Grid.Column="1" Text="2" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterBitePointFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="2" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="100" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterBitePointFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointFrequencySlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="40"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Smoothness}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointSmoothness" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointSmoothness_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointSmoothnessValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointSmoothness}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="100"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Intensity}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointIntensity_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointIntensityValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointIntensity}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
                             <Expander Header="{x:Static res:Strings.Section_EngineContinuous}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">

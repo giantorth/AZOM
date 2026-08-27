@@ -1574,6 +1574,15 @@ namespace MozaPlugin.Devices
             WorkerFor(pedalIndex)?.SetThresholdTestSustained(on);
         }
 
+        /// <summary>Turn Bite Point's (Clutch-only) sustained test toggle on/off for
+        /// pedal <paramref name="pedalIndex"/> — same live-tracking and always-allow-off
+        /// semantics as SetThresholdTestActive.</summary>
+        public void SetBitePointTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetBitePointTestSustained(on);
+        }
+
         /// <summary>
         /// Forces Travel End and Max Threshold to their Brake Fade caps
         /// (BrakeFadeMaxTravelEndMm / BrakeFadeMaxThresholdKg) while

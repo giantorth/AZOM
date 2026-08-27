@@ -169,6 +169,7 @@
   <data name="Label_Test" xml:space="preserve"><value>Δοκιμή</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Κλείδωμα</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Κατώφλι</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Σημείο συμπλέκτη</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Δόνηση κινητήρα</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Συχνότητα (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Ομαλότητα</value></data>

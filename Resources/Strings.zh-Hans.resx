@@ -169,6 +169,7 @@
   <data name="Label_Test" xml:space="preserve"><value>测试</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>锁死</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>阈值</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>离合点</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>发动机震动</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>频率 (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>平滑度</value></data>

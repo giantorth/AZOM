@@ -245,6 +245,7 @@ namespace MozaPlugin.Resources
         public static string Label_Test => Get("Label_Test");
         public static string Section_Lockup => Get("Section_Lockup");
         public static string Section_Threshold => Get("Section_Threshold");
+        public static string Section_BitePoint => Get("Section_BitePoint");
         public static string Section_EngineContinuous => Get("Section_EngineContinuous");
         public static string SliderLabel_FrequencyHz => Get("SliderLabel_FrequencyHz");
         public static string SliderLabel_Smoothness => Get("SliderLabel_Smoothness");
