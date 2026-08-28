@@ -841,5 +841,12 @@ namespace MozaPlugin.Resources
         public static string Option_WheelbaseLfeSourceShakeIt => Get("Option_WheelbaseLfeSourceShakeIt");
         public static string Status_WheelbaseLfeShakeItUnavailable => Get("Status_WheelbaseLfeShakeItUnavailable");
         public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
+        public static string Section_GameCompatibility => Get("Section_GameCompatibility");
+        public static string SliderLabel_ForzaCompatMode => Get("SliderLabel_ForzaCompatMode");
+        public static string Label_BaseGraphMode => Get("Label_BaseGraphMode");
+        public static string Option_GraphBandwidth => Get("Option_GraphBandwidth");
+        public static string Option_GraphTorque => Get("Option_GraphTorque");
+        public static string Label_Torque => Get("Label_Torque");
+        public static string Label_GraphScale => Get("Label_GraphScale");
     }
 }

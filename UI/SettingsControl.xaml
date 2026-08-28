@@ -357,27 +357,65 @@
                                     <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <ctrl:SteeringArc Grid.Column="0" x:Name="SteeringArcViz"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
-                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
-                                        <Button DockPanel.Dock="Left" x:Name="BaseCalibrateButton"
+                                <!-- Steering arc with Calibrate Center directly beneath it —
+                                     the button acts on what the arc is showing, so it sits
+                                     with it rather than in the right-hand column. -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <ctrl:SteeringArc x:Name="SteeringArcViz"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <!-- Negative top margin is deliberate: SteeringArc is a fixed
+                                         220x220 box whose arc ink bottoms out at y~176 (endpoints
+                                         at 175.03 + 3px stroke) with its readout vertically
+                                         centred, so the lower ~43px of the control is empty. The
+                                         template hardcodes that 220 internally, so shrinking the
+                                         control's Height would clip rather than trim — pulling the
+                                         row up is what actually closes the gap. -30 leaves ~10px
+                                         clear of the dot's lowest travel at full lock. -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                                Margin="0,-30,0,0">
+                                        <Button x:Name="BaseCalibrateButton"
                                                 Content="{x:Static res:Strings.Button_CalibrateCenter}"
                                                 Click="BaseCalibrateButton_Click"
                                                 VerticalAlignment="Center"/>
-                                        <TextBlock DockPanel.Dock="Left" x:Name="BaseCalibrateStatus"
+                                        <TextBlock x:Name="BaseCalibrateStatus"
                                                    Style="{StaticResource MutedHintText}"
                                                    VerticalAlignment="Center"
                                                    Margin="10,0,0,0"/>
-                                        <ctrl:SegmentedControl DockPanel.Dock="Right"
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
+                                    <!-- One row, two selectors: Performance output takes the
+                                         slot the Calibrate button vacated (left), the graph
+                                         selector sits opposite it (right). Declaration order is
+                                         load-bearing in a DockPanel — for Dock="Left" the first
+                                         child is leftmost, for Dock="Right" the first child is
+                                         RIGHTmost, so each pair is declared in the order that
+                                         reads label-then-control on screen.
+                                         The graph selector swaps the bandwidth card for the
+                                         live-torque card and gates the plugin's background 10 Hz
+                                         wire poll, so picking Bandwidth stops that traffic. -->
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   Text="{x:Static res:Strings.Label_PerformanceOutput}"
+                                                   Style="{StaticResource LabelText}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                        <ctrl:SegmentedControl DockPanel.Dock="Left"
                                                                x:Name="PerformanceOutputCombo"
                                                                SelectionChanged="PerformanceOutputCombo_Changed"
                                                                VerticalAlignment="Center">
                                             <ListBoxItem Content="{x:Static res:Strings.Option_Reserved}"/>
                                             <ListBoxItem Content="{x:Static res:Strings.Option_Full}"/>
                                         </ctrl:SegmentedControl>
+                                        <ctrl:SegmentedControl DockPanel.Dock="Right"
+                                                               x:Name="BaseGraphModeCombo"
+                                                               SelectionChanged="BaseGraphModeCombo_Changed"
+                                                               VerticalAlignment="Center">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_GraphBandwidth}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_GraphTorque}"/>
+                                        </ctrl:SegmentedControl>
                                         <TextBlock DockPanel.Dock="Right"
-                                                   Text="{x:Static res:Strings.Label_PerformanceOutput}"
+                                                   Text="{x:Static res:Strings.Label_BaseGraphMode}"
                                                    Style="{StaticResource LabelText}"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,10,0"/>
@@ -386,8 +424,9 @@
                                          Left  = MCU/MOSFET/Motor rolling temp graph (legend sorts hot→cool).
                                          Right = dual-line bandwidth sparkline (cyan=in, amber=out)
                                          relocated from the About tab so traffic + thermals are visible
-                                         on the same screen. Both halves are inner cards with their own
-                                         legend underneath. -->
+                                         on the same screen, OR the live-torque sparkline — whichever
+                                         BaseGraphModeCombo selects. Both halves are inner cards with
+                                         their own legend underneath. -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -438,7 +477,7 @@
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
-                                        <Border Grid.Column="1" Style="{StaticResource InnerCardBorder}"
+                                        <Border Grid.Column="1" x:Name="BandwidthCard" Style="{StaticResource InnerCardBorder}"
                                                 Padding="10,8" Margin="7,0,0,0">
                                             <StackPanel>
                                                 <!-- MaxValue = serial-port byte cap (115200 baud / 10 bits-per-byte). -->
@@ -484,6 +523,39 @@
                                                 <StackPanel Visibility="Collapsed">
                                                     <TextBlock x:Name="BandwidthInSessionText"/>
                                                     <TextBlock x:Name="BandwidthOutSessionText"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Live wheelbase torque (base status reg 0x07). Single
+                                             series: the wire value is signed only to say which way
+                                             the base pulls, and torque is torque either way, so the
+                                             magnitude is what gets plotted. MaxValue is set from
+                                             code each tick (floored auto-scale) because no rated-Nm
+                                             figure is available per base model. -->
+                                        <Border Grid.Column="1" x:Name="TorqueCard" Style="{StaticResource InnerCardBorder}"
+                                                Padding="10,8" Margin="7,0,0,0" Visibility="Collapsed">
+                                            <StackPanel>
+                                                <ctrl:BandwidthSparkline x:Name="TorqueGraphViz" Height="80"
+                                                                         InBrush="{StaticResource AmberBrush}"
+                                                                         InFillBrush="{StaticResource BwOutFillBrush}"
+                                                                         ShowGridlines="True"/>
+                                                <StackPanel Margin="0,6,0,0">
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                        <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                                                                 Fill="{StaticResource AmberBrush}" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="{x:Static res:Strings.Label_Torque}" Style="{StaticResource KvKeyText}"/>
+                                                        <TextBlock x:Name="TorqueValueText" Text="--"
+                                                                   Style="{StaticResource KvValueText}"
+                                                                   Foreground="{StaticResource AmberBrush}"/>
+                                                        <TextBlock x:Name="TorquePeakText" Style="{StaticResource KvKeyText}"
+                                                                   Margin="8,0,0,0" Opacity="0.7"/>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <TextBlock Text="{x:Static res:Strings.Label_GraphScale}" Style="{StaticResource KvKeyText}"/>
+                                                        <TextBlock x:Name="TorqueScaleText"
+                                                                   Style="{StaticResource KvValueText}"
+                                                                   Foreground="{StaticResource TextFaintBrush}"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
@@ -3458,6 +3530,20 @@
                                 </Grid>
                                 <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
                                            Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                        <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                             Persistent base-side state, read back from the device
+                             rather than stored in settings — so the toggle shows what
+                             the base actually holds, including a value PitHouse set. -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_GameCompatibility}" Icon="{StaticResource IconGame}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                              Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
+                                </StackPanel>
                             </StackPanel>
                         </ctrl:SectionCard>
 

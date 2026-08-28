@@ -382,6 +382,25 @@ namespace MozaPlugin.Devices
             return true;
         }
 
+        /// <summary>
+        /// Send a settings read WITHOUT registering it with the retry tracker.
+        /// For high-rate live polls (the Base-tab torque graph, ~15 Hz): tracked
+        /// reads are keyed by command name and retransmitted on a 200 ms-and-up
+        /// backoff, so re-tracking one name faster than its own backoff piles
+        /// retransmits on top of the poll. A dropped reply here should cost one
+        /// graph sample, not start a retry storm — the next tick re-asks anyway.
+        /// </summary>
+        public bool ReadSettingUntracked(string commandName)
+        {
+            if (!_connection.IsConnected) return false;
+            var cmd = MozaCommandDatabase.Get(commandName);
+            if (cmd == null) return false;
+            var msg = cmd.BuildReadMessage(GetDeviceId(cmd.DeviceType));
+            if (msg == null) return false;
+            _connection.Send(msg);
+            return true;
+        }
+
         public bool WriteSetting(string commandName, int value)
         {
             if (!_connection.IsConnected) return false;

@@ -337,6 +337,9 @@ CMDS[0x2A] = {
 CMDS[0x2B] = {
     ["01"] = "state",       ["02"] = "state-err",
     ["04"] = "mcu-temp",    ["05"] = "mosfet-temp", ["06"] = "motor-temp",
+    -- 07: BE16 biased +500, 0.1 Nm/count => (raw-500)/10. PitHouse torque-curve
+    -- panel polls it at ~18 Hz; read-only, nothing written to enable it.
+    ["07"] = "live-torque",
 }
 
 -- Group 0x2C — motor run-state

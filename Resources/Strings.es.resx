@@ -784,4 +784,11 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requiere SimHub 9.12 o posterior.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definición de dispositivo actualizada. Reinicia SimHub para aplicarla.</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>Compatibilidad de juegos</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidad con Forza Horizon</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>Gráfico</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Ancho de banda</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Par</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Par</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Escala</value></data>
 </root>

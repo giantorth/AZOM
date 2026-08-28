@@ -37,6 +37,13 @@ namespace MozaPlugin.Integration
             _plugin.AttachDelegate("AZOM.MosfetTemp", () => (_plugin.Data == null || _plugin.PropertyResolver == null) ? 0.0 : _plugin.PropertyResolver.ConvertTemp(_plugin.Data.MosfetTemp));
             _plugin.AttachDelegate("AZOM.MotorTemp", () => (_plugin.Data == null || _plugin.PropertyResolver == null) ? 0.0 : _plugin.PropertyResolver.ConvertTemp(_plugin.Data.MotorTemp));
             _plugin.AttachDelegate("AZOM.BaseState", () => _plugin.Data?.BaseState ?? 0);
+            // Live motor torque in Nm, unsigned — direction is dropped, since
+            // torque is torque whichever way the wheel is turning (this is how
+            // PitHouse graphs it too). Always live: base-live-torque rides the
+            // 5 s StatusPollCommands sweep alongside the temps. The Base tab's
+            // Torque graph adds a 10 Hz sampler on top while it is on screen, so
+            // this reads at 0.2 Hz normally and 10 Hz with that graph up.
+            _plugin.AttachDelegate("AZOM.CurrentTorque", () => _plugin.Data?.LiveTorqueNm ?? 0.0);
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);
 
             // Every wheelbase setting, in the same display units the Base-tab

@@ -183,7 +183,7 @@ namespace MozaPlugin.Devices.Extensions
             // for a model the user may not own — the live base-fw-version trigger
             // writes those. The connected base still gets its real haptics state.
             var connectedBasePrefix = BaseModelInfo.ExtractPrefix(MozaPlugin.Instance?.Data?.BaseModelName);
-            foreach (var (prefix, _, ledsPerStrip) in BaseModelInfo.KnownModels)
+            foreach (var (prefix, _, ledsPerStrip, _) in BaseModelInfo.KnownModels)
             {
                 bool isConnected = string.Equals(prefix, connectedBasePrefix, StringComparison.OrdinalIgnoreCase);
                 bool wantHaptics = isConnected && wheelbaseWantsHaptics;
@@ -793,7 +793,7 @@ namespace MozaPlugin.Devices.Extensions
                         EnsureThumbnail(deviceDir, prefix);
                 }
 
-                foreach (var (prefix, friendlyName, _) in BaseModelInfo.KnownModels)
+                foreach (var (prefix, friendlyName, _, _) in BaseModelInfo.KnownModels)
                 {
                     var deviceDir = Path.Combine(userDefsDir, "MOZA " + friendlyName);
                     if (File.Exists(Path.Combine(deviceDir, "device.json")))

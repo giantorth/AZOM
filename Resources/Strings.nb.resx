@@ -784,4 +784,11 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Krever SimHub 9.12 eller nyere.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Enhetsdefinisjonen er oppdatert. Start SimHub på nytt for å bruke den.</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>Spillkompatibilitet</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-kompatibilitet</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graf</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Båndbredde</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Dreiemoment</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Dreiemoment</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Skala</value></data>
 </root>

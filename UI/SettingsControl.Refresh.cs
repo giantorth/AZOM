@@ -42,7 +42,7 @@ namespace MozaPlugin.UI
                 "base-speed-damping", "base-speed-damping-point",
                 "base-soft-limit-stiffness", "base-soft-limit-retain",
                 "base-ffb-reverse", "main-get-work-mode", "main-get-led-status",
-                "main-get-ble-mode",
+                "main-get-ble-mode", "main-get-compat-mode",
                 "base-mcu-temp", "base-mosfet-temp", "base-motor-temp"
             );
         }
@@ -63,6 +63,7 @@ namespace MozaPlugin.UI
                 RefreshAb9Tab();
                 RefreshStalksTab();
                 RefreshMBoosterTab();
+                RefreshOptionsTab();
                 InitTelemetryTab();
                 RefreshSdkTabTick();
                 // Last: the per-tab refreshes above each set their own tab's

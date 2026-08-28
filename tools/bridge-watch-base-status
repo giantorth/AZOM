@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Live monitor for wheelbase status reads (group 0x2B) on a bridge capture.
+
+Group 0x2B / dev 0x13 is the base's read-only status surface; the base answers
+on group 0xAB / dev 0x31 (group|0x80, device nibble-swapped) with the register
+id echoed in payload[0] followed by a big-endian 16-bit value.
+
+Documented registers (docs/protocol/devices/wheelbase-0x13.md § Group 0x2B):
+  01 state          02 state-err
+  04 mcu-temp       05 mosfet-temp    06 motor-temp
+
+Anything else is unlabeled and printed as `reg-NN`. PitHouse starts and stops
+these polls as its UI panels open and close, so the poll rate per register is
+itself a signal — a register climbing to ~20 Hz means a live readout is on
+screen.
+
+Usage:
+    tools/bridge-watch-base-status                      # tail latest capture
+    tools/bridge-watch-base-status --capture FILE
+    tools/bridge-watch-base-status --reg 07             # one register only
+    tools/bridge-watch-base-status --from-start         # replay whole file
+    tools/bridge-watch-base-status --no-follow          # one-shot summary
+    tools/bridge-watch-base-status --summary-every 5    # stats cadence (s)
+"""
+import argparse
+import sys
+import time
+from collections import defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from moza_bridge import resolve_bridge, stream_bridge
+
+READ_GRP = 0x2B
+RESP_GRP = 0xAB
+READ_DEV = 0x13
+RESP_DEV = 0x31
+
+NAMES = {
+    0x01: "state",
+    0x02: "state-err",
+    0x04: "mcu-temp",
+    0x05: "mosfet-temp",
+    0x06: "motor-temp",
+}
+
+
+def reg_name(reg: int) -> str:
+    return NAMES.get(reg, f"reg-{reg:02x}")
+
+
+class RegStat:
+    __slots__ = ("n", "lo", "hi", "cur", "first_t", "last_t", "changes")
+
+    def __init__(self):
+        self.n = 0
+        self.lo = None
+        self.hi = None
+        self.cur = None
+        self.first_t = None
+        self.last_t = None
+        self.changes = 0
+
+    def add(self, val, t):
+        self.n += 1
+        if self.cur is not None and val != self.cur:
+            self.changes += 1
+        self.cur = val
+        self.lo = val if self.lo is None else min(self.lo, val)
+        self.hi = val if self.hi is None else max(self.hi, val)
+        if self.first_t is None:
+            self.first_t = t
+        self.last_t = t
+
+    @property
+    def hz(self):
+        if self.first_t is None or self.last_t is None:
+            return 0.0
+        span = self.last_t - self.first_t
+        return (self.n / span) if span > 0 else 0.0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
+    ap.add_argument("--capture", type=Path, default=None)
+    ap.add_argument("--reg", type=lambda s: int(s, 16), default=None,
+                    help="hex register id to isolate, e.g. 07")
+    ap.add_argument("--from-start", action="store_true")
+    ap.add_argument("--no-follow", action="store_true")
+    ap.add_argument("--summary-every", type=float, default=5.0)
+    ap.add_argument("--quiet", action="store_true",
+                    help="stats lines only, no per-change lines")
+    args = ap.parse_args()
+
+    # stdout is block-buffered when redirected to a file; live monitors are
+    # useless if their output sits in a 4 KB buffer.
+    sys.stdout.reconfigure(line_buffering=True)
+
+    cap = resolve_bridge(args.capture)
+    print(f"watching {cap}", file=sys.stderr)
+
+    stats = defaultdict(RegStat)
+    polls = defaultdict(int)
+    last_summary = time.time()
+
+    def summary():
+        if not stats:
+            print("  (no group 0x2B status replies yet)")
+            return
+        print(f"  {'reg':<14} {'n':>7} {'Hz':>6} {'cur':>7} {'min':>7} "
+              f"{'max':>7} {'span':>6} {'chg':>6} {'polls':>6}")
+        for reg in sorted(stats):
+            s = stats[reg]
+            span = (s.hi - s.lo) if s.lo is not None else 0
+            print(f"  {reg_name(reg):<14} {s.n:7d} {s.hz:6.1f} {s.cur:7d} "
+                  f"{s.lo:7d} {s.hi:7d} {span:6d} {s.changes:6d} "
+                  f"{polls.get(reg, 0):6d}")
+        print()
+
+    try:
+        for f in stream_bridge(cap, from_start=args.from_start,
+                               follow=not args.no_follow):
+            pl = f.payload
+            if not pl:
+                continue
+
+            # host poll: 2B/13 <reg> 00 00
+            if f.dir == "h2b" and f.grp == READ_GRP and f.dev == READ_DEV:
+                reg = pl[0]
+                if args.reg is None or reg == args.reg:
+                    polls[reg] += 1
+
+            # base reply: AB/31 <reg> <hi> <lo>
+            elif f.dir == "b2h" and f.grp == RESP_GRP and f.dev == RESP_DEV:
+                if len(pl) < 3:
+                    continue
+                reg = pl[0]
+                if args.reg is not None and reg != args.reg:
+                    continue
+                val = (pl[1] << 8) | pl[2]
+                s = stats[reg]
+                prev = s.cur
+                s.add(val, f.t)
+                if not args.quiet and prev is not None and val != prev:
+                    print(f"{f.t_rel:9.3f} {reg_name(reg):<14} "
+                          f"{prev:5d} -> {val:5d}  ({val - prev:+d})")
+
+            now = time.time()
+            if args.summary_every > 0 and now - last_summary >= args.summary_every:
+                print(f"--- t={f.t_rel:.1f}s ---")
+                summary()
+                last_summary = now
+    except KeyboardInterrupt:
+        pass
+
+    print("--- final ---")
+    summary()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

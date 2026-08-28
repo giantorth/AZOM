@@ -134,7 +134,7 @@ namespace MozaPlugin.Devices
                 }
 
                 // 4. Same for wheelbase models, under the base: key namespace.
-                foreach (var (prefix, _, _) in BaseModelInfo.KnownModels)
+                foreach (var (prefix, _, _, _) in BaseModelInfo.KnownModels)
                 {
                     var key = BaseKeyPrefix + prefix;
                     if (!PrefixToGuid.ContainsKey(key))

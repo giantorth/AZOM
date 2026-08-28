@@ -30,18 +30,39 @@ namespace MozaPlugin.Devices
         /// Known wheelbase models. <c>LedsPerStrip == 0</c> means the body has no
         /// ambient strip at all (R3/R5/R9/R12 silently drop the 0xA2 read) — not
         /// "unknown", which falls through to <see cref="DefaultLedsPerStrip"/>.
+        ///
+        /// <c>RatedNm</c> is the model's peak torque, used only to scale the
+        /// Base-tab torque graph. <c>0</c> means "not established" and the graph
+        /// falls back to auto-scaling — deliberately the case for R3/R5, whose
+        /// ratings are fractional (not simply the model number) and were never
+        /// confirmed from a MOZA-sourced string here. Do not guess them.
         /// </summary>
-        public static readonly (string Prefix, string FriendlyName, int LedsPerStrip)[] KnownModels =
+        public static readonly (string Prefix, string FriendlyName, int LedsPerStrip, int RatedNm)[] KnownModels =
         {
-            ("R3",  "R3",  0),
-            ("R5",  "R5",  0),
-            ("R9",  "R9",  0),
-            ("R12", "R12", 0),
-            ("R16", "R16", 6),
-            ("R21", "R21", 9),
-            ("R25", "R25", 9),
-            ("R27", "R27", 9),
+            ("R3",  "R3",  0, 0),
+            ("R5",  "R5",  0, 0),
+            ("R9",  "R9",  0, 9),
+            ("R12", "R12", 0, 12),
+            ("R16", "R16", 6, 16),
+            ("R21", "R21", 9, 21),
+            ("R25", "R25", 9, 25),
+            ("R27", "R27", 9, 27),
         };
+
+        /// <summary>Model peak torque in Nm, or 0 when not established.</summary>
+        public static int RatedNm(string? baseModelName)
+        {
+            var prefix = ExtractPrefix(baseModelName);
+            if (prefix.Length == 0)
+                return 0;
+
+            foreach (var (p, _, _, nm) in KnownModels)
+            {
+                if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
+                    return nm;
+            }
+            return 0;
+        }
 
         /// <summary>
         /// The leading model token of a firmware model-name string, upper-cased
@@ -72,7 +93,7 @@ namespace MozaPlugin.Devices
                 return "";
 
             var trimmed = baseModelName!.Trim();
-            foreach (var (prefix, _, _) in KnownModels)
+            foreach (var (prefix, _, _, _) in KnownModels)
             {
                 if (string.Equals(prefix, token, StringComparison.OrdinalIgnoreCase))
                     return prefix;
@@ -81,7 +102,7 @@ namespace MozaPlugin.Devices
             // No exact token match — fall back to longest-first StartsWith so an
             // unseparated string ("R16Black") still lands on the right entry.
             string best = "";
-            foreach (var (prefix, _, _) in KnownModels)
+            foreach (var (prefix, _, _, _) in KnownModels)
             {
                 if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && prefix.Length > best.Length)
                     best = prefix;
@@ -95,7 +116,7 @@ namespace MozaPlugin.Devices
             if (string.IsNullOrEmpty(prefix))
                 return "";
 
-            foreach (var (p, friendly, _) in KnownModels)
+            foreach (var (p, friendly, _, _) in KnownModels)
             {
                 if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
                     return friendly;
@@ -115,7 +136,7 @@ namespace MozaPlugin.Devices
             if (prefix.Length == 0)
                 return DefaultLedsPerStrip;
 
-            foreach (var (p, _, leds) in KnownModels)
+            foreach (var (p, _, leds, _) in KnownModels)
             {
                 if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
                     return leds > 0 ? leds : DefaultLedsPerStrip;
@@ -145,7 +166,7 @@ namespace MozaPlugin.Devices
             if (string.IsNullOrEmpty(prefix))
                 return false;
 
-            foreach (var (p, _, leds) in KnownModels)
+            foreach (var (p, _, leds, _) in KnownModels)
             {
                 if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
                     return leds > 0;
@@ -208,7 +229,7 @@ namespace MozaPlugin.Devices
             if (string.IsNullOrEmpty(prefix))
                 return 0;
 
-            foreach (var (p, _, leds) in KnownModels)
+            foreach (var (p, _, leds, _) in KnownModels)
             {
                 if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
                     return leds;

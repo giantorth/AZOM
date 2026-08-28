@@ -504,6 +504,15 @@ namespace MozaPlugin
                 _tempHistoryTimer.AutoReset = true;
                 _tempHistoryTimer.Start();
 
+                // Live-torque sampler. Runs for the plugin's life like the temp
+                // sampler, but every tick no-ops unless TorqueGraphActive — this
+                // one issues a wire read, so it must not poll for a panel that
+                // is shut or showing the bandwidth graph.
+                _torqueHistoryTimer = new Timer(TorqueHistoryIntervalMs);
+                _torqueHistoryTimer.Elapsed += SampleTorqueHistory;
+                _torqueHistoryTimer.AutoReset = true;
+                _torqueHistoryTimer.Start();
+
                 // 250ms < shortest ReadRetryBackoffMs (200) so a dropped probe
                 // gets retried within ~one backoff window.
                 _retryTimer = new Timer(250);
@@ -777,6 +786,7 @@ namespace MozaPlugin
             UnhookArduinoScanVeto();
             try { _pollTimer?.Stop(); } catch { }
             try { _tempHistoryTimer?.Stop(); } catch { }
+            try { _torqueHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _profileCoordinator?.StopSaveDebounceTimer(); } catch { }
@@ -884,6 +894,7 @@ namespace MozaPlugin
             try { _baseManager?.Dispose(); } catch { }
             try { _pollTimer?.Dispose(); } catch { }
             try { _tempHistoryTimer?.Dispose(); } catch { }
+            try { _torqueHistoryTimer?.Dispose(); } catch { }
             try { _retryTimer?.Dispose(); } catch { }
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _profileCoordinator?.DisposeSaveDebounceTimer(); } catch { }

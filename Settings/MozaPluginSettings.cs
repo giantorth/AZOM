@@ -16,6 +16,17 @@ namespace MozaPlugin.Settings
         ShakeIt = 1,
     }
 
+    /// <summary>Which graph fills the right-hand slot of the Base tab's live
+    /// telemetry pair. Torque additionally gates its own ~15 Hz wire poll, so
+    /// this is not purely cosmetic.</summary>
+    public enum BaseGraphMode
+    {
+        /// <summary>Dual-line serial traffic sparkline (in/out). No extra wire cost.</summary>
+        Bandwidth = 0,
+        /// <summary>Live wheelbase torque magnitude, polled from base status reg 0x07.</summary>
+        Torque = 1,
+    }
+
     /// <summary>
     /// Persisted plugin settings. Saved/loaded via SimHub's ReadCommonSettings/SaveCommonSettings.
     /// Stores values that the wheel doesn't retain between sessions.
@@ -194,6 +205,11 @@ namespace MozaPlugin.Settings
 
         // Whether to automatically apply profile settings on launch
         public bool AutoApplyProfileOnLaunch { get; set; } = true;
+
+        // Which graph occupies the right-hand slot of the Base tab's live
+        // telemetry pair. Defaults to Bandwidth: it costs nothing on the wire,
+        // whereas Torque runs a ~15 Hz poll whenever the panel is open.
+        public BaseGraphMode BaseTabGraph { get; set; } = BaseGraphMode.Bandwidth;
 
         // When true, every device tab in the plugin pane is shown regardless of
         // detection — including the ones normally gated on hardware being present

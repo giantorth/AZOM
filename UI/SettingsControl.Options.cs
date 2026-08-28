@@ -81,6 +81,29 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
+        // Forza Horizon compatibility — a persistent wheelbase mode, not a plugin
+        // setting: the write goes to the device and the toggle is re-synced from
+        // main-get-compat-mode, so a value PitHouse set is reflected here.
+        // Polarity is plain 1/0 — do NOT copy BluetoothCheck's inverted 0/85.
+        private void ForzaCompatCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            int val = ForzaCompatCheck.IsChecked == true ? 1 : 0;
+            _data.CompatMode = val;
+            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-compat-mode", val);
+        }
+
+        // Periodic re-sync for Options-tab controls backed by DEVICE state rather
+        // than plugin settings. Settings-driven toggles here are one-shot (nothing
+        // else can change them), but compat-mode lives on the base and PitHouse or
+        // another host can flip it behind our back, so it is re-read every tick.
+        // Called from RefreshDisplay inside the event suppressor.
+        private void RefreshOptionsTab()
+        {
+            if (ForzaCompatCheck != null)
+                ForzaCompatCheck.IsChecked = _data.CompatMode == 1;
+        }
+
         private void DisableSerialProbeFallbackCheck_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;

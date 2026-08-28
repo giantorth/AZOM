@@ -84,6 +84,10 @@ namespace MozaPlugin.Protocol
             AddCommand("base-mcu-temp",    "base", 43, 0xFF, new byte[] { 4 }, 2, "int");
             AddCommand("base-mosfet-temp", "base", 43, 0xFF, new byte[] { 5 }, 2, "int");
             AddCommand("base-motor-temp",  "base", 43, 0xFF, new byte[] { 6 }, 2, "int");
+            // Live motor torque. BE16 biased by +500 (500 = zero), 0.1 Nm/count;
+            // the sign is only which way the base pulls, so consumers plot
+            // Math.Abs(raw - 500) / 10.0. docs/protocol/devices/wheelbase-0x13.md
+            AddCommand("base-live-torque", "base", 43, 0xFF, new byte[] { 7 }, 2, "int");
 
             // Wheelbase calibration (write group 42)
             AddCommand("base-calibration", "base", 0xFF, 42, new byte[] { 1 }, 2, "int");

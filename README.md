@@ -228,6 +228,7 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | `AZOM.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.BaseState` | int | Wheelbase state |
+| `AZOM.CurrentTorque` | double | Live motor torque in Nm, unsigned (direction is not reported). Refreshed on the same 5 s status sweep as the temperatures, and at 10 Hz while the Base tab's Torque graph is on screen |
 | `AZOM.MaxAngle` | int | Max steering angle (degrees) |
 | `AZOM.ClutchSplitPoint` | int | Clutch split point (%) for the current wheel, as shown on the wheel device page (Paddles Mode = Combined) |
 | `AZOM.HidConnected` | bool | Whether a device HID surface is being read (live input is available) |

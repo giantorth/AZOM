@@ -126,6 +126,20 @@ namespace MozaPlugin
         public volatile int MotorTemp;
         public volatile bool UseFahrenheit;
 
+        // Live motor torque, raw wire value: BE16 biased by +500 (500 = zero),
+        // 0.1 Nm per count. The sign is direction only — plot the magnitude via
+        // LiveTorqueNm. 500 (= 0.0 Nm) is the correct pre-read default, since a
+        // never-read register must not graph as a phantom 50 Nm.
+        public volatile int LiveTorqueRaw = LiveTorqueZeroBias;
+
+        public const int LiveTorqueZeroBias = 500;
+
+        /// <summary>Unsigned live torque in Nm. Direction is discarded — torque
+        /// is torque whichever way the wheel is turning, which is how PitHouse
+        /// graphs it too.</summary>
+        public double LiveTorqueNm =>
+            Math.Abs(LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
+
         // State
         public volatile int BaseState;
         public volatile int BaseStateError;
@@ -542,6 +556,9 @@ namespace MozaPlugin
 
         // ===== Main device =====
         public volatile int BleMode;               // 0=On, 85=Off
+        // Forza Horizon compatibility. Plain polarity: 1=On, 0=Off — do NOT copy
+        // BleMode's inverted convention. -1 = not read back yet.
+        public volatile int CompatMode = -1;
 
         // ===== Pedals settings =====
         public volatile int PedalsThrottleDir;
@@ -773,6 +790,12 @@ namespace MozaPlugin
                 case "base-mosfet-temp":    MosfetTemp = value; break;
                 case "base-motor-temp":     MotorTemp = value; break;
 
+                // Live torque. Deliberately does NOT set IsBaseConnected: it
+                // shares read group 43 with base-mcu-temp, which is the base
+                // detection trigger (DeviceProber), and a cosmetic graph must
+                // not become a second detection source.
+                case "base-live-torque":    LiveTorqueRaw = value; break;
+
                 // State
                 case "base-state":          BaseState = value; break;
                 case "base-state-err":      BaseStateError = value; break;
@@ -821,6 +844,7 @@ namespace MozaPlugin
                 case "main-get-led-status":    LedStatus = value; break;
                 case "main-get-interpolation": Interpolation = value; break;
                 case "main-get-ble-mode":      BleMode = value; break;
+                case "main-get-compat-mode":   CompatMode = value; break;
 
                 // Wheel LED settings
                 case "wheel-telemetry-mode":        WheelTelemetryMode = value; break;

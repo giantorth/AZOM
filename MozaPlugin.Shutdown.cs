@@ -38,6 +38,7 @@ namespace MozaPlugin
             _profileCoordinator?.StopSaveDebounceTimer();
             _pollTimer?.Stop();
             _tempHistoryTimer?.Stop();
+            _torqueHistoryTimer?.Stop();
             _retryTimer?.Stop();
             _reconnectTimer?.Stop();
 
@@ -251,6 +252,7 @@ namespace MozaPlugin
             _profileCoordinator?.DisposeSaveDebounceTimer();
             _pollTimer?.Dispose();
             _tempHistoryTimer?.Dispose();
+            _torqueHistoryTimer?.Dispose();
             _retryTimer?.Dispose();
             _reconnectTimer?.Dispose();
 

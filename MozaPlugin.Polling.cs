@@ -197,6 +197,38 @@ namespace MozaPlugin
             catch (Exception ex) { MozaLog.Warn($"[AZOM] Temp-history sample failed: {ex.Message}"); }
         }
 
+        // Background feed for live torque: the Base-tab graph's history ring and
+        // the AZOM.CurrentTorque property. Gated on TorqueGraphActive — unlike the
+        // temperature sampler this one issues a wire read, and 10 Hz of it is not
+        // worth paying permanently for a property most setups never read. Enable
+        // the Base tab's Torque graph to make it live.
+        //
+        // Costs one 8-byte read + 8-byte reply per tick while active: ~160 B/s at
+        // 10 Hz, ~1.4% of the 11520 B/s ceiling. Runs off the WPF dispatcher; the
+        // UI only ever renders a snapshot on its existing 500 ms tick.
+        private void SampleTorqueHistory(object sender, ElapsedEventArgs e)
+        {
+            if (IsShuttingDown) return;
+            if (!TorqueGraphActive) return;
+            var data = _data;
+            if (data == null) return;
+
+            try
+            {
+                if (!data.IsBaseConnected)
+                {
+                    _torqueHistory.Record(0.0);
+                    return;
+                }
+                // Untracked: a dropped reply costs one sample, where a tracked
+                // read re-registered at this rate would stack retransmits on its
+                // own backoff.
+                _deviceManager?.ReadSettingUntracked("base-live-torque");
+                _torqueHistory.Record(data.LiveTorqueNm);
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Torque-history sample failed: {ex.Message}"); }
+        }
+
         // Attempts spent on the base-fw-version retry burst before giving up.
         // ~5 × the 5 s poll interval ≈ 25 s past base detect, at three small
         // frames per round — enough to ride out a busy cold-start, cheap enough

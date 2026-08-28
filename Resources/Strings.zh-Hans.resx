@@ -779,4 +779,11 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>需要 SimHub 9.12 或更高版本。</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>设备定义已更新。请重启 SimHub 以应用。</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>游戏兼容性</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 兼容性</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>图表</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>带宽</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>扭矩</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>扭矩</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>刻度</value></data>
 </root>

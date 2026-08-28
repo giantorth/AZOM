@@ -130,6 +130,33 @@ Both produce ACK response: `7E 03 AA 31 43 0x 05 [chk]` (echo with group|0x80, d
 | mcu-temp | `04` | 2 | int | |
 | mosfet-temp | `05` | 2 | int | |
 | motor-temp | `06` | 2 | int | |
+| live-torque | `07` | 2 | int | **Live motor torque.** BE16 biased by +500, 0.1 Nm per count — `torque_Nm = (raw - 500) / 10.0`, sign carries direction. Read-only live measurement; nothing is written to enable it. PitHouse's **torque curve** panel is a pure reader: opening it starts an ~18 Hz poll of this register alone (no temps alongside) and closing it stops the poll, so the poll's presence *is* the feature's on/off state. |
+
+**`live-torque` (`07`) verification** — real R16 Ultra, PitHouse bridge capture
+`bridge-pithouse-features-20260828-061341.jsonl`:
+
+```
+h2b  7E 03 2B 13 07 00 00 [chk]     ← poll, ~18 Hz (50 ms nominal)
+b2h  7E 03 AB 31 07 01 F4 [chk]     ← reply: reg echo + BE16 value (0x01F4 = 500 = 0.0 Nm)
+```
+
+| Wheel state | raw | Nm |
+|---|---|---|
+| idle, untouched (±1 count dither) | `499`–`500` | 0.0 |
+| hand-wiggled, both directions | `467`…`538` | −3.3 … +3.8 |
+| held static against a stop (PitHouse UI read 6 Nm) | `440` plateau, 437–445 over 40 s | −6.0 |
+
+The static hold is what distinguishes torque from angular velocity: steady force
+with no rotation holds a *sustained* offset, where a velocity channel would
+return to the 500 bias.
+
+The sign is only which way the wheelbase is pulling. PitHouse's torque graph
+plots the **unsigned magnitude** — `Math.Abs(raw - 500) / 10.0` — because torque
+is torque regardless of direction; that is why a raw `440` displays as `6 Nm`
+and not `-6 Nm`. Consumers wanting a plottable value should do the same.
+
+Full scale (the clip point) is not yet measured — nothing in this capture drove
+the value beyond ±60 counts.
 
 ### Group `0x2C` (44) — Motor run-state / partner-API extension (write-only)
 
