@@ -347,18 +347,17 @@ namespace MozaPlugin.Telemetry.Display
                     // REAR wing (tester-confirmed on dashboards 5/10 — the last three read one
                     // gauge earlier than the old labels claimed). Unlike the tyre boxes these
                     // carry DAMAGE, not remaining %, so no 100− inversion.
-                    // Five gauges onto SimHub's five generic damage channels, one each.
-                    // `CarDamage1..5` are the only damage channels on StatusDataBase —
-                    // Telemetry.json's WingWearFL/EngineWear/GearBoxWear point at
-                    // …FrontLeftWingDamage/…EngineDamage/…GearBoxDamage, which do not exist.
-                    // Which car part each channel carries is game-defined, so a game that
-                    // orders them differently needs a per-field remap. FieldIds are historical,
-                    // kept so existing profile overrides stay attached to the same gauge.
-                    .U8("wwFL", "Front wing damage FL", G + "CarDamage1")
-                    .U8("wwFR", "Front wing damage FR", G + "CarDamage2")
-                    .U8("wwR", "ICE damage", G + "CarDamage3")
-                    .U8("engWear", "Gearbox damage", G + "CarDamage4")
-                    .U8("gbxWear", "Rear wing damage", G + "CarDamage5")
+                    // Per-part damage from the F1 raw player-car status — the generic
+                    // `CarDamage1..5` are one undifferentiated pool per game, so they can't tell
+                    // a wing from a gearbox. Bias +1: the gauge leaves 0 unlit, so an undamaged
+                    // part reads 1 and renders green (tester-verified on dashboards 5/10).
+                    // FieldIds are historical, kept so existing profile overrides stay attached
+                    // to the same gauge.
+                    .U8("wwFL", "Front wing damage FL", F1RawPlayerStatus + "m_frontLeftWingDamage", bias: 1.0)
+                    .U8("wwFR", "Front wing damage FR", F1RawPlayerStatus + "m_frontRightWingDamage", bias: 1.0)
+                    .U8("wwR", "ICE damage", F1RawPlayerStatus + "m_engineDamage", bias: 1.0)
+                    .U8("engWear", "Gearbox damage", F1RawPlayerStatus + "m_gearBoxDamage", bias: 1.0)
+                    .U8("gbxWear", "Rear wing damage", F1RawPlayerStatus + "m_rearWingDamage", bias: 1.0)
                     .U8("ersR", "ERS remaining", G + "ERSPercent")
                     .U8("fuel", "Fuel remaining", G + "Fuel")
                     .GearDrsErs("gde")
@@ -653,6 +652,20 @@ namespace MozaPlugin.Telemetry.Display
 
         public static Fsr1Dashboard? ByType(byte type) =>
             Dashboards.FirstOrDefault(d => d.RecordType == type);
+
+        /// <summary>True when the record carries the 24-bit sign-magnitude gap/delta slot.</summary>
+        public static bool HasGapField(Fsr1Dashboard? dash) =>
+            dash != null && System.Array.Exists(dash.Fields, f => f.Kind == Fsr1FieldKind.SignedMagnitude);
+
+        /// <summary>
+        /// Smallest gap-bearing record (type-0c, 18 bytes). The driver interleaves this at a low
+        /// rate on pages whose primary record has NO gap slot (index 4 → type-03, index 8 →
+        /// type-05, …), so the firmware's cached delta keeps tracking instead of going stale —
+        /// the same cache mechanism 0x0d uses for tyre data. type-0c is the safest carrier: its
+        /// other fields (current lap time, speed, RPM, max RPM, gear) are values we already
+        /// compute correctly, so anything it puts in the cache alongside the gap is also right.
+        /// </summary>
+        public static Fsr1Dashboard? GapCarrier => ByType(0x0c);
 
         /// <summary>
         /// Active page index (Param 6 / g32-81) -> the record type(s) the wheel renders
