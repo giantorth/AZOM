@@ -196,7 +196,7 @@ type, heartbeat) arrives on the base's `0x0E` channel with source byte
 The plugin registers a ROUTED mBooster lane for this hookup: when the
 pedal sub-device is detected on a base/hub pipe, its identity is probed
 at `0x19` and — model-name `mBooster` being the discriminator against
-plain SGP pedals, which answer the same identity groups — an
+plain CRP/SRP pedals, which answer the same identity groups — an
 `MBoosterDeviceController` is registered over the shared pipe. All
 mbooster-* traffic (identity, calibration, `0xb1` motor frames,
 keepalive) addresses `0x19`; `0x1d`/`0x1e` are never used on a shared

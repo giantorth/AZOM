@@ -69,6 +69,23 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
+        /// <summary>
+        /// True iff an mBooster occupies the relayed pedal sub-device (0x19) on
+        /// a base/hub pipe. A routed lane only reaches the registry once the
+        /// model-name read confirmed an mBooster, so this is proof — not a
+        /// guess — that the pedal slot is NOT plain pedals. The pedals-*
+        /// command set writes the same group/cmd bytes as mbooster-*, so any
+        /// pedals surface aimed at 0x19 would land on the mBooster.
+        /// </summary>
+        public bool AnyRoutedPedalLane
+        {
+            get
+            {
+                lock (_lock)
+                    return _order.Any(c => c.IsRouted && c.HostDeviceId == MozaProtocol.DevicePedals);
+            }
+        }
+
         /// <summary>Snapshot of all known controllers in enumeration order.</summary>
         public IReadOnlyList<MBoosterDeviceController> Devices
         {

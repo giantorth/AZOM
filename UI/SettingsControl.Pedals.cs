@@ -40,7 +40,13 @@ namespace MozaPlugin.UI
 
         private void RefreshPedalsTab()
         {
-            bool detected = _plugin.IsPedalsDetected;
+            // An mBooster on a base/hub pedal port answers as device 0x19 and so
+            // latches PedalsDetected, but every control on this tab writes the
+            // same group/cmd bytes as the mbooster-* set — including the
+            // calibration routine, which would run against a motorized pedal.
+            // Its own card is the correct surface, so hide this one entirely.
+            bool detected = _plugin.IsPedalsDetected
+                            && !(_plugin.MBoosterRegistry?.AnyRoutedPedalLane ?? false);
             PedalsTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
             if (!detected) return;
 

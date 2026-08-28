@@ -300,7 +300,7 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Fired when the model-name read answers (once per distinct value).
         /// The routed-lane probe uses this to discriminate an mBooster on a
-        /// base/hub pedal port from plain SGP pedals before registering the
+        /// base/hub pedal port from plain pedals before registering the
         /// lane — both answer the same identity groups at dev 0x19.
         /// </summary>
         public event Action<string>? ModelNameResolved;
@@ -617,10 +617,11 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         private void RecomputeChainRoleMap()
         {
-            // Single active pedal: its role owns the one motor, which is the
-            // host. Passive pedals have no motor at all, and their output
-            // calibration lives on the host too (0x12 answers all three roles'
-            // min/max), so nothing else needs a mapping.
+            // Single active pedal: its role owns the one motor, which is this
+            // lane's host — 0x12 on a USB pipe, HostDeviceId (0x19) routed.
+            // Passive pedals have no motor at all, and their output calibration
+            // lives on the host too (it answers all three roles' min/max), so
+            // nothing else needs a mapping.
             int soleActive = SoleActiveAxis();
             if (soleActive >= 0)
             {
@@ -631,7 +632,7 @@ namespace MozaPlugin.Devices.MBooster
                                 : soleRole == MBoosterRole.Clutch ? 2 : -1;
                 if (soleRoleIdx >= 0)
                 {
-                    PublishRoleMap(new Dictionary<int, byte> { [soleRoleIdx] = MozaProtocol.DeviceMain });
+                    PublishRoleMap(new Dictionary<int, byte> { [soleRoleIdx] = HostDeviceId });
                     return;
                 }
             }
@@ -1595,7 +1596,7 @@ namespace MozaPlugin.Devices.MBooster
                 // motor doesn't latch the last waveform after the port closes
                 // (protocol note § 3 "Disable"). Only once the lane has
                 // identified as an actual mBooster — a routed probe that
-                // turned out to be plain SGP pedals must not write motor
+                // turned out to be plain pedals must not write motor
                 // frames at the pedals sub-device.
                 if (ModelName != null && ModelName.IndexOf("mBooster", StringComparison.OrdinalIgnoreCase) >= 0)
                     SendAllDisableFrames();

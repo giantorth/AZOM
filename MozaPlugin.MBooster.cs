@@ -190,7 +190,7 @@ namespace MozaPlugin
         // count separately). An entry persists for the session once created —
         // as a registered lane when the pedal device identified as an
         // mBooster, or as a retired negative when it turned out to be plain
-        // SGP pedals (prevents a re-probe loop; a hookup change mid-session
+        // pedals (prevents a re-probe loop; a hookup change mid-session
         // needs a plugin restart to be picked up).
         private readonly object _routedMBoosterLock = new object();
         private readonly Dictionary<MozaDeviceManager, MBoosterDeviceController> _routedMBoosterProbes =
@@ -203,7 +203,7 @@ namespace MozaPlugin
 
         /// <summary>
         /// A pedal sub-device was detected on a base/hub pipe — it may be an
-        /// mBooster on the RJ45 pedal port rather than plain SGP pedals. Spin
+        /// mBooster on the RJ45 pedal port rather than plain pedals. Spin
         /// up a ROUTED controller against the pipe's shared connection (dev
         /// 0x19) and interrogate its identity; registration with the registry
         /// happens only when the model-name read confirms an mBooster (both
@@ -292,7 +292,7 @@ namespace MozaPlugin
                 }
                 else
                 {
-                    // Plain SGP pedals (or another non-mBooster pedal device) —
+                    // Plain pedals (CRP/SRP, or another non-mBooster pedal device) —
                     // retire the probe. Dispose skips the motor disable frames
                     // when the model never identified as an mBooster.
                     MozaLog.Debug($"[AZOM/mBooster] pedal sub-device ({c.PortName}) is '{model}', not an mBooster — routed probe retired");

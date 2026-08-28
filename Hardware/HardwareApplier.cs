@@ -1686,12 +1686,36 @@ namespace MozaPlugin.Hardware
         public void WriteIfPedalsDetected(string command, int value)
         {
             if (value < 0) return;
+            if (SuppressPedalsWrite(command)) return;
             if (_detectionState.PedalsDetected) PedalsManager.WriteSetting(command, value);
         }
         public void WriteFloatIfPedalsDetected(string command, int value)
         {
             if (value < 0) return;
+            if (SuppressPedalsWrite(command)) return;
             if (_detectionState.PedalsDetected) PedalsManager.WriteFloat(command, value);
+        }
+
+        // An mBooster on a base/hub pedal port answers as device 0x19 and so
+        // latches PedalsDetected, but the pedals-* command set writes the SAME
+        // group/cmd bytes as mbooster-* — every write here would land on the
+        // mBooster's own registers, and pedals-*-cal-start would run a CRP/SRP
+        // calibration sweep against a motorized pedal. Gated at the write path,
+        // not just in the UI, because the SDK/CoAP pedal resources reach these
+        // same two methods. The mBooster card owns that hardware.
+        private readonly System.Collections.Generic.HashSet<string> _pedalsWriteSuppressedLogged =
+            new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+
+        private bool SuppressPedalsWrite(string command)
+        {
+            if (!(_plugin?.MBoosterRegistry?.AnyRoutedPedalLane ?? false)) return false;
+            bool isNew;
+            lock (_pedalsWriteSuppressedLogged) isNew = _pedalsWriteSuppressedLogged.Add(command ?? "");
+            if (isNew)
+                MozaLog.Info(
+                    $"[AZOM] '{command}' suppressed — the pedal slot (0x19) holds an mBooster, " +
+                    "not CRP/SRP pedals; use the mBooster card");
+            return true;
         }
         public void WriteIfHgpDetected(string command, int value)
         {
