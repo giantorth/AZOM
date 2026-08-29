@@ -290,11 +290,6 @@ namespace MozaPlugin.Resources
         public static string Hint_AlwaysResendBitmask => Get("Hint_AlwaysResendBitmask");
         public static string SliderLabel_KeepaliveTimeout => Get("SliderLabel_KeepaliveTimeout");
         public static string Hint_KeepaliveTimeout => Get("Hint_KeepaliveTimeout");
-        public static string Section_UsbDetection => Get("Section_UsbDetection");
-        public static string SliderLabel_DisableSerialProbe => Get("SliderLabel_DisableSerialProbe");
-        public static string Hint_DisableSerialProbe => Get("Hint_DisableSerialProbe");
-        public static string SliderLabel_DisableAb9Detection => Get("SliderLabel_DisableAb9Detection");
-        public static string Hint_DisableAb9Detection => Get("Hint_DisableAb9Detection");
         public static string Section_DashboardTelemetry => Get("Section_DashboardTelemetry");
         public static string Label_UploadDashboardOnConnect => Get("Label_UploadDashboardOnConnect");
         public static string Label_DownloadDashboardsFromWheel => Get("Label_DownloadDashboardsFromWheel");

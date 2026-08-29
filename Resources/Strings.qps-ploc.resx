@@ -215,11 +215,6 @@
   <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Howl Yowl Bork!</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Bark!</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Wan Yap Bork Grrowl Grr!</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>ARF!!</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Howl Rrrf!</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Yap Howl Yip!</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Snarf Arf!</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Bork Wroof!</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Wuff!</value></data>

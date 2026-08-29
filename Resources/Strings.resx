@@ -226,11 +226,6 @@
   <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Only send LED data when it actually changes.</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Always resend bitmask</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Always send the LED bitmask with color updates, even if unchanged. Causes extra traffic.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB DETECTION</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Disable serial-probe fallback (advanced)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Only required if plugin is talking to incorrect device.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disable active-shifter detection (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Skip the active-shifter reconnect probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD TELEMETRY</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Upload dashboard on connect</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Download dashboards from wheel</value></data>

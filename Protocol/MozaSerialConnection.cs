@@ -178,7 +178,9 @@ namespace MozaPlugin.Protocol
         // PID filter for port discovery; null PID = probe-based (unknown).
         private readonly Func<string?, bool>? _pidFilter;
         private readonly MozaProbeTarget _probeTarget;
-        // Hard-disable serial probe fallback (user-toggle via MozaPluginSettings).
+        // Hard-disable the probe fallback for THIS lane. Enumeration-only lanes
+        // (base-aux, hub, dashboard, standalone peripherals) pass () => true;
+        // lanes that still need the fallback leave it null. Not user-settable.
         private readonly Func<bool>? _disableProbeFallback;
 
         private volatile IMozaPort? _port;
@@ -567,7 +569,8 @@ namespace MozaPlugin.Protocol
         /// Connection scoped to a subset of MOZA PIDs. <paramref name="pidFilter"/>
         /// accepts/rejects ports by PID; <paramref name="probeTarget"/> selects which
         /// probe frames the fallback issues; <paramref name="disableProbeFallback"/>
-        /// hard-disables the fallback (default keeps it armed for empty-registry case).
+        /// hard-disables the fallback for enumeration-only lanes (default keeps it
+        /// armed for the empty-registry case).
         /// </summary>
         public MozaSerialConnection(
             Func<string?, bool>? pidFilter,
@@ -1735,7 +1738,7 @@ namespace MozaPlugin.Protocol
             if (disableProbeFallback?.Invoke() == true)
             {
                 MozaLog.DebugIfChanged($"probe-skip-disabled:{laneLabel}",
-                    $"[AZOM] [{laneLabel}] No matching MOZA device in registry; DisableSerialProbeFallback is on so probe is skipped");
+                    $"[AZOM] [{laneLabel}] No matching MOZA device in registry; this lane is enumeration-only so the probe is skipped");
                 return (null, null, false, null);
             }
 

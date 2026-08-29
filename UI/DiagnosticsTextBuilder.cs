@@ -53,13 +53,9 @@ namespace MozaPlugin.UI
             var sb = new StringBuilder();
             var ports = MozaPortDiscovery.Instance.Enumerate();
             var source = MozaPortDiscovery.Instance.Source;
-            string fallbackState;
-            if (plugin.Settings.DisableSerialProbeFallback)
-                fallbackState = "DISABLED";
-            else if (source != MozaDiscoverySource.None)
-                fallbackState = "not used (enumeration is authoritative)";
-            else
-                fallbackState = "armed (active — no device source)";
+            string fallbackState = source != MozaDiscoverySource.None
+                ? "not used (enumeration is authoritative)"
+                : "armed (active — no device source)";
             sb.AppendLine($"Source:         {source}  (probe fallback: {fallbackState})");
             sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
             if (Protocol.WineHost.IsWine)
@@ -91,9 +87,7 @@ namespace MozaPlugin.UI
             sb.Append(string.IsNullOrEmpty(wheelbasePort) ? "(disconnected)" : "→ " + wheelbasePort);
             // AB9/AB6 share one lane. LastPortName survives Disconnect, so gate on
             // IsConnected like the Hub / Base(aux) lines below — otherwise this
-            // prints a port for a shifter that was unplugged. A user-disabled lane
-            // reads as such rather than as "disconnected": that setting is the
-            // single most common reason an active shifter never appears.
+            // prints a port for a shifter that was unplugged.
             var ab9Conn = plugin.Ab9Manager?.Connection;
             bool ab9Connected = ab9Conn?.IsConnected == true;
             string ab9Port = ab9Connected ? ab9Conn!.LastPortName ?? "" : "";
@@ -102,9 +96,7 @@ namespace MozaPlugin.UI
                 ? Protocol.MozaUsbIds.ActiveShifterShortName(ab9Conn!.DiscoveredPid)
                 : "AB9/AB6");
             sb.Append(' ');
-            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
-                      : plugin.Settings?.DisableAb9Detection == true ? "(detection disabled)"
-                      : "(disconnected)");
+            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port : "(disconnected)");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");

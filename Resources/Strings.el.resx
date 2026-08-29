@@ -196,11 +196,6 @@
   <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Αποστολή δεδομένων σε LED μόνο όταν αλλάζουν.</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Πάντα επαναποστολή bitmask</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Πάντα αποστολή LED bitmask με ενημερώσεις χρώματος, ακόμα και αν δεν άλλαξε. Προκαλεί επιπλέον κίνηση δεδομένων.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>ΑΝΙΧΝΕΥΣΗ USB</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Απενεργοποίηση fallback σειριακής ανίχνευσης (για προχωρημένους)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Απαιτείται μόνο αν το plugin επικοινωνεί με λάθος συσκευή.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Απενεργοποίηση ανίχνευσης active-shifter (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Παράλειψη ανίχνευσης επανασύνδεσης του active-shifter.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ΤΗΛΕΜΕΤΡΙΑ ΟΘΟΝΗΣ ΟΡΓΑΝΩΝ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Μεταφόρτωση οθόνης κατά τη σύνδεση</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Λήψη οθόνης από το τιμόνι</value></data>

@@ -196,11 +196,6 @@
   <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>N'envoyer les données LED que lorsqu'elles changent réellement.</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Toujours renvoyer le bitmask</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Toujours envoyer le bitmask LED avec les mises à jour de couleur, même s'il ne change pas. Génère du trafic supplémentaire.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>DÉTECTION USB</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Désactiver la sonde série de secours (avancé)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>À activer uniquement si le plugin communique avec un mauvais périphérique.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Désactiver la détection du levier actif (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Ignorer la sonde de reconnexion du levier actif.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TÉLÉMÉTRIE DU TABLEAU DE BORD</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Téléverser le tableau de bord à la connexion</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Télécharger les tableaux de bord depuis le volant</value></data>

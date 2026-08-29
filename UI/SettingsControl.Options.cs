@@ -103,20 +103,6 @@ namespace MozaPlugin.UI
                 ForzaCompatCheck.IsChecked = _data.CompatMode == 1;
         }
 
-        private void DisableSerialProbeFallbackCheck_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            _plugin.Settings.DisableSerialProbeFallback = DisableSerialProbeFallbackCheck.IsChecked == true;
-            _plugin.SaveSettings();
-        }
-
-        private void DisableAb9DetectionCheck_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            _plugin.Settings.DisableAb9Detection = DisableAb9DetectionCheck.IsChecked == true;
-            _plugin.SaveSettings();
-        }
-
         private void RedeployDefinitionsButton_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(

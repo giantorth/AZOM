@@ -135,12 +135,9 @@ namespace MozaPlugin
             // symlink, which locks up SimHub and opens other vendors' hardware.
             // (This used to test the registry alone, which is always empty on
             // Wine — it silently disabled every lane below on Linux.)
-            // DisableAb9Detection wins regardless.
             bool deviceSourceLive =
                 Protocol.MozaPortDiscovery.Instance.IsAuthoritative;
-            if (!_settings.DisableAb9Detection
-                && deviceSourceLive
-                && !_ab9Manager.IsConnected)
+            if (deviceSourceLive && !_ab9Manager.IsConnected)
                 _connectionCoordinator?.TryConnectAb9();
 
             // Standalone-USB CM2 on its own port (0x0025) — same gate.

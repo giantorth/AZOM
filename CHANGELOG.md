@@ -80,6 +80,8 @@ All notable changes to the AZOM plugin are documented here.
   the base model and firmware — including whether the firmware question was ever answered — plus
   whether LFE haptics and the 10-band equalizer are unlocked and which condition is failing.
 - **The wheel firmware era override has been removed.** Auto mode is now the default.
+- **Legacy USB Detection options have been removed.** AB9 / AB6 detection always runs, and 
+  serial-probe fallback always remains an option.
 
 ## [1.5.7]
 

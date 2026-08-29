@@ -3547,25 +3547,6 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_UsbDetection}" Icon="{StaticResource IconRefresh}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisableSerialProbe}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="DisableSerialProbeFallbackCheck" VerticalAlignment="Center"
-                                              Checked="DisableSerialProbeFallbackCheck_Changed" Unchecked="DisableSerialProbeFallbackCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_DisableSerialProbe}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisableAb9Detection}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="DisableAb9DetectionCheck" VerticalAlignment="Center"
-                                              Checked="DisableAb9DetectionCheck_Changed" Unchecked="DisableAb9DetectionCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_DisableAb9Detection}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
                         <!-- Hidden: dashboard upload/download UI collapsed while the feature is
                              in development. Runtime values are forced off in MozaPlugin; the
                              upload/download scaffolding is intentionally preserved. It kept its

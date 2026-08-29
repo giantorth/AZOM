@@ -83,8 +83,6 @@ namespace MozaPlugin.UI
                 // RefreshBaseTab on every 500 ms tick so a profile switch with
                 // the panel open tracks the new game's values. See the comment
                 // in RefreshBaseTab for why the constructor copy was removed.
-                DisableSerialProbeFallbackCheck.IsChecked = plugin.Settings.DisableSerialProbeFallback;
-                DisableAb9DetectionCheck.IsChecked = plugin.Settings.DisableAb9Detection;
             }
 
             InitProfilesTab();

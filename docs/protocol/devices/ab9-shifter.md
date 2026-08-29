@@ -54,7 +54,7 @@ COM6  VID 0x346E  PID 0x1002   HID product string: "MOZA AB6 FFB Base"
 
 HID descriptor: 8 GenericDesktop axes (`0x30`..`0x37`) + 128 buttons — the same generic MOZA composite descriptor the wheelbases report, so it carries no model information.
 
-**There is no AB6 wire capture.** The reporter had `DisableAb9Detection` set, so `TryConnectAb9()` never ran and the port was never opened — their bundle contains 18,759 frames, all labelled `wheelbase`, and zero bytes on COM6. `0x1002` is registered in category `Ab9` and driven by the shared lane on the **assumption** of protocol parity with the AB9. Everything below (groups `0x1E`/`0x1F`/`0x20`, dev `0x12`, the FFB alloc handshake, the engine-vibration stream set) is AB9-measured and unverified on an AB6.
+**There is no AB6 wire capture.** The reporter had the since-retired `DisableAb9Detection` setting on, so `TryConnectAb9()` never ran and the port was never opened — their bundle contains 18,759 frames, all labelled `wheelbase`, and zero bytes on COM6. `0x1002` is registered in category `Ab9` and driven by the shared lane on the **assumption** of protocol parity with the AB9. Everything below (groups `0x1E`/`0x1F`/`0x20`, dev `0x12`, the FFB alloc handshake, the engine-vibration stream set) is AB9-measured and unverified on an AB6.
 
 Open questions the first AB6 capture should settle:
 

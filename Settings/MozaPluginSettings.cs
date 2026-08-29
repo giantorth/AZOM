@@ -173,35 +173,6 @@ namespace MozaPlugin.Settings
         public string LastHubDeviceId { get; set; } = "";
         public string LastBaseAuxDeviceId { get; set; } = "";
 
-        // Hard opt-out of the serial-probe fallback. Default behaviour
-        // (false) is registry-first: if the registry-based MOZA USB
-        // discovery returns matching ports, those are used and no probe
-        // ever runs; if the registry returns zero MOZA devices total
-        // (Wine/Proton without USB enumeration, driver not loaded),
-        // the plugin falls back to writing a Moza protocol probe frame
-        // to every COM port on the system as a last resort. Setting
-        // this to true forbids the probe entirely — useful for the
-        // rare user who wants to guarantee no Moza writes ever reach
-        // a non-Moza serial peripheral. The previous ScanUnknownSerialPorts
-        // (and earlier EnableAb9) on-disk keys are silently ignored.
-        public bool DisableSerialProbeFallback { get; set; } = false;
-
-        // Skip AB9 active-shifter detection entirely. Explicit user opt-out
-        // that wins regardless of discovery mode. When false (default), AB9
-        // probing is *also* auto-suppressed at runtime whenever MOZA's
-        // registry-based USB enumeration returns empty — that's the signal
-        // that the system has no working Windows registry path (Wine/Proton),
-        // where the AB9 probe would otherwise sweep every COM symlink every
-        // 5 seconds and has been observed to lock up SimHub. So in practice:
-        //   - Windows w/ working registry, no AB9: probe runs in microseconds.
-        //   - Windows w/ working registry, AB9 present: detected normally.
-        //   - Wine/Linux (registry empty): probe auto-skipped.
-        //   - User explicitly true: probe skipped on any system.
-        // The AB9 manager instance is still constructed so existing null-safe
-        // call sites and the dormant engine-vib worker stay valid; only the
-        // connect/probe is suppressed.
-        public bool DisableAb9Detection { get; set; } = false;
-
         // Whether to automatically apply profile settings on launch
         public bool AutoApplyProfileOnLaunch { get; set; } = true;
 

@@ -199,11 +199,6 @@
   <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Invia i dati LED solo quando cambiano effettivamente.</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Reinvia sempre la bitmask</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Invia sempre la bitmask LED con gli aggiornamenti colore, anche se invariata. Genera traffico aggiuntivo.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>RILEVAMENTO USB</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Disabilita fallback serial-probe (avanzato)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Necessario solo se il plugin comunica con il dispositivo sbagliato.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disabilita rilevamento cambio attivo (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Salta il probe di riconnessione del cambio attivo.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRIA DASHBOARD</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Carica dashboard alla connessione</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Scarica dashboard dal volante</value></data>

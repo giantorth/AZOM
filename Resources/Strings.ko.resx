@@ -196,11 +196,6 @@
   <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>LED 데이터가 실제로 변경될 때만 전송합니다.</value></data>
   <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>비트마스크 항상 재전송</value></data>
   <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>변경이 없어도 색상 업데이트와 함께 LED 비트마스크를 항상 전송합니다. 추가 트래픽이 발생합니다.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB 감지</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>시리얼 프로브 폴백 비활성화 (고급)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>플러그인이 잘못된 장치와 통신하는 경우에만 필요합니다.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 감지 비활성화 (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 재연결 프로브를 건너뜁니다.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>연결 시 대시보드 업로드</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>휠에서 대시보드 다운로드</value></data>

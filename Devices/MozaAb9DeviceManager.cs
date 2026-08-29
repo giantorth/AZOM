@@ -114,7 +114,7 @@ namespace MozaPlugin.Devices
             remove => _connection.MessageReceived -= value;
         }
 
-        public MozaAb9DeviceManager(Func<bool>? disableProbeFallback = null)
+        public MozaAb9DeviceManager()
         {
             // PID filter accepts the AB9 PID and any unknown Moza PID
             // (future-hardware fallback) during registry-based discovery.
@@ -132,8 +132,7 @@ namespace MozaPlugin.Devices
             // docs/protocol/devices/usb-ids.md.
             _connection = new MozaSerialConnection(
                 pid => MozaUsbIds.IsAb9Pid(pid) || !MozaUsbIds.IsKnownMozaPid(pid),
-                MozaProbeTarget.Ab9,
-                disableProbeFallback);
+                MozaProbeTarget.Ab9);
             _connection.CaptureLabel = "ab9";
             // Drop the detection latch when the underlying port dies. Fires on the
             // read/write thread, so this handler MUST stay lightweight (no Join, no

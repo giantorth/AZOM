@@ -221,8 +221,6 @@ namespace MozaPlugin
                 // Wheelbase + Universal HUB + unknown Moza PIDs. Excludes
                 // pedals/shifter/handbrake/AB9 (they ignore base probes).
                 // See Protocol/MozaUsbIds.cs and docs/protocol/devices/usb-ids.md.
-                Func<bool> disableProbeFallback = () =>
-                    _settings != null && _settings.DisableSerialProbeFallback;
                 // Reuse the persistent connection from a prior plugin
                 // instance if it's still connected — this keeps wheel
                 // sessions alive across SimHub game-switch plugin reloads
@@ -308,8 +306,7 @@ namespace MozaPlugin
                         pid => MozaUsbIds.IsWheelbasePid(pid)
                                || MozaUsbIds.IsHubPid(pid)
                                || !MozaUsbIds.IsKnownMozaPid(pid),
-                        MozaProbeTarget.BaseAndHub,
-                        disableProbeFallback);
+                        MozaProbeTarget.BaseAndHub);
                     if (!string.IsNullOrEmpty(_settings.LastWheelbasePort))
                         _connection.LastPortName = _settings.LastWheelbasePort;
                     if (!string.IsNullOrEmpty(_settings.LastWheelbaseDeviceId))
@@ -361,7 +358,7 @@ namespace MozaPlugin
                     }
                 }
 
-                _ab9Manager = new MozaAb9DeviceManager(disableProbeFallback);
+                _ab9Manager = new MozaAb9DeviceManager();
                 if (!string.IsNullOrEmpty(_settings.LastAb9Port))
                     _ab9Manager.Connection.LastPortName = _settings.LastAb9Port;
                 if (!string.IsNullOrEmpty(_settings.LastAb9DeviceId))
