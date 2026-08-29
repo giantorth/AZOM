@@ -11,7 +11,7 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Επιλογές</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Εισαγωγή</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Σχετικά</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Αποσυνδεδεμένο</value></data>
@@ -223,21 +223,8 @@
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// ενεργοποιήστε αυτήν την επιλογή για να αποτρέψετε την αυτόματη εκκίνηση του PitHouse</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Παρέχει υποστήριξη επίσημου MOZA SDK για παιχνίδια που το απαιτούν — όπως το iRacing, ή οποιοδήποτε παιχνίδι χρησιμοποιεί λειτουργία 360 Hz. Το plugin εκτελεί ενσωματωμένο CoAP SDK control server σε loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Όταν είναι ενεργό, το plugin εκτελεί μια μικρή βοηθητική διεργασία που εμφανίζεται στη λίστα διεργασιών ως "MOZA Pit House.exe". Αυτό είναι αναμενόμενο — επιτρέπει στις εφαρμογές MOZA SDK να εντοπίζουν το PitHouse. Τερματίζεται αυτόματα όταν απενεργοποιείται ή κλείνει το SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση CoAP SDK server</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP CONTROL</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// CBOR-over-UDP control surface</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Αυτός είναι ένας legacy UDP control για ρύθμιση γωνίας τιμονιού. Η μόνη γνωστή χρήση είναι η RSF έκδοση του Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Ενεργοποίηση UDP control server</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Θύρα</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>ΚΑΤΑΣΤΑΣΗ</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP control</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>ΠΡΟΣΦΑΤΑ ΑΙΤΗΜΑΤΑ</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// τελευταία 20 αιτήματα ανά server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>ΣΧΕΤΙΚΑ</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Πρόσθετο SimHub ανοιχτού κώδικα</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -530,9 +517,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Εκκίνηση…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Σταματημένο</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Εκτελείται (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Ο διακομιστής δεν ξεκίνησε — ενεργοποιήστε τον με τον διακόπτη παραπάνω</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Δεν υπάρχουν ακόμη αιτήματα</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Δεν υπάρχουν ακόμη αιτήματα — τα εργαλεία τρίτων επικοινωνούν εδώ μόνο όταν διαβάζουν ή γράφουν μια ρύθμιση</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Διαχειριστής stub</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>Καταγραφή… (η συνεχής καταγραφή είναι ενεργή — κάντε κλικ στο Διακοπή όταν είστε έτοιμοι)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>Καταγραφή… (ανοίξτε άλλη καρτέλα και χρησιμοποιήστε τη συσκευή, μετά επιστρέψτε για διακοπή)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>εξαγωγή στο {0}</value></data>

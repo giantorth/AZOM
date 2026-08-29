@@ -16,7 +16,7 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Alternativer</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Om</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Frakoblet</value></data>
@@ -228,21 +228,8 @@
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sist endret</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SLETT</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// aktiver dette alternativet for å hindre at PitHouse starter automatisk</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Gir offisiell MOZA SDK-støtte for spill som krever det — som iRacing, eller spill som bruker 360 Hz-modus. Pluginen kjører en innebygd CoAP SDK-kontrollserver på loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Når aktivert kjører pluginen en liten stand-in-prosess som vises i prosesslisten som «MOZA Pit House.exe». Dette er forventet — det lar MOZA SDK-apper finne PitHouse via navnet. Den avsluttes automatisk når du deaktiverer dette eller lukker SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Aktiver CoAP SDK-server</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP-KONTROLL</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// rå CBOR-over-UDP-kontrollflate</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Dette er en eldre UDP-kontroll for å sette rattvinkel. Eneste kjente bruk er RSF-versjonen av Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Aktiver UDP-kontrollserver</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP-server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP-kontroll</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>SISTE FORESPØRSLER</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// siste 20 forespørsler per server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>OM</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// SimHub-plugin med åpen kildekode</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -536,9 +523,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Starter…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Stoppet</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Kjører (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Serveren er ikke startet – aktiver den med bryteren over</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Ingen forespørsler ennå</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Ingen forespørsler ennå – tredjepartsverktøy kommuniserer her bare når de leser eller skriver en innstilling</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Stub-behandler</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>tar opp… (alltid-opptak er på – klikk Stopp når du er klar)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>tar opp… (åpne en annen fane og bruk enheten, kom så tilbake for å stoppe)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>eksportert til {0}</value></data>

@@ -83,6 +83,8 @@ All notable changes to the AZOM plugin are documented here.
 - **Legacy USB Detection options have been removed.** AB9 / AB6 detection always runs, and 
   serial-probe fallback always remains an option.
 - **Limit updates to wheel and Always resend bitmask have been removed.** Both are now always off.
+- **The SDK tab is gone.** Its CoAP and UDP control toggles moved to the Options tab; request
+  activity is now logged to the diagnostics bundle instead of an on-screen list.
 
 ## [1.5.7]
 

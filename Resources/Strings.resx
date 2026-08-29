@@ -18,7 +18,7 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Disconnected</value></data>
@@ -253,21 +253,8 @@
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Last modified</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>DELETE</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// enable this option to prevent PitHouse from launching automatically</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Provides official MOZA SDK support for games that require it — such as iRacing, or any game that uses 360 Hz mode. The plugin runs an embedded CoAP SDK control server on loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>While enabled, the plugin runs a small stand-in process that appears in your process list as "MOZA Pit House.exe". This is expected — it lets MOZA SDK apps find PitHouse by name. It exits automatically when you disable this or close SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Enable CoAP SDK server</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP CONTROL</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// plain CBOR-over-UDP control surface</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>This is a legacy UDP control for setting steering angle. The only known use is the RSF version of Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Enable UDP control server</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP control</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>RECENT REQUESTS</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// last 20 requests per server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>ABOUT</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Open-source SimHub plugin</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -561,9 +548,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Starting…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Stopped</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Running (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Server not started — enable with the toggle above</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>No requests yet</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>No requests yet — third-party tools only talk here when they read or write a setting</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Stub manager</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>capturing… (always-capture is on — click Stop when ready)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>capturing… (open another tab and use the device, then come back to stop)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>exported to {0}</value></data>

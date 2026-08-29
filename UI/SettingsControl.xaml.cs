@@ -85,7 +85,7 @@ namespace MozaPlugin.UI
 
             InitProfilesTab();
             InitRedesignControls();
-            InitSdkTab();
+            InitSdkCard();
             InitLanguageCombo();
 
             // Inline PitHouse import wizard (Import tab). Instantiated here
@@ -106,7 +106,7 @@ namespace MozaPlugin.UI
             BannersHost.Content = new UI.PluginBanners
             {
                 OpenReleaseNotesInApp = OpenReleaseNotes,
-                ConfigureSdkInApp = NavigateToSdkTab,
+                ConfigureSdkInApp = NavigateToSdkSettings,
             };
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -194,11 +194,6 @@ namespace MozaPlugin.UI
             if (MBoosterGForceTestToggle?.IsChecked == true)
                 CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
             StopAllCustomEffectTests();
-            // SDK CoAP server fires RecentRequestAppended on its receive
-            // thread; unsubscribe so a torn-down SettingsControl can be GC'd
-            // without the server's event list pinning it. Re-subscribe
-            // happens on the next refresh tick after Loaded fires.
-            UnsubscribeFromSdkServer();
             if (ReferenceEquals(Instance, this)) Instance = null;
         }
 

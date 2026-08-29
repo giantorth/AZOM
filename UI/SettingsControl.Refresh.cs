@@ -65,7 +65,7 @@ namespace MozaPlugin.UI
                 RefreshMBoosterTab();
                 RefreshOptionsTab();
                 InitTelemetryTab();
-                RefreshSdkTabTick();
+                RefreshSdkStatusTick();
                 // Last: the per-tab refreshes above each set their own tab's
                 // Visibility from detection, so the override only sticks if it
                 // runs after them. Turning it back off needs no undo here —

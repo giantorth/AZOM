@@ -35,9 +35,8 @@ namespace MozaPlugin.Sdk
     ///   timeout.</item>
     /// </list>
     ///
-    /// Per-request rows are recorded in <see cref="RecentRequests"/> (rolling
-    /// 20-deep) for the UI tab; <see cref="RecentRequestAppended"/> fires
-    /// after each append so the UI can refresh without polling.
+    /// Per-request rows go to <see cref="MozaLog"/> (liveness/noisy URIs
+    /// sampled) so they land in the ring buffer the diagnostics bundle carries.
     /// </summary>
     public sealed class MozaSdkCoapServer : IDisposable
     {
@@ -49,28 +48,6 @@ namespace MozaPlugin.Sdk
         /// reach our handlers. Not exposed as a setting for that reason.
         /// </summary>
         public const int CoapPort = 40266;
-
-        /// <summary>Maximum number of rows retained in <see cref="RecentRequests"/>.</summary>
-        public const int RecentRequestCapacity = 20;
-
-        /// <summary>One row of the recent-requests rolling buffer.</summary>
-        public readonly struct RecentRequest
-        {
-            public DateTime Time { get; }
-            public string Verb { get; }
-            public string Uri { get; }
-            public byte ResponseCode { get; }
-            public int DurationMs { get; }
-
-            public RecentRequest(DateTime time, string verb, string uri, byte responseCode, int durationMs)
-            {
-                Time = time;
-                Verb = verb ?? string.Empty;
-                Uri = uri ?? string.Empty;
-                ResponseCode = responseCode;
-                DurationMs = durationMs;
-            }
-        }
 
         private readonly DeviceCatalog _catalog;
         private readonly CoapResourceRegistry _registry;
@@ -84,8 +61,6 @@ namespace MozaPlugin.Sdk
         private string _status = "Disabled";
         private int _boundPort;
 
-        private readonly object _recentGate = new object();
-        private readonly LinkedList<RecentRequest> _recent = new LinkedList<RecentRequest>();
 
         // Per-URI sampling counters for noisy resources (Feedforward etc.).
         // Sampled at the same N=60 ratio as the Motor agent's emitter so
@@ -119,7 +94,7 @@ namespace MozaPlugin.Sdk
         /// <remarks>
         /// Constructor is internal because <see cref="HardwareApplier"/> is an
         /// internal type; the public read-only surface (Status, IsRunning,
-        /// RecentRequests, etc.) remains accessible to external callers via
+        /// etc.) remains accessible to external callers via
         /// <see cref="MozaPlugin.SdkServer"/>.
         /// </remarks>
         internal MozaSdkCoapServer(MozaData data, HardwareApplier hw)
@@ -152,34 +127,6 @@ namespace MozaPlugin.Sdk
 
         /// <summary>Diagnostic: the URI suffixes the resource registry currently knows about.</summary>
         public IEnumerable<string> KnownUriSuffixes => _registry.KnownUriSuffixes;
-
-        /// <summary>
-        /// Rolling buffer of the most recent <see cref="RecentRequestCapacity"/>
-        /// requests, newest last. Returns a snapshot; the underlying list may
-        /// mutate concurrently so callers should not retain element references
-        /// across UI tick boundaries.
-        /// </summary>
-        public IReadOnlyList<RecentRequest> RecentRequests
-        {
-            get
-            {
-                lock (_recentGate)
-                {
-                    var snapshot = new RecentRequest[_recent.Count];
-                    int i = 0;
-                    foreach (var r in _recent) snapshot[i++] = r;
-                    return snapshot;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Raised on the receive thread immediately after a row is appended to
-        /// <see cref="RecentRequests"/>. UI subscribers MUST marshal to the
-        /// dispatcher before touching WPF controls — the listener fires this
-        /// on its own thread.
-        /// </summary>
-        public event Action? RecentRequestAppended;
 
         /// <summary>
         /// Bind the UDP socket and spawn the receive thread. Idempotent —
@@ -417,7 +364,7 @@ namespace MozaPlugin.Sdk
                     Payload = Array.Empty<byte>(),
                 };
                 SendSafe(udp, rst, remote);
-                AppendRecent(new RecentRequest(DateTime.Now, "Ping", string.Empty, CoapCode.Empty, (int)sw.ElapsedMilliseconds));
+                LogRequest("Ping", "/(ping)", null, CoapCode.Empty, null, (int)sw.ElapsedMilliseconds);
                 return;
             }
 
@@ -515,7 +462,6 @@ namespace MozaPlugin.Sdk
             SendSafe(udp, response, remote);
 
             int durationMs = (int)sw.ElapsedMilliseconds;
-            AppendRecent(new RecentRequest(DateTime.Now, verb, uriPath, resourceResponse.ResponseCode, durationMs));
             LogRequest(verb, uriPath, request.Payload, resourceResponse.ResponseCode, resourceResponse.Reason, durationMs);
         }
 
@@ -566,26 +512,6 @@ namespace MozaPlugin.Sdk
                 case CoapCode.Delete: return "DELETE";
                 case CoapCode.Empty: return "Ping";
                 default: return $"0x{code:X2}";
-            }
-        }
-
-        private void AppendRecent(RecentRequest row)
-        {
-            lock (_recentGate)
-            {
-                _recent.AddLast(row);
-                while (_recent.Count > RecentRequestCapacity)
-                    _recent.RemoveFirst();
-            }
-
-            var handler = RecentRequestAppended;
-            if (handler != null)
-            {
-                try { handler(); }
-                catch (Exception ex)
-                {
-                    MozaLog.Debug($"[Sdk] RecentRequestAppended subscriber threw: {ex.GetType().Name}: {ex.Message}");
-                }
             }
         }
 

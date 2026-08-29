@@ -11,7 +11,7 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importer</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>À propos</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Déconnecté</value></data>
@@ -223,21 +223,8 @@
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hachage</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Dernière modification</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SUPPRIMER</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>SERVEUR COAP</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// activez cette option pour empêcher PitHouse de démarrer automatiquement</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle SDK CoAP intégré.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Lorsqu'il est activé, le plugin exécute un petit processus de substitution qui apparaît dans la liste des processus sous le nom « MOZA Pit House.exe ». C'est normal : cela permet aux applications du SDK MOZA de trouver PitHouse par son nom. Il se ferme automatiquement lorsque vous le désactivez ou fermez SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Activer le serveur SDK CoAP</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>CONTRÔLE UDP</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// surface de contrôle CBOR-sur-UDP simple</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Lorsqu'activé, le plugin exécute un serveur de contrôle UDP intégré pour les outils tiers de configuration de volant.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Activer le serveur de contrôle UDP</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>Contrôle UDP</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>ÉTAT</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>Serveur CoAP</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>REQUÊTES RÉCENTES</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 20 dernières requêtes par serveur · en direct</value></data>
   <data name="Section_About" xml:space="preserve"><value>À PROPOS</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// plugin SimHub open source</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -531,9 +518,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Démarrage…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Arrêté</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>En cours (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Serveur non démarré — activez-le avec le bouton ci-dessus</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Aucune requête pour l'instant</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Aucune requête pour l'instant — les outils tiers ne communiquent ici que lorsqu'ils lisent ou écrivent un paramètre</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Gestionnaire de stub</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>capture… (la capture permanente est activée — cliquez sur Arrêter une fois prêt)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>capture… (ouvrez un autre onglet et utilisez le périphérique, puis revenez pour arrêter)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>exporté vers {0}</value></data>

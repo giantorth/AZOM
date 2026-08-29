@@ -11,7 +11,7 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Opções</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importar</value></data>
   <data name="TabHeader_About" xml:space="preserve"><value>Sobre</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Desconectado</value></data>
@@ -246,21 +246,8 @@
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Última modificação</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>EXCLUIR</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>SERVIDOR COAP</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// ative esta opção para impedir que o PitHouse abra automaticamente</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Fornece suporte oficial ao SDK MOZA para jogos que o exigem — como o iRacing, ou qualquer jogo que use o modo 360 Hz. O plugin executa um servidor de controle CoAP SDK embutido no loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Enquanto ativado, o plugin executa um pequeno processo substituto que aparece na sua lista de processos como "MOZA Pit House.exe". Isso é esperado — permite que apps do SDK MOZA encontrem o PitHouse pelo nome. Ele encerra automaticamente quando você desativa esta opção ou fecha o SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ativar servidor CoAP SDK</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>CONTROLE UDP</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// superfície de controle CBOR sobre UDP</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Este é um controle UDP legado para definir o ângulo de direção. O único uso conhecido é a versão RSF do Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Ativar servidor de controle UDP</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Porta</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>Servidor CoAP</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>Controle UDP</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>REQUISIÇÕES RECENTES</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// últimas 20 requisições por servidor · ao vivo</value></data>
   <data name="Section_About" xml:space="preserve"><value>SOBRE</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// plugin de código aberto para SimHub</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -553,9 +540,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Iniciando…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Parado</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Em execução (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Servidor não iniciado — ative com o botão acima</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Nenhuma requisição ainda</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Nenhuma requisição ainda — ferramentas de terceiros só falam aqui quando leem ou gravam uma configuração</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Gerenciador de stub</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>capturando… (captura automática ativa — clique em Parar quando quiser)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>capturando… (abra outra aba e use o dispositivo, depois volte para parar)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>exportado para {0}</value></data>
