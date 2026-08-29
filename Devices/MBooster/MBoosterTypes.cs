@@ -825,7 +825,7 @@ namespace MozaPlugin.Devices.MBooster
         public readonly double MaxRpm;
         public readonly double IdleRpm;
         public readonly double Brake;        // 0..1
-        public readonly double Throttle;     // 0..1 — used by Traction Control's sustained test toggle
+        public readonly double Throttle;     // 0..1 — Wheel Spin's slip heuristic; also a Throttle-role pedal's own press
         public readonly bool   AbsActive;
         public readonly bool   TcActive;
         public readonly double VehicleSpeedMs;

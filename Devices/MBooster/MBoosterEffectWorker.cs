@@ -447,14 +447,21 @@ namespace MozaPlugin.Devices.MBooster
                 // (so its modulated test pulses feel right with no game running).
                 var role = PedalRole(lane);
                 double brakeSignal = EffectiveBrake(role, snap);
-                double throttleSignal = EffectiveThrottle(role, snap);
+                // Test-toggle modulator: THIS pedal's own press, whatever role
+                // it holds. Traction Control / Wheel Spin used to test against
+                // the throttle, which a single-active-pedal lane can never
+                // supply — only the motorized axis runs a worker, so on a brake
+                // booster the gate never opened and both tests were dead
+                // (bundle NWS6EY7X). Telemetry-driven activation still keys off
+                // real throttle/slip below; only the tests use this.
+                double ownPressSignal = EffectiveOwnPress(role, snap);
 
                 // --- Compute per-effect requests from telemetry per doc § 4 -----
 
                 UpdateEngineRequest(effects, snap, ref _engine);
                 UpdateAbsRequest(effects, brakeSignal, snap, ref _abs);
-                UpdateTractionControlRequest(effects, throttleSignal, snap, ref _tc);
-                UpdateWheelSpinRequest(effects, throttleSignal, snap, ref _wheelSpin);
+                UpdateTractionControlRequest(effects, ownPressSignal, snap, ref _tc);
+                UpdateWheelSpinRequest(effects, ownPressSignal, snap, ref _wheelSpin);
                 UpdateGearShiftRequest(effects, snap, ref _gearShift);
                 UpdateLockupRequest(effects, brakeSignal, snap, ref _lockup);
                 UpdateThresholdRequest(effects, brakeSignal, snap, ref _threshold);
@@ -692,24 +699,28 @@ namespace MozaPlugin.Devices.MBooster
         // unlike ABS) — gated at 80% throttle, not any nonzero press, so
         // the test only fires once you're pressing hard enough to
         // plausibly trigger real wheelspin, not on a light tap.
-        private void UpdateTractionControlRequest(IMBoosterEffects? effects, double throttleSignal, in MBoosterTelemetrySnapshot snap, ref EffectState st)
+        private void UpdateTractionControlRequest(IMBoosterEffects? effects, double testPress, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
             double freqHz = ClampTractionControlFreq(effects?.TractionControl?.FrequencyHz ?? MBoosterUiConstants.TractionControlFreqMinHz);
             // No Smoothness slider for Traction Control (unlike ABS) — fixed
             // at the "verified" ABS default ripple depth (smoothness01 = 1).
             st.SmoothnessRequest01 = 1.0;
 
+            // Sustained test toggle substitutes THIS pedal's own press for the
+            // TC-active signal (see EffectiveOwnPress) — there's no live TC
+            // signal to press against outside a real intervention, and gating
+            // on the throttle stranded every lane whose motorized pedal isn't
+            // the throttle.
             if (_tcTestSustained)
             {
-                double throttleT = throttleSignal;
-                if (throttleT < 0.8)
+                if (testPress < 0.6)
                 {
                     st.IntensityRequest = 0;
                     st.FreqHz = 0;
                     return;
                 }
                 double testScale = ((effects?.TractionControl?.IntensityPct ?? 0) / 100.0) * TractionControlScaleMax;
-                st.IntensityRequest = Clamp01(throttleT * testScale);
+                st.IntensityRequest = Clamp01(testPress * testScale);
                 st.FreqHz = freqHz;
                 return;
             }
@@ -750,26 +761,25 @@ namespace MozaPlugin.Devices.MBooster
         // tall gear is normal driving, not spin. Same Frequency (10-100Hz)/
         // Intensity slider config as Traction Control, no Smoothness slider,
         // fixed at smoothness01 = 1 like Traction Control.
-        private void UpdateWheelSpinRequest(IMBoosterEffects? effects, double throttleSignal, in MBoosterTelemetrySnapshot snap, ref EffectState st)
+        private void UpdateWheelSpinRequest(IMBoosterEffects? effects, double testPress, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
             double freqHz = ClampWheelSpinFreq(effects?.WheelSpin?.FrequencyHz ?? MBoosterUiConstants.WheelSpinFreqMinHz);
             st.SmoothnessRequest01 = 1.0;
 
-            // Sustained test toggle substitutes live throttle position for
-            // the wheelspin heuristic (there's no live wheelspin signal to
-            // press against outside a real spin event) — same substitution
-            // Traction Control's test makes, gated at the same 80% throttle.
+            // Sustained test toggle substitutes THIS pedal's own press for the
+            // wheelspin heuristic (there's no live wheelspin signal to press
+            // against outside a real spin event) — same substitution Traction
+            // Control's test makes, at the same gate.
             if (_wheelSpinTestSustained)
             {
-                double throttleT = throttleSignal;
-                if (throttleT < 0.8)
+                if (testPress < 0.6)
                 {
                     st.IntensityRequest = 0;
                     st.FreqHz = 0;
                     return;
                 }
                 double testScale = ((effects?.WheelSpin?.IntensityPct ?? 0) / 100.0) * WheelSpinScaleMax;
-                st.IntensityRequest = Clamp01(throttleT * testScale);
+                st.IntensityRequest = Clamp01(testPress * testScale);
                 st.FreqHz = freqHz;
                 return;
             }
@@ -1653,15 +1663,21 @@ namespace MozaPlugin.Devices.MBooster
         /// for ABS/Lockup/Threshold, so the user can feel throttle-modulated
         /// test pulses even with no game running.
         /// </summary>
-        private double EffectiveThrottle(MBoosterRole role, in MBoosterTelemetrySnapshot snap)
+        /// <summary>
+        /// This pedal's own press (0..1), role-agnostic — the game's value for
+        /// whichever role this pedal holds, raised by its own HID position.
+        /// Drives the sustained Test toggles: a test has to respond to the
+        /// pedal the motor is actually in. The snapshot carries no clutch
+        /// channel, so a Clutch-role pedal tests on its HID alone.
+        /// </summary>
+        private double EffectiveOwnPress(MBoosterRole role, in MBoosterTelemetrySnapshot snap)
         {
-            double t = Clamp01(snap.Throttle);
-            if (role == MBoosterRole.Throttle)
-            {
-                double hid = Clamp01(PedalHid());
-                if (hid > t) t = hid;
-            }
-            return t;
+            double game = role == MBoosterRole.Throttle ? snap.Throttle
+                        : role == MBoosterRole.Brake ? snap.Brake
+                        : 0.0;
+            double v = Clamp01(game);
+            double hid = Clamp01(PedalHid());
+            return hid > v ? hid : v;
         }
 
         private static double Clamp01(double v)

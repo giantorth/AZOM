@@ -504,10 +504,32 @@ need to reverse-engineer Pit House's exact noise algorithm to work
 correctly — any reasonable road-like noise generator satisfies the wire
 contract, since the actual shaping happens firmware-side. See
 `MBoosterEffectSynthesizer.SynthesizeRoadTextureNoise` (a deterministic
-value-noise generator, smoothstep-interpolated between pseudo-random
-keyframes every 0.35s to loosely match the observed oscillation rate —
-explicitly *not* a decoded replica of Pit House's own algorithm, since
-that wasn't necessary or knowable from this evidence).
+value-noise generator, explicitly *not* a decoded replica of Pit House's
+own algorithm, since that wasn't necessary or knowable from this
+evidence).
+
+**The ~1.3-1.6 peaks/sec rate above is NOT trusted as Pit House's real
+oscillation rate.** It reads the frame-by-frame sample sequence *as* the
+waveform, which only holds if the noise is band-limited well under the
+frame rate — nothing here established that, and road chatter is exactly
+the case where it wouldn't be. Near-full-range excursions (±32700) at
+~1.4/sec is the signature of *undersampled* broadband noise. It is also
+physically implausible on its face: an effect Pit House ships as "Road
+Texture", through a vibration motor, making full-scale excursions ~1.4
+times a second is a slow ram, not texture.
+
+The generator originally targeted that rate and consequently felt like
+"running over a speedbump every 2 seconds" on real hardware (bug report
+`NWS6EY7X`: 13 zero crossings in 18.1 s of emitted samples, 0.72-2.12 s
+apart — the plugin faithfully reproducing the suspect number). It is now
+two octaves, grain-dominant, and no longer targets that rate.
+
+Note this does **not** disturb the architectural finding in this section.
+"Intensity/Smoothness don't shape the noise" is a *comparative* result
+across 4 settings each — it holds whether or not the absolute rate was
+aliased, since it would have been aliased identically at every setting.
+Settling the true rate needs a fresh Pit House road-texture capture read
+with frame timestamps, not sample indices.
 
 Because the payload shape differs so much from the other four effects,
 Road Texture doesn't go through the shared `ProcessEffect`/

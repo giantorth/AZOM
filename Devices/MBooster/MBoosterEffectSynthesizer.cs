@@ -154,15 +154,42 @@ namespace MozaPlugin.Devices.MBooster
             return wave * intensity;
         }
 
-        // ROAD TEXTURE keyframe spacing — chosen to match the ~1.3-1.6
-        // peaks/sec oscillation rate measured in a real Pit House capture
-        // (docs/protocol/devices/mbooster.md "Effects card UI"). Not a
-        // protocol-verified constant, just a "feels similar" match: capture
-        // evidence shows Intensity/Smoothness don't affect the noise
-        // signal's shape at all (the firmware applies both internally), so
-        // there's no real reference to match exactly — any reasonable
-        // road-like noise generator satisfies the wire contract.
-        private const double RoadTextureKeyframeSec = 0.35;
+        // ROAD TEXTURE noise octaves — grain riding on surface waviness.
+        //
+        // This used to be a single 0.35 s keyframe layer, picked to reproduce
+        // the "~1.3-1.6 peaks/sec" rate the Pit House road-texture capture was
+        // read as showing (docs/protocol/devices/mbooster.md "Road Texture").
+        // It did reproduce it — and the result is a slow ram, not texture:
+        // the emitted sample crossed zero only about every 1.4 s (bundle
+        // NWS6EY7X, 13 crossings in 18.1 s), which the reporter felt as
+        // "running over a speedbump every 2 seconds".
+        //
+        // That target rate is not trusted. Reading a frame-by-frame sample
+        // sequence AS the waveform only holds if the signal is band-limited
+        // well under the frame rate, which nothing established — and
+        // near-full-range excursions at ~1.4/sec is the signature of
+        // undersampled broadband noise, which is exactly what road chatter
+        // would be. The capture's load-bearing finding is unaffected either
+        // way: Intensity/Smoothness provably don't shape the noise across 4
+        // settings each (a COMPARATIVE result, aliased or not), so the
+        // firmware applies them and any reasonable road-like noise satisfies
+        // the wire contract.
+        //
+        // So the fine layer is the primary one and the coarse layer is demoted
+        // to a slow amplitude undulation — the physical shape of a road
+        // surface, rather than a rate we're not confident we measured.
+        private const double RoadTextureCoarseKeyframeSec = 0.35;
+        // ~11 Hz grain. Kept at 2+ ticks per keyframe so smoothstep still
+        // interpolates and the octave stays inside the 25 Hz Nyquist limit of
+        // the 50 Hz motor-frame stream — shortening this toward one tick per
+        // keyframe would alias on our own side.
+        private const double RoadTextureFineKeyframeSec = 0.045;
+        // Grain-dominant: ~10 zero-crossings/sec against the coarse layer's
+        // 1.4, with the coarse swell still audible underneath.
+        private const double RoadTextureFineWeight = 2.5;
+        // Decorrelates the two octaves' keyframe sequences — without it both
+        // layers would share index 0 at onset and move together.
+        private const long RoadTextureFineSalt = 0x5F5F5F;
 
         // ROAD TEXTURE directional attack transient — a haptics technique,
         // not a protocol-verified behavior: injecting a brief, strongly
@@ -174,7 +201,7 @@ namespace MozaPlugin.Devices.MBooster
         // which raw-sample polarity the firmware/motor treats as which
         // physical direction — prior Road Texture work only needed to match
         // the noise's amplitude/oscillation character (see
-        // RoadTextureKeyframeSec's doc comment), never its sign's physical
+        // RoadTextureCoarseKeyframeSec's doc comment), never its sign's physical
         // meaning. RoadTextureAttackSign is therefore a guess at "pushes the
         // pedal face toward the driver's foot" — if it feels backwards on
         // real hardware, negate this one constant.
@@ -190,8 +217,10 @@ namespace MozaPlugin.Devices.MBooster
         /// or this plugin — applies Intensity/Smoothness to shape this
         /// signal internally, so this is a host-side stand-in for whatever
         /// reference noise Pit House streams, not a decoded/verified
-        /// algorithm. Deterministic value noise: a new pseudo-random target
-        /// every <see cref="RoadTextureKeyframeSec"/>, smoothstep-
+        /// algorithm. Deterministic two-octave value noise: the grain layer at
+        /// <see cref="RoadTextureFineKeyframeSec"/> over a slow surface
+        /// undulation at <see cref="RoadTextureCoarseKeyframeSec"/>, each
+        /// smoothstep-
         /// interpolated between keyframes so the output can't jump
         /// discontinuously. <paramref name="elapsedSec"/> is time since
         /// THIS bump's activation edge (resets to 0 each time the effect
@@ -205,19 +234,34 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         public static double SynthesizeRoadTextureNoise(double elapsedSec)
         {
-            double t = elapsedSec / RoadTextureKeyframeSec;
-            double t0 = Math.Floor(t);
-            double frac = t - t0;
-            double a = KeyframeNoise((long)t0);
-            double b = KeyframeNoise((long)t0 + 1);
-            double s = frac * frac * (3.0 - 2.0 * frac); // smoothstep
-            double ambient = a + (b - a) * s;
+            // Normalized so the summed octaves still span [-1, 1] — the wire
+            // sample is sent unscaled, so clipping here would flatten peaks
+            // into a buzz instead of leaving headroom for the coarse swell.
+            double ambient =
+                (ValueNoise(elapsedSec, RoadTextureCoarseKeyframeSec, 0)
+                 + ValueNoise(elapsedSec, RoadTextureFineKeyframeSec, RoadTextureFineSalt) * RoadTextureFineWeight)
+                / (1.0 + RoadTextureFineWeight);
 
             if (elapsedSec >= RoadTextureAttackSec) return ambient;
 
             double blend = elapsedSec / RoadTextureAttackSec; // 0 at onset -> 1 at end of attack window
             double impulse = RoadTextureAttackSign * Math.Exp(-elapsedSec / (RoadTextureAttackSec / 3.0));
             return impulse * (1.0 - blend) + ambient * blend;
+        }
+
+        /// <summary>One octave: smoothstep-interpolated value noise over
+        /// keyframes <paramref name="keyframeSec"/> apart, in [-1, 1].
+        /// <paramref name="salt"/> offsets the keyframe index so separate
+        /// octaves draw independent sequences.</summary>
+        private static double ValueNoise(double elapsedSec, double keyframeSec, long salt)
+        {
+            double t = elapsedSec / keyframeSec;
+            double t0 = Math.Floor(t);
+            double frac = t - t0;
+            double a = KeyframeNoise((long)t0 + salt);
+            double b = KeyframeNoise((long)t0 + 1 + salt);
+            double s = frac * frac * (3.0 - 2.0 * frac); // smoothstep
+            return a + (b - a) * s;
         }
 
         /// <summary>Deterministic hash of an integer keyframe index to a pseudo-random value in [-1, 1].</summary>
