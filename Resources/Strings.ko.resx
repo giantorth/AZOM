@@ -13,7 +13,7 @@
   <data name="TabHeader_Options" xml:space="preserve"><value>옵션</value></data>
   <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>가져오기</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>정보</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>도움말</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>연결 안 됨</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>새로 고침</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>성능 출력</value></data>

@@ -18,7 +18,7 @@
   <data name="TabHeader_Options" xml:space="preserve"><value>Opciones</value></data>
   <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importar</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>Acerca de</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Ayuda</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Desconectado</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>ACTUALIZAR</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Salida de Rendimiento</value></data>

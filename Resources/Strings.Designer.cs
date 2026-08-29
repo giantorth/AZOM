@@ -74,7 +74,7 @@ namespace MozaPlugin.Resources
         public static string TabHeader_Hub => Get("TabHeader_Hub");
         public static string TabHeader_Options => Get("TabHeader_Options");
         public static string TabHeader_Import => Get("TabHeader_Import");
-        public static string TabHeader_About => Get("TabHeader_About");
+        public static string TabHeader_Help => Get("TabHeader_Help");
         public static string Status_Disconnected => Get("Status_Disconnected");
         public static string Status_Connected => Get("Status_Connected");
         public static string Status_Recovering => Get("Status_Recovering");

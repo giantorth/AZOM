@@ -20,7 +20,7 @@
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
   <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Help</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Disconnected</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>REFRESH</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Performance Output</value></data>

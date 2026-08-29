@@ -63,7 +63,7 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
-**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open About > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
+**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open Options > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
 
 **Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11.8+.
 
@@ -164,7 +164,7 @@ All translations are embedded directly into `MozaPlugin.dll` — no per-culture 
 
 ### Hardware Configuration
 
-The plugin panel (Settings > Plugins > AZOM) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, SDK, About). The About tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
+The plugin panel (Settings > Plugins > AZOM) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, Help). The Help tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
 
 The Universal Hub gets its own tab listing each connected port and the device attached to it, polled every 2 seconds.
 
@@ -203,14 +203,14 @@ An experimental calibration section is also available per device, with direction
 
 ### Diagnostics & Serial Capture
 
-The About tab includes a **Serial traffic capture** section for bug reports:
+The Help tab includes a **Serial traffic capture** section for bug reports:
 
 - **Start capture** records every TX/RX serial frame (wheelbase + AB9 pipes) with millisecond timestamps in memory. Nothing is written to disk while capturing, and the buffer is wiped each time SimHub restarts.
 - **Stop capture** reveals the captured frames inline (hex dump, one frame per line) and unlocks the export buttons. Per-direction labels (`T`/`R`) and pipe labels (`wheelbase` / `ab9`) make it easy to correlate with protocol docs.
 - **Export bundle (ZIP)** writes a timestamped archive containing:
   - `manifest.txt` — bundle header (plugin version, OS, capture summary)
   - `serial-capture.txt` — TX/RX frame log
-  - `diagnostics.txt` — snapshot of the About tab's diagnostic report (identity, dashboard state, session info)
+  - `diagnostics.txt` — snapshot of the Help tab's diagnostic report (identity, dashboard state, session info)
   - `moza-log.txt` — every `[Moza]` log line emitted by the plugin since launch (pulled from the in-process `MozaLog` ring buffer, so flush cadence and SimHub log-file location don't matter)
 - **Copy capture to clipboard** copies the frame log without exporting a file.
 
