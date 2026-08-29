@@ -190,12 +190,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>PROFILE</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Profil-Einstellungen beim Start anwenden</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>LENKRAD-LED-AUSGABE</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// Drosselung von RPM + Tasten</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Empfehlung: die LED-Optionen unten auf AUS lassen, außer es treten LED-Probleme auf.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Updates ans Lenkrad begrenzen</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>LED-Daten nur senden, wenn sie sich tatsächlich ändern.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Bitmaske immer erneut senden</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Sendet die LED-Bitmaske bei jedem Farb-Update mit, auch wenn sie unverändert ist. Verursacht zusätzlichen Datenverkehr.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRIE</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Dashboard beim Verbinden hochladen</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Dashboards vom Lenkrad herunterladen</value></data>

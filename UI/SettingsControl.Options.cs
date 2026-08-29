@@ -57,20 +57,6 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
-        private void LimitWheelUpdatesCheck_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            _plugin.Settings.LimitWheelUpdates = LimitWheelUpdatesCheck.IsChecked == true;
-            _plugin.SaveSettings();
-        }
-
-        private void AlwaysResendBitmaskCheck_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            _plugin.Settings.AlwaysResendBitmask = AlwaysResendBitmaskCheck.IsChecked == true;
-            _plugin.SaveSettings();
-        }
-
         private void KeepaliveTimeoutSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents) return;
@@ -186,7 +172,6 @@ namespace MozaPlugin.UI
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
                 SyncWheelbaseLfeSourceCombo();
-                LimitWheelUpdatesCheck.IsChecked = _plugin.Settings.LimitWheelUpdates;
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;
                 ProfileListControl.DataContext = _plugin.ProfileStore;

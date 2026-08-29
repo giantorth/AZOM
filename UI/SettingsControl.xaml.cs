@@ -73,8 +73,6 @@ namespace MozaPlugin.UI
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
                 SyncWheelbaseLfeSourceCombo();
                 SyncAutoStandbyCombo();
-                LimitWheelUpdatesCheck.IsChecked = plugin.Settings.LimitWheelUpdates;
-                AlwaysResendBitmaskCheck.IsChecked = plugin.Settings.AlwaysResendBitmask;
                 int kaSec = plugin.Settings.WheelKeepaliveTimeoutSec;
                 KeepaliveTimeoutSlider.Value = Math.Max(KeepaliveTimeoutSlider.Minimum, Math.Min(KeepaliveTimeoutSlider.Maximum, kaSec));
                 KeepaliveTimeoutValue.Text = $"{kaSec} s";

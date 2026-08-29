@@ -269,7 +269,6 @@ namespace MozaPlugin.Devices.Led
                 if (ledColors.Length == 0)
                     return;
 
-                bool alwaysResend = plugin.Settings.AlwaysResendBitmask;
                 var now = DateTime.UtcNow;
                 bool gameActive = plugin.IsGameActive;
 
@@ -301,7 +300,7 @@ namespace MozaPlugin.Devices.Led
                 // wheel wire pending a PitHouse capture of this firmware.
                 if (plugin.Cm2HasNewLedFirmware)
                 {
-                    DisplayNewEra(plugin, ledColors, alwaysResend, gameActive, now);
+                    DisplayNewEra(plugin, ledColors, gameActive, now);
                     return;
                 }
 
@@ -341,12 +340,11 @@ namespace MozaPlugin.Devices.Led
                 // pause the keepalive — the dash must stay live for the whole
                 // session and only idle once the game is closed. Otherwise resend
                 // on change always, and hold the keepalive / always-resend for
-                // holdSec after the bar last had a lit bit, then pause. A 1 Hz (or
-                // per-frame, under AlwaysResendBitmask) all-off resend pins the
-                // dash in live-render mode and blocks its idle/sleep — the same
-                // fix applied to the wheel keepalive.
+                // holdSec after the bar last had a lit bit, then pause. A 1 Hz
+                // all-off resend pins the dash in live-render mode and blocks its
+                // idle/sleep — the same fix applied to the wheel keepalive.
                 if (_hostDriveEngaged
-                    && (bitmaskChanged || ((gameActive || withinHold) && (alwaysResend || keepaliveDue))))
+                    && (bitmaskChanged || ((gameActive || withinHold) && keepaliveDue)))
                 {
                     _lastBitmask = bitmask;
                     _lastSendTime = now;
@@ -382,11 +380,11 @@ namespace MozaPlugin.Devices.Led
                 }
                 bool flagKeepaliveDue = anyFlagOn
                     && (now - _lastFlagSendTime).TotalSeconds >= FlagKeepaliveIntervalSeconds;
-                // anyFlagOn gates the keepalive AND always-resend: a fully-off flag
-                // array is sent once via flagsChanged, then left quiet so the dash
-                // can idle instead of being held awake by all-black flag refreshes.
+                // anyFlagOn gates the keepalive: a fully-off flag array is sent once
+                // via flagsChanged, then left quiet so the dash can idle instead of
+                // being held awake by all-black flag refreshes.
                 if (_hostDriveEngaged && hasFlags
-                    && (flagsChanged || ((alwaysResend || flagKeepaliveDue) && anyFlagOn)))
+                    && (flagsChanged || (flagKeepaliveDue && anyFlagOn)))
                 {
                     Array.Copy(rgb, _lastFlagRgb, rgb.Length);
                     _lastFlagPrimed = true;
@@ -424,7 +422,7 @@ namespace MozaPlugin.Devices.Led
         /// before the mask, send-on-change + keepalive while game-active / within
         /// hold, gated on the host-drive latch like every other path.
         /// </summary>
-        private void DisplayNewEra(MozaPlugin plugin, Color[] ledColors, bool alwaysResend, bool gameActive, DateTime now)
+        private void DisplayNewEra(MozaPlugin plugin, Color[] ledColors, bool gameActive, DateTime now)
         {
             if (!_hostDriveEngaged) return;
             int count = Math.Min(ledColors.Length, TotalLedCount);
@@ -447,7 +445,7 @@ namespace MozaPlugin.Devices.Led
             int holdSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? (int)KeepaliveHoldSeconds;
             bool withinHold = (now - _lastLitUtc).TotalSeconds < holdSec;
             bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
-            bool cadence = (gameActive || withinHold) && (alwaysResend || keepaliveDue);
+            bool cadence = (gameActive || withinHold) && keepaliveDue;
             if (!colorsChanged && !bitmaskChanged && !cadence) return;
 
             if (colorsChanged || cadence)

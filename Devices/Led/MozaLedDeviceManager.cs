@@ -669,8 +669,6 @@ namespace MozaPlugin.Devices.Led
                     MozaLog.Debug("[AZOM] ES wheel LED wake-up sent");
                 }
 
-                bool limitUpdates = plugin.Settings.LimitWheelUpdates;
-                bool alwaysResendBitmask = plugin.Settings.AlwaysResendBitmask;
                 bool anySent = false;
 
                 // Per-model live LED wire-rate cap (frames/sec; 0 = unlimited).
@@ -719,7 +717,7 @@ namespace MozaPlugin.Devices.Led
                 // forceRefresh resends only when something is lit: an all-off frame
                 // is sent once via rpmChanged (lit->off) and then left quiet, so
                 // forceRefresh can't re-flood the wheel with all-black frames at idle.
-                bool shouldSendRpm = !ledThrottled && (rpmChanged || (!limitUpdates && forceRefresh && AnyLit(rpmColors)));
+                bool shouldSendRpm = !ledThrottled && (rpmChanged || (forceRefresh && AnyLit(rpmColors)));
 
                 if (shouldSendRpm)
                 {
@@ -756,7 +754,7 @@ namespace MozaPlugin.Devices.Led
                         // single-display rim — never the bus-CM2 contention case the
                         // stream lane exists for — so it gains nothing from streaming.
                         SendColorChunks(plugin, rpmColors, count, "wheel-telemetry-rpm-colors");
-                        if (alwaysResendBitmask || bitmask != _lastRpmBitmask)
+                        if (bitmask != _lastRpmBitmask)
                         {
                             _lastRpmBitmask = bitmask;
                             plugin.DeviceManager.WriteArray("wheel-send-rpm-telemetry",
@@ -775,7 +773,7 @@ namespace MozaPlugin.Devices.Led
                         // every colour ahead of the bitmask that lights it.
                         SendColorChunks(plugin, rpmColors, count, "wheel-telemetry-rpm-colors");
 
-                        if (alwaysResendBitmask || bitmask != _lastRpmBitmask)
+                        if (bitmask != _lastRpmBitmask)
                         {
                             _lastRpmBitmask = bitmask;
                             // 8-byte active+window form, matching PitHouse on every wheel
@@ -794,7 +792,7 @@ namespace MozaPlugin.Devices.Led
                         // an ES rim is single-display, so it needs no stream-lane
                         // protection, and lane parity keeps the wake-pulse OFF from
                         // landing after the lit bitmask and blanking the rim.
-                        if (alwaysResendBitmask || bitmask != _lastRpmBitmask)
+                        if (bitmask != _lastRpmBitmask)
                         {
                             _lastRpmBitmask = bitmask;
                             plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", bitmask);
@@ -816,7 +814,7 @@ namespace MozaPlugin.Devices.Led
                         int srcIdx = i < 3 ? i : rpmN + i;  // 0,1,2, rpmN+3, rpmN+4, rpmN+5
                         var c = ledColors[srcIdx];
                         bool changed = !_lastFlagColorsPrimed || _lastFlagColors[i] != c;
-                        if (changed || (!limitUpdates && forceRefresh && (c.R | c.G | c.B) != 0))
+                        if (changed || (forceRefresh && (c.R | c.G | c.B) != 0))
                         {
                             _lastFlagColors[i] = c;
                             _rpmChangedUtc = DateTime.UtcNow; // flags ride the RPM keepalive row
@@ -885,7 +883,7 @@ namespace MozaPlugin.Devices.Led
                             plugin.WheelLedAppliedBrightnessButtons, plugin.WheelLedMasterBrightness));
 
                     bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
-                    bool shouldSendButtons = !ledThrottled && (buttonsChanged || (!limitUpdates && forceRefresh && AnyLit(buttonColors)));
+                    bool shouldSendButtons = !ledThrottled && (buttonsChanged || (forceRefresh && AnyLit(buttonColors)));
 
                     if (shouldSendButtons)
                     {
@@ -905,7 +903,7 @@ namespace MozaPlugin.Devices.Led
 
                         SendColorChunks(plugin, buttonColors, buttonCount, "wheel-telemetry-button-colors", buttonMap);
 
-                        if (alwaysResendBitmask || buttonBitmask != _lastButtonBitmask)
+                        if (buttonBitmask != _lastButtonBitmask)
                         {
                             _lastButtonBitmask = buttonBitmask;
                             // 8-byte form: active_mask(u32 LE) + window_mask(u32 LE).
@@ -1049,7 +1047,7 @@ namespace MozaPlugin.Devices.Led
                     else if (knobsActive && !_knobStaticHoldReleased)
                     {
                         bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
-                        bool shouldSendKnobs = !ledThrottled && (knobsChanged || (!limitUpdates && forceRefresh && AnyLit(knobColors)));
+                        bool shouldSendKnobs = !ledThrottled && (knobsChanged || (forceRefresh && AnyLit(knobColors)));
 
                         if (shouldSendKnobs)
                         {

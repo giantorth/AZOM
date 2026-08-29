@@ -200,10 +200,6 @@ namespace MozaPlugin.Settings
         // is true. Selected from a preset combo in the UI.
         public int AutoStandbyTimeoutMinutes { get; set; } = 10;
 
-        // When true, only send LED updates to wheel when data actually changed (ignores SimHub forceRefresh).
-        // Fixes flickering on some non-ES wheels. When false, respects SimHub's refresh cycle.
-        public bool LimitWheelUpdates { get; set; } = false;
-
         // When true, resend LED state to wheel every ~1 second even if unchanged.
         // Some ES wheels need this to stay in telemetry mode.
         public bool WheelKeepalive { get; set; } = true;
@@ -212,10 +208,6 @@ namespace MozaPlugin.Settings
         // idle before pausing, so the wheel/dash can enter its own idle/sleep mode.
         // 0 = pause immediately. Applies to both the wheel and dash LED keepalives.
         public int WheelKeepaliveTimeoutSec { get; set; } = 45;
-
-        // When true, always resend the LED bitmask alongside color updates even if the bitmask
-        // value hasn't changed. Fixes wheels that don't pick up new colors without a bitmask write.
-        public bool AlwaysResendBitmask { get; set; } = false;
 
         // CM2 meter firmware era, auto-detected from the meter's 0x0E heartbeat
         // vocabulary and persisted so the right LED path is used from boot (the

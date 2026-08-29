@@ -185,8 +185,7 @@ Selects which LEDs are currently lit. The plugin emits the **8-byte
 - `active_mask` = the lit subset. Bit `i` lit ↔ LED `i` has non-black color
   in the chunk write.
 
-Plugin sends the bitmask only when it changes (or every frame when
-`AlwaysResendBitmask` is set), regardless of color-chunk cadence.
+Plugin sends the bitmask only when it changes, regardless of color-chunk cadence.
 
 ### Example (CS V2.1 — 10 RPM LEDs, alternating red/blue)
 

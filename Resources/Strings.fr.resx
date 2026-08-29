@@ -190,12 +190,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>PROFILS</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Appliquer les réglages du profil au lancement</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>SORTIE LED DU VOLANT</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// limitation rpm + boutons</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Recommandé : laissez les options LED ci-dessous DÉSACTIVÉES sauf si vous rencontrez des problèmes avec les LED.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Limiter les mises à jour vers le volant</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>N'envoyer les données LED que lorsqu'elles changent réellement.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Toujours renvoyer le bitmask</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Toujours envoyer le bitmask LED avec les mises à jour de couleur, même s'il ne change pas. Génère du trafic supplémentaire.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TÉLÉMÉTRIE DU TABLEAU DE BORD</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Téléverser le tableau de bord à la connexion</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Télécharger les tableaux de bord depuis le volant</value></data>

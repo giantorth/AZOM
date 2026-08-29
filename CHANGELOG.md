@@ -82,6 +82,7 @@ All notable changes to the AZOM plugin are documented here.
 - **The wheel firmware era override has been removed.** Auto mode is now the default.
 - **Legacy USB Detection options have been removed.** AB9 / AB6 detection always runs, and 
   serial-probe fallback always remains an option.
+- **Limit updates to wheel and Always resend bitmask have been removed.** Both are now always off.
 
 ## [1.5.7]
 

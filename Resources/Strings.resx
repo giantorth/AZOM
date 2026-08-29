@@ -220,12 +220,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>PROFILES</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Apply profile settings on launch</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>WHEEL LED OUTPUT</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// rpm + buttons throttling</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Recommended: leave LED options below OFF unless you experience LED issues.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Limit updates to wheel</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Only send LED data when it actually changes.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Always resend bitmask</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Always send the LED bitmask with color updates, even if unchanged. Causes extra traffic.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD TELEMETRY</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Upload dashboard on connect</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Download dashboards from wheel</value></data>

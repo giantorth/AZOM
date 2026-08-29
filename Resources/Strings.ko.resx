@@ -190,12 +190,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>프로필</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>시작 시 프로필 설정 적용</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>휠 LED 출력</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// RPM + 버튼 전송 제한</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>권장: LED 문제가 없는 한 아래 LED 옵션은 OFF로 두세요.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>휠 업데이트 제한</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>LED 데이터가 실제로 변경될 때만 전송합니다.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>비트마스크 항상 재전송</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>변경이 없어도 색상 업데이트와 함께 LED 비트마스크를 항상 전송합니다. 추가 트래픽이 발생합니다.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>연결 시 대시보드 업로드</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>휠에서 대시보드 다운로드</value></data>

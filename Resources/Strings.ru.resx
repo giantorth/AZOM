@@ -190,12 +190,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>ПРОФИЛИ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Применять настройки профиля при запуске</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>ВЫХОД СВЕТОДИОДОВ РУЛЯ</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// ограничение rpm + кнопок</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Рекомендуется: оставьте параметры светодиодов ниже выключенными, если нет проблем со светодиодами.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Ограничить обновления руля</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Отправлять данные светодиодов только при их изменении.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Всегда отправлять битмаску</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Всегда отправлять битмаску светодиодов с обновлениями цвета, даже если она не меняется. Создаёт дополнительный трафик.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ТЕЛЕМЕТРИЯ ПАНЕЛИ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Загружать панель при подключении</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Скачивать панели с руля</value></data>

@@ -209,12 +209,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Yowl Bork!</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>BARK!!</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>Ruff!</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Bork Arf Grrowl Grrowl!</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Snarf!</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Howl Yowl Bork!</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Bark!</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Wan Yap Bork Grrowl Grr!</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Wuff!</value></data>

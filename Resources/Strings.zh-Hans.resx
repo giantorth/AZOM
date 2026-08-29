@@ -190,12 +190,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>配置文件</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>启动时应用配置文件设置</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>方向盘 LED 输出</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// RPM 与按键的发送节流</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>建议:除非遇到 LED 异常,否则将下方 LED 选项保持为关闭。</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>限制对方向盘的更新</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>仅在 LED 数据实际变化时才发送。</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>始终重发位掩码</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>在颜色更新时始终发送 LED 位掩码,即使未发生变化。会产生额外流量。</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>仪表盘遥测</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>连接时上传仪表盘</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>从方向盘下载仪表盘</value></data>

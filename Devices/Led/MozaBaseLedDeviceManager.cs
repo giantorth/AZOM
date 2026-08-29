@@ -239,8 +239,6 @@ namespace MozaPlugin.Devices.Led
                 if (plugin == null || !plugin.Data.IsConnected || !plugin.IsBaseAmbientLedSupported)
                     return;
 
-                bool alwaysResendBitmask = plugin.Settings.AlwaysResendBitmask;
-
                 // No telemetry colors this frame — issue a single release
                 // (bitmask=0 to both strips) on the active→idle transition,
                 // then stay quiet so the firmware's standby animation
@@ -278,11 +276,9 @@ namespace MozaPlugin.Devices.Led
                 var now = DateTime.UtcNow;
                 bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
                 bool sent0 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 0, sourceOffset: 0,
-                    ledsPerStrip: ledsPerStrip,
-                    alwaysResendBitmask: alwaysResendBitmask, keepaliveDue: keepaliveDue);
+                    ledsPerStrip: ledsPerStrip, keepaliveDue: keepaliveDue);
                 bool sent1 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: ledsPerStrip,
-                    ledsPerStrip: ledsPerStrip,
-                    alwaysResendBitmask: alwaysResendBitmask, keepaliveDue: keepaliveDue);
+                    ledsPerStrip: ledsPerStrip, keepaliveDue: keepaliveDue);
                 if (sent0 || sent1)
                     _lastSendTime = now;
             }
@@ -295,8 +291,7 @@ namespace MozaPlugin.Devices.Led
         // Returns true if a bitmask frame was sent for this strip (change or
         // keepalive) so the caller can advance the shared keepalive timer.
         private bool ProcessStrip(MozaPlugin plugin, Color[] ledColors, double brightness,
-            int stripIndex, int sourceOffset, int ledsPerStrip,
-            bool alwaysResendBitmask, bool keepaliveDue)
+            int stripIndex, int sourceOffset, int ledsPerStrip, bool keepaliveDue)
         {
             // Materialise this strip's colors with brightness applied. Source
             // array may be shorter than expected — pad with black so the
@@ -334,7 +329,7 @@ namespace MozaPlugin.Devices.Led
                 _lastColorHash[stripIndex] = colorHash;
             }
 
-            if (alwaysResendBitmask || bitmaskChanged || keepaliveDue)
+            if (bitmaskChanged || keepaliveDue)
             {
                 SendBitmask(plugin, stripIndex, bitmask);
                 _lastBitmask[stripIndex] = bitmask;

@@ -203,12 +203,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>PERFIS</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Aplicar configurações do perfil ao iniciar</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>SAÍDA DE LED DO VOLANTE</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// limitação de rpm + botões</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Recomendado: deixe as opções de LED abaixo DESLIGADAS, a menos que você tenha problemas com os LEDs.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Limitar atualizações ao volante</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Enviar dados de LED somente quando realmente mudarem.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Sempre reenviar bitmask</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Sempre envia o bitmask de LED junto com as atualizações de cor, mesmo sem mudanças. Gera tráfego extra.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRIA DO PAINEL</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Enviar painel ao conectar</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Baixar painéis do volante</value></data>

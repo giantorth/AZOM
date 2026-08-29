@@ -282,12 +282,6 @@ namespace MozaPlugin.Resources
         public static string Section_Profiles => Get("Section_Profiles");
         public static string SliderLabel_ApplyProfileOnLaunch => Get("SliderLabel_ApplyProfileOnLaunch");
         public static string Section_WheelLedOutput => Get("Section_WheelLedOutput");
-        public static string Subtitle_WheelLedOutput => Get("Subtitle_WheelLedOutput");
-        public static string Hint_LedOptionsRecommendedOff => Get("Hint_LedOptionsRecommendedOff");
-        public static string SliderLabel_LimitWheelUpdates => Get("SliderLabel_LimitWheelUpdates");
-        public static string Hint_OnlySendLedWhenChanged => Get("Hint_OnlySendLedWhenChanged");
-        public static string SliderLabel_AlwaysResendBitmask => Get("SliderLabel_AlwaysResendBitmask");
-        public static string Hint_AlwaysResendBitmask => Get("Hint_AlwaysResendBitmask");
         public static string SliderLabel_KeepaliveTimeout => Get("SliderLabel_KeepaliveTimeout");
         public static string Hint_KeepaliveTimeout => Get("Hint_KeepaliveTimeout");
         public static string Section_DashboardTelemetry => Get("Section_DashboardTelemetry");

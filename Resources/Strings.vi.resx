@@ -190,12 +190,6 @@
   <data name="Section_Profiles" xml:space="preserve"><value>HỒ SƠ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Áp dụng cài đặt hồ sơ khi khởi chạy</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>ĐẦU RA LED VÔ LĂNG</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// điều tiết rpm + nút bấm</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Khuyến nghị: hãy để các tùy chọn LED bên dưới TẮT trừ khi bạn gặp sự cố LED.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Giới hạn cập nhật tới vô lăng</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Chỉ gửi dữ liệu LED khi thực sự có thay đổi.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Luôn gửi lại bitmask</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Luôn gửi bitmask LED kèm cập nhật màu, kể cả khi không đổi. Gây tăng lưu lượng.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRY BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Tải lên bảng điều khiển khi kết nối</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Tải bảng điều khiển từ vô lăng</value></data>
