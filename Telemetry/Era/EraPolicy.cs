@@ -30,11 +30,12 @@ namespace MozaPlugin.Telemetry.Era
     public sealed class EraPolicy
     {
         /// <summary>The era this policy was built from. After auto-resolution,
-        /// reflects the resolved era (e.g. Era2026), not the user's pick.</summary>
+        /// reflects the era probed from the wheel (e.g. Era2026).</summary>
         public MozaWheelEra Era;
 
-        /// <summary>True when the user picked <see cref="MozaWheelEra.Auto"/>.
-        /// Enables runtime auto-resolution and upload-wire-format fallback.</summary>
+        /// <summary>True when built from <see cref="MozaWheelEra.Auto"/> — the
+        /// only mode the plugin runs. Enables runtime auto-resolution and
+        /// upload-wire-format fallback.</summary>
         public bool IsAuto;
 
         public TierDefEncoding Encoding;

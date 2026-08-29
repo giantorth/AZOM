@@ -79,6 +79,7 @@ All notable changes to the AZOM plugin are documented here.
 - **The diagnostics report now includes the wheelbase itself.** A "Base identity" section reports
   the base model and firmware — including whether the firmware question was ever answered — plus
   whether LFE haptics and the 10-band equalizer are unlocked and which condition is failing.
+- **The wheel firmware era override has been removed.** Auto mode is now the default.
 
 ## [1.5.7]
 

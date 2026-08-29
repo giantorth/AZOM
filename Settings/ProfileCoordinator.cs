@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using SimHub.Plugins;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
-using MozaPlugin.Telemetry.Era;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin.Settings
@@ -12,7 +11,7 @@ namespace MozaPlugin.Settings
     /// Settings persistence (debounced save, clear/reset) plus the SimHub
     /// profile system: profile-store init/subscription, profile apply, and the
     /// per-wheel-page accessor family (overlay, telemetry enable/name/path,
-    /// sleep/idle bundles, firmware era) with the wheel-reported seed methods.
+    /// sleep/idle bundles) with the wheel-reported seed methods.
     /// Settings are read live via <c>_plugin.Settings</c>; only the moved
     /// <see cref="ClearSettings"/> replaces the backing field.
     /// </summary>
@@ -696,65 +695,5 @@ namespace MozaPlugin.Settings
             if (changed) PersistSettings();
         }
 
-        /// <summary>
-        /// Firmware era for the current wheel page. Reads the per-page-GUID
-        /// override for the connected wheel; when no wheel has identified yet
-        /// (UI opened before hardware came up), falls back to the
-        /// <see cref="MozaDeviceConstants.WheelGenericGuid"/> bucket so the
-        /// user's pick made before the wheel was visible still applies.
-        /// Returns <see cref="MozaWheelEra.Auto"/> only when neither bucket
-        /// holds an explicit value.
-        /// </summary>
-        internal MozaWheelEra ActiveTelemetryWheelEra
-        {
-            get
-            {
-                if (_plugin.Settings?.WheelTelemetryEraByPageGuid == null) return MozaWheelEra.Auto;
-                var g = _plugin.GetCurrentWheelPageGuid();
-                if (g.HasValue
-                    && _plugin.Settings.WheelTelemetryEraByPageGuid.TryGetValue(g.Value, out var v)
-                    && v >= 0)
-                    return MigrateStoredEra(v);
-                if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic)
-                    && _plugin.Settings.WheelTelemetryEraByPageGuid.TryGetValue(generic, out var gv)
-                    && gv >= 0)
-                    return MigrateStoredEra(gv);
-                return MozaWheelEra.Auto;
-            }
-            set
-            {
-                if (_plugin.Settings == null) return;
-                if (_plugin.Settings.WheelTelemetryEraByPageGuid == null)
-                    _plugin.Settings.WheelTelemetryEraByPageGuid = new Dictionary<Guid, int>();
-                // Specific wheel identified → write the per-wheel override.
-                // Otherwise stash under WheelGenericGuid so the user's pick
-                // survives until the wheel shows up; the getter falls back
-                // to this bucket when the per-wheel entry is missing.
-                var g = _plugin.GetCurrentWheelPageGuid();
-                if (!g.HasValue
-                    && Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic))
-                    g = generic;
-                if (!g.HasValue) return;
-                _plugin.Settings.WheelTelemetryEraByPageGuid[g.Value] = (int)value;
-            }
-        }
-
-        /// <summary>
-        /// Map a persisted era int onto the current <see cref="MozaWheelEra"/>
-        /// values. The defunct Era2025 was stored as 2 (now a retired hole) and
-        /// is migrated to <see cref="MozaWheelEra.Auto"/> so the wheel is
-        /// re-probed rather than pinned to a hallucinated era. Existing
-        /// Era2024 (1) and Era2026 (3) picks are preserved; anything else
-        /// (including 0 and the retired 2) falls back to Auto.
-        /// </summary>
-        private static MozaWheelEra MigrateStoredEra(int stored)
-        {
-            switch (stored)
-            {
-                case (int)MozaWheelEra.Era2024: return MozaWheelEra.Era2024;
-                case (int)MozaWheelEra.Era2026: return MozaWheelEra.Era2026;
-                default: return MozaWheelEra.Auto;
-            }
-        }
     }
 }

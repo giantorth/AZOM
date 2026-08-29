@@ -852,7 +852,6 @@ namespace MozaPlugin.UI
             // display had answered identity fine still read "DisplayDetected: False".
             sb.AppendLine($"DisplayDetected:    sender={ts?.DisplayDetected.ToString() ?? "n/a"}  probe={plugin.IsDisplayDetected}");
             sb.AppendLine($"DisplayModelName:   {Blank(ts?.DisplayModelName ?? plugin.DisplayModelName)}");
-            sb.AppendLine($"WheelEra:           {plugin.ActiveTelemetryWheelEra}");
             if (ts != null)
             {
                 sb.AppendLine($"WheelReportedSlot:  {ts.WheelReportedSlot}");

@@ -298,11 +298,6 @@ namespace MozaPlugin.Resources
         public static string Section_DashboardTelemetry => Get("Section_DashboardTelemetry");
         public static string Label_UploadDashboardOnConnect => Get("Label_UploadDashboardOnConnect");
         public static string Label_DownloadDashboardsFromWheel => Get("Label_DownloadDashboardsFromWheel");
-        public static string Label_WheelFirmwareEra => Get("Label_WheelFirmwareEra");
-        public static string Option_FirmwareEraAuto => Get("Option_FirmwareEraAuto");
-        public static string Option_FirmwareEra2024 => Get("Option_FirmwareEra2024");
-        public static string Option_FirmwareEra2026 => Get("Option_FirmwareEra2026");
-        public static string Hint_FirmwareEra => Get("Hint_FirmwareEra");
         public static string SliderLabel_ShowAllTabs => Get("SliderLabel_ShowAllTabs");
         public static string Section_DeviceDefinitions => Get("Section_DeviceDefinitions");
         public static string Button_RedeployDefinitions => Get("Button_RedeployDefinitions");

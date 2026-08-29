@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Devices.StalksTruckSim;
 using MozaPlugin.Telemetry;
-using MozaPlugin.Telemetry.Era;
 using MozaPlugin.UI.UpdateCheck;
 
 namespace MozaPlugin.Settings
@@ -521,13 +520,6 @@ namespace MozaPlugin.Settings
         // it left every pre-existing install's newly-attached display wheel dark
         // (see ProfileCoordinator.ActiveTelemetryEnabled).
         public bool TelemetryEnabledDefaultForNewWheels { get; set; } = false;
-
-        // Per-wheel-page firmware-era pick. Keyed by SimHub page GUID, stored as int
-        // (cast from MozaWheelEra). Firmware era is a property of the wheel/firmware,
-        // not the game — making it per-(game × wheel) would just force the user to
-        // re-pick the same era for every profile.
-        public Dictionary<Guid, int> WheelTelemetryEraByPageGuid { get; set; }
-            = new Dictionary<Guid, int>();
 
         // Per-wheel-page sleep-light settings (firmware preference, not per-game).
         // Schema v8 moved these off WheelOverride / MozaProfile baseline. Each

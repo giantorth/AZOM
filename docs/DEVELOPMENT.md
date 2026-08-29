@@ -150,7 +150,7 @@ touch session lifecycle, test a game switch explicitly.
 | `Telemetry/Dashboard/` | Dashboard library + upload/download: `DashboardProfileStore`, `DashboardCache`, `WheelUploadCoordinator`, `DashboardDownloader`, `FileTransferBuilder`, `ConfigJsonClient`, `WheelStateParser`/`WheelDashboardState` |
 | `Telemetry/Display/` | Standalone (non-tier-def) display drivers: `Fsr1DisplayDriver`/`Emitter`/`DashboardCatalog`, `Cm1DisplayDriver`/`Emitter`/`DashboardCatalog`, `Fsr1VizSnapshot`, `WheelSlotTracker` |
 | `Telemetry/Lifecycle/` | Pipeline lifecycle: `HotSwitchCoordinator`, `RecoveryDispatcher`, `CatalogResyncProbe`, `PostSwitchCatalogConvergence`, `SilenceGate`, `TelemetryInboundDispatcher` (inbound 0xC3 routing), `DisplayWatchdog` (engagement verdict + close-storm backstop) |
-| `Telemetry/Era/`, `TestMode/`, `TileServer/` | Era policy (`MozaWheelEra`/`EraPolicy`); test-signal generator/catalog + the dashboard test pattern and switch auto-test; tile-server state build/parse |
+| `Telemetry/Era/`, `TestMode/`, `TileServer/` | Era policy (`MozaWheelEra`/`EraPolicy`, always resolved from the wheel — there is no user override); test-signal generator/catalog + the dashboard test pattern and switch auto-test; tile-server state build/parse |
 | `Hardware/` | `HardwareApplier` (partials: core, `.Cm2`, `.MBooster`) — every hardware-side write path: `Apply*ToHardware`, the detection-gated `WriteIf*` family, CM2 write routing; plus `ProcessResponsivenessManager` (EcoQoS opt-out + timer resolution) |
 | `Settings/` | The whole settings domain: `MozaPluginSettings`, `MozaProfile`, `MozaProfileStore`, `BaseSettingCatalog`, `ProfileCoordinator` (persistence + profile system + per-wheel-page accessors) |
 | `Integration/` | SimHub-registration surfaces: `SimHubRegistrar` (`AZOM.*` properties + button actions), `ControlMapperBridge` + `MozaVariantProvider` (see [`docs/controlmapper.md`](controlmapper.md)) |
@@ -246,7 +246,7 @@ The two orchestrators — `MozaPlugin.cs` and `Telemetry/TelemetrySender.cs` —
 | `Devices/DeviceDetectionState.cs` | Volatile per-device detection flags shared across poll/UI/serial/telemetry threads; survives game-switch reloads via the persistent-wire bag |
 | `Devices/ConnectionCoordinator.cs` | Primary connect + AB9/CM2/hub/base-aux dedicated lanes, base↔hub primary migration state machine, hub/base pipe polling + inbound scoping |
 | `Hardware/HardwareApplier.cs` | Every hardware write path: `ApplyProfileHardware`, the per-device `Apply*ToHardware` methods, detection-gated `WriteIf*`/`WriteColorIf*`/`WriteArrayIf*` family, owner-routed pedal/handbrake writes, model-capability LED gating |
-| `Settings/ProfileCoordinator.cs` | Settings persistence (debounced save, clear/reset), profile-store init/subscription, `ApplyProfile`, the per-wheel-page accessor family (`ActiveTelemetry*`, overlay, sleep/idle bundles, era), wheel-reported seed methods |
+| `Settings/ProfileCoordinator.cs` | Settings persistence (debounced save, clear/reset), profile-store init/subscription, `ApplyProfile`, the per-wheel-page accessor family (`ActiveTelemetry*`, overlay, sleep/idle bundles), wheel-reported seed methods |
 | `Telemetry/DashboardBindingCoordinator.cs` | Dashboard binding: telemetry settings push, kind=4 emission for profile-driven switches, wheel-initiated switch handling, lifecycle gates, pending-apply retry |
 | `Telemetry/DualDisplayCoordinator.cs` | CM2/CM1 dual-display pipelines: `EnsureCm2Pipeline`, the CM1 discriminator, FSR1/CM1 driver start/stop |
 | `Telemetry/Fsr1Cm1MappingCoordinator.cs` | FSR1/CM1 field mappings + active dashboard index store + `Table 7 Param 6` page-report follow |
@@ -394,7 +394,7 @@ Key supporting pieces:
 Per-game configuration snapshots on SimHub's `ProfileBase`. State is split across four storage tiers:
 
 - **Plugin-global** (`MozaPluginSettings` flat fields): connection toggles, last ports, probe-fallback opt-out, update-check state, etc.
-- **Per-wheel-page** (`MozaPluginSettings` dicts keyed by SimHub page GUID): mzdash folder, telemetry enabled, era, sleep bundle, idle bundle (`*ByPageGuid`).
+- **Per-wheel-page** (`MozaPluginSettings` dicts keyed by SimHub page GUID): mzdash folder, telemetry enabled, sleep bundle, idle bundle (`*ByPageGuid`).
 - **Per-(profile × wheel-page)** (`MozaProfile.WheelOverridesByPageGuid`): wheel LED/mode/brightness/colors/input modes + the per-game dashboard pick (`TelemetryProfileName`/`TelemetryMzdashPath`). Sentinel `-1`/null = fall through to baseline.
 - **Per-game baseline** (`MozaProfile` directly): motor/FFB/handbrake/pedals, dash + base-ambient settings, gearshift tuning, `Ab9Settings`, `TelemetryDashboardKey`, `TelemetryChannelMappings` (profile × page × dashboard-key × URL → property path).
 
@@ -532,7 +532,7 @@ Settings are split across `MozaPluginSettings` (plugin-global values plus the pe
 - the legacy Stable/Dev update-channel enum drains when `UpdateChannelId` is still empty (retired Dev users land on Stable with a cleared `LastSeen*` cache);
 - the `VerboseWireDebugLog` default flip is gated by the dedicated `VerboseWireDebugLogDefaultMigrated` bool, so anyone who re-enables it afterwards keeps it.
 
-Follow that pattern for new migrations: put the sentinel next to the setting it guards, drain in `Init`, and never read the legacy field again. Value-level coercion belongs with its owner instead — e.g. `ProfileCoordinator.MigrateStoredEra` folds unknown/retired stored era values back to `MozaWheelEra.Auto` so the wheel is re-probed rather than pinned to a hallucinated era.
+Follow that pattern for new migrations: put the sentinel next to the setting it guards, drain in `Init`, and never read the legacy field again. A retired setting can also be dropped outright when nothing reads it any more — Newtonsoft ignores the orphaned key on the next load, which is how the per-wheel-page firmware-era pick (`WheelTelemetryEraByPageGuid`) was removed along with its UI selector.
 
 Use `MozaDeviceConstants.ResolveWheelGuid(prefix)` to map a model prefix to a page GUID — never hard-code GUIDs. The device-JSON → plugin-settings drain is one-shot, gated by `WheelExtensionDrained` with fill-only semantics, because SimHub doesn't reliably re-serialize device JSON before shutdown.
 

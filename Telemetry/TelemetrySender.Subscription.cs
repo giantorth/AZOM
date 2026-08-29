@@ -159,9 +159,9 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// One-shot auto-era resolution. When the user picked
-        /// <see cref="MozaWheelEra.Auto"/>, walk the available signals and
-        /// replace the provisional policy with a pinned one. Idempotent:
+        /// One-shot auto-era resolution. The policy is always built from
+        /// <see cref="MozaWheelEra.Auto"/>, so this walks the available signals
+        /// and replaces the provisional policy with a pinned one. Idempotent:
         /// guarded by <see cref="_autoResolutionDone"/> so subsequent
         /// dashboard-switch re-applications don't re-resolve mid-session.
         /// </summary>

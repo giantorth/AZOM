@@ -234,13 +234,14 @@ namespace MozaPlugin.Telemetry
 
             // Source from the current wheel's overlay (single source of truth).
             // When no wheel is identified yet, ActiveTelemetry* return defaults
-            // → era Auto, paths empty, no profile loaded. The sender stays idle
-            // until wheel-model-name resolves the page GUID.
+            // → paths empty, no profile loaded. The sender stays idle until
+            // wheel-model-name resolves the page GUID.
             string telemPath = _plugin.ActiveTelemetryMzdashPath;
             string telemName = _plugin.ActiveTelemetryProfileName;
-            MozaWheelEra era = _plugin.ActiveTelemetryWheelEra;
 
-            sender.Policy = EraPolicy.For(era);
+            // Era is always Auto — TelemetrySender.ResolveAutoPolicy pins the
+            // real era from the wheel's catalog/model at session start.
+            sender.Policy = EraPolicy.For(MozaWheelEra.Auto);
             // Upload/download UI is hidden while feature is in development;
             // force both off regardless of saved settings.
             sender.UploadDashboard = false;

@@ -19,7 +19,6 @@ using MozaPlugin.Settings;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Display;
 using MozaPlugin.Telemetry.Dashboard;
-using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
@@ -230,12 +229,6 @@ namespace MozaPlugin
         internal WheelSleepSettings? GetOrCreateActiveWheelSleep() => _profileCoordinator.GetOrCreateActiveWheelSleep();
         internal WheelIdleSettings? ActiveWheelIdle => _profileCoordinator.ActiveWheelIdle;
         internal WheelIdleSettings? GetOrCreateActiveWheelIdle() => _profileCoordinator.GetOrCreateActiveWheelIdle();
-        internal MozaWheelEra ActiveTelemetryWheelEra
-        {
-            get => _profileCoordinator.ActiveTelemetryWheelEra;
-            set => _profileCoordinator.ActiveTelemetryWheelEra = value;
-        }
-
         /// <summary>
         /// Channel-mapping dict for the active profile × current wheel page. Null
         /// when no profile/wheel is resolvable. Caller must not mutate returned

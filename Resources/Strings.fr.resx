@@ -204,11 +204,6 @@
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TÉLÉMÉTRIE DU TABLEAU DE BORD</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Téléverser le tableau de bord à la connexion</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Télécharger les tableaux de bord depuis le volant</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Ère du firmware du volant :</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Tenter la détection depuis la poignée de main du volant</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Ère 2024 — (abonnement par URL)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Ère 2026 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto détecte l'ère du firmware du volant depuis sa poignée de main et choisit le protocole correspondant. Ne forcez l'option que si la télémétrie ne fonctionne pas.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Afficher tous les onglets (avancé)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DÉFINITIONS D'APPAREIL</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>REDÉPLOYER TOUTES LES DÉFINITIONS</value></data>

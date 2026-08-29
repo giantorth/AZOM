@@ -204,11 +204,6 @@
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRY BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Tải lên bảng điều khiển khi kết nối</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Tải bảng điều khiển từ vô lăng</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Thời kỳ firmware vô lăng:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Tự động — Cố gắng phát hiện qua bắt tay với vô lăng</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Thời kỳ 2024 — (đăng ký URL)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Thời kỳ 2026 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Tự động phát hiện thời kỳ firmware của vô lăng từ bắt tay và chọn giao thức tương ứng. Chỉ ghi đè khi telemetry không hoạt động.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Hiện tất cả các tab (nâng cao)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ĐỊNH NGHĨA THIẾT BỊ</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>TRIỂN KHAI LẠI TẤT CẢ ĐỊNH NGHĨA</value></data>

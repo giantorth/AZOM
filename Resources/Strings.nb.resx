@@ -209,11 +209,6 @@
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRI</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Last opp dashboard ved tilkobling</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Last ned dashboard fra rattet</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Ratt-firmware-versjon:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Forsøk å detektere fra ratt-handshake</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024-versjon — (URL-abonnement)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026-versjon — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detekterer rattets firmware-versjon fra handshake og velger riktig protokoll. Overstyr kun hvis telemetrien ikke virker.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Vis alle faner (avansert)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ENHETSDEFINISJONER</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>DISTRIBUER ALLE DEFINISJONER PÅ NYTT</value></data>
