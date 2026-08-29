@@ -704,6 +704,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsfading (Experimentell)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Einsatztemperatur (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimentell — schreibt während der Aktivierung die echten Hardware-Kalibrierungen für Wegende und Max. Schwellenwert (mehr Pedalweg und mehr Kraft erforderlich) und stellt Ihre konfigurierten Werte wieder her, sobald die Bremsen abkühlen. Setzt voraus, dass diese bereits unter Pedalgefühl / Sim-Eingabezuordnung eingestellt sind — sonst ohne Wirkung.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-Kraft (Trägheits-Pedalgefühl) (Experimentell)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimentell — drückt das Pedal selbst unter deinem Fuß proportional zur aktuellen Längsbeschleunigung (Beschleunigen drückt nach vorn, Bremsen nach hinten), statt zu vibrieren. Max. Pedalweg legt fest, wie weit es sich bei voller G-Kraft bewegt; Reaktionsgeschwindigkeit bestimmt, wie schnell das Pedal die neue Position anfährt.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Max. Pedalweg (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Reaktionsgeschwindigkeit (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

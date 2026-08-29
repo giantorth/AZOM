@@ -707,6 +707,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Fading dei Freni (Sperimentale)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura di Innesco (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Sperimentale — mentre è attivo, scrive le calibrazioni hardware reali di Fine Corsa e Soglia massima (serve più corsa e più forza), poi ripristina i valori configurati man mano che i freni si raffreddano. Richiede che questi siano già impostati in Sensazione del Pedale / Mappatura Input Sim — altrimenti non ha effetto.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Forza G (Feeling inerziale del pedale) (Sperimentale)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Sperimentale — spinge il pedale stesso sotto il piede in proporzione alla G longitudinale in tempo reale (accelerando spinge in avanti, frenando all'indietro), invece di vibrare. Corsa massima del pedale imposta di quanto si muove alla G massima; Velocità di risposta imposta quanto rapidamente il pedale raggiunge la nuova posizione.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Corsa massima del pedale (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Velocità di risposta (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

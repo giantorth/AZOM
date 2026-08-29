@@ -704,6 +704,10 @@ Id : {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Fading des Freins (Expérimental)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Température de Déclenchement (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Expérimental — écrit, tant que c'est actif, les calibrations matérielles réelles de Fin de Course et de Seuil maximal (plus de course et plus de force nécessaires), puis restaure vos valeurs configurées à mesure que les freins refroidissent. Nécessite que ces valeurs soient déjà définies dans Ressenti de la Pédale / Mappage d'Entrée Sim — sans effet sinon.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Force G (Ressenti inertiel de la pédale) (Expérimental)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Expérimental — pousse la pédale elle-même sous votre pied proportionnellement à la G longitudinale en temps réel (accélérer pousse vers l'avant, freiner vers l'arrière), au lieu de vibrer. Course maximale de la pédale définit son déplacement à pleine G ; Vitesse de réponse définit la rapidité avec laquelle la pédale atteint la nouvelle position.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Course maximale de la pédale (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Vitesse de réponse (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

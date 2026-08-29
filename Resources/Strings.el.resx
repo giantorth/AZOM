@@ -703,6 +703,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Εξασθένηση Φρένων (Πειραματικό)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Θερμοκρασία Έναρξης (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Πειραματικό — όσο είναι ενεργό, γράφει τις πραγματικές βαθμονομήσεις υλικού για το Τέλος Διαδρομής και το Μέγιστο κατώφλι (απαιτείται περισσότερη διαδρομή και περισσότερη δύναμη), και επαναφέρει τις ρυθμισμένες τιμές σας καθώς κρυώνουν τα φρένα. Απαιτεί να έχουν ήδη οριστεί αυτές οι τιμές στην Αίσθηση Πεντάλ / Αντιστοίχιση Εισόδου Προσομοίωσης — διαφορετικά δεν έχει καμία επίδραση.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Δύναμη G (Αδρανειακή αίσθηση πεντάλ) (Πειραματικό)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Πειραματικό — σπρώχνει το ίδιο το πεντάλ κάτω από το πόδι σας ανάλογα με τη ζωντανή διαμήκη επιτάχυνση (η επιτάχυνση σπρώχνει μπροστά, το φρενάρισμα πίσω), αντί να δονείται. Η Μέγιστη διαδρομή πεντάλ ορίζει πόσο μετακινείται στη μέγιστη δύναμη G· η Ταχύτητα απόκρισης ορίζει πόσο γρήγορα φτάνει το πεντάλ στη νέα θέση.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Μέγιστη διαδρομή πεντάλ (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Ταχύτητα απόκρισης (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

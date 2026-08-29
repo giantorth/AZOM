@@ -159,6 +159,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Arf Yap!</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Woof!</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Boof!</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Wuff Yip Grr!</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>YOWFF!!</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Bork Awoo Ruff!</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Snarf Wroof Boof Yap Grrowl Wan Howl!</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Barff!</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Wuff!</value></data>
@@ -182,6 +188,10 @@
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Yap!</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Grrowl!</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Barff Wuff Boof Yap Snarf Wuff!</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Grrowl Wroof!</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Awoo Bork Yowff Ruff Snarf Wan Boof!</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Yowff!</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Arf!</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>Bark Grrowl Bark!</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Rrrf Boof Ruff Wan Wan Yip!</value></data>

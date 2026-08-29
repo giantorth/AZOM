@@ -709,6 +709,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Desvanecimiento de Frenos (Experimental)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura de Inicio (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimental — mientras está activo, escribe las calibraciones de hardware reales de Fin de Recorrido y Umbral máximo (se necesita más recorrido y más fuerza), y luego restaura tus valores configurados a medida que los frenos se enfrían. Requiere que esos valores ya estén establecidos en Sensación del Pedal / Mapeo de Entrada de Simulación; de lo contrario, no tiene efecto.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Fuerza G (Sensación inercial del pedal) (Experimental)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimental — empuja el propio pedal bajo tu pie en proporción a la G longitudinal en tiempo real (acelerar empuja hacia delante, frenar hacia atrás), en lugar de vibrar. Recorrido máximo del pedal define cuánto se mueve a plena G; Velocidad de respuesta define con qué rapidez el pedal alcanza la nueva posición.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Recorrido máximo del pedal (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Velocidad de respuesta (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

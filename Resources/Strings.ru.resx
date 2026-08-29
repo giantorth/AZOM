@@ -704,6 +704,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Затухание тормозов (Экспериментально)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Температура начала (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Экспериментально — пока активно, записывает реальные калибровки оборудования для конца хода и макс. порога (требуется больше хода и больше усилия), а затем восстанавливает заданные вами значения по мере остывания тормозов. Требует, чтобы эти значения уже были заданы в разделе «Ощущение педали / Сопоставление ввода симулятора» — иначе не действует.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Перегрузка (Инерционное ощущение педали) (Экспериментально)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Экспериментально — вместо вибрации сама педаль перемещается под вашей ногой пропорционально текущему продольному ускорению (разгон толкает вперёд, торможение — назад). Максимальный ход педали задаёт, насколько она смещается при максимальной перегрузке; Скорость отклика — как быстро педаль приходит в новое положение.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Максимальный ход педали (мм)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Скорость отклика (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

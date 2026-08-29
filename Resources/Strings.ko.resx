@@ -703,6 +703,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>브레이크 페이드 (실험적)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>시작 온도 (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>실험적 — 활성화되어 있는 동안 실제 하드웨어 캘리브레이션 값인 이동 종료 지점과 최대 임계값을 기록하여(더 많은 이동 거리와 힘이 필요해짐) 브레이크가 식으면서 설정한 값으로 복원합니다. 페달 느낌 / 시뮬레이션 입력 매핑에서 해당 값이 이미 설정되어 있어야 하며, 그렇지 않으면 효과가 없습니다.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-포스 (관성 페달 필) (실험적)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>실험적 — 진동 대신 실시간 종방향 G에 비례해 페달 자체를 발 아래에서 밀어냅니다(가속 시 앞으로, 제동 시 뒤로). 최대 페달 이동은 최대 G에서 얼마나 움직일지, 응답 속도는 페달이 새 위치까지 얼마나 빨리 이동할지 정합니다.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>최대 페달 이동 (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>응답 속도 (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

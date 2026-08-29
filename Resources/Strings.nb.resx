@@ -709,6 +709,10 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsefading (Eksperimentell)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Starttemperatur (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Eksperimentell — skriver de ekte maskinvarekalibreringene for Sluttpunkt for bevegelse og Maks terskel mens den er aktiv (mer bevegelse og mer kraft kreves), og gjenoppretter deretter dine konfigurerte verdier etter hvert som bremsene kjøles ned. Krever at disse allerede er satt i Pedalfølelse / Sim-inngangskartlegging — har ellers ingen effekt.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-kraft (Treghetsbasert pedalfølelse) (Eksperimentell)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Eksperimentell — skyver selve pedalen under foten din i forhold til sanntids langsgående G (akselerasjon skyver forover, bremsing skyver bakover), i stedet for å vibrere. Maks pedalvandring angir hvor langt den beveger seg ved full G; Responshastighet angir hvor raskt pedalen når den nye posisjonen.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Maks pedalvandring (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Responshastighet (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>

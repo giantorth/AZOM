@@ -153,6 +153,12 @@
   <data name="SliderLabel_TravelRangeMm" xml:space="preserve"><value>Início / fim do curso (mm)</value></data>
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Rigidez do limite frontal</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Rigidez do limite final</value></data>
+  <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simula uma força de atrito independente da saída do jogo.</value></data>
+  <data name="Section_SegmentedDamping" xml:space="preserve"><value>AMORTECIMENTO SEGMENTADO</value></data>
+  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Força de amortecimento independente da saída do jogo, por segmento de curso do pedal</value></data>
+  <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simula uma força de amortecimento independente da saída do jogo. O curso do pedal é dividido em vários segmentos, cada um com um intervalo ajustável e o seu próprio amortecimento natural. Arraste um divisor para redimensionar um segmento; arraste dentro de um segmento para definir a sua quantidade de amortecimento.</value></data>
+  <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Ao Pressionar</value></data>
+  <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Ao Soltar</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>MAPEAMENTO DE ENTRADA DO SIMULADOR</value></data>
   <data name="Subtitle_SimInputMapping" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Limiar máx. (kg)</value></data>
@@ -176,6 +182,10 @@
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decaimento da vibração</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura de início (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimental — enquanto ativo, grava as calibrações reais de fim de curso e limiar máximo no hardware (exigindo mais curso e mais força) e restaura os valores configurados conforme os freios esfriam. Requer que esses valores já estejam definidos em Sensação do pedal / Mapeamento de entrada — caso contrário não tem efeito.</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Força G (Sensação inercial do pedal) (Experimental)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimental — empurra o próprio pedal sob o seu pé proporcionalmente à G longitudinal em tempo real (acelerar empurra para a frente, frear empurra para trás), em vez de vibrar. Curso máximo do pedal define o quanto ele se move em G máxima; Velocidade de resposta define a rapidez com que o pedal atinge a nova posição.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Curso máximo do pedal (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Velocidade de resposta (%)</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Efeitos personalizados (experimental)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// experimental — vibração definida pelo usuário via fórmulas SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Experimental — cada efeito personalizado vibra o motor usando uma propriedade do SimHub ou fórmula NCalc que você fornece. Todos os efeitos personalizados (e o efeito Motor integrado) compartilham um único canal, então apenas um pode acionar o motor por vez; o efeito ativo processado mais recentemente vence. Frequência/Intensidade funcionam como os controles do próprio efeito Motor.</value></data>
