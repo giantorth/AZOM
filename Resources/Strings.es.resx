@@ -192,7 +192,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>Puerto 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Puerto 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Puerto 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PERFILES</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>AJUSTES</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Aplicar ajustes del perfil al iniciar</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>SALIDA DE LED DEL VOLANTE</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRÍA DEL TABLERO</value></data>
@@ -709,7 +709,7 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Desvanecimiento de Frenos (Experimental)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura de Inicio (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimental — mientras está activo, escribe las calibraciones de hardware reales de Fin de Recorrido y Umbral máximo (se necesita más recorrido y más fuerza), y luego restaura tus valores configurados a medida que los frenos se enfrían. Requiere que esos valores ya estén establecidos en Sensación del Pedal / Mapeo de Entrada de Simulación; de lo contrario, no tiene efecto.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -768,7 +768,7 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requiere SimHub 9.12 o posterior.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definición de dispositivo actualizada. Reinicia SimHub para aplicarla.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>Compatibilidad de juegos</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>COMPATIBILIDAD DE JUEGOS</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidad con Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Gráfico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Ancho de banda</value></data>

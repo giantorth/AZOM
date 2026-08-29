@@ -190,7 +190,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>Porta 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Porta 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Porta 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PROFILI</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>IMPOSTAZIONI</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Applica impostazioni profilo all'avvio</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>USCITA LED VOLANTE</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRIA DASHBOARD</value></data>
@@ -707,7 +707,7 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Fading dei Freni (Sperimentale)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura di Innesco (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Sperimentale — mentre è attivo, scrive le calibrazioni hardware reali di Fine Corsa e Soglia massima (serve più corsa e più forza), poi ripristina i valori configurati man mano che i freni si raffreddano. Richiede che questi siano già impostati in Sensazione del Pedale / Mappatura Input Sim — altrimenti non ha effetto.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -766,7 +766,7 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Richiede SimHub 9.12 o successivo.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definizione dispositivo aggiornata. Riavvia SimHub per applicarla.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>Compatibilità giochi</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>COMPATIBILITÀ GIOCHI</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilità Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Grafico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Larghezza di banda</value></data>

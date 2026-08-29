@@ -200,7 +200,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>Porta 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Porta 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Porta 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PERFIS</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>CONFIGURAÇÕES</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Aplicar configurações do perfil ao iniciar</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>SAÍDA DE LED DO VOLANTE</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRIA DO PAINEL</value></data>
@@ -697,7 +697,7 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importar</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Exportar</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Trepidação da estrada</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Relatar um problema</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>RELATAR UM PROBLEMA</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Envie um relatório de diagnóstico ao desenvolvedor</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Descreva o problema</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Descreva o problema: o que você fez, o que o volante ou o painel fez e quando começou.</value></data>
@@ -756,7 +756,7 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requer o SimHub 9.12 ou posterior.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definição de dispositivo atualizada. Reinicie o SimHub para aplicar.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>Compatibilidade de jogos</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>COMPATIBILIDADE DE JOGOS</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidade com Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Gráfico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Largura de banda</value></data>

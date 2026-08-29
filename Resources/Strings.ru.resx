@@ -187,7 +187,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>Порт 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Порт 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Порт 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>ПРОФИЛИ</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>НАСТРОЙКИ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Применять настройки профиля при запуске</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>ВЫХОД СВЕТОДИОДОВ РУЛЯ</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ТЕЛЕМЕТРИЯ ПАНЕЛИ</value></data>
@@ -704,7 +704,7 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Затухание тормозов (Экспериментально)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Температура начала (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Экспериментально — пока активно, записывает реальные калибровки оборудования для конца хода и макс. порога (требуется больше хода и больше усилия), а затем восстанавливает заданные вами значения по мере остывания тормозов. Требует, чтобы эти значения уже были заданы в разделе «Ощущение педали / Сопоставление ввода симулятора» — иначе не действует.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -763,7 +763,7 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Требуется SimHub 9.12 или новее.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>Совместимость с играми</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>СОВМЕСТИМОСТЬ С ИГРАМИ</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>

@@ -187,7 +187,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Port 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Port 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PROFILE</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>EINSTELLUNGEN</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Profil-Einstellungen beim Start anwenden</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>LENKRAD-LED-AUSGABE</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRIE</value></data>
@@ -704,7 +704,7 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsfading (Experimentell)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Einsatztemperatur (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimentell — schreibt während der Aktivierung die echten Hardware-Kalibrierungen für Wegende und Max. Schwellenwert (mehr Pedalweg und mehr Kraft erforderlich) und stellt Ihre konfigurierten Werte wieder her, sobald die Bremsen abkühlen. Setzt voraus, dass diese bereits unter Pedalgefühl / Sim-Eingabezuordnung eingestellt sind — sonst ohne Wirkung.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -763,7 +763,7 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Erfordert SimHub 9.12 oder neuer.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Gerätedefinition aktualisiert. SimHub zum Anwenden neu starten.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>Spielkompatibilität</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>SPIELKOMPATIBILITÄT</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-Kompatibilität</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Diagramm</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandbreite</value></data>

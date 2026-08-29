@@ -279,7 +279,7 @@ namespace MozaPlugin.Resources
         public static string Label_Port1 => Get("Label_Port1");
         public static string Label_Port2 => Get("Label_Port2");
         public static string Label_Port3 => Get("Label_Port3");
-        public static string Section_Profiles => Get("Section_Profiles");
+        public static string Section_Settings => Get("Section_Settings");
         public static string SliderLabel_ApplyProfileOnLaunch => Get("SliderLabel_ApplyProfileOnLaunch");
         public static string Section_WheelLedOutput => Get("Section_WheelLedOutput");
         public static string SliderLabel_KeepaliveTimeout => Get("SliderLabel_KeepaliveTimeout");

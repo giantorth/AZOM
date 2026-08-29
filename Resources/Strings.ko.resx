@@ -187,7 +187,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>포트 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>포트 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>포트 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>프로필</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>설정</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>시작 시 프로필 설정 적용</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>휠 LED 출력</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
@@ -703,7 +703,7 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>브레이크 페이드 (실험적)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>시작 온도 (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>실험적 — 활성화되어 있는 동안 실제 하드웨어 캘리브레이션 값인 이동 종료 지점과 최대 임계값을 기록하여(더 많은 이동 거리와 힘이 필요해짐) 브레이크가 식으면서 설정한 값으로 복원합니다. 페달 느낌 / 시뮬레이션 입력 매핑에서 해당 값이 이미 설정되어 있어야 하며, 그렇지 않으면 효과가 없습니다.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>

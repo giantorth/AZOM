@@ -217,7 +217,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Port 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Port 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PROFILES</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>SETTINGS</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Apply profile settings on launch</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>WHEEL LED OUTPUT</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD TELEMETRY</value></data>
@@ -715,7 +715,7 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Import</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Export</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Road Rumble</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -774,7 +774,7 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requires SimHub 9.12 or newer.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Device definition updated. Restart SimHub to apply.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>Game Compatibility</value></data>
+  <data name="Section_GameCompatibility" xml:space="preserve"><value>GAME COMPATIBILITY</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon compatibility</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graph</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandwidth</value></data>

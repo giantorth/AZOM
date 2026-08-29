@@ -187,7 +187,7 @@
   <data name="Label_Port1" xml:space="preserve"><value>端口 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>端口 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>端口 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>配置文件</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>设置</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>启动时应用配置文件设置</value></data>
   <data name="Section_WheelLedOutput" xml:space="preserve"><value>方向盘 LED 输出</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>仪表盘遥测</value></data>
@@ -704,7 +704,7 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>刹车热衰减 (实验性)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>起始温度 (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>实验性 — 激活期间会写入真实的行程终点和最大阈值硬件校准值(需要更长行程和更大力度),并在刹车冷却后恢复你配置的数值。需要事先在踏板手感/模拟输入映射中设置好这些值 — 否则不起作用。</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
