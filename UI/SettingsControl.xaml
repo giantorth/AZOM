@@ -3450,6 +3450,30 @@
                                                    Style="{StaticResource MutedHintText}"
                                                    VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
+                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                                         Persistent base-side state, read back from the device
+                                         rather than stored in settings — so the toggle shows what
+                                         the base actually holds, including a value PitHouse set. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="45 s"/>
+                                    </Grid>
+                                    <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
+                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
 
@@ -3507,50 +3531,6 @@
                                          TextWrapping="Wrap"/>
                             </StackPanel>
                         </ctrl:SectionCard>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
-                                              Title="{x:Static res:Strings.Section_WheelLedOutput}"
-                                              Icon="{StaticResource IconLed}">
-                                <StackPanel>
-                                    <Grid Margin="0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="45 s"/>
-                                    </Grid>
-                                    <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
-                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </ctrl:SectionCard>
-
-                            <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
-                                 Persistent base-side state, read back from the device
-                                 rather than stored in settings — so the toggle shows what
-                                 the base actually holds, including a value PitHouse set. -->
-                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
-                                              Title="{x:Static res:Strings.Section_GameCompatibility}" Icon="{StaticResource IconGame}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
-                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </ctrl:SectionCard>
-                        </Grid>
 
                         <!-- Hidden: dashboard upload/download UI collapsed while the feature is
                              in development. Runtime values are forced off in MozaPlugin; the

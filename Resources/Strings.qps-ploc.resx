@@ -218,7 +218,6 @@
   <data name="Label_Port3" xml:space="preserve"><value>Awoo!</value></data>
   <data name="Section_Settings" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Yowl Bork!</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Wuff!</value></data>
@@ -514,7 +513,7 @@
   <data name="SliderLabel_Color" xml:space="preserve"><value>Yap!</value></data>
   <data name="Section_Language" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Arf!</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Grr Howl Bork Bork Grr Awoo!</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Grr Awoo Bork!</value></data>
   <data name="Button_ImportProfile" xml:space="preserve"><value>BARK…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Boof!</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Awoo…</value></data>
@@ -757,7 +756,6 @@
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Yap Yowff!</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Boof Grr Howl Barff Yip Arf!</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Snarf Bork Yowff Barff Grrowl Woof Yip Arf Boof!</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>YIP!</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Woof!</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Arf!</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bark!</value></data>

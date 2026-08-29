@@ -189,7 +189,6 @@
   <data name="Label_Port3" xml:space="preserve"><value>Θύρα 3</value></data>
   <data name="Section_Settings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Εφαρμογή ρυθμίσεων προφίλ κατά την εκκίνηση</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>ΕΞΟΔΟΣ LED ΤΙΜΟΝΙΟΥ</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ΤΗΛΕΜΕΤΡΙΑ ΟΘΟΝΗΣ ΟΡΓΑΝΩΝ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Μεταφόρτωση οθόνης κατά τη σύνδεση</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Λήψη οθόνης από το τιμόνι</value></data>
@@ -485,7 +484,7 @@
   <data name="SliderLabel_Color" xml:space="preserve"><value>Χρώμα</value></data>
   <data name="Section_Language" xml:space="preserve"><value>ΓΛΩΣΣΑ</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Γλώσσα</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Κλείστε και ανοίξτε ξανά αυτή τη σελίδα ρυθμίσεων για εφαρμογή της νέας γλώσσας. Η αυτόματη επιλογή ακολουθεί τη γλώσσα του SimHub, και μετά του λειτουργικού συστήματος.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Απαιτεί επανεκκίνηση μετά την αλλαγή.</value></data>
 <data name="Button_ImportProfile" xml:space="preserve"><value>ΕΙΣΑΓΩΓΗ ΠΡΟΦΙΛ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Εισαγωγή Preset PitHouse</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Αναζήτηση αρχείου…</value></data>
@@ -613,7 +612,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Λεβιές ταχυτήτων</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Προσομοίωση πτήσης</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Χρονικό όριο Keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Πόση ώρα θα ανανεώνονται τα LED μετά τη διακοπή τηλεμετρίας πριν το τιμόνι μπει σε αδράνεια. 0 = άμεση διακοπή.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Πόση ώρα θα ανανεώνονται τα LED μετά τη διακοπή τηλεμετρίας πριν το τιμόνι μπει σε αδράνεια.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Περιστροφή οθόνης</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Ομαλή</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Άμεση</value></data>
@@ -766,7 +765,6 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Απαιτεί SimHub 9.12 ή νεότερο.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Ο ορισμός συσκευής ενημερώθηκε. Επανεκκινήστε το SimHub για εφαρμογή.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>ΣΥΜΒΑΤΌΤΗΤΑ ΠΑΙΧΝΙΔΙΏΝ</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Συμβατότητα Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Γράφημα</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Εύρος ζώνης</value></data>

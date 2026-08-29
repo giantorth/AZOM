@@ -189,7 +189,6 @@
   <data name="Label_Port3" xml:space="preserve"><value>Порт 3</value></data>
   <data name="Section_Settings" xml:space="preserve"><value>НАСТРОЙКИ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Применять настройки профиля при запуске</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>ВЫХОД СВЕТОДИОДОВ РУЛЯ</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ТЕЛЕМЕТРИЯ ПАНЕЛИ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Загружать панель при подключении</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Скачивать панели с руля</value></data>
@@ -485,7 +484,7 @@
   <data name="SliderLabel_Color" xml:space="preserve"><value>Цвет</value></data>
   <data name="Section_Language" xml:space="preserve"><value>ЯЗЫК</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Язык</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Закройте и снова откройте эту страницу настроек, чтобы применить новый язык. «Авто» следует языку SimHub, затем языку системы.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>После изменения требуется перезапуск.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>ИМПОРТ ПРОФИЛЯ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Импорт пресета PitHouse</value></data>
@@ -614,7 +613,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Коробка передач</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Авиасимулятор</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Тайм-аут keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Как долго обновлять светодиоды после остановки телеметрии, прежде чем руль перейдёт в спящий режим. 0 = остановить сразу.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Как долго обновлять светодиоды после остановки телеметрии, прежде чем руль перейдёт в спящий режим.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Поворот дисплея</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Плавный</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Мгновенный</value></data>
@@ -767,7 +766,6 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Требуется SimHub 9.12 или новее.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>СОВМЕСТИМОСТЬ С ИГРАМИ</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>

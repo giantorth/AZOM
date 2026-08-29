@@ -192,7 +192,6 @@
   <data name="Label_Port3" xml:space="preserve"><value>Porta 3</value></data>
   <data name="Section_Settings" xml:space="preserve"><value>IMPOSTAZIONI</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Applica impostazioni profilo all'avvio</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>USCITA LED VOLANTE</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRIA DASHBOARD</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Carica dashboard alla connessione</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Scarica dashboard dal volante</value></data>
@@ -488,7 +487,7 @@
   <data name="SliderLabel_Color" xml:space="preserve"><value>Colore</value></data>
   <data name="Section_Language" xml:space="preserve"><value>LINGUA</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Lingua</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Chiudi e riapri questa pagina delle impostazioni per applicare la nuova lingua. Auto segue l'impostazione della lingua di SimHub, poi quella del sistema operativo.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Richiede il riavvio dopo la modifica.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORTA PROFILO…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Importa preset PitHouse</value></data>
@@ -617,7 +616,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Cambio</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Simulazione di volo</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Timeout keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Per quanto tempo continuare ad aggiornare i LED dopo l'arresto della telemetria prima che il volante possa andare in sospensione. 0 = arresta subito.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Per quanto tempo continuare ad aggiornare i LED dopo l'arresto della telemetria prima che il volante possa andare in sospensione.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotazione display</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Fluida</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immediata</value></data>
@@ -770,7 +769,6 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Richiede SimHub 9.12 o successivo.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definizione dispositivo aggiornata. Riavvia SimHub per applicarla.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>COMPATIBILITÀ GIOCHI</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilità Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Grafico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Larghezza di banda</value></data>

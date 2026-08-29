@@ -189,7 +189,6 @@
   <data name="Label_Port3" xml:space="preserve"><value>Cổng 3</value></data>
   <data name="Section_Settings" xml:space="preserve"><value>CÀI ĐẶT</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Áp dụng cài đặt hồ sơ khi khởi chạy</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>ĐẦU RA LED VÔ LĂNG</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>TELEMETRY BẢNG ĐIỀU KHIỂN</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Tải lên bảng điều khiển khi kết nối</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Tải bảng điều khiển từ vô lăng</value></data>
@@ -485,7 +484,7 @@
   <data name="SliderLabel_Color" xml:space="preserve"><value>Màu</value></data>
   <data name="Section_Language" xml:space="preserve"><value>NGÔN NGỮ</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Ngôn ngữ</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Đóng và mở lại trang cài đặt này để áp dụng ngôn ngữ mới. Tự động sẽ theo ngôn ngữ của SimHub, rồi đến hệ điều hành.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Cần khởi động lại sau khi thay đổi.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>NHẬP HỒ SƠ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Nhập cài đặt PitHouse</value></data>
@@ -614,7 +613,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Cần số</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Mô phỏng bay</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Thời gian chờ keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Thời gian tiếp tục làm mới đèn LED sau khi telemetry dừng trước khi vô-lăng có thể ngủ. 0 = dừng ngay.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Thời gian tiếp tục làm mới đèn LED sau khi telemetry dừng trước khi vô-lăng có thể ngủ.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Xoay màn hình</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Mượt</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Tức thì</value></data>
@@ -767,7 +766,6 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Cần SimHub 9.12 trở lên.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>TƯƠNG THÍCH TRÒ CHƠI</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Khả năng tương thích Forza Horizon</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Biểu đồ</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Băng thông</value></data>

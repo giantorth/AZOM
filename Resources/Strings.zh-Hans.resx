@@ -189,7 +189,6 @@
   <data name="Label_Port3" xml:space="preserve"><value>端口 3</value></data>
   <data name="Section_Settings" xml:space="preserve"><value>设置</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>启动时应用配置文件设置</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>方向盘 LED 输出</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>仪表盘遥测</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>连接时上传仪表盘</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>从方向盘下载仪表盘</value></data>
@@ -485,7 +484,7 @@
   <data name="SliderLabel_Color" xml:space="preserve"><value>颜色</value></data>
   <data name="Section_Language" xml:space="preserve"><value>语言</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>语言</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>关闭并重新打开此设置页面以应用新语言。“自动”会先跟随 SimHub 的语言设置,再跟随系统语言。</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>更改后需要重启。</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>导入配置…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>导入 PitHouse 预设</value></data>
@@ -614,7 +613,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>换挡器</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>飞行模拟</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>保活超时</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>遥测停止后继续刷新 LED 多久，方向盘才能进入休眠。0 = 立即停止。</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>遥测停止后继续刷新 LED 多久，方向盘才能进入休眠。</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>屏幕旋转</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>平滑</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>立即</value></data>
@@ -767,7 +766,6 @@ Id: {2}</value></data>
   <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>需要 SimHub 9.12 或更高版本。</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>设备定义已更新。请重启 SimHub 以应用。</value></data>
-  <data name="Section_GameCompatibility" xml:space="preserve"><value>游戏兼容性</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 兼容性</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>图表</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>带宽</value></data>

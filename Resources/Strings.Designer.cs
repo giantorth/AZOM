@@ -281,7 +281,6 @@ namespace MozaPlugin.Resources
         public static string Label_Port3 => Get("Label_Port3");
         public static string Section_Settings => Get("Section_Settings");
         public static string SliderLabel_ApplyProfileOnLaunch => Get("SliderLabel_ApplyProfileOnLaunch");
-        public static string Section_WheelLedOutput => Get("Section_WheelLedOutput");
         public static string SliderLabel_KeepaliveTimeout => Get("SliderLabel_KeepaliveTimeout");
         public static string Hint_KeepaliveTimeout => Get("Hint_KeepaliveTimeout");
         public static string Section_DashboardTelemetry => Get("Section_DashboardTelemetry");
@@ -825,7 +824,6 @@ namespace MozaPlugin.Resources
         public static string Option_WheelbaseLfeSourceShakeIt => Get("Option_WheelbaseLfeSourceShakeIt");
         public static string Status_WheelbaseLfeShakeItUnavailable => Get("Status_WheelbaseLfeShakeItUnavailable");
         public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
-        public static string Section_GameCompatibility => Get("Section_GameCompatibility");
         public static string SliderLabel_ForzaCompatMode => Get("SliderLabel_ForzaCompatMode");
         public static string Label_BaseGraphMode => Get("Label_BaseGraphMode");
         public static string Option_GraphBandwidth => Get("Option_GraphBandwidth");
