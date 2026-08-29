@@ -510,7 +510,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Vô-lăng đang kết nối</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} chưa được thêm trong SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Một bảng đồng hồ MOZA đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Wheelbase này có dải LED môi trường, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0} để điều khiển dải LED.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Wheelbase đang được kết nối, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Vô-lăng '{1}' đang được kết nối, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>cổng COM của MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Đèn báo núm xoay</value></data>

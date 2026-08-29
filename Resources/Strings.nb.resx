@@ -515,7 +515,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Det tilkoblede rattet</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} er ikke lagt til i SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Et MOZA-dashbord er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Denne wheelbasen har en ambient LED-stripe, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0} for å styre stripen.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Wheelbasen er tilkoblet, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Rattet «{1}» er tilkoblet, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA-COM-porten</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knappindikatorer</value></data>

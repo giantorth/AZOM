@@ -610,7 +610,7 @@ namespace MozaPlugin.Resources
         public static string Banner_WheelFwOutdated_GenericSubject => Get("Banner_WheelFwOutdated_GenericSubject");
         public static string Banner_ProfileNotAdded_TitleFmt => Get("Banner_ProfileNotAdded_TitleFmt");
         public static string Banner_ProfileNotAddedDash_Body => Get("Banner_ProfileNotAddedDash_Body");
-        public static string Banner_ProfileNotAddedBaseAmbient_Body => Get("Banner_ProfileNotAddedBaseAmbient_Body");
+        public static string Banner_ProfileNotAddedBase_Body => Get("Banner_ProfileNotAddedBase_Body");
         public static string Banner_ProfileNotAddedWheel_Body => Get("Banner_ProfileNotAddedWheel_Body");
         public static string Banner_PortFallbackName => Get("Banner_PortFallbackName");
         public static string DeviceDef_KnobIndicators => Get("DeviceDef_KnobIndicators");

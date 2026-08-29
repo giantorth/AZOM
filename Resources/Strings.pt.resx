@@ -532,7 +532,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>O volante conectado</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} não foi adicionado no SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Um painel MOZA está conectado, mas o dispositivo não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Esta base tem uma faixa de LED ambiente, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0} para acionar a faixa.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>A base está conectada, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>O volante '{1}' está conectado, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>a porta COM MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicadores de knob</value></data>

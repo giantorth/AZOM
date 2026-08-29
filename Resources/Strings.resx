@@ -540,7 +540,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>The connected wheel</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} not added in SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>A MOZA dashboard is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>This wheelbase has an ambient LED strip, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0} to drive the strip.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>The wheelbase is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Wheel '{1}' is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>the MOZA COM port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knob Indicators</value></data>

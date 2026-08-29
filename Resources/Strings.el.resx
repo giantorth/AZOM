@@ -509,7 +509,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>συνδεδεμένο τιμόνι</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>Το {0} δεν έχει προστεθεί στο SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ένα ταμπλό MOZA είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Αυτή η βάση τιμονιού έχει λωρίδα LED περιβάλλοντος, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0} για να ελέγξετε τη λωρίδα.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Η βάση τιμονιού είναι συνδεδεμένη, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Το τιμόνι «{1}» είναι συνδεδεμένο, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>τη θύρα COM της MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Ενδείξεις περιστροφικών</value></data>

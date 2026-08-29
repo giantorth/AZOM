@@ -510,7 +510,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Подключённый руль</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} не добавлен в SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Приборная панель MOZA подключена, но устройство не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>У этой базы есть лента окружающей подсветки, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}, чтобы управлять лентой.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>База подключена, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Руль «{1}» подключён, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>COM-порт MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Индикаторы регуляторов</value></data>

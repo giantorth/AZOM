@@ -538,7 +538,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Yip!</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} Yowl Howl!</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Wroof Snarf Wan Woof Grrowl Yip {0} Rrrf Grr Boof Wan Yap Snarf!</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Boof Snarf Boof Rrrf Grr Snarf {0} Rrrf Barff Bark Grrowl Howl Grrowl {0} Howl Grr Arf Yowl Arf Grr!</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Boof Snarf Grr {0} Rrrf Barff Bark Grrowl Howl {0} Arf Yowl Grr!</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Ruff Awoo Wan Barff Ruff Awoo {1} Boof Grr Bark Yowl Grrowl Ruff {0} Arf Wroof Woof Yap Wan Grrowl {0} Bork Grr Snarf Wroof Rrrf Yowl!</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>Snarf!</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Rrrf!</value></data>

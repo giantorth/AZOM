@@ -509,7 +509,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>연결된 휠</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0}이(가) SimHub에 추가되지 않았습니다</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>MOZA 대시보드가 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>이 휠베이스에는 앰비언트 LED 스트립이 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 스트립을 제어하려면 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>휠베이스가 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>휠 '{1}'이(가) 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 포트</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>노브 표시등</value></data>
