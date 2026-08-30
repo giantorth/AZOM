@@ -580,8 +580,11 @@ namespace MozaPlugin.Devices.Ui
             long sig = ComputeMappingDataSignature();
             if (sig != _lastMappingDataSignature) PopulateChannelMappingList();
 
-            bool enabled = _plugin.ActiveTelemetryEnabled;
-            var active = _plugin.TelemetrySender;
+            // Dash page owns its own enable flag and its own sender: a dash-only
+            // rig resolves no wheel page GUID, so ActiveTelemetryEnabled is pinned
+            // false there and would label a live CM2 "Disabled" (bundle 8MNSN33G).
+            bool enabled = IsCm2Target ? _plugin.ActiveDashTelemetryEnabled : _plugin.ActiveTelemetryEnabled;
+            var active = ActiveSender;
             bool testMode = _plugin.DashboardTestPatternActive;
 
             // Sync checkbox to overlay each tick so game/profile switches reflect immediately.
@@ -599,7 +602,7 @@ namespace MozaPlugin.Devices.Ui
             bool senderReady = active != null && active.IsActive && !inCooldown && !pendingApply;
             // FSR V1 renders via its standalone 0x42 driver, not the tier-def sender — that
             // sender never goes Active, so gate the selector + status on the driver instead.
-            bool fsr1 = _plugin?.IsFsr1DisplayWheel ?? false;
+            bool fsr1 = !IsCm2Target && (_plugin?.IsFsr1DisplayWheel ?? false);
             bool fsr1Running = fsr1 && (_plugin?.IsFsr1DriverRunning ?? false);
             bool selectorReady = senderReady || fsr1Running;
             // Surface the pipeline health model first so recovery/park states are
