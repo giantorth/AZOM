@@ -211,20 +211,21 @@ namespace MozaPlugin.UI
             // Floor 60° = measured firmware clamp (PitHouse stops at 90°);
             // must stay even — the wire's half-degree raw makes odd degrees
             // unrepresentable — and matched to the XAML slider Minimum.
-            double rot = _data.Limit * 2.0;
-            RotationSlider.Value = Clamp(rot, 60, 2700);
+            double rot = Clamp(_data.Limit * 2.0, 60, 2700);
+            RotationSlider.Value = rot;
             SetValueText(RotationValue, $"{rot:F0}°");
 
-            double ffb = _data.FfbStrength / 10.0;
-            FfbStrengthSlider.Value = Clamp(ffb, 0, 100);
+            double ffb = Clamp(_data.FfbStrength / 10.0, 0, 100);
+            FfbStrengthSlider.Value = ffb;
             SetValueText(FfbStrengthValue, $"{ffb:F0}%");
 
-            double interp = _data.Interpolation / 10.0;   // wire 0-100 -> display 0-10
-            InterpolationSlider.Value = Clamp(interp, 0, 10);
+            double interp = Clamp(_data.Interpolation / 10.0, 0, 10);   // wire 0-100 -> display 0-10
+            InterpolationSlider.Value = interp;
             SetValueText(InterpolationValue, $"{interp:F0}");
 
-            TorqueSlider.Value = Clamp(_data.Torque, 50, 100);
-            SetValueText(TorqueValue, $"{_data.Torque}%");
+            double torque = Clamp(_data.Torque, 50, 100);
+            TorqueSlider.Value = torque;
+            SetValueText(TorqueValue, $"{torque:F0}%");
 
             // Performance output (cmd 0x1E base = TempStrategy): 0 = Reserved, 1 = Full
             int perf = _data.TempStrategy;
@@ -283,39 +284,43 @@ namespace MozaPlugin.UI
             bool eq10 = _data.BaseSupportsEq10;
             ApplyEqBandMode(eq10);
 
-            double spd = _data.Speed / 10.0;
-            SpeedSlider.Value = Clamp(spd, 0, 200);
+            double spd = Clamp(_data.Speed / 10.0, 0, 200);
+            SpeedSlider.Value = spd;
             SetValueText(SpeedValue, $"{spd:F0}%");
 
             SetSliderPercent(DamperSlider, DamperValue, _data.Damper / 10.0, 0, 100);
             SetSliderPercent(FrictionSlider, FrictionValue, _data.Friction / 10.0, 0, 100);
-            InertiaSlider.Value = Clamp(_data.Inertia / 10.0, 100, 500);
-            SetValueText(InertiaValue, $"{_data.Inertia / 10.0:F0}");
+            double inertia = Clamp(_data.Inertia / 10.0, 100, 500);
+            InertiaSlider.Value = inertia;
+            SetValueText(InertiaValue, $"{inertia:F0}");
             SetSliderPercent(SpringSlider, SpringValue, _data.Spring / 10.0, 0, 100);
 
-            FfbReverseCheck.IsChecked = _data.FfbReverse != 0;
+            FfbReverseCheck.IsChecked = _data.FfbReverse > 0;
 
             SetSliderPercent(GameDamperSlider, GameDamperValue, _data.GameDamper / 2.55, 0, 100);
             SetSliderPercent(GameFrictionSlider, GameFrictionValue, _data.GameFriction / 2.55, 0, 100);
             SetSliderPercent(GameInertiaSlider, GameInertiaValue, _data.GameInertia / 2.55, 0, 100);
             SetSliderPercent(GameSpringSlider, GameSpringValue, _data.GameSpring / 2.55, 0, 100);
 
-            SpeedDampingSlider.Value = Clamp(_data.SpeedDamping, 0, 100);
-            SetValueText(SpeedDampingValue, $"{_data.SpeedDamping}%");
-            SpeedDampingPointSlider.Value = Clamp(_data.SpeedDampingPoint, 0, 400);
-            SetValueText(SpeedDampingPointValue, $"{_data.SpeedDampingPoint} kph");
+            double spdDamp = Clamp(_data.SpeedDamping, 0, 100);
+            SpeedDampingSlider.Value = spdDamp;
+            SetValueText(SpeedDampingValue, $"{spdDamp:F0}%");
+            double spdDampPt = Clamp(_data.SpeedDampingPoint, 0, 400);
+            SpeedDampingPointSlider.Value = spdDampPt;
+            SetValueText(SpeedDampingPointValue, $"{spdDampPt:F0} kph");
 
-            ProtectionCheck.IsChecked = _data.Protection != 0;
-            NaturalInertiaSlider.Value = Clamp(_data.NaturalInertia, 100, 4000);
-            SetValueText(NaturalInertiaValue, $"{_data.NaturalInertia}");
+            ProtectionCheck.IsChecked = _data.Protection > 0;
+            double natInertia = Clamp(_data.NaturalInertia, 100, 4000);
+            NaturalInertiaSlider.Value = natInertia;
+            SetValueText(NaturalInertiaValue, $"{natInertia:F0}");
 
             double stiff = (_data.SoftLimitStiffness / (400.0 / 9.0)) - 2.25 + 1.0;
             stiff = Math.Round(Clamp(stiff, 1, 10));
             SoftLimitStiffnessSlider.Value = stiff;
             SetValueText(SoftLimitStiffnessValue, $"{stiff:F0}");
-            SoftLimitRetainCheck.IsChecked = _data.SoftLimitRetain != 0;
+            SoftLimitRetainCheck.IsChecked = _data.SoftLimitRetain > 0;
 
-            StandbyCheck.IsChecked = _data.WorkMode != 0;
+            StandbyCheck.IsChecked = _data.WorkMode > 0;
             SyncAutoStandbyCombo();
             LedStatusCheck.IsChecked = _data.LedStatus != 0;
             BluetoothCheck.IsChecked = _data.BleMode == 0;

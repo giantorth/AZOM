@@ -176,50 +176,50 @@ namespace MozaPlugin
         public volatile bool HandbrakeButtonPressed;
 
         // Core settings
-        public volatile int Limit;
-        public volatile int MaxAngle;
-        public volatile int FfbStrength;
-        public volatile int Torque;
-        public volatile int Speed;
+        public volatile int Limit = -1;
+        public volatile int MaxAngle = -1;
+        public volatile int FfbStrength = -1;
+        public volatile int Torque = -1;
+        public volatile int Speed = -1;
 
         // Wheelbase effects
-        public volatile int Damper;
-        public volatile int Friction;
-        public volatile int Inertia;
-        public volatile int Spring;
+        public volatile int Damper = -1;
+        public volatile int Friction = -1;
+        public volatile int Inertia = -1;
+        public volatile int Spring = -1;
 
         // Protection
-        public volatile int Protection;
+        public volatile int Protection = -1;
         public volatile int ProtectionMode;
-        public volatile int NaturalInertia;
+        public volatile int NaturalInertia = -1;
 
         // High speed damping
-        public volatile int SpeedDamping;
-        public volatile int SpeedDampingPoint;
+        public volatile int SpeedDamping = -1;
+        public volatile int SpeedDampingPoint = -1;
 
         // Soft limit
-        public volatile int SoftLimitStiffness;
+        public volatile int SoftLimitStiffness = -1;
         public volatile int SoftLimitStrength;
-        public volatile int SoftLimitRetain;
+        public volatile int SoftLimitRetain = -1;
 
         // FFB misc
-        public volatile int FfbReverse;
+        public volatile int FfbReverse = -1;
         public volatile int FfbDisable;
-        public volatile int TempStrategy;        // cmd 0x1E base — also exposed in
+        public volatile int TempStrategy = -1;   // cmd 0x1E base — also exposed in
                                                   // PitHouse as "Performance output"
                                                   // (0 = Reserved, 1 = Full).
-        public volatile int GearshiftVibration;  // cmd 0x2E base — 0..5 intensity.
+        public volatile int GearshiftVibration = -1;  // cmd 0x2E base — 0..5 intensity.
 
         // Game effects
-        public volatile int GameDamper;
-        public volatile int GameFriction;
-        public volatile int GameInertia;
-        public volatile int GameSpring;
+        public volatile int GameDamper = -1;
+        public volatile int GameFriction = -1;
+        public volatile int GameInertia = -1;
+        public volatile int GameSpring = -1;
 
         // Main device
-        public volatile int WorkMode;
+        public volatile int WorkMode = -1;
         public volatile int LedStatus;
-        public volatile int Interpolation;
+        public volatile int Interpolation = -1;
 
         // ===== Wheel LED settings =====
         // Per-group LED mode: 0=Off, 1=SimHub/Telemetry, 2=Static. -1 = NOT YET READ

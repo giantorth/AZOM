@@ -41,6 +41,11 @@ namespace MozaPlugin.UI.Import
             AddHalfDegrees(plan, dp, "maximumSteeringAngle", "Max Steering Angle",
                    () => profile.Limit, v => profile.Limit = v);
 
+            // The base's other rotation register (base-max-angle) — in-game
+            // full lock, same half-degree units as maximumSteeringAngle.
+            AddHalfDegrees(plan, dp, "maximumGameSteeringAngle", "In-Game Max Angle",
+                   () => profile.MaxAngle, v => profile.MaxAngle = v);
+
             AddBoolToInt(plan, dp, "safeDrivingEnabled", "Protection",
                          () => profile.Protection, v => profile.Protection = v);
 
@@ -112,7 +117,6 @@ namespace MozaPlugin.UI.Import
 
             AddSkipped(plan, dp, "gameForceFeedbackFilter", "no profile field");
             AddSkipped(plan, dp, "gearJoltLevel", "no profile field");
-            AddSkipped(plan, dp, "maximumGameSteeringAngle", "no profile field");
 
             // ----- Wheelbase LFE effects (base fw >= 1.2.10.10) -----
             // Engine / ABS / complex-gearshift vibration — each a switch + freq

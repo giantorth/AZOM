@@ -460,7 +460,8 @@ namespace MozaPlugin.Settings
         public override Control ProfileContentControl => null!;
 
         // ===== Base/Motor settings (raw device values from MozaData) =====
-        public int Limit { get; set; } = -1;               // raw = degrees / 2
+        public int Limit { get; set; } = -1;               // raw = degrees / 2, mechanical stop
+        public int MaxAngle { get; set; } = -1;            // raw = degrees / 2, in-game full lock (<= Limit)
         public int FfbStrength { get; set; } = -1;          // raw = percent * 10
         public int Interpolation { get; set; } = -1;        // raw = display(0-10) * 10
         public int Torque { get; set; } = -1;               // percent
@@ -717,7 +718,8 @@ namespace MozaPlugin.Settings
         public override void CopyProfilePropertiesFrom(MozaProfile p)
         {
             // Base/Motor
-            Limit = p.Limit; FfbStrength = p.FfbStrength; Torque = p.Torque;
+            Limit = p.Limit; MaxAngle = p.MaxAngle;
+            FfbStrength = p.FfbStrength; Torque = p.Torque;
             Interpolation = p.Interpolation;
             Speed = p.Speed; Damper = p.Damper; Friction = p.Friction;
             Inertia = p.Inertia; Spring = p.Spring;
@@ -918,12 +920,16 @@ namespace MozaPlugin.Settings
         /// </param>
         public void CaptureFromCurrent(MozaPluginSettings settings, MozaData data, string? activeDashboardKey = null)
         {
-            if (!data.BaseSettingsRead) return;
             if (!string.IsNullOrEmpty(activeDashboardKey))
                 TelemetryDashboardKey = activeDashboardKey;
 
-            // Base/Motor
-            Limit = data.Limit; FfbStrength = data.FfbStrength; Torque = data.Torque;
+            // Base/Motor + game effects. These carry the -1 sentinel until the base
+            // reports them, so capturing an unread field stores -1 and every
+            // downstream write skips it (HardwareApplier's Apply helper). Ungated
+            // on purpose: a value the user just set in the UI must reach the
+            // profile even on a base that never answered its read sweep.
+            Limit = data.Limit; MaxAngle = data.MaxAngle;
+            FfbStrength = data.FfbStrength; Torque = data.Torque;
             Interpolation = data.Interpolation;
             Speed = data.Speed; Damper = data.Damper; Friction = data.Friction;
             Inertia = data.Inertia; Spring = data.Spring;
@@ -932,27 +938,31 @@ namespace MozaPlugin.Settings
             SoftLimitRetain = data.SoftLimitRetain; FfbReverse = data.FfbReverse;
             Protection = data.Protection;
 
-            // Game effects
             GameDamper = data.GameDamper; GameFriction = data.GameFriction;
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;
             WorkMode = data.WorkMode;
             GearshiftVibration = data.GearshiftVibration;
             TempStrategy = data.TempStrategy;
-
-            // FFB Equalizer. Bands 7-10 only on 10-band firmware — an old-fw
-            // session must not bake the untouched _data defaults over the sentinel.
-            Equalizer1 = data.Equalizer1; Equalizer2 = data.Equalizer2; Equalizer3 = data.Equalizer3;
-            Equalizer4 = data.Equalizer4; Equalizer5 = data.Equalizer5; Equalizer6 = data.Equalizer6;
-            if (data.BaseSupportsEq10)
-            {
-                Equalizer7 = data.Equalizer7; Equalizer8 = data.Equalizer8;
-                Equalizer9 = data.Equalizer9; Equalizer10 = data.Equalizer10;
-            }
             RoadSensitivity = data.RoadSensitivity;
 
-            // FFB Curve
-            FfbCurveX1 = data.FfbCurveX1; FfbCurveX2 = data.FfbCurveX2; FfbCurveX3 = data.FfbCurveX3; FfbCurveX4 = data.FfbCurveX4;
-            FfbCurveY1 = data.FfbCurveY1; FfbCurveY2 = data.FfbCurveY2; FfbCurveY3 = data.FfbCurveY3; FfbCurveY4 = data.FfbCurveY4; FfbCurveY5 = data.FfbCurveY5;
+            // EQ and the FFB curve default to real neutral values (flat / linear),
+            // not a sentinel, so they still need the read gate: capturing them
+            // unread would overwrite the base's own curve on the next apply.
+            if (data.BaseSettingsRead)
+            {
+                // Bands 7-10 only on 10-band firmware — an old-fw session must not
+                // bake the untouched _data defaults over the sentinel.
+                Equalizer1 = data.Equalizer1; Equalizer2 = data.Equalizer2; Equalizer3 = data.Equalizer3;
+                Equalizer4 = data.Equalizer4; Equalizer5 = data.Equalizer5; Equalizer6 = data.Equalizer6;
+                if (data.BaseSupportsEq10)
+                {
+                    Equalizer7 = data.Equalizer7; Equalizer8 = data.Equalizer8;
+                    Equalizer9 = data.Equalizer9; Equalizer10 = data.Equalizer10;
+                }
+
+                FfbCurveX1 = data.FfbCurveX1; FfbCurveX2 = data.FfbCurveX2; FfbCurveX3 = data.FfbCurveX3; FfbCurveX4 = data.FfbCurveX4;
+                FfbCurveY1 = data.FfbCurveY1; FfbCurveY2 = data.FfbCurveY2; FfbCurveY3 = data.FfbCurveY3; FfbCurveY4 = data.FfbCurveY4; FfbCurveY5 = data.FfbCurveY5;
+            }
 
             // Handbrake — only once the device has reported its calibration, so a
             // pre-read default (e.g. min/max 0) isn't baked into the profile.

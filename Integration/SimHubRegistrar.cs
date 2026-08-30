@@ -246,7 +246,7 @@ namespace MozaPlugin.Integration
             {
                 var data = _plugin.Data;
                 if (data == null) return;
-                int val = data.WorkMode != 0 ? 0 : 1;
+                int val = data.WorkMode > 0 ? 0 : 1;
                 data.WorkMode = val;
                 _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", val);
                 _plugin.SaveSettings();

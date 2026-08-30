@@ -1287,6 +1287,7 @@ namespace MozaPlugin.Hardware
             MozaLog.Debug(
                 $"[AZOM] ApplyBaseToHardware '{profile.Name}': " +
                 $"Limit={profile.Limit} ({(profile.Limit >= 0 ? (profile.Limit * 2) + "°" : "skip")}), " +
+                $"MaxAngle={profile.MaxAngle} ({(profile.MaxAngle >= 0 ? (profile.MaxAngle * 2) + "°" : "skip")}), " +
                 $"FfbStrength={profile.FfbStrength}, Torque={profile.Torque}, Speed={profile.Speed}, " +
                 $"BaseDetected={_detectionState.BaseDetected}, " +
                 $"_data.IsBaseConnected={_data.IsBaseConnected}, baseSettingsRead={_data.BaseSettingsRead}");
@@ -1302,9 +1303,16 @@ namespace MozaPlugin.Hardware
             // MozaProfile.CopyProfilePropertiesFrom and CaptureFromCurrent,
             // and the field declaration itself — no parallel seed list to
             // drift out of sync.
+            // Two independent registers: base-limit is the mechanical stop,
+            // base-max-angle the in-game full lock (gameMax <= limit).
+            // ORDER IS LOAD-BEARING: base-limit first — the base rejects a
+            // max-angle write made while a higher old limit still stands.
             Apply(() => profile.Limit,              v => profile.Limit              = v,
-                  () => _data.Limit,                v => { _data.Limit = v; _data.MaxAngle = v; },
-                  "base-limit", "base-max-angle");
+                  () => _data.Limit,                v => _data.Limit                = v,
+                  "base-limit");
+            Apply(() => profile.MaxAngle,           v => profile.MaxAngle           = v,
+                  () => _data.MaxAngle,             v => _data.MaxAngle             = v,
+                  "base-max-angle");
             Apply(() => profile.FfbStrength,        v => profile.FfbStrength        = v,
                   () => _data.FfbStrength,          v => _data.FfbStrength          = v,
                   "base-ffb-strength");
@@ -1511,7 +1519,8 @@ namespace MozaPlugin.Hardware
             if (profile.Limit == 0 && profile.FfbStrength == 0 && profile.Torque == 0 && profile.Speed == 0)
             {
                 MozaLog.Warn("[AZOM] Profile has zeroed base settings — resetting to sentinels");
-                profile.Limit = -1; profile.FfbStrength = -1; profile.Torque = -1; profile.Speed = -1;
+                profile.Limit = -1; profile.MaxAngle = -1;
+                profile.FfbStrength = -1; profile.Torque = -1; profile.Speed = -1;
                 profile.Damper = -1; profile.Friction = -1; profile.Inertia = -1; profile.Spring = -1;
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
                 profile.NaturalInertia = -1; profile.SoftLimitStiffness = -1;
