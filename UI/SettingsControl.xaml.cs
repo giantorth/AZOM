@@ -353,7 +353,7 @@ namespace MozaPlugin
                 ? selected.LastAxisRawPercentPreThreshold[idx] : 0.0;
 
             // Pedal Feel's curve is now a REAL hardware effect (see
-            // MozaMBoosterRegistry.ComputeFeelCurve) — the device reshapes
+            // MozaMBoosterRegistry.ComputeFeelCurveX) — the device reshapes
             // the raw force before this HID read ever sees it, so AZOM has
             // no live TRUE "input to that curve" value to plot (that would
             // need the raw pre-reshape force, which AZOM never receives).
@@ -3382,6 +3382,8 @@ namespace MozaPlugin
             SetValueText(MBoosterRoadTextureIntensityValue, (fx?.RoadTexture?.IntensityPct ?? 50).ToString());
             MBoosterRoadTextureSmoothness.Value = fx?.RoadTexture?.SmoothnessPct ?? 50;
             SetValueText(MBoosterRoadTextureSmoothnessValue, (fx?.RoadTexture?.SmoothnessPct ?? 50).ToString());
+            MBoosterRoadTextureGain.Value = fx?.RoadTexture?.GainPct ?? 100;
+            SetValueText(MBoosterRoadTextureGainValue, (fx?.RoadTexture?.GainPct ?? 100).ToString());
             MBoosterRoadTextureTestToggle.IsChecked = false;
             MBoosterGForceEnable.IsChecked = fx?.GForce?.Enabled ?? false;
             MBoosterGForceMaxTravel.Value = fx?.GForce?.MaxTravelMm ?? 10;
@@ -4273,6 +4275,16 @@ namespace MozaPlugin
             (s.RoadTexture ??= new MBoosterEffectSettings()).SmoothnessPct = v;
             _plugin.SaveSettings();
         }
+        private void MBoosterRoadTextureGain_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterRoadTextureGainValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.RoadTexture ??= new MBoosterEffectSettings()).GainPct = v;
+            _plugin.SaveSettings();
+        }
         // Sustained test toggle — bypasses Enabled and the game-running/
         // speed gate entirely (there's no live "how rough is the road"
         // signal to preview against outside a real drive), running
@@ -4541,7 +4553,7 @@ namespace MozaPlugin
             Array.ConvertAll(MBoosterInputCurvePresets[0], x => (float)x);
 
         // Pedal Feel input curve — CONFIRMED real hardware calibration (see
-        // MozaMBoosterRegistry.ComputeFeelCurve and
+        // MozaMBoosterRegistry.ComputeFeelCurveY and
         // MBoosterDeviceController.PushFeelCurveResync): its 6 nodes (0-100%
         // of the Deadzone-Max Force span) populate mbooster-brake-
         // feelcurve-1..6 directly. Unlike SetMBoosterCurveY (host-side,

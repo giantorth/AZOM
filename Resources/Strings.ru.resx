@@ -173,6 +173,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Вибрация двигателя</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Частота (Гц)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Плавность</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Усиление</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// экспериментально — прошивка mBooster может это игнорировать</value></data>

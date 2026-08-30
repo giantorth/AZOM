@@ -176,6 +176,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Vibrazione motore</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequenza (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Morbidezza</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Guadagno</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Livello di attivazione</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decadimento della vibrazione</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// sperimentale — potrebbe non essere supportato dal firmware mBooster</value></data>

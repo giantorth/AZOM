@@ -1081,6 +1081,55 @@ brake-named singleton `0xAB` write with no per-pedal selector, so editing
 it from a passive pedal's page would overwrite the active pedal's
 registers instead.
 
+### Pedal Feel default curve shape and node X domain — REVISED (mBooster "Deadzone slider does nothing" report)
+
+**REVISED**: the `{8.049, 19.495, 44.245, 72.433, 90.040, 97.910}%` default
+shape claimed above is **wrong**, and the node X domain claim ("percentage
+of the Deadzone→Max Force span, same as Y") is wrong for X specifically.
+A report that the Deadzone slider had no perceptible effect on
+Throttle/Clutch mBoosters prompted four fresh isolated sweeps —
+`clutch-0-8kg-deadzone-sweep.pcapng`, `clutch-4-20kg-maxforce-sweep.pcapng`,
+`throttle-0-6kg-deadzone-sweep.pcapng`, `throttle-4-20kg-maxforce-sweep
+.pcapng` — each holding the curve at its un-dragged default and sweeping
+only Deadzone or only Max Force:
+
+- **Y nodes** (`0x08`-`0x0D`): `(value − deadzone) / (maxForce − deadzone)`
+  landed within ~0.005 of **`k/7` for k=1..6** (evenly-spaced sevenths) at
+  every sweep point, on both roles — not the asymmetric constants above.
+  Those constants were measured off a single Brake unit's un-dragged curve
+  in the original `max-force-24-75-128-166-200.pcapng` /
+  `deadzone-0-5-11-14.pcapng` captures and assumed to be the factory
+  Linear default; that unit had almost certainly already picked up a
+  non-default curve from earlier testing in the same session. The
+  `(value − deadzone) / (maxForce − deadzone)` RELATIONSHIP for Y itself
+  still holds exactly — only the specific fraction constants were wrong.
+- **X nodes** (`0x01`-`0x06`): stayed **bit-for-bit identical** across an
+  entire Deadzone sweep AND an entire Max Force sweep, on both roles —
+  proving X is NOT relative to this pedal's own Deadzone-Max Force span at
+  all, contrary to the claim above. The constant values landed within
+  ~0.15kg of `k/7 × 200` — i.e. evenly-spaced sevenths of the fixed
+  0-200kg full scale every other Pedal Feel field shares (the original
+  node-drag captures that established X as real, `pedal-feel-node{2,5}-
+  {x,y}-adjust.pcapng`, happened to be taken at the degenerate 0kg/200kg
+  anchors, so they couldn't distinguish "relative to Deadzone-Max Force"
+  from "relative to the fixed 0-200kg scale" — both formulas coincide when
+  deadzone=0 and maxForce=200).
+
+Net effect of the bug: on every Deadzone or Max Force edit, AZOM was
+recomputing BOTH the Y nodes (with the wrong shape) AND the X nodes
+(rescaled to the wrong, pedal-specific span instead of the fixed 0-200kg
+one) and pushing all 8 values together — likely handing the firmware a
+badly warped curve on each edit, which could easily read as "the Deadzone
+slider doesn't do anything" rather than a visibly wrong curve. Fixed in
+`MozaMBoosterRegistry.FeelCurveFractions` (now `k/7`) and by splitting the
+single `ComputeFeelCurve` into `ComputeFeelCurveY` (deadzone-relative,
+unchanged) and `ComputeFeelCurveX` (fixed 0-200kg scale, independent of
+Deadzone/Max Force) — see `MBoosterDeviceController.PushFeelCurveResync`.
+The customized (non-null `InputCurveX`) case now also uses the fixed
+0-200kg scale for consistency; this hasn't been independently re-verified
+against a customized-curve capture on a non-degenerate Deadzone/Max Force
+pair, so treat that specific case as inferred rather than confirmed.
+
 ### Pedal Feel node X position
 
 **REVISED**: each of the 6 Pedal Feel nodes is draggable on BOTH axes —

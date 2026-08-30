@@ -173,6 +173,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Vibração do motor</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequência (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Suavidade</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Ganho</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Nível de entrada do gatilho</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decaimento da vibração</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura de início (°C)</value></data>

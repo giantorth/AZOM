@@ -586,44 +586,39 @@ namespace MozaPlugin.Devices
         private static readonly float[] DefaultCurveX =
             { 100f / 6f, 200f / 6f, 300f / 6f, 400f / 6f, 500f / 6f, 600f / 6f };
 
-        // Default/un-dragged shape of the Pedal Feel curve's 6 nodes on
-        // EITHER axis (mbooster-brake-feelcurve-1..6 for Y, cmdId 0xAB
-        // selectors 0x08-0x0D; mbooster-brake-feelcurve-x-1..6 for X,
-        // selectors 0x01-0x06), as a fraction (0-1) of the way from Deadzone
-        // to Max Force — empirically measured across both
-        // max-force-24-75-128-166-200.pcapng (Deadzone fixed, Max Force
-        // swept 75/128/166kg) and deadzone-0-5-11-14.pcapng (Max Force
-        // fixed, Deadzone swept 5/11/14kg): (value - deadzone) / (maxForce -
-        // deadzone) landed on the identical constant per selector in all 6
-        // write bursts (std-dev < 0.0001). This is Pit House's own
-        // un-dragged default shape (a Linear/identity curve — Y=X trivially
-        // holds for any untouched curve regardless of its real X-breakpoint
-        // spacing), NOT a fixed rule: the 6 points on EACH axis are
-        // genuinely user-adjustable, Y via
-        // MBoosterDeviceSettings.InputCurveY and X via InputCurveX (see
-        // ComputeFeelCurve below, used for both) — confirmed by isolated
-        // single-node-drag captures (pedal-feel-node{2,5}-{x,y}-adjust
-        // .pcapng) that independently exercised the X selector family, which
-        // an earlier, less rigorous investigation had spotted once and
-        // dismissed as an unconfirmed guess for a different curve (see
-        // docs/protocol/devices/mbooster.md "Removed: y1..y5 and curve7").
-        // See docs/protocol/devices/mbooster.md "Pedal Feel" and bug bundle
-        // 5VR5AQ8Y.
+        // Default/un-dragged shape of the Pedal Feel curve's 6 Y nodes
+        // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D),
+        // as a fraction (0-1) of the way from Deadzone to Max Force —
+        // REVISED to evenly-spaced sevenths (k/7 for k=1..6). A "Deadzone
+        // slider does nothing" report prompted 4 fresh sweeps
+        // (clutch-0-8kg-deadzone-sweep.pcapng, clutch-4-20kg-maxforce-sweep
+        // .pcapng, throttle-0-6kg-deadzone-sweep.pcapng, throttle-4-20kg-
+        // maxforce-sweep.pcapng): (value - deadzone) / (maxForce - deadzone)
+        // landed within ~0.005 of k/7 at every sweep point on both roles,
+        // while the previous asymmetric constants below were off by up to
+        // 1.7kg — enough to visibly distort the curve on every Deadzone/Max
+        // Force edit. Those constants were originally measured off a single
+        // Brake unit's un-dragged curve (max-force-24-75-128-166-200.pcapng
+        // / deadzone-0-5-11-14.pcapng) and assumed to be the factory Linear
+        // default; that unit almost certainly already carried a non-default
+        // curve from earlier testing, not evidence of a genuinely
+        // non-uniform default shape. Previous (WRONG) measured values, kept
+        // for history: { 0.08049, 0.19495, 0.44245, 0.72433, 0.90040,
+        // 0.97910 }. See docs/protocol/devices/mbooster.md "Pedal Feel" and
+        // bug bundles 5VR5AQ8Y / mBooster-deadzone-no-effect.
         internal static readonly double[] FeelCurveFractions =
-            { 0.08049, 0.19495, 0.44245, 0.72433, 0.90040, 0.97910 };
+            { 1.0 / 7, 2.0 / 7, 3.0 / 7, 4.0 / 7, 5.0 / 7, 6.0 / 7 };
 
         /// <summary>
-        /// The 6 points of the Pedal Feel curve on ONE axis, in kg, ready to
-        /// write to <c>mbooster-brake-feelcurve-1..6</c> (Y) or
-        /// <c>mbooster-brake-feelcurve-x-1..6</c> (X) — see
+        /// The 6 Y points of the Pedal Feel curve, in kg, ready to write to
+        /// <c>mbooster-brake-feelcurve-1..6</c> — see
         /// <see cref="MBoosterDeviceController.PushFeelCurveResync"/>. Each
         /// node in <paramref name="inputCurve"/> is a percentage (0-100) of
         /// the Deadzone-Max Force span; falls back to
-        /// <see cref="FeelCurveFractions"/> (the Linear default, shared by
-        /// both axes) for any node the user hasn't customized (null or
-        /// wrong-length array).
+        /// <see cref="FeelCurveFractions"/> (the Linear default) for any
+        /// node the user hasn't customized (null or wrong-length array).
         /// </summary>
-        internal static double[] ComputeFeelCurve(double deadzoneKg, double maxForceKg, float[]? inputCurve = null)
+        internal static double[] ComputeFeelCurveY(double deadzoneKg, double maxForceKg, float[]? inputCurve = null)
         {
             double range = maxForceKg - deadzoneKg;
             int n = FeelCurveFractions.Length;
@@ -633,6 +628,35 @@ namespace MozaPlugin.Devices
             {
                 double frac01 = haveCurve ? inputCurve![i] / 100.0 : FeelCurveFractions[i];
                 result[i] = deadzoneKg + frac01 * range;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// The 6 X points of the Pedal Feel curve, in kg, ready to write to
+        /// <c>mbooster-brake-feelcurve-x-1..6</c>. UNLIKE the Y nodes above,
+        /// X is NOT relative to the pedal's own Deadzone-Max Force span —
+        /// the same 4 sweeps documented on <see cref="FeelCurveFractions"/>
+        /// showed the X selectors (0xAB 0x01-0x06) sent bit-for-bit
+        /// identical values across an ENTIRE Deadzone sweep and an entire
+        /// Max Force sweep, on both Throttle and Clutch, landing within
+        /// ~0.15kg of k/7 * 200 — the fixed 0-200kg full-scale every other
+        /// Pedal Feel field shares (see
+        /// <see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>) —
+        /// regardless of that pedal's actual configured Deadzone/Max Force.
+        /// Each node in <paramref name="inputCurve"/> is a percentage
+        /// (0-100) of that same fixed 0-200kg scale (NOT of Deadzone-Max
+        /// Force, unlike Y's <paramref name="inputCurve"/> above).
+        /// </summary>
+        internal static double[] ComputeFeelCurveX(float[]? inputCurve = null)
+        {
+            int n = FeelCurveFractions.Length;
+            bool haveCurve = inputCurve != null && inputCurve.Length == n;
+            var result = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                double frac01 = haveCurve ? inputCurve![i] / 100.0 : FeelCurveFractions[i];
+                result[i] = frac01 * 200.0;
             }
             return result;
         }

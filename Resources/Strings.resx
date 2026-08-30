@@ -187,6 +187,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Engine Vibration</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequency (hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Smoothness</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Gain</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Trigger Input Level</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibration Decay</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Onset Temperature (°C)</value></data>

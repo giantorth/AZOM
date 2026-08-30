@@ -1498,7 +1498,8 @@ namespace MozaPlugin.Devices
         /// running continuously the whole time you're driving. The
         /// transmitted Intensity is the user's configured percentage scaled
         /// by that same envelope (<see cref="EffectState.RoadTextureRoughness01"/>)
-        /// every tick.
+        /// and by the user's GainPct (a plain host-side multiplier, no
+        /// envelope of its own) every tick.
         /// </summary>
         private void ProcessRoadTextureEffect(IMBoosterEffects? effects, ref EffectState st)
         {
@@ -1525,7 +1526,8 @@ namespace MozaPlugin.Devices
             if (noise < -1) noise = -1; else if (noise > 1) noise = 1;
             short noiseSample = (short)Math.Round(noise * short.MaxValue);
             ushort noiseRaw = unchecked((ushort)noiseSample);
-            double effectiveIntensityPct = (effects?.RoadTexture?.IntensityPct ?? 0) * st.RoadTextureRoughness01;
+            double gain01 = (effects?.RoadTexture?.GainPct ?? 100) / 100.0;
+            double effectiveIntensityPct = (effects?.RoadTexture?.IntensityPct ?? 0) * st.RoadTextureRoughness01 * gain01;
             ushort intensityRaw = MozaMBoosterProtocol.EncodeRoadTextureLevel(effectiveIntensityPct);
             ushort smoothnessRaw = MozaMBoosterProtocol.EncodeRoadTextureLevel(effects?.RoadTexture?.SmoothnessPct ?? 0);
 

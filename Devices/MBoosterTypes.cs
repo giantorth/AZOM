@@ -172,7 +172,7 @@ namespace MozaPlugin.Devices
         // no wire command — see MozaMBoosterRegistry.EvaluateCurveArbitraryX.
         // Pedal Feel (InputCurveY) is a REAL hardware write, populating
         // mbooster-brake-feelcurve-1..6 (cmdId 0xAB selectors 0x08-0x0D) —
-        // see MozaMBoosterRegistry.ComputeFeelCurve and
+        // see MozaMBoosterRegistry.ComputeFeelCurveY and
         // MBoosterDeviceController.PushFeelCurveResync. See
         // docs/protocol/devices/mbooster.md "Sim Input Mapping" / "Pedal Feel".
         public const int SimInputMappingNodeCount = 6;
@@ -238,6 +238,17 @@ namespace MozaPlugin.Devices
         // preserves pre-existing behavior for profiles that predate this
         // slider.
         public int SmoothnessPct { get; set; } = 100;
+
+        // Road Texture-only, 0..100 — a second, purely host-side multiplier
+        // on top of IntensityPct (see MBoosterEffectWorker
+        // .ProcessRoadTextureEffect: effectiveIntensityPct is scaled by
+        // GainPct/100 after the bump-envelope scaling). Added because users
+        // found the bump/kerb pulse too strong even after turning
+        // IntensityPct down, since Intensity alone only spans the same
+        // 0..100 range the envelope already modulates. Default 100 (no
+        // attenuation) preserves pre-existing behavior for profiles that
+        // predate this slider.
+        public int GainPct { get; set; } = 100;
 
         // Threshold: 50..100 (MBoosterUiConstants.ThresholdTriggerMinPct/
         // MaxPct) — the brake position (%) at which the rising-edge trigger
@@ -315,6 +326,7 @@ namespace MozaPlugin.Devices
                 IntensityPct = IntensityPct,
                 FrequencyHz = FrequencyHz,
                 SmoothnessPct = SmoothnessPct,
+                GainPct = GainPct,
                 TriggerLevelPct = TriggerLevelPct,
                 DecayPct = DecayPct,
                 BrakeFadeOnsetC = BrakeFadeOnsetC,
@@ -784,24 +796,27 @@ namespace MozaPlugin.Devices
         // selectors 0x08-0x0D). Null = use the default Linear shape
         // (MozaMBoosterRegistry.FeelCurveFractions) — existing profiles are
         // unaffected until the user opens this section. See
-        // MozaMBoosterRegistry.ComputeFeelCurve,
+        // MozaMBoosterRegistry.ComputeFeelCurveY,
         // MBoosterDeviceController.PushFeelCurveResync, and
         // docs/protocol/devices/mbooster.md "Pedal Feel".
         public float[]? InputCurveY { get; set; } = null;
 
-        // X position (0-100% of the Deadzone-Max Force span) of each Pedal
-        // Feel node, draggable in the curve editor exactly like Sim Input
-        // Mapping's CurveX — ALSO real hardware calibration though, unlike
-        // CurveX: reverse-engineered from pedal-feel-node{2,5}-{x,y}-adjust
-        // .pcapng (four isolated single-node-drag captures), which showed a
-        // second, previously-undocumented cmdId 0xAB selector family
-        // (0x01-0x06, one per node, distinct from feelcurve-1..6's
-        // 0x08-0x0D) always written alongside the node's own feelcurve-N
-        // write — sent first, same kg-relative-to-span encoding. Null =
-        // default fixed breakpoints (MozaMBoosterRegistry.FeelCurveFractions
-        // — the same identity shape InputCurveY defaults to). See
-        // MozaMBoosterRegistry.ComputeFeelCurve and
-        // MBoosterDeviceController.PushFeelCurveResync.
+        // X position of each Pedal Feel node, draggable in the curve editor
+        // exactly like Sim Input Mapping's CurveX — ALSO real hardware
+        // calibration though, unlike CurveX: reverse-engineered from
+        // pedal-feel-node{2,5}-{x,y}-adjust.pcapng (four isolated
+        // single-node-drag captures), which showed a second, previously-
+        // undocumented cmdId 0xAB selector family (0x01-0x06, one per node,
+        // distinct from feelcurve-1..6's 0x08-0x0D) always written alongside
+        // the node's own feelcurve-N write — sent first. UNLIKE InputCurveY,
+        // this is a percentage (0-100) of the fixed 0-200kg full scale, NOT
+        // the Deadzone-Max Force span — confirmed by 4 throttle/clutch
+        // Deadzone/Max Force sweeps that left this curve at its default and
+        // saw the X selectors stay bit-for-bit constant throughout (see
+        // MozaMBoosterRegistry.FeelCurveFractions for the capture list).
+        // Null = default fixed breakpoints (MozaMBoosterRegistry
+        // .FeelCurveFractions). See MozaMBoosterRegistry.ComputeFeelCurveX
+        // and MBoosterDeviceController.PushFeelCurveResync.
         public float[]? InputCurveX { get; set; } = null;
 
         // Deadzone at the start of pedal travel, in kg of force (0..40) —

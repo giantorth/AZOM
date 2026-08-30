@@ -605,9 +605,9 @@ namespace MozaPlugin.Protocol
             // Max Force, both in kg using the identical encoding as Max
             // Threshold (raw = round(kg * 65536 / 200) — see
             // MozaMBoosterProtocol.EncodeThresholdKg). Selectors 0x08-0x0D are
-            // the Pedal Feel curve's own 6 user-adjustable nodes (0-100% of the
-            // Deadzone-Max Force span) — see MozaMBoosterRegistry
-            // .ComputeFeelCurve. Every Max Force / Deadzone sweep in both
+            // the Pedal Feel curve's own 6 user-adjustable Y nodes (0-100% of
+            // the Deadzone-Max Force span) — see MozaMBoosterRegistry
+            // .ComputeFeelCurveY. Every Max Force / Deadzone sweep in both
             // captures resent this whole 8-value family as one atomic burst,
             // and real Pit House does NOT clamp Max Force to Max Threshold
             // (128kg/166kg were sent while Threshold read back as 125kg) — see

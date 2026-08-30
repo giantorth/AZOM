@@ -249,6 +249,7 @@ namespace MozaPlugin.Resources
         public static string Section_EngineContinuous => Get("Section_EngineContinuous");
         public static string SliderLabel_FrequencyHz => Get("SliderLabel_FrequencyHz");
         public static string SliderLabel_Smoothness => Get("SliderLabel_Smoothness");
+        public static string SliderLabel_Gain => Get("SliderLabel_Gain");
         public static string SliderLabel_TriggerLevel => Get("SliderLabel_TriggerLevel");
         public static string SliderLabel_VibrationDecay => Get("SliderLabel_VibrationDecay");
         public static string SliderLabel_OnsetTempC => Get("SliderLabel_OnsetTempC");

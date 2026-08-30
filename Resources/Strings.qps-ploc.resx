@@ -179,6 +179,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Wroof!</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Snarf!</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Yap!</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Vroom!</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Grr!</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Yap!</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Grrowl!</value></data>

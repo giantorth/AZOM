@@ -1213,14 +1213,17 @@ namespace MozaPlugin.Devices
         /// as Max Threshold (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
         /// <paramref name="inputCurveY"/>/<paramref name="inputCurveX"/> are
         /// the Pedal Feel curve's own 6 user-adjustable nodes per axis
-        /// (0-100%, null/wrong-length = use the default Linear shape) — see
-        /// <see cref="MozaMBoosterRegistry.ComputeFeelCurve"/>.
+        /// (0-100%, null/wrong-length = use the default Linear shape) — Y is
+        /// a percentage of the Deadzone-Max Force span, X of the fixed
+        /// 0-200kg full scale (the two axes are NOT interchangeable — see
+        /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveY"/> and
+        /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveX"/>).
         /// </summary>
         public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device)
         {
             SendIntWrite("mbooster-brake-deadzone", MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg), device);
-            var midX = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg, inputCurveX);
-            var midY = MozaMBoosterRegistry.ComputeFeelCurve(deadzoneKg, maxForceKg, inputCurveY);
+            var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
+            var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
             for (int i = 0; i < midY.Length; i++)
             {
                 SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midX[i]), device);

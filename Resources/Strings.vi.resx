@@ -173,6 +173,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Rung động cơ</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Tần số (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Độ mượt</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Độ khuếch đại</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Mức kích hoạt đầu vào</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Độ suy giảm rung</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// thử nghiệm — có thể không được firmware mBooster áp dụng</value></data>

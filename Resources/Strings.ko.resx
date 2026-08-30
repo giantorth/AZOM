@@ -173,6 +173,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>엔진 진동</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>주파수 (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>부드러움</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>게인</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>트리거 입력 레벨</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>진동 감쇠</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 실험적 기능 — mBooster 펌웨어가 적용하지 않을 수 있음</value></data>

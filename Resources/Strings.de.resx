@@ -173,6 +173,7 @@
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Motorvibration</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequenz (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Glätte</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Verstärkung</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Auslöseschwelle</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrationsabklingen</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// experimentell — wird ggf. nicht von der mBooster-Firmware übernommen</value></data>
