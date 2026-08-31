@@ -81,6 +81,29 @@ namespace MozaPlugin.Telemetry.Frames
             _lastSubscriptionDiag = null;
         }
 
+        /// <summary>Drop the previous tier-def emission's chunks from the
+        /// retransmit queue. A new flagBase supersedes them, so replaying them
+        /// would push a stale generation at the wheel. Scoped to exactly those
+        /// chunks — <see cref="_tierDefBlindFrames"/> is an exact record of the
+        /// tier-def chunks the retransmitter holds, since both are populated
+        /// only under BlindRetransmitTierDef. Everything else queued (FF init
+        /// handshake, property pushes, value frames) is current-generation on a
+        /// seq counter that is NOT reset here, so it stays ackable and keeps its
+        /// retx cover.</summary>
+        public void DropTrackedTierDefChunks()
+        {
+            var frames = _tierDefBlindFrames;
+            _tierDefBlindFrames = null;
+            _tierDefBlindSentRounds = 0;
+            _tierDefBlindLastTickCount = 0;
+            if (frames == null) return;
+            foreach (var frame in frames)
+            {
+                if (frame == null || frame.Length < 10) continue;
+                _sender.Retransmitter.Drop(frame[6], frame[8] | (frame[9] << 8));
+            }
+        }
+
         /// <summary>
         /// Spin-wait for the wheel's catalog push to go quiet. Returns when
         /// last catalog activity is older than <paramref name="quietMs"/>.

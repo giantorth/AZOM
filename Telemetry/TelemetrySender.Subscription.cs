@@ -103,23 +103,6 @@ namespace MozaPlugin.Telemetry
             // policy used for tier-def emission and value-frame routing.
             ResolveAutoPolicy();
 
-            // If the catalog revealed a different tier-def session than when we
-            // first sent the FF-init handshake (Form B: catalog landed on 0x02,
-            // flipping the FF session from 0x02 to 0x01), the wheel acked the
-            // init on the OLD session and won't accept kind=4 / commit the
-            // tier-def on the new FF session — symptom: dash renders but shows
-            // no data. Re-send the init handshake on the now-correct FF session
-            // before the tier-def below so the binding actually commits. Fires
-            // at most once per cycle (after re-send the sessions match).
-            byte ffNow = ResolveFfSession();
-            if (_initHandshakeSession != 0 && _initHandshakeSession != ffNow)
-            {
-                MozaLog.Debug(
-                    $"[AZOM] FF session moved 0x{_initHandshakeSession:X2}→0x{ffNow:X2} after catalog " +
-                    "arrived — re-sending init handshake on the corrected FF session so kind=4/tier-def commit.");
-                SendSessionInitHandshake();
-            }
-
             MaybeSwapProfileForCatalog(force: force);
             if (_profile == null || _profile.Tiers.Count == 0)
                 return;
@@ -139,12 +122,35 @@ namespace MozaPlugin.Telemetry
             // wheel's existing binding stays valid, so wiping in-flight retx
             // entries and queued FF property pushes mid-flight would kill the
             // blind-retx safety net for chunks already on the wire.
+            //
+            // The retx drop is scoped to the superseded tier-def generation.
+            // A blanket queue Clear() here also wiped current-generation chunks
+            // — the FF init handshake most damagingly, since a lost init chunk
+            // leaves the tier-def uncommitted and the dash renders empty for the
+            // rest of the session (wake-from-sleep bundle 1KY1PZ4M).
             if (!reuseFlagBase)
             {
-                _retransmitter.Clear();
+                _tierDefEmitter.DropTrackedTierDefChunks();
                 _propertyPushQueue.Clear();
                 lock (_subscriptionResponseChunks) _subscriptionResponseChunks.Clear();
                 Interlocked.Exchange(ref _subscriptionResponseDeadlineTicks, 0);
+            }
+
+            // If the catalog revealed a different tier-def session than when we
+            // first sent the FF-init handshake (Form B: catalog landed on 0x02,
+            // flipping the FF session from 0x02 to 0x01), the wheel acked the
+            // init on the OLD session and won't accept kind=4 / commit the
+            // tier-def on the new FF session — symptom: dash renders but shows
+            // no data. Re-send the init handshake on the now-correct FF session
+            // before the tier-def below so the binding actually commits. Fires
+            // at most once per cycle (after re-send the sessions match).
+            byte ffNow = ResolveFfSession();
+            if (_initHandshakeSession != 0 && _initHandshakeSession != ffNow)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] FF session moved 0x{_initHandshakeSession:X2}→0x{ffNow:X2} after catalog " +
+                    "arrived — re-sending init handshake on the corrected FF session so kind=4/tier-def commit.");
+                SendSessionInitHandshake();
             }
 
             _tierDefEmitter.SendTierDefinition(reuseFlagBase);
