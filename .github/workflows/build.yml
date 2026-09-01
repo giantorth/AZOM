@@ -154,7 +154,8 @@ jobs:
       pr_number: ${{ steps.mode.outputs.pr_number }}
       pr_title: ${{ steps.mode.outputs.pr_title }}
       head_sha: ${{ steps.mode.outputs.head_sha }}
-      merge_sha: ${{ steps.vars.outputs.merge_sha }}
+      release_target: ${{ steps.mode.outputs.release_target }}
+      is_fork: ${{ steps.mode.outputs.is_fork }}
       pr_version: ${{ steps.vars.outputs.pr_version }}
       short_sha: ${{ steps.vars.outputs.short_sha }}
       zip_name: ${{ steps.vars.outputs.zip_name }}
@@ -173,11 +174,13 @@ jobs:
           EVENT_PR_TITLE: ${{ github.event.pull_request.title }}
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
           EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           EVENT_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           pr_number=""; pr_title=""; head_sha=""; base_sha=""; release="false"
+          is_fork="false"; base_ref=""
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "${INPUT_PR:-}" ]; then
             # Fork heads are buildable ONLY down this path. Dispatch requires
@@ -185,15 +188,17 @@ jobs:
             # before it gets a write token and DISCORD_WEBHOOK_URL. The
             # pull_request trigger below still refuses to release a fork.
             info=$(gh pr view "$INPUT_PR" --repo "$GITHUB_REPOSITORY" \
-              --json number,title,state,isDraft,headRefOid,baseRefOid,headRepository,headRepositoryOwner)
+              --json number,title,state,isDraft,headRefOid,baseRefOid,baseRefName,headRepository,headRepositoryOwner)
             if [ "$(jq -r '.state' <<<"$info")" != "OPEN" ] || [ "$(jq -r '.isDraft' <<<"$info")" = "true" ]; then
               echo "::error::PR #${INPUT_PR} is not an open, non-draft PR"
               exit 1
             fi
             head_repo=$(jq -r '.headRepositoryOwner.login + "/" + .headRepository.name' <<<"$info")
             if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+              is_fork="true"
               echo "::warning::PR #${INPUT_PR} head is fork ${head_repo} — building fork code with repo secrets"
             fi
+            base_ref=$(jq -r '.baseRefName' <<<"$info")
             pr_number=$(jq -r '.number'     <<<"$info")
             pr_title=$( jq -r '.title'      <<<"$info")
             head_sha=$( jq -r '.headRefOid' <<<"$info")
@@ -204,6 +209,7 @@ jobs:
             pr_title="$EVENT_PR_TITLE"
             head_sha="$EVENT_HEAD_SHA"
             base_sha="$EVENT_BASE_SHA"
+            base_ref="$EVENT_BASE_REF"
             # Fork PRs run with a read-only token and no secrets, and drafts are
             # not ready to publish. Both still compile as a gate; a maintainer
             # releases them with /build or a dispatch.
@@ -214,23 +220,28 @@ jobs:
             fi
           fi
 
-          # Release builds take refs/pull/<n>/merge, NOT the fork head.
-          # Creating a tag at a commit whose .github/workflows tree differs from
-          # the base needs `workflows: write`, which GITHUB_TOKEN can never hold
-          # (it is not a valid `permissions:` scope) — so tagging an out-of-date
-          # fork head fails with a 403 that no amount of retrying fixes. The
-          # merge commit carries the PR's code with the BASE's workflow files, so
-          # the tag creates cleanly and the artifact still matches the tag.
+          # Release builds take the PR head so the artifact is exactly the
+          # submitted code, and refs/pull/<n>/head resolves for a fork head too.
           # Everything else leaves ref empty and checks out the triggering
-          # commit. Only release builds need tags and commit history.
+          # commit — which on a pull_request event is the merge commit, so
+          # compile-only gates still test the merge result.
+          # Only release builds need tags and commit history.
           ref=""; fetch_depth=1
           if [ "$release" = "true" ]; then
-            if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/pull/${pr_number}/merge" >/dev/null 2>&1; then
-              echo "::error::PR #${pr_number} has no merge ref — resolve its conflicts with the base branch, then re-run."
-              exit 1
-            fi
-            ref="refs/pull/${pr_number}/merge"
+            ref="refs/pull/${pr_number}/head"
             fetch_depth=0
+          fi
+
+          # Where the release TAG lands. Measured: GITHUB_TOKEN with
+          # contents:write gets 403 from both POST /git/refs and POST /releases
+          # when the target commit is not on a branch of THIS repo — a fork head
+          # and a refs/pull/<n>/merge commit both fail, dev's head succeeds. So a
+          # fork build tags the base branch instead; the exact commit built is
+          # recorded in the version string, the tag name and the release body.
+          release_target="$head_sha"
+          if [ "$release" = "true" ] && [ "$is_fork" = "true" ]; then
+            release_target="$base_ref"
+            echo "Fork build: tagging ${base_ref} — GITHUB_TOKEN cannot tag a fork commit."
           fi
 
           # Version core from the title when it names one (release PRs are
@@ -252,6 +263,8 @@ jobs:
             echo "head_sha=${head_sha}"
             echo "base_sha=${base_sha}"
             echo "release=${release}"
+            echo "is_fork=${is_fork}"
+            echo "release_target=${release_target}"
             echo "ref=${ref}"
             echo "fetch_depth=${fetch_depth}"
           } >> "$GITHUB_OUTPUT"
@@ -269,12 +282,11 @@ jobs:
           HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
         run: |
           set -euo pipefail
-          # The merge ref is recomputed whenever either side moves, so confirm
-          # its PR-side parent (HEAD^2) is still the head we resolved. Tag and
-          # artifact must agree, so fail rather than ship a mismatch.
-          actual=$(git rev-parse HEAD^2)
+          # refs/pull/<n>/head can advance between the resolve step and here.
+          # The artifact must be the commit we advertise, so fail on a mismatch.
+          actual=$(git rev-parse HEAD)
           if [ "$actual" != "$HEAD_SHA" ]; then
-            echo "::error::Merge ref's PR-side parent is ${actual} but PR head is ${HEAD_SHA}"
+            echo "::error::Checked out ${actual} but PR head is ${HEAD_SHA}"
             exit 1
           fi
 
@@ -342,7 +354,6 @@ jobs:
             echo "zip_name=MozaPlugin_pr${PR_NUMBER}_${short_sha}.zip"
             echo "commit_count=${commit_count}"
             echo "build_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            echo "merge_sha=$(git rev-parse HEAD)"
             echo "commit_list<<COMMIT_LIST_EOF"
             echo "$commit_list"
             echo "COMMIT_LIST_EOF"
@@ -398,7 +409,8 @@ jobs:
           COMMIT_LIST: ${{ steps.vars.outputs.commit_list }}
           BASE_SHA: ${{ steps.mode.outputs.base_sha }}
           HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
-          MERGE_SHA: ${{ steps.vars.outputs.merge_sha }}
+          RELEASE_TARGET: ${{ steps.mode.outputs.release_target }}
+          IS_FORK: ${{ steps.mode.outputs.is_fork }}
         run: |
           set -euo pipefail
           printf '%s\n' "$COMMIT_LIST" > commit-list.md
@@ -407,8 +419,12 @@ jobs:
             printf '**PR:** [#%s — %s](https://github.com/%s/pull/%s)\n' \
               "$PR_NUMBER" "$PR_TITLE" "$GITHUB_REPOSITORY" "$PR_NUMBER"
             printf '**Version:** `%s` (%s)\n' "$PR_VERSION" "$BUILD_TIMESTAMP"
-            printf '**Built from:** `%s` merged into the base (`%s`)\n' \
-              "${HEAD_SHA:0:7}" "${MERGE_SHA:0:7}"
+            printf '**Built from:** [`%s`](https://github.com/%s/commit/%s)\n' \
+              "${HEAD_SHA:0:7}" "$GITHUB_REPOSITORY" "$HEAD_SHA"
+            if [ "$IS_FORK" = "true" ]; then
+              printf '**Note:** this PR is from a fork, so the release tag points at `%s` rather than the fork commit — the artifact above is built from the commit linked on the previous line.\n' \
+                "$RELEASE_TARGET"
+            fi
             printf '**Commits in this PR: `%s`**\n' "$COMMIT_COUNT"
             cat commit-list.md
             printf '\n**Diff:** https://github.com/%s/compare/%s...%s\n' \
@@ -454,7 +470,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: pr-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
-          TARGET: ${{ needs.compile.outputs.merge_sha }}
+          TARGET: ${{ needs.compile.outputs.release_target }}
           # The in-app channel picker parses this exact shape — see
           # UpdateCheckService.ExtractPrVersionFromName before changing it.
           # The PR number lives in the version string and the tag.
