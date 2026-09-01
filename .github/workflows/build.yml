@@ -434,7 +434,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: compile
-    if: needs.compile.outputs.release == 'true'
+    # `changed` is skipped on every event except a PR push, and GitHub
+    # propagates that skip down the chain — so this needs the same always()
+    # anchor `compile` uses, plus an explicit success check.
+    if: >-
+      always() &&
+      needs.compile.result == 'success' &&
+      needs.compile.outputs.release == 'true'
     permissions:
       contents: write
     steps:
