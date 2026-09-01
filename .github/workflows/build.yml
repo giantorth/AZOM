@@ -135,16 +135,31 @@ jobs:
 
           skip "pushed commits touch no buildable source."
 
-  build:
+  # This job compiles the PR's own code — MSBuild can run arbitrary targets —
+  # so it never holds a write token. Releasing happens in `publish` below, which
+  # never checks out or runs PR code.
+  compile:
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
+      pull-requests: read
     needs: changed
     # `changed` is skipped for every event except a PR push — treat that as go.
     # A failed or cancelled `changed` leaves `code` empty, so it stops here.
     if: >-
       always() &&
       (needs.changed.result == 'skipped' || needs.changed.outputs.code == 'true')
+    outputs:
+      release: ${{ steps.mode.outputs.release }}
+      pr_number: ${{ steps.mode.outputs.pr_number }}
+      pr_title: ${{ steps.mode.outputs.pr_title }}
+      head_sha: ${{ steps.mode.outputs.head_sha }}
+      merge_sha: ${{ steps.vars.outputs.merge_sha }}
+      pr_version: ${{ steps.vars.outputs.pr_version }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+      zip_name: ${{ steps.vars.outputs.zip_name }}
+      commit_count: ${{ steps.vars.outputs.commit_count }}
+      build_timestamp: ${{ steps.vars.outputs.build_timestamp }}
 
     steps:
       - name: Resolve build mode
@@ -199,15 +214,22 @@ jobs:
             fi
           fi
 
-          # Release builds take the PR head: the release tag must point at a
-          # real commit and the artifact must match it, and refs/pull/<n>/head
-          # resolves for a fork head too. Everything else leaves ref empty and
-          # checks out the triggering commit — which on a pull_request event is
-          # the merge commit, so compile-only gates still test the merge result.
-          # Only release builds need tags and commit history.
+          # Release builds take refs/pull/<n>/merge, NOT the fork head.
+          # Creating a tag at a commit whose .github/workflows tree differs from
+          # the base needs `workflows: write`, which GITHUB_TOKEN can never hold
+          # (it is not a valid `permissions:` scope) — so tagging an out-of-date
+          # fork head fails with a 403 that no amount of retrying fixes. The
+          # merge commit carries the PR's code with the BASE's workflow files, so
+          # the tag creates cleanly and the artifact still matches the tag.
+          # Everything else leaves ref empty and checks out the triggering
+          # commit. Only release builds need tags and commit history.
           ref=""; fetch_depth=1
           if [ "$release" = "true" ]; then
-            ref="refs/pull/${pr_number}/head"
+            if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/pull/${pr_number}/merge" >/dev/null 2>&1; then
+              echo "::error::PR #${pr_number} has no merge ref — resolve its conflicts with the base branch, then re-run."
+              exit 1
+            fi
+            ref="refs/pull/${pr_number}/merge"
             fetch_depth=0
           fi
 
@@ -247,11 +269,12 @@ jobs:
           HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
         run: |
           set -euo pipefail
-          # refs/pull/<n>/head can advance between the resolve step and here.
-          # Tag and artifact must agree, so fail rather than ship a mismatch.
-          actual=$(git rev-parse HEAD)
+          # The merge ref is recomputed whenever either side moves, so confirm
+          # its PR-side parent (HEAD^2) is still the head we resolved. Tag and
+          # artifact must agree, so fail rather than ship a mismatch.
+          actual=$(git rev-parse HEAD^2)
           if [ "$actual" != "$HEAD_SHA" ]; then
-            echo "::error::Checked out ${actual} but PR head is ${HEAD_SHA}"
+            echo "::error::Merge ref's PR-side parent is ${actual} but PR head is ${HEAD_SHA}"
             exit 1
           fi
 
@@ -319,6 +342,7 @@ jobs:
             echo "zip_name=MozaPlugin_pr${PR_NUMBER}_${short_sha}.zip"
             echo "commit_count=${commit_count}"
             echo "build_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "merge_sha=$(git rev-parse HEAD)"
             echo "commit_list<<COMMIT_LIST_EOF"
             echo "$commit_list"
             echo "COMMIT_LIST_EOF"
@@ -359,18 +383,13 @@ jobs:
       # refuses to retry a 403 — it assumes the token is wrong. So drive the
       # API directly: retry, and log the response headers so the next failure
       # leaves x-github-request-id behind instead of just "403".
-      - name: Publish PR pre-release
+      # Rendered here because this is the job with the checkout and git
+      # history. Multi-line content travels in the artifact rather than a job
+      # output, and the publish job never touches PR code.
+      - name: Render release notes
         if: steps.mode.outputs.release == 'true'
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: pr-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
-          TARGET: ${{ steps.mode.outputs.head_sha }}
-          # The in-app channel picker parses this exact shape — see
-          # UpdateCheckService.ExtractPrVersionFromName before changing it.
-          # The PR number lives in the version string and the tag.
-          RELEASE_NAME: "${{ steps.mode.outputs.pr_title }} (${{ steps.vars.outputs.pr_version }})"
-          ZIP_NAME: ${{ steps.vars.outputs.zip_name }}
           PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
           PR_TITLE: ${{ steps.mode.outputs.pr_title }}
           PR_VERSION: ${{ steps.vars.outputs.pr_version }}
@@ -379,54 +398,92 @@ jobs:
           COMMIT_LIST: ${{ steps.vars.outputs.commit_list }}
           BASE_SHA: ${{ steps.mode.outputs.base_sha }}
           HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
+          MERGE_SHA: ${{ steps.vars.outputs.merge_sha }}
         run: |
           set -euo pipefail
-          if [ ! -f "$ZIP_NAME" ]; then
-            echo "::error::asset ${ZIP_NAME} was not produced"
-            exit 1
-          fi
-
-          notes=$(mktemp)
+          printf '%s\n' "$COMMIT_LIST" > commit-list.md
           {
             printf '**Pre-release PR build — expect possible bugs.**\n\n'
             printf '**PR:** [#%s — %s](https://github.com/%s/pull/%s)\n' \
               "$PR_NUMBER" "$PR_TITLE" "$GITHUB_REPOSITORY" "$PR_NUMBER"
             printf '**Version:** `%s` (%s)\n' "$PR_VERSION" "$BUILD_TIMESTAMP"
+            printf '**Built from:** `%s` merged into the base (`%s`)\n' \
+              "${HEAD_SHA:0:7}" "${MERGE_SHA:0:7}"
             printf '**Commits in this PR: `%s`**\n' "$COMMIT_COUNT"
-            printf '%s\n\n' "$COMMIT_LIST"
-            printf '**Diff:** https://github.com/%s/compare/%s...%s\n' \
+            cat commit-list.md
+            printf '\n**Diff:** https://github.com/%s/compare/%s...%s\n' \
               "$GITHUB_REPOSITORY" "$BASE_SHA" "$HEAD_SHA"
-          } > "$notes"
+          } > release-notes.md
+
+      - name: Upload release payload
+        if: steps.mode.outputs.release == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-release-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
+          path: |
+            ${{ steps.vars.outputs.zip_name }}
+            release-notes.md
+            commit-list.md
+          retention-days: 1
+          if-no-files-found: error
+
+  # Holds the write token, so it must never check out or execute PR code — it
+  # only downloads the artifact `compile` produced. Needs `contents: write`
+  # alone: the tag lands on the merge commit, whose .github/workflows tree
+  # matches the base, so no `workflows` scope is involved.
+  publish:
+    runs-on: ubuntu-latest
+    needs: compile
+    if: needs.compile.outputs.release == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Download release payload
+        uses: actions/download-artifact@v8
+        with:
+          name: pr-release-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
+
+      - name: Publish PR pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: pr-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
+          TARGET: ${{ needs.compile.outputs.merge_sha }}
+          # The in-app channel picker parses this exact shape — see
+          # UpdateCheckService.ExtractPrVersionFromName before changing it.
+          # The PR number lives in the version string and the tag.
+          RELEASE_NAME: "${{ needs.compile.outputs.pr_title }} (${{ needs.compile.outputs.pr_version }})"
+          ZIP_NAME: ${{ needs.compile.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+          for f in "$ZIP_NAME" release-notes.md; do
+            [ -f "$f" ] || { echo "::error::${f} missing from the compile artifact"; exit 1; }
+          done
 
           # make_latest is a string enum on the REST API, not a boolean.
           payload=$(jq -n \
             --arg tag_name "$TAG" \
             --arg target   "$TARGET" \
             --arg name     "$RELEASE_NAME" \
-            --rawfile body "$notes" \
+            --rawfile body release-notes.md \
             '{tag_name: $tag_name, target_commitish: $target, name: $name,
               body: $body, prerelease: true, make_latest: "false"}')
 
-          # `gh api -i` puts the status line and headers on stdout for both the
-          # 2xx and the 4xx path, which is the whole point of using it here.
+          # `gh api -i` keeps the status line and headers on stdout for the 4xx
+          # path too, so a failure leaves x-github-request-id behind.
           created=false
           for attempt in 1 2 3; do
             if resp=$(printf '%s' "$payload" \
                 | gh api -i -X POST "repos/${GITHUB_REPOSITORY}/releases" --input - 2>&1); then
               created=true
-              printf '%s\n' "$resp" | grep -iE '^(HTTP/|x-github-request-id:)' || true
-              echo "Created release ${TAG} on attempt ${attempt}."
+              echo "Created release ${TAG} at ${TARGET} on attempt ${attempt}."
               break
             fi
 
             echo "::warning::Release create attempt ${attempt}/3 failed for ${TAG}"
             printf '%s\n' "$resp" \
-              | grep -iE '^(HTTP/|status:|x-github-request-id:|x-accepted-github-permissions:|x-ratelimit-remaining:)' || true
+              | grep -iE '^(HTTP/|x-github-request-id:|x-accepted-github-permissions:|x-ratelimit-remaining:)' || true
             printf '%s\n' "$resp" | grep -o '"message":"[^"]*"' | head -n 1 || true
-            # Did the token really lose contents:write, or is the endpoint
-            # rejecting a call it should accept? push=false means the former.
-            gh api "repos/${GITHUB_REPOSITORY}" \
-              --jq '"token repo access: pull=\(.permissions.pull) push=\(.permissions.push) admin=\(.permissions.admin)"' || true
 
             # A partial success on an earlier attempt leaves the release behind;
             # fall through to the upload rather than fighting over the tag.
@@ -461,20 +518,20 @@ jobs:
           exit 1
 
       - name: Notify Discord
-        if: success() && steps.mode.outputs.release == 'true'
+        if: success()
         continue-on-error: true
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
-          PR_TITLE: ${{ steps.mode.outputs.pr_title }}
-          SHORT_SHA: ${{ steps.vars.outputs.short_sha }}
-          PR_VERSION: ${{ steps.vars.outputs.pr_version }}
-          COMMIT_COUNT: ${{ steps.vars.outputs.commit_count }}
-          COMMIT_LIST: ${{ steps.vars.outputs.commit_list }}
-          BUILT: ${{ steps.vars.outputs.build_timestamp }}
+          PR_NUMBER: ${{ needs.compile.outputs.pr_number }}
+          PR_TITLE: ${{ needs.compile.outputs.pr_title }}
+          SHORT_SHA: ${{ needs.compile.outputs.short_sha }}
+          PR_VERSION: ${{ needs.compile.outputs.pr_version }}
+          COMMIT_COUNT: ${{ needs.compile.outputs.commit_count }}
+          BUILT: ${{ needs.compile.outputs.build_timestamp }}
         shell: bash
         run: |
           set -euo pipefail
+          COMMIT_LIST=$(cat commit-list.md)
           if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
             echo "DISCORD_WEBHOOK_URL not set; skipping notification."
             exit 0
@@ -531,10 +588,9 @@ jobs:
           rm -f "$response_file" "$payload_file"
 
       - name: Prune old builds for this PR
-        if: steps.mode.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
+          PR_NUMBER: ${{ needs.compile.outputs.pr_number }}
         shell: bash
         run: |
           set -euo pipefail
