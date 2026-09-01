@@ -757,4 +757,13 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Крутящий момент</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Масштаб</value></data>
+  <data name="Option_Ab9LayoutUnknown01" xml:space="preserve"><value>Неизвестно (0x01)</value></data>
+  <data name="Option_Ab9LayoutUnknown02" xml:space="preserve"><value>Неизвестно (0x02)</value></data>
+  <data name="Option_Ab9LayoutUnknown03" xml:space="preserve"><value>Неизвестно (0x03)</value></data>
+  <data name="Option_Ab9LayoutUnknown08" xml:space="preserve"><value>Неизвестно (0x08)</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>ОПРОС СОСТОЯНИЯ</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Опрос в реальном времени</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Обратное чтение раскладки</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Состояние</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Ошибка состояния</value></data>
 </root>

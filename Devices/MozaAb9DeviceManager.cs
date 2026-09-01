@@ -13,10 +13,17 @@ namespace MozaPlugin.Devices
     public enum Ab9Mode : byte
     {
         FivePlusR_L1 = 0x00,
+        // Never observed from PitHouse — the capture only exercised the six named
+        // layouts, leaving 0x01..0x03 and 0x08 unexplained. Selectable so the gaps
+        // can be tried on hardware; the doc guesses 5+R Layout 2 and friends.
+        Unknown01 = 0x01,
+        Unknown02 = 0x02,
+        Unknown03 = 0x03,
         SixPlusR_L1  = 0x04,
         SixPlusR_L2  = 0x05,
         SevenPlusR_L1 = 0x06,
         SevenPlusR_L2 = 0x07,
+        Unknown08 = 0x08,
         Sequential   = 0x09,
     }
 
@@ -291,6 +298,43 @@ namespace MozaPlugin.Devices
             frame[4] = cmdId;
             frame[5] = MozaProtocol.CalculateWireChecksum(frame, 5);
             _connection.Send(frame);
+        }
+
+        // Status registers asked in both candidate forms. The 0x2B names build
+        // their own read frames (7E 03 2B 12 <cmd> 00 00, the base's shape); the
+        // 0x1E ones go out through SendAb9Read's 1-byte form and exist in the
+        // command DB only so the replies parse.
+        private static readonly string[] StatusProbeGroup2b =
+        {
+            "ab9-2b-state", "ab9-2b-state-err", "ab9-2b-mcu-temp",
+            "ab9-2b-mosfet-temp", "ab9-2b-motor-temp", "ab9-2b-live-torque",
+        };
+        private static readonly byte[] StatusProbeGroup1eCmds = { 0x01, 0x02, 0x04, 0x05, 0x06, 0x07 };
+
+        /// <summary>
+        /// Ask the AB9's main for the wheelbase status registers (state, MCU /
+        /// MOSFET / motor temperature, live torque) on both candidate transports,
+        /// plus a layout read-back. 13 one-shot frames, paced 4 ms apart by the
+        /// FIFO. Diagnostic only — nothing here configures the device.
+        /// </summary>
+        public void RequestStatusProbe()
+        {
+            if (!_connection.IsConnected) return;
+            foreach (var name in StatusProbeGroup2b)
+                SendAb9StatusRead(name);
+            foreach (var cmdId in StatusProbeGroup1eCmds)
+                SendAb9Read(cmdId);
+            SendAb9Read(0xD3); // layout read-back — did the device keep what we wrote?
+        }
+
+        private bool SendAb9StatusRead(string commandName)
+        {
+            var cmd = MozaCommandDatabase.Get(commandName);
+            if (cmd == null) return false;
+            var msg = cmd.BuildReadMessage(MozaProtocol.DeviceAb9);
+            if (msg == null) return false;
+            _connection.Send(msg);
+            return true;
         }
 
         private bool WriteSliderRaw(string commandName, byte value)

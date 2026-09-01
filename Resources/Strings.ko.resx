@@ -756,4 +756,13 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>토크</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>토크</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>범위</value></data>
+  <data name="Option_Ab9LayoutUnknown01" xml:space="preserve"><value>알 수 없음 (0x01)</value></data>
+  <data name="Option_Ab9LayoutUnknown02" xml:space="preserve"><value>알 수 없음 (0x02)</value></data>
+  <data name="Option_Ab9LayoutUnknown03" xml:space="preserve"><value>알 수 없음 (0x03)</value></data>
+  <data name="Option_Ab9LayoutUnknown08" xml:space="preserve"><value>알 수 없음 (0x08)</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>상태 조회</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>실시간 조회</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>레이아웃 되읽기</value></data>
+  <data name="Label_State" xml:space="preserve"><value>상태</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>상태 오류</value></data>
 </root>

@@ -2800,10 +2800,17 @@
                                 <ComboBox x:Name="Ab9ModeCombo" Margin="0,4" HorizontalAlignment="Stretch"
                                           SelectionChanged="Ab9ModeCombo_Changed">
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout5R1}" Tag="0"/>
+                                    <!-- 0x01..0x03 and 0x08 were never seen in a PitHouse
+                                         capture; selectable so the gaps can be tried on
+                                         hardware. docs/protocol/devices/ab9-shifter.md -->
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown01}" Tag="1"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown02}" Tag="2"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown03}" Tag="3"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout6R1}" Tag="4"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout6R2}" Tag="5"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R1}" Tag="6"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R2}" Tag="7"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown08}" Tag="8"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Sequential}"   Tag="9"/>
                                 </ComboBox>
                             </ctrl:SectionCard>
@@ -2961,6 +2968,98 @@
                         </StackPanel>
 
                         </Grid>
+
+                        <!-- Does the AB9's main answer the wheelbase's read-only status
+                             registers? Both candidate transports are asked side by side:
+                             the base's group 0x2B retargeted at dev 0x12, and the AB9's
+                             own group 0x1E. Column headers are register identifiers, not
+                             prose. Temperatures print both candidate scalings because the
+                             shipped ConvertTemp divides by 100 while the protocol notes
+                             say x0.1 — see docs/protocol/periodic/group-0x2B.md. -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Ab9StatusProbe}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button x:Name="Ab9StatusProbeButton" Margin="0,0,14,0"
+                                            Content="{x:Static res:Strings.Button_ReadFromDevice}"
+                                            Click="Ab9StatusProbeButton_Click"/>
+                                    <TextBlock Text="{x:Static res:Strings.Label_Ab9PollLive}"
+                                               Style="{StaticResource LabelText}" Margin="0,0,8,0"/>
+                                    <ctrl:OffOnToggle x:Name="Ab9StatusPollCheck" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="grp 0x2B"
+                                               Style="{StaticResource SliderRangeEndLabel}" Margin="9,0,0,4"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="grp 0x1E"
+                                               Style="{StaticResource SliderRangeEndLabel}" Margin="9,0,0,4"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_State}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="Ab9State2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="2" x:Name="Ab9State1eValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_StateError}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="Ab9StateErr2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="2" x:Name="Ab9StateErr1eValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Brand_Mcu}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="Ab9Mcu2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="2" x:Name="Ab9Mcu1eValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Brand_Mosfet}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" x:Name="Ab9Mosfet2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="2" x:Name="Ab9Mosfet1eValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Brand_Motor}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="1" x:Name="Ab9Motor2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                    <TextBlock Grid.Row="5" Grid.Column="2" x:Name="Ab9Motor1eValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_Torque}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="6" Grid.Column="1" x:Name="Ab9Torque2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                    <TextBlock Grid.Row="6" Grid.Column="2" x:Name="Ab9Torque1eValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <TextBlock Text="{x:Static res:Strings.Label_Ab9LayoutReadback}"
+                                               Style="{StaticResource LabelText}" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="Ab9ModeReadbackValue" Style="{StaticResource ValueText}"
+                                               TextAlignment="Left" Text="—"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
 
                     </StackPanel>
                 </ScrollViewer>

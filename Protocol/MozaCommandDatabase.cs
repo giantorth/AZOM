@@ -560,6 +560,28 @@ namespace MozaPlugin.Protocol
             AddCommand("ab9-status-d4-read",       "ab9", 0x1E, 0xFF, new byte[] { 0xD4 }, 2, "int");
             AddCommand("ab9-status-5d-read",       "ab9", 0x1E, 0xFF, new byte[] { 0x5D }, 2, "int");
 
+            // Status-register probe: does the AB9's own main answer the wheelbase's
+            // read-only status registers (state / temps / live torque)? Two candidate
+            // transports, asked side by side — the base's group 0x2B retargeted at dev
+            // 0x12, and the AB9's own group 0x1E. Registers per
+            // docs/protocol/devices/wheelbase-0x13.md § Group 0x2B: 01 state,
+            // 02 state-err, 04 mcu-temp, 05 mosfet-temp, 06 motor-temp, 07 live-torque.
+            // Only the 0x2B entries build read frames (7E 03 2B 12 <cmd> 00 00 —
+            // identical to base-mcu-temp's); the 0x1E entries are parse-only, since
+            // that group's read form is 1-byte and hand-rolled by SendAb9Read.
+            AddCommand("ab9-2b-state",             "ab9", 0x2B, 0xFF, new byte[] { 1 }, 2, "int");
+            AddCommand("ab9-2b-state-err",         "ab9", 0x2B, 0xFF, new byte[] { 2 }, 2, "int");
+            AddCommand("ab9-2b-mcu-temp",          "ab9", 0x2B, 0xFF, new byte[] { 4 }, 2, "int");
+            AddCommand("ab9-2b-mosfet-temp",       "ab9", 0x2B, 0xFF, new byte[] { 5 }, 2, "int");
+            AddCommand("ab9-2b-motor-temp",        "ab9", 0x2B, 0xFF, new byte[] { 6 }, 2, "int");
+            AddCommand("ab9-2b-live-torque",       "ab9", 0x2B, 0xFF, new byte[] { 7 }, 2, "int");
+            AddCommand("ab9-1e-state",             "ab9", 0x1E, 0xFF, new byte[] { 0x01 }, 2, "int");
+            AddCommand("ab9-1e-state-err",         "ab9", 0x1E, 0xFF, new byte[] { 0x02 }, 2, "int");
+            AddCommand("ab9-1e-mcu-temp",          "ab9", 0x1E, 0xFF, new byte[] { 0x04 }, 2, "int");
+            AddCommand("ab9-1e-mosfet-temp",       "ab9", 0x1E, 0xFF, new byte[] { 0x05 }, 2, "int");
+            AddCommand("ab9-1e-motor-temp",        "ab9", 0x1E, 0xFF, new byte[] { 0x06 }, 2, "int");
+            AddCommand("ab9-1e-live-torque",       "ab9", 0x1E, 0xFF, new byte[] { 0x07 }, 2, "int");
+
             // Identity-probe responses. Empty CommandId = wildcard; the response
             // group alone disambiguates. Requires busHint="ab9" so dev 0x12 collisions
             // with the wheelbase main don't match base-* first.

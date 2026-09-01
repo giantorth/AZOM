@@ -757,4 +757,13 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Mô-men xoắn</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Mô-men xoắn</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Tỷ lệ</value></data>
+  <data name="Option_Ab9LayoutUnknown01" xml:space="preserve"><value>Không xác định (0x01)</value></data>
+  <data name="Option_Ab9LayoutUnknown02" xml:space="preserve"><value>Không xác định (0x02)</value></data>
+  <data name="Option_Ab9LayoutUnknown03" xml:space="preserve"><value>Không xác định (0x03)</value></data>
+  <data name="Option_Ab9LayoutUnknown08" xml:space="preserve"><value>Không xác định (0x08)</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>DÒ TRẠNG THÁI</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Dò trực tiếp</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Đọc lại bố cục</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Trạng thái</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Lỗi trạng thái</value></data>
 </root>

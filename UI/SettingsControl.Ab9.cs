@@ -91,7 +91,78 @@ namespace MozaPlugin.UI
                 Ab9GearShiftDebounceSlider.Value = ab9DbMs;
                 Ab9GearShiftDebounceValue.Text = $"{ab9DbMs} ms";
             }
+
+            RefreshAb9StatusProbe();
         }
+
+        // ===== AB9 status probe (diagnostic) =====
+
+        // Environment.TickCount of the last polled probe; the panel refresh runs at
+        // 500 ms and the probe is 13 frames, so it is throttled to ~1 Hz.
+        private int _ab9ProbeLastTickMs;
+        private const int Ab9ProbeIntervalMs = 1000;
+
+        private void Ab9StatusProbeButton_Click(object sender, RoutedEventArgs e)
+        {
+            _plugin?.Ab9Manager?.RequestStatusProbe();
+            _ab9ProbeLastTickMs = Environment.TickCount;
+        }
+
+        // Renders the last probe result and, while the toggle is on, re-issues the
+        // reads. Called from RefreshAb9Tab, so it only runs with the panel open and
+        // the AB9 tab present. Send() just enqueues on the write lane — no blocking
+        // work lands on the dispatcher.
+        private void RefreshAb9StatusProbe()
+        {
+            var data = _data;
+            if (data == null) return;
+
+            if (Ab9StatusPollCheck.IsChecked == true)
+            {
+                int now = Environment.TickCount;
+                if (unchecked(now - _ab9ProbeLastTickMs) >= Ab9ProbeIntervalMs)
+                {
+                    _ab9ProbeLastTickMs = now;
+                    _plugin?.Ab9Manager?.RequestStatusProbe();
+                }
+            }
+
+            Ab9State2bValue.Text     = FormatAb9Raw(data.Ab9State2b);
+            Ab9State1eValue.Text     = FormatAb9Raw(data.Ab9State1e);
+            Ab9StateErr2bValue.Text  = FormatAb9Raw(data.Ab9StateErr2b);
+            Ab9StateErr1eValue.Text  = FormatAb9Raw(data.Ab9StateErr1e);
+            Ab9Mcu2bValue.Text       = FormatAb9Temp(data.Ab9McuTemp2b);
+            Ab9Mcu1eValue.Text       = FormatAb9Temp(data.Ab9McuTemp1e);
+            Ab9Mosfet2bValue.Text    = FormatAb9Temp(data.Ab9MosfetTemp2b);
+            Ab9Mosfet1eValue.Text    = FormatAb9Temp(data.Ab9MosfetTemp1e);
+            Ab9Motor2bValue.Text     = FormatAb9Temp(data.Ab9MotorTemp2b);
+            Ab9Motor1eValue.Text     = FormatAb9Temp(data.Ab9MotorTemp1e);
+            Ab9Torque2bValue.Text    = FormatAb9Torque(data.Ab9LiveTorque2b);
+            Ab9Torque1eValue.Text    = FormatAb9Torque(data.Ab9LiveTorque1e);
+
+            int mode = data.Ab9ModeReadback;
+            Ab9ModeReadbackValue.Text = mode == MozaData.NoAb9Reading
+                ? "—" : $"0x{mode:X2} ({mode})";
+        }
+
+        // Em dash = the register never answered, which is the probe's whole point,
+        // so no reading can be confused with "absent".
+        private static string FormatAb9Raw(int raw)
+            => raw == MozaData.NoAb9Reading ? "—" : $"{raw} (0x{raw:X4})";
+
+        // Both candidate scalings: the plugin's ConvertTemp uses raw/100, the
+        // protocol notes say raw*0.1. Which one the AB9 (if any) speaks is exactly
+        // what this probe has to establish, so neither is picked here.
+        private static string FormatAb9Temp(int raw)
+            => raw == MozaData.NoAb9Reading
+                ? "—"
+                : $"{raw} (0x{raw:X4}) · {raw / 100.0:F1} / {raw / 10.0:F1} °C";
+
+        private static string FormatAb9Torque(int raw)
+            => raw == MozaData.NoAb9Reading
+                ? "—"
+                : $"{raw} (0x{raw:X4}) · " +
+                  $"{Math.Abs(raw - MozaData.LiveTorqueZeroBias) / 10.0:F1} Nm";
 
         private void SetAb9Slider(Slider slider, TextBox value, byte v)
         {
