@@ -16,7 +16,8 @@ name: Build
 on:
   # `paths:` scopes a push to the commits actually pushed, but scopes a
   # pull_request to the PR's whole diff — the `changed` job below narrows that
-  # back to the pushed range. Keep both lists in sync with changed-code.yml.
+  # back to the pushed range. Keep both lists in sync with the `case` in the
+  # `changed` job below.
   push:
     branches: [main, dev]
     paths:
@@ -59,13 +60,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Narrowing a PR's cumulative diff to the pushed range only changes the answer
-  # for `synchronize`. Every other event makes changed-code.yml return `true`
-  # unconditionally (see its first guard), so calling it there burned a runner
-  # to echo a constant. `push` already gets a range-scoped `paths:` for free.
+  # A `paths:` filter on `pull_request` matches the PR's *cumulative* diff, not
+  # the commits just pushed — so once a PR touches source, every later push
+  # (a README tweak, a changelog line) re-fires the build. This narrows the
+  # question to github.event.before..after. It fails open: anything it cannot
+  # determine reports `true`, so a real code change is never silently dropped.
+  #
+  # Only `synchronize` needs narrowing — every other event short-circuits to
+  # `true` in the first guard below, and `push` already gets a range-scoped
+  # `paths:` for free. Hence the `if:`, which keeps the runner from spinning up
+  # just to echo a constant.
   changed:
     if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
-    uses: ./.github/workflows/changed-code.yml
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - name: Detect source changes in the pushed range
+        id: detect
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+
+          build() { echo "code=true"  >> "$GITHUB_OUTPUT"; echo "BUILD: $1"; exit 0; }
+          skip()  { echo "code=false" >> "$GITHUB_OUTPUT"; echo "SKIP: $1";  exit 0; }
+
+          # Only a push to an existing PR needs narrowing. opened / reopened /
+          # ready_for_review are already gated by this workflow's `paths:` filter,
+          # and the whole-PR diff is the right question for those. `push` gets
+          # a range-scoped `paths:` filter for free, and workflow_dispatch is a
+          # deliberate manual build.
+          if [ "$EVENT_NAME" != "pull_request" ] || [ "$ACTION" != "synchronize" ]; then
+            build "event ${EVENT_NAME}/${ACTION:-none} is not a PR push."
+          fi
+
+          empty=0000000000000000000000000000000000000000
+          if [ -z "$BEFORE" ] || [ -z "$AFTER" ] || [ "$BEFORE" = "$empty" ]; then
+            build "no usable range (before=${BEFORE:-unset} after=${AFTER:-unset})."
+          fi
+
+          if ! resp=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${AFTER}"); then
+            build "compare ${BEFORE}...${AFTER} failed — force-push, or a fork commit the base repo cannot reach."
+          fi
+
+          # The compare endpoint caps its file list at 300. A push that large is
+          # not a docs tweak, so treat a truncated list as a code change.
+          if [ "$(jq -r '.files | length' <<<"$resp")" -ge 300 ]; then
+            build "compare file list truncated at 300 entries."
+          fi
+
+          # previous_filename catches renames out of a source extension
+          # (Foo.cs -> Foo.cs.bak), which .filename alone would miss.
+          files=$(jq -r '.files[]? | .filename, (.previous_filename // empty)' <<<"$resp")
+          echo "Files changed in ${BEFORE:0:7}..${AFTER:0:7}:"
+          printf '%s\n' "${files:-  (none)}" | sed 's/^/  /'
+
+          # Mirrors the two `paths:` filters above — all three lists must
+          # stay in sync.
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            case "$f" in
+              *.cs|*.csproj|*.sln|*.xaml|*.resx|libs/*|DeviceTemplates/*|Resources/*|Data/*|Themes/*)
+                build "source changed: ${f}" ;;
+            esac
+          done <<<"$files"
+
+          skip "pushed commits touch no buildable source."
 
   build:
     runs-on: windows-latest
@@ -285,29 +353,112 @@ jobs:
           # deployment, no satellite-folder bundling needed. See release.yml.
           Compress-Archive -Path ./staging/* -DestinationPath ./$env:ZIP_NAME
 
+      # Was softprops/action-gh-release@v3. GitHub has intermittently 403'd
+      # POST /releases here with `Contents: write` on the token (same workflow
+      # blob and action SHA as runs that passed minutes later), and the action
+      # refuses to retry a 403 — it assumes the token is wrong. So drive the
+      # API directly: retry, and log the response headers so the next failure
+      # leaves x-github-request-id behind instead of just "403".
       - name: Publish PR pre-release
         if: steps.mode.outputs.release == 'true'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: pr-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
-          target_commitish: ${{ steps.mode.outputs.head_sha }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: pr-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
+          TARGET: ${{ steps.mode.outputs.head_sha }}
           # The in-app channel picker parses this exact shape — see
           # UpdateCheckService.ExtractPrVersionFromName before changing it.
           # The PR number lives in the version string and the tag.
-          name: "${{ steps.mode.outputs.pr_title }} (${{ steps.vars.outputs.pr_version }})"
-          prerelease: true
-          make_latest: false
-          fail_on_unmatched_files: true
-          files: ${{ steps.vars.outputs.zip_name }}
-          body: |
-            **Pre-release PR build — expect possible bugs.**
+          RELEASE_NAME: "${{ steps.mode.outputs.pr_title }} (${{ steps.vars.outputs.pr_version }})"
+          ZIP_NAME: ${{ steps.vars.outputs.zip_name }}
+          PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
+          PR_TITLE: ${{ steps.mode.outputs.pr_title }}
+          PR_VERSION: ${{ steps.vars.outputs.pr_version }}
+          BUILD_TIMESTAMP: ${{ steps.vars.outputs.build_timestamp }}
+          COMMIT_COUNT: ${{ steps.vars.outputs.commit_count }}
+          COMMIT_LIST: ${{ steps.vars.outputs.commit_list }}
+          BASE_SHA: ${{ steps.mode.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$ZIP_NAME" ]; then
+            echo "::error::asset ${ZIP_NAME} was not produced"
+            exit 1
+          fi
 
-            **PR:** [#${{ steps.mode.outputs.pr_number }} — ${{ steps.mode.outputs.pr_title }}](https://github.com/${{ github.repository }}/pull/${{ steps.mode.outputs.pr_number }})
-            **Version:** `${{ steps.vars.outputs.pr_version }}` (${{ steps.vars.outputs.build_timestamp }})
-            **Commits in this PR: `${{ steps.vars.outputs.commit_count }}`**
-            ${{ steps.vars.outputs.commit_list }}
+          notes=$(mktemp)
+          {
+            printf '**Pre-release PR build — expect possible bugs.**\n\n'
+            printf '**PR:** [#%s — %s](https://github.com/%s/pull/%s)\n' \
+              "$PR_NUMBER" "$PR_TITLE" "$GITHUB_REPOSITORY" "$PR_NUMBER"
+            printf '**Version:** `%s` (%s)\n' "$PR_VERSION" "$BUILD_TIMESTAMP"
+            printf '**Commits in this PR: `%s`**\n' "$COMMIT_COUNT"
+            printf '%s\n\n' "$COMMIT_LIST"
+            printf '**Diff:** https://github.com/%s/compare/%s...%s\n' \
+              "$GITHUB_REPOSITORY" "$BASE_SHA" "$HEAD_SHA"
+          } > "$notes"
 
-            **Diff:** https://github.com/${{ github.repository }}/compare/${{ steps.mode.outputs.base_sha }}...${{ steps.mode.outputs.head_sha }}
+          # make_latest is a string enum on the REST API, not a boolean.
+          payload=$(jq -n \
+            --arg tag_name "$TAG" \
+            --arg target   "$TARGET" \
+            --arg name     "$RELEASE_NAME" \
+            --rawfile body "$notes" \
+            '{tag_name: $tag_name, target_commitish: $target, name: $name,
+              body: $body, prerelease: true, make_latest: "false"}')
+
+          # `gh api -i` puts the status line and headers on stdout for both the
+          # 2xx and the 4xx path, which is the whole point of using it here.
+          created=false
+          for attempt in 1 2 3; do
+            if resp=$(printf '%s' "$payload" \
+                | gh api -i -X POST "repos/${GITHUB_REPOSITORY}/releases" --input - 2>&1); then
+              created=true
+              printf '%s\n' "$resp" | grep -iE '^(HTTP/|x-github-request-id:)' || true
+              echo "Created release ${TAG} on attempt ${attempt}."
+              break
+            fi
+
+            echo "::warning::Release create attempt ${attempt}/3 failed for ${TAG}"
+            printf '%s\n' "$resp" \
+              | grep -iE '^(HTTP/|status:|x-github-request-id:|x-accepted-github-permissions:|x-ratelimit-remaining:)' || true
+            printf '%s\n' "$resp" | grep -o '"message":"[^"]*"' | head -n 1 || true
+            # Did the token really lose contents:write, or is the endpoint
+            # rejecting a call it should accept? push=false means the former.
+            gh api "repos/${GITHUB_REPOSITORY}" \
+              --jq '"token repo access: pull=\(.permissions.pull) push=\(.permissions.push) admin=\(.permissions.admin)"' || true
+
+            # A partial success on an earlier attempt leaves the release behind;
+            # fall through to the upload rather than fighting over the tag.
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release ${TAG} already exists — reusing it."
+              created=true
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 20))
+            fi
+          done
+
+          if [ "$created" != "true" ]; then
+            echo "::error::Could not create release ${TAG} after 3 attempts"
+            exit 1
+          fi
+
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" "$ZIP_NAME" \
+                 --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Uploaded ${ZIP_NAME} to ${TAG} on attempt ${attempt}."
+              exit 0
+            fi
+            echo "::warning::Asset upload attempt ${attempt}/3 failed for ${TAG}"
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 20))
+            fi
+          done
+          echo "::error::Could not upload ${ZIP_NAME} to ${TAG} after 3 attempts"
+          exit 1
 
       - name: Notify Discord
         if: success() && steps.mode.outputs.release == 'true'

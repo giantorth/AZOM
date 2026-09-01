@@ -101,7 +101,7 @@ several of them **fail silently at runtime rather than at build time**:
 | `UI/Controls/` namespace | Stays `MozaControls`, not `MozaPlugin.UI.Controls` — five XAML files hard-code `xmlns:ctrl="clr-namespace:MozaControls"`. |
 | `Resources/Strings*.resx` | 13 `<EmbeddedResource Update="…">` entries with explicit `ManifestResourceName`. MSBuild does **not** error on a non-matching `Update`; the resx silently gets a default manifest name and `Strings.Designer.cs` fails at runtime. |
 | `CoapStub/`, `tools/` | Pinned by `<DefaultItemExcludes>`. Move either and its `.cs` files get swept into the net48 compile — `tools/simhub-compat` is net9.0 and breaks the build. |
-| `libs/`, `DeviceTemplates/`, `Resources/`, `Data/`, `Themes/` | Named literally in the CI `paths:` filters, which are duplicated in **four** places: `build.yml` (×2), `pr-build.yml`, and a shell `case` in `changed-code.yml`. Keep all four in sync or pushes stop triggering builds. |
+| `libs/`, `DeviceTemplates/`, `Resources/`, `Data/`, `Themes/` | Named literally in the CI `paths:` filters, which are duplicated in **three** places, all in `build.yml`: the `push` and `pull_request` filters, and the shell `case` in the `changed` job. Keep all three in sync or pushes stop triggering builds. |
 | `MozaData.cs` | Stays at the repo root in `namespace MozaPlugin`. 110 files read it, and since every sub-namespace is a child of `MozaPlugin` they resolve it with no `using` at all. |
 
 `obj/` caches a BAML tree, so an **incremental build silently misses a broken XAML type
