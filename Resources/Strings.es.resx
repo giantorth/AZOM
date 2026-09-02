@@ -124,6 +124,11 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>Disposición 7+R 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>Disposición 7+R 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Secuencial</value></data>
+  <data name="Option_Ab9LayoutUnknown0A" xml:space="preserve"><value>Desconocido (0x0A)</value></data>
+  <data name="Option_Ab9LayoutUnknown0B" xml:space="preserve"><value>Desconocido (0x0B)</value></data>
+  <data name="Option_Ab9LayoutUnknown0C" xml:space="preserve"><value>Desconocido (0x0C)</value></data>
+  <data name="Option_Ab9LayoutUnknown0D" xml:space="preserve"><value>Desconocido (0x0D)</value></data>
+  <data name="Option_Ab9LayoutUnknown0E" xml:space="preserve"><value>Desconocido (0x0E)</value></data>
   <data name="Option_HPattern" xml:space="preserve"><value>Patrón en H</value></data>
   <data name="Label_ShifterType" xml:space="preserve"><value>Tipo de palanca de cambios</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>TACTO</value></data>
@@ -762,10 +767,10 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Par</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Par</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Escala</value></data>
-  <data name="Option_Ab9LayoutUnknown01" xml:space="preserve"><value>Desconocido (0x01)</value></data>
-  <data name="Option_Ab9LayoutUnknown02" xml:space="preserve"><value>Desconocido (0x02)</value></data>
-  <data name="Option_Ab9LayoutUnknown03" xml:space="preserve"><value>Desconocido (0x03)</value></data>
-  <data name="Option_Ab9LayoutUnknown08" xml:space="preserve"><value>Desconocido (0x08)</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Disposición 5+R 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Disposición R+5</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Disposición R+6</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>Disposición R+8</value></data>
   <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>SONDEO DE ESTADO</value></data>
   <data name="Label_Ab9PollLive" xml:space="preserve"><value>Sondeo en vivo</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Relectura de disposición</value></data>

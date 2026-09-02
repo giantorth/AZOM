@@ -128,17 +128,8 @@ namespace MozaPlugin.UI
             }
 
             Ab9State2bValue.Text     = FormatAb9Raw(data.Ab9State2b);
-            Ab9State1eValue.Text     = FormatAb9Raw(data.Ab9State1e);
             Ab9StateErr2bValue.Text  = FormatAb9Raw(data.Ab9StateErr2b);
-            Ab9StateErr1eValue.Text  = FormatAb9Raw(data.Ab9StateErr1e);
             Ab9Mcu2bValue.Text       = FormatAb9Temp(data.Ab9McuTemp2b);
-            Ab9Mcu1eValue.Text       = FormatAb9Temp(data.Ab9McuTemp1e);
-            Ab9Mosfet2bValue.Text    = FormatAb9Temp(data.Ab9MosfetTemp2b);
-            Ab9Mosfet1eValue.Text    = FormatAb9Temp(data.Ab9MosfetTemp1e);
-            Ab9Motor2bValue.Text     = FormatAb9Temp(data.Ab9MotorTemp2b);
-            Ab9Motor1eValue.Text     = FormatAb9Temp(data.Ab9MotorTemp1e);
-            Ab9Torque2bValue.Text    = FormatAb9Torque(data.Ab9LiveTorque2b);
-            Ab9Torque1eValue.Text    = FormatAb9Torque(data.Ab9LiveTorque1e);
 
             int mode = data.Ab9ModeReadback;
             Ab9ModeReadbackValue.Text = mode == MozaData.NoAb9Reading
@@ -150,19 +141,16 @@ namespace MozaPlugin.UI
         private static string FormatAb9Raw(int raw)
             => raw == MozaData.NoAb9Reading ? "—" : $"{raw} (0x{raw:X4})";
 
-        // Both candidate scalings: the plugin's ConvertTemp uses raw/100, the
-        // protocol notes say raw*0.1. Which one the AB9 (if any) speaks is exactly
-        // what this probe has to establish, so neither is picked here.
+        // raw/100 degrees C, the same scaling the wheelbase uses (a live AB9 MCU
+        // reads 0x0ED8 = 38.0 C, where the protocol notes' x0.1 would claim 380 C).
+        // A raw 0 is an unpopulated register, not 0.00 C on a powered device, so it
+        // prints bare — deriving a temperature from it would invent a reading.
         private static string FormatAb9Temp(int raw)
-            => raw == MozaData.NoAb9Reading
-                ? "—"
-                : $"{raw} (0x{raw:X4}) · {raw / 100.0:F1} / {raw / 10.0:F1} °C";
-
-        private static string FormatAb9Torque(int raw)
-            => raw == MozaData.NoAb9Reading
-                ? "—"
-                : $"{raw} (0x{raw:X4}) · " +
-                  $"{Math.Abs(raw - MozaData.LiveTorqueZeroBias) / 10.0:F1} Nm";
+        {
+            if (raw == MozaData.NoAb9Reading) return "—";
+            if (raw == 0) return "0 (0x0000)";
+            return $"{raw} (0x{raw:X4}) · {raw / 100.0:F1} °C";
+        }
 
         private void SetAb9Slider(Slider slider, TextBox value, byte v)
         {

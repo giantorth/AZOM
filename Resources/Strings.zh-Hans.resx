@@ -119,6 +119,11 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R 布局 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R 布局 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>顺序</value></data>
+  <data name="Option_Ab9LayoutUnknown0A" xml:space="preserve"><value>未知 (0x0A)</value></data>
+  <data name="Option_Ab9LayoutUnknown0B" xml:space="preserve"><value>未知 (0x0B)</value></data>
+  <data name="Option_Ab9LayoutUnknown0C" xml:space="preserve"><value>未知 (0x0C)</value></data>
+  <data name="Option_Ab9LayoutUnknown0D" xml:space="preserve"><value>未知 (0x0D)</value></data>
+  <data name="Option_Ab9LayoutUnknown0E" xml:space="preserve"><value>未知 (0x0E)</value></data>
   <data name="Option_HPattern" xml:space="preserve"><value>H型</value></data>
   <data name="Label_ShifterType" xml:space="preserve"><value>换挡器类型</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>手感</value></data>
@@ -757,10 +762,10 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>扭矩</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>扭矩</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>刻度</value></data>
-  <data name="Option_Ab9LayoutUnknown01" xml:space="preserve"><value>未知 (0x01)</value></data>
-  <data name="Option_Ab9LayoutUnknown02" xml:space="preserve"><value>未知 (0x02)</value></data>
-  <data name="Option_Ab9LayoutUnknown03" xml:space="preserve"><value>未知 (0x03)</value></data>
-  <data name="Option_Ab9LayoutUnknown08" xml:space="preserve"><value>未知 (0x08)</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R 布局 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 布局</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 布局</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 布局</value></data>
   <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>状态探测</value></data>
   <data name="Label_Ab9PollLive" xml:space="preserve"><value>实时轮询</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>布局回读</value></data>

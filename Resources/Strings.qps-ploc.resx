@@ -127,6 +127,11 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>Yap!</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>Howl!</value></data>
+  <data name="Option_Ab9LayoutUnknown0A" xml:space="preserve"><value>Sniff?</value></data>
+  <data name="Option_Ab9LayoutUnknown0B" xml:space="preserve"><value>Snuf?</value></data>
+  <data name="Option_Ab9LayoutUnknown0C" xml:space="preserve"><value>Whuf?</value></data>
+  <data name="Option_Ab9LayoutUnknown0D" xml:space="preserve"><value>Yip?</value></data>
+  <data name="Option_Ab9LayoutUnknown0E" xml:space="preserve"><value>Wurf?</value></data>
   <data name="Option_HPattern" xml:space="preserve"><value>Yip!</value></data>
   <data name="Label_ShifterType" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>RUFF!!</value></data>
@@ -747,10 +752,10 @@
   <data name="Option_GraphTorque" xml:space="preserve"><value>Growl!</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Yap!</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Ruff!</value></data>
-  <data name="Option_Ab9LayoutUnknown01" xml:space="preserve"><value>Yip!</value></data>
-  <data name="Option_Ab9LayoutUnknown02" xml:space="preserve"><value>Yip!</value></data>
-  <data name="Option_Ab9LayoutUnknown03" xml:space="preserve"><value>Yip!</value></data>
-  <data name="Option_Ab9LayoutUnknown08" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Arf!</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Woof!</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>Awoo!</value></data>
   <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>SNIFF!!</value></data>
   <data name="Label_Ab9PollLive" xml:space="preserve"><value>Bork!</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Yap!</value></data>

@@ -12,19 +12,28 @@ namespace MozaPlugin.Devices
     /// </summary>
     public enum Ab9Mode : byte
     {
+        // The R+n layouts put reverse ahead of first rather than past top gear.
+        // 0x01/0x02/0x03/0x08 never appeared in a PitHouse capture — that tool
+        // only exercised the other six — but all ten are real device layouts.
         FivePlusR_L1 = 0x00,
-        // Never observed from PitHouse — the capture only exercised the six named
-        // layouts, leaving 0x01..0x03 and 0x08 unexplained. Selectable so the gaps
-        // can be tried on hardware; the doc guesses 5+R Layout 2 and friends.
-        Unknown01 = 0x01,
-        Unknown02 = 0x02,
-        Unknown03 = 0x03,
+        FivePlusR_L2 = 0x01,
+        RPlusFive    = 0x02,
+        RPlusSix     = 0x03,
         SixPlusR_L1  = 0x04,
         SixPlusR_L2  = 0x05,
         SevenPlusR_L1 = 0x06,
         SevenPlusR_L2 = 0x07,
-        Unknown08 = 0x08,
+        RPlusEight   = 0x08,
         Sequential   = 0x09,
+        // Past the known set. Nothing is known about whether the firmware accepts
+        // these — exposed only so they can be tried on hardware, and deliberately
+        // left out of SimHubRegistrar.Ab9Layouts so Ab9LayoutNext/Prev can't land a
+        // user on one. Promote a value out of this block once it is identified.
+        Unknown0A = 0x0A,
+        Unknown0B = 0x0B,
+        Unknown0C = 0x0C,
+        Unknown0D = 0x0D,
+        Unknown0E = 0x0E,
     }
 
     /// <summary>
@@ -300,21 +309,17 @@ namespace MozaPlugin.Devices
             _connection.Send(frame);
         }
 
-        // Status registers asked in both candidate forms. The 0x2B names build
-        // their own read frames (7E 03 2B 12 <cmd> 00 00, the base's shape); the
-        // 0x1E ones go out through SendAb9Read's 1-byte form and exist in the
-        // command DB only so the replies parse.
+        // Status registers ride group 0x2B (BuildReadMessage emits the base's
+        // 7E 03 2B 12 <cmd> 00 00 shape). Only the three that carry data — the
+        // wheelbase's other 0x2B registers reply a constant zero on an AB9.
         private static readonly string[] StatusProbeGroup2b =
         {
             "ab9-2b-state", "ab9-2b-state-err", "ab9-2b-mcu-temp",
-            "ab9-2b-mosfet-temp", "ab9-2b-motor-temp", "ab9-2b-live-torque",
         };
-        private static readonly byte[] StatusProbeGroup1eCmds = { 0x01, 0x02, 0x04, 0x05, 0x06, 0x07 };
 
         /// <summary>
-        /// Ask the AB9's main for the wheelbase status registers (state, MCU /
-        /// MOSFET / motor temperature, live torque) on both candidate transports,
-        /// plus a layout read-back. 13 one-shot frames, paced 4 ms apart by the
+        /// Ask the AB9's main for its state, error code and MCU temperature, plus the
+        /// stored layout read-back. Four one-shot frames, paced 4 ms apart by the
         /// FIFO. Diagnostic only — nothing here configures the device.
         /// </summary>
         public void RequestStatusProbe()
@@ -322,8 +327,6 @@ namespace MozaPlugin.Devices
             if (!_connection.IsConnected) return;
             foreach (var name in StatusProbeGroup2b)
                 SendAb9StatusRead(name);
-            foreach (var cmdId in StatusProbeGroup1eCmds)
-                SendAb9Read(cmdId);
             SendAb9Read(0xD3); // layout read-back — did the device keep what we wrote?
         }
 

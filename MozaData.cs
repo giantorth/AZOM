@@ -140,26 +140,15 @@ namespace MozaPlugin
         public double LiveTorqueNm =>
             Math.Abs(LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
 
-        // AB9 status-register probe. The same six wheelbase registers asked over
-        // two candidate transports — the base's group 0x2B retargeted at the AB9's
-        // dev 0x12, and the AB9's own group 0x1E. NoAb9Reading = the register never
-        // answered, which is the whole point of the probe, so no value can double
-        // as "absent". Raw wire values only; the UI derives units.
+        // AB9 status registers, read off the AB9's own pipe on group 0x2B (dev 0x12).
+        // Only the ones that carry data: the wheelbase's mosfet/motor/torque registers
+        // reply a constant zero on an AB9 and aren't asked. NoAb9Reading = never
+        // answered. Temperature is raw/100 degrees C, same scaling as the wheelbase's.
         public const int NoAb9Reading = -1;
 
         public volatile int Ab9State2b = NoAb9Reading;
         public volatile int Ab9StateErr2b = NoAb9Reading;
         public volatile int Ab9McuTemp2b = NoAb9Reading;
-        public volatile int Ab9MosfetTemp2b = NoAb9Reading;
-        public volatile int Ab9MotorTemp2b = NoAb9Reading;
-        public volatile int Ab9LiveTorque2b = NoAb9Reading;
-
-        public volatile int Ab9State1e = NoAb9Reading;
-        public volatile int Ab9StateErr1e = NoAb9Reading;
-        public volatile int Ab9McuTemp1e = NoAb9Reading;
-        public volatile int Ab9MosfetTemp1e = NoAb9Reading;
-        public volatile int Ab9MotorTemp1e = NoAb9Reading;
-        public volatile int Ab9LiveTorque1e = NoAb9Reading;
 
         /// <summary>Layout byte the AB9 reports for itself (group 0x1E cmd 0xD3) —
         /// the only way to tell whether a written layout stuck or the firmware
@@ -172,9 +161,6 @@ namespace MozaPlugin
         public void ResetAb9Probe()
         {
             Ab9State2b = Ab9StateErr2b = Ab9McuTemp2b = NoAb9Reading;
-            Ab9MosfetTemp2b = Ab9MotorTemp2b = Ab9LiveTorque2b = NoAb9Reading;
-            Ab9State1e = Ab9StateErr1e = Ab9McuTemp1e = NoAb9Reading;
-            Ab9MosfetTemp1e = Ab9MotorTemp1e = Ab9LiveTorque1e = NoAb9Reading;
             Ab9ModeReadback = NoAb9Reading;
         }
 
@@ -834,21 +820,12 @@ namespace MozaPlugin
                 // not become a second detection source.
                 case "base-live-torque":    LiveTorqueRaw = value; break;
 
-                // AB9 status-register probe (diagnostic). Routed here only from
-                // the AB9 pipe's own inbound handler, which parses with
-                // busHint "ab9" — these can never be fed a wheelbase reply.
+                // AB9 status registers (diagnostic). Routed here only from the AB9
+                // pipe's own inbound handler, which parses with busHint "ab9" —
+                // these can never be fed a wheelbase reply.
                 case "ab9-2b-state":        Ab9State2b = value; break;
                 case "ab9-2b-state-err":    Ab9StateErr2b = value; break;
                 case "ab9-2b-mcu-temp":     Ab9McuTemp2b = value; break;
-                case "ab9-2b-mosfet-temp":  Ab9MosfetTemp2b = value; break;
-                case "ab9-2b-motor-temp":   Ab9MotorTemp2b = value; break;
-                case "ab9-2b-live-torque":  Ab9LiveTorque2b = value; break;
-                case "ab9-1e-state":        Ab9State1e = value; break;
-                case "ab9-1e-state-err":    Ab9StateErr1e = value; break;
-                case "ab9-1e-mcu-temp":     Ab9McuTemp1e = value; break;
-                case "ab9-1e-mosfet-temp":  Ab9MosfetTemp1e = value; break;
-                case "ab9-1e-motor-temp":   Ab9MotorTemp1e = value; break;
-                case "ab9-1e-live-torque":  Ab9LiveTorque1e = value; break;
                 case "ab9-mode-read":       Ab9ModeReadback = value; break;
 
                 // State
