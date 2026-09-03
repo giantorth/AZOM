@@ -12,10 +12,13 @@ namespace MozaPlugin.Devices.MBooster
     /// Owns per-effect synthesis state (phase, elapsed, last amplitude) and
     /// the telemetry → freq/intensity mapping per protocol note § 4.
     ///
-    /// One worker per <see cref="MBoosterDeviceController"/>. The shared
-    /// <c>StreamKind.MBoosterEffect</c> lane on the device's connection
-    /// coalesces frames if the writer lags — at 50 Hz with one frame per
-    /// tick this is harmless (older tick gets dropped, newer tick lands).
+    /// One worker per pedal axis on a <see cref="MBoosterDeviceController"/>,
+    /// each with its OWN <c>StreamKind.MBoosterEffect</c>/
+    /// <c>MBoosterEffectAxis1</c>/<c>MBoosterEffectAxis2</c> lane on the
+    /// device's connection. A lane coalesces frames if the writer lags — at
+    /// 50 Hz with one frame per tick this is harmless (older tick gets
+    /// dropped, newer tick lands) and, being per axis, identical for every
+    /// pedal in a chain.
     /// </summary>
     internal sealed class MBoosterEffectWorker : IDisposable
     {
@@ -271,17 +274,23 @@ namespace MozaPlugin.Devices.MBooster
 
         /// <summary>
         /// Emit a motor frame (already addressed to this pedal's device id) for
-        /// this pedal. The primary (device 0x12) uses the coalescing stream lane
-        /// so its effects follow the latest-wins priority ladder; chained pedals
-        /// (0x1d/0x1e) use the one-shot FIFO so they don't clobber the primary's
-        /// single shared StreamKind lane. In the common one-effect-per-pedal case
-        /// this is equivalent; only simultaneous effects on ONE chained pedal
-        /// skip the ladder (rare).
+        /// this pedal, on THIS axis's own coalescing stream lane — so every
+        /// axis gets identical delivery and the latest-wins priority ladder
+        /// works per pedal.
+        ///
+        /// Chained axes used to fall back to the one-shot FIFO instead, to
+        /// avoid clobbering the single shared StreamKind lane. But that FIFO
+        /// delivers EVERY frame where the stream lane coalesces, so a chained
+        /// brake got the full ~50 Hz noise stream while the throttle on the
+        /// stream lane dropped frames whenever the write loop lagged — the
+        /// brake's Road Texture felt far stronger for identical settings. It
+        /// also queued ~50 motor frames/sec PER chained axis onto the paced
+        /// FIFO, starving everything else sharing it. Each axis now has its
+        /// own lane (StreamKind.MBoosterEffect / MBoosterEffectAxis1/2).
         /// </summary>
         private void SendMotor(byte[] frame)
         {
-            if (_isPrimary) _device.SendMotorStream(frame);
-            else _device.SendOneShot(frame);
+            _device.SendMotorStream(frame, _pedalAxisIndex);
         }
 
         private struct EffectState
@@ -485,9 +494,9 @@ namespace MozaPlugin.Devices.MBooster
 
                 // --- Apply per-effect activation edges + emit motor frame ------
                 //
-                // All vibration effects share ONE latest-wins motor stream slot
-                // (MozaSerialConnection StreamKind.MBoosterEffect — SendStream
-                // overwrites the pending value), so when more than one effect is
+                // All of THIS axis's vibration effects share its one latest-wins
+                // motor stream slot (SendMotor — SendStream overwrites the
+                // pending value), so when more than one effect is
                 // active in the same tick only the LAST frame emitted here
                 // reaches the motor. Emission order is therefore a priority
                 // ladder, lowest first: the two continuous "ambient" effects

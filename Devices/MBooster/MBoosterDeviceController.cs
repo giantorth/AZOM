@@ -1135,13 +1135,30 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Send a motor-write frame via the latest-wins stream lane (worker
         /// path). Stream lane coalesces stale frames if writer lag piles up,
-        /// which is the correct behaviour at 50 Hz cadence.
+        /// which is the correct behaviour at 50 Hz cadence. Each pedal axis
+        /// gets its OWN lane so a chained lane's axes can't coalesce each
+        /// other away — and so every axis gets identical delivery. Routing an
+        /// axis to the one-shot FIFO instead is what made a chained brake's
+        /// Road Texture far stronger than the throttle's (see the
+        /// MBoosterEffectAxis1/2 comment in StreamKind).
         /// </summary>
-        public void SendMotorStream(byte[] frame)
+        public void SendMotorStream(byte[] frame, int axisIndex)
         {
             if (frame == null || !_connection.IsConnected) return;
-            _connection.SendStream(StreamKind.MBoosterEffect, frame);
+            _connection.SendStream(StreamSlotForAxis(axisIndex), frame);
         }
+
+        /// <summary>Per-axis motor stream lane. Axes beyond the mapped ones
+        /// share axis 0's lane — the device only ever drives three motor ids
+        /// (MozaMBoosterProtocol.MotorDeviceIds), so that branch is unreachable
+        /// today and only guards a future axis-count bump from an out-of-range
+        /// slot (which SendStream would drop with a loud warning).</summary>
+        private static StreamKind StreamSlotForAxis(int axisIndex) => axisIndex switch
+        {
+            1 => StreamKind.MBoosterEffectAxis1,
+            2 => StreamKind.MBoosterEffectAxis2,
+            _ => StreamKind.MBoosterEffect,
+        };
 
         /// <summary>
         /// Send a one-shot (typically a disable or test-fire frame) via the
