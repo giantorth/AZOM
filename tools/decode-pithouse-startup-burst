@@ -18,7 +18,8 @@ from moza_bridge import load_bridge
 def main():
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--path", default="/home/rorth/src/moza-simhub-plugin/sim/logs/bridge-20260514-170002.jsonl")
+    ap.add_argument("--path", required=True,
+                    help="PitHouse bridge JSONL capture (see MOZA_TRACE_DIR)")
     ap.add_argument("--max-seq", type=int, default=20,
                     help="Reassemble seq=3..N on sess=02 (default 20 covers the startup burst)")
     args = ap.parse_args()

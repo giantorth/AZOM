@@ -1,0 +1,73 @@
+name: PR Command
+
+# `/build` in a PR comment dispatches Build for that PR.
+#
+# This is the only trigger that reaches a fork PR without pull_request_target:
+# issue_comment always runs in the base repo, from the default branch, with a
+# write token. The two things that do NOT work, and why this file exists:
+#
+#   * Re-running the fork PR's skipped Build run — a re-run replays the original
+#     pull_request payload, so the fork gate skips it again, every time.
+#   * The workflow_dispatch branch picker — it only lists branches of this repo,
+#     and a fork's head branch is not one of them.
+#
+# GITHUB_TOKEN-triggered events do not start workflow runs, with workflow_dispatch
+# and repository_dispatch as the documented exceptions — which is what lets the
+# dispatch below actually launch Build.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # issue_comment fires for issues too; .pull_request is only set on PRs.
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/build')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # dispatch Build
+      issues: write   # react on the comment
+    steps:
+      - name: Authorize commenter
+        id: auth
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          set -euo pipefail
+          react() {
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+              -f content="$1" --silent >/dev/null 2>&1 || true
+          }
+          # /build hands a write token and DISCORD_WEBHOOK_URL to whatever code
+          # the PR head points at, so it is maintainers only. A contributor
+          # asking for a build of their own fork PR must not be able to grant it.
+          perm=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${ACTOR}/permission" \
+            --jq '.permission' 2>/dev/null || echo none)
+          echo "${ACTOR} has '${perm}' permission on ${GITHUB_REPOSITORY}"
+          case "$perm" in
+            admin|maintain|write) react "rocket" ;;
+            *) react "-1"; echo "::error::${ACTOR} lacks write access — /build refused"; exit 1 ;;
+          esac
+
+      - name: Dispatch Build for this PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          # --ref is which copy of build.yml to run, not what gets built; the
+          # pr_number input is what redirects the checkout to the PR head.
+          # issue_comment always runs from the default branch, so GITHUB_REF_NAME
+          # is the right definition to use.
+          gh workflow run build.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$GITHUB_REF_NAME" \
+            -f pr_number="$PR_NUMBER"
+          echo "Dispatched Build for PR #${PR_NUMBER} from ${GITHUB_REF_NAME}"

@@ -217,10 +217,10 @@ channels that simply read 0 in a parked capture).
 
 **Plugin handling**
 
-- `Telemetry/Cm1DashboardCatalog.cs` — flat field set (keys + labels + SimHub channel +
+- `Telemetry/Display/Cm1DashboardCatalog.cs` — flat field set (keys + labels + SimHub channel +
   per-field Scale/Bias for °F unit-variants).
-- `Telemetry/Cm1DisplayEmitter.cs` — frame/handshake/switch builders (BE-float32).
-- `Telemetry/Cm1DisplayDriver.cs` — standalone ~50 ms driver on the wheelbase connection,
+- `Telemetry/Display/Cm1DisplayEmitter.cs` — frame/handshake/switch builders (BE-float32).
+- `Telemetry/Display/Cm1DisplayDriver.cs` — standalone ~50 ms driver on the wheelbase connection,
   dash-lane stream slots 18-28 (disjoint from the wheel lane 0-8), so it runs concurrently
   with an FSR1/tier-def wheel screen.
 - **Discriminator** (`MozaPlugin.TickCm1Discriminator`): a bus-bridged dash first gets the

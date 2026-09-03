@@ -11,9 +11,9 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Optionen</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>Über</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Hilfe</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Getrennt</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>AKTUALISIEREN</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Leistungsausgabe</value></data>
@@ -189,28 +189,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Port 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Port 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PROFILE</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>EINSTELLUNGEN</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Profil-Einstellungen beim Start anwenden</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>LENKRAD-LED-AUSGABE</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// Drosselung von RPM + Tasten</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Empfehlung: die LED-Optionen unten auf AUS lassen, außer es treten LED-Probleme auf.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Updates ans Lenkrad begrenzen</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>LED-Daten nur senden, wenn sie sich tatsächlich ändern.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Bitmaske immer erneut senden</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Sendet die LED-Bitmaske bei jedem Farb-Update mit, auch wenn sie unverändert ist. Verursacht zusätzlichen Datenverkehr.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB-ERKENNUNG</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Serielles Probe-Fallback deaktivieren (erweitert)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Nur erforderlich, wenn das Plugin mit einem falschen Gerät kommuniziert.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Erkennung des Aktivschalthebels deaktivieren (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Überspringt die Reconnect-Probe des Aktivschalthebels.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRIE</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Dashboard beim Verbinden hochladen</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Dashboards vom Lenkrad herunterladen</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Lenkrad-Firmware-Generation:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Versuch zur Erkennung anhand des Lenkrad-Handshakes</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Ära 2024 — (URL-Abonnement)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Ära 2026 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto ermittelt die Firmware-Generation aus dem Handshake des Lenkrads und wählt das passende Protokoll. Nur überschreiben, falls die Telemetrie nicht funktioniert.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Alle Registerkarten anzeigen (erweitert)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>GERÄTEDEFINITIONEN</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>ALLE DEFINITIONEN NEU BEREITSTELLEN</value></data>
@@ -218,10 +201,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ALLE EINSTELLUNGEN &amp; PROFILE LÖSCHEN</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Damit werden alle Plugin-Einstellungen und Profile auf ihre Standardwerte zurückgesetzt.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Der Dashboard-Upload ist in Entwicklung und überträgt aktuell KEINE Dateien an das Lenkrad.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-UPLOAD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// eine .mzdash-Datei an das verbundene Lenkrad senden</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Der Status spiegelt das zuletzt vom Lenkrad bestätigte ACK wider.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>QUELLE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Lokale .mzdash-Datei</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard-Bibliothek</value></data>
@@ -236,32 +217,16 @@
   <data name="Label_InFlight" xml:space="preserve"><value>In Übertragung:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Letztes ACK bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Letztes ACK-Statusbyte:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Hinweis: Uploads erfordern eine bestehende Verbindung zum Lenkrad und eine ausgehandelte Management-Sitzung.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>LENKRAD-DATEIEN</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// auf dem Lenkrad geladene Dashboards</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Löschen ist vorübergehend deaktiviert.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Status</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Titel</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>Verzeichnis</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Zuletzt geändert</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>LÖSCHEN</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Vorübergehend deaktiviert.</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// diese Option aktivieren, um den automatischen Start von PitHouse zu verhindern</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Bietet offizielle MOZA-SDK-Unterstützung für Spiele, die sie erfordern – etwa iRacing oder jedes Spiel, das den 360-Hz-Modus nutzt. Das Plugin betreibt dazu einen eingebetteten CoAP-SDK-Steuerserver auf Loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Wenn aktiviert, führt das Plugin einen kleinen Platzhalterprozess aus, der in der Prozessliste als „MOZA Pit House.exe“ erscheint. Das ist beabsichtigt – so finden MOZA-SDK-Apps PitHouse anhand des Namens. Er wird automatisch beendet, wenn Sie dies deaktivieren oder SimHub schließen.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP-SDK-Server aktivieren</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP-STEUERUNG</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// einfache CBOR-über-UDP-Steueroberfläche</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Dies ist eine veraltete UDP-Steuerung zum Einstellen des Lenkwinkels. Der einzige bekannte Anwendungsfall ist die RSF-Version von Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>UDP-Steuerserver aktivieren</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP-Server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP-Steuerung</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>LETZTE ANFRAGEN</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// letzte 20 Anfragen pro Server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>ÜBER</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Open-Source-SimHub-Plugin</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -417,6 +382,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>SimHub-Eigenschaftsbindung bearbeiten</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Als Formel bearbeiten (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>AUF STANDARDS ZURÜCKSETZEN</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>GLOBALE STANDARDS</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Globale Kanal-Standardwerte</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>ALLE STANDARDS ZURÜCKSETZEN</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>SCHLIESSEN</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} von {1} überschrieben</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Standard wiederherstellen</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Globaler Kanal-Editor nicht verfügbar (siehe Protokoll)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>FELD ZURÜCKSETZEN</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>FELD TEILEN</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>BIT TEILEN</value></data>
@@ -495,14 +467,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>BEARBEITEN · DREHREGLER 1 · AKTIV</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>RING MIT AUSWAHL FÜLLEN</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>DIESEN DREHREGLER AUF ALLE KOPIEREN</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Dashboard-Upload funktioniert noch nicht</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>RUHELICHT</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// was das Lenkrad nach Ablauf der Leerlaufzeit anzeigt</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Geschwindigkeit</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Farbe</value></data>
   <data name="Section_Language" xml:space="preserve"><value>SPRACHE</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Sprache</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Diese Einstellungsseite schließen und erneut öffnen, um die neue Sprache zu übernehmen. „Auto“ folgt der Sprache von SimHub, danach der des Betriebssystems.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Erfordert einen Neustart nach der Änderung.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>PROFIL IMPORTIEREN…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>PitHouse-Voreinstellung importieren</value></data>
@@ -541,7 +512,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Das verbundene Lenkrad</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} in SimHub nicht hinzugefügt</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ein MOZA-Dashboard ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Diese Wheelbase hat einen Ambient-LED-Streifen, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}, um den Streifen anzusteuern.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Die Wheelbase ist verbunden, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Lenkrad „{1}“ ist verbunden, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>den MOZA-COM-Port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Drehknopf-Anzeigen</value></data>
@@ -549,9 +520,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Wird gestartet…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Gestoppt</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Läuft (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Server nicht gestartet – über den Schalter oben aktivieren</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Noch keine Anfragen</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Noch keine Anfragen – Drittanbieter-Tools kommunizieren hier nur, wenn sie eine Einstellung lesen oder schreiben</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Stub-Manager</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>Aufzeichnung läuft… (Daueraufzeichnung ist aktiv – klicken Sie auf Stopp, wenn Sie fertig sind)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>Aufzeichnung läuft… (öffnen Sie einen anderen Tab und nutzen Sie das Gerät, kommen Sie dann zum Stoppen zurück)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>exportiert nach {0}</value></data>
@@ -631,7 +600,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Schaltung</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flugsimulation</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-Timeout</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Wie lange die LEDs nach dem Ende der Telemetrie aktualisiert werden, bevor das Lenkrad in den Ruhezustand wechseln kann. 0 = sofort stoppen.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Wie lange die LEDs nach dem Ende der Telemetrie aktualisiert werden, bevor das Lenkrad in den Ruhezustand wechseln kann.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Displayrotation</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Sanft</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Sofort</value></data>
@@ -721,7 +690,11 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsfading (Experimentell)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Einsatztemperatur (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Experimentell — schreibt während der Aktivierung die echten Hardware-Kalibrierungen für Wegende und Max. Schwellenwert (mehr Pedalweg und mehr Kraft erforderlich) und stellt Ihre konfigurierten Werte wieder her, sobald die Bremsen abkühlen. Setzt voraus, dass diese bereits unter Pedalgefühl / Sim-Eingabezuordnung eingestellt sind — sonst ohne Wirkung.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-Kraft (Trägheits-Pedalgefühl) (Experimentell)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimentell — drückt das Pedal selbst unter deinem Fuß proportional zur aktuellen Längsbeschleunigung (Beschleunigen drückt nach vorn, Bremsen nach hinten), statt zu vibrieren. Max. Pedalweg legt fest, wie weit es sich bei voller G-Kraft bewegt; Reaktionsgeschwindigkeit bestimmt, wie schnell das Pedal die neue Position anfährt.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Max. Pedalweg (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Reaktionsgeschwindigkeit (%)</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -768,8 +741,23 @@ Id: {2}</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Eingabekraft</value></data>
-  <data name="Section_GForce" xml:space="preserve"><value>G-Kraft (Trägheits-Pedalgefühl) (Experimentell)</value></data>
-  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Max. Pedalweg (mm)</value></data>
-  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Reaktionsgeschwindigkeit (%)</value></data>
-  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Experimentell — bewegt das Pedal selbst unter Ihrem Fuß proportional zur aktuellen Längs-G-Kraft (Beschleunigen drückt nach vorne, Bremsen drückt zurück), anstatt zu vibrieren. Max. Pedalweg legt fest, wie weit es sich bei voller G-Kraft bewegt; Reaktionsgeschwindigkeit legt fest, wie schnell das Pedal zur neuen Position übergeht.</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>LED-FARBEN EINZELN</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Ruhe · Konstant</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Ruhe · Atmen</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Schlaf · Atmen</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Animationsgeschwindigkeit (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Atemgeschwindigkeit (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>RUHE-EFFEKT</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Ruhe-Animation</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Quelle für Wheelbase-LFE</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>LFE-Tab des Plugins</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Erfordert SimHub 9.12 oder neuer.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Gerätedefinition aktualisiert. SimHub zum Anwenden neu starten.</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-Kompatibilität</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>Diagramm</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandbreite</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Drehmoment</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Drehmoment</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Skala</value></data>
 </root>

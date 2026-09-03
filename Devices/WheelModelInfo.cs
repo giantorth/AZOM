@@ -56,6 +56,23 @@ namespace MozaPlugin.Devices
         public int KnobCount { get; }
 
         /// <summary>
+        /// Number of physical rotary encoders whose input mode (BUTTON vs KNOB,
+        /// <c>wheel-knob-signal-mode{i}</c> / sub-id <c>[42, i]</c>) is configurable.
+        /// Distinct from <see cref="KnobCount"/>, which counts only the encoders that
+        /// also have addressable LED rings — most rims have encoders and no knob LEDs.
+        /// <para><c>-1</c> = not catalogued: fall back to sweep discovery (the reads go
+        /// out for indices 0..4 and the answers drive the UI). That fallback OVER-REPORTS
+        /// — firmware answers every index 0..4 regardless of how many encoders exist
+        /// (owner-confirmed on the KS, which answered all five with three knobs) — so a
+        /// model is only accurate once its real count is recorded here. Defaults to
+        /// <see cref="KnobCount"/> when that is non-zero, since an encoder with an LED
+        /// ring is by definition an encoder.</para>
+        /// <para><c>0</c> = confirmed to have no configurable encoders; suppresses the
+        /// reads and the UI section entirely.</para>
+        /// </summary>
+        public int KnobEncoderCount { get; }
+
+        /// <summary>
         /// Per-knob individual LED counts for the Group 3 (Rotary) ring LEDs.
         /// Array length == KnobCount. Null when the wheel has no per-LED ring control.
         /// CS Pro: [12,12,12,12] (48 total). KS Pro: [12,12,8,12,12] (56 total).
@@ -122,7 +139,7 @@ namespace MozaPlugin.Devices
         /// the rim turns. When <c>true</c>, the plugin exposes the rotation-mode
         /// control (off / smooth / immediate) and pushes the mode via the
         /// session-0x02 FF property record (<c>kind=5</c>,
-        /// <see cref="Protocol.SessionPropertyPushBuilder.KindDashDisplayRotation"/>).
+        /// <see cref="Sessions.SessionPropertyPushBuilder.KindDashDisplayRotation"/>).
         /// Only the VGS (Vision GS) is known to have the sensor; other display
         /// wheels ignore the push. Default <c>false</c>; flip to <c>true</c> on any
         /// model confirmed to carry the rotation IMU.
@@ -175,13 +192,13 @@ namespace MozaPlugin.Devices
         /// </summary>
         internal static readonly (string Prefix, string FriendlyName, WheelModelInfo Info)[] KnownModels =
         {
-            ("GS V2P",  "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            ("GS V2P",  "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, knobEncoderCount: 5)),
             // Some GS V2 Pro firmware variants report the bare prefix "GS"
             // instead of "GS V2P" (observed on RS21-D02-MC GW). Same physical
             // layout — 10 RPM + 10 button LEDs, no display. Must come after
             // "GS V2P" so the longer prefix matches first when present.
-            ("GS",      "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
-            ("CS V2.1", "CS V2",      new WheelModelInfo(10, 6,  false, new[] { 0, 1, 3, 6, 8, 9 }, 0, hasDisplay: false)),
+            ("GS",      "GS V2 Pro",  new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, knobEncoderCount: 5)),
+            ("CS V2.1", "CS V2",      new WheelModelInfo(10, 6,  false, new[] { 0, 1, 3, 6, 8, 9 }, 0, hasDisplay: false, knobEncoderCount: 2)),
             // CS Pro / KS Pro expose rotary encoders with configurable background +
             // primary colors (protocol groups 0..KnobCount-1 via cmd 0x27).
             // Group 3 (Rotary) provides per-LED ring control: 12 LEDs/knob on CS Pro,
@@ -190,7 +207,11 @@ namespace MozaPlugin.Devices
             // KS Pro 3/12/3 LED strip appears to live entirely in group 0 (Shift/RPM),
             // not split across RPM + Meter flag sub-device. Driving all 18 as one RPM strip.
             ("W18",     "KS Pro",     new WheelModelInfo(18, 10, false, null, 5, new[] { 12, 12, 8, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 4, 3, 1, 2 })),
-            ("KS",      "KS",         new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            // KS: 3 rotary encoders, none with LED rings (knobCount stays 0). The
+            // encoder count is explicit because the firmware answers ALL FIVE
+            // wheel-knob-signal-mode indices regardless of how many knobs exist, so
+            // sweep discovery reports 5 — owner-confirmed 2026-08-25.
+            ("KS",      "KS",         new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, knobEncoderCount: 3)),
             // Lamborghini Revuelto (firmware "W11"): screenless new-protocol wheel,
             // 0 RPM LEDs + 16 dimming-only backlit buttons (no per-button RGB — the
             // wheel ignores the colour bytes, like ES).
@@ -198,13 +219,13 @@ namespace MozaPlugin.Devices
             // MOZA × Porsche Mission R (firmware "W05"): display wheel, 4 backlit
             // buttons, no RPM LEDs (per user). Buttons are dimming-only backlit
             // (like the Revuelto/ES, no per-button RGB).
-            ("W05",     "× Porsche Mission R", new WheelModelInfo(0, 4, false, null, 0, hasDisplay: true)),
+            ("W05",     "× Porsche Mission R", new WheelModelInfo(0, 4, false, null, 0, hasDisplay: true, knobEncoderCount: 2)),
             // ESSENZA SCV12 (firmware "W06"): display wheel, 10 RPM LEDs in a
             // 1/8/1 brow arrangement (1-LED brow each side, 8 in the middle —
             // the same scheme as the 3/10/3 wheels, smaller), no button LEDs.
             // Per user.
-            ("W06",     "ESSENZA SCV12", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: true, browSegmentSize: 1)),
-            ("W13",     "FSR V2",     new WheelModelInfo(16, 10, false, null, 0, hasDisplay: true,  browSegmentSize: 3)),  // firmware reports "W13" for FSR V2
+            ("W06",     "ESSENZA SCV12", new WheelModelInfo(10, 0, false, null, 0, hasDisplay: true, browSegmentSize: 1, knobEncoderCount: 4)),
+            ("W13",     "FSR V2",     new WheelModelInfo(16, 10, false, null, 0, hasDisplay: true,  browSegmentSize: 3, knobEncoderCount: 5)),  // firmware reports "W13" for FSR V2
             // FSR V1 display wheel (box name "FSR1"): firmware reports model-name
             // "FSR", hw "RS21-D03-HW FW-C", sw "RS21-D03-MC FW". A DISTINCT, older
             // product from FSR V2 ("W13"). It does NOT speak the standard tier-def
@@ -216,18 +237,24 @@ namespace MozaPlugin.Devices
             // wheel never answers that probe); the 0x42 sender is started instead via
             // the explicit MozaPlugin.IsFsr1DisplayWheel bypass. The 10 RPM + 10
             // button LEDs use the standard group-0x3F SimHub LED path unchanged.
-            ("FSR",     "FSR V1",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            // knobEncoderCount 5 is owner-confirmed, but this rim reads NOTHING back
+            // (BuildNewWheelLedReadCommands returns empty for FSR1 — its param store
+            // wedges), so wheel-knob-signal-mode never answers and the UI cannot know
+            // whether the firmware supports per-knob mode. It therefore offers the
+            // legacy wheel-wide All-Rotaries selector rather than five chips. Writes
+            // still go out on user edit, which is PitHouse's own model for this rim.
+            ("FSR",     "FSR V1",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, knobEncoderCount: 5)),
             // VGS (Vision GS): has the display-rotation IMU — supportsDisplayRotation:true
             // exposes the off/smooth/immediate rotation-mode control (session-0x02 FF
             // kind=5 push). Verified from VGS PitHouse captures.
-            ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true)),
-            ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false)),
+            ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true, knobEncoderCount: 3)),
+            ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false, knobEncoderCount: 0)),
             // RS V2: 10 RPM + 10 button LEDs (owner-confirmed, 2026-07-30),
             // screenless. The real RS V2 self-reports "RS Leather # W00"
             // (hw "RS21-W00-HW SM-C", dev-type 01 02 09 07) and resolves via
             // the "RS Leather" rim entry below; this prefix stays for firmware
             // that reports the literal product name.
-            ("RS V2",   "RS V2",      new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false)),
+            ("RS V2",   "RS V2",      new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, knobEncoderCount: 2)),
             // RS round / D-shape family (MOZA-sourced names): 10 RGB RPM +
             // 10 button LEDs, screenless, sleep-light off (safe default for
             // unmeasured rims). The real RS V2 reports "RS Leather # W00"
@@ -238,7 +265,13 @@ namespace MozaPlugin.Devices
             ("RS D-Shape Alcantara", "RS Alcantara D-Shape", new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             ("RS D-Shape Leather",   "RS Leather D-Shape",   new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
             ("RS Alcantara",         "RS Alcantara Round",   new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
-            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            // knobEncoderCount 2 is owner-confirmed for the RS V2, which resolves HERE
+            // (it self-reports "RS Leather # W00"), not via the "RS V2" prefix above.
+            // The other three RS rims are left uncatalogued (-1): the row comment says
+            // their LED layout is assumed rather than measured, so their knob count is
+            // unmeasured too — they fall back to sweep discovery and over-report at 5
+            // until someone counts them.
+            ("RS Leather",           "RS Leather Round",     new WheelModelInfo(10, 10, false, null, 0, hasDisplay: false, hasSleepLight: false, knobEncoderCount: 2)),
             // Original CS (predecessor to CS V2 / CS V2.1) — firmware reports the
             // bare prefix "CS" with no version suffix. 10 RGB RPM LEDs, no button
             // / flag / knob LEDs, no display. Must come after "CS V2.1" so the
@@ -246,7 +279,7 @@ namespace MozaPlugin.Devices
             // hasSleepLight=false: pushing wheel-idle-mode/timeout/speed/color at
             // this wheel triggers a Table 8 read-fail storm in its firmware that
             // makes it intermittently unresponsive.
-            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, usesLegacyRpmTelemetry: true)),
+            ("CS",      "CS",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, usesLegacyRpmTelemetry: true, knobEncoderCount: 0)),
             // ESX wheel — the entry rim's ESX variant; same old-protocol topology
             // (wheelbase module at internal id 0x18) and the same capabilities as
             // the ES. Per docs/how-to-query-device-type.md the firmware reports
@@ -258,7 +291,10 @@ namespace MozaPlugin.Devices
             // the plugin doesn't use; over the wheelbase they'd resolve to the "ES"
             // entry (identical 10-RPM / screenless layout). GUID is UUID-v5
             // auto-generated from "RSX"; 10 RGB RPM LEDs, no button LEDs.
-            ("RSX",     "ESX",        new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            // knobEncoderCount 0 follows the ES (owner-confirmed none) per this row's
+            // "same capabilities as the ES" note. Inert either way: both are
+            // old-protocol and never reach the knob read/UI paths.
+            ("RSX",     "ESX",        new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, knobEncoderCount: 0)),
             // ES — MOZA's entry wheel, integrated into the wheelbase as a module at
             // internal id 0x18 (firmware model-name "ES", hw "RS21-D05-HW SM-C").
             // Old-protocol RPM only: 10 RGB RPM LEDs driven via the wheel-old-rpm-*
@@ -267,10 +303,10 @@ namespace MozaPlugin.Devices
             // hasSleepLight:false avoids the Table-8 read-fail storm legacy rims hit
             // on sleep-light writes. Button-LED count is conservative (0) — refine
             // from a live capability read if ES exposes addressable button LEDs.
-            ("ES",      "ES",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false)),
+            ("ES",      "ES",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, knobEncoderCount: 0)),
         };
 
-        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0, bool usesLegacyRpmTelemetry = false, int[]? knobSignalModeOrder = null, bool supportsDisplayRotation = false)
+        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0, bool usesLegacyRpmTelemetry = false, int[]? knobSignalModeOrder = null, bool supportsDisplayRotation = false, int knobEncoderCount = -1)
         {
             SupportsDisplayRotation = supportsDisplayRotation;
             RpmLedCount = rpmLedCount;
@@ -278,6 +314,10 @@ namespace MozaPlugin.Devices
             HasFlagLeds = hasFlagLeds;
             ButtonLedMap = buttonLedMap;
             KnobCount = knobCount;
+            // An LED-ringed knob is an encoder, so knobCount is the floor when no
+            // explicit encoder count is recorded. -1 stays -1 for rims with neither.
+            KnobEncoderCount = knobEncoderCount >= 0 ? knobEncoderCount
+                             : (knobCount > 0 ? knobCount : -1);
             KnobRingLeds = knobRingLeds;
             int total = 0;
             if (knobRingLeds != null)

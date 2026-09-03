@@ -89,6 +89,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             var state = WheelStateParser.Parse(decomp, out var missing);
             if (state != null)
             {
+                // TitleId=4 pushes are deltas — merge into the prior state so
+                // the cached inventory doesn't collapse to the last delta.
+                state = WheelDashboardState.Merge(_lastState ?? _cachedLastState, state);
                 _lastState = state;
                 _cachedLastState = state;
                 // Consume the decoded blob so successive updates (e.g. after
@@ -131,6 +134,130 @@ namespace MozaPlugin.Telemetry.Dashboard
         private string _lastMissingShape = "";
 
         /// <summary>
+        /// Compact wheel-confirmed deletions out of the cached slot table —
+        /// call the moment the wheel's TitleId=4 confirm delta lands
+        /// (TelemetrySender.OnConfigJsonStateReadyCheckPendingDelete). The
+        /// wheel compacts its own render table (order-preserving) when it
+        /// ACCEPTS the host's follow-up list-without-name — mid-session; a
+        /// port bounce does NOT rebuild that table (wire-verified 2026-08-17).
+        /// Compacting the cache here keeps the host's name→slot mapping in
+        /// lockstep with the wheel's imminent compaction.
+        /// </summary>
+        public void CompactConfirmedDeletes()
+        {
+            var basis = _lastState ?? _cachedLastState;
+            if (basis == null || basis.ConfirmedRemovedNames.Count == 0) return;
+            var doomed = new HashSet<string>(basis.ConfirmedRemovedNames, StringComparer.Ordinal);
+            var table = new List<string>(basis.ConfigJsonList);
+            int before = table.Count;
+            table.RemoveAll(n => doomed.Contains(n));
+            var s = CloneWithList(basis, table);
+            s.ConfirmedRemovedNames = Array.Empty<string>();
+            _lastState = s;
+            _cachedLastState = s;
+            try
+            {
+                MozaLog.Info(
+                    $"[AZOM] Slot table compacted: {before} → {table.Count} entries " +
+                    $"(removed: {string.Join(", ", doomed)})");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Apply a host-caused library mutation to the cached slot table. The
+        /// wheel maintains its configJsonList itself (ordinal-sorted) and
+        /// updates it LIVE on enable/delete — but never re-pushes it
+        /// mid-session (full TitleId=1 pushes only happen at connect;
+        /// wire-verified 2026-08-16, both plugin and PitHouse sessions). So
+        /// the host predicts the wheel's table by applying its OWN deltas to
+        /// the wheel-reported list: enabled names insert at their ordinal
+        /// position, removed names drop. This is deliberately NOT wholesale
+        /// adoption of the declared list (disproven — the wheel's set can
+        /// contain entries the enabled-only declaration omits) — only the
+        /// names this host just mutated move.
+        /// </summary>
+        public void ApplyLibraryDelta(string? addName, string? removeName)
+        {
+            var basis = _lastState ?? _cachedLastState;
+            if (basis == null) return;
+            var list = new List<string>(basis.ConfigJsonList);
+            bool changed = false;
+            if (!string.IsNullOrEmpty(removeName))
+                changed |= list.RemoveAll(n => string.Equals(n, removeName, StringComparison.Ordinal)) > 0;
+            if (!string.IsNullOrEmpty(addName)
+                && list.FindIndex(n => string.Equals(n, addName, StringComparison.Ordinal)) < 0)
+            {
+                int at = 0;
+                while (at < list.Count && string.CompareOrdinal(list[at], addName) < 0) at++;
+                list.Insert(at, addName!);
+                changed = true;
+            }
+            if (!changed) return;
+            AdoptList(basis, list);
+            try
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Slot-table prediction updated (add='{addName}' remove='{removeName}'): " +
+                    $"{list.Count} entries");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// UNUSED (kept for reference): early 2026-08-16 theory that the wheel
+        /// adopts the host's configJson() list as its slot table. Disproven
+        /// same day — the wheel maintains its own ordinal-sorted
+        /// configJsonList, which can include entries the host's enabled-only
+        /// declaration omits; adopting the declared list shifted name→slot
+        /// mappings and routed switches to the wrong dash. The wheel-reported
+        /// list is the only slot authority; host-caused deltas are applied via
+        /// <see cref="ApplyLibraryDelta"/>.
+        /// </summary>
+        public void AdoptDeclaredLibraryList(IReadOnlyList<string> names)
+        {
+            if (names == null || names.Count == 0) return;
+            var basis = _lastState ?? _cachedLastState;
+            if (basis == null) return;
+            AdoptList(basis, new List<string>(names));
+        }
+
+        /// <summary>Clone <paramref name="basis"/> with a replacement
+        /// <see cref="WheelDashboardState.ConfigJsonList"/> and publish it as
+        /// the cached state.</summary>
+        private void AdoptList(WheelDashboardState basis, List<string> names)
+        {
+            var s = CloneWithList(basis, names);
+            _lastState = s;
+            _cachedLastState = s;
+        }
+
+        private static WheelDashboardState CloneWithList(WheelDashboardState basis, List<string> names)
+        {
+            return new WheelDashboardState
+            {
+                TitleId = basis.TitleId,
+                DisplayVersion = basis.DisplayVersion,
+                ResetVersion = basis.ResetVersion,
+                SortTag = basis.SortTag,
+                RootDirPath = basis.RootDirPath,
+                ConfigJsonList = new List<string>(names),
+                EnabledDashboards = basis.EnabledDashboards,
+                DisabledDashboards = basis.DisabledDashboards,
+                ImageRefMap = basis.ImageRefMap,
+                ImagePath = basis.ImagePath,
+                FontRefMap = basis.FontRefMap,
+                RootPath = basis.RootPath,
+                CapturedAt = DateTime.UtcNow,
+                EnabledListKind = basis.EnabledListKind,
+                DisabledListKind = basis.DisabledListKind,
+                EnabledDeletedIds = basis.EnabledDeletedIds,
+                DisabledDeletedIds = basis.DisabledDeletedIds,
+                ConfirmedRemovedNames = basis.ConfirmedRemovedNames,
+            };
+        }
+
+        /// <summary>
         /// Seq-aware variant. Detects when a chunk seq is missing and signals the
         /// caller to re-handshake — without this, a single dropped chunk under
         /// Wine SerialPort R/W contention silently corrupts the zlib stream and
@@ -147,12 +274,16 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (decomp == null) return ChunkResult.Buffered;
             var state = WheelStateParser.Parse(decomp, out var missing);
             if (state == null) return ChunkResult.Buffered;
+            // TitleId=4 pushes are deltas — merge into the prior state so the
+            // cached inventory doesn't collapse to the last delta.
+            state = WheelDashboardState.Merge(_lastState ?? _cachedLastState, state);
             _lastState = state;
             _cachedLastState = state;
             _deviceInbox.Clear();
             try
             {
-                MozaLog.Debug(
+                // Info: the delete/enable acceptance-test monitor line.
+                MozaLog.Info(
                     $"[AZOM] configJson state received: TitleId={state.TitleId} " +
                     $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
                     $"configJsonList={state.ConfigJsonList.Count} " +
@@ -234,9 +365,17 @@ namespace MozaPlugin.Telemetry.Dashboard
             byte[] compressed = CompressZlib(uncompressed);
             // Same 9-byte envelope as device→host state blobs on session 0x09:
             //   [flag:1B=0x00] [comp_size:u32 LE] [uncomp_size:u32 LE] [zlib]
+            // comp_size = zlib length + 4 — PitHouse's convention everywhere in
+            // this protocol (also the bundle preamble's total_compressed field).
+            // The wheel slices the zlib region as comp_size − 4; emitting the
+            // bare zlib length truncates the stream by 4 bytes wheel-side and
+            // it silently DISCARDS the reply — which is why the host's library
+            // list never drove dashboard enablement (byte-diff vs PitHouse
+            // reply, bridge-enable-toggle-20260816: PH comp=208 for a 204 B
+            // zlib; ours was comp=263 for 263 B).
             var env = new byte[9 + compressed.Length];
             env[0] = 0x00;
-            uint c = (uint)compressed.Length;
+            uint c = (uint)compressed.Length + 4;
             env[1] = (byte)(c & 0xFF); env[2] = (byte)((c >> 8) & 0xFF);
             env[3] = (byte)((c >> 16) & 0xFF); env[4] = (byte)((c >> 24) & 0xFF);
             uint u = (uint)uncompressed.Length;

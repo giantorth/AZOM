@@ -1,10 +1,23 @@
 name: Build
 
+# Single entry point for every build:
+#
+#   push to main/dev            compile only
+#   pull_request, same-repo     compile + publish the PR pre-release
+#   pull_request, fork/draft    compile only (read-only token, no secrets)
+#   workflow_dispatch + PR num  compile + release that PR, forks included
+#   workflow_dispatch, no num   compile the selected branch
+#   /build comment on a PR      pr-command.yml dispatches the case above
+#
+# Replaces the old build.yml + pr-build.yml pair. Those fired together on every
+# pull_request event with one of the two always reporting "skipped", because
+# between them they expressed a single either/or: release-capable PR, or not.
+
 on:
   # `paths:` scopes a push to the commits actually pushed, but scopes a
   # pull_request to the PR's whole diff — the `changed` job below narrows that
-  # back to the pushed range. Keep both lists in sync with pr-build.yml and
-  # changed-code.yml.
+  # back to the pushed range. Keep both lists in sync with the `case` in the
+  # `changed` job below.
   push:
     branches: [main, dev]
     paths:
@@ -16,8 +29,10 @@ on:
       - "libs/**"
       - "DeviceTemplates/**"
       - "Resources/**"
+      - "Data/**"
+      - "Themes/**"
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "**.cs"
       - "**.csproj"
@@ -27,40 +42,589 @@ on:
       - "libs/**"
       - "DeviceTemplates/**"
       - "Resources/**"
+      - "Data/**"
+      - "Themes/**"
+  # Reaching a fork PR needs this input: the branch picker only lists branches
+  # of this repo, and a fork's head is not one of them. pr_number redirects the
+  # checkout to refs/pull/<n>/head, which resolves for a fork head too.
+  # Re-running a fork PR's skipped run does NOT work — a re-run replays the
+  # original pull_request payload, so the fork gate skips it again.
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to build and release (blank = build the selected branch)"
+        required: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Same-repo non-draft PRs already get a full build from pr-build.yml —
-  # skip the duplicate compile. Forks and drafts keep this gate.
+  # A `paths:` filter on `pull_request` matches the PR's *cumulative* diff, not
+  # the commits just pushed — so once a PR touches source, every later push
+  # (a README tweak, a changelog line) re-fires the build. This narrows the
+  # question to github.event.before..after. It fails open: anything it cannot
+  # determine reports `true`, so a real code change is never silently dropped.
+  #
+  # Only `synchronize` needs narrowing — every other event short-circuits to
+  # `true` in the first guard below, and `push` already gets a range-scoped
+  # `paths:` for free. Hence the `if:`, which keeps the runner from spinning up
+  # just to echo a constant.
   changed:
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name != github.repository ||
-      github.event.pull_request.draft == true
-    uses: ./.github/workflows/changed-code.yml
+    if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - name: Detect source changes in the pushed range
+        id: detect
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
 
-  build:
+          build() { echo "code=true"  >> "$GITHUB_OUTPUT"; echo "BUILD: $1"; exit 0; }
+          skip()  { echo "code=false" >> "$GITHUB_OUTPUT"; echo "SKIP: $1";  exit 0; }
+
+          # Only a push to an existing PR needs narrowing. opened / reopened /
+          # ready_for_review are already gated by this workflow's `paths:` filter,
+          # and the whole-PR diff is the right question for those. `push` gets
+          # a range-scoped `paths:` filter for free, and workflow_dispatch is a
+          # deliberate manual build.
+          if [ "$EVENT_NAME" != "pull_request" ] || [ "$ACTION" != "synchronize" ]; then
+            build "event ${EVENT_NAME}/${ACTION:-none} is not a PR push."
+          fi
+
+          empty=0000000000000000000000000000000000000000
+          if [ -z "$BEFORE" ] || [ -z "$AFTER" ] || [ "$BEFORE" = "$empty" ]; then
+            build "no usable range (before=${BEFORE:-unset} after=${AFTER:-unset})."
+          fi
+
+          if ! resp=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${AFTER}"); then
+            build "compare ${BEFORE}...${AFTER} failed — force-push, or a fork commit the base repo cannot reach."
+          fi
+
+          # The compare endpoint caps its file list at 300. A push that large is
+          # not a docs tweak, so treat a truncated list as a code change.
+          if [ "$(jq -r '.files | length' <<<"$resp")" -ge 300 ]; then
+            build "compare file list truncated at 300 entries."
+          fi
+
+          # previous_filename catches renames out of a source extension
+          # (Foo.cs -> Foo.cs.bak), which .filename alone would miss.
+          files=$(jq -r '.files[]? | .filename, (.previous_filename // empty)' <<<"$resp")
+          echo "Files changed in ${BEFORE:0:7}..${AFTER:0:7}:"
+          printf '%s\n' "${files:-  (none)}" | sed 's/^/  /'
+
+          # Mirrors the two `paths:` filters above — all three lists must
+          # stay in sync.
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            case "$f" in
+              *.cs|*.csproj|*.sln|*.xaml|*.resx|libs/*|DeviceTemplates/*|Resources/*|Data/*|Themes/*)
+                build "source changed: ${f}" ;;
+            esac
+          done <<<"$files"
+
+          skip "pushed commits touch no buildable source."
+
+  # This job compiles the PR's own code — MSBuild can run arbitrary targets —
+  # so it never holds a write token. Releasing happens in `publish` below, which
+  # never checks out or runs PR code.
+  compile:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      pull-requests: read
     needs: changed
-    if: needs.changed.outputs.code == 'true'
+    # `changed` is skipped for every event except a PR push — treat that as go.
+    # A failed or cancelled `changed` leaves `code` empty, so it stops here.
+    if: >-
+      always() &&
+      (needs.changed.result == 'skipped' || needs.changed.outputs.code == 'true')
+    outputs:
+      release: ${{ steps.mode.outputs.release }}
+      pr_number: ${{ steps.mode.outputs.pr_number }}
+      pr_title: ${{ steps.mode.outputs.pr_title }}
+      head_sha: ${{ steps.mode.outputs.head_sha }}
+      release_target: ${{ steps.mode.outputs.release_target }}
+      is_fork: ${{ steps.mode.outputs.is_fork }}
+      pr_version: ${{ steps.vars.outputs.pr_version }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+      zip_name: ${{ steps.vars.outputs.zip_name }}
+      commit_count: ${{ steps.vars.outputs.commit_count }}
+      build_timestamp: ${{ steps.vars.outputs.build_timestamp }}
 
     steps:
+      - name: Resolve build mode
+        id: mode
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_PR_TITLE: ${{ github.event.pull_request.title }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          pr_number=""; pr_title=""; head_sha=""; base_sha=""; release="false"
+          is_fork="false"; base_ref=""
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "${INPUT_PR:-}" ]; then
+            # Fork heads are buildable ONLY down this path. Dispatch requires
+            # write access to this repo, so the fork's code has been reviewed
+            # before it gets a write token and DISCORD_WEBHOOK_URL. The
+            # pull_request trigger below still refuses to release a fork.
+            info=$(gh pr view "$INPUT_PR" --repo "$GITHUB_REPOSITORY" \
+              --json number,title,state,isDraft,headRefOid,baseRefOid,baseRefName,headRepository,headRepositoryOwner)
+            if [ "$(jq -r '.state' <<<"$info")" != "OPEN" ] || [ "$(jq -r '.isDraft' <<<"$info")" = "true" ]; then
+              echo "::error::PR #${INPUT_PR} is not an open, non-draft PR"
+              exit 1
+            fi
+            head_repo=$(jq -r '.headRepositoryOwner.login + "/" + .headRepository.name' <<<"$info")
+            if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+              is_fork="true"
+              echo "::warning::PR #${INPUT_PR} head is fork ${head_repo} — building fork code with repo secrets"
+            fi
+            base_ref=$(jq -r '.baseRefName' <<<"$info")
+            pr_number=$(jq -r '.number'     <<<"$info")
+            pr_title=$( jq -r '.title'      <<<"$info")
+            head_sha=$( jq -r '.headRefOid' <<<"$info")
+            base_sha=$( jq -r '.baseRefOid' <<<"$info")
+            release="true"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            pr_number="$EVENT_PR_NUMBER"
+            pr_title="$EVENT_PR_TITLE"
+            head_sha="$EVENT_HEAD_SHA"
+            base_sha="$EVENT_BASE_SHA"
+            base_ref="$EVENT_BASE_REF"
+            # Fork PRs run with a read-only token and no secrets, and drafts are
+            # not ready to publish. Both still compile as a gate; a maintainer
+            # releases them with /build or a dispatch.
+            if [ "$EVENT_HEAD_REPO" = "$GITHUB_REPOSITORY" ] && [ "$EVENT_DRAFT" != "true" ]; then
+              release="true"
+            else
+              echo "Compile-only: head=${EVENT_HEAD_REPO:-none} draft=${EVENT_DRAFT:-none}"
+            fi
+          fi
+
+          # Release builds take the PR head so the artifact is exactly the
+          # submitted code, and refs/pull/<n>/head resolves for a fork head too.
+          # Everything else leaves ref empty and checks out the triggering
+          # commit — which on a pull_request event is the merge commit, so
+          # compile-only gates still test the merge result.
+          # Only release builds need tags and commit history.
+          ref=""; fetch_depth=1
+          if [ "$release" = "true" ]; then
+            ref="refs/pull/${pr_number}/head"
+            fetch_depth=0
+          fi
+
+          # Where the release TAG lands. Measured: GITHUB_TOKEN with
+          # contents:write gets 403 from both POST /git/refs and POST /releases
+          # when the target commit is not on a branch of THIS repo — a fork head
+          # and a refs/pull/<n>/merge commit both fail, dev's head succeeds. So a
+          # fork build tags the base branch instead; the exact commit built is
+          # recorded in the version string, the tag name and the release body.
+          release_target="$head_sha"
+          if [ "$release" = "true" ] && [ "$is_fork" = "true" ]; then
+            release_target="$base_ref"
+            echo "Fork build: tagging ${base_ref} — GITHUB_TOKEN cannot tag a fork commit."
+          fi
+
+          # Version core from the title when it names one (release PRs are
+          # titled like "v1.6.0"); parsed before truncation so a long title
+          # can't cut the match. Empty means "use the tag-bump fallback".
+          title_version=""
+          if [[ "$pr_title" =~ (^|[^a-zA-Z0-9])v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            title_version="${BASH_REMATCH[2]}"
+          fi
+          # The title feeds the release name, which the in-app channel picker
+          # parses ("<title> (<version>)") — cap it so names stay sane.
+          pr_title="${pr_title:0:80}"
+
+          echo "mode: event=${EVENT_NAME} pr=${pr_number:-none} release=${release} ref=${ref:-<triggering commit>}"
+          {
+            echo "pr_number=${pr_number}"
+            echo "pr_title=${pr_title}"
+            echo "title_version=${title_version}"
+            echo "head_sha=${head_sha}"
+            echo "base_sha=${base_sha}"
+            echo "release=${release}"
+            echo "is_fork=${is_fork}"
+            echo "release_target=${release_target}"
+            echo "ref=${ref}"
+            echo "fetch_depth=${fetch_depth}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.mode.outputs.ref }}
+          fetch-depth: ${{ steps.mode.outputs.fetch_depth }}
 
-      - name: Setup .NET SDK
+      - name: Verify checkout matches PR head
+        if: steps.mode.outputs.release == 'true'
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          # refs/pull/<n>/head can advance between the resolve step and here.
+          # The artifact must be the commit we advertise, so fail on a mismatch.
+          actual=$(git rev-parse HEAD)
+          if [ "$actual" != "$HEAD_SHA" ]; then
+            echo "::error::Checked out ${actual} but PR head is ${HEAD_SHA}"
+            exit 1
+          fi
+
+      # Release builds pin 8.0.x so a PR pre-release is compiled by the same
+      # toolchain as the stable artifact (release.yml). Compile-only gates keep
+      # the 8+9 pair the push path has always installed.
+      - name: Setup .NET SDK (release)
+        if: steps.mode.outputs.release == 'true'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup .NET SDK (compile gate)
+        if: steps.mode.outputs.release != 'true'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
             9.0.x
 
+      - name: Compute PR build version
+        id: vars
+        if: steps.mode.outputs.release == 'true'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
+          TITLE_VERSION: ${{ steps.mode.outputs.title_version }}
+          HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
+          BASE_SHA: ${{ steps.mode.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          short_sha="${HEAD_SHA::7}"
+          # Core from the PR title ("v1.6.0" → 1.6.0) when given, else next
+          # patch after the newest stable tag.
+          if [ -n "$TITLE_VERSION" ]; then
+            next="$TITLE_VERSION"
+          else
+            latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+            latest_tag=${latest_tag:-v0.0.0}
+            IFS=. read -r MAJ MIN PAT <<<"${latest_tag#v}"
+            next="${MAJ}.${MIN}.$((PAT+1))"
+          fi
+          pr_version="${next}-pr.${PR_NUMBER}.${short_sha}"
+
+          # Markdown bullet list of the PR's commits, newest first, capped to
+          # keep the Discord embed under its 4096-char description limit.
+          # base_sha can be stale after a base-branch merge — fall back to the
+          # head commit alone rather than failing the build.
+          if commit_count=$(git rev-list --count "${BASE_SHA}..${HEAD_SHA}" 2>/dev/null); then
+            commit_list=$(git log "${BASE_SHA}..${HEAD_SHA}" \
+              --max-count=15 \
+              --pretty=format:"- [\`%h\`](https://github.com/${GITHUB_REPOSITORY}/commit/%H) — %s")
+          else
+            commit_count=1
+            commit_list=$(git log "${HEAD_SHA}" --max-count=1 \
+              --pretty=format:"- [\`%h\`](https://github.com/${GITHUB_REPOSITORY}/commit/%H) — %s")
+          fi
+          if [ "$commit_count" -gt 15 ]; then
+            commit_list="${commit_list}"$'\n'"- … and $((commit_count - 15)) more"
+          fi
+
+          {
+            echo "short_sha=${short_sha}"
+            echo "pr_version=${pr_version}"
+            echo "zip_name=MozaPlugin_pr${PR_NUMBER}_${short_sha}.zip"
+            echo "commit_count=${commit_count}"
+            echo "build_timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "commit_list<<COMMIT_LIST_EOF"
+            echo "$commit_list"
+            echo "COMMIT_LIST_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Restore dependencies
         run: dotnet restore
 
+      # pwsh: Git Bash mangles the leading slash in /p:Version= (MSB1009).
       - name: Build plugin DLL
-        run: dotnet build -c Release --no-restore
+        shell: pwsh
+        env:
+          PR_VERSION: ${{ steps.vars.outputs.pr_version }}
+        run: |
+          if ($env:PR_VERSION) {
+            dotnet build -c Release --no-restore "/p:Version=$env:PR_VERSION"
+          } else {
+            dotnet build -c Release --no-restore
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stage and zip release files
+        if: steps.mode.outputs.release == 'true'
+        shell: pwsh
+        env:
+          ZIP_NAME: ${{ steps.vars.outputs.zip_name }}
+        run: |
+          $staging = "staging"
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+          Copy-Item ./bin/x86/Release/MozaPlugin.dll $staging/
+          # Localized resources are embedded in MozaPlugin.dll — single-file
+          # deployment, no satellite-folder bundling needed. See release.yml.
+          Compress-Archive -Path ./staging/* -DestinationPath ./$env:ZIP_NAME
+
+      # Was softprops/action-gh-release@v3. GitHub has intermittently 403'd
+      # POST /releases here with `Contents: write` on the token (same workflow
+      # blob and action SHA as runs that passed minutes later), and the action
+      # refuses to retry a 403 — it assumes the token is wrong. So drive the
+      # API directly: retry, and log the response headers so the next failure
+      # leaves x-github-request-id behind instead of just "403".
+      # Rendered here because this is the job with the checkout and git
+      # history. Multi-line content travels in the artifact rather than a job
+      # output, and the publish job never touches PR code.
+      - name: Render release notes
+        if: steps.mode.outputs.release == 'true'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.mode.outputs.pr_number }}
+          PR_TITLE: ${{ steps.mode.outputs.pr_title }}
+          PR_VERSION: ${{ steps.vars.outputs.pr_version }}
+          BUILD_TIMESTAMP: ${{ steps.vars.outputs.build_timestamp }}
+          COMMIT_COUNT: ${{ steps.vars.outputs.commit_count }}
+          COMMIT_LIST: ${{ steps.vars.outputs.commit_list }}
+          BASE_SHA: ${{ steps.mode.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.mode.outputs.head_sha }}
+          RELEASE_TARGET: ${{ steps.mode.outputs.release_target }}
+          IS_FORK: ${{ steps.mode.outputs.is_fork }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$COMMIT_LIST" > commit-list.md
+          {
+            printf '**Pre-release PR build — expect possible bugs.**\n\n'
+            printf '**PR:** [#%s — %s](https://github.com/%s/pull/%s)\n' \
+              "$PR_NUMBER" "$PR_TITLE" "$GITHUB_REPOSITORY" "$PR_NUMBER"
+            printf '**Version:** `%s` (%s)\n' "$PR_VERSION" "$BUILD_TIMESTAMP"
+            printf '**Built from:** [`%s`](https://github.com/%s/commit/%s)\n' \
+              "${HEAD_SHA:0:7}" "$GITHUB_REPOSITORY" "$HEAD_SHA"
+            if [ "$IS_FORK" = "true" ]; then
+              printf '**Note:** this PR is from a fork, so the release tag points at `%s` rather than the fork commit — the artifact above is built from the commit linked on the previous line.\n' \
+                "$RELEASE_TARGET"
+            fi
+            printf '**Commits in this PR: `%s`**\n' "$COMMIT_COUNT"
+            cat commit-list.md
+            printf '\n**Diff:** https://github.com/%s/compare/%s...%s\n' \
+              "$GITHUB_REPOSITORY" "$BASE_SHA" "$HEAD_SHA"
+          } > release-notes.md
+
+      - name: Upload release payload
+        if: steps.mode.outputs.release == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-release-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
+          path: |
+            ${{ steps.vars.outputs.zip_name }}
+            release-notes.md
+            commit-list.md
+          retention-days: 1
+          if-no-files-found: error
+
+  # Holds the write token, so it must never check out or execute PR code — it
+  # only downloads the artifact `compile` produced. Needs `contents: write`
+  # alone: the tag lands on the merge commit, whose .github/workflows tree
+  # matches the base, so no `workflows` scope is involved.
+  publish:
+    runs-on: ubuntu-latest
+    needs: compile
+    # `changed` is skipped on every event except a PR push, and GitHub
+    # propagates that skip down the chain — so this needs the same always()
+    # anchor `compile` uses, plus an explicit success check.
+    if: >-
+      always() &&
+      needs.compile.result == 'success' &&
+      needs.compile.outputs.release == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Download release payload
+        uses: actions/download-artifact@v8
+        with:
+          name: pr-release-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
+
+      - name: Publish PR pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: pr-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
+          TARGET: ${{ needs.compile.outputs.release_target }}
+          # The in-app channel picker parses this exact shape — see
+          # UpdateCheckService.ExtractPrVersionFromName before changing it.
+          # The PR number lives in the version string and the tag.
+          RELEASE_NAME: "${{ needs.compile.outputs.pr_title }} (${{ needs.compile.outputs.pr_version }})"
+          ZIP_NAME: ${{ needs.compile.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+          for f in "$ZIP_NAME" release-notes.md; do
+            [ -f "$f" ] || { echo "::error::${f} missing from the compile artifact"; exit 1; }
+          done
+
+          # make_latest is a string enum on the REST API, not a boolean.
+          payload=$(jq -n \
+            --arg tag_name "$TAG" \
+            --arg target   "$TARGET" \
+            --arg name     "$RELEASE_NAME" \
+            --rawfile body release-notes.md \
+            '{tag_name: $tag_name, target_commitish: $target, name: $name,
+              body: $body, prerelease: true, make_latest: "false"}')
+
+          # `gh api -i` keeps the status line and headers on stdout for the 4xx
+          # path too, so a failure leaves x-github-request-id behind.
+          created=false
+          for attempt in 1 2 3; do
+            if resp=$(printf '%s' "$payload" \
+                | gh api -i -X POST "repos/${GITHUB_REPOSITORY}/releases" --input - 2>&1); then
+              created=true
+              echo "Created release ${TAG} at ${TARGET} on attempt ${attempt}."
+              break
+            fi
+
+            echo "::warning::Release create attempt ${attempt}/3 failed for ${TAG}"
+            printf '%s\n' "$resp" \
+              | grep -iE '^(HTTP/|x-github-request-id:|x-accepted-github-permissions:|x-ratelimit-remaining:)' || true
+            printf '%s\n' "$resp" | grep -o '"message":"[^"]*"' | head -n 1 || true
+
+            # A partial success on an earlier attempt leaves the release behind;
+            # fall through to the upload rather than fighting over the tag.
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release ${TAG} already exists — reusing it."
+              created=true
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 20))
+            fi
+          done
+
+          if [ "$created" != "true" ]; then
+            echo "::error::Could not create release ${TAG} after 3 attempts"
+            exit 1
+          fi
+
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" "$ZIP_NAME" \
+                 --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Uploaded ${ZIP_NAME} to ${TAG} on attempt ${attempt}."
+              exit 0
+            fi
+            echo "::warning::Asset upload attempt ${attempt}/3 failed for ${TAG}"
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 20))
+            fi
+          done
+          echo "::error::Could not upload ${ZIP_NAME} to ${TAG} after 3 attempts"
+          exit 1
+
+      - name: Notify Discord
+        if: success()
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PR_NUMBER: ${{ needs.compile.outputs.pr_number }}
+          PR_TITLE: ${{ needs.compile.outputs.pr_title }}
+          SHORT_SHA: ${{ needs.compile.outputs.short_sha }}
+          PR_VERSION: ${{ needs.compile.outputs.pr_version }}
+          COMMIT_COUNT: ${{ needs.compile.outputs.commit_count }}
+          BUILT: ${{ needs.compile.outputs.build_timestamp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMIT_LIST=$(cat commit-list.md)
+          if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+            echo "DISCORD_WEBHOOK_URL not set; skipping notification."
+            exit 0
+          fi
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/pr-${PR_NUMBER}-${SHORT_SHA}"
+          pr_url="https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}"
+          # Build the payload entirely inside jq so every interpolated value is
+          # JSON-encoded safely. -a forces ASCII-only output so any non-ASCII
+          # character (e.g. em-dash) is emitted as \uXXXX, eliminating any risk
+          # of mis-encoded UTF-8 bytes on the Windows runner. Unicode-safe
+          # slicing keeps us under Discord's embed limits (title 256 chars,
+          # description 4096 chars).
+          payload_file=$(mktemp)
+          jq -an \
+            --arg pr_number    "$PR_NUMBER" \
+            --arg pr_title     "$PR_TITLE" \
+            --arg pr_version   "$PR_VERSION" \
+            --arg commit_count "$COMMIT_COUNT" \
+            --arg commit_list  "$COMMIT_LIST" \
+            --arg built        "$BUILT" \
+            --arg release_url  "$release_url" \
+            --arg pr_url       "$pr_url" \
+            '{
+              embeds: [{
+                title: (("Moza SimHub Plugin — PR #" + $pr_number + " (" + $pr_version + ")")[0:250]),
+                url: $release_url,
+                description: ((
+                  "**[" + $pr_title + "](" + $pr_url + ")**\n" +
+                  "**Commits in this PR (" + $commit_count + "):**\n" +
+                  $commit_list +
+                  "\n[Download release](" + $release_url + ")"
+                )[0:4090]),
+                color: 3447003
+              }]
+            }' > "$payload_file"
+          # Strip any leading UTF-8 BOM (some Windows tooling adds one) and any
+          # CR bytes — both are rejected by Discord's JSON parser.
+          python -c "import sys, pathlib; p=pathlib.Path(sys.argv[1]); b=p.read_bytes(); b=b.lstrip(b'\xef\xbb\xbf').replace(b'\r', b''); p.write_bytes(b)" "$payload_file"
+          response_file=$(mktemp)
+          http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -X POST --data-binary "@$payload_file" "$DISCORD_WEBHOOK_URL") || http_code="000"
+          if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Discord notification sent (HTTP $http_code)."
+          else
+            echo "::warning::Discord notification failed (HTTP $http_code)"
+            echo "Payload bytes ($(wc -c < "$payload_file")):"
+            cat "$payload_file"
+            echo
+            echo "Response body:"
+            cat "$response_file" || true
+            echo
+          fi
+          rm -f "$response_file" "$payload_file"
+
+      - name: Prune old builds for this PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.compile.outputs.pr_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep the newest 5 builds per PR — enough history to step back a
+          # few commits, while bounding the release list to the single page
+          # the in-app updater fetches. Close/merge deletes the rest
+          # (pr-cleanup.yml).
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 500 \
+            --json tagName,publishedAt \
+            --jq "[.[] | select(.tagName | test(\"^pr-${PR_NUMBER}-[0-9a-f]{7}\$\"))] | sort_by(.publishedAt) | reverse | .[5:] | .[].tagName" \
+          | while read -r tag; do
+              [ -n "$tag" ] || continue
+              echo "Pruning $tag — keeping newest 5 builds for PR #${PR_NUMBER}"
+              gh release delete "$tag" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+            done

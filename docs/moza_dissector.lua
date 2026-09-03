@@ -1,293 +1,730 @@
 -- Moza Racing Protocol — Wireshark Lua Dissector
 --
--- Generic dissector that identifies all known message types from the
--- Moza serial protocol.  Hooks into the usbcom (CDC bulk data) layer
--- on Moza Racing bases (VID 346E / PID 0006, Interface 0, endpoints
--- 0x02 OUT / 0x82 IN).
+-- Generic dissector for the MOZA Racing internal serial protocol as it rides
+-- the CDC-ACM bulk pipe of a wheelbase / CM2 / AB9 composite USB device.
+-- Hooks the usbcom (CDC bulk data) layer.
 --
 -- Installation: copy to your Wireshark personal plugins folder, then
 --   Wireshark > Analyze > Reload Lua Plugins  (or restart Wireshark)
 --
--- Personal plugin folder locations:
---   Linux/Mac:  ~/.config/wireshark/plugins/
+-- Personal plugin folder (Help > About Wireshark > Folders shows the real one):
+--   Linux:      ~/.local/lib/wireshark/plugins/   (older builds: ~/.config/wireshark/plugins/)
+--   macOS:      ~/.local/lib/wireshark/plugins/
 --   Windows:    %APPDATA%\Wireshark\plugins\
 --
--- Frame format:
---   7E [N] [group] [device] [N bytes payload] [checksum]
+-- Or ad-hoc:  tshark -X lua_script:moza_dissector.lua -r capture.pcapng -Y moza
 --
--- Responses: group = request_group + 0x80, device nibbles swapped.
--- Checksum = (0x0D + sum of all preceding bytes including 0x7E) % 256.
+-- CAUTION: an installed copy in the personal plugin folder SHADOWS
+-- `-X lua_script:` — Wireshark loads the folder first and the second
+-- Proto("moza") registration is silently dropped, so you get the installed
+-- version's output while thinking you tested the file you passed. When
+-- iterating, either keep the installed copy in sync or isolate the run
+-- (`HOME=$(mktemp -d) tshark -X lua_script:... `).
 --
--- See docs/moza-protocol.md for full protocol documentation.
+-- ── Frame format ───────────────────────────────────────────────────────────
+--   7E [N] [group] [device] [N-byte payload] [checksum]
+--
+-- N counts payload bytes only. Response frames: group |= 0x80, device nibbles
+-- swapped (0x13 -> 0x31, 0x17 -> 0x71).
+--
+-- ── 0x7E byte stuffing (docs/protocol/wire/checksum.md) ────────────────────
+-- Every 0x7E from frame index 2 onward (group, device, payload, checksum) is
+-- DOUBLED on the wire. N is a count of *decoded* payload bytes, so the wire
+-- length of a frame is N+5 plus one extra byte per 0x7E in group/dev/payload/
+-- checksum. This dissector de-stuffs before decoding, exactly as
+-- Protocol/MozaSerialConnection.cs ReadLoop does.
+--
+-- Checksum is computed over the WIRE representation:
+--   chk = (0x0D + 0x7E + N + sum(body) + 0x7E * count(0x7E in body)) & 0xFF
+-- where body = group, device, payload (checksum byte itself excluded).
+-- See MozaProtocol.CalculateWireChecksum / CalculateWireChecksumFromParts.
+--
+-- Frames from senders that predate the escape fix (docs/protocol/wire/checksum.md
+-- § Plugin impl note, 2026-04-22) carry lone 0x7E bytes. Those are recovered via
+-- a fallback reading and marked `moza.legacy_unstuffed`; the checksum decides
+-- which reading is real, so mixed-era captures decode fully either way.
+--
+-- ── Useful display filters ─────────────────────────────────────────────────
+--   moza                          any Moza frame
+--   moza.checksum_status          frames whose checksum failed both readings
+--   moza.legacy_unstuffed         legacy sender (pre-2026-04-22)
+--   moza.escapes > 0              frames that carried doubled 0x7E on the wire
+--   moza.ss.session == 2          one SerialStream session
+--   moza.ff.kind == 4             dashboard-switch FF records
+--   moza.telem.flag               live-telemetry value frames
+--   moza.cmd_name contains "led"  by decoded command name
+--
+-- ── Self-test ──────────────────────────────────────────────────────────────
+--   lua5.4 tools/dissector-selftest.lua docs/moza_dissector.lua
+--
+-- ── Reference ──────────────────────────────────────────────────────────────
+-- docs/protocol/  (wire/, transport/, identity/, telemetry/, sessions/,
+--                  tier-definition/, dashboard-upload/, leds/, settings/,
+--                  periodic/, devices/)
+-- Protocol/MozaProtocol.cs, Protocol/MozaCommandDatabase.cs,
+-- Protocol/MozaSerialConnection.cs (framing), Protocol/MozaMBoosterProtocol.cs,
+-- Protocol/MozaBaseLfeProtocol.cs
 
 local moza = Proto("moza", "Moza Racing Protocol")
 
--- ─── Group names ────────────────────────────────────────────────────────────
--- Request groups (bit 7 clear)
+local START = 0x7E
+local MAGIC = 0x0D   -- checksum seed
 
-local GROUP_NAMES = {
-    -- Heartbeat / keep-alive
-    [0x00] = "Heartbeat",
+-- ─── Request group names ────────────────────────────────────────────────────
+-- Response groups are derived as (req | 0x80) further down.
+-- Group numbers cross-checked against Protocol/MozaProtocol.cs +
+-- Protocol/MozaCommandDatabase.cs and the per-group docs.
 
-    -- Identity probes (wheel connection sequence)
-    [0x02] = "Identity: Protocol Version",
-    [0x04] = "Identity: Hardware ID",
-    [0x05] = "Identity: Capabilities",
-    [0x06] = "Identity: Hardware Identifier",
-    [0x07] = "Identity: Model Name",
-    [0x08] = "Identity: HW/FW Version",
-    [0x09] = "Identity: Presence Check",
+local REQ_GROUPS = {
+    [0x00] = "Bus Heartbeat",
+
+    -- Identity / probe groups (docs/protocol/identity/)
+    [0x01] = "Lifecycle (soft reboot)",
+    [0x02] = "Ident: Product Type",
+    [0x04] = "Ident: Device Type",
+    [0x05] = "Ident: Capabilities",
+    [0x06] = "Ident: MCU UID",
+    [0x07] = "Ident: Model Name",
+    [0x08] = "Ident: HW Version",
+    [0x09] = "Ident: Presence Check",
     [0x0A] = "EEPROM Direct Access",
-    [0x0E] = "Parameter Table / Debug",
-    [0x0F] = "Identity: FW Version",
-    [0x10] = "Identity: Serial Number",
-    [0x11] = "Identity: Unknown",
+    [0x0E] = "Param Reader / Debug Log",
+    [0x0F] = "Ident: SW Version",
+    [0x10] = "Ident: Serial Number",
+    [0x11] = "Ident: Identity-11",
 
-    -- Main controller (0x12)
-    [0x1E] = "Main: Output",
-    [0x1F] = "Main: Settings",
-    [0x20] = "Base Ambient LED Write",
+    -- Wheel firmware flash transfer (docs/protocol/findings/
+    -- 2026-07-31-wheel-firmware-update-protocol.md)
+    [0x15] = "FW Flash: Byte Counter",
+    [0x16] = "FW Flash: Image Stream",
+    [0x17] = "FW Flash: Block Digest",
+    [0x18] = "FW Flash: Commit / Verify",
+    [0x19] = "FW Flash: Finalize",
+
+    -- Main / hub (dev 0x12) and AB9 shifter (own USB device, dev 0x12)
+    [0x1E] = "Main: Output / AB9 Read",
+    [0x1F] = "Main: Settings / AB9 Write",
+    [0x20] = "Base Ambient LED Write / AB9 Effect Stream",
     [0x22] = "Base Ambient LED Read",
 
-    -- Base (0x13)
-    [0x28] = "Base: Parameters",
-    [0x29] = "Base: Timing/Rate",
-    [0x2B] = "State Change",
-    [0x2D] = "Sequence Counter",
+    -- Pedals (dev 0x19); 0x24 is also the mBooster motor-write group
+    [0x23] = "Pedals: Settings Read",
+    [0x24] = "Pedals: Settings Write / mBooster Motor",
+    [0x25] = "Pedals: Output Read",
+    [0x26] = "Pedals: Calibration Write",
 
-    -- Wheel (0x17)
-    [0x3F] = "Wheel LED",
-    [0x40] = "Wheel/Dash Config",
-    [0x41] = "Dash Telemetry Enable",
+    -- Wheelbase (dev 0x13)
+    [0x28] = "Base: Settings Read",
+    [0x29] = "Base: Settings Write",
+    [0x2A] = "Base: Calibration / Chime / Partner-SDK",
+    [0x2B] = "Base: Status Read",
+    [0x2C] = "Base: Motor Run-State Write",
+    [0x2D] = "Base: Seq Counter / Discrete Events",
+
+    -- Dash / meter (dev 0x14), also FSR1 wheel select+brightness on dev 0x17
+    [0x32] = "Dash: Settings Write",
+    [0x33] = "Dash: Settings Read",
+
+    -- CM1 racing dash keyed value stream (dev 0x14)
+    [0x35] = "CM1: Value Stream (fast lane)",
+    [0x36] = "CM1: Value Stream (slow lane)",
+
+    -- Wheel (dev 0x17)
+    [0x3E] = "Wheel LED (newer-wheel variant)",
+    [0x3F] = "Wheel: Config / LED Write",
+    [0x40] = "Wheel: Config / LED Read",
+    [0x41] = "Wheel: Telemetry Enable",
+    [0x42] = "FSR1: Display Data Push",
     [0x43] = "Telemetry / SerialStream",
 
-    -- Response groups (request + 0x80)
-    [0x80] = "Heartbeat Response",
-    [0x82] = "Identity Response: Protocol Version",
-    [0x84] = "Identity Response: Hardware ID",
-    [0x85] = "Identity Response: Capabilities",
-    [0x86] = "Identity Response: Hardware Identifier",
-    [0x87] = "Identity Response: Model Name",
-    [0x88] = "Identity Response: HW/FW Version",
-    [0x89] = "Identity Response: Presence Check",
-    [0x8A] = "EEPROM Response",
-    [0x8E] = "Parameter / Debug Response",
-    [0x8F] = "Identity Response: FW Version",
-    [0x90] = "Identity Response: Serial Number",
-    [0x91] = "Identity Response: Unknown",
+    -- Observed on the wire but undecoded; see docs/protocol/open-questions.md.
+    --   0x21 -> dev 0x12 on the wheelbase pipe. One-shot per PitHouse connect:
+    --           `7E 01 21 12 03` -> `7E 05 A1 21 03 AA 55 01 90` (constant).
+    --   0x4C -> dev 0x12 on the MOZA Stalks pipe (PID 0x0024, model `S07`).
+    --           ~1 Hz `7E 05 4C 12 07 00 00 00 00` -> `7E 03 CC 21 07 00 00`.
+    --   0x5A -> dev 0x1B. The plugin's own handbrake presence poll
+    --           (TelemetryFrameCache.HandbrakePresenceFrame): 1-byte cmd 00,
+    --           0xDA reply is 20 bytes, contents undecoded.
+    [0x21] = "Main: one-shot probe (undecoded)",
+    [0x4C] = "Stalks: status poll (undecoded)",
+    [0x5A] = "Handbrake: presence poll",
 
-    [0x9E] = "Main: Output Response",
-    [0x9F] = "Main: Settings Response",
-    [0xA0] = "Base Ambient LED Write Response",
-    [0xA2] = "Base Ambient LED Read Response",
+    [0x46] = "E-Stop: Status Poll",
 
-    [0xA8] = "Base: Parameters Response",
-    [0xA9] = "Base: Timing/Rate Response",
-    [0xAB] = "State Change Response",
-    [0xAD] = "Seq Counter Response",
+    -- Shifter (dev 0x1A)
+    [0x51] = "Shifter: Settings Read",
+    [0x52] = "Shifter: Settings Write",
+    [0x53] = "Shifter: Output Read",
+    [0x54] = "Shifter: Calibration Write",
 
-    [0xBF] = "Wheel LED Response",
-    [0xC0] = "Wheel/Dash Config Response",
-    [0xC1] = "Dash Telemetry Enable Response",
-    [0xC3] = "Telemetry / SerialStream Response",
+    -- Handbrake (dev 0x1B)
+    [0x5B] = "Handbrake: Settings Read",
+    [0x5C] = "Handbrake: Settings Write",
+    [0x5D] = "Handbrake: Output Read",
+    [0x5E] = "Handbrake: Calibration Write",
+
+    [0x64] = "Hub: Connected Device Status",
 }
 
--- ─── Device names ────────────────────────────────────────────────────────────
--- Devices on the internal serial bus (request addresses)
+local GROUP_NAMES = {}
+for g, name in pairs(REQ_GROUPS) do
+    GROUP_NAMES[g] = name
+    GROUP_NAMES[g + 0x80] = name .. " [resp]"
+end
+-- E-Stop pushes unsolicited status on 0xC6 with the REQUEST device id (0x1C),
+-- so it is not purely a response group. Keep the derived name but note it.
+GROUP_NAMES[0xC6] = "E-Stop: Status (resp / unsolicited push)"
 
-local DEVICE_NAMES = {
-    -- Request addresses
-    [0x11] = "Base(0x11)",
-    [0x12] = "Main/Hub(0x12)",
-    [0x13] = "Base(0x13)",
-    [0x14] = "Dash(0x14)",
-    [0x15] = "Dev(0x15)",
-    [0x17] = "Wheel(0x17)",
-    [0x19] = "Pedals(0x19)",
-    [0x1A] = "Shifter(0x1A)",
-    [0x1B] = "Handbrake(0x1B)",
-    [0x1C] = "E-Stop(0x1C)",
-    [0x1D] = "Dev(0x1D)",
-    [0x1E] = "Dev(0x1E)",
+-- ─── Device names ───────────────────────────────────────────────────────────
+-- Internal-bus addresses (docs/protocol/transport/usb-topology.md
+-- § Internal bus addressing, docs/protocol/devices/README.md).
 
-    -- Response addresses (nibbles swapped)
-    [0x21] = "Main-resp(0x21)",
-    [0x31] = "Base-resp(0x31)",
-    [0x41] = "Dash-resp(0x41)",
-    [0x51] = "Dev-resp(0x51)",
-    [0x71] = "Wheel-resp(0x71)",
-    [0x91] = "Pedals-resp(0x91)",
-    [0xA1] = "Shifter-resp(0xA1)",
-    [0xB1] = "Handbrake-resp(0xB1)",
-    [0xC1] = "E-Stop-resp(0xC1)",
+local REQ_DEVICES = {
+    [0x12] = "Main/Hub",         -- also AB9 and standalone CM2/pedals on own pipe
+    [0x13] = "Base",
+    [0x14] = "Dash/Meter",
+    [0x15] = "Wheel(secondary)",
+    [0x17] = "Wheel",
+    [0x18] = "ES Wheel",         -- base-MCU steering module; 0x17 is silent on ES
+    [0x19] = "Pedals",
+    [0x1A] = "Shifter",
+    [0x1B] = "Handbrake",
+    [0x1C] = "E-Stop",
+    [0x1D] = "Reserved/mBooster2",
+    [0x1E] = "Reserved/mBooster3",
 }
 
--- ─── Sub-command tables ─────────────────────────────────────────────────────
-
--- Group 0x43 / 0xC3 — Telemetry / SerialStream
-local CMD_NAMES_43 = {
-    [0x7D23] = "Live Telemetry",
-    [0x7C00] = "SerialStream Data",
-    [0x7C23] = "Dashboard Activation",
-    [0x7C27] = "Display Config",
-    [0xFC00] = "Session Ack",
-}
-
--- Group 0x3F / 0xBF — Wheel LEDs
-local CMD_NAMES_3F = {
-    [0x1A00] = "RPM LED Position",
-    [0x1A01] = "Button LED State",
-}
-
--- Group 0x40 / 0xC0 — Wheel/Dash Config
-local CMD_NAMES_40 = {
-    [0x0900] = "Config Reset",
-    [0x1B00] = "Brightness Page 0",
-    [0x1B01] = "Brightness Page 1",
-    [0x1C00] = "Page Config 0",
-    [0x1C01] = "Page Config 1",
-    [0x1D00] = "Page Config 0 (alt)",
-    [0x1D01] = "Page Config 1 (alt)",
-    [0x1E00] = "Channel Enable Page 0",
-    [0x1E01] = "Channel Enable Page 1",
-    [0x1F00] = "LED Color Page 0",
-    [0x1F01] = "LED Color Page 1",
-    [0x2800] = "Get Dashboard Mode",
-    [0x2801] = "Get Active Page",
-    [0x2802] = "Set Multi-Channel Mode",
-}
-
--- Group 0x41 / 0xC1 — Telemetry Enable
-local CMD_NAMES_41 = {
-    [0xFDDE] = "Telemetry Enable Signal",
-}
-
--- Group 0x2D / 0xAD — Sequence Counter
-local CMD_NAMES_2D = {
-    [0xF531] = "Sequence Counter",
-}
-
--- Group 0x0E / 0x8E — Parameter Table / Debug
-local CMD_NAMES_0E = {
-    [0x0000] = "Parameter Read",
-    [0x0001] = "Parameter Read (idx 1)",
-    -- 0x05XX = Debug log text (handled dynamically)
-}
-
--- Group 0x0A — EEPROM Direct Access
-local CMD_NAMES_0A = {
-    [0x0005] = "EEPROM Select Table",
-    [0x0006] = "EEPROM Read Table",
-    [0x0007] = "EEPROM Select Address",
-    [0x0008] = "EEPROM Read Address",
-    [0x0009] = "EEPROM Write Int",
-    [0x000A] = "EEPROM Read Int",
-    [0x000B] = "EEPROM Write Float",
-    [0x000C] = "EEPROM Read Float",
-}
-
--- Group 0x28 — Base Parameters
-local CMD_NAMES_28 = {
-    [0x0100] = "Base Param 0x01",
-    [0x0200] = "Base Param 0x02",
-    [0x1700] = "Wheel Param 0x17",
-}
-
--- Group 0x1F / 0x9F — Main Settings
-local CMD_NAMES_1F = {
-    [0x0800] = "Get LED Status",
-    [0x0900] = "Set LED Status",
-    [0x1300] = "Set Compat Mode",
-    [0x1700] = "Get Compat Mode",
-    [0x3300] = "Set Work Mode",
-    [0x3400] = "Get Work Mode",
-    [0x3500] = "Set Default FFB Status",
-    [0x3600] = "Get Default FFB Status",
-    [0x4600] = "Get BLE Mode",
-    [0x4700] = "Set BLE Mode",
-    [0x4C00] = "Set Interpolation",
-    [0x4D00] = "Get Interpolation",
-}
-
--- Map group byte to its sub-command table (works for both request and response)
-local function cmd_table_for_group(g)
-    local base_g = bit.band(g, 0x7F)  -- strip response bit
-    if base_g == 0x43 then return CMD_NAMES_43 end
-    if base_g == 0x3F then return CMD_NAMES_3F end
-    if base_g == 0x40 then return CMD_NAMES_40 end
-    if base_g == 0x41 then return CMD_NAMES_41 end
-    if base_g == 0x2D then return CMD_NAMES_2D end
-    if base_g == 0x0E then return CMD_NAMES_0E end
-    if base_g == 0x0A then return CMD_NAMES_0A end
-    if base_g == 0x28 then return CMD_NAMES_28 end
-    if base_g == 0x1F then return CMD_NAMES_1F end
-    return nil
+local DEVICE_NAMES = {}
+for d, name in pairs(REQ_DEVICES) do
+    DEVICE_NAMES[d] = string.format("%s(0x%02X)", name, d)
+    local swapped = ((d & 0x0F) << 4) | ((d & 0xF0) >> 4)
+    DEVICE_NAMES[swapped] = string.format("%s-resp(0x%02X)", name, swapped)
 end
 
--- ─── Proto fields ────────────────────────────────────────────────────────────
+-- ─── Sub-command tables ─────────────────────────────────────────────────────
+-- Keyed by a lowercase hex string of the command-ID prefix. Lookup tries the
+-- longest prefix first (4 bytes down to 1), so `1f 00 ff 03` resolves ahead of
+-- the generic `1f`. Names follow the device command tables in
+-- docs/protocol/devices/ and docs/protocol/leds/.
+
+local CMDS = {}
+
+-- Group 0x0A — EEPROM direct access (docs/protocol/settings/eeprom-0x0A.md)
+CMDS[0x0A] = {
+    ["0005"] = "select-table",   ["0006"] = "read-table",
+    ["0007"] = "select-address", ["0008"] = "read-address",
+    ["0009"] = "write-int",      ["000a"] = "read-int",
+    ["000b"] = "write-float",    ["000c"] = "read-float",
+}
+
+-- Group 0x01 — main lifecycle
+CMDS[0x01] = { ["02"] = "soft-reboot" }
+
+-- Group 0x1E — main output (dev 0x12)
+CMDS[0x1E] = { ["39"] = "output" }
+
+-- Group 0x1F — main settings (docs/protocol/devices/main-hub-0x12.md § 0x1F)
+-- plus the PitHouse poll set from docs/protocol/periodic/group-0x1F.md and the
+-- AB9 writes from docs/protocol/devices/ab9-shifter.md (own USB device).
+CMDS[0x1F] = {
+    ["08"] = "get-led-status",       ["09"] = "set-led-status",
+    ["13"] = "set-compat-mode",      ["17"] = "get-compat-mode",
+    ["33"] = "set-work-mode",        ["34"] = "get-work-mode",
+    ["35"] = "set-default-ffb",      ["36"] = "get-default-ffb",
+    ["46"] = "get-ble-mode",         ["47"] = "set-ble-mode",
+    ["4c"] = "set-interpolation",    ["4d"] = "get-interpolation",
+    ["4e08"] = "set-spring-gain",    ["4f08"] = "get-spring-gain",
+    ["4e09"] = "set-damper-gain",    ["4f09"] = "get-damper-gain",
+    ["4e0a"] = "set-inertia-gain",   ["4f0a"] = "get-inertia-gain",
+    ["4e0b"] = "set-friction-gain",  ["4f0b"] = "get-friction-gain",
+    -- PitHouse hub-config poll set (semantics undecoded)
+    ["0a"] = "hub-poll 0a",  ["0f"] = "hub-poll 0f",  ["10"] = "hub-poll 10",
+    ["18"] = "hub-poll 18",  ["19"] = "hub-poll 19",  ["20"] = "hub-poll 20",
+    ["21"] = "hub-poll 21",  ["23"] = "hub-poll 23",  ["25"] = "hub-poll 25",
+    ["55"] = "calibration-scalar", ["56"] = "calibration-triples",
+    -- AB9 active shifter (dev 0x12 on VID 346E PID 1000)
+    ["d300"] = "ab9 shifter-mode-set",
+    ["5d"]   = "ab9 mode/online-toggle",
+    ["0a01"] = "ab9 gearshift-intensity",
+    ["0a05"] = "ab9 engine-vib-config",
+    ["0b02"] = "ab9 engine-pulse-a",
+    ["0b03"] = "ab9 engine-pulse-b",
+}
+
+-- Groups 0x20 / 0x22 — base ambient LEDs
+-- (docs/protocol/leds/base-ambient-0x20-0x22.md)
+local AMBIENT_CMDS = {
+    ["1a"] = "live-color-chunk",  ["1b"] = "live-bitmask",
+    ["1c"] = "indicator-state",   ["1d"] = "standby-mode",
+    ["1e"] = "standby-interval",  ["1f02"] = "brightness",
+    ["1fff"] = "brightness",      ["20"] = "led-color",
+    ["21"] = "sleep-mode",        ["22"] = "sleep-timeout",
+    ["2301"] = "sleep-breath-interval", ["24"] = "sleep-brightness",
+    ["25"] = "sleep-led-color",   ["26"] = "startup-color",
+    ["27"] = "shutdown-color",
+}
+CMDS[0x20] = AMBIENT_CMDS
+CMDS[0x22] = AMBIENT_CMDS
+
+-- Groups 0x23 / 0x24 — pedals settings (docs/protocol/devices/pedals-0x19.md)
+local PEDAL_CMDS = {
+    ["01"] = "throttle-dir", ["02"] = "throttle-min", ["03"] = "throttle-max",
+    ["04"] = "brake-dir",    ["05"] = "brake-min",    ["06"] = "brake-max",
+    ["07"] = "clutch-dir",   ["08"] = "clutch-min",   ["09"] = "clutch-max",
+    ["0d"] = "compat-mode",
+    ["0e"] = "throttle-y1", ["0f"] = "throttle-y2", ["10"] = "throttle-y3",
+    ["11"] = "throttle-y4", ["1b"] = "throttle-y5",
+    ["12"] = "brake-y1",    ["13"] = "brake-y2",    ["14"] = "brake-y3",
+    ["15"] = "brake-y4",    ["1c"] = "brake-y5",
+    ["16"] = "clutch-y1",   ["17"] = "clutch-y2",   ["18"] = "clutch-y3",
+    ["19"] = "clutch-y4",   ["1d"] = "clutch-y5",
+    ["1a"] = "brake-angle-ratio",
+    ["1e"] = "throttle-hid-source", ["1f"] = "throttle-hid-cmd",
+    -- mBooster shares group 0x24 (Protocol/MozaMBoosterProtocol.cs)
+    ["b1"] = "mBooster motor-write",
+}
+CMDS[0x23] = PEDAL_CMDS
+CMDS[0x24] = PEDAL_CMDS
+CMDS[0x25] = { ["01"] = "throttle-output", ["02"] = "brake-output",
+               ["03"] = "clutch-output" }
+CMDS[0x26] = { ["0c"] = "throttle-calib-start", ["0d"] = "brake-calib-start",
+               ["0e"] = "clutch-calib-start",   ["10"] = "throttle-calib-stop",
+               ["11"] = "brake-calib-stop",     ["12"] = "clutch-calib-stop" }
+
+-- Groups 0x28 / 0x29 — wheelbase settings
+-- (docs/protocol/devices/wheelbase-0x13.md § 0x28/0x29,
+--  Protocol/MozaCommandDatabase.cs "base-*")
+local BASE_CMDS = {
+    ["01"] = "limit",              ["02"] = "ffb-strength",
+    ["04"] = "inertia",            ["07"] = "damper",
+    ["08"] = "friction",           ["09"] = "spring",
+    ["0a"] = "speed",              ["0c"] = "road-sensitivity",
+    ["0d"] = "protection",         ["0e"] = "equalizer1",
+    ["0f"] = "equalizer2",         ["10"] = "equalizer3",
+    ["11"] = "equalizer4",         ["12"] = "torque",
+    ["13"] = "natural-inertia",    ["14"] = "equalizer5",
+    ["16"] = "natural-inertia-en", ["17"] = "max-angle",
+    ["18"] = "ffb-reverse",        ["19"] = "speed-damping",
+    ["1a"] = "speed-damping-point",["1b"] = "soft-limit-strength",
+    ["1c"] = "soft-limit-retain",  ["1e"] = "performance-output",
+    ["1f"] = "soft-limit-stiffness",
+    ["2201"] = "ffb-curve-x1", ["2202"] = "ffb-curve-x2",
+    ["2203"] = "ffb-curve-x3", ["2204"] = "ffb-curve-x4",
+    ["2205"] = "ffb-curve-y1", ["2206"] = "ffb-curve-y2",
+    ["2207"] = "ffb-curve-y3", ["2208"] = "ffb-curve-y4",
+    ["2209"] = "ffb-curve-y5",
+    ["2c"] = "equalizer6",         ["2d"] = "protection-mode",
+    ["2e"] = "gearshift-vibration",
+    ["32"] = "equalizer7", ["33"] = "equalizer8",
+    ["34"] = "equalizer9", ["35"] = "equalizer10",
+    ["fe"] = "ffb-disable",
+}
+CMDS[0x28] = BASE_CMDS
+CMDS[0x29] = BASE_CMDS
+
+-- Group 0x2A — calibration / startup chime / partner-SDK
+CMDS[0x2A] = {
+    ["01"] = "calibration",
+    ["4300"] = "music-preview",     ["4301"] = "music-index-set",
+    ["4302"] = "music-index-get",   ["4303"] = "music-enabled-set",
+    ["4304"] = "music-enabled-get",
+    ["4400"] = "music-volume-set",  ["4401"] = "music-volume-get",
+    ["40"] = "feedforward (partner-SDK)",
+    ["41"] = "high-freq-torque (partner-SDK)",
+}
+
+-- Group 0x2B — base status read
+CMDS[0x2B] = {
+    ["01"] = "state",       ["02"] = "state-err",
+    ["04"] = "mcu-temp",    ["05"] = "mosfet-temp", ["06"] = "motor-temp",
+    -- 07: BE16 biased +500, 0.1 Nm/count => (raw-500)/10. PitHouse torque-curve
+    -- panel polls it at ~18 Hz; read-only, nothing written to enable it.
+    ["07"] = "live-torque",
+}
+
+-- Group 0x2C — motor run-state
+CMDS[0x2C] = { ["01"] = "motor-run-state (partner-SDK)" }
+
+-- Group 0x2D — sequence counter / discrete events
+CMDS[0x2D] = {
+    ["f531"] = "sequence-counter",
+    ["76"]   = "gearshift-event",
+    ["77"]   = "lfe-effect",
+}
+
+-- Groups 0x32 / 0x33 — dash settings + FSR1 wheel page select
+-- (docs/protocol/devices/dash-0x14.md § 0x32/0x33,
+--  docs/protocol/devices/wheel-0x17.md § Dashboard switching)
+local DASH_CMDS = {
+    ["00"] = "fsr1 display-brightness (write)",
+    ["80"] = "fsr1 display-brightness (commit)",
+    ["81"] = "fsr1 dashboard-select",
+    ["05"] = "rpm-timings",       ["07"] = "rpm-display-mode",
+    ["0800"] = "flag-colors",
+    ["0900"] = "rpm-blink-color1", ["0901"] = "rpm-blink-color2",
+    ["0902"] = "rpm-blink-color3", ["0903"] = "rpm-blink-color4",
+    ["0904"] = "rpm-blink-color5", ["0905"] = "rpm-blink-color6",
+    ["0906"] = "rpm-blink-color7", ["0907"] = "rpm-blink-color8",
+    ["0908"] = "rpm-blink-color9", ["0909"] = "rpm-blink-color10",
+    ["0a00"] = "rpm-brightness",  ["0a02"] = "flags-brightness",
+    ["0b00"] = "rpm-color",       ["0b02"] = "flag-color",
+    ["0d"] = "rpm-mode",          ["0e"] = "rpm-value",
+}
+CMDS[0x32] = DASH_CMDS
+CMDS[0x33] = DASH_CMDS
+
+-- Group 0x41 — telemetry enable
+CMDS[0x41] = { ["fdde"] = "send-telemetry (enable)" }
+
+-- Group 0x46 / 0xC6 — E-Stop
+CMDS[0x46] = { ["00"] = "receive-status", ["01"] = "get-status" }
+
+-- Group 0x21 — one-shot main probe (undecoded, PitHouse-only)
+CMDS[0x21] = { ["03"] = "probe (reply AA 55 01 90)" }
+
+-- Group 0x4C — MOZA Stalks status poll (undecoded)
+CMDS[0x4C] = { ["07"] = "status poll" }
+
+-- Group 0x5A — handbrake presence poll (reply body undecoded)
+CMDS[0x5A] = { ["00"] = "presence" }
+
+-- Groups 0x51..0x54 — shifter (docs/protocol/devices/shifter-0x1A.md)
+local SHIFTER_CMDS = {
+    ["01"] = "hid-mode",   ["02"] = "shifter-type/apply-mode",
+    ["03"] = "brightness", ["04"] = "colors",
+    ["05"] = "direction",  ["06"] = "paddle-sync",
+}
+CMDS[0x51] = SHIFTER_CMDS
+CMDS[0x52] = SHIFTER_CMDS
+CMDS[0x53] = { ["01"] = "output-x", ["02"] = "output-y" }
+CMDS[0x54] = { ["03"] = "calibration-start", ["04"] = "calibration-stop" }
+
+-- Groups 0x5B..0x5E — handbrake (docs/protocol/devices/handbrake-0x1B.md)
+local HANDBRAKE_CMDS = {
+    ["01"] = "direction", ["02"] = "min", ["03"] = "max",
+    ["04"] = "hid-mode",  ["05"] = "y1",  ["06"] = "y2", ["07"] = "y3",
+    ["08"] = "y4",        ["09"] = "y5",  ["0a"] = "button-threshold",
+    ["0b"] = "mode",
+}
+CMDS[0x5B] = HANDBRAKE_CMDS
+CMDS[0x5C] = HANDBRAKE_CMDS
+CMDS[0x5D] = { ["01"] = "output" }
+CMDS[0x5E] = { ["03"] = "calibration-start", ["04"] = "calibration-stop" }
+
+-- Group 0x64 — hub connected-device status
+-- (docs/protocol/devices/main-hub-0x12.md § 0x64)
+CMDS[0x64] = {
+    ["02"] = "base",     ["03"] = "port1",    ["04"] = "port2",
+    ["0501"] = "port3",  ["06"] = "pedals1",  ["07"] = "pedals2",
+    ["08"] = "pedals3",
+    ["0101"] = "slot1 probe", ["0102"] = "slot2 probe", ["0103"] = "slot3 probe",
+}
+
+-- Groups 0x3F / 0x40 — wheel config + LED groups
+-- Sources: docs/protocol/devices/wheel-0x17.md (§ 0x3F/0x40, Old-Protocol,
+-- Extended LED Group Architecture), docs/protocol/leds/color-commands.md,
+-- docs/protocol/leds/wheel-groups-0x3F-0x40.md,
+-- docs/protocol/channel-config/group-0x40-burst.md.
+-- LED group ids: 0 Shift/RPM, 1 Button, 2 Single, 3 Rotary/knob, 4 Ambient.
+local WHEEL_CMDS = {
+    ["00"] = "colors",              ["01"] = "brightness",
+    ["02"] = "rpm-timings",         ["03"] = "paddles-mode",
+    ["04"] = "rpm-indicator-mode (old proto)",
+    ["05"] = "stick-mode",
+    ["07"] = "set-rpm-display-mode",
+    ["08"] = "get-rpm-display-mode",
+    ["0801"] = "paddles-calib-start", ["0802"] = "paddles-calib-save",
+    ["09"] = "clutch-point",        ["0900"] = "config-reset (0x40 burst)",
+    ["0a"] = "knob-mode",           ["0b"] = "paddle-adaptive-mode",
+    ["0c"] = "device-info",         ["0d"] = "paddle-button-mode",
+    ["0e00"] = "flag-colors1",      ["0e01"] = "flag-colors2",
+    ["0f00"] = "rpm-blink-color1",  ["0f01"] = "rpm-blink-color2",
+    ["0f02"] = "rpm-blink-color3",  ["0f03"] = "rpm-blink-color4",
+    ["0f04"] = "rpm-blink-color5",  ["0f05"] = "rpm-blink-color6",
+    ["0f06"] = "rpm-blink-color7",  ["0f07"] = "rpm-blink-color8",
+    ["0f08"] = "rpm-blink-color9",  ["0f09"] = "rpm-blink-color10",
+    ["10"] = "meter-auto-rotation",
+    ["13"] = "key-combination",
+    ["1400"] = "old-rpm-brightness",
+    ["1500"] = "old-rpm-color",     ["1502"] = "flag-color",
+    ["16"] = "rpm-interval",        ["17"] = "rpm-mode",
+    ["18"] = "rpm-value",
+    ["1900"] = "live-colors g0/RPM",   ["1901"] = "live-colors g1/button",
+    ["1902"] = "live-colors g2/single",["1903"] = "live-colors g3/knob",
+    ["1904"] = "live-colors g4/ambient",
+    ["1a00"] = "live-bitmask g0/RPM",  ["1a01"] = "live-bitmask g1/button",
+    ["1a02"] = "live-bitmask g2/single",["1a03"] = "live-bitmask g3/knob",
+    ["1a04"] = "live-bitmask g4/ambient",
+    ["1b00"] = "brightness g0/RPM",    ["1b01"] = "brightness g1/button",
+    ["1b02"] = "brightness g2/flags",  ["1b03"] = "brightness g3/knob",
+    ["1b04"] = "brightness g4/ambient",
+    ["1c00"] = "telemetry-mode / normal-mode g0",
+    ["1c01"] = "normal-mode g1",       ["1c02"] = "normal-mode g2",
+    ["1c03"] = "normal-mode g3",       ["1c04"] = "normal-mode g4",
+    ["1d00"] = "telemetry-idle-effect / standby-mode g0",
+    ["1d01"] = "buttons-idle-effect / standby-mode g1",
+    ["1d02"] = "standby-mode g2",      ["1d03"] = "standby-mode g3",
+    ["1d04"] = "standby-mode g4",
+    ["1e00"] = "telemetry-idle-interval / chan-enable page0",
+    ["1e01"] = "buttons-idle-interval / chan-enable page1",
+    ["1e03"] = "chan-enable page3",
+    ["1f00"] = "led-color g0/RPM",     ["1f01"] = "led-color g1/button",
+    ["1f02"] = "led-color g2/single",  ["1f03"] = "led-color g3/knob",
+    ["1f04"] = "led-color g4/ambient",
+    ["20"] = "idle-mode",           ["21"] = "idle-timeout",
+    ["22"] = "idle-speed",          ["23"] = "sleep-breath-brightness",
+    ["24"] = "idle-color",          ["25"] = "startup-color",
+    ["26"] = "paddle-thresholds",
+    -- cmd 0x27 is dual-purpose: knob "Active" LED colour (0x3F write / 0x40
+    -- read role byte) and the per-page dashboard binding fingerprint seen in
+    -- the 0x40 config burst. Docs cover both; disambiguate by payload length.
+    ["27"] = "knob-active-color / page-binding-fingerprint",
+    ["2800"] = "get-dashboard-mode",   ["2801"] = "get-active-page",
+    ["2802"] = "set-multi-channel-mode",
+    ["2900"] = "display-setting 29:00",
+    ["2a"] = "rotary-signal-mode / display-setting",
+}
+CMDS[0x3F] = WHEEL_CMDS
+CMDS[0x40] = WHEEL_CMDS
+CMDS[0x3E] = { ["0b"] = "newer-wheel LED cmd" }
+
+-- Group 0x43 — telemetry / SerialStream (docs/protocol/telemetry/,
+-- docs/protocol/sessions/, docs/protocol/devices/wheel-0x17.md § 0x43)
+CMDS[0x43] = {
+    ["7d23"] = "live-telemetry",
+    ["7c00"] = "session chunk",
+    ["fc00"] = "session ack",
+    ["7c23"] = "dashboard-activate",
+    ["7c27"] = "display-config",
+    ["7c1e"] = "display-settings",
+    ["b8"]   = "wheel-input-event",
+    -- 1-byte forms addressed to the display sub-device are identity probes,
+    -- decoded separately (see decode_43).
+}
+
+-- Chunk type names (docs/protocol/sessions/chunk-format.md)
+local SS_TYPE_NAMES = {
+    [0x00] = "control / end marker",
+    [0x01] = "data",
+    [0x81] = "session open",
+}
+
+-- FF-record kinds on session 0x01/0x02
+-- (docs/protocol/sessions/session-0x02-ff-init.md)
+local FF_KINDS = {
+    [2]  = "init_nonce",     [4]  = "dashboard-switch",
+    [5]  = "handshake",      [7]  = "init_enum",
+    [8]  = "init_catalog_a", [9]  = "ticker",
+    [10] = "wheel_init_a",   [11] = "init_catalog_b",
+    [14] = "device-log request", [15] = "device-log ack",
+    [16] = "wheel_init_b",
+}
+
+-- Session 0x01 typed sub-msg registry
+-- (docs/protocol/sessions/session-0x01-channel-protocol.md)
+local SESS01_TYPES = {
+    [0x00] = "end/ack marker",
+    [0x01] = "tier-def (subscription)",
+    [0x03] = "wheel handshake response",
+    [0x04] = "catalog URL announcement",
+    [0x05] = "string value push",
+    [0x06] = "seq-ack",
+    [0x07] = "init / tier-def version",
+}
+
+-- 6-byte upload sub-message types
+-- (docs/protocol/dashboard-upload/6-byte-submsg-header.md)
+local SUBMSG_TYPES = {
+    [0x01] = "ready/progress ack (dev->host)",
+    [0x02] = "metadata (host->dev)",
+    [0x03] = "content (host->dev)",
+    [0x08] = "dir-listing probe (host->dev)",
+    [0x0a] = "dir-listing reply (dev->host)",
+    [0x11] = "complete ack (dev->host)",
+}
+
+-- Identity response groups wrapped inside 0x43/0xC3 for the display
+-- sub-device (docs/protocol/identity/display-sub-device.md)
+local WRAPPED_IDENT = {
+    [0x80] = "keepalive ack",  [0x82] = "product type",
+    [0x84] = "device type",    [0x85] = "capabilities",
+    [0x86] = "MCU UID",        [0x87] = "model name",
+    [0x88] = "HW version",     [0x89] = "presence",
+    [0x8F] = "SW version",     [0x90] = "serial number",
+    [0x91] = "identity-11",
+}
+
+-- FSR1 group-0x42 record types → dashboard index list
+-- (docs/protocol/devices/wheel-0x17.md § Full index→type map)
+local FSR1_TYPES = {
+    [0x01] = "type 01 (idx 0, power-on default)",
+    [0x02] = "type 02 (idx 1, brake dash)",
+    [0x03] = "type 03 (idx 4, 9)",
+    [0x04] = "type 04 (idx 5, 6, 13, 14)",
+    [0x05] = "type 05 (idx 8)",
+    [0x06] = "type 06 (idx 2, 3, 7)",
+    [0x08] = "type 08 (idx 10)",
+    [0x09] = "type 09 (idx 11)",
+    [0x0B] = "type 0b",
+    [0x0C] = "type 0c (idx 15, 18)",
+    [0x0D] = "type 0d (background tyre/status cache)",
+    [0x0E] = "type 0e (idx 12)",
+    [0x11] = "type 11 (idx 17, GT Style A)",
+    [0x12] = "type 12 (idx 17, GT Style B)",
+}
+
+-- mBooster effect ids (Protocol/MozaMBoosterProtocol.cs)
+local MB_EFFECTS = {
+    [1] = "ABS", [2] = "Lockup", [3] = "Threshold", [4] = "Engine",
+    [9] = "Road Texture",
+}
+
+-- LFE effect ids (Protocol/MozaBaseLfeProtocol.cs, group 0x2D cmd 0x77)
+local LFE_EFFECTS = { [0] = "gearshift", [1] = "engine", [2] = "abs" }
+
+-- Groups whose payload has no command-ID prefix at all: the payload is a
+-- record/value stream. Never label their first bytes as a "Cmd ID".
+--   0x00 bus heartbeat (N=0)
+--   0x35/0x36 CM1 keyed value stream (payload = [key u16 BE][f32 BE] * N)
+--   0x42 FSR1 display push (payload = [type][b1][b2][00][00][data])
+--   0x43 handled entirely by decode_43 (opcode, keepalive, or wrapped identity)
+local NO_CMD_ID = {
+    [0x00] = true, [0x35] = true, [0x36] = true, [0x42] = true, [0x43] = true,
+}
+
+-- ─── Proto fields ───────────────────────────────────────────────────────────
 
 local pf = {
-    -- Frame skeleton
-    start       = ProtoField.uint8 ("moza.start",       "Start (0x7E)",       base.HEX),
-    n           = ProtoField.uint8 ("moza.n",            "Payload Length (N)", base.DEC),
-    group       = ProtoField.uint8 ("moza.group",        "Group",              base.HEX, GROUP_NAMES),
-    device      = ProtoField.uint8 ("moza.device",       "Device",             base.HEX, DEVICE_NAMES),
-    cmd         = ProtoField.bytes ("moza.cmd",          "Cmd ID"),
-    data        = ProtoField.bytes ("moza.data",         "Data"),
-    checksum    = ProtoField.uint8 ("moza.checksum",     "Checksum",           base.HEX),
-    chk_status  = ProtoField.string("moza.checksum_status", "Checksum Status"),
+    start       = ProtoField.uint8 ("moza.start",     "Start (0x7E)",       base.HEX),
+    n           = ProtoField.uint8 ("moza.n",         "Payload Length (N)", base.DEC),
+    group       = ProtoField.uint8 ("moza.group",     "Group",              base.HEX, GROUP_NAMES),
+    device      = ProtoField.uint8 ("moza.device",    "Device",             base.HEX, DEVICE_NAMES),
+    cmd         = ProtoField.bytes ("moza.cmd",       "Cmd ID"),
+    cmd_name    = ProtoField.string("moza.cmd_name",  "Cmd Name"),
+    data        = ProtoField.bytes ("moza.data",      "Data"),
+    checksum    = ProtoField.uint8 ("moza.checksum",  "Checksum",           base.HEX),
+    chk_calc    = ProtoField.uint8 ("moza.checksum_calculated", "Calculated Checksum", base.HEX),
+    chk_status  = ProtoField.string("moza.checksum_status",     "Checksum Status"),
+    is_response = ProtoField.bool  ("moza.is_response", "Is Response"),
+    wire_len    = ProtoField.uint32("moza.wire_len",  "Wire Length (bytes)", base.DEC),
+    escapes     = ProtoField.uint32("moza.escapes",   "0x7E Escapes",        base.DEC),
+    legacy      = ProtoField.bool  ("moza.legacy_unstuffed", "Legacy Unstuffed Frame"),
 
-    -- Direction indicator
-    is_response = ProtoField.bool  ("moza.is_response",  "Is Response"),
+    -- Live telemetry (0x43 7D 23)
+    t_const4    = ProtoField.bytes ("moza.telem.const4",  "Const (32 00 23 32)"),
+    t_flag      = ProtoField.uint8 ("moza.telem.flag",    "Tier Flag Byte",  base.HEX),
+    t_const20   = ProtoField.uint8 ("moza.telem.const20", "Const (0x20)",    base.HEX),
+    t_live      = ProtoField.bytes ("moza.telem.live",    "Bit-packed Channel Data"),
 
-    -- Telemetry header (0x43 / 7D23)
-    t_const4    = ProtoField.bytes ("moza.telem.const4",   "Const (32 00 23 32)"),
-    t_flag      = ProtoField.uint8 ("moza.telem.flag",     "Flag Byte (tier ID)", base.HEX),
-    t_const20   = ProtoField.uint8 ("moza.telem.const20",  "Const (0x20)",        base.HEX),
-    t_live      = ProtoField.bytes ("moza.telem.live",     "Bit-packed Live Data"),
+    -- SerialStream chunk (0x43 7C 00)
+    ss_session  = ProtoField.uint8 ("moza.ss.session",  "Session ID",       base.HEX),
+    ss_type     = ProtoField.uint8 ("moza.ss.type",     "Chunk Type",       base.HEX, SS_TYPE_NAMES),
+    ss_seq      = ProtoField.uint16("moza.ss.seq",      "Sequence",         base.DEC),
+    ss_port     = ProtoField.uint16("moza.ss.port",     "Port / Session Id",base.DEC),
+    ss_window   = ProtoField.uint16("moza.ss.window",   "Receive Window",   base.DEC),
+    ss_ackseq   = ProtoField.uint16("moza.ss.ack_seq",  "Close Ack Seq",    base.DEC),
+    ss_data     = ProtoField.bytes ("moza.ss.data",     "Chunk Net Data"),
+    ss_crc      = ProtoField.uint32("moza.ss.crc",      "Chunk CRC-32 (LE)",base.HEX),
+    ss_crc_calc = ProtoField.uint32("moza.ss.crc_calculated", "Calculated CRC-32", base.HEX),
+    ss_crc_st   = ProtoField.string("moza.ss.crc_status","CRC Status"),
 
-    -- RPM LED (0x3F / 1A00) — 4 x uint16 LE
-    rpm_pos     = ProtoField.uint16("moza.rpm.position",   "RPM Position (0-1023)", base.DEC),
-    rpm_zero1   = ProtoField.uint16("moza.rpm.zero1",      "Padding (0)",           base.DEC),
-    rpm_max     = ProtoField.uint16("moza.rpm.max",        "RPM Max (1023)",        base.DEC),
-    rpm_zero2   = ProtoField.uint16("moza.rpm.zero2",      "Padding (0)",           base.DEC),
+    -- FF-record envelope (session 0x01 / 0x02)
+    ff_size     = ProtoField.uint32("moza.ff.size",     "FF Record Size",   base.DEC),
+    ff_crc      = ProtoField.uint32("moza.ff.crc",      "FF Inner CRC-32",  base.HEX),
+    ff_kind     = ProtoField.uint32("moza.ff.kind",     "FF Kind",          base.DEC, FF_KINDS),
 
-    -- SerialStream chunk fields (0x43 / 7C00)
-    ss_session  = ProtoField.uint8 ("moza.ss.session",     "Session ID",            base.HEX),
-    ss_type     = ProtoField.uint8 ("moza.ss.type",        "Chunk Type",            base.HEX),
-    ss_seq      = ProtoField.uint16("moza.ss.seq",         "Sequence Number",       base.DEC),
-    ss_payload  = ProtoField.bytes ("moza.ss.payload",     "Chunk Payload"),
+    -- 6-byte upload sub-message header
+    sm_type     = ProtoField.uint8 ("moza.submsg.type", "Sub-msg Type",     base.HEX, SUBMSG_TYPES),
+    sm_size     = ProtoField.uint16("moza.submsg.size", "Sub-msg Body Size",base.DEC),
 
-    -- Session ack fields (0x43 / FC00)
-    ack_session = ProtoField.uint8 ("moza.ack.session",    "Ack Session ID",        base.HEX),
-    ack_seq     = ProtoField.uint16("moza.ack.seq",        "Ack Sequence",          base.DEC),
+    -- Session 0x01 typed sub-msg header
+    sm_type_01  = ProtoField.uint8 ("moza.sess01.type", "Sub-msg Type",     base.HEX, SESS01_TYPES),
+    sm_size32   = ProtoField.uint32("moza.sess01.size", "Sub-msg Body Size",base.DEC),
+    chan_idx    = ProtoField.uint8 ("moza.sess01.channel_idx", "Channel Index", base.DEC),
+    chan_url    = ProtoField.string("moza.sess01.channel_url", "Channel URL"),
+    chan_seq    = ProtoField.uint32("moza.sess01.seq", "Seq-ack Value",     base.DEC),
 
-    -- Sequence counter (0x2D / F531)
-    seq_counter = ProtoField.uint8 ("moza.seq.counter",    "Counter Value",         base.DEC),
+    -- 9-byte compressed message envelope (sessions 0x09 / 0x0a)
+    env_csz     = ProtoField.uint32("moza.env.comp_size",   "Compressed Size + 4", base.DEC),
+    env_usz     = ProtoField.uint32("moza.env.uncomp_size", "Uncompressed Size",   base.DEC),
 
-    -- Telemetry enable (0x41 / FDDE)
-    enable_data = ProtoField.bytes ("moza.enable.data",    "Enable Data"),
+    -- Session ack (0x43 FC 00)
+    ack_session = ProtoField.uint8 ("moza.ack.session", "Ack Session ID",   base.HEX),
+    ack_seq     = ProtoField.uint16("moza.ack.seq",     "Ack Sequence",     base.DEC),
 
-    -- Identity string fields
+    -- Sequence counter (0x2D F5 31)
+    seq_counter = ProtoField.uint8 ("moza.seq.counter",  "Counter Value",   base.DEC),
+
+    -- LED live path (0x3F 19/1A)
+    led_group   = ProtoField.uint8 ("moza.led.group",    "LED Group",       base.DEC),
+    led_index   = ProtoField.uint8 ("moza.led.index",    "LED Index",       base.DEC),
+    led_rgb     = ProtoField.bytes ("moza.led.rgb",      "RGB"),
+    led_active  = ProtoField.uint32("moza.led.active_mask","Active Mask",   base.HEX),
+    led_window  = ProtoField.uint32("moza.led.window_mask","Window Mask",   base.HEX),
+
+    -- LFE (0x2D 77)
+    lfe_effect  = ProtoField.uint8 ("moza.lfe.effect",   "Effect Id",       base.DEC, LFE_EFFECTS),
+    lfe_play    = ProtoField.uint8 ("moza.lfe.play",     "Play Flag",       base.DEC),
+    lfe_period  = ProtoField.uint16("moza.lfe.period",   "Period (BE, ms)", base.DEC),
+    lfe_freq    = ProtoField.uint16("moza.lfe.freq",     "Frequency (BE raw)", base.DEC),
+    lfe_amp     = ProtoField.uint16("moza.lfe.intensity","Intensity (BE raw)", base.DEC),
+
+    -- mBooster (0x24 B1)
+    mb_effect   = ProtoField.uint8 ("moza.mb.effect",    "Effect Type",     base.DEC, MB_EFFECTS),
+    mb_enable   = ProtoField.uint8 ("moza.mb.enable",    "Enable",          base.DEC),
+    mb_param1   = ProtoField.uint8 ("moza.mb.param1",    "Param1",          base.DEC),
+    mb_freq     = ProtoField.uint16("moza.mb.freq",      "Frequency (BE raw)", base.DEC),
+    mb_amp      = ProtoField.uint16("moza.mb.amp",       "Amplitude (BE raw)", base.DEC),
+
+    -- FSR1 group 0x42
+    fsr_type    = ProtoField.uint8 ("moza.fsr1.type",    "Record Type",     base.HEX, FSR1_TYPES),
+    fsr_b1      = ProtoField.uint8 ("moza.fsr1.b1",      "Sub-header b1",   base.HEX),
+    fsr_b2      = ProtoField.uint8 ("moza.fsr1.b2",      "Sub-header b2",   base.HEX),
+    fsr_data    = ProtoField.bytes ("moza.fsr1.data",    "Record Data"),
+    fsr_index   = ProtoField.uint32("moza.fsr1.index",   "Dashboard Index (BE)", base.DEC),
+
+    -- CM1 keyed value stream (0x35 / 0x36)
+    cm1_key     = ProtoField.uint16("moza.cm1.key",      "Field Key",       base.HEX),
+    cm1_value   = ProtoField.float ("moza.cm1.value",    "Value (BE f32)"),
+
+    -- Identity
     id_string   = ProtoField.string("moza.identity.string", "Identity String"),
-    id_subcmd   = ProtoField.uint8 ("moza.identity.subcmd", "Sub-command",           base.HEX),
+    id_subcmd   = ProtoField.uint8 ("moza.identity.subcmd", "Sub-command",  base.HEX),
     id_bytes    = ProtoField.bytes ("moza.identity.bytes",  "Identity Bytes"),
+    inner_group = ProtoField.uint8 ("moza.identity.inner_group", "Wrapped Inner Response", base.HEX, WRAPPED_IDENT),
 
-    -- 0x0E debug/parameter fields
+    -- Group 0x0E
+    dbg_sev     = ProtoField.uint8 ("moza.debug.severity", "Log Severity",  base.HEX),
     dbg_text    = ProtoField.string("moza.debug.text",     "Debug Log Text"),
-    param_table = ProtoField.uint8 ("moza.param.table",    "EEPROM Table",          base.HEX),
-    param_index = ProtoField.uint8 ("moza.param.index",    "Parameter Index",       base.HEX),
+    param_table = ProtoField.uint8 ("moza.param.table",    "EEPROM Table",  base.HEX),
+    param_index = ProtoField.uint8 ("moza.param.index",    "Parameter Index", base.HEX),
+    param_value = ProtoField.bytes ("moza.param.value",    "Parameter Value"),
 
-    -- 0x40 config fields
-    cfg_subcmd  = ProtoField.bytes ("moza.cfg.subcmd",     "Config Sub-command"),
-    cfg_data    = ProtoField.bytes ("moza.cfg.data",       "Config Data"),
-
-    -- Display config (7C27)
-    dcfg_data   = ProtoField.bytes ("moza.dcfg.data",      "Display Config Data"),
+    -- Generic value view
+    cfg_data    = ProtoField.bytes ("moza.cfg.data",       "Value Bytes"),
 }
 
 moza.fields = {}
 for _, v in pairs(pf) do moza.fields[#moza.fields + 1] = v end
+
+-- ─── Expert info ────────────────────────────────────────────────────────────
+
+local ef = {
+    bad_chk   = ProtoExpert.new("moza.expert.bad_checksum", "Bad frame checksum",
+                                expert.group.CHECKSUM, expert.severity.WARN),
+    bad_crc   = ProtoExpert.new("moza.expert.bad_crc", "Bad chunk CRC-32",
+                                expert.group.CHECKSUM, expert.severity.WARN),
+    esc_viol  = ProtoExpert.new("moza.expert.escape_violation",
+                                "0x7E escape violation (lone 0x7E in frame body)",
+                                expert.group.MALFORMED, expert.severity.WARN),
+    truncated = ProtoExpert.new("moza.expert.truncated",
+                                "Frame truncated — continues in a later USB transfer",
+                                expert.group.REASSEMBLE, expert.severity.NOTE),
+    legacy    = ProtoExpert.new("moza.expert.legacy_unstuffed",
+                                "Legacy unstuffed frame (lone 0x7E in body)",
+                                expert.group.PROTOCOL, expert.severity.NOTE),
+}
+moza.experts = { ef.bad_chk, ef.bad_crc, ef.esc_viol, ef.truncated, ef.legacy }
 
 -- ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -299,324 +736,625 @@ local function device_label(d)
     return DEVICE_NAMES[d] or string.format("Dev 0x%02X", d)
 end
 
-local function is_response_group(g)
-    return bit.band(g, 0x80) ~= 0
-end
+local function is_response_group(g) return (g & 0x80) ~= 0 end
+local function base_group(g)        return g & 0x7F end
 
-local function base_group(g)
-    return bit.band(g, 0x7F)
-end
-
--- Compute the Moza checksum over a range of bytes in a tvb
--- checksum = (0x0D + sum of all preceding bytes including 0x7E) % 256
-local function compute_checksum(tvb, offset, count)
-    local sum = 0x0D
-    for i = 0, count - 1 do
-        sum = sum + tvb(offset + i, 1):uint()
+-- CRC-32 (reflected, poly 0xEDB88320, init/xorout 0xFFFFFFFF) — the zlib /
+-- Ethernet CRC used by session chunk trailers and FF-record inner CRCs.
+local crc_tbl = {}
+for i = 0, 255 do
+    local c = i
+    for _ = 1, 8 do
+        if (c & 1) == 1 then c = (c >> 1) ~ 0xEDB88320 else c = c >> 1 end
     end
-    return bit.band(sum, 0xFF)
+    crc_tbl[i] = c & 0xFFFFFFFF
 end
 
--- Attempt to read a null-terminated ASCII string from a tvb range
-local function read_ascii(tvb, offset, maxlen)
+local function crc32(tvbr)
+    local bytes = tvbr:bytes()
+    local crc = 0xFFFFFFFF
+    for i = 0, bytes:len() - 1 do
+        crc = (crc >> 8) ~ crc_tbl[(crc ~ bytes:get_index(i)) & 0xFF]
+        crc = crc & 0xFFFFFFFF
+    end
+    return (crc ~ 0xFFFFFFFF) & 0xFFFFFFFF
+end
+
+-- Longest-prefix command-name lookup for a group.
+local function cmd_lookup(group, tvb, off, n)
+    local tbl = CMDS[base_group(group)]
+    if tbl == nil or n < 1 then return nil, 0 end
+    local maxlen = math.min(4, n)
+    for l = maxlen, 1, -1 do
+        local key = tvb(off, l):bytes():tohex(true)
+        local name = tbl[key]
+        if name then return name, l end
+    end
+    return nil, 0
+end
+
+local function read_ascii(tvb, off, maxlen)
     local s = {}
     for i = 0, maxlen - 1 do
-        local b = tvb(offset + i, 1):uint()
+        local b = tvb(off + i, 1):uint()
         if b == 0 then break end
-        if b >= 0x20 and b <= 0x7E then
-            s[#s + 1] = string.char(b)
-        else
-            s[#s + 1] = "."
-        end
+        if b >= 0x20 and b <= 0x7E then s[#s + 1] = string.char(b)
+        else s[#s + 1] = "." end
     end
     return table.concat(s)
 end
 
--- Check if a byte range looks like printable ASCII
-local function is_ascii(tvb, offset, len)
+local function is_ascii(tvb, off, len)
+    if len <= 0 then return false end
     local printable = 0
     for i = 0, len - 1 do
-        local b = tvb(offset + i, 1):uint()
-        if b >= 0x20 and b <= 0x7E then
-            printable = printable + 1
-        elseif b == 0x00 then
-            -- null padding is fine
-        else
-            return false
-        end
+        local b = tvb(off + i, 1):uint()
+        if b >= 0x20 and b <= 0x7E then printable = printable + 1
+        elseif b ~= 0x00 and b ~= 0x0A and b ~= 0x0D then return false end
     end
     return printable > 0
 end
 
--- ─── SerialStream chunk type names ──────────────────────────────────────────
+-- ─── Payload decoders ───────────────────────────────────────────────────────
+-- All decoders take (tvb, tree, off, n) where `off` is the offset of the
+-- payload's first byte in the (de-stuffed) frame tvb and `n` is N.
 
-local SS_TYPE_NAMES = {
-    [0x00] = "Control/End",
-    [0x01] = "Data",
-    [0x81] = "Session Open",
-}
-
--- ─── Per-command decoders ───────────────────────────────────────────────────
-
--- 0x43 / 7D23 — Live Telemetry
-local function decode_7d23(tvb, subtree, payload_off, n)
-    -- Structure: cmd(2) + const4(4) + flag(1) + 0x20(1) + live_data(N-8)
-    if n < 8 then return end
-
-    subtree:add(pf.t_const4,  tvb(payload_off + 2, 4))
-    local flag = tvb(payload_off + 6, 1):uint()
-    subtree:add(pf.t_flag,    tvb(payload_off + 6, 1)):append_text(
-        string.format("  [tier stream identifier]"))
-    subtree:add(pf.t_const20, tvb(payload_off + 7, 1))
-
-    local live_len = n - 8
-    if live_len <= 0 then
-        subtree:add(tvb(payload_off + 6, 2),
-            string.format("Stub frame (flag=0x%02X, no data — tier inactive)", flag))
+-- 0x43 / 7D 23 — live telemetry value frame
+-- docs/protocol/telemetry/live-stream.md
+local function decode_live_telemetry(tvb, t, off, n)
+    if n < 8 then
+        t:add(pf.data, tvb(off + 2, n - 2)):append_text("  [short 7D 23 frame]")
         return
     end
-
-    local live_off = payload_off + 8
-    local live_tree = subtree:add(pf.t_live, tvb(live_off, live_len))
-    live_tree:set_text(string.format(
-        "Bit-packed Live Data: %d bytes (%d bits), flag=0x%02X",
+    t:add(pf.t_const4,  tvb(off + 2, 4))
+    local flag = tvb(off + 6, 1):uint()
+    t:add(pf.t_flag,    tvb(off + 6, 1))
+        :append_text("  [tier selector; Type02 fw binds widgets to the highest flag]")
+    t:add(pf.t_const20, tvb(off + 7, 1))
+    local live_len = n - 8
+    if live_len <= 0 then
+        t:add(pf.data, tvb(off + 6, 2)):set_text(
+            string.format("Stub frame (flag=0x%02X) — tier has no active channels", flag))
+        return
+    end
+    local lt = t:add(pf.t_live, tvb(off + 8, live_len))
+    lt:append_text(string.format("  (%d bytes / %d bits, flag=0x%02X)",
         live_len, live_len * 8, flag))
 end
 
--- 0x3F / 1A00 — RPM LED Position
-local function decode_rpm_led(tvb, subtree, payload_off, n)
-    if n < 10 then return end  -- cmd(2) + 8 data bytes
-    local pos = tvb(payload_off + 2, 2):le_uint()
-    local pct = pos / 1023 * 100
-    subtree:add(pf.rpm_pos,   tvb(payload_off + 2, 2)):append_text(
-        string.format("  (%.1f%% of redline)", pct))
-    subtree:add(pf.rpm_zero1, tvb(payload_off + 4, 2))
-    subtree:add(pf.rpm_max,   tvb(payload_off + 6, 2))
-    subtree:add(pf.rpm_zero2, tvb(payload_off + 8, 2))
+-- ── Application framing carried inside session chunk net data ──────────────
+--
+-- Each session runs its own envelope. Only the framing that STARTS at the head
+-- of a chunk's net data can be identified from a single frame — application
+-- messages span chunks and this dissector deliberately does not reassemble, so
+-- everything below is labelled "first sub-msg in chunk".
+--
+--   sess 0x01/0x02 → 5-byte typed sub-msg  [type u8][size u32 LE]
+--               (docs/protocol/sessions/session-0x01-channel-protocol.md)
+--   sess 0x01/0x02 → FF-record envelope  [FF][size u32 LE][crc u32 LE][kind u32 LE]
+--               (docs/protocol/sessions/session-0x02-ff-init.md)
+--   sess 0x04..0x07 → 6-byte upload sub-msg [type u8][size u16 LE][pad 3]
+--               (docs/protocol/dashboard-upload/6-byte-submsg-header.md)
+--   sess 0x09/0x0a → 9-byte compressed envelope [flags][csz+4 u32 LE][usz u32 LE]
+--               (docs/protocol/sessions/compressed-0x09-0x0a.md)
+--   sess 0x03/0x0b → 12-byte tile-server envelope (layout not decoded here)
+
+local function try_ff_record(tvb, t, off, len)
+    if len < 13 then return false end
+    if tvb(off, 1):uint() ~= 0xFF then return false end
+    local size = tvb(off + 1, 4):le_uint()
+    if size < 4 or size > 0x100000 then return false end
+    local ft = t:add(moza, tvb(off, math.min(len, 9 + size)), "FF property record")
+    ft:add_le(pf.ff_size, tvb(off + 1, 4))
+    ft:add_le(pf.ff_crc,  tvb(off + 5, 4))
+    ft:add_le(pf.ff_kind, tvb(off + 9, 4))
+    local kind = tvb(off + 9, 4):le_uint()
+    ft:append_text(string.format(": kind=%d (%s), size=%d",
+        kind, FF_KINDS[kind] or "unknown", size))
+    if 9 + size > len then
+        ft:append_text("  [spans further chunks — not reassembled]")
+    end
+    return true
 end
 
--- 0x43 / 7C00 — SerialStream Data (chunk-based transport)
-local function decode_7c00(tvb, subtree, payload_off, n)
-    if n < 6 then return end  -- cmd(2) + session(1) + type(1) + seq(2) minimum
-    local session = tvb(payload_off + 2, 1):uint()
-    local chunk_type = tvb(payload_off + 3, 1):uint()
-    local seq = tvb(payload_off + 4, 2):le_uint()
+local function try_sess01_submsg(tvb, t, off, len)
+    if len < 5 then return false end
+    local ty = tvb(off, 1):uint()
+    local name = SESS01_TYPES[ty]
+    if name == nil then return false end
+    local size = tvb(off + 1, 4):le_uint()
+    if size > 0x100000 then return false end
+    local st = t:add(moza, tvb(off, math.min(len, 5 + size)), "Sess-01 sub-msg")
+    st:add(pf.sm_type_01, tvb(off, 1))
+    st:add_le(pf.sm_size32, tvb(off + 1, 4))
+    st:append_text(string.format(": %s, body=%d B (stride %d)", name, size, 5 + size))
+    if ty == 0x04 and size >= 2 and 5 + size <= len then
+        st:add(pf.chan_idx, tvb(off + 5, 1))
+        local url_len = size - 1
+        if url_len > 0 and is_ascii(tvb, off + 6, url_len) then
+            st:add(pf.chan_url, tvb(off + 6, url_len),
+                   read_ascii(tvb, off + 6, url_len))
+        end
+    elseif ty == 0x06 and size == 4 and 9 <= len then
+        st:add_le(pf.chan_seq, tvb(off + 5, 4))
+    end
+    return true
+end
 
-    local type_name = SS_TYPE_NAMES[chunk_type] or string.format("0x%02X", chunk_type)
+local function try_upload_submsg(tvb, t, off, len)
+    if len < 6 then return false end
+    local ty = tvb(off, 1):uint()
+    if SUBMSG_TYPES[ty] == nil then return false end
+    if tvb(off + 3, 3):uint() ~= 0 then return false end   -- pad must be 00 00 00
+    local size = tvb(off + 1, 2):le_uint()
+    local st = t:add(moza, tvb(off, 6), "Upload sub-msg header")
+    st:add(pf.sm_type, tvb(off, 1))
+    st:add_le(pf.sm_size, tvb(off + 1, 2))
+    st:append_text(string.format(": %s, body=%d B (stride %d)",
+        SUBMSG_TYPES[ty], size, 6 + size))
+    return true
+end
 
-    subtree:add(pf.ss_session, tvb(payload_off + 2, 1)):append_text(
-        string.format("  [session %d]", session))
-    subtree:add(pf.ss_type,    tvb(payload_off + 3, 1)):append_text(
-        string.format("  [%s]", type_name))
-    subtree:add(pf.ss_seq,     tvb(payload_off + 4, 2))
+local function try_compressed_envelope(tvb, t, off, len)
+    if len < 11 then return false end
+    if tvb(off, 1):uint() ~= 0x00 then return false end
+    local csz = tvb(off + 1, 4):le_uint()
+    local usz = tvb(off + 5, 4):le_uint()
+    if csz < 6 or csz > 0x400000 or usz == 0 or usz > 0x4000000 then return false end
+    if tvb(off + 9, 1):uint() ~= 0x78 then return false end   -- zlib magic
+    local et = t:add(moza, tvb(off, math.min(len, 9)), "Compressed message envelope")
+    et:add_le(pf.env_csz, tvb(off + 1, 4)):append_text("  [zlib stream is this minus 4]")
+    et:add_le(pf.env_usz, tvb(off + 5, 4))
+    et:append_text(string.format(": zlib %d B -> %d B", csz - 4, usz))
+    return true
+end
 
-    if chunk_type == 0x81 then
-        -- Session open: payload has session_id(2 LE) + window(2 LE)
+-- Sniff the head of a chunk's net data according to the session's envelope.
+local function decode_chunk_body(tvb, t, off, len, session)
+    if len <= 0 then return end
+    local ok = false
+    if session == 0x01 or session == 0x02 then
+        -- Both envelopes appear on both sessions depending on firmware era:
+        -- FF-records dominate sess 0x02, the 5-byte typed framing sess 0x01,
+        -- but KS Pro captures carry type=0x04 catalog URLs on 0x02 as well.
+        ok = try_ff_record(tvb, t, off, len) or try_sess01_submsg(tvb, t, off, len)
+    elseif session >= 0x04 and session <= 0x07 then
+        ok = try_upload_submsg(tvb, t, off, len)
+    elseif session == 0x09 or session == 0x0A then
+        ok = try_compressed_envelope(tvb, t, off, len)
+    end
+    if not ok then
+        -- No recognisable header at this offset: continuation bytes of a
+        -- multi-chunk application message, or an envelope this dissector does
+        -- not decode (sess 0x03 / 0x0b tile-server, legacy 8-byte upload hdr).
+        t:append_text("  [continuation / undecoded envelope]")
+    end
+end
+
+-- 0x43 / 7C 00 — SerialStream chunk
+-- docs/protocol/sessions/chunk-format.md, type-0x81-channel-open.md
+local function decode_chunk(tvb, t, off, n)
+    if n < 6 then
+        if n > 2 then t:add(pf.data, tvb(off + 2, n - 2)) end
+        return
+    end
+    local session = tvb(off + 2, 1):uint()
+    local ctype   = tvb(off + 3, 1):uint()
+    t:add(pf.ss_session, tvb(off + 2, 1))
+    t:add(pf.ss_type,    tvb(off + 3, 1))
+
+    if ctype == 0x81 then
+        -- 7C 00 [sess] 81 [seq LE] [port LE] [window LE]   (N = 10)
+        t:add_le(pf.ss_seq, tvb(off + 4, 2))
+        if n >= 8  then t:add_le(pf.ss_port,   tvb(off + 6, 2)) end
         if n >= 10 then
-            local port = tvb(payload_off + 6, 2):le_uint()
-            local window = tvb(payload_off + 10, 2):le_uint()
-            subtree:add(tvb(payload_off + 6, 2),
-                string.format("Port: %d (0x%04X)", port, port))
-            subtree:add(tvb(payload_off + 10, 2),
-                string.format("Receive Window: %d", window))
+            t:add_le(pf.ss_window, tvb(off + 8, 2))
+                :append_text("  [0x02FD = 765 in every observed open]")
+        end
+        if n > 10 then t:add(pf.data, tvb(off + 10, n - 10)) end
+        return
+    end
+
+    if ctype == 0x00 then
+        -- Close / end marker: seq field carries the ack seq being reclaimed.
+        t:add_le(pf.ss_ackseq, tvb(off + 4, 2))
+        if n > 6 then t:add(pf.data, tvb(off + 6, n - 6)) end
+        return
+    end
+
+    -- type 0x01 data chunk: net data + 4-byte CRC-32 LE trailer.
+    t:add_le(pf.ss_seq, tvb(off + 4, 2))
+    local chunk_len = n - 6
+    if chunk_len < 4 then
+        if chunk_len > 0 then t:add(pf.ss_data, tvb(off + 6, chunk_len)) end
+        return
+    end
+    local net_len = chunk_len - 4
+    if net_len > 0 then
+        t:add(pf.ss_data, tvb(off + 6, net_len))
+    else
+        t:append_text("  [keepalive: 0-byte net data]")
+    end
+    local wire_crc = tvb(off + 6 + net_len, 4):le_uint()
+    local calc_crc = (net_len > 0) and crc32(tvb(off + 6, net_len)) or 0
+    local ci = t:add_le(pf.ss_crc, tvb(off + 6 + net_len, 4))
+    if wire_crc == calc_crc then
+        ci:append_text("  [OK]")
+    else
+        ci:append_text(string.format("  [BAD: computed 0x%08X]", calc_crc))
+        t:add(pf.ss_crc_calc, tvb(off + 6 + net_len, 4), calc_crc)
+        t:add_proto_expert_info(ef.bad_crc)
+    end
+
+    if net_len > 0 then
+        decode_chunk_body(tvb, t, off + 6, net_len, session)
+    end
+end
+
+-- 0x43 / FC 00 — session ack
+local function decode_ack(tvb, t, off, n)
+    if n < 5 then return end
+    t:add(pf.ack_session, tvb(off + 2, 1))
+    t:add_le(pf.ack_seq,     tvb(off + 3, 2))
+    if n > 5 then t:add(pf.data, tvb(off + 5, n - 5)) end
+end
+
+-- 0x43 / 7C 23, 7C 27, 7C 1E — periodic display / activate / settings pushes.
+-- docs/protocol/channel-config/group-0x43-active-display-cycle.md
+local function decode_display_cycle(tvb, t, off, n)
+    if n <= 2 then return end
+    local d = t:add(pf.data, tvb(off + 2, n - 2))
+    if n >= 8 then
+        d:append_text(string.format("  [const=0x%02X flag=0x%02X b2=%d b4=%d]",
+            tvb(off + 2, 1):uint(), tvb(off + 3, 1):uint(),
+            tvb(off + 4, 2):le_uint(), tvb(off + 6, 2):le_uint()))
+    end
+end
+
+-- Display sub-device identity, wrapped in 0x43 / 0xC3.
+-- docs/protocol/identity/display-sub-device.md
+local function decode_wrapped_identity(tvb, t, off, n, is_resp)
+    if n < 1 then return end
+    local b0 = tvb(off, 1):uint()
+    if is_resp then
+        t:add(pf.inner_group, tvb(off, 1))
+        if n < 2 then return end
+        local rest_off, rest_len = off + 1, n - 1
+        -- 0x87/0x88/0x8F/0x90 carry a 1-byte sub-cmd then an ASCII string.
+        if b0 == 0x87 or b0 == 0x88 or b0 == 0x8F or b0 == 0x90 then
+            t:add(pf.id_subcmd, tvb(off + 1, 1))
+            rest_off, rest_len = off + 2, n - 2
+        end
+        if rest_len > 0 then
+            if is_ascii(tvb, rest_off, rest_len) then
+                local s = read_ascii(tvb, rest_off, rest_len)
+                t:add(pf.id_string, tvb(rest_off, rest_len), s)
+            else
+                t:add(pf.id_bytes, tvb(rest_off, rest_len))
+            end
+        end
+    else
+        t:add(pf.id_subcmd, tvb(off, 1)):append_text(
+            string.format("  [identity probe group 0x%02X wrapped in 0x43]", b0))
+        if n > 1 then t:add(pf.data, tvb(off + 1, n - 1)) end
+    end
+end
+
+-- Group 0x43 dispatcher.
+local function decode_43(tvb, t, off, n, group)
+    local is_resp = is_response_group(group)
+    if n == 0 then return end
+    local b0 = tvb(off, 1):uint()
+
+    if n >= 2 then
+        local b1 = tvb(off + 1, 1):uint()
+        if b0 == 0x7D and b1 == 0x23 then return decode_live_telemetry(tvb, t, off, n) end
+        if b0 == 0x7C and b1 == 0x00 then return decode_chunk(tvb, t, off, n) end
+        if b0 == 0xFC and b1 == 0x00 then return decode_ack(tvb, t, off, n) end
+        if b0 == 0x7C and (b1 == 0x23 or b1 == 0x27 or b1 == 0x1E) then
+            return decode_display_cycle(tvb, t, off, n)
+        end
+        if b0 == 0xB8 and n >= 3 then
+            local a, b = tvb(off + 1, 1):uint(), tvb(off + 2, 1):uint()
+            local what = "unknown"
+            if     a == 0x00 and b == 0x02 then what = "next dashboard"
+            elseif a == 0x01 and b == 0x02 then what = "previous dashboard"
+            elseif a == 0x02 and b == 0x00 then what = "next page"
+            elseif a == 0x02 and b == 0x01 then what = "previous page" end
+            t:add(pf.data, tvb(off + 1, n - 1))
+                :append_text(string.format("  [wheel input: %s]", what))
+            return
         end
     end
 
-    local chunk_data_len = n - 6
-    if chunk_data_len > 0 then
-        subtree:add(pf.ss_payload, tvb(payload_off + 6, chunk_data_len))
-    end
+    -- Everything else on 0x43/0xC3 is display sub-device identity traffic
+    -- (1-byte keepalive `00`, presence `09`, and the 0x02..0x11 probes).
+    decode_wrapped_identity(tvb, t, off, n, is_resp)
 end
 
--- 0x43 / FC00 — Session Acknowledgment
-local function decode_fc00(tvb, subtree, payload_off, n)
-    if n < 5 then return end  -- cmd(2) + session(1) + ack_seq(2)
-    local session = tvb(payload_off + 2, 1):uint()
-    local ack_seq = tvb(payload_off + 3, 2):le_uint()
-
-    subtree:add(pf.ack_session, tvb(payload_off + 2, 1)):append_text(
-        string.format("  [session %d]", session))
-    subtree:add(pf.ack_seq,     tvb(payload_off + 3, 2))
-end
-
--- 0x2D / F531 — Sequence Counter
-local function decode_seq_counter(tvb, subtree, payload_off, n)
-    if n < 6 then return end  -- cmd(2) + 4 data bytes (00 00 00 XX)
-    local counter = tvb(payload_off + 5, 1):uint()
-    subtree:add(pf.seq_counter, tvb(payload_off + 5, 1)):append_text(
-        string.format("  [frame sequence %d]", counter))
-    if n > 2 then
-        subtree:add(pf.data, tvb(payload_off + 2, n - 2))
-    end
-end
-
--- 0x41 / FDDE — Telemetry Enable
-local function decode_enable(tvb, subtree, payload_off, n)
-    if n < 6 then return end  -- cmd(2) + 4 data bytes
-    subtree:add(pf.enable_data, tvb(payload_off + 2, n - 2)):append_text(
-        "  [expected: 00 00 00 00 = telemetry active]")
-end
-
--- Identity response groups (0x82, 0x84, 0x85, 0x87, 0x88, 0x8F, 0x90, etc.)
-local function decode_identity_response(tvb, subtree, payload_off, n, group)
+-- Group 0x0E — parameter reader (host->dev) / firmware debug log (dev->host)
+-- docs/protocol/periodic/group-0x0E-param-reader.md
+local function decode_param_debug(tvb, t, off, n, group)
     if n < 1 then return end
+    local c0 = tvb(off, 1):uint()
+    -- Device-initiated firmware logs keep group 0x0E (not 0x8E) and only swap
+    -- the device id — e.g. `0e 71 05 "[INFO]param_manage.c…"`. So treat a
+    -- leading 0x05 as a log line regardless of the group's response bit.
+    if is_response_group(group) or c0 == 0x05 then
+        if c0 == 0x05 then
+            -- 05 [severity/idx] + ASCII log line
+            t:add(pf.dbg_sev, tvb(off, 1)):append_text("  [info log]")
+            local text_off = off + 1
+            local text_len = n - 1
+            if text_len > 0 and is_ascii(tvb, text_off, text_len) then
+                local s = read_ascii(tvb, text_off, text_len)
+                t:add(pf.dbg_text, tvb(text_off, text_len), s)
+            elseif text_len > 0 then
+                t:add(pf.data, tvb(text_off, text_len))
+            end
+            return
+        end
+        if c0 == 0x00 and n >= 3 then
+            t:add(pf.param_index, tvb(off + 1, 1))
+            if n > 3 then t:add(pf.param_value, tvb(off + 3, n - 3)) end
+            return
+        end
+    end
+    -- Request: 00 [table] [index]
+    if n >= 3 and c0 == 0x00 then
+        t:add(pf.param_table, tvb(off + 1, 1))
+        t:add(pf.param_index, tvb(off + 2, 1))
+        if n > 3 then t:add(pf.data, tvb(off + 3, n - 3)) end
+        return
+    end
+    t:add(pf.data, tvb(off, n))
+end
 
+-- Group 0x2D — sequence counter / gearshift / LFE
+-- docs/protocol/devices/wheelbase-0x13.md § 0x2D
+local function decode_2d(tvb, t, off, n)
+    if n < 1 then return end
+    local c0 = tvb(off, 1):uint()
+    if c0 == 0xF5 and n >= 6 then
+        t:add(pf.seq_counter, tvb(off + 5, 1))
+        t:add(pf.data, tvb(off + 2, n - 2))
+        return
+    end
+    if c0 == 0x76 then
+        t:add(pf.data, tvb(off + 1, n - 1)):append_text(
+            "  [gearshift trigger; intensity comes from 0x29 cmd 0x2E]")
+        return
+    end
+    if c0 == 0x77 and n >= 10 then
+        t:add(pf.lfe_effect, tvb(off + 2, 1))
+        t:add(pf.lfe_play,   tvb(off + 3, 1))
+        t:add(pf.lfe_period, tvb(off + 4, 2))
+        local fr = tvb(off + 6, 2):uint()
+        local am = tvb(off + 8, 2):uint()
+        t:add(pf.lfe_freq, tvb(off + 6, 2))
+            :append_text(string.format("  (%.2f Hz)", fr / 65536.0 * 200.0))
+        t:add(pf.lfe_amp,  tvb(off + 8, 2))
+            :append_text(string.format("  (%.1f%%)", am / 65535.0 * 100.0))
+        return
+    end
+    if n > 1 then t:add(pf.data, tvb(off + 1, n - 1)) end
+end
+
+-- Group 0x24 cmd 0xB1 — mBooster motor write
+-- Protocol/MozaMBoosterProtocol.cs
+local function decode_mbooster(tvb, t, off, n)
+    -- 7E 09 24 12  b1 EF EN 00 P1 FH FL AH AL  CK  -> N = 9 (cmd + 8 payload)
+    if n < 9 then return end
+    t:add(pf.mb_effect, tvb(off + 1, 1))
+    t:add(pf.mb_enable, tvb(off + 2, 1))
+    t:add(pf.mb_param1, tvb(off + 4, 1))
+    local fr = tvb(off + 5, 2):uint()
+    local am = tvb(off + 7, 2):uint()
+    t:add(pf.mb_freq, tvb(off + 5, 2))
+        :append_text(string.format("  (%.2f Hz)", fr / 65536.0 * 200.0))
+    t:add(pf.mb_amp,  tvb(off + 7, 2))
+        :append_text(string.format("  (%.1f%%)", am / 65535.0 * 100.0))
+end
+
+-- Groups 0x3F / 0x40 — wheel config, LED live path
+local function decode_wheel_cfg(tvb, t, off, n)
+    if n < 1 then return false end
+    local c0 = tvb(off, 1):uint()
+    local c1 = (n >= 2) and tvb(off + 1, 1):uint() or nil
+
+    -- 19 [G] — 20-byte live colour chunk: 5 x [idx, R, G, B]
+    if c0 == 0x19 and c1 ~= nil and n >= 6 then
+        t:add(pf.led_group, tvb(off + 1, 1))
+        local entries = math.floor((n - 2) / 4)
+        for i = 0, entries - 1 do
+            local eo = off + 2 + i * 4
+            local idx = tvb(eo, 1):uint()
+            local et = t:add(moza, tvb(eo, 4), string.format("LED entry %d", i))
+            et:add(pf.led_index, tvb(eo, 1))
+            et:add(pf.led_rgb,   tvb(eo + 1, 3))
+            if idx == 0xFF then
+                et:append_text(": padding (0xFF)")
+            else
+                et:append_text(string.format(": led %d = #%02X%02X%02X", idx,
+                    tvb(eo + 1, 1):uint(), tvb(eo + 2, 1):uint(), tvb(eo + 3, 1):uint()))
+            end
+        end
+        local rem = (n - 2) % 4
+        if rem > 0 then t:add(pf.data, tvb(off + 2 + entries * 4, rem)) end
+        return true
+    end
+
+    -- 1A [G] — live bitmask: [active u32 LE][window u32 LE] (8-byte form)
+    if c0 == 0x1A and c1 ~= nil then
+        t:add(pf.led_group, tvb(off + 1, 1))
+        if n >= 10 then
+            t:add_le(pf.led_active, tvb(off + 2, 4))
+            t:add_le(pf.led_window, tvb(off + 6, 4))
+                :append_text("  [full addressable LED set for this group]")
+            if n > 10 then t:add(pf.data, tvb(off + 10, n - 10)) end
+        elseif n > 2 then
+            t:add(pf.cfg_data, tvb(off + 2, n - 2))
+                :append_text("  [short bitmask form]")
+        end
+        return true
+    end
+
+    -- 1F [G] FF [N] — static per-LED colour
+    if c0 == 0x1F and n >= 7 then
+        t:add(pf.led_group, tvb(off + 1, 1))
+        t:add(pf.led_index, tvb(off + 3, 1))
+        t:add(pf.led_rgb,   tvb(off + 4, 3))
+        return true
+    end
+
+    -- Generic: cmd prefix already added by the caller; let the shared
+    -- value-bytes path render the tail.
+    return false
+end
+
+-- Group 0x42 — FSR1 fixed-schema display push
+-- docs/protocol/devices/wheel-0x17.md § Group 0x42
+local function decode_fsr1(tvb, t, off, n)
+    if n < 5 then
+        if n > 0 then t:add(pf.data, tvb(off, n)) end
+        return
+    end
+    t:add(pf.fsr_type, tvb(off, 1))
+    t:add(pf.fsr_b1,   tvb(off + 1, 1))
+    t:add(pf.fsr_b2,   tvb(off + 2, 1))
+        :append_text("  [sub-header; does NOT gate field presence — see docs]")
+    if n > 5 then
+        t:add(pf.fsr_data, tvb(off + 5, n - 5))
+            :append_text("  [u16-BE gauge slots from offset 5, u8 tail]")
+    end
+end
+
+-- Groups 0x35 / 0x36 — CM1 keyed value stream: N/6 records of
+-- [key u16 BE][value f32 BE].  docs/protocol/devices/dash-0x14.md § 0x35
+local function decode_cm1(tvb, t, off, n)
+    local recs = math.floor(n / 6)
+    for i = 0, recs - 1 do
+        local ro = off + i * 6
+        local rt = t:add(moza, tvb(ro, 6), string.format("Record %d", i))
+        rt:add(pf.cm1_key,   tvb(ro, 2))
+        rt:add(pf.cm1_value, tvb(ro + 2, 4))
+        rt:append_text(string.format(": key=0x%04X value=%g",
+            tvb(ro, 2):uint(), tvb(ro + 2, 4):float()))
+    end
+    local rem = n % 6
+    if rem > 0 then t:add(pf.data, tvb(off + recs * 6, rem)) end
+end
+
+-- Top-level identity groups 0x02..0x11 (unwrapped).
+-- docs/protocol/identity/wheel-probe-sequence.md
+local function decode_identity(tvb, t, off, n, group)
+    if n < 1 then return end
     local bg = base_group(group)
-
-    -- Groups with a sub-command byte before string data
-    if bg == 0x07 or bg == 0x08 or bg == 0x0F or bg == 0x10 then
-        if n >= 2 then
-            subtree:add(pf.id_subcmd, tvb(payload_off, 1))
-            local str_off = payload_off + 1
-            local str_len = n - 1
-            if str_len > 0 and is_ascii(tvb, str_off, str_len) then
-                local s = read_ascii(tvb, str_off, str_len)
-                subtree:add(pf.id_string, tvb(str_off, str_len), s):append_text(
-                    string.format("  [\"%s\"]", s))
-            else
-                subtree:add(pf.id_bytes, tvb(str_off, str_len))
-            end
-        end
-    elseif bg == 0x04 or bg == 0x05 then
-        -- 4-byte capability/hardware ID data
-        subtree:add(pf.id_bytes, tvb(payload_off, n))
-    elseif bg == 0x06 then
-        -- 12-byte hardware identifier
-        subtree:add(pf.id_bytes, tvb(payload_off, n))
-    elseif bg == 0x02 then
-        -- Protocol version (1 byte)
-        subtree:add(pf.id_bytes, tvb(payload_off, n))
-    elseif bg == 0x09 then
-        -- Presence check response (2 bytes, e.g. 00 01)
-        subtree:add(pf.id_bytes, tvb(payload_off, n)):append_text(
-            "  [sub-device count?]")
-    else
-        -- Generic identity data
-        if n > 0 and is_ascii(tvb, payload_off, n) then
-            local s = read_ascii(tvb, payload_off, n)
-            subtree:add(pf.id_string, tvb(payload_off, n), s)
-        else
-            subtree:add(pf.id_bytes, tvb(payload_off, n))
-        end
-    end
-end
-
--- Identity request groups (0x02, 0x04, 0x05, 0x07, 0x08, 0x0F, 0x10, etc.)
-local function decode_identity_request(tvb, subtree, payload_off, n, group)
-    if n < 1 then return end
-    if group == 0x07 or group == 0x08 or group == 0x0F or group == 0x10 then
-        -- Sub-command byte (e.g. 0x01 for model name, 0x02 for HW rev)
-        subtree:add(pf.id_subcmd, tvb(payload_off, 1))
-        if n > 1 then
-            subtree:add(pf.data, tvb(payload_off + 1, n - 1))
-        end
-    elseif group == 0x04 or group == 0x05 then
-        -- 0x00 + 3 zero bytes
-        subtree:add(pf.data, tvb(payload_off, n))
-    else
-        subtree:add(pf.data, tvb(payload_off, n))
-    end
-end
-
--- 0x0E / 0x8E — Parameter Table / Debug
-local function decode_param_debug(tvb, subtree, payload_off, n, group)
-    if n < 2 then return end
-    local cmd_hi = tvb(payload_off, 1):uint()
-
+    local has_subcmd = (bg == 0x07 or bg == 0x08 or bg == 0x0F or bg == 0x10)
     if is_response_group(group) then
-        if cmd_hi == 0x05 then
-            -- Debug log text (0x05:XX + ASCII)
-            if n > 2 and is_ascii(tvb, payload_off + 2, n - 2) then
-                local text = read_ascii(tvb, payload_off + 2, n - 2)
-                subtree:add(pf.dbg_text, tvb(payload_off + 2, n - 2), text):append_text(
-                    string.format("  [\"%s\"]", text))
-            else
-                subtree:add(pf.data, tvb(payload_off + 2, n - 2))
-            end
-        elseif cmd_hi == 0x00 then
-            -- Parameter value response (cmd=00:00, n=7)
-            subtree:add(pf.data, tvb(payload_off + 2, n - 2)):append_text(
-                "  [parameter value]")
-        else
-            subtree:add(pf.data, tvb(payload_off + 2, n - 2))
+        local so, sl = off, n
+        if has_subcmd and n >= 2 then
+            t:add(pf.id_subcmd, tvb(off, 1))
+            so, sl = off + 1, n - 1
+        end
+        if sl > 0 and is_ascii(tvb, so, sl) then
+            local s = read_ascii(tvb, so, sl)
+            t:add(pf.id_string, tvb(so, sl), s)
+        elseif sl > 0 then
+            local it = t:add(pf.id_bytes, tvb(so, sl))
+            if bg == 0x09 then it:append_text("  [sub-device count]")
+            elseif bg == 0x06 then it:append_text("  [12-byte STM32 MCU UID]")
+            elseif bg == 0x04 then it:append_text("  [byte 2 = dev_type]") end
         end
     else
-        -- Request: 00 [table] [index]
-        if n >= 3 then
-            subtree:add(pf.param_table, tvb(payload_off + 1, 1))
-            subtree:add(pf.param_index, tvb(payload_off + 2, 1))
+        if has_subcmd then
+            t:add(pf.id_subcmd, tvb(off, 1))
+            if n > 1 then t:add(pf.data, tvb(off + 1, n - 1)) end
+        else
+            t:add(pf.data, tvb(off, n))
         end
-        if n > 3 then
-            subtree:add(pf.data, tvb(payload_off + 3, n - 3))
-        end
-    end
-end
-
--- 0x40 / 0xC0 — Wheel/Dash Config
-local function decode_config_40(tvb, subtree, payload_off, n)
-    if n < 2 then return end
-    -- Show the 2-byte sub-command and any data after it
-    subtree:add(pf.cfg_subcmd, tvb(payload_off, 2))
-    if n > 2 then
-        subtree:add(pf.cfg_data, tvb(payload_off + 2, n - 2))
-    end
-end
-
--- 0x43 / 7C27 — Periodic Display Config
-local function decode_7c27(tvb, subtree, payload_off, n)
-    if n < 2 then return end
-    subtree:add(pf.dcfg_data, tvb(payload_off + 2, n - 2))
-end
-
--- 0x43 / 7C23 — Dashboard Activation
-local function decode_7c23(tvb, subtree, payload_off, n)
-    if n > 2 then
-        subtree:add(pf.data, tvb(payload_off + 2, n - 2)):append_text(
-            "  [dashboard activation parameters]")
-    end
-end
-
--- 0x1F — Main Settings
-local function decode_main_settings(tvb, subtree, payload_off, n, group)
-    if n < 1 then return end
-    -- The cmd byte is the sub-command ID; rest is data
-    subtree:add(pf.cfg_subcmd, tvb(payload_off, math.min(n, 2)))
-    if n > 2 then
-        subtree:add(pf.cfg_data, tvb(payload_off + 2, n - 2))
-    elseif n > 1 then
-        subtree:add(pf.cfg_data, tvb(payload_off + 1, n - 1))
-    end
-end
-
--- 0x2B — State Change
-local function decode_state_change(tvb, subtree, payload_off, n)
-    if n > 0 then
-        subtree:add(pf.data, tvb(payload_off, n)):append_text(
-            "  [state change payload]")
-    end
-end
-
--- 0x28 — Base Parameters
-local function decode_base_params(tvb, subtree, payload_off, n)
-    if n < 1 then return end
-    subtree:add(pf.cfg_subcmd, tvb(payload_off, math.min(n, 2)))
-    if n > 2 then
-        subtree:add(pf.cfg_data, tvb(payload_off + 2, n - 2)):append_text(
-            "  [parameter value]")
-    elseif n > 1 then
-        subtree:add(pf.cfg_data, tvb(payload_off + 1, n - 1))
-    end
-end
-
--- 0x1F — Unknown group (0x1F to device 0x12)
-local function decode_1f_main(tvb, subtree, payload_off, n)
-    if n > 0 then
-        subtree:add(pf.data, tvb(payload_off, n)):append_text(
-            string.format("  [settings command, %d bytes]", n))
     end
 end
 
 -- ─── Core frame parser ──────────────────────────────────────────────────────
+
+-- De-stuff one frame starting at `off` in `tvb`.
+-- Mirrors Protocol/MozaSerialConnection.cs ReadLoop exactly.
+-- Returns: status, needed, body_bytearray, wire_len
+--   status = "ok" | "escape" | "truncated"
+local function destuff(tvb, off, len, n)
+    local needed = n + 3            -- group + device + payload + checksum
+    local body = ByteArray.new()
+    body:set_size(needed)
+    local decoded = 0
+    local wp = off + 2
+    while decoded < needed do
+        if wp >= len then return "truncated", needed, body, wp - off end
+        local b = tvb(wp, 1):uint(); wp = wp + 1
+        if b == START then
+            if wp >= len then return "truncated", needed, body, wp - off end
+            local e = tvb(wp, 1):uint(); wp = wp + 1
+            if e ~= START then return "escape", needed, body, wp - off end
+            body:set_index(decoded, START)
+        else
+            body:set_index(decoded, b)
+        end
+        decoded = decoded + 1
+    end
+    return "ok", needed, body, wp - off
+end
+
+-- Wire checksum over the de-stuffed body (group, device, payload), matching
+-- MozaProtocol.CalculateWireChecksumFromParts.
+local function wire_checksum(n, body, body_len)
+    local sum = MAGIC + START + n
+    for i = 0, body_len - 1 do
+        local b = body:get_index(i)
+        sum = sum + b
+        if b == START then sum = sum + START end
+    end
+    return sum & 0xFF
+end
+
+-- Plain (non-escape-aware) checksum over verbatim wire bytes. This is what a
+-- legacy sender that never doubled 0x7E produced — the SimHub plugin's old
+-- CalculateChecksum(), fixed 2026-04-22 (docs/protocol/wire/checksum.md
+-- § Plugin impl note). Captures taken before that fix contain lone 0x7E bytes
+-- inside 7D 23 telemetry payloads and must be read this way.
+local function plain_checksum(n, body)
+    local sum = MAGIC + START + n
+    for i = 0, n + 1 do sum = sum + body:get_index(i) end
+    return sum & 0xFF
+end
+
+-- Resolve one frame at `off`. Tries the stuffed reading first, then the legacy
+-- unstuffed reading; the checksum decides which is real, so mixed-era captures
+-- both decode. Returns:
+--   mode      "stuffed" | "raw" | nil
+--   body      ByteArray of [group, device, payload..., checksum] (nil if mode nil)
+--   wire_len  bytes consumed on the wire
+--   chk_ok    whether the accepted reading's checksum validated
+--   fail      "truncated" | "escape" when mode is nil
+local function read_frame(tvb, off, len, n)
+    local needed = n + 3
+    local status, _, body, wire_len = destuff(tvb, off, len, n)
+
+    if status == "ok" and wire_checksum(n, body, n + 2) == body:get_index(needed - 1) then
+        return "stuffed", body, wire_len, true
+    end
+
+    if off + 2 + needed <= len then
+        local raw = tvb(off + 2, needed):bytes()
+        if plain_checksum(n, raw) == raw:get_index(needed - 1) then
+            return "raw", raw, 2 + needed, true
+        end
+    end
+
+    -- Neither reading validated: surface the complete-but-corrupt frame if we
+    -- have one, otherwise report why we could not frame it at all.
+    if status == "ok" then return "stuffed", body, wire_len, false end
+    return nil, nil, wire_len, false, status
+end
 
 local function parse_frames(tvb, pinfo, tree)
     local len         = tvb:len()
@@ -625,189 +1363,206 @@ local function parse_frames(tvb, pinfo, tree)
     local info_items  = {}
 
     while offset < len do
-        -- Scan for start byte
-        if tvb(offset, 1):uint() ~= 0x7E then
+        if tvb(offset, 1):uint() ~= START then
             offset = offset + 1
+        elseif offset + 2 > len then
+            break                                   -- need start + N
         else
-            if offset + 4 >= len then break end
-            local n         = tvb(offset + 1, 1):uint()
-            local frame_len = n + 5   -- 7E + N + group + device + N*payload + checksum
-            if offset + frame_len > len then break end
+            local n = tvb(offset + 1, 1):uint()
+            if n > 200 then
+                -- Not a plausible length; resync on the next 0x7E.
+                offset = offset + 1
+            else
+                local needed = n + 3
+                local mode, body, wire_len, chk_ok, fail =
+                    read_frame(tvb, offset, len, n)
 
-            local group  = tvb(offset + 2, 1):uint()
-            local device = tvb(offset + 3, 1):uint()
-            local is_resp = is_response_group(group)
-            local bg = base_group(group)
-
-            -- Extract 16-bit command ID when payload >= 2
-            local cmd16 = -1
-            if n >= 2 then
-                cmd16 = bit.bor(bit.lshift(tvb(offset + 4, 1):uint(), 8),
-                                tvb(offset + 5, 1):uint())
-            end
-
-            -- Look up command name from the appropriate table
-            local cmd_tbl = cmd_table_for_group(group)
-            local grp_s = group_label(group)
-            local dev_s = device_label(device)
-            local cmd_s = ""
-            local cmd_name = nil
-
-            if cmd16 >= 0 and cmd_tbl then
-                cmd_name = cmd_tbl[cmd16]
-            end
-
-            -- Special handling for 0x0E debug log detection
-            if cmd_name == nil and bg == 0x0E and cmd16 >= 0 then
-                local cmd_hi = bit.rshift(cmd16, 8)
-                if cmd_hi == 0x05 then
-                    cmd_name = "Debug Log"
-                elseif cmd_hi == 0x00 then
-                    cmd_name = "Parameter Read"
+                if mode == nil and fail == "truncated" then
+                    local ti = tree:add(moza, tvb(offset, len - offset),
+                        string.format("Moza [partial]: N=%d, %d/%d body bytes in this transfer",
+                            n, len - offset - 2, needed))
+                    ti:add_proto_expert_info(ef.truncated)
+                    break
                 end
-            end
 
-            if cmd_name then
-                cmd_s = string.format(" [%s]", cmd_name)
-            elseif cmd16 >= 0 then
-                cmd_s = string.format(" cmd:%04X", cmd16)
-            end
-
-            -- Direction label
-            local dir_s = is_resp and "RSP" or "REQ"
-
-            -- Heartbeat with n=0 is common
-            local heartbeat = (bg == 0x00 and n == 0)
-
-            -- Frame label
-            local frame_label
-            if heartbeat then
-                frame_label = string.format(
-                    "Moza #%d [%s]: Heartbeat → %s",
-                    frame_count + 1, dir_s, dev_s)
-            elseif n == 1 and bg == 0x43 then
-                -- Bare 0x43 keepalive (n=1, payload=0x00 or 0x80)
-                local kbyte = tvb(offset + 4, 1):uint()
-                if kbyte == 0x00 then
-                    frame_label = string.format(
-                        "Moza #%d [%s]: Dash Keepalive → %s",
-                        frame_count + 1, dir_s, dev_s)
-                elseif kbyte == 0x80 then
-                    frame_label = string.format(
-                        "Moza #%d [%s]: Dash Keepalive Ack → %s",
-                        frame_count + 1, dir_s, dev_s)
+                if mode == nil then
+                    local ei = tree:add(moza, tvb(offset, math.min(wire_len, len - offset)),
+                        "Moza [escape violation]: lone 0x7E inside frame body, checksum invalid both ways")
+                    ei:add_proto_expert_info(ef.esc_viol)
+                    offset = offset + 1              -- resync like the read loop
                 else
-                    frame_label = string.format(
-                        "Moza #%d [%s]: %s → %s data:%02X  (N=%d)",
-                        frame_count + 1, dir_s, grp_s, dev_s, kbyte, n)
-                end
-            else
-                frame_label = string.format(
-                    "Moza #%d [%s]: %s → %s%s  (N=%d)",
-                    frame_count + 1, dir_s, grp_s, dev_s, cmd_s, n)
-            end
-
-            local ftree = tree:add(moza, tvb(offset, frame_len), frame_label)
-            ftree:add(pf.start,   tvb(offset,     1))
-            ftree:add(pf.n,       tvb(offset + 1, 1))
-            ftree:add(pf.group,   tvb(offset + 2, 1)):append_text(
-                is_resp and "  [RESPONSE]" or "  [REQUEST]")
-            ftree:add(pf.device,  tvb(offset + 3, 1))
-
-            local payload_off = offset + 4  -- absolute start of N-byte payload
-
-            -- Checksum verification
-            local expected_chk = compute_checksum(tvb, offset, 4 + n)
-            local actual_chk   = tvb(offset + 4 + n, 1):uint()
-            local chk_ok       = (expected_chk == actual_chk)
-            local chk_item     = ftree:add(pf.checksum, tvb(offset + 4 + n, 1))
-            if chk_ok then
-                chk_item:append_text("  [OK]")
-            else
-                chk_item:append_text(
-                    string.format("  [BAD: expected 0x%02X]", expected_chk))
-                ftree:add(pf.chk_status, tvb(offset + 4 + n, 1), "CHECKSUM MISMATCH")
-            end
-
-            -- Decode payload based on group + command
-            if heartbeat then
-                -- No payload for heartbeat frames
-            elseif n >= 2 then
-                ftree:add(pf.cmd, tvb(payload_off, 2))
-
-                -- Dispatch to specialized decoders
-                if bg == 0x43 then
-                    if cmd16 == 0x7D23 then
-                        decode_7d23(tvb, ftree, payload_off, n)
-                    elseif cmd16 == 0x7C00 then
-                        decode_7c00(tvb, ftree, payload_off, n)
-                    elseif cmd16 == 0xFC00 then
-                        decode_fc00(tvb, ftree, payload_off, n)
-                    elseif cmd16 == 0x7C27 then
-                        decode_7c27(tvb, ftree, payload_off, n)
-                    elseif cmd16 == 0x7C23 then
-                        decode_7c23(tvb, ftree, payload_off, n)
-                    elseif n > 2 then
-                        ftree:add(pf.data, tvb(payload_off + 2, n - 2))
-                    end
-                elseif bg == 0x3F and cmd16 == 0x1A00 then
-                    decode_rpm_led(tvb, ftree, payload_off, n)
-                elseif bg == 0x3F and cmd16 == 0x1A01 then
-                    -- Button LED state
-                    if n > 2 then
-                        ftree:add(pf.data, tvb(payload_off + 2, n - 2)):append_text(
-                            "  [button LED data]")
-                    end
-                elseif bg == 0x2D and cmd16 == 0xF531 then
-                    decode_seq_counter(tvb, ftree, payload_off, n)
-                elseif bg == 0x41 and cmd16 == 0xFDDE then
-                    decode_enable(tvb, ftree, payload_off, n)
-                elseif bg == 0x0E then
-                    decode_param_debug(tvb, ftree, payload_off, n, group)
-                elseif bg == 0x40 then
-                    decode_config_40(tvb, ftree, payload_off, n)
-                elseif bg == 0x1F then
-                    decode_main_settings(tvb, ftree, payload_off, n, group)
-                elseif bg == 0x28 then
-                    decode_base_params(tvb, ftree, payload_off, n)
-                elseif bg == 0x2B then
-                    decode_state_change(tvb, ftree, payload_off, n)
-                elseif bg == 0x0A then
-                    -- EEPROM direct access
-                    if n > 2 then
-                        ftree:add(pf.data, tvb(payload_off + 2, n - 2))
-                    end
-                -- Identity groups (request or response)
-                elseif (bg >= 0x02 and bg <= 0x11) then
-                    if is_resp then
-                        decode_identity_response(tvb, ftree, payload_off, n, group)
+                    -- Present the frame from a de-stuffed tvb only when the wire
+                    -- actually carried escapes; otherwise dissect in place so the
+                    -- byte view stays on the real packet.
+                    local escapes = wire_len - (needed + 2)
+                    local ftvb, foff
+                    if escapes > 0 then
+                        local full = ByteArray.new()
+                        full:set_size(needed + 2)
+                        full:set_index(0, START)
+                        full:set_index(1, n)
+                        for i = 0, needed - 1 do
+                            full:set_index(2 + i, body:get_index(i))
+                        end
+                        ftvb = full:tvb(string.format("Moza frame (de-stuffed, %d escape%s)",
+                            escapes, escapes == 1 and "" or "s"))
+                        foff = 0
                     else
-                        decode_identity_request(tvb, ftree, payload_off, n, group)
+                        ftvb = tvb
+                        foff = offset
                     end
-                else
-                    -- Unknown group: show raw data
-                    if n > 2 then
-                        ftree:add(pf.data, tvb(payload_off + 2, n - 2))
+
+                    local group  = body:get_index(0)
+                    local device = body:get_index(1)
+                    local is_resp = is_response_group(group)
+                    local bg = base_group(group)
+                    local grp_s = group_label(group)
+                    local dev_s = device_label(device)
+                    local dir_s = is_resp and "RSP" or "REQ"
+
+                    local payload_off = foff + 4
+                    local cmd_name, cmd_len = nil, 0
+                    if n >= 1 then
+                        cmd_name, cmd_len = cmd_lookup(group, ftvb, payload_off, n)
                     end
+
+                    -- Frame label
+                    local label
+                    if bg == 0x00 and n == 0 then
+                        label = string.format("Moza #%d [%s]: Bus Heartbeat -> %s",
+                            frame_count + 1, dir_s, dev_s)
+                    elseif bg == 0x43 and n == 1 then
+                        local kb = ftvb(payload_off, 1):uint()
+                        if kb == 0x00 then
+                            label = string.format("Moza #%d [%s]: Dash Keepalive -> %s",
+                                frame_count + 1, dir_s, dev_s)
+                        elseif kb == 0x80 then
+                            label = string.format("Moza #%d [%s]: Dash Keepalive Ack -> %s",
+                                frame_count + 1, dir_s, dev_s)
+                        else
+                            label = string.format("Moza #%d [%s]: %s -> %s  probe:%02X",
+                                frame_count + 1, dir_s, grp_s, dev_s, kb)
+                        end
+                    else
+                        local cs = ""
+                        if cmd_name then
+                            cs = string.format(" [%s]", cmd_name)
+                        elseif n >= 2 then
+                            cs = string.format(" cmd:%s",
+                                ftvb(payload_off, math.min(2, n)):bytes():tohex())
+                        elseif n == 1 then
+                            cs = string.format(" cmd:%02X", ftvb(payload_off, 1):uint())
+                        end
+                        label = string.format("Moza #%d [%s]: %s -> %s%s  (N=%d)",
+                            frame_count + 1, dir_s, grp_s, dev_s, cs, n)
+                    end
+
+                    -- Root item always spans the real wire bytes.
+                    local ftree = tree:add(moza, tvb(offset, wire_len), label)
+                    ftree:add(pf.start,  ftvb(foff, 1))
+                    ftree:add(pf.n,      ftvb(foff + 1, 1))
+                    ftree:add(pf.group,  ftvb(foff + 2, 1))
+                        :append_text(is_resp and "  [RESPONSE]" or "  [REQUEST]")
+                    ftree:add(pf.device, ftvb(foff + 3, 1))
+                    ftree:add(pf.is_response, ftvb(foff + 2, 1), is_resp)
+                    ftree:add(pf.wire_len, tvb(offset, wire_len), wire_len)
+                    if escapes > 0 then
+                        ftree:add(pf.escapes, tvb(offset, wire_len), escapes)
+                            :append_text("  [0x7E doubled on wire; body shown de-stuffed]")
+                    end
+                    if mode == "raw" then
+                        ftree:add(pf.legacy, tvb(offset, wire_len), true)
+                            :append_text("  [lone 0x7E in body; pre-2026-04-22 sender]")
+                        ftree:add_proto_expert_info(ef.legacy)
+                    end
+
+                    -- Checksum. `mode` records which reading validated:
+                    -- "stuffed" = escape-aware (current firmware + plugin),
+                    -- "raw" = legacy unstuffed sender.
+                    local expected = (mode == "raw")
+                        and plain_checksum(n, body)
+                        or  wire_checksum(n, body, n + 2)
+                    local actual   = body:get_index(needed - 1)
+                    local ci = ftree:add(pf.checksum, ftvb(foff + 4 + n, 1))
+                    if expected == actual then
+                        ci:append_text(mode == "raw" and "  [OK, legacy unstuffed]" or "  [OK]")
+                    else
+                        ci:append_text(string.format("  [BAD: computed 0x%02X]", expected))
+                        ftree:add(pf.chk_calc, ftvb(foff + 4 + n, 1), expected)
+                        ftree:add(pf.chk_status, ftvb(foff + 4 + n, 1), "CHECKSUM MISMATCH")
+                        ftree:add_proto_expert_info(ef.bad_chk)
+                    end
+
+                    -- Payload
+                    if n >= 1 then
+                        if cmd_len > 0 then
+                            ftree:add(pf.cmd, ftvb(payload_off, cmd_len))
+                            ftree:add(pf.cmd_name, ftvb(payload_off, cmd_len), cmd_name)
+                        elseif n >= 2 and not NO_CMD_ID[bg] then
+                            -- Unrecognised opcode: show the conventional 2-byte
+                            -- command ID so it can still be grepped/filtered.
+                            ftree:add(pf.cmd, ftvb(payload_off, 2))
+                        end
+
+                        local handled = true
+                        if bg == 0x43 then
+                            decode_43(ftvb, ftree, payload_off, n, group)
+                        elseif bg == 0x0E then
+                            decode_param_debug(ftvb, ftree, payload_off, n, group)
+                        elseif bg == 0x2D then
+                            decode_2d(ftvb, ftree, payload_off, n)
+                        elseif bg == 0x42 then
+                            decode_fsr1(ftvb, ftree, payload_off, n)
+                        elseif bg == 0x35 or bg == 0x36 then
+                            decode_cm1(ftvb, ftree, payload_off, n)
+                        elseif bg == 0x24 and ftvb(payload_off, 1):uint() == 0xB1 then
+                            decode_mbooster(ftvb, ftree, payload_off, n)
+                        elseif bg == 0x3F or bg == 0x40 or bg == 0x3E then
+                            handled = decode_wheel_cfg(ftvb, ftree, payload_off, n)
+                        elseif bg == 0x41 then
+                            if n > 2 then
+                                ftree:add(pf.cfg_data, ftvb(payload_off + 2, n - 2))
+                                    :append_text("  [always 00 00 00 00 in captures]")
+                            end
+                        elseif (bg == 0x32 or bg == 0x33)
+                               and ftvb(payload_off, 1):uint() == 0x81 and n >= 5 then
+                            ftree:add(pf.fsr_index, ftvb(payload_off + 1, 4))
+                        elseif bg >= 0x02 and bg <= 0x11 and bg ~= 0x0A and bg ~= 0x0E then
+                            decode_identity(ftvb, ftree, payload_off, n, group)
+                        else
+                            handled = false
+                        end
+
+                        if not handled then
+                            local vo = payload_off + math.max(cmd_len, 0)
+                            local vl = n - math.max(cmd_len, 0)
+                            if vl > 0 then
+                                local vi = ftree:add(pf.cfg_data, ftvb(vo, vl))
+                                if vl <= 4 then
+                                    local be = ftvb(vo, vl):uint()
+                                    vi:append_text(string.format("  (BE = %d)", be))
+                                end
+                            end
+                        end
+                    end
+
+                    -- Info column entry
+                    local entry
+                    if bg == 0x00 and n == 0 then
+                        entry = string.format("HB>%s", dev_s)
+                    elseif bg == 0x43 and n == 1 then
+                        entry = string.format("KA>%s", dev_s)
+                    elseif cmd_name then
+                        entry = string.format("0x%02X>%s [%s]", group, dev_s, cmd_name)
+                    else
+                        entry = string.format("0x%02X>%s", group, dev_s)
+                    end
+                    info_items[#info_items + 1] = entry
+
+                    frame_count = frame_count + 1
+                    offset = offset + wire_len
                 end
-            elseif n == 1 then
-                -- Single-byte payload (e.g. bare 0x43 keepalive)
-                ftree:add(pf.data, tvb(payload_off, 1))
             end
-
-            -- Accumulate info column
-            local info_entry
-            if heartbeat then
-                info_entry = string.format("HB→%s", dev_s)
-            elseif n == 1 and bg == 0x43 then
-                info_entry = string.format("KA→%s", dev_s)
-            else
-                info_entry = string.format("0x%02X→%s%s", group, dev_s, cmd_s)
-            end
-            info_items[#info_items + 1] = info_entry
-
-            frame_count = frame_count + 1
-            offset = offset + frame_len
         end
     end
 
@@ -815,28 +1570,33 @@ local function parse_frames(tvb, pinfo, tree)
         pinfo.cols.protocol:set("MOZA")
         pinfo.cols.info:set(table.concat(info_items, " | "))
     end
-
     return frame_count
 end
 
--- ─── Hook: post-dissector on usbcom layer ───────────────────────────────────
+-- ─── Hook: post-dissector on the usbcom (CDC bulk data) layer ───────────────
 --
--- usbcom.data.out_payload / in_payload are FT_BYTES fields; Lua returns a
--- ByteArray from FieldInfo.value, which we promote to a Tvb for parsing.
+-- usbcom.data.out_payload / in_payload are FT_BYTES fields; FieldInfo.value
+-- yields a ByteArray, which we promote to a Tvb for parsing.
+--
+-- Both fields are extracted (a single URB carries only one direction, but the
+-- field extractor can return several instances when a capture stacks them).
+-- Payloads are scanned rather than requiring byte 0 == 0x7E, so a transfer that
+-- begins mid-frame still surfaces whatever complete frames it contains.
 
 local fi_out = Field.new("usbcom.data.out_payload")
 local fi_in  = Field.new("usbcom.data.in_payload")
 
 function moza.dissector(tvb, pinfo, tree)
-    local fi = fi_out() or fi_in()
-    if fi == nil then return end
-
-    local ba = fi.value          -- ByteArray
-    if ba == nil or ba:len() == 0 then return end
-    if ba:get_index(0) ~= 0x7E then return end   -- quick rejection
-
-    local payload_tvb = ba:tvb("Moza Protocol")
-    parse_frames(payload_tvb, pinfo, tree)
+    local total = 0
+    for _, extractor in ipairs({ fi_out, fi_in }) do
+        for _, fi in ipairs({ extractor() }) do
+            local ba = fi.value
+            if ba ~= nil and ba:len() > 0 then
+                total = total + parse_frames(ba:tvb("Moza Protocol"), pinfo, tree)
+            end
+        end
+    end
+    return total
 end
 
 register_postdissector(moza)

@@ -84,6 +84,10 @@ namespace MozaPlugin.Protocol
             AddCommand("base-mcu-temp",    "base", 43, 0xFF, new byte[] { 4 }, 2, "int");
             AddCommand("base-mosfet-temp", "base", 43, 0xFF, new byte[] { 5 }, 2, "int");
             AddCommand("base-motor-temp",  "base", 43, 0xFF, new byte[] { 6 }, 2, "int");
+            // Live motor torque. BE16 biased by +500 (500 = zero), 0.1 Nm/count;
+            // the sign is only which way the base pulls, so consumers plot
+            // Math.Abs(raw - 500) / 10.0. docs/protocol/devices/wheelbase-0x13.md
+            AddCommand("base-live-torque", "base", 43, 0xFF, new byte[] { 7 }, 2, "int");
 
             // Wheelbase calibration (write group 42)
             AddCommand("base-calibration", "base", 0xFF, 42, new byte[] { 1 }, 2, "int");
@@ -186,6 +190,19 @@ namespace MozaPlugin.Protocol
 
             // ===== WHEEL IDENTITY (read-only, bytes=0 → request sends cmd ID only) =====
             AddCommand("wheel-model-name",  "wheel",  7, 0xFF, new byte[] { 1 }, 0, "array");
+            // Base model name at dev 0x12 (e.g. "R16 Black # MOT-3-V01"). MUST be
+            // DeviceType "main": MozaResponseParser hints every dev-0x12 reply as
+            // "main" and drops commands whose DeviceType differs, so reading this
+            // via wheel-model-name retargeted at 0x12 produced a reply that matched
+            // nothing and left MozaData.BaseModelName permanently empty. That name
+            // is what selects the ambient strip geometry (BaseModelInfo), so an
+            // empty value silently fell back to the 9-LED layout.
+            // Read in two 16-byte chunks and stitched by the inbound handler:
+            // chunk 1 alone is truncated ("R16 Black # MOT-"), which is enough for
+            // the geometry prefix but would put a cut-off product name into the
+            // CoAP device manifest.
+            AddCommand("main-model-name",   "main",   7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("main-model-name-b", "main",   7, 0xFF, new byte[] { 2 }, 0, "array");
             AddCommand("wheel-sw-version",  "wheel", 15, 0xFF, new byte[] { 1 }, 0, "array");
             AddCommand("wheel-hw-version",  "wheel",  8, 0xFF, new byte[] { 1 }, 0, "array");
             AddCommand("wheel-hw-sub",      "wheel",  8, 0xFF, new byte[] { 2 }, 0, "array");
@@ -499,7 +516,16 @@ namespace MozaPlugin.Protocol
             // Generic device-type identity probe (grp 0x04, same shape as wheel-device-type:
             // reply `01 02 XX 06`). Fired at a base/hub-relayed shifter to tell HGP from SGP
             // where the PID isn't visible — a positive identity answer, not a timeout.
+            // Measured `01 02 08 01` on an HGP behind an R5 (bundle 32ZD7KHW).
             AddCommand("shifter-device-type", "shifter", 4, 0xFF, new byte[] { }, 0, "array");
+            // Shared identity groups, same shapes as the wheel/pedals blocks above. A
+            // relayed pedal set at 0x19 answers these, so a shifter at 0x1A plausibly
+            // does too — an answer would carry a self-describing model string and retire
+            // the device-type magic value as the HGP/SGP discriminator. Registered so the
+            // reply is NAMED rather than falling through the group bucket to wheel-*
+            // (the parser's dev-0x1A hint does the rest); logged by DeviceProber.
+            AddCommand("shifter-model-name",  "shifter", 7, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("shifter-hw-version",  "shifter", 8, 0xFF, new byte[] { 1 }, 0, "array");
             // Calibration (write-only, grp 0x54). Best-effort: present in foxblat
             // serial.yml + SDK ShifterCalibrateStart/Finish, absent from the local
             // parameter DB; gated on detection like handbrake calibration.
@@ -729,11 +755,12 @@ namespace MozaPlugin.Protocol
             // capture-verified one and the only one the firmware honours.
             AddCommand("base-ambient-brightness", "main", 0x22, 0x20, new byte[] { 0x1F, 0xFF }, 1, "int");
 
-            // Per-LED static colors. cmd `0x20 [strip] [mode] [led]` + RGB.
-            // strip = 0/1, mode = 1 (constant) / 2 (breath), led = 0..8.
-            // Only LedDeviceManager + UI path that touches all 36 needs these
-            // registered; we add them now so any future per-LED settings UI
-            // can use them without revisiting the database.
+            // Per-LED idle palette. cmd `0x20 [strip] [mode] [led]` + RGB.
+            // The mode byte is the STANDBY-MODE number the palette belongs to,
+            // not a constant/breath enum: only modes 1 (constant) and 2
+            // (breathing) store a palette, since cycle/rainbow/flow generate
+            // their own colours. Registered for led 0..8 — the largest strip
+            // any base uses; a 6-LED base simply never addresses 6..8.
             for (byte strip = 0; strip < 2; strip++)
                 for (byte mode = 1; mode <= 2; mode++)
                     for (byte led = 0; led < 9; led++)
@@ -744,9 +771,12 @@ namespace MozaPlugin.Protocol
 
             AddCommand("base-ambient-sleep-mode",      "main", 0x22, 0x20, new byte[] { 0x21 }, 1, "int");
             AddCommand("base-ambient-sleep-timeout",   "main", 0x22, 0x20, new byte[] { 0x22 }, 2, "int");
-            AddCommand("base-ambient-breath-interval", "main", 0x22, 0x20, new byte[] { 0x23, 0x01 }, 2, "int");
+            // Speed of the SLEEP breathing effect — NOT the standby breath speed,
+            // which is `1E 02`. Selector is the sleep-mode number (1 = breathe).
+            AddCommand("base-ambient-sleep-breath-interval", "main", 0x22, 0x20, new byte[] { 0x23, 0x01 }, 2, "int");
 
-            // Per-LED sleep colors. cmd `0x25 [strip] 0x01 [led]` + RGB.
+            // Per-LED sleep palette. cmd `0x25 [strip] [sleep-mode] [led]` + RGB;
+            // sleep-mode 1 (breathe) is the only value with a stored palette.
             for (byte strip = 0; strip < 2; strip++)
                 for (byte led = 0; led < 9; led++)
                     AddCommand(

@@ -45,15 +45,17 @@ namespace MozaPlugin.UI
         /// <summary>Set slider value (clamped) and paint a "%" label.</summary>
         public static void SetSliderPercent(Slider slider, TextBox label, double value, double min, double max)
         {
-            slider.Value = Clamp(value, min, max);
-            SetValueText(label, $"{value:F0}%");
+            double shown = Clamp(value, min, max);
+            slider.Value = shown;
+            SetValueText(label, $"{shown:F0}%");
         }
 
         /// <summary>Set slider value (clamped) and paint a label with optional suffix.</summary>
         public static void SetSliderRaw(Slider slider, TextBox label, int value, int min, int max, string suffix)
         {
-            slider.Value = Clamp(value, min, max);
-            SetValueText(label, $"{value}{suffix}");
+            int shown = (int)Clamp(value, min, max);
+            slider.Value = shown;
+            SetValueText(label, $"{shown}{suffix}");
         }
 
         /// <summary>

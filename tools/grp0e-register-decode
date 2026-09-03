@@ -14,7 +14,7 @@ from pathlib import Path
 from collections import defaultdict
 
 sys.path.insert(0, str(Path(__file__).parent))
-from moza_bridge import load_bridge
+from moza_bridge import load_bridge, BRIDGE_DIR
 
 
 def collect_replies(path):
@@ -65,7 +65,7 @@ def interpret_value(val_bytes):
 
 
 def main():
-    base = Path("/home/rorth/src/moza-simhub-plugin/sim/logs")
+    base = BRIDGE_DIR
     paths = sorted(base.glob("bridge-*.jsonl"))[:6]
 
     all_data = {}

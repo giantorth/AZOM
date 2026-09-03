@@ -133,14 +133,22 @@
     <EmbeddedResource Include="DeviceTemplates\MozaWheelGeneric\MOZA Racing Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelGeneric.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm2\MOZA CM2 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm2.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm1\MOZA CM1 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm1.device.json" />
-    <EmbeddedResource Include="DeviceTemplates\MozaWheelBase\MOZA Wheel Base\device.json" LogicalName="MozaPlugin.Devices.WheelBase.device.json" />
     <!-- Device-profile artwork. SimHub renders a profile's picture from a
          `thumbnail.png` sidecar next to device.json; DeviceDefinitionDeployer
-         writes one out per detected wheel. Filename = the firmware model prefix
-         (WheelModelInfo.KnownModels), which is what the deployer looks up.
-         Non-recursive on purpose: `Unwired/` parks art for wheels whose prefix
-         isn't known yet, and must stay out of the DLL until it can resolve.
-         Regenerate with tools/make-device-thumbnail. -->
+         writes one out per detected device. Filename = the firmware model prefix
+         for wheels (WheelModelInfo.KnownModels), or the key DeviceDefinitionDeployer
+         maps a wheelbase token / template to (BaseThumbnails, TemplateThumbnails).
+         Non-recursive on purpose: an `Unwired/` subfolder parks art for devices
+         whose prefix isn't known yet, and must stay out of the DLL until it can
+         resolve. Regenerate with tools/make-device-thumbnail. -->
+    <!-- ShakeIt effect defaults for the wheelbase Haptics section. SimHub reads
+         ShakeIt/EffectsDefaults/<DefaultSettingsKey>/<ContainerType>.json on Add
+         effect / Reset effect; MozaBaseHapticsBridge also applies them to the
+         profile SimHub seeds before the plugin's provider is installed. Data, so
+         the feel can be retuned without a rebuild. -->
+    <EmbeddedResource Include="ShakeItDefaults\MozaWheelbaseLfe\*.json">
+      <LogicalName>MozaPlugin.ShakeItDefaults.MozaWheelbaseLfe.%(Filename).json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="DeviceTemplates\Thumbnails\*.png">
       <LogicalName>MozaPlugin.Devices.Thumbnails.%(Filename).png</LogicalName>
     </EmbeddedResource>

@@ -9,12 +9,15 @@ Usage from other tools:
     from moza_bridge import load_bridge, BFrame
 """
 import json
+import os
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-BRIDGE_DIR = Path(__file__).resolve().parent.parent / "sim" / "logs"
+# Trace captures used to live in <repo>/sim/logs; the emulator now lives in
+# its own repo, so the capture dir is caller-supplied via MOZA_TRACE_DIR.
+BRIDGE_DIR = Path(os.environ.get("MOZA_TRACE_DIR") or Path.cwd())
 
 
 @dataclass

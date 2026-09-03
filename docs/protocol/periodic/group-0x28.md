@@ -41,5 +41,5 @@ PitHouse may store strength as a fraction-of-max in this slot rather than
 the raw 10000-scale used in the settings UI. Verification welcome.
 
 Plugin does not implement; sim answers via
-[`sim/wheel_sim.py`](../../../sim/wheel_sim.py) param-replay tables when
+[`sim/wheel_sim.py`](https://github.com/giantorth/moza-simulator) param-replay tables when
 PitHouse polls during connect.

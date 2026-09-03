@@ -1,4 +1,4 @@
-using MozaPlugin.Telemetry.Protocol;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.Frames
 {

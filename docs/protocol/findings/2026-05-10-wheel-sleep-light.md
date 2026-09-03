@@ -93,7 +93,7 @@ existing registration matches PitHouse byte-for-byte — no change required.
 ## Plugin alignment summary
 
 All four commands are registered in `Protocol/MozaCommandDatabase.cs` as of
-2026-05-10. The wheel UI (`Devices/MozaWheelSettingsControl.xaml(.cs)`)
+2026-05-10. The wheel UI (`Devices/Ui/MozaWheelSettingsControl.xaml(.cs)`)
 does **not** expose any controls for these settings — sleep-light
 configuration is currently driven only via PitHouse. Adding mode,
 timeout, speed, and color UI would round out the wheel page.

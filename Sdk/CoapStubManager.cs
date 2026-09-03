@@ -535,6 +535,47 @@ namespace MozaPlugin.Sdk
             {
                 try { MozaLog.Info($"[AZOM] Orphan-sweep reaped {killed} prior-session stub process(es) — stale wineserver state cleared."); } catch { }
             }
+
+            KillOrphanStubProcessesNative(ourExePath);
+        }
+
+        /// <summary>
+        /// Host-side half of the sweep. An orphan whose wineserver DIED reparents
+        /// to init and is invisible to <see cref="Process.GetProcessesByName"/> —
+        /// the managed sweep above returns 0 candidates while the process is
+        /// demonstrably alive — so the only way to reach it is from outside Wine.
+        /// Runs pre-spawn (see <see cref="s_orphanSweepDone"/>), so our own child
+        /// cannot match.
+        ///
+        /// <para><b>Match pattern.</b> A Wine process's <c>/proc/PID/cmdline</c>
+        /// carries the DOS path, verified live under GE-Proton:
+        /// <c>C:\users\steamuser\AppData\Local\SimHub\MozaPlugin\CoapStub\MOZA Pit
+        /// House.exe --parent-pid N</c>. So the unix path would never match. We
+        /// also can't pass the DOS path verbatim — <c>pkill -f</c> takes an ERE
+        /// and its backslashes would read as escapes (<c>\A</c>, <c>\S</c>, …).
+        /// Instead match the two trailing path components with <c>.</c> standing
+        /// in for the separator, which is both regex-safe and independent of
+        /// which form Wine reports. The <c>CoapStub</c> component is our own
+        /// extraction directory, so a real PitHouse install can't match.</para>
+        /// </summary>
+        private static void KillOrphanStubProcessesNative(string ourExePath)
+        {
+            if (!Protocol.WineNativeExec.Available) return;
+
+            string leaf;
+            try { leaf = Path.GetFileName(ourExePath); }
+            catch { return; }
+            if (string.IsNullOrEmpty(leaf)) return;
+
+            // Only the literal '.' needs escaping; spaces are fine in an ERE and
+            // Regex.Escape would turn them into '\ ', which POSIX leaves undefined.
+            string pattern = "MozaPlugin.CoapStub." + leaf.Replace(".", "\\.");
+            var r = Protocol.WineNativeExec.Run(new[] { "pkill", "-KILL", "-f", pattern }, timeoutMs: 2000);
+            // pkill: 0 = something matched and was signalled, 1 = nothing matched.
+            if (r.Outcome == Protocol.NativeSpawnOutcome.Completed && r.Status == 0)
+                try { MozaLog.Info("[AZOM] Orphan-sweep (host-side) reaped wineserver-less stub(s)"); } catch { }
+            else
+                try { MozaLog.Debug($"[AZOM] Orphan-sweep (host-side): {Protocol.WineNativeExec.LastRun}"); } catch { }
         }
 
         private void OnProcessExited()

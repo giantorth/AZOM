@@ -46,8 +46,6 @@ usb-capture/
 
 __pycache__
 
-sim/logs/
-sim/captures/
 Data/Dashes
 
 *.lock

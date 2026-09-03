@@ -117,7 +117,7 @@ Across all four captures combined, these FF kinds appear on h2b session 0x02. Co
 | 1 | 0 | — | brightness u32 (per `SessionPropertyPushBuilder.cs:44`) | not seen in these captures | optional |
 | 10 | 0 | — | standby timeout u64 (per `SessionPropertyPushBuilder.cs:56`) | not seen in these captures | optional |
 
-Note: kinds 1 and 10 are emitted from the existing plugin via UI brightness sliders / standby timeout settings. They aren't observed in these capture sessions because the user didn't move those sliders during recording. The new `FfRecordBuilder` must support them per `Protocol/SessionPropertyPushBuilder.cs:44,56`.
+Note: kinds 1 and 10 are emitted from the existing plugin via UI brightness sliders / standby timeout settings. They aren't observed in these capture sessions because the user didn't move those sliders during recording. The new `FfRecordBuilder` must support them per `Telemetry/Sessions/SessionPropertyPushBuilder.cs:44,56`.
 
 ### ~~kind=14 + kind=15 heartbeat pattern~~ — SOLVED 2026-08-07: it is the device log pull
 
@@ -167,7 +167,7 @@ Slots observed in captures:
 - 113353: slot 8 (`08 00 00 00`)
 - 115840: 5 occurrences (5 different switches in the multi-switch capture)
 
-Existing `Protocol/SessionPropertyPushBuilder.cs:72 BuildDashboardSwitchBody` already builds this; the new builder can reuse it.
+Existing `Telemetry/Sessions/SessionPropertyPushBuilder.cs:72 BuildDashboardSwitchBody` already builds this; the new builder can reuse it.
 
 ### kind=9 LED color push
 
@@ -176,7 +176,7 @@ Sample `0090000000430001ffff0000232332320000` (22B value):
 - `ffff0000` (4B — first LED RGB16?)
 - `232332320000` (6B — additional LED bytes?)
 
-Out of scope for Phase 0 — LED color encoding is its own decode task. The existing plugin LED system in `Devices/MozaLedDeviceManager.cs` writes LEDs over a different non-FF path (group 41/40 raw frames), so kind=9 may be for the dashboard's own LED pipeline rather than wheel LEDs. Defer until LED parity work.
+Out of scope for Phase 0 — LED color encoding is its own decode task. The existing plugin LED system in `Devices/Led/MozaLedDeviceManager.cs` writes LEDs over a different non-FF path (group 41/40 raw frames), so kind=9 may be for the dashboard's own LED pipeline rather than wheel LEDs. Defer until LED parity work.
 
 ## Operational rules for the new WheelHandshakeOp
 

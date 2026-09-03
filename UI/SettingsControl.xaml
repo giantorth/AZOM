@@ -1,9 +1,9 @@
-﻿<UserControl x:Class="MozaPlugin.SettingsControl"
+﻿<UserControl x:Class="MozaPlugin.UI.SettingsControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              xmlns:ctrl="clr-namespace:MozaControls"
-             xmlns:devices="clr-namespace:MozaPlugin.Devices"
+             xmlns:mbooster="clr-namespace:MozaPlugin.Devices.MBooster"
              xmlns:ui="clr-namespace:MozaPlugin.UI"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
              Padding="0"
@@ -357,27 +357,65 @@
                                     <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <ctrl:SteeringArc Grid.Column="0" x:Name="SteeringArcViz"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
-                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
-                                        <Button DockPanel.Dock="Left" x:Name="BaseCalibrateButton"
+                                <!-- Steering arc with Calibrate Center directly beneath it —
+                                     the button acts on what the arc is showing, so it sits
+                                     with it rather than in the right-hand column. -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <ctrl:SteeringArc x:Name="SteeringArcViz"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <!-- Negative top margin is deliberate: SteeringArc is a fixed
+                                         220x220 box whose arc ink bottoms out at y~176 (endpoints
+                                         at 175.03 + 3px stroke) with its readout vertically
+                                         centred, so the lower ~43px of the control is empty. The
+                                         template hardcodes that 220 internally, so shrinking the
+                                         control's Height would clip rather than trim — pulling the
+                                         row up is what actually closes the gap. -30 leaves ~10px
+                                         clear of the dot's lowest travel at full lock. -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                                Margin="0,-30,0,0">
+                                        <Button x:Name="BaseCalibrateButton"
                                                 Content="{x:Static res:Strings.Button_CalibrateCenter}"
                                                 Click="BaseCalibrateButton_Click"
                                                 VerticalAlignment="Center"/>
-                                        <TextBlock DockPanel.Dock="Left" x:Name="BaseCalibrateStatus"
+                                        <TextBlock x:Name="BaseCalibrateStatus"
                                                    Style="{StaticResource MutedHintText}"
                                                    VerticalAlignment="Center"
                                                    Margin="10,0,0,0"/>
-                                        <ctrl:SegmentedControl DockPanel.Dock="Right"
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
+                                    <!-- One row, two selectors: Performance output takes the
+                                         slot the Calibrate button vacated (left), the graph
+                                         selector sits opposite it (right). Declaration order is
+                                         load-bearing in a DockPanel — for Dock="Left" the first
+                                         child is leftmost, for Dock="Right" the first child is
+                                         RIGHTmost, so each pair is declared in the order that
+                                         reads label-then-control on screen.
+                                         The graph selector swaps the bandwidth card for the
+                                         live-torque card and gates the plugin's background 10 Hz
+                                         wire poll, so picking Bandwidth stops that traffic. -->
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   Text="{x:Static res:Strings.Label_PerformanceOutput}"
+                                                   Style="{StaticResource LabelText}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                        <ctrl:SegmentedControl DockPanel.Dock="Left"
                                                                x:Name="PerformanceOutputCombo"
                                                                SelectionChanged="PerformanceOutputCombo_Changed"
                                                                VerticalAlignment="Center">
                                             <ListBoxItem Content="{x:Static res:Strings.Option_Reserved}"/>
                                             <ListBoxItem Content="{x:Static res:Strings.Option_Full}"/>
                                         </ctrl:SegmentedControl>
+                                        <ctrl:SegmentedControl DockPanel.Dock="Right"
+                                                               x:Name="BaseGraphModeCombo"
+                                                               SelectionChanged="BaseGraphModeCombo_Changed"
+                                                               VerticalAlignment="Center">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_GraphBandwidth}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_GraphTorque}"/>
+                                        </ctrl:SegmentedControl>
                                         <TextBlock DockPanel.Dock="Right"
-                                                   Text="{x:Static res:Strings.Label_PerformanceOutput}"
+                                                   Text="{x:Static res:Strings.Label_BaseGraphMode}"
                                                    Style="{StaticResource LabelText}"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,10,0"/>
@@ -386,8 +424,9 @@
                                          Left  = MCU/MOSFET/Motor rolling temp graph (legend sorts hot→cool).
                                          Right = dual-line bandwidth sparkline (cyan=in, amber=out)
                                          relocated from the About tab so traffic + thermals are visible
-                                         on the same screen. Both halves are inner cards with their own
-                                         legend underneath. -->
+                                         on the same screen, OR the live-torque sparkline — whichever
+                                         BaseGraphModeCombo selects. Both halves are inner cards with
+                                         their own legend underneath. -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -438,7 +477,7 @@
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
-                                        <Border Grid.Column="1" Style="{StaticResource InnerCardBorder}"
+                                        <Border Grid.Column="1" x:Name="BandwidthCard" Style="{StaticResource InnerCardBorder}"
                                                 Padding="10,8" Margin="7,0,0,0">
                                             <StackPanel>
                                                 <!-- MaxValue = serial-port byte cap (115200 baud / 10 bits-per-byte). -->
@@ -484,6 +523,39 @@
                                                 <StackPanel Visibility="Collapsed">
                                                     <TextBlock x:Name="BandwidthInSessionText"/>
                                                     <TextBlock x:Name="BandwidthOutSessionText"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Live wheelbase torque (base status reg 0x07). Single
+                                             series: the wire value is signed only to say which way
+                                             the base pulls, and torque is torque either way, so the
+                                             magnitude is what gets plotted. MaxValue is set from
+                                             code each tick (floored auto-scale) because no rated-Nm
+                                             figure is available per base model. -->
+                                        <Border Grid.Column="1" x:Name="TorqueCard" Style="{StaticResource InnerCardBorder}"
+                                                Padding="10,8" Margin="7,0,0,0" Visibility="Collapsed">
+                                            <StackPanel>
+                                                <ctrl:BandwidthSparkline x:Name="TorqueGraphViz" Height="80"
+                                                                         InBrush="{StaticResource AmberBrush}"
+                                                                         InFillBrush="{StaticResource BwOutFillBrush}"
+                                                                         ShowGridlines="True"/>
+                                                <StackPanel Margin="0,6,0,0">
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                        <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                                                                 Fill="{StaticResource AmberBrush}" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="{x:Static res:Strings.Label_Torque}" Style="{StaticResource KvKeyText}"/>
+                                                        <TextBlock x:Name="TorqueValueText" Text="--"
+                                                                   Style="{StaticResource KvValueText}"
+                                                                   Foreground="{StaticResource AmberBrush}"/>
+                                                        <TextBlock x:Name="TorquePeakText" Style="{StaticResource KvKeyText}"
+                                                                   Margin="8,0,0,0" Opacity="0.7"/>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <TextBlock Text="{x:Static res:Strings.Label_GraphScale}" Style="{StaticResource KvKeyText}"/>
+                                                        <TextBlock x:Name="TorqueScaleText"
+                                                                   Style="{StaticResource KvValueText}"
+                                                                   Foreground="{StaticResource TextFaintBrush}"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
@@ -2109,20 +2181,20 @@
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
-                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
-                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
-                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
-                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
-                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  Divider1Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampPressedPlot_ValuesChanged"/>
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingReleased}" Style="{StaticResource SectionTitleText}" Margin="0,16,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampReleasedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
-                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
-                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
-                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
-                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
-                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  Divider1Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampReleasedPlot_ValuesChanged"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
@@ -3383,105 +3455,7 @@
             <TabItem x:Name="ImportTab" Header="{x:Static res:Strings.TabHeader_Import}"/>
 
 
-            <TabItem x:Name="SdkTab" Header="{x:Static res:Strings.TabHeader_Sdk}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
-                    <StackPanel>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_CoapServer}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_CoapServer}"
-                                          Icon="{StaticResource IconBolt}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
-                                           Text="{x:Static res:Strings.Hint_CoapServerEnabled}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableCoapServer}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
-                                              Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <TextBlock Text="{x:Static res:Strings.Label_PortNumber}" Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock x:Name="SdkCoapPortText"
-                                               Text="40266"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Foreground="{StaticResource TextDimBrush}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,12,0,0"
-                                           Text="{x:Static res:Strings.Hint_CoapStubProcessName}"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_UdpControl}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_UdpControl}"
-                                          Icon="{StaticResource IconBolt}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
-                                           Text="{x:Static res:Strings.Hint_UdpControlEnabled}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
-                                              Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <TextBlock Text="{x:Static res:Strings.Label_PortNumber}" Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock x:Name="UdpControlPortText"
-                                               Text="40288"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Foreground="{StaticResource TextDimBrush}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Status}" Icon="{StaticResource IconDiag}">
-                            <StackPanel>
-                                <TextBlock x:Name="SdkServerStatusText"
-                                           Text="{x:Static res:Strings.Option_Disabled}"
-                                           FontFamily="{StaticResource FontMono}"
-                                           Foreground="{StaticResource TextDimBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,4,0,8"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <Button x:Name="SdkRefreshStatusButton" Content="{x:Static res:Strings.Button_Refresh}"
-                                            Click="SdkRefreshStatusButton_Click" MinWidth="100"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_RecentRequests}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_RecentRequests}"
-                                          Icon="{StaticResource IconDiag}">
-                            <StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Label_CoapServer}"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,0,0,4"/>
-                                <ListBox x:Name="SdkRecentRequestsList"
-                                         FontFamily="{StaticResource FontMono}" FontSize="11"
-                                         Background="{StaticResource BgDeepBrush}"
-                                         Foreground="{StaticResource TextDimBrush}"
-                                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                         Height="180"
-                                         HorizontalContentAlignment="Stretch"/>
-                                <TextBlock Text="{x:Static res:Strings.Label_UdpControlServer}"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,12,0,4"/>
-                                <ListBox x:Name="ControlUdpRecentRequestsList"
-                                         FontFamily="{StaticResource FontMono}" FontSize="11"
-                                         Background="{StaticResource BgDeepBrush}"
-                                         Foreground="{StaticResource TextDimBrush}"
-                                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                         Height="120"
-                                         HorizontalContentAlignment="Stretch"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem Header="{x:Static res:Strings.TabHeader_Options}">
+            <TabItem x:Name="OptionsTab" Header="{x:Static res:Strings.TabHeader_Options}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
 
@@ -3492,11 +3466,48 @@
                             </Grid.ColumnDefinitions>
 
                             <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
-                                              Title="{x:Static res:Strings.Section_Profiles}" Icon="{StaticResource IconBolt}">
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
-                                              Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
+                                              Title="{x:Static res:Strings.Section_Settings}" Icon="{StaticResource IconBolt}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
+                                                  Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="WheelbaseLfeSourceRow" Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_WheelbaseLfeSource}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:SegmentedControl x:Name="WheelbaseLfeSourceCombo" VerticalAlignment="Center"
+                                                               SelectionChanged="WheelbaseLfeSource_Changed">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_WheelbaseLfeSourcePlugin}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_WheelbaseLfeSourceShakeIt}"/>
+                                        </ctrl:SegmentedControl>
+                                        <TextBlock x:Name="WheelbaseLfeSourceStatusText" Text=""
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                                         Persistent base-side state, read back from the device
+                                         rather than stored in settings — so the toggle shows what
+                                         the base actually holds, including a value PitHouse set. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="45 s"/>
+                                    </Grid>
+                                    <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
+                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
 
@@ -3513,229 +3524,6 @@
                                 </StackPanel>
                             </ctrl:SectionCard>
                         </Grid>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BugReport}"
-                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
-                            <StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Label_BugReportDescription}"
-                                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
-                                <TextBox x:Name="BugReportDescriptionBox" Style="{StaticResource LfeNameBox}"
-                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="2000"
-                                         MinHeight="80" MaxHeight="160"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"
-                                         ToolTip="{x:Static res:Strings.Placeholder_BugReportDescription}"/>
-                                <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
-                                           Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
-                                <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
-                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
-                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                    <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
-                                            Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>
-                                    <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
-                                            Click="SerialCaptureExport_Click" Margin="8,0,0,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
-                                    <Button x:Name="CopyBugReportRefButton" Content="{x:Static res:Strings.Button_CopyReference}"
-                                            Click="CopyBugReportRef_Click" Margin="8,0,0,0"
-                                            Visibility="Collapsed"/>
-                                </StackPanel>
-                                <!-- Read-only TextBox rather than a TextBlock: the
-                                     result line carries the ticket reference (and
-                                     the export path a file path), which the user
-                                     has to be able to select and copy. Own row so
-                                     a long message wraps instead of clipping. -->
-                                <TextBox x:Name="BugReportStatusText"
-                                         Visibility="Collapsed" Margin="0,10,0,0"
-                                         IsReadOnly="True" IsReadOnlyCaretVisible="False"
-                                         Background="Transparent" BorderThickness="0" Padding="0"
-                                         Foreground="{StaticResource TextFaintBrush}"
-                                         FontFamily="{StaticResource FontUi}" FontSize="13"
-                                         TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_WheelLedOutput}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_WheelLedOutput}"
-                                          Icon="{StaticResource IconLed}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8"
-                                           Text="{x:Static res:Strings.Hint_LedOptionsRecommendedOff}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_LimitWheelUpdates}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="LimitWheelUpdatesCheck" VerticalAlignment="Center"
-                                              Checked="LimitWheelUpdatesCheck_Changed" Unchecked="LimitWheelUpdatesCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_OnlySendLedWhenChanged}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_AlwaysResendBitmask}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="AlwaysResendBitmaskCheck" VerticalAlignment="Center"
-                                              Checked="AlwaysResendBitmaskCheck_Changed" Unchecked="AlwaysResendBitmaskCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_AlwaysResendBitmask}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <Grid Margin="0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
-                                    <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
-                                    <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
-                                             Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
-                                             KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                             Text="45 s"/>
-                                </Grid>
-                                <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_UsbDetection}" Icon="{StaticResource IconRefresh}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisableSerialProbe}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="DisableSerialProbeFallbackCheck" VerticalAlignment="Center"
-                                              Checked="DisableSerialProbeFallbackCheck_Changed" Unchecked="DisableSerialProbeFallbackCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_DisableSerialProbe}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisableAb9Detection}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="DisableAb9DetectionCheck" VerticalAlignment="Center"
-                                              Checked="DisableAb9DetectionCheck_Changed" Unchecked="DisableAb9DetectionCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_DisableAb9Detection}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_DashboardTelemetry}" Icon="{StaticResource IconDiag}">
-                            <StackPanel>
-                                <!-- Hidden: dashboard upload/download UI collapsed while the feature is
-                                     in development. Runtime values are forced off in MozaPlugin; the
-                                     upload/download scaffolding is intentionally preserved. -->
-                                <StackPanel Visibility="Collapsed">
-                                    <ctrl:OffOnToggle x:Name="UploadDashboardCheck" Content="{x:Static res:Strings.Label_UploadDashboardOnConnect}"
-                                              Margin="0,8,0,4" Checked="UploadDashboard_Changed" Unchecked="UploadDashboard_Changed"/>
-                                    <ctrl:OffOnToggle x:Name="DownloadDashboardCheck" Content="{x:Static res:Strings.Label_DownloadDashboardsFromWheel}"
-                                              Margin="0,8,0,4" Checked="DownloadDashboard_Changed" Unchecked="DownloadDashboard_Changed"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <TextBlock Text="{x:Static res:Strings.Label_WheelFirmwareEra}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <ComboBox x:Name="FirmwareEraCombo" Width="500"
-                                              SelectionChanged="FirmwareEra_Changed">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEraAuto}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2024}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2026}"/>
-                                    </ComboBox>
-                                </StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,4,0,0"
-                                           Text="{x:Static res:Strings.Hint_FirmwareEra}"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_DeviceDefinitions}" Icon="{StaticResource IconRefresh}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <Button x:Name="RedeployDefinitionsButton" Content="{x:Static res:Strings.Button_RedeployDefinitions}"
-                                            Click="RedeployDefinitionsButton_Click" MinWidth="120"/>
-                                    <TextBlock x:Name="RedeployDefinitionsStatusText" Text=""
-                                               Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
-                                              Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <Button x:Name="ClearAllSettingsButton" Content="{x:Static res:Strings.Button_ClearAllSettings}"
-                                            Style="{StaticResource MozaButtonDanger}"
-                                            Click="ClearAllSettingsButton_Click"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_ClearAllSettingsWarning}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem x:Name="AboutTab" Header="{x:Static res:Strings.TabHeader_About}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
-                    <StackPanel>
-
-                        <!-- ============ About / Project links ============ -->
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_About}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_About}"
-                                          Icon="{StaticResource IconShield}">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{x:Static res:Strings.Label_AzomTitle}"
-                                                   FontFamily="{StaticResource FontUi}"
-                                                   FontSize="22" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextBrush}"/>
-                                        <TextBlock x:Name="AboutVersionText"
-                                                   Text="{x:Static res:Strings.Label_VersionPlaceholder}"
-                                                   FontFamily="{StaticResource FontMono}"
-                                                   FontSize="13"
-                                                   Foreground="{StaticResource CyanBrush}"
-                                                   Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <TextBlock TextWrapping="Wrap"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,0,0,16"
-                                           Text="{x:Static res:Strings.Hint_AboutDescription}"/>
-                                <TextBlock TextWrapping="Wrap"
-                                           Style="{StaticResource MutedHintText}"
-                                           FontStyle="Italic"
-                                           Foreground="{StaticResource TextDimBrush}"
-                                           Margin="0,0,0,16"
-                                           Text="{x:Static res:Strings.Hint_ThanksToTesters}"/>
-                                <TextBlock TextWrapping="Wrap"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,0,0,12"
-                                           Text="{x:Static res:Strings.Hint_SponsorshipsAppreciated}"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <Button Content="{x:Static res:Strings.Button_Github}"
-                                            Click="AboutGitHubButton_Click"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_Github}"/>
-                                    <Button Content="{x:Static res:Strings.Button_JoinDiscord}"
-                                            Click="AboutDiscordButton_Click"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_JoinDiscord}"/>
-                                    <Button Content="{x:Static res:Strings.Button_SponsorDevelopment}"
-                                            Click="AboutSponsorButton_Click"
-                                            Foreground="{StaticResource GreenBrush}"
-                                            BorderBrush="#6639FF88"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_Sponsor}"/>
-                                    <Button Content="{x:Static res:Strings.Button_Kofi}"
-                                            Click="AboutKofiButton_Click"
-                                            Foreground="{StaticResource RedBrush}"
-                                            BorderBrush="#6639FF88"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_Kofi}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
 
                         <!-- ============ Updates ============
                              Owned by the SettingsControl.UpdateBanner.cs partial.
@@ -3846,10 +3634,193 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
+                        <!-- Hidden: dashboard upload/download UI collapsed while the feature is
+                             in development. Runtime values are forced off in MozaPlugin; the
+                             upload/download scaffolding is intentionally preserved. It kept its
+                             own panel when the enclosing Dashboard-telemetry card (which only
+                             ever showed the retired firmware-era override) was removed. -->
+                        <StackPanel Visibility="Collapsed">
+                            <ctrl:OffOnToggle x:Name="UploadDashboardCheck" Content="{x:Static res:Strings.Label_UploadDashboardOnConnect}"
+                                      Margin="0,8,0,4" Checked="UploadDashboard_Changed" Unchecked="UploadDashboard_Changed"/>
+                            <ctrl:OffOnToggle x:Name="DownloadDashboardCheck" Content="{x:Static res:Strings.Label_DownloadDashboardsFromWheel}"
+                                      Margin="0,8,0,4" Checked="DownloadDashboard_Changed" Unchecked="DownloadDashboard_Changed"/>
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
+                                              Title="{x:Static res:Strings.Section_Sdk}" Icon="{StaticResource IconBolt}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableCoapServer}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
+                                                  Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="SdkCoapStatusText" Text=""
+                                               Style="{StaticResource MutedHintText}"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
+                                                  Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="SdkUdpStatusText" Text=""
+                                               Style="{StaticResource MutedHintText}"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+
+                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
+                                              Title="{x:Static res:Strings.Section_DeviceDefinitions}" Icon="{StaticResource IconRefresh}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <Button x:Name="RedeployDefinitionsButton" Content="{x:Static res:Strings.Button_RedeployDefinitions}"
+                                                Click="RedeployDefinitionsButton_Click" MinWidth="120"/>
+                                        <TextBlock x:Name="RedeployDefinitionsStatusText" Text=""
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
+                                                  Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+                        </Grid>
+
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <Button x:Name="ClearAllSettingsButton" Content="{x:Static res:Strings.Button_ClearAllSettings}"
+                                            Style="{StaticResource MozaButtonDanger}"
+                                            Click="ClearAllSettingsButton_Click"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Static res:Strings.Hint_ClearAllSettingsWarning}"
+                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem x:Name="HelpTab" Header="{x:Static res:Strings.TabHeader_Help}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
+                    <StackPanel>
+
+                        <!-- ============ About / Project links ============ -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_About}"
+                                          Subtitle="{x:Static res:Strings.Subtitle_About}"
+                                          Icon="{StaticResource IconShield}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{x:Static res:Strings.Label_AzomTitle}"
+                                                   FontFamily="{StaticResource FontUi}"
+                                                   FontSize="22" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock x:Name="AboutVersionText"
+                                                   Text="{x:Static res:Strings.Label_VersionPlaceholder}"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   FontSize="13"
+                                                   Foreground="{StaticResource CyanBrush}"
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock TextWrapping="Wrap"
+                                           Style="{StaticResource MutedHintText}"
+                                           Margin="0,0,0,16"
+                                           Text="{x:Static res:Strings.Hint_AboutDescription}"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           Style="{StaticResource MutedHintText}"
+                                           FontStyle="Italic"
+                                           Foreground="{StaticResource TextDimBrush}"
+                                           Margin="0,0,0,16"
+                                           Text="{x:Static res:Strings.Hint_ThanksToTesters}"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           Style="{StaticResource MutedHintText}"
+                                           Margin="0,0,0,12"
+                                           Text="{x:Static res:Strings.Hint_SponsorshipsAppreciated}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="{x:Static res:Strings.Button_Github}"
+                                            Click="AboutGitHubButton_Click"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_Github}"/>
+                                    <Button Content="{x:Static res:Strings.Button_JoinDiscord}"
+                                            Click="AboutDiscordButton_Click"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_JoinDiscord}"/>
+                                    <Button Content="{x:Static res:Strings.Button_SponsorDevelopment}"
+                                            Click="AboutSponsorButton_Click"
+                                            Foreground="{StaticResource GreenBrush}"
+                                            BorderBrush="#6639FF88"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_Sponsor}"/>
+                                    <Button Content="{x:Static res:Strings.Button_Kofi}"
+                                            Click="AboutKofiButton_Click"
+                                            Foreground="{StaticResource RedBrush}"
+                                            BorderBrush="#6639FF88"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_Kofi}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
                         <!-- Bandwidth visualization was moved to the Base tab's live header
                              (next to the temperature graph) as a single dual-line sparkline. -->
 
-                        <!-- Serial Traffic Capture + Report a problem moved to the Options tab. -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BugReport}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportDescription}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="BugReportDescriptionBox" Style="{StaticResource LfeNameBox}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="2000"
+                                         MinHeight="80" MaxHeight="160"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"
+                                         ToolTip="{x:Static res:Strings.Placeholder_BugReportDescription}"/>
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
+                                <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
+                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
+                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
+                                            Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>
+                                    <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
+                                            Click="SerialCaptureExport_Click" Margin="8,0,0,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
+                                    <Button x:Name="CopyBugReportRefButton" Content="{x:Static res:Strings.Button_CopyReference}"
+                                            Click="CopyBugReportRef_Click" Margin="8,0,0,0"
+                                            Visibility="Collapsed"/>
+                                </StackPanel>
+                                <!-- Read-only TextBox rather than a TextBlock: the
+                                     result line carries the ticket reference (and
+                                     the export path a file path), which the user
+                                     has to be able to select and copy. Own row so
+                                     a long message wraps instead of clipping. -->
+                                <TextBox x:Name="BugReportStatusText"
+                                         Visibility="Collapsed" Margin="0,10,0,0"
+                                         IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                                         Background="Transparent" BorderThickness="0" Padding="0"
+                                         Foreground="{StaticResource TextFaintBrush}"
+                                         FontFamily="{StaticResource FontUi}" FontSize="13"
+                                         TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
 
                         <!-- ============ Full Diagnostic Report (expandable) ============ -->
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_FullDiagReport}"

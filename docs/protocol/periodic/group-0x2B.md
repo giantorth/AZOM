@@ -22,7 +22,7 @@ for the full read-only command table.
 `AB` = `0x2B | 0x80`; `0x31` = nibble-swap of `0x13`.
 
 **Observed sub-cmds and response values** (from
-[`sim/wheel_sim.py`](../../../sim/wheel_sim.py) `_plugin_probe_rsp`,
+[`sim/wheel_sim.py`](https://github.com/giantorth/moza-simulator) `_plugin_probe_rsp`,
 captures verified across multiple connects):
 
 | Sub-cmd | Resp value | DB name | Notes |

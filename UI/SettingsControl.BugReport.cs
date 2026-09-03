@@ -8,7 +8,7 @@ using MozaPlugin.Diagnostics;
 using MozaPlugin.Resources;
 using MozaPlugin.UI.BugReport;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl: the About-tab "Report a
     // problem" flow and the shared diagnostics-bundle assembly used by both the

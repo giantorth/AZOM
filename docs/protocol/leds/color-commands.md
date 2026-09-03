@@ -105,7 +105,7 @@ streaming colour chunks (so the firmware buffer renders the actual
 black frame), but suppress the bitmask write when its current value
 would be zero. Release the bitmask to zero only on explicit teardown
 (disconnect, mode switch). Plugin implementation: the knob block in
-`Devices/MozaLedDeviceManager.cs` Display() gates the `1A 03` write on
+`Devices/Led/MozaLedDeviceManager.cs` Display() gates the `1A 03` write on
 `knobBitmask != 0`; the keepalive re-emits the last non-zero value.
 
 **Button color chunk** (`wheel-telemetry-button-colors`):
@@ -165,14 +165,14 @@ Chunks per group:
 **Padding rule:** unused entries within a chunk MUST use index `0xFF`. Zero
 padding (`00 00 00 00`) is interpreted as "set LED 0 to black" by firmware,
 causing button 0 to flicker on every frame. See
-[`Devices/MozaLedDeviceManager.cs:472`](../../../Devices/MozaLedDeviceManager.cs)
+[`Devices/Led/MozaLedDeviceManager.cs:472`](../../../Devices/Led/MozaLedDeviceManager.cs)
 (`SendColorChunks`).
 
 ### Bitmask format
 
 Selects which LEDs are currently lit. The plugin emits the **8-byte
 `active+window` form** for every group (RPM, button, knob) via
-[`Devices/MozaLedDeviceManager.cs`](../../../Devices/MozaLedDeviceManager.cs)
+[`Devices/Led/MozaLedDeviceManager.cs`](../../../Devices/Led/MozaLedDeviceManager.cs)
 (`BuildWindowedBitmaskBytes`):
 
 ```
@@ -185,8 +185,7 @@ Selects which LEDs are currently lit. The plugin emits the **8-byte
 - `active_mask` = the lit subset. Bit `i` lit ↔ LED `i` has non-black color
   in the chunk write.
 
-Plugin sends the bitmask only when it changes (or every frame when
-`AlwaysResendBitmask` is set), regardless of color-chunk cadence.
+Plugin sends the bitmask only when it changes, regardless of color-chunk cadence.
 
 ### Example (CS V2.1 — 10 RPM LEDs, alternating red/blue)
 

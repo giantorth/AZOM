@@ -11,7 +11,7 @@ using MozaPlugin.Resources;
 using MozaPlugin.UI;
 using MozaPlugin.UI.UpdateCheck;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl that owns the in-plugin
     // update-notification surface: the "update available" banner inside the
@@ -465,9 +465,9 @@ namespace MozaPlugin
 
             try
             {
-                if (MainTabs != null && AboutTab != null)
-                    MainTabs.SelectedItem = AboutTab;
-                // Defer the scroll until the About tab's content is realized.
+                if (MainTabs != null && OptionsTab != null)
+                    MainTabs.SelectedItem = OptionsTab;
+                // Defer the scroll until the Options tab's content is realized.
                 Dispatcher.BeginInvoke(
                     new Action(() => { try { UpdatesSection?.BringIntoView(); } catch { } }),
                     System.Windows.Threading.DispatcherPriority.Background);

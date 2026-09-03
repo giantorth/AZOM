@@ -1,7 +1,7 @@
 using System;
 using MozaPlugin.UI.Import;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Partial-class continuation of <see cref="SettingsControl"/> that holds
@@ -54,7 +54,7 @@ namespace MozaPlugin
                 {
                     var settings = controller.CurrentSettings;
                     if (settings != null)
-                        _plugin.ApplyMBoosterToHardware(controller, settings);
+                        _plugin.HardwareApplier.ApplyMBoosterToHardware(controller, settings);
                 }
                 catch (Exception ex)
                 {

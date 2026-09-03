@@ -1,0 +1,453 @@
+#!/usr/bin/env python3
+"""End-to-end decoder for a PitHouse dashboard *upload* in a bridge capture.
+
+Reassembles the host→wheel (h2b) file-transfer session-data, walks the 6-byte
+sub-message stream (type=0x02 metadata, type=0x03 content), reconstructs the
+compressed bundle payload and decompresses it, and reassembles the wheel→host
+(b2h) ack stream on sess=0x04 (type=0x01 progress / type=0x11 complete). Prints
+a field-by-field timeline with byte offsets so the plugin's *encode* can be
+diffed against PitHouse byte-for-byte.
+
+Resolves the open byte-layout questions in
+docs/protocol/dashboard-upload/implementation-plan.md (Q1-Q9): the leading
+2-byte body pad, the content-body TLV arrangement, the metadata/per-chunk size
+fields, the MD5 input, chunk-0 preamble placement, the metadata XOR trailer, and
+the session-acquisition handshake (7c 23 open-request vs upload-on-0x04).
+
+Usage:
+    tools/upload-decode [capture] [--session 0xNN] [--list] [--acks] [--dump-payload OUT]
+
+`capture` resolves like the other bridge tools (path, name fragment, or latest).
+With no --session, all sessions carrying a type=0x02 metadata sub-msg are
+decoded. --list prints a one-line summary of every session and exits.
+"""
+import argparse
+import sys
+import zlib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from moza_bridge import load_bridge, resolve_bridge, BFrame  # noqa: E402
+
+ACK_SESSION = 0x04
+SUBMSG_TYPES = {0x01: "ready/progress", 0x02: "metadata", 0x03: "content",
+                0x08: "dirlist-probe", 0x0a: "dirlist-reply", 0x11: "complete"}
+
+
+def hexs(b: bytes, limit: int = 0) -> str:
+    if limit and len(b) > limit:
+        return b[:limit].hex() + f"...(+{len(b) - limit}B)"
+    return b.hex()
+
+
+def be32(b: bytes, off: int) -> int:
+    return int.from_bytes(b[off:off + 4], "big")
+
+
+def le32(b: bytes, off: int) -> int:
+    return int.from_bytes(b[off:off + 4], "little")
+
+
+def xor_bytes(b: bytes) -> int:
+    x = 0
+    for v in b:
+        x ^= v
+    return x
+
+
+def reassemble(frames, direction, session, verify_crc=True, t0=None, t1=None):
+    """Reconstruct the logical session-data byte stream for (direction,
+    session) over the optional time window [t0,t1].
+
+    PitHouse retransmits chunks and restarts uploads (seq resets to ~7),
+    so multiple attempts overlap in the buffer with reused seq numbers.
+    Within one attempt window the content per seq is stable, so we take the
+    LAST occurrence of each seq (the most recent retransmit) and order by
+    seq. The per-chunk 4-byte CRC32-LE trailer is stripped (and optionally
+    validated). NOTE: the bridge JSONL is already 0x7E-de-stuffed by
+    sim/bridge.py; feed only de-stuffed captures here.
+
+    Returns (buffer, crc_ok, crc_bad, n_seqs)."""
+    by_seq = {}
+    for f in frames:
+        if f.dir != direction or not f.is_session_data:
+            continue
+        if f.sess_id != session or f.sess_type != 0x01:
+            continue
+        if t0 is not None and f.t_rel < t0:
+            continue
+        if t1 is not None and f.t_rel > t1:
+            continue
+        by_seq[f.sess_seq] = f.sess_data  # last occurrence wins
+    crc_ok = crc_bad = 0
+    out = bytearray()
+    for seq in sorted(by_seq):
+        chunk = by_seq[seq]
+        if len(chunk) < 4:
+            out += chunk
+            continue
+        net, crc = chunk[:-4], chunk[-4:]
+        if verify_crc:
+            if (zlib.crc32(net) & 0xFFFFFFFF) == int.from_bytes(crc, "little"):
+                crc_ok += 1
+            else:
+                crc_bad += 1
+        out += net
+    return bytes(out), crc_ok, crc_bad, len(by_seq)
+
+
+def attempt_windows(frames, direction, session, gap=30.0):
+    """Split a session's chunk stream into attempt windows separated by time
+    gaps > `gap` seconds (each PitHouse upload restart). Returns [(t0,t1),...]."""
+    ts = sorted(f.t_rel for f in frames
+                if f.dir == direction and f.is_session_data
+                and f.sess_id == session and f.sess_type == 0x01)
+    if not ts:
+        return []
+    wins, start, prev = [], ts[0], ts[0]
+    for t in ts[1:]:
+        if t - prev > gap:
+            wins.append((start, prev))
+            start = t
+        prev = t
+    wins.append((start, prev))
+    return wins
+
+
+def parse_tlvs(body, off):
+    """Walk consecutive path TLVs at `off`: [marker][00][UTF-16LE...][00 00].
+    Returns (entries, new_off). Stops at the 0x10 MD5-length flag."""
+    entries = []
+    while off + 2 <= len(body):
+        marker = body[off]
+        if marker == 0x10:  # flag byte that precedes the 16-byte MD5
+            break
+        if marker not in (0x8C, 0x84, 0x70) or body[off + 1] != 0x00:
+            break
+        # find the UTF-16LE NUL terminator (00 00 on an even boundary)
+        p = off + 2
+        end = None
+        while p + 1 < len(body):
+            if body[p] == 0x00 and body[p + 1] == 0x00:
+                end = p
+                break
+            p += 2
+        if end is None:
+            break
+        try:
+            text = body[off + 2:end].decode("utf-16-le")
+        except Exception:
+            text = "<undecodable>"
+        entries.append((marker, off, text))
+        off = end + 2
+    return entries, off
+
+
+def decode_metadata(body):
+    """type=0x02 metadata body. Returns a dict of decoded fields."""
+    d = {"len": len(body)}
+    o = 0
+    d["lead_pad"] = body[0:2].hex()
+    o = 2
+    tlvs, o = parse_tlvs(body, o)
+    d["tlvs"] = tlvs
+    if o < len(body) and body[o] == 0x10:
+        d["flag_off"] = o
+        d["md5"] = body[o + 1:o + 17].hex()
+        o += 17
+    # trailer: [bytes_written BE][total_size BE][ff ff ff ff][xor]
+    if len(body) >= o + 13:
+        toff = len(body) - 13
+        d["bytes_written"] = be32(body, toff)
+        d["total_size"] = be32(body, toff + 4)
+        d["sentinel"] = body[toff + 8:toff + 12].hex()
+        d["status"] = body[-1]
+        d["xor_over_body"] = xor_bytes(body[:-1])
+        d["xor_match"] = (d["status"] == d["xor_over_body"])
+        d["mid_gap"] = body[o:toff].hex()  # anything between md5 and trailer
+    return d
+
+
+def decode_content(body):
+    """type=0x03 content body. Returns decoded fields + the deflate slice."""
+    d = {"len": len(body)}
+    d["lead_pad"] = body[0:2].hex()
+    o = 2
+    tlvs, o = parse_tlvs(body, o)
+    d["tlvs"] = tlvs
+    if o < len(body) and body[o] == 0x10:
+        d["flag_off"] = o
+        d["md5"] = body[o + 1:o + 17].hex()
+        o += 17
+    d["env_off"] = o
+    if len(body) >= o + 12:
+        d["chunk_offset"] = be32(body, o)
+        d["total_compressed"] = be32(body, o + 4)
+        d["this_chunk"] = be32(body, o + 8)
+        slice_start = o + 12
+        d["slice_start"] = slice_start
+        d["slice"] = body[slice_start:slice_start + d["this_chunk"]]
+        d["trailing"] = body[slice_start + d["this_chunk"]:].hex()
+    return d
+
+
+def walk_submsgs(buf):
+    """Yield (offset, type, size, body) for each 6-byte-header sub-msg.
+    Header: [type:1][size_LE:2][pad:3]; next at off+6+size."""
+    off = 0
+    while off + 6 <= len(buf):
+        if buf[off + 3] != 0 or buf[off + 4] != 0 or buf[off + 5] != 0:
+            break
+        t = buf[off]
+        size = buf[off + 1] | (buf[off + 2] << 8)
+        if t not in SUBMSG_TYPES:
+            break
+        if off + 6 + size > len(buf):
+            break
+        yield off, t, size, buf[off + 6:off + 6 + size]
+        off += 6 + size
+
+
+def dump_session(frames, session, t0=None, t1=None):
+    win = f" window t=[{t0:.1f},{t1:.1f}]" if t0 is not None else ""
+    print(f"\n{'=' * 78}\nUPLOAD SESSION 0x{session:02X}{win}\n{'=' * 78}")
+    buf, ok, bad, n = reassemble(frames, "h2b", session, t0=t0, t1=t1)
+    print(f"h2b reassembly: {n} seqs, {len(buf)} bytes, chunk-CRC ok={ok} bad={bad}")
+
+    chunks_payload = []  # (chunk_offset, slice) for type=0x03 reconstruction
+    for off, t, size, body in walk_submsgs(buf):
+        tname = SUBMSG_TYPES.get(t, "?")
+        print(f"\n  [{off:#08x}] type=0x{t:02X} ({tname}) size={size} body={len(body)}B")
+        if t == 0x02:
+            d = decode_metadata(body)
+            print(f"      lead_pad={d['lead_pad']}")
+            for marker, mo, text in d["tlvs"]:
+                print(f"      TLV 0x{marker:02X} @body[{mo}]: {text!r}")
+            if "md5" in d:
+                print(f"      flag@{d['flag_off']}=0x10 md5={d['md5']}")
+            if "total_size" in d:
+                print(f"      bytes_written={d['bytes_written']} total_size={d['total_size']} "
+                      f"sentinel={d['sentinel']}")
+                print(f"      status=0x{d['status']:02X} xor(body[:-1])=0x{d['xor_over_body']:02X} "
+                      f"match={d['xor_match']}")
+                if d.get("mid_gap"):
+                    print(f"      mid_gap(md5->trailer)={d['mid_gap']}")
+        elif t == 0x03:
+            d = decode_content(body)
+            print(f"      lead_pad={d['lead_pad']}")
+            for marker, mo, text in d["tlvs"]:
+                print(f"      TLV 0x{marker:02X} @body[{mo}]: {text!r}")
+            if "md5" in d:
+                print(f"      flag@{d['flag_off']}=0x10 md5={d['md5']}")
+            if "chunk_offset" in d:
+                print(f"      env@body[{d['env_off']}]: chunk_offset={d['chunk_offset']} "
+                      f"total_compressed={d['total_compressed']} this_chunk={d['this_chunk']}")
+                print(f"      slice@body[{d['slice_start']}]={hexs(d['slice'], 16)} "
+                      f"trailing={d['trailing']!r}")
+                chunks_payload.append((d["chunk_offset"], d["slice"]))
+
+    # Reconstruct the compressed payload from the type=0x03 slices and decompress.
+    if chunks_payload:
+        chunks_payload.sort(key=lambda x: x[0])
+        payload = b"".join(s for _, s in chunks_payload)
+        print(f"\n  reconstructed compressed payload: {len(payload)} bytes "
+              f"(chunk_offsets={[c for c, _ in chunks_payload]})")
+        zoff = payload.find(b"\x78\x9c")
+        if zoff < 0:
+            zoff = payload.find(b"\x78\xda")
+        print(f"  zlib magic at payload[{zoff}] (preamble length = {zoff})")
+        if zoff >= 0:
+            _dump_preamble(payload[:zoff])
+            try:
+                raw = zlib.decompress(payload[zoff:])
+                print(f"  decompressed bundle: {len(raw)} bytes "
+                      f"(eof reached, first 64B={hexs(raw[:64])})")
+            except Exception as e:
+                d = zlib.decompressobj()
+                raw = d.decompress(payload[zoff:])
+                print(f"  decompress PARTIAL ({e}): {len(raw)} bytes, eof={d.eof}")
+        return payload
+    return None
+
+
+def _dump_preamble(pre):
+    """Decode the uncompressed bundle preamble (file table) that precedes the
+    zlib stream in chunk 0."""
+    if len(pre) < 4:
+        return
+    print(f"  preamble ({len(pre)}B):")
+    o = 0
+    n = be32(pre, 0)
+    o = 4
+    print(f"      file_count={n}")
+    for i in range(n):
+        if o + 4 > len(pre):
+            break
+        plen = be32(pre, o); o += 4
+        path = pre[o:o + plen].decode("utf-16-be", "replace"); o += plen
+        usize = be32(pre, o); o += 4
+        print(f"      file[{i}] dest_len={plen} uncompressed_size={usize} path={path!r}")
+    if o + 8 <= len(pre):
+        print(f"      total_compressed(BE)={be32(pre, o)} total_uncompressed(LE)={le32(pre, o + 4)}")
+        o += 8
+    if o < len(pre):
+        print(f"      preamble_tail[{o}:]={pre[o:].hex()}")
+
+
+def reassemble_timed(frames, direction, session, t0=None, t1=None):
+    """Like reassemble() but also returns [(end_offset, t_rel), ...] chunk
+    boundaries in stream order so sub-msg completion times can be recovered.
+    For retransmitted seqs the FIRST emission time is kept (original send)."""
+    by_seq = {}
+    for f in frames:
+        if f.dir != direction or not f.is_session_data:
+            continue
+        if f.sess_id != session or f.sess_type != 0x01:
+            continue
+        if t0 is not None and f.t_rel < t0:
+            continue
+        if t1 is not None and f.t_rel > t1:
+            continue
+        prev = by_seq.get(f.sess_seq)
+        t_keep = prev[1] if prev else f.t_rel
+        by_seq[f.sess_seq] = (f.sess_data, t_keep)
+    out = bytearray()
+    bounds = []
+    for seq in sorted(by_seq):
+        chunk, t = by_seq[seq]
+        net = chunk[:-4] if len(chunk) >= 4 else chunk
+        out += net
+        bounds.append((len(out), t))
+    return bytes(out), bounds
+
+
+def _t_at(bounds, end_off):
+    for eo, t in bounds:
+        if eo >= end_off:
+            return t
+    return bounds[-1][1] if bounds else float("nan")
+
+
+def dump_timeline(frames, session, t0=None, t1=None):
+    """Interleaved h2b/b2h sub-msg timeline on one session, each stamped with
+    the time of the chunk that completed it — shows per-round pacing and
+    whether acks ride the same session."""
+    print(f"\n  ── sub-msg timeline sess=0x{session:02X} ──")
+    events = []
+    for d in ("h2b", "b2h"):
+        buf, bounds = reassemble_timed(frames, d, session, t0=t0, t1=t1)
+        for off, t, size, body in walk_submsgs(buf):
+            tt = _t_at(bounds, off + 6 + size)
+            info = ""
+            if t in (0x01, 0x11) and size >= 13:
+                bw = be32(body, size - 13)
+                total = be32(body, size - 9)
+                st = body[size - 1]
+                info = f" bytes_written={bw} total={total} status=0x{st:02X}"
+            elif t == 0x03 and size >= 291:
+                info = (f" chunk_off={be32(body, 279)}"
+                        f" total={be32(body, 283)} this={be32(body, 287)}")
+            elif t == 0x02 and size >= 13:
+                info = f" total_size={be32(body, size - 9)}"
+            events.append((tt, d, t, size, info))
+    for tt, d, t, size, info in sorted(events):
+        tname = SUBMSG_TYPES.get(t, "?")
+        print(f"    t={tt:9.3f} {d} type=0x{t:02X} ({tname:14s}) size={size}{info}")
+
+
+def dump_acks(frames):
+    print(f"\n{'=' * 78}\nb2h ACK STREAM (sess=0x{ACK_SESSION:02X})\n{'=' * 78}")
+    buf, ok, bad, n = reassemble(frames, "b2h", ACK_SESSION)
+    print(f"b2h sess=0x04 reassembly: {n} chunks, {len(buf)} bytes, chunk-CRC ok={ok} bad={bad}")
+    for off, t, size, body in walk_submsgs(buf):
+        tname = SUBMSG_TYPES.get(t, "?")
+        print(f"\n  [{off:#08x}] type=0x{t:02X} ({tname}) size={size}")
+        if t in (0x01, 0x11) and size >= 13:
+            d = decode_metadata(body)
+            for marker, mo, text in d["tlvs"]:
+                print(f"      TLV 0x{marker:02X}: {text!r}")
+            if "total_size" in d:
+                print(f"      bytes_written={d['bytes_written']} total_size={d['total_size']} "
+                      f"status=0x{d['status']:02X} xor_match={d['xor_match']}")
+
+
+def dump_acquisition(frames):
+    """Q8: show the session-acquisition handshake — host 7c 23 open-requests and
+    wheel 7c 00 <sess> 81 device-inits, in time order."""
+    print(f"\n{'=' * 78}\nSESSION ACQUISITION (Q8)\n{'=' * 78}")
+    for f in frames:
+        if not f.is_telemetry or len(f.payload) < 4:
+            continue
+        p = f.payload
+        # host open-request: 7c 23 ...
+        if f.dir == "h2b" and p[0] == 0x7C and p[1] == 0x23:
+            print(f"  t={f.t_rel:8.3f} h2b OPEN-REQ  {hexs(p, 14)}")
+        # session open (device-init or host): 7c 00 <sess> 81
+        elif p[0] == 0x7C and p[1] == 0x00 and len(p) >= 4 and p[3] == 0x81:
+            who = "wheel-devinit" if f.dir == "b2h" else "host-open"
+            print(f"  t={f.t_rel:8.3f} {f.dir} {who:13} sess=0x{p[2]:02X} {hexs(p, 12)}")
+        # session close: 7c 00 <sess> 00
+        elif p[0] == 0x7C and p[1] == 0x00 and len(p) >= 4 and p[3] == 0x00 and f.dir == "h2b":
+            pass  # close frames are noisy; omit unless needed
+
+
+def find_upload_sessions(frames):
+    """Sessions whose h2b stream contains a type=0x02 metadata sub-msg."""
+    found = []
+    for sess in range(0x04, 0x10):
+        buf, *_ = reassemble(frames, "h2b", sess, verify_crc=False)
+        if any(t == 0x02 for _, t, _, _ in walk_submsgs(buf)):
+            found.append(sess)
+    return found
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("capture", nargs="?", default=None)
+    ap.add_argument("--session", type=lambda s: int(s, 0), default=None)
+    ap.add_argument("--list", action="store_true")
+    ap.add_argument("--acks", action="store_true", help="also decode b2h sess=0x04 acks")
+    ap.add_argument("--acq", action="store_true", help="also dump session-acquisition (Q8)")
+    ap.add_argument("--dump-payload", default=None, help="write reconstructed payload to file")
+    args = ap.parse_args()
+
+    path = resolve_bridge(args.capture)
+    print(f"capture: {path}")
+    frames = load_bridge(path)
+    print(f"frames: {len(frames)}  span: {frames[-1].t_rel:.1f}s")
+
+    if args.list:
+        for sess in range(0x04, 0x10):
+            for d in ("h2b", "b2h"):
+                buf, ok, bad, n = reassemble(frames, d, sess, verify_crc=False)
+                if n:
+                    types = sorted({t for _, t, _, _ in walk_submsgs(buf)})
+                    tn = ",".join(f"0x{t:02X}" for t in types)
+                    print(f"  {d} sess=0x{sess:02X}: {n} chunks {len(buf)}B submsg_types=[{tn}]")
+        return
+
+    sessions = [args.session] if args.session is not None else find_upload_sessions(frames)
+    if not sessions:
+        print("no upload sessions (no type=0x02 metadata found in 0x04..0x0a)")
+    payload = None
+    for sess in sessions:
+        wins = attempt_windows(frames, "h2b", sess)
+        print(f"\nsession 0x{sess:02X}: {len(wins)} attempt window(s): "
+              f"{[(round(a, 1), round(b, 1)) for a, b in wins]}")
+        for (a, b) in wins:
+            p = dump_session(frames, sess, t0=a - 0.5, t1=b + 0.5)
+            dump_timeline(frames, sess, t0=a - 0.5, t1=b + 0.5)
+            if p:
+                payload = p
+        if args.dump_payload and payload:
+            Path(args.dump_payload).write_bytes(payload)
+            print(f"  wrote payload -> {args.dump_payload}")
+    if args.acks:
+        dump_acks(frames)
+    if args.acq:
+        dump_acquisition(frames)
+
+
+if __name__ == "__main__":
+    main()

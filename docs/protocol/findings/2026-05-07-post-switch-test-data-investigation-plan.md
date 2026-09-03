@@ -301,7 +301,7 @@ is right; flagged here so they can be opened in the same plan:
   retx loop does
 - `MozaPlugin.cs:1225` — `OnDashboardSwitched` and the profile-apply
   lambda passed in
-- `Protocol/SessionPropertyPushBuilder` — body format for FF kind=4 (and
+- `Telemetry/Sessions/SessionPropertyPushBuilder` — body format for FF kind=4 (and
   whether kinds 2/7/8/11 already have helpers we are not using)
 
 ## Decision points the user needs to weigh in on

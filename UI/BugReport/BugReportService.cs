@@ -223,9 +223,10 @@ namespace MozaPlugin.UI.BugReport
         /// <summary>
         /// Runs only after a failed submit. Separates "nothing between us and the
         /// Worker is working" (DNS/TLS/proxy) from "the Worker itself refused":
-        /// a GET of the origin root is answered by the Worker with a 404
-        /// <c>{"error":"not found"}</c>, so anything else — HTML, 403, timeout —
-        /// points at the edge, a corporate proxy, or intercepting AV.
+        /// the Worker serves nothing at the origin root, so its answer there is a
+        /// bodyless 404 carrying <c>cf-ray</c>. Anything else — HTML, a non-empty
+        /// body, 403, timeout — points at the edge, a corporate proxy, or
+        /// intercepting AV.
         /// </summary>
         private static async Task AppendConnectivityProbeAsync(StringBuilder rec, CancellationToken ct)
         {

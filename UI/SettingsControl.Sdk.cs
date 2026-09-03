@@ -1,59 +1,24 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Text;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Threading;
 using MozaPlugin.Sdk;
-using MozaPlugin.Sdk.Coap;
 using MozaPlugin.Resources;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
-    // Partial-class continuation of SettingsControl that holds wiring for the
-    // CoAP tab. Stream 7 is now live — the Recent Requests list pulls from
-    // MozaPlugin.Instance.SdkServer.RecentRequests and the status text block
-    // reflects the live server state. When the server is null (feature
-    // disabled) the tab shows persistent settings intent only.
+    // Partial-class continuation of SettingsControl holding the CoAP / UDP
+    // control toggles, which live on the Options tab's SDK card. Per-request
+    // rows are no longer mirrored into a UI list — both servers log every
+    // request through MozaLog, so the traffic rides the ring buffer into the
+    // diagnostics bundle instead.
     public partial class SettingsControl
     {
-        // Backing collection for the CoAP recent-requests list — replaced on
-        // every refresh tick with the latest snapshot from the live server.
-        // The ListBox binds to this ObservableCollection so WPF gets per-row
-        // change notifications without rebuilding the visual tree.
-        private readonly ObservableCollection<string> _sdkRecentRequests
-            = new ObservableCollection<string>();
-
-        // Parallel buffer for the PitHouse UDP control server. Same pattern,
-        // separate list so the two protocols are visually distinct in the
-        // SDK tab.
-        private readonly ObservableCollection<string> _controlUdpRecentRequests
-            = new ObservableCollection<string>();
-
-        // Server instances the UI is currently subscribed to. Tracked so we
-        // can unsubscribe cleanly when a server cycles (e.g. Init wired a
-        // new one after a settings change + restart).
-        private MozaSdkCoapServer? _subscribedSdkServer;
-        private Sdk.PitHouseUdp.MozaControlUdpServer? _subscribedControlUdpServer;
-
-        // Dirty flags raised by the server-thread event handlers; the
-        // dispatcher-tick handler polls them on the UI thread. Volatile so
-        // the dispatcher-thread reader sees the receive-thread writer.
-        private volatile bool _sdkRecentDirty;
-        private volatile bool _controlUdpRecentDirty;
-
         /// <summary>
         /// Called from the SettingsControl constructor (after
-        /// InitializeComponent) to populate the SDK tab's controls from
-        /// persisted settings and wire the recent-requests collection.
-        /// Suppresses change events while seeding so the toggle/port handlers
-        /// don't double-save the values that just came out of the settings
-        /// file.
+        /// InitializeComponent) to seed the SDK toggles from persisted
+        /// settings. Suppresses change events while seeding so the handlers
+        /// don't re-save the values that just came out of the settings file.
         /// </summary>
-        private void InitSdkTab()
+        private void InitSdkCard()
         {
             using (_suppressor.Begin())
             {
@@ -62,64 +27,40 @@ namespace MozaPlugin
 
                 if (UdpControlEnabledCheck != null)
                     UdpControlEnabledCheck.IsChecked = _plugin.Settings.UdpControlEnabled;
-
-                if (SdkRecentRequestsList != null)
-                    SdkRecentRequestsList.ItemsSource = _sdkRecentRequests;
-
-                if (ControlUdpRecentRequestsList != null)
-                    ControlUdpRecentRequestsList.ItemsSource = _controlUdpRecentRequests;
             }
 
-            TrySubscribeToSdkServer();
-            TrySubscribeToControlUdpServer();
             RefreshSdkStatus();
-            RefreshSdkRecentRequests(force: true);
-            RefreshControlUdpRecentRequests(force: true);
         }
 
         /// <summary>
-        /// Update the SDK status TextBlock with one line per component —
-        /// CoAP listener (port 40266), PitHouse UDP control listener
-        /// (port 40288), and the stub manager process. When the feature is
-        /// disabled (no instances constructed) the block reports the
-        /// persisted intent in a single line. All three components share the
-        /// same enable gate so they normally come up and go down together;
-        /// independent failures (port already in use, stub couldn't extract,
-        /// etc.) surface as per-line status text so the user can tell which
-        /// piece broke.
+        /// Render one status line under each toggle: the CoAP listener (port
+        /// 40266) plus its stub-manager process, and the PitHouse UDP control
+        /// listener (port 40288). Each component has its own enable gate, so a
+        /// user may run one without the other and the two lines report
+        /// independently — a port collision or a stub that couldn't extract
+        /// shows up against the piece that broke.
         /// </summary>
         private void RefreshSdkStatus()
         {
-            // Defensive null check: this is called from InitSdkTab before
-            // the control may have realized, and from the refresh tick after
-            // the user has navigated tabs back and forth.
-            if (SdkServerStatusText == null) return;
-
-            bool anyEnabled = _plugin.Settings.SdkEmulationEnabled
-                              || _plugin.Settings.UdpControlEnabled;
-            if (!anyEnabled
-                && _plugin.SdkServer == null
-                && _plugin.ControlUdpServer == null
-                && _plugin.SdkStubManager == null)
+            // Defensive null checks: called from InitSdkCard before the controls
+            // may have realized, and from the 500 ms refresh tick afterwards.
+            if (SdkCoapStatusText != null)
             {
-                SdkServerStatusText.Text = Strings.Sdk_Status_Disabled;
-                return;
+                SdkCoapStatusText.Text = string.Format(
+                    "{0}: {1}  ·  {2}: {3}",
+                    MozaSdkCoapServer.CoapPort,
+                    DescribeServerStatus(_plugin.SdkServer?.Status, _plugin.Settings.SdkEmulationEnabled),
+                    Strings.Label_StubManager,
+                    DescribeStubStatus(_plugin.SdkStubManager, _plugin.Settings.SdkEmulationEnabled));
             }
 
-            // Each component has its own enable gate, so describe each
-            // intent against its own flag — a user might run CoAP without
-            // UDP control (or vice-versa) and the status text should
-            // reflect exactly that. The stub manager tracks CoAP since
-            // it only matters for the official SDK DLL name probe.
-            var sb = new StringBuilder();
-            sb.Append("CoAP listener (").Append(MozaSdkCoapServer.CoapPort).Append("): ")
-              .AppendLine(DescribeServerStatus(_plugin.SdkServer?.Status, _plugin.Settings.SdkEmulationEnabled));
-            sb.Append("UDP control listener (")
-              .Append(Sdk.PitHouseUdp.MozaControlUdpServer.ControlPort).Append("): ")
-              .AppendLine(DescribeServerStatus(_plugin.ControlUdpServer?.Status, _plugin.Settings.UdpControlEnabled));
-            sb.Append("Stub manager: ").Append(DescribeStubStatus(_plugin.SdkStubManager, _plugin.Settings.SdkEmulationEnabled));
-
-            SdkServerStatusText.Text = sb.ToString();
+            if (SdkUdpStatusText != null)
+            {
+                SdkUdpStatusText.Text = string.Format(
+                    "{0}: {1}",
+                    Sdk.PitHouseUdp.MozaControlUdpServer.ControlPort,
+                    DescribeServerStatus(_plugin.ControlUdpServer?.Status, _plugin.Settings.UdpControlEnabled));
+            }
         }
 
         private static string DescribeServerStatus(string? liveStatus, bool enabledIntent)
@@ -140,214 +81,12 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Snapshot the server's recent-requests buffer into the bound
-        /// ObservableCollection. Called from the dispatcher tick + on the
-        /// initial tab populate. Cheap when the dirty flag isn't set; a full
-        /// rebuild otherwise (≤20 rows so the cost is negligible).
-        /// </summary>
-        private void RefreshSdkRecentRequests(bool force)
-        {
-            if (SdkRecentRequestsList == null) return;
-            // Re-subscribe in case the server was (re)created since the last
-            // tick — the SettingsControl outlives any single SdkServer
-            // instance when SimHub reloads the plugin.
-            TrySubscribeToSdkServer();
-
-            var server = _plugin.SdkServer;
-            if (server == null)
-            {
-                if (_sdkRecentRequests.Count != 1
-                    || !string.Equals(_sdkRecentRequests[0], Strings.Sdk_ServerNotStarted, StringComparison.Ordinal))
-                {
-                    _sdkRecentRequests.Clear();
-                    _sdkRecentRequests.Add(Strings.Sdk_ServerNotStarted);
-                }
-                _sdkRecentDirty = false;
-                return;
-            }
-
-            if (!force && !_sdkRecentDirty) return;
-            _sdkRecentDirty = false;
-
-            // Newest-first so the freshest activity is at the top of the
-            // list — matches the convention of every other diagnostics panel
-            // in this UI (serial trace, sleep trace, etc.).
-            var snapshot = server.RecentRequests;
-            var rendered = new List<string>(snapshot.Count);
-            for (int i = snapshot.Count - 1; i >= 0; i--)
-            {
-                rendered.Add(FormatRecentRequest(snapshot[i]));
-            }
-
-            // Diff-light update: clear + add is fine at this size; trying to
-            // diff each row brings little benefit since the buffer slides as
-            // a whole.
-            _sdkRecentRequests.Clear();
-            if (rendered.Count == 0)
-            {
-                _sdkRecentRequests.Add(Strings.Sdk_NoRequestsYet);
-            }
-            else
-            {
-                foreach (var line in rendered) _sdkRecentRequests.Add(line);
-            }
-        }
-
-        private static string FormatRecentRequest(MozaSdkCoapServer.RecentRequest row)
-        {
-            // HH:mm:ss.fff  GET  /uri  ->  2.05 (1ms)
-            string time = row.Time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            string code = CoapCode.Format(row.ResponseCode);
-            string uri = string.IsNullOrEmpty(row.Uri) ? "(ping)" : row.Uri;
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}  {1,-5} {2}  ->  {3} ({4}ms)",
-                time, row.Verb, uri, code, row.DurationMs);
-        }
-
-        /// <summary>
-        /// Wire the <see cref="MozaSdkCoapServer.RecentRequestAppended"/>
-        /// event to mark the UI as dirty. The dispatcher-tick handler reads
-        /// the dirty flag on its next pass and re-snapshots the buffer.
-        /// Idempotent — subscribing twice to the same server is a no-op.
-        /// </summary>
-        private void TrySubscribeToSdkServer()
-        {
-            var current = _plugin.SdkServer;
-            if (ReferenceEquals(current, _subscribedSdkServer)) return;
-
-            if (_subscribedSdkServer != null)
-            {
-                try { _subscribedSdkServer.RecentRequestAppended -= OnSdkRecentRequestAppended; }
-                catch { /* receiver may already have been torn down */ }
-            }
-            _subscribedSdkServer = current;
-            if (_subscribedSdkServer != null)
-                _subscribedSdkServer.RecentRequestAppended += OnSdkRecentRequestAppended;
-        }
-
-        private void OnSdkRecentRequestAppended()
-        {
-            // Fires on the server's receive thread — DO NOT touch WPF here.
-            // The next dispatcher tick will pick up the dirty flag and
-            // snapshot the buffer on the UI thread.
-            _sdkRecentDirty = true;
-        }
-
-        /// <summary>
-        /// Drop both server subscriptions so neither keeps this control
-        /// alive via its event-handler list. Called from
-        /// OnUnloadedStopTimers; re-subscription happens lazily on the next
-        /// refresh tick when the control is reloaded.
-        /// </summary>
-        private void UnsubscribeFromSdkServer()
-        {
-            if (_subscribedSdkServer != null)
-            {
-                try { _subscribedSdkServer.RecentRequestAppended -= OnSdkRecentRequestAppended; }
-                catch { }
-                _subscribedSdkServer = null;
-            }
-            if (_subscribedControlUdpServer != null)
-            {
-                try { _subscribedControlUdpServer.RecentRequestAppended -= OnControlUdpRecentRequestAppended; }
-                catch { }
-                _subscribedControlUdpServer = null;
-            }
-        }
-
-        // ===== PitHouse UDP control server — parallel to the CoAP block above =====
-
-        /// <summary>
-        /// Snapshot the UDP server's recent-requests buffer into the bound
-        /// ObservableCollection. Same shape as <see cref="RefreshSdkRecentRequests"/>;
-        /// rebuilt only when the dirty flag has fired (or <paramref name="force"/>).
-        /// </summary>
-        private void RefreshControlUdpRecentRequests(bool force)
-        {
-            if (ControlUdpRecentRequestsList == null) return;
-            TrySubscribeToControlUdpServer();
-
-            var server = _plugin.ControlUdpServer;
-            if (server == null)
-            {
-                if (_controlUdpRecentRequests.Count != 1
-                    || !string.Equals(_controlUdpRecentRequests[0], Strings.Sdk_ServerNotStarted, StringComparison.Ordinal))
-                {
-                    _controlUdpRecentRequests.Clear();
-                    _controlUdpRecentRequests.Add(Strings.Sdk_ServerNotStarted);
-                }
-                _controlUdpRecentDirty = false;
-                return;
-            }
-
-            if (!force && !_controlUdpRecentDirty) return;
-            _controlUdpRecentDirty = false;
-
-            var snapshot = server.RecentRequests;
-            var rendered = new List<string>(snapshot.Count);
-            for (int i = snapshot.Count - 1; i >= 0; i--)
-            {
-                rendered.Add(FormatControlUdpRecentRequest(snapshot[i]));
-            }
-
-            _controlUdpRecentRequests.Clear();
-            if (rendered.Count == 0)
-            {
-                _controlUdpRecentRequests.Add(Strings.Sdk_NoRequestsYet_Udp);
-            }
-            else
-            {
-                foreach (var line in rendered) _controlUdpRecentRequests.Add(line);
-            }
-        }
-
-        private static string FormatControlUdpRecentRequest(Sdk.PitHouseUdp.MozaControlUdpServer.RecentRequest row)
-        {
-            // HH:mm:ss.fff  PacketId N  Operation  Detail  (Nms)
-            string time = row.Time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            string pid = row.PacketId >= 0
-                ? $"PacketId {row.PacketId,-3}"
-                : "PacketId ?  ";
-            string detail = string.IsNullOrEmpty(row.Detail) ? "" : " " + row.Detail;
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0}  {1}  {2}{3}  ({4}ms)",
-                time, pid, row.Operation, detail, row.DurationMs);
-        }
-
-        private void TrySubscribeToControlUdpServer()
-        {
-            var current = _plugin.ControlUdpServer;
-            if (ReferenceEquals(current, _subscribedControlUdpServer)) return;
-
-            if (_subscribedControlUdpServer != null)
-            {
-                try { _subscribedControlUdpServer.RecentRequestAppended -= OnControlUdpRecentRequestAppended; }
-                catch { /* receiver may already have been torn down */ }
-            }
-            _subscribedControlUdpServer = current;
-            if (_subscribedControlUdpServer != null)
-                _subscribedControlUdpServer.RecentRequestAppended += OnControlUdpRecentRequestAppended;
-        }
-
-        private void OnControlUdpRecentRequestAppended()
-        {
-            // Fires on the UDP server's receive thread — DO NOT touch WPF.
-            _controlUdpRecentDirty = true;
-        }
-
-        /// <summary>
         /// Tick hook used by the SettingsControl refresh DispatcherTimer to
-        /// poll the server's live state. Splits the work in two: the status
-        /// text always re-renders (cheap), the recent-requests list only
-        /// rebuilds when the dirty flag has been raised.
+        /// poll the servers' live state. Cheap — two formatted strings.
         /// </summary>
-        private void RefreshSdkTabTick()
+        private void RefreshSdkStatusTick()
         {
             RefreshSdkStatus();
-            RefreshSdkRecentRequests(force: false);
-            RefreshControlUdpRecentRequests(force: false);
         }
 
         // ===== Event handlers =====
@@ -361,10 +100,10 @@ namespace MozaPlugin
             // Apply the change live — no plugin restart needed. Off-loaded to the
             // ThreadPool because the stub spawn/teardown (CreateProcess +
             // JobObject under Wine) can take a moment and must not stall the WPF
-            // thread; the 500 ms RefreshSdkTabTick renders the resulting status.
+            // thread; the 500 ms RefreshSdkStatusTick renders the resulting status.
             System.Threading.Tasks.Task.Run(() =>
             {
-                try { _plugin.SetSdkEmulationEnabled(on); }
+                try { _plugin.SdkLifecycle?.SetEmulationEnabled(on); }
                 catch { /* helper logs its own failures; status reflects them */ }
             });
             RefreshSdkStatus();
@@ -380,28 +119,21 @@ namespace MozaPlugin
             _plugin.SaveSettings();
             System.Threading.Tasks.Task.Run(() =>
             {
-                try { _plugin.SetUdpControlEnabled(on); }
+                try { _plugin.SdkLifecycle?.SetUdpControlEnabled(on); }
                 catch { /* helper logs its own failures; status reflects them */ }
             });
             RefreshSdkStatus();
         }
 
-        private void SdkRefreshStatusButton_Click(object sender, RoutedEventArgs e)
-        {
-            RefreshSdkStatus();
-            RefreshSdkRecentRequests(force: true);
-            RefreshControlUdpRecentRequests(force: true);
-        }
-
         // ===== One-time "enable SDK support" nudge banner =====
 
-        // The SDK-setup nudge banner + its Configure/Dismiss handlers now live in
-        // the shared PluginBanners control. The plugin pane wires that control's
-        // ConfigureSdkInApp delegate to NavigateToSdkTab (below) so Configure
-        // still switches to the SDK tab here.
-        internal void NavigateToSdkTab()
+        // The SDK-setup nudge banner + its Configure/Dismiss handlers live in the
+        // shared PluginBanners control. The plugin pane wires that control's
+        // ConfigureSdkInApp delegate here so Configure lands on the Options tab,
+        // which is where the SDK toggles now live.
+        internal void NavigateToSdkSettings()
         {
-            try { if (MainTabs != null && SdkTab != null) MainTabs.SelectedItem = SdkTab; }
+            try { if (MainTabs != null && OptionsTab != null) MainTabs.SelectedItem = OptionsTab; }
             catch (Exception ex) { MozaLog.Debug($"[SdkPrompt] navigate failed: {ex.Message}"); }
         }
     }

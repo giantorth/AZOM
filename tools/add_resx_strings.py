@@ -31,6 +31,8 @@ LOCALES = {
     "Strings.it.resx": "it",
     "Strings.ko.resx": "ko",
     "Strings.nb.resx": "nb",
+    "Strings.pt.resx": "pt",
+    "Strings.qps-ploc.resx": "qps-ploc",
     "Strings.ru.resx": "ru",
     "Strings.vi.resx": "vi",
     "Strings.zh-Hans.resx": "zh-Hans",

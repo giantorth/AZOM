@@ -1,21 +1,7 @@
 ## Open questions
 
-- **Dashboard upload path ambiguity** — Two upload structures documented in [`dashboard-upload/`](dashboard-upload/) (Path A session 0x01 FF-prefix vs Path B session 0x04 sub-msg 1/2). Not yet confirmed whether these are:
-  - (a) Two different upload paths firmware supports in parallel
-  - (b) Same path described from different capture/understanding eras (one is stale)
-  - (c) Different firmware versions (2026-04 vs 2025-11)
-
-  Plugin currently implements Path B. Needs side-by-side capture on both firmware versions to resolve whether Path A is still needed on older firmware.
-
-- **Dashboard byte limit configuration** — stored at config object offset `+0x30`, set during dashboard upload (group 0x40). Exact mechanism for setting this limit not yet traced.
-
-- **Cold-start initialization** — EEPROM persistence across power cycles confirmed for channel config; unclear for session state.
-
-- **MDD (standalone dash)** — no captures of telemetry sent to device 0x14; protocol may differ.
-
-- **Dashboard upload: per-field pacing** — Plugin sends all upload chunks (across all 3 FF-prefixed fields) in a single burst, then waits for ack. PitHouse may instead pace by field: send field 0 chunks → wait for ack → send field 1 → wait → send field 2. Burst approach matches how tier definitions are sent (also tight-loop, working). If large dashboards fail while small ones succeed, try adding per-field ack waits.
-
-- **Dashboard upload: seq=2 assumes port=1** — Data chunks on mgmt session start at seq=2, assuming session open used seq=1 (i.e. mgmtPort=1). Session open frame uses seq=port, so data should start at port+1. Since serial port is exclusive (PitHouse cannot run simultaneously), port probing always finds ports 1 and 2, making seq=2 correct in practice. Same assumption in tier definition code (seq=3, assumes telemetry port=2). If this changes (e.g. multi-client over network), both need to use `port + 1` instead of hardcoded values.
+-
+- **Relayed HGP/SGP discriminator — what does a base/hub-relayed SGP answer on group `0x04`?** A relayed shifter has no PID and both models share bus id `0x1A`, EEPROM table 9, and the whole `0x51`/`0x52` settings block — a relayed **HGP** answers brightness and colors reads/writes exactly like an SGP (measured, bundle `32ZD7KHW`, see [`devices/shifter-0x1A.md`](devices/shifter-0x1A.md) § Telling HGP from SGP). The one signal that could differ is the group `0x04` device-type reply, measured at `01 02 08 01` for that HGP and **never measured for a relayed SGP**. Until an SGP bundle lands, "dev-type `08 01` ⇒ HGP" is a positive HGP match that does not prove the SGP differs. Both mitigations now ship: `ProbeRelayedShifter` reads model-name (`0x07`) and hw-version (`0x08`) at `0x1A` and logs whatever comes back (a relayed pedal set at `0x19` answers those groups — see [`identity/pedal-0x19.md`](identity/pedal-0x19.md); whether `0x1A` does is the open part), and the raw device-type plus the HGP/SGP verdict is logged on every relayed shifter connect, so the next SGP bundle answers this on arrival. A third, untried option: probe device-type on the **standalone** SGP lane (PID `0x0023`, model already known from the PID) — it would give the first SGP reading, though at root id `0x12` rather than relayed `0x1A`.
 
 - **EEPROM direct access** — group 10 protocol found in rs21_parameter.db but never observed in USB captures; needs live verification.
 
@@ -31,9 +17,67 @@
 
 - **PitHouse UDP control — multi-base topology.** The protocol envelope has no device-id field — implicit assumption is one wheelbase per machine. RSF only ever talks to a single base. If a user attaches two bases, both servicing the same write is almost certainly wrong; needs a survey of real PitHouse behaviour before any multi-base shipping.
 
-- **Base ambient LEDs** — groups 32/34 commands found in rs21_parameter.db; not captured in USB traces (requires base with LED strips).
+- **Group `0x21` — one-shot main probe, reply is a constant.** Host → dev `0x12` on the wheelbase pipe (PID `0x0006`), exactly **once per PitHouse connect**, then never again:
 
-- **Wheel LED groups 2-4** — Single (28), Rotary (56), Ambient (12) groups found in rs21_parameter.db; only groups 0 (Shift/RPM) and 1 (Button) confirmed in captures so far. Plugin commands exist for `1F [G] FF [N]` per-LED color, `1B [G] FF` brightness, `1C [G]` mode. Brightness-read probe is **unreliable** as a presence check (firmware acknowledges reads for parameters with no physical hardware; confirmed on base KS wheel which has no rotary/ambient hardware but responds to all three probes). No live telemetry equivalent (`25 G` / `26 G` bulk+bitmask) confirmed for groups 2-4. **Group 3 (Rotary) per-LED live telemetry attempted 2026-05-19** — speculative wide-form `0x1A 0x03` (u64 active + u64 window, 16-byte payload) with `0x19 0x03` chunks carrying contiguous ring indices 0..47 (CS Pro). Wheel lit each knob as a whole unit only; firmware did not honour per-LED indices. Per-LED live path is **not supported** on current CS Pro firmware (W17). Static path (`0x1F 03 01 [idx]`) remains the only way to drive individual ring LEDs.
+  ```
+  7E 01 21 12 03 [chk]              host → main
+  7E 05 A1 21 03 AA 55 01 90 [chk]  main → host
+  ```
+
+  Byte-identical in every PitHouse startup capture checked (`12-04-26/moza-startup`, `12-04-26-2/moza-startup-1`, `-2`, `ksp/putOnWheelAndOpenPitHouse`, `fh6/pithouse-start`, `fh6/pithouse-start-low-fps-at-start`) — 6/6, one request each, always the same 4 value bytes. Fires consistently **0.6–1.7 s after the first `0x07` model-name probe**, i.e. inside the identity phase:
+
+  | capture | first `0x07` | `0x21` | first session open |
+  |---|---|---|---|
+  | `moza-startup` | 8.67 s | 9.30 s | 8.76 s |
+  | `moza-startup-1` | 8.41 s | 9.05 s | 8.50 s |
+  | `putOnWheelAndOpenPitHouse` | 16.29 s | 17.20 s | 26.86 s |
+  | `fh6/pithouse-start` | 18.04 s | 19.72 s | *(none in capture)* |
+
+  Note it is **not** ordered relative to the session opens — it lands ~0.5 s after them on the `12-04-26*` rigs and ~9.7 s before them on the KS Pro rig. So it tracks the identity sweep, not session setup. Absent from every `simhub-*` capture, and the plugin has no group-`0x21` command anywhere — so this is PitHouse-only today.
+
+  `AA 55` is the classic sync/magic pair, so the reply reads like a fixed capability or protocol-generation token rather than a per-unit value — but all six captures resolve to a PID `0x0006` (R12) base, so "constant" may just mean "constant for this base family". Open: (a) does the value vary by base model / firmware, (b) does the base gate anything on the read, (c) is the plugin's omission harmless? The plugin has shipped without it, so it is not required for telemetry — but it is a cheap parity gap to close if (b) turns out to matter. Resolving needs the same one-shot read on a non-R12 base, and one PitHouse connect where the probe is blocked (sim-side) to see whether engagement still happens.
+
+- **Group `0x4C` — MOZA Stalks has a live CDC protocol; `usb-ids.md` said it had none.** PID `0x0024` (`Stalks`) enumerates its own CDC pipe and answers a full protocol surface at dev `0x12`. Confirmed by resolving the USB device address of every group-`0x4C` frame back to its `idProduct` — `0x346E:0x0024` in all five captures that carry the group (`AB9/all_gears`, `AB9/1-N`, `fh6/pithouse-start`, `fh6/pithouse-start-low-fps-at-start`, `fh6/controller-wheel-controller-pithouse-running`), across two rigs. In `all_gears` the Stalks is a third MOZA device alongside the R12 base (`0x0006`) and the AB9 (`0x1000`), each on its own address.
+
+  The device self-identifies through the standard identity groups:
+
+  | Probe | Reply |
+  |-------|-------|
+  | `0x07` model-name | `S07` |
+  | `0x08` hw-version | `RS21-S07-HW BM-C` |
+  | `0x08` hw-revision | `U-V10` |
+  | `0x0F` sw-version | `RS21-S07-MC SW` |
+  | `0x04` dev-type | `01 02 07 01` (DT_2 DT_3 = `07 01`) |
+  | `0x05` capabilities | `01 02 4F 00` |
+  | `0x09` presence | `00 08` |
+  | `0x11` identity-11 | `04 01` |
+  | `0x10` serial | 32 ASCII chars |
+
+  Beyond identity, the only traffic is heartbeat (`0x00`/`0x80`), group `0x0E` (param/debug), and a **~1 Hz read on group `0x4C`**:
+
+  ```
+  7E 05 4C 12 07 00 00 00 00 [chk]   host → stalks
+  7E 03 CC 21 07 00 00 [chk]          stalks → host
+  ```
+
+  Always cmd `0x07` with a 4-byte zero payload, always a 2-byte zero reply — across all 81 polls (26 / 20 / 15 / 12 / 8) in those five captures. It runs for essentially the whole capture (`controller-wheel-controller-pithouse-running`: 0.06 s → 25.0 s of a 25.4 s capture) or from the moment PitHouse engages (`pithouse-start`: 21.1 s → 36.6 s of 39.7 s).
+
+  Three things are open. (1) **What `0x4C`/`07` reads** — the value has never been observed non-zero, so it is probably a state/status word that only moves when a stalk is actuated; a capture with the stalks physically operated while PitHouse is open would settle it. (2) **Whether the poll is load-bearing.** The plugin reads the Stalks over **HID only** (`Protocol/MozaHidReader.cs` — a 28-button joystick feeding `MozaData.StalksButtonStates` and the truck-sim keyboard feature) and never opens its CDC pipe, so if the `0x4C` poll is a keepalive the plugin is relying on the device not needing one. It has not caused reported problems, which is weak evidence that it is optional. (3) **`0x09` presence returns `00 08`** where a wheel with one Display sub-device returns `00 01` — if that field really is a sub-device count, the Stalks exposes 8 of them, which nothing else in the docs accounts for.
+
+  Also needs folding into the canonical pages once decided: [`devices/usb-ids.md`](devices/usb-ids.md) describes the `Stalks` category as *"no CDC traffic yet"* (now known false — corrected inline), and [`identity/dev-type-table.md`](identity/dev-type-table.md) has no row for a non-wheel dev-type, so `07 01` / `S07` is unrecorded.
+
+- **Group `0x5A` — handbrake presence poll, 20-byte reply undecoded.** The plugin emits this itself (`Telemetry/Frames/TelemetryFrameCache.cs` `HandbrakePresenceFrame`, dispatched from `TelemetrySender.Tick.cs`) but it appears in no device table:
+
+  ```
+  7E 01 5A 1B 00 [chk]                      host → handbrake
+  7E 14 DA B1 00 × 20 [chk]                 handbrake → host   (N = 0x14 = 20)
+  ```
+
+  Verified on `soft-restart.calibrate-paddles.interpolation-…deadzone-…` with a handbrake physically attached (dev `0x1B` answers `0x00` presence heartbeats 391×): 5418 requests, 5415 replies, paired 1:1 with the documented `0x5D` output poll (5414 requests) — matching `TickEmitPeripheralPolls`, which fires presence at phase 0 and output at phase `slow/5` of the same ~1 Hz cycle. (The comment above the frame table in `TelemetryFrameCache.cs` claims "presence ~22 Hz, handbrake-output ~10 Hz"; the tick code and the wire both say ~1 Hz each, so that comment is stale.) **Every reply body byte is zero in the entire capture** — 20 zero bytes, 5415 times.
+
+  So the request works and the device answers, but nothing is known about what the 20 bytes carry. `0x5A` also sits *below* the documented handbrake block (`0x5B` settings read / `0x5C` write / `0x5D` output / `0x5E` calibration — see [`devices/handbrake-0x1B.md`](devices/handbrake-0x1B.md)), which is the one gap in an otherwise contiguous per-device group quartet, so it may not be a handbrake group at all — it could be a generic per-device block that only the handbrake happens to be polled on. Open: (a) does any byte ever become non-zero (pull the handbrake during a capture), (b) is `0x5A` accepted by other device ids (`0x19` pedals, `0x1A` shifter) — a cheap read sweep would answer this, (c) what is the plugin's poll actually for, given the reply is discarded? If it is genuinely a presence probe then the reply body is irrelevant and this is purely a documentation gap; if it carries state, the plugin is throwing data away. Caveat before deleting it as dead weight: apparently-useless parity polls on this bus have repeatedly turned out to keep a device engaged at idle, so establish what it does before removing it.
+
+- **Non-MOZA CDC traffic can false-positive as a Moza frame.** In `AB9/all_gears` a single frame on USB device address 22 (`0x1532:0x0D06`, a Razer device) parsed as group `0x4D` and is the capture's only checksum failure. Rate is 1 frame in 7365 and it is flagged, but any tooling that trusts `0x7E [N]` framing without a checksum gate on a multi-vendor capture will pick up noise like this. Not a protocol question — recorded so the stray `0x4D` is not chased as a real group.
 
 - **Group 0x09 semantics** — presence/ready check sent first during probe. Response `00 01` may indicate sub-device count (VGS has 1 Display sub-device). Needs verification with other wheel models.
 
