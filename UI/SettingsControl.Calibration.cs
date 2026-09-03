@@ -186,19 +186,31 @@ namespace MozaPlugin.UI
         // Pedal Feel curve presets (6 nodes) — derived by sampling the
         // existing 5-point PedalCurvePresets shapes (Linear/S-Curve/
         // Exponential/Parabolic) at this curve's own fixed breakpoints
-        // (8.05/19.5/44.2/72.4/90.0/97.9% — see
-        // MozaMBoosterRegistry.FeelCurveFractions), not new hand-picked
-        // values, so the presets keep the same visual identity users
-        // already know from the 5-point curve.
+        // (k/7, see MozaMBoosterRegistry.FeelCurveFractions), not new
+        // hand-picked values, so the presets keep the same visual identity
+        // users already know from the 5-point curve.
+        //
+        // These were originally sampled at 8.05/19.5/44.2/72.4/90.0/97.9%,
+        // which is what FeelCurveFractions held before the Max-Force fix
+        // replaced it with the hardware-verified k/7 spacing; the presets
+        // were never resampled, so Linear's nodes came out bunched instead
+        // of evenly spaced (deltas 8/11/25/28/18/8 rather than ~14 each).
         private static readonly int[][] MBoosterInputCurvePresets =
         {
-            new[] { 8, 19, 44, 72, 90, 98 },  // Linear
-            new[] { 3, 8, 33, 88, 97, 99 },   // S Curve
-            new[] { 2, 6, 16, 42, 76, 95 },   // Exponential
-            new[] { 20, 45, 76, 91, 97, 99 }, // Parabolic
+            new[] { 14, 29, 43, 57, 71, 86 }, // Linear
+            new[] { 5, 12, 30, 70, 88, 95 },  // S Curve
+            new[] { 4, 9, 16, 25, 41, 66 },   // Exponential
+            new[] { 34, 59, 75, 84, 91, 96 }, // Parabolic
         };
+
+        // The curve's fixed X breakpoints, as a percentage. Derived straight
+        // from FeelCurveFractions so the two can never drift apart again —
+        // Linear above is the identity over these, and a preset click resets
+        // dragged X positions back to them.
         private static readonly float[] MBoosterInputCurveDefault =
-            Array.ConvertAll(MBoosterInputCurvePresets[0], x => (float)x);
+            Array.ConvertAll(
+                global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.FeelCurveFractions,
+                f => (float)Math.Round(f * 100.0));
 
         // Pedal Feel input curve — CONFIRMED real hardware calibration (see
         // MozaMBoosterRegistry.ComputeFeelCurveY and
