@@ -662,15 +662,10 @@ namespace MozaPlugin
                 _data.IsBaseConnected = false;
                 _data.IsHubConnected = false;
                 _data.ClearWheelIdentity();
-                DetectionState.BaseDetected = false;
+                DetectionState.ResetBase();
+                _data.ClearBaseIdentity();
                 _data.BaseSettingsRead = false;
                 DetectionState.DashDetected = false;
-                DetectionState.BaseAmbientLedSupported = false;
-                DetectionState.BaseAmbientProbed = false;
-                DetectionState.BaseEq10Probed = false;
-                DetectionState.BaseFwVersionLogged = false;
-                DetectionState.BaseFwVersionProbeRetries = 0;
-                _data.BaseModelName = "";
                 _baseModelChunk1 = null;
                 _baseModelChunk2 = null;
                 DetectionState.NewWheelDetected = false;

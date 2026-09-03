@@ -141,11 +141,10 @@ namespace MozaPlugin.Devices
         /// </summary>
         public void ResetAll()
         {
-            BaseDetected = false;
+            // Also picks up BaseFwVersionLogged / BaseFwVersionProbeRetries, which
+            // this method used to leave latched across a reload.
+            ResetBase();
             DashDetected = false;
-            BaseAmbientLedSupported = false;
-            BaseAmbientProbed = false;
-            BaseEq10Probed = false;
             NewWheelDetected = false;
             OldWheelDetected = false;
             LastKnownWheelDeviceId = 0;
@@ -180,6 +179,33 @@ namespace MozaPlugin.Devices
             LastKnownWheelDeviceId = 0;
             NewWheelActingOldProtocol = false;
             NewWheelActingOldModel = "";
+        }
+
+        /// <summary>
+        /// Clear the base-detection latches so the prober re-runs the wheelbase
+        /// detect cascade and re-issues its identity probes.
+        /// <para>
+        /// MUST be paired with <see cref="MozaData.ClearBaseIdentity"/>: DeviceProber
+        /// gates the base identity reads (incl. <c>base-mcu-uid</c>) on BOTH
+        /// <see cref="BaseDetected"/> and <see cref="BaseAmbientProbed"/>, so clearing
+        /// the identity without clearing both latches leaves it blank for the rest of
+        /// the session — which empties the SDK <c>DeviceCatalog</c> and makes every
+        /// device-scoped CoAP URI answer 4.04.
+        /// </para>
+        /// <para>
+        /// <see cref="BaseOwner"/> is deliberately NOT cleared here: ownership is
+        /// pipe-specific, so each caller decides whether the pipe that dropped was
+        /// the owning one.
+        /// </para>
+        /// </summary>
+        public void ResetBase()
+        {
+            BaseDetected = false;
+            BaseAmbientLedSupported = false;
+            BaseAmbientProbed = false;
+            BaseEq10Probed = false;
+            BaseFwVersionLogged = false;
+            BaseFwVersionProbeRetries = 0;
         }
     }
 }

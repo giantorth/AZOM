@@ -420,14 +420,17 @@ namespace MozaPlugin.Hardware
         // this. Mirror the wheel cache: only write a base setting when its value
         // actually changed since the last write to THIS base.
         //
-        // CAUTION — empty UID must NOT invalidate: ResetWheelDetection ->
-        // _data.ClearWheelIdentity() blanks _data.BaseMcuUid on every rim detach,
-        // and the base is not re-probed mid-session (BaseDetected stays latched),
-        // so the UID reads back empty after the first flap. Treat an empty UID as
+        // CAUTION — empty UID must NOT invalidate. ResetBaseDetection ->
+        // _data.ClearBaseIdentity() blanks _data.BaseMcuUid on connection loss, and
+        // ApplyBaseToHardware can run before the re-probe answers, so the UID reads
+        // back empty for a window on every reconnect. Treat an empty UID as
         // "unknown, keep the cache" rather than a new base — otherwise each flap
         // would clear the cache and re-push the very storm this guards against. A
         // genuinely different base reports a different non-empty UID and re-writes
         // its config once.
+        //
+        // A rim detach no longer blanks the base UID (ClearWheelIdentity is
+        // rim-scoped), so a rim flap keeps both the identity and the cache.
         //
         // STATIC so the "write base config once per physical base" guarantee spans
         // plugin reloads: HardwareApplier is reconstructed on every game-switch

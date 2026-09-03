@@ -153,21 +153,55 @@ namespace MozaPlugin
             _connectionCoordinator?.ResetHubWheelMigrationState();
             if (DetectionState.NewWheelDetected || DetectionState.OldWheelDetected || DetectionState.DashDetected)
                 ResetWheelDetection("Serial disconnect — resetting wheel detection");
+            // UNGATED, unlike the wheel reset above: an earlier rim reset may have
+            // already cleared the wheel/dash flags, and the base state would then
+            // survive a real disconnect with nothing left to re-probe it.
+            ResetBaseDetection("Serial disconnect — resetting base detection");
+        }
+
+        /// <summary>
+        /// Drop wheelbase detection + identity so the prober re-runs the base detect
+        /// cascade on the next connection. Call ONLY when the base itself is gone
+        /// (connection loss, deliberate disable) — never for a rim hot-swap, which
+        /// leaves the base attached; see <see cref="ResetWheelDetection"/>.
+        /// </summary>
+        internal void ResetBaseDetection(string reason)
+        {
+            if (_data == null) return;
+            MozaLog.Debug($"[AZOM] {reason}");
+            DetectionState.ResetBase();
+            _data.ClearBaseIdentity();
+            _data.BaseSettingsRead = false;
+            // Half-received main-model-name chunks must not recombine with the next
+            // base's reply.
+            _baseModelChunk1 = null;
+            _baseModelChunk2 = null;
+            // Ownership only drops if the pipe that went away was the owner; a base
+            // on the dedicated base-aux pipe keeps its own.
+            if (ReferenceEquals(DetectionState.BaseOwner, _deviceManager))
+                DetectionState.BaseOwner = null;
         }
 
         /// <summary>
         /// Clear ALL device-detection flags. Called by Init() and End() so a plugin
         /// reload doesn't carry over stale detected state. See <see cref="ResetWheelDetection"/>
-        /// for the hot-swap-scoped reset that preserves base/hub/handbrake/pedals.
+        /// for the hot-swap-scoped reset that preserves base/hub/handbrake/pedals, and
+        /// <see cref="ResetBaseDetection"/> for the base-scoped one.
         /// </summary>
         private void ResetDetectionFlags()
         {
             DetectionState.ResetAll();
-            if (_data != null) _data.BaseModelName = "";
+            if (_data != null) _data.ClearBaseIdentity();
             _baseModelChunk1 = null;
             _baseModelChunk2 = null;
         }
 
+        /// <summary>
+        /// Rim-scoped reset: preserves base/hub/handbrake/pedals detection AND base
+        /// identity, because most callers (presence miss, rim detach, model/ID
+        /// hot-swap) fire with the base still attached. A caller that knows the base
+        /// went away calls <see cref="ResetBaseDetection"/> as well.
+        /// </summary>
         internal void ResetWheelDetection(string reason)
         {
             MozaLog.Debug($"[AZOM] {reason}");
