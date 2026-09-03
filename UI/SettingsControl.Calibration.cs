@@ -334,6 +334,27 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
+        /// Park a PEDAL FEEL write — Travel / End Stop / Natural Friction /
+        /// Segmented Damping / Deadzone-Max Force-feel curve. These live on
+        /// brake-named SINGLETON cmdIds with no per-pedal selector, so they
+        /// can only configure the pedal that owns that hardware. Pushing them
+        /// from a PASSIVE pedal's config doesn't configure that pedal — it
+        /// overwrites the ACTIVE pedal's registers (bundle J5PSSQG8: selecting
+        /// a passive pedal's page pushed its stored values over the brake's
+        /// real ones ~400ms later, so nothing the user set ever stuck). Same
+        /// gate ApplyMBoosterToHardware applies on connect; this closes the
+        /// live-UI path it never covered.
+        /// </summary>
+        private void QueueMBoosterPedalFeelPush(string key, Action<MBoosterDeviceController, byte> push)
+        {
+            var controller = CurrentMBoosterController();
+            if (controller == null) return;
+            if (!controller.IsAxisMotorized(_mboosterEffectPedalIndex)) return;
+            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            controller.QueueCalibWrite($"{dev:x2}:{key}", () => push(controller, dev));
+        }
+
+        /// <summary>
         /// Park a Deadzone/Max Force write (cmdId 0xAB selectors 0x07-0x0E) —
         /// separate from <see cref="QueueMBoosterCalibPush"/> because neither
         /// capture that confirmed this family (max-force-24-75-128-166-200
@@ -362,6 +383,8 @@ namespace MozaPlugin.UI
         /// </summary>
         private void PushMBoosterFeelCurve(IMBoosterPedalConfig s, global::MozaPlugin.Devices.MBooster.MBoosterDeviceController controller, int axisIndex)
         {
+            // Singleton Pedal Feel hardware — see QueueMBoosterPedalFeelPush.
+            if (!controller.IsAxisMotorized(axisIndex)) return;
             byte dev = MBoosterCalibDevice(controller, axisIndex);
             double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
             double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
@@ -381,7 +404,7 @@ namespace MozaPlugin.UI
             // Travel is a physical setting on every pedal mode — push to THIS
             // pedal's own mBooster unit (device 0x12 host / 0x1d / 0x1e chain).
             float startMm = s.TravelStartMm, endMm = s.TravelEndMm;
-            QueueMBoosterCalibPush("travel", (c, dev) =>
+            QueueMBoosterPedalFeelPush("travel", (c, dev) =>
             {
                 c.SendIntWrite("mbooster-brake-travel-start",
                     global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(startMm), dev);
@@ -472,7 +495,7 @@ namespace MozaPlugin.UI
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.EndstopFrontStiffness = v;
-                QueueMBoosterCalibPush("endstop-front", (c, dev) =>
+                QueueMBoosterPedalFeelPush("endstop-front", (c, dev) =>
                     c.SendIntWrite("mbooster-brake-endstop-front",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev));
             });
@@ -483,7 +506,7 @@ namespace MozaPlugin.UI
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.EndstopEndStiffness = v;
-                QueueMBoosterCalibPush("endstop-end", (c, dev) =>
+                QueueMBoosterPedalFeelPush("endstop-end", (c, dev) =>
                     c.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev));
             });
@@ -507,7 +530,7 @@ namespace MozaPlugin.UI
                 if (s == null) return;
                 s.NaturalFrictionPct = v;
                 int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(v);
-                QueueMBoosterCalibPush("friction", (c, dev) =>
+                QueueMBoosterPedalFeelPush("friction", (c, dev) =>
                 {
                     c.SendIntWrite("mbooster-brake-friction-0", raw, dev);
                     c.SendIntWrite("mbooster-brake-friction-1", raw, dev);
@@ -530,7 +553,7 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
             float pct = s.NaturalFrictionEnabled ? (float)MBoosterNaturalFrictionSlider.Value : 0f;
             int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(pct);
-            QueueMBoosterCalibPush("friction", (c, dev) =>
+            QueueMBoosterPedalFeelPush("friction", (c, dev) =>
             {
                 c.SendIntWrite("mbooster-brake-friction-0", raw, dev);
                 c.SendIntWrite("mbooster-brake-friction-1", raw, dev);
@@ -600,7 +623,7 @@ namespace MozaPlugin.UI
 
             // Built inside the parked action so the flush sends whatever the
             // plots hold when the drag settles, not a mid-drag snapshot.
-            QueueMBoosterCalibPush("segdamp", (c, dev) =>
+            QueueMBoosterPedalFeelPush("segdamp", (c, dev) =>
                 c.SendOneShot(global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
                     sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
                     sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
