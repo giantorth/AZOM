@@ -230,6 +230,52 @@ namespace MozaPlugin.Protocol
         private static readonly ConcurrentDictionary<string, byte> _probeInFlight =
             new ConcurrentDictionary<string, byte>();
 
+        // Per-port blocked-probe backoff. A port whose Open() keeps hanging (a
+        // non-MOZA CDC device, or one another process holds open) used to be
+        // re-probed on every sweep forever.
+        //
+        // The interval is CAPPED, never retired: probing a port must never stop
+        // permanently. The whole reason ProbeWithTimeout abandons threads is the
+        // Wine freshly-powered-base wedge, where Open() hangs on a port that IS
+        // a MOZA base and only opens in time a few sweeps later. A give-up rule
+        // would blind exactly that port for the rest of the session, and the
+        // abandoned thread's late (responded, reachable) cannot rescue it — on
+        // the timeout path it lands in locals of a call that already returned.
+        //
+        // Keyed per PORT, not per ProbeKind: a wedged Open() is a property of
+        // the port. The value is immutable and replaced wholesale, so a
+        // concurrent reader on another lane's reconnect timer sees one reference,
+        // never a torn pair. Written only from the probe sweep (reconnect-timer
+        // ThreadPool callback) — ConcurrentDictionary, no lock, per the hard rule
+        // in docs/DEVELOPMENT.md § Threading model.
+        private static readonly ConcurrentDictionary<string, ProbeBackoff> _probeBackoff =
+            new ConcurrentDictionary<string, ProbeBackoff>();
+
+        private sealed class ProbeBackoff
+        {
+            public readonly int Consecutive;
+            public readonly DateTime NextEligibleUtc;
+
+            public ProbeBackoff(int consecutive, DateTime nextEligibleUtc)
+            {
+                Consecutive = consecutive;
+                NextEligibleUtc = nextEligibleUtc;
+            }
+        }
+
+        private const int ProbeBackoffBaseMs = 10_000;
+        private const int ProbeBackoffMaxMs = 300_000;
+
+        /// <summary>Retry interval after <paramref name="consecutive"/> blocked
+        /// probe cycles: ProbeBackoffBaseMs doubled per cycle, capped at
+        /// ProbeBackoffMaxMs. The shift is clamped so a long-lived wedge can't
+        /// overflow it.</summary>
+        private static long ProbeBackoffFor(int consecutive)
+        {
+            int steps = Math.Min(Math.Max(consecutive, 1) - 1, 20);
+            return Math.Min((long)ProbeBackoffBaseMs << steps, ProbeBackoffMaxMs);
+        }
+
         // Priority lane: unpaced FIFO for tiny, time-critical frames (fc:00 session
         // acks). Drained ahead of one-shot every WriteLoop iteration so an ack
         // can't get buried behind a 1000-chunk tier-def burst — the wheel times
@@ -1753,6 +1799,12 @@ namespace MozaPlugin.Protocol
                 return nb.CompareTo(na); // Descending - check high ports first
             });
 
+            // Reset blocked-probe backoff for ports that have left the
+            // enumeration since the last sweep: an unplug/replug may be
+            // different hardware, so it starts over at the full probe cadence
+            // instead of inheriting a widened interval.
+            PruneProbeBackoff(ports);
+
             // Saved-port hint: probe the remembered port first so registry-less
             // discovery (Wine/Proton) revalidates it before sweeping the full
             // list. The probe reply still decides — a different device on that
@@ -1961,6 +2013,15 @@ namespace MozaPlugin.Protocol
             // abandoned at the deadline (see _probeInFlight docs) and self-cleans
             // when the syscall finally returns.
 
+            // Blocked-probe backoff (see _probeBackoff). Silent while the
+            // interval is unexpired — suppressing the per-sweep spam is the
+            // whole point. Getting past this line therefore means we are on the
+            // FIRST attempt of a backoff step, which is what keeps the two
+            // MozaLog.Debug lines below to one-per-step instead of twice-per-sweep.
+            _probeBackoff.TryGetValue(portName, out var backoff);
+            if (backoff != null && DateTime.UtcNow < backoff.NextEligibleUtc)
+                return (false, false);
+
             // A prior probe on this port hung in Open() and was abandoned (see
             // _probeInFlight docs). Its SerialPort still owns the OS handle, so
             // a new Open() here would fail anyway — and, more importantly,
@@ -1968,9 +2029,11 @@ namespace MozaPlugin.Protocol
             // a not-ready CDC-ACM port. Skip until that thread self-cleans.
             if (_probeInFlight.ContainsKey(portName))
             {
-                MozaLog.Debug(
-                    $"[AZOM] Probe {portName}: skipped — a prior probe is still " +
-                    "blocked in Open() (port not ready); will retry once it clears.");
+                // The prior probe's Open() still has not returned. Count it as
+                // another blocked cycle so a permanently-wedged port widens its
+                // interval instead of relogging this on every sweep.
+                NoteProbeBlocked(portName, backoff,
+                    "skipped — a prior probe is still blocked in Open() (port not ready)");
                 return (false, false);
             }
 
@@ -2021,12 +2084,63 @@ namespace MozaPlugin.Protocol
                 // thread, removes the in-flight marker) when the syscall finally
                 // returns; until then this port is skipped above. The thread is
                 // IsBackground, so it never blocks process exit.
-                MozaLog.Debug(
-                    $"[AZOM] Probe {portName}: timed out after {timeoutMs}ms — abandoning " +
-                    "blocked probe thread (not force-closing cross-thread; port marked in-flight).");
+                NoteProbeBlocked(portName, backoff,
+                    $"timed out after {timeoutMs}ms — abandoning blocked probe thread " +
+                    "(not force-closing cross-thread; port marked in-flight)");
                 return (false, false);
             }
+
+            // Open() returned inside the deadline, so the port is responsive
+            // whatever it answered — clear any backoff it had accumulated. A
+            // slow-but-real port (the Wine freshly-powered-base case the abandon
+            // path exists for) recovers its full probe cadence here.
+            _probeBackoff.TryRemove(portName, out _);
             return (responded, reachable);
+        }
+
+        /// <summary>
+        /// Record a blocked/timed-out probe cycle for <paramref name="portName"/>
+        /// and widen its retry interval. Logs once per widening step — callers
+        /// only get here after the previous window expired — and goes quiet once
+        /// the interval reaches its ceiling, while still retrying at that
+        /// interval forever (the port is never given up on).
+        /// </summary>
+        private static void NoteProbeBlocked(string portName, ProbeBackoff? prior, string what)
+        {
+            int n = (prior?.Consecutive ?? 0) + 1;
+            long ms = ProbeBackoffFor(n);
+            bool wasAlreadyCapped = prior != null && ProbeBackoffFor(prior.Consecutive) >= ProbeBackoffMaxMs;
+
+            _probeBackoff[portName] = new ProbeBackoff(n, DateTime.UtcNow.AddMilliseconds(ms));
+
+            if (wasAlreadyCapped) return;   // ceiling already announced — stay quiet
+
+            if (ms < ProbeBackoffMaxMs)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Probe {portName}: {what} — next attempt in {ms / 1000}s (blocked {n}).");
+                return;
+            }
+
+            MozaLog.Debug(
+                $"[AZOM] Probe {portName}: {what} — blocked {n} times; settling at one attempt " +
+                $"every {ms / 1000}s and logging no further. Likely not a MOZA port, or held " +
+                "open by another process.");
+        }
+
+        /// <summary>
+        /// Drop backoff entries for ports no longer in the enumeration, so an
+        /// unplug/replug returns to the full probe cadence.
+        /// </summary>
+        private static void PruneProbeBackoff(string[] currentPorts)
+        {
+            if (_probeBackoff.IsEmpty) return;
+            // ConcurrentDictionary.Keys is a snapshot — safe to remove while iterating.
+            foreach (var known in _probeBackoff.Keys)
+            {
+                if (Array.IndexOf(currentPorts, known) < 0)
+                    _probeBackoff.TryRemove(known, out _);
+            }
         }
 
         private static int ExtractPortNumber(string portName)
