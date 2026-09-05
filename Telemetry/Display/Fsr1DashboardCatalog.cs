@@ -653,20 +653,6 @@ namespace MozaPlugin.Telemetry.Display
         public static Fsr1Dashboard? ByType(byte type) =>
             Dashboards.FirstOrDefault(d => d.RecordType == type);
 
-        /// <summary>True when the record carries the 24-bit sign-magnitude gap/delta slot.</summary>
-        public static bool HasGapField(Fsr1Dashboard? dash) =>
-            dash != null && System.Array.Exists(dash.Fields, f => f.Kind == Fsr1FieldKind.SignedMagnitude);
-
-        /// <summary>
-        /// Smallest gap-bearing record (type-0c, 18 bytes). The driver interleaves this at a low
-        /// rate on pages whose primary record has NO gap slot (index 4 → type-03, index 8 →
-        /// type-05, …), so the firmware's cached delta keeps tracking instead of going stale —
-        /// the same cache mechanism 0x0d uses for tyre data. type-0c is the safest carrier: its
-        /// other fields (current lap time, speed, RPM, max RPM, gear) are values we already
-        /// compute correctly, so anything it puts in the cache alongside the gap is also right.
-        /// </summary>
-        public static Fsr1Dashboard? GapCarrier => ByType(0x0c);
-
         /// <summary>
         /// Active page index (Param 6 / g32-81) -> the record type(s) the wheel renders
         /// on that page (table above). Firmware-fixed: the index->type mapping is

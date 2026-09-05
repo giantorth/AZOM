@@ -392,21 +392,6 @@ namespace MozaPlugin.Telemetry.Display
                                 (StreamKind)((int)StreamKind.TierDash0 + streamSlot), rec);
                         streamSlot++;
                     }
-
-                    // Gap carrier. Some pages' records have NO gap slot at all (index 4 →
-                    // type-03, index 8 → type-05, …), so the delta the firmware shows there is
-                    // whatever it cached from the last gap-bearing record — it goes stale while
-                    // the user sits on the page. Interleave the smallest gap-bearing record
-                    // (type-0c) as a one-shot to keep that cache fresh, the same mechanism 0x0d
-                    // uses for tyre data. Skipped while the byte probe is armed: the probe zeroes
-                    // non-target records, so a carrier frame would push a zero gap into the cache
-                    // and muddy the sweep.
-                    if (!probe && !ActiveCarriesGap(active) && _tickCounter % GapCarrierEvery(oneHzEvery) == 0)
-                    {
-                        var carrier = Fsr1DashboardCatalog.GapCarrier;
-                        if (carrier != null)
-                        { var gp = SafeRecordFor(carrier); if (gp != null) _connection.Send(gp); }
-                    }
                 }
                 else
                 {
@@ -465,17 +450,5 @@ namespace MozaPlugin.Telemetry.Display
 
         private static long Clamp(long v, long lo, long hi) => v < lo ? lo : (v > hi ? hi : v);
 
-        /// <summary>True when any record the active page streams carries the gap slot.</summary>
-        private static bool ActiveCarriesGap(Fsr1Dashboard[] active)
-        {
-            for (int i = 0; i < active.Length; i++)
-                if (Fsr1DashboardCatalog.HasGapField(active[i])) return true;
-            return false;
-        }
-
-        /// <summary>Tick period of the gap-carrier one-shot — 5 Hz. Faster than the 0.5 Hz
-        /// tyre cache because a delta is read continuously, not glanced at; still only ~10 % of
-        /// the primary's frame rate.</summary>
-        private static int GapCarrierEvery(int oneHzEvery) => Math.Max(1, oneHzEvery / 5);
     }
 }
