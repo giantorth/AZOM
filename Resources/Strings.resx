@@ -711,6 +711,7 @@ Id: {2}</value></data>
   <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
   <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Upload blocked by our CDN, not your connection — use Export Bundle instead.</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
   <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
   <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>

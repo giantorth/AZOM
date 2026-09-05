@@ -208,7 +208,10 @@ namespace MozaPlugin.UI
                         // "denied every time" report actionable when the user
                         // quotes the line, and it also sits in the exported
                         // bundle's upload-log.txt.
-                        SetBugReportStatus(AppendShortCode(Strings.Status_BugReportFailed, result.ShortCode));
+                        SetBugReportStatus(AppendShortCode(
+                            result.EdgeBlocked ? Strings.Status_BugReportEdgeBlocked
+                                               : Strings.Status_BugReportFailed,
+                            result.ShortCode));
                         break;
                 }
             }

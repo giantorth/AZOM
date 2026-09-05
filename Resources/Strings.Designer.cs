@@ -763,6 +763,7 @@ namespace MozaPlugin.Resources
         public static string Status_BugReportRateLimited => Get("Status_BugReportRateLimited");
         public static string Status_BugReportTooLarge => Get("Status_BugReportTooLarge");
         public static string Status_BugReportFailed => Get("Status_BugReportFailed");
+        public static string Status_BugReportEdgeBlocked => Get("Status_BugReportEdgeBlocked");
         public static string Status_BugReportNeedDescription => Get("Status_BugReportNeedDescription");
         public static string Status_BugReportCooldown => Get("Status_BugReportCooldown");
         public static string Label_DiagnosticCapture => Get("Label_DiagnosticCapture");
