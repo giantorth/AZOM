@@ -763,4 +763,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Dreiemoment</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Dreiemoment</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Skala</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>REDIGER I STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NYTT DASHBORD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Åpne det valgte dashbordet i MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Lag et nytt dashbord i MOZA Dashboard Studio, tilpasset den tilkoblede skjermen</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Åpnet i MOZA Dashboard Studio — trykk Oppdater når du er ferdig for å laste biblioteket på nytt.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Fant ikke MOZA Dashboard Studio. Installer MOZA Pit House for å bruke dashbordredigereren.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Kunne ikke starte MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Velg et dashbord som har en fil på disken for å redigere det.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ingen skjerminfo fra enheten ennå — Studio åpnes uten forhåndsvalgt enhet.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lagrer nye dashbord i {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashbordbiblioteket lastet på nytt ({0} dashbord).</value></data>
 </root>

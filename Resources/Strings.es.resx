@@ -763,4 +763,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Par</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Par</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Escala</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>EDITAR EN STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NUEVO TABLERO…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Abrir el tablero seleccionado en MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Crear un tablero nuevo en MOZA Dashboard Studio, con el tamaño de la pantalla conectada</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Abierto en MOZA Dashboard Studio: pulsa Actualizar al terminar para recargar la biblioteca.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>No se encontró MOZA Dashboard Studio. Instala MOZA Pit House para usar el editor de tableros.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>No se pudo iniciar MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Selecciona un tablero que tenga archivo en disco para editarlo.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Aún no hay información de pantalla del dispositivo: Studio se abrirá sin dispositivo preseleccionado.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio guarda los tableros nuevos en {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Biblioteca de tableros recargada ({0} tableros).</value></data>
 </root>

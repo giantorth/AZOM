@@ -992,13 +992,14 @@ namespace MozaPlugin.Devices
                             if (initialProfile != null)
                                 _plugin.ApplyProfile(initialProfile);
 
-                            // Auto-load this wheel's mzdash folder if configured.
+                            // Auto-load the dashboard library: this wheel's
+                            // configured mzdash folder plus MOZA Dashboard
+                            // Studio's own project root (see
+                            // MozaPlugin.ReloadDashboardLibrary).
                             var ovFolder = _plugin.ActiveTelemetryMzdashFolder;
-                            if (!string.IsNullOrEmpty(ovFolder) && System.IO.Directory.Exists(ovFolder))
-                            {
-                                MozaLog.Debug($"[AZOM] Loading per-wheel mzdash folder from overlay: {ovFolder}");
-                                _plugin.DashCache?.LoadFromFolder(ovFolder);
-                            }
+                            MozaLog.Debug("[AZOM] Loading dashboard library from: "
+                                + string.Join(", ", _plugin.DashboardLibraryFolders(ovFolder)));
+                            _plugin.ReloadDashboardLibrary(ovFolder);
 
                             try { _plugin.ApplyTelemetrySettings(); }
                             catch (Exception ex)

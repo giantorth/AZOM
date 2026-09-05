@@ -758,4 +758,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Mô-men xoắn</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Mô-men xoắn</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Tỷ lệ</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>SỬA TRONG STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>BẢNG ĐIỀU KHIỂN MỚI…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Mở bảng điều khiển đã chọn trong MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Tạo bảng điều khiển mới trong MOZA Dashboard Studio, đúng kích thước màn hình đang kết nối</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Đã mở trong MOZA Dashboard Studio — xong thì bấm Làm mới để nạp lại thư viện.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Không tìm thấy MOZA Dashboard Studio. Cài MOZA Pit House để dùng trình chỉnh sửa bảng điều khiển.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Không khởi động được MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Chọn một bảng điều khiển có tệp trên đĩa để chỉnh sửa.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Chưa có thông tin màn hình từ thiết bị — Studio sẽ mở mà không chọn sẵn thiết bị.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lưu bảng điều khiển mới vào {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Đã nạp lại thư viện bảng điều khiển ({0} bảng).</value></data>
 </root>

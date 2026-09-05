@@ -758,4 +758,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Drehmoment</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Drehmoment</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Skala</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>IN STUDIO BEARBEITEN</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NEUES DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Das ausgewählte Dashboard in MOZA Dashboard Studio öffnen</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Ein neues Dashboard in MOZA Dashboard Studio erstellen, passend zum verbundenen Display</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>In MOZA Dashboard Studio geöffnet — danach auf Aktualisieren klicken, um die Bibliothek neu zu laden.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio nicht gefunden. Installieren Sie MOZA Pit House, um den Dashboard-Editor zu nutzen.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>MOZA Dashboard Studio konnte nicht gestartet werden: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Wählen Sie ein Dashboard mit einer Datei auf der Festplatte, um es zu bearbeiten.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Noch keine Display-Infos vom Gerät — Studio öffnet ohne vorausgewähltes Gerät.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio speichert neue Dashboards unter {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashboard-Bibliothek neu geladen ({0} Dashboards).</value></data>
 </root>

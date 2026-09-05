@@ -816,5 +816,16 @@ namespace MozaPlugin.Resources
         public static string Option_GraphTorque => Get("Option_GraphTorque");
         public static string Label_Torque => Get("Label_Torque");
         public static string Label_GraphScale => Get("Label_GraphScale");
+        public static string Button_EditInStudio => Get("Button_EditInStudio");
+        public static string Button_NewDashboard => Get("Button_NewDashboard");
+        public static string Tooltip_EditInStudio => Get("Tooltip_EditInStudio");
+        public static string Tooltip_NewDashboard => Get("Tooltip_NewDashboard");
+        public static string Studio_Launched => Get("Studio_Launched");
+        public static string Studio_NotInstalled => Get("Studio_NotInstalled");
+        public static string Studio_LaunchFailed => Get("Studio_LaunchFailed");
+        public static string Studio_NoEditablePath => Get("Studio_NoEditablePath");
+        public static string Studio_NoDeviceInfo => Get("Studio_NoDeviceInfo");
+        public static string Studio_NewDashboardSavesTo => Get("Studio_NewDashboardSavesTo");
+        public static string Studio_LibraryReloaded => Get("Studio_LibraryReloaded");
     }
 }

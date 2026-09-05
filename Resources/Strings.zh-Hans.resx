@@ -758,4 +758,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>扭矩</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>扭矩</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>刻度</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>在 STUDIO 中编辑</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>新建仪表盘…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>在 MOZA Dashboard Studio 中打开所选仪表盘</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>在 MOZA Dashboard Studio 中新建仪表盘，尺寸匹配已连接的显示屏</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>已在 MOZA Dashboard Studio 中打开 — 完成后点击「刷新」重新加载库。</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>未找到 MOZA Dashboard Studio。请安装 MOZA Pit House 以使用仪表盘编辑器。</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>无法启动 MOZA Dashboard Studio：{0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>请选择磁盘上存在文件的仪表盘才能编辑。</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>尚未收到设备的显示屏信息 — Studio 将在未预选设备的情况下打开。</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio 会将新仪表盘保存到 {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>已重新加载仪表盘库（{0} 个）。</value></data>
 </root>

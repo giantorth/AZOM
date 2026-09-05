@@ -26,6 +26,15 @@ namespace MozaPlugin.Settings
         Torque = 1,
     }
 
+    /// <summary>Which source the Files tab's dashboard-upload picker reads from.</summary>
+    public enum DashboardUploadSource
+    {
+        /// <summary>Browse for a .mzdash on disk.</summary>
+        LocalFile = 0,
+        /// <summary>Pick from the cached / folder dashboard library.</summary>
+        Library = 1,
+    }
+
     /// <summary>
     /// Persisted plugin settings. Saved/loaded via SimHub's ReadCommonSettings/SaveCommonSettings.
     /// Stores values that the wheel doesn't retain between sessions.
@@ -526,6 +535,26 @@ namespace MozaPlugin.Settings
         // Scanned at init and on picker change. Wheel cache takes priority;
         // folder acts as fallback library when cache misses.
         public string TelemetryMzdashFolder { get; set; } = "";
+
+        // Files tab -> DASHBOARD UPLOAD -> Source radio. Plugin-global on
+        // purpose: it is a preference about how the user likes to PICK a
+        // dashboard, not a property of a wheel — so the wheel page and the CM2
+        // dash page (which share one DashboardFilesControl instance type) share
+        // it. LocalFile preserves the previously hardcoded XAML IsChecked.
+        // Serializes as an int — there is no StringEnumConverter anywhere in
+        // this project — so LocalFile must stay pinned at 0.
+        public DashboardUploadSource DashboardUploadSourceMode { get; set; }
+            = DashboardUploadSource.LocalFile;
+
+        // Last dashboard name picked in the Files-tab library combo. A stale
+        // name simply misses the combo's Items.Contains test and falls through
+        // to index 0 — no failure mode.
+        public string LastUploadLibraryName { get; set; } = "";
+
+        // Directory the .mzdash OpenFileDialog opens in. Convenience only; the
+        // file itself is deliberately NOT restored, so the Upload button stays
+        // correctly disabled until the user actually picks one.
+        public string LastUploadFileDirectory { get; set; } = "";
 
         // Byte limit override (0 = auto from profile)
         public int TelemetryByteLimitOverride { get; set; } = 0;

@@ -71,13 +71,14 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>
         /// Build a file-transfer upload with the chosen wire format.
-        /// <paramref name="mzdashSourceDirectory"/> is used to look up PNG asset
-        /// dependencies referenced by the mzdash JSON at
-        /// <c>&lt;dir&gt;/Resource/MD5/&lt;hex&gt;.png</c>. Pass <c>null</c> or
-        /// empty when the mzdash came from an embedded resource — the upload
-        /// will ship as a single-file bundle (file_count=1) and widgets that
-        /// reference PNGs will render blank until the PNGs land on the wheel
-        /// by some other path.
+        /// <paramref name="mzdashSourceDirectory"/> is the first place PNG asset
+        /// dependencies are looked up (<c>&lt;dir&gt;/Resource/MD5/&lt;hex&gt;.png</c>).
+        /// <c>null</c> or empty is fine — PitHouse's shared image pool is
+        /// searched regardless, so a Dashboard Studio project (which has no
+        /// <c>Resource/</c> subtree) or an embedded/wheel-cache mzdash can still
+        /// bundle its images. Anything still unresolved is logged with every
+        /// path tried, and those widgets render blank on the wheel.
+        /// See <see cref="ImageSearchDirectories"/>.
         /// </summary>
         public static UploadPayload BuildUpload(byte[] mzdashContent, string dashboardName,
                                                 uint token, long timestampMs,
@@ -151,14 +152,17 @@ namespace MozaPlugin.Telemetry.Dashboard
             var files = new List<(string destPath, byte[] content)>();
             files.Add((destMzdash, normalizedMzdash));
             int bundledPngs = 0;
-            if (!string.IsNullOrEmpty(mzdashSourceDirectory))
+            // No source-dir guard: images also resolve from PitHouse's SHARED
+            // pool (see ImageSearchDirectories), which is where Dashboard Studio
+            // keeps them, so a dashboard with no Resource/ subtree — or one that
+            // came from the wheel cache with no directory at all — can still
+            // bundle its PNGs.
+            foreach (var (hex, ext, bytes) in ResolveImageReferences(
+                         normalizedMzdash, mzdashSourceDirectory ?? ""))
             {
-                foreach (var (hex, ext, bytes) in ResolveImageReferences(normalizedMzdash, mzdashSourceDirectory!))
-                {
-                    string imageDest = $"/home/moza/resource/images/MD5/{hex}.{ext}";
-                    files.Add((imageDest, bytes));
-                    bundledPngs++;
-                }
+                string imageDest = $"/home/moza/resource/images/MD5/{hex}.{ext}";
+                files.Add((imageDest, bytes));
+                bundledPngs++;
             }
 
             // 3. Build the compressed payload (preamble + zlib).
@@ -224,6 +228,45 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// uploads (file_count = 1 + N_resolved) but widgets bound to a
         /// missing image render blank on the wheel.
         /// </summary>
+        /// <summary>
+        /// Directories to search for <c>&lt;32hex&gt;.&lt;ext&gt;</c>, most
+        /// specific first.
+        ///
+        /// <para>Two layouts exist in the wild and only the first was
+        /// originally handled:</para>
+        /// <list type="bullet">
+        /// <item><c>&lt;dir&gt;/Resource/MD5/</c> — a dashboard downloaded from
+        /// the wheel, or a PitHouse export bundle, which carries its own
+        /// copies. Lowercase variants are tried too: the FS is case-insensitive
+        /// on Windows but not under Proton.</item>
+        /// <item><c>&lt;imageRoot&gt;/MD5/</c> — the SHARED pool MOZA Dashboard
+        /// Studio actually authors against (default
+        /// <c>%LOCALAPPDATA%\MOZA Pit House\_dashes\images</c>). Studio does not
+        /// copy an image into the project folder, so a dashboard created there
+        /// has no <c>Resource/</c> subtree at all and its custom images were
+        /// silently dropped from the upload.</item>
+        /// </list>
+        /// </summary>
+        private static IEnumerable<string> ImageSearchDirectories(string sourceDirectory)
+        {
+            if (!string.IsNullOrEmpty(sourceDirectory))
+            {
+                yield return Path.Combine(sourceDirectory, "Resource", "MD5");
+                yield return Path.Combine(sourceDirectory, "resource", "MD5");
+                yield return Path.Combine(sourceDirectory, "Resource", "md5");
+                yield return Path.Combine(sourceDirectory, "resource", "md5");
+            }
+
+            string? imageRoot = null;
+            try { imageRoot = UI.DashboardStudioLauncher.ResolveImageRoot(); }
+            catch { /* discovery is best-effort; the sourceDir paths still apply */ }
+            if (!string.IsNullOrEmpty(imageRoot))
+            {
+                yield return Path.Combine(imageRoot!, "MD5");
+                yield return Path.Combine(imageRoot!, "md5");
+            }
+        }
+
         private static IEnumerable<(string hex, string ext, byte[] bytes)> ResolveImageReferences(
             byte[] mzdashUtf8, string sourceDirectory)
         {
@@ -246,23 +289,21 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (!seen.Add(hex)) continue;
 
                 string fileName = hex + "." + ext;
-                string candidate = Path.Combine(sourceDirectory, "Resource", "MD5", fileName);
-                if (!File.Exists(candidate))
+                var searched = new List<string>(6);
+                string? candidate = null;
+                foreach (var dir in ImageSearchDirectories(sourceDirectory))
                 {
-                    // Also try lowercase directory variants (case-insensitive FS
-                    // on Windows but not on Linux when SimHub runs in Proton —
-                    // be lenient and look at both).
-                    string altRes = Path.Combine(sourceDirectory, "resource", "MD5", fileName);
-                    string altMd5 = Path.Combine(sourceDirectory, "Resource", "md5", fileName);
-                    if (File.Exists(altRes)) candidate = altRes;
-                    else if (File.Exists(altMd5)) candidate = altMd5;
-                    else
-                    {
-                        MozaLog.Warn(
-                            $"[AZOM] Upload: image asset MD5/{fileName} referenced by mzdash but not " +
-                            $"found at {candidate} — widget bound to it will render blank.");
-                        continue;
-                    }
+                    string p = Path.Combine(dir, fileName);
+                    searched.Add(p);
+                    if (File.Exists(p)) { candidate = p; break; }
+                }
+                if (candidate == null)
+                {
+                    MozaLog.Warn(
+                        $"[AZOM] Upload: image asset MD5/{fileName} referenced by mzdash but not " +
+                        $"found — widget bound to it will render blank. Looked in: "
+                        + string.Join(", ", searched));
+                    continue;
                 }
 
                 byte[] bytes;

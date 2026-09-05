@@ -765,4 +765,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Torque</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Scale</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>EDIT IN STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NEW DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Open the selected dashboard in MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Create a new dashboard in MOZA Dashboard Studio, sized for the connected display</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Opened in MOZA Dashboard Studio — press Refresh when you're done to reload the library.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio not found. Install MOZA Pit House to use the dashboard editor.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Could not start MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Select a dashboard with a file on disk to edit it.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>No display info from the device yet — Studio will open without a pre-selected device.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio saves new dashboards to {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashboard library reloaded ({0} dashboards).</value></data>
 </root>

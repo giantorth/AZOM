@@ -761,4 +761,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Coppia</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Coppia</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Scala</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>MODIFICA IN STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NUOVA DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Apri la dashboard selezionata in MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Crea una nuova dashboard in MOZA Dashboard Studio, dimensionata per il display collegato</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Aperto in MOZA Dashboard Studio — premi Aggiorna al termine per ricaricare la libreria.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio non trovato. Installa MOZA Pit House per usare l'editor delle dashboard.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Impossibile avviare MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Seleziona una dashboard con un file su disco per modificarla.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Nessuna info sul display dal dispositivo — Studio si aprirà senza dispositivo preselezionato.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio salva le nuove dashboard in {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Libreria dashboard ricaricata ({0} dashboard).</value></data>
 </root>

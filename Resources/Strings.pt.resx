@@ -757,4 +757,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Torque</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Escala</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>EDITAR NO STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NOVO PAINEL…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Abrir o painel selecionado no MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Criar um painel novo no MOZA Dashboard Studio, dimensionado para o ecrã ligado</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Aberto no MOZA Dashboard Studio — carregue em Atualizar quando terminar para recarregar a biblioteca.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio não encontrado. Instale o MOZA Pit House para usar o editor de painéis.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Não foi possível iniciar o MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Selecione um painel com ficheiro em disco para o editar.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ainda sem informação de ecrã do dispositivo — o Studio abrirá sem dispositivo pré-selecionado.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>O Studio guarda os painéis novos em {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Biblioteca de painéis recarregada ({0} painéis).</value></data>
 </root>

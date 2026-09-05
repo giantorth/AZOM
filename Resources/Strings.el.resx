@@ -757,4 +757,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Ροπή</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Ροπή</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Κλίμακα</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ΕΠΕΞΕΡΓΑΣΙΑ ΣΤΟ STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>ΝΕΟ DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Άνοιγμα του επιλεγμένου dashboard στο MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Δημιουργία νέου dashboard στο MOZA Dashboard Studio, στο μέγεθος της συνδεδεμένης οθόνης</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Άνοιξε στο MOZA Dashboard Studio — πατήστε Ανανέωση όταν τελειώσετε για επαναφόρτωση της βιβλιοθήκης.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Δεν βρέθηκε το MOZA Dashboard Studio. Εγκαταστήστε το MOZA Pit House για να χρησιμοποιήσετε τον επεξεργαστή.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Δεν ήταν δυνατή η εκκίνηση του MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Επιλέξτε ένα dashboard που έχει αρχείο στον δίσκο για να το επεξεργαστείτε.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Δεν υπάρχουν ακόμη πληροφορίες οθόνης από τη συσκευή — το Studio θα ανοίξει χωρίς προεπιλεγμένη συσκευή.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Το Studio αποθηκεύει τα νέα dashboards στο {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Η βιβλιοθήκη dashboard φορτώθηκε ξανά ({0} dashboards).</value></data>
 </root>

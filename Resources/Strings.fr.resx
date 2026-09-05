@@ -758,4 +758,15 @@ Id : {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Couple</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Couple</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Échelle</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ÉDITER DANS STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NOUVEAU TABLEAU…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Ouvrir le tableau de bord sélectionné dans MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Créer un tableau de bord dans MOZA Dashboard Studio, aux dimensions de l'écran connecté</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Ouvert dans MOZA Dashboard Studio — appuyez sur Actualiser une fois terminé pour recharger la bibliothèque.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio introuvable. Installez MOZA Pit House pour utiliser l'éditeur de tableau de bord.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Impossible de démarrer MOZA Dashboard Studio : {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Sélectionnez un tableau de bord possédant un fichier sur le disque pour l'éditer.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Aucune info d'écran reçue de l'appareil — Studio s'ouvrira sans appareil présélectionné.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio enregistre les nouveaux tableaux de bord dans {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Bibliothèque de tableaux de bord rechargée ({0} tableaux).</value></data>
 </root>

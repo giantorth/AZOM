@@ -748,4 +748,15 @@
   <data name="Option_GraphTorque" xml:space="preserve"><value>Growl!</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Yap!</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Ruff!</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>SNIFF!</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>WOOF…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Awoo Bork Yip Wuff MOZA Dashboard Studio!</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Yowl Wan Snarf Grrowl MOZA Dashboard Studio Arf Howl!</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Wuff MOZA Dashboard Studio Yip Yip — Bork Awoo Snarf Howl!</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Grrowl MOZA Dashboard Studio Wan Wan. Snarf MOZA Pit House Yowl!</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Yelp MOZA Dashboard Studio Wuff: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Bork Wan Yip Snarf Awoo!</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Wan Wan Yowl — Studio Grrowl Arf Howl!</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio Wuff Bork Yip {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Snarf Awoo Bork ({0} Wuff).</value></data>
 </root>

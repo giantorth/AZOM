@@ -311,6 +311,45 @@ namespace MozaPlugin
         internal DashboardProfileStore DashProfileStore { get; } = new DashboardProfileStore();
         internal DashboardCache DashCache { get; private set; } = null!;
 
+        /// <summary>
+        /// Reload the folder half of the dashboard library from every source
+        /// that can hold a user's dashboards. Single entry point so the Files
+        /// tab, the Refresh button and post-detection load all see the same set.
+        ///
+        /// <para>MOZA Dashboard Studio authors into its own projectRoot while
+        /// PitHouse syncs a per-wheel copy elsewhere, and neither tree is a
+        /// superset of the other — a dashboard just created in Studio would
+        /// otherwise be invisible here. The user's configured folder is scanned
+        /// LAST so it wins on a duplicate name.</para>
+        /// </summary>
+        /// <param name="configuredFolder">
+        /// Override for the configured folder; defaults to
+        /// <see cref="ActiveTelemetryMzdashFolder"/> when null.
+        /// </param>
+        internal void ReloadDashboardLibrary(string? configuredFolder = null)
+        {
+            var folder = configuredFolder ?? ActiveTelemetryMzdashFolder;
+            DashCache?.LoadFromFolders(new[]
+            {
+                UI.DashboardStudioLauncher.ResolveProjectRoot(),
+                folder,
+            });
+        }
+
+        /// <summary>Every folder <see cref="ReloadDashboardLibrary"/> scans, for
+        /// UI that reports where the library came from.</summary>
+        internal IReadOnlyList<string> DashboardLibraryFolders(string? configuredFolder = null)
+        {
+            var result = new List<string>(2);
+            var studio = UI.DashboardStudioLauncher.ResolveProjectRoot();
+            var folder = configuredFolder ?? ActiveTelemetryMzdashFolder;
+            if (!string.IsNullOrEmpty(folder)) result.Add(folder!);
+            if (!string.IsNullOrEmpty(studio)
+                && !result.Any(p => string.Equals(p, studio, StringComparison.OrdinalIgnoreCase)))
+                result.Add(studio!);
+            return result;
+        }
+
         // Device detection state shared with serial-reader, poll timer, UI, telemetry.
         internal DeviceDetectionState DetectionState { get; private set; } = new DeviceDetectionState();
 

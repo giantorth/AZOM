@@ -758,4 +758,15 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Крутящий момент</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Масштаб</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ОТКРЫТЬ В STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>НОВЫЙ ДАШБОРД…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Открыть выбранный дашборд в MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Создать дашборд в MOZA Dashboard Studio под размер подключённого экрана</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Открыто в MOZA Dashboard Studio — по завершении нажмите «Обновить», чтобы перечитать библиотеку.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio не найден. Установите MOZA Pit House, чтобы использовать редактор дашбордов.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Не удалось запустить MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Выберите дашборд, у которого есть файл на диске, чтобы его редактировать.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>От устройства ещё нет данных о дисплее — Studio откроется без выбранного устройства.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio сохраняет новые дашборды в {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Библиотека дашбордов перечитана ({0} шт.).</value></data>
 </root>

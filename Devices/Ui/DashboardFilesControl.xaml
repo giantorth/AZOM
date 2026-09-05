@@ -60,6 +60,25 @@
                         <Button Content="{x:Static res:Strings.Button_Refresh}" Click="UploadLibraryRefresh_Click"/>
                     </StackPanel>
                 </StackPanel>
+                <!-- MOZA Dashboard Studio. Edit passes the selected dashboard's
+                     absolute .mzdash path as a bare positional argument (forward
+                     slashes) — the exact form PitHouse uses, and it accepts any
+                     path, not just Studio's own project root. New seeds the canvas
+                     from the connected display's idealDeviceInfos. Deliberately a
+                     sibling AFTER UploadLibraryPanel, not inside it: editing is
+                     useful in local-file mode too, and that panel is collapsed
+                     there. -->
+                <StackPanel x:Name="StudioPanel" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button x:Name="StudioEditButton" Content="{x:Static res:Strings.Button_EditInStudio}"
+                            ToolTip="{x:Static res:Strings.Tooltip_EditInStudio}"
+                            Margin="0,0,8,0" Click="StudioEdit_Click"/>
+                    <Button x:Name="StudioCreateButton" Content="{x:Static res:Strings.Button_NewDashboard}"
+                            ToolTip="{x:Static res:Strings.Tooltip_NewDashboard}"
+                            Margin="0,0,8,0" Click="StudioCreate_Click"/>
+                    <TextBlock x:Name="StudioStatusText" VerticalAlignment="Center"
+                               Style="{StaticResource MutedHintText}"
+                               TextTrimming="CharacterEllipsis" MaxWidth="420"/>
+                </StackPanel>
                 <Separator Margin="0,8,0,12"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                     <Button x:Name="UploadNowButton" Content="{x:Static res:Strings.Button_UploadNow}" MinWidth="120"
