@@ -302,7 +302,7 @@
   <data name="Hint_MBoosterIntro" xml:space="preserve"><value>Ogni mBooster connesso appare qui sotto. Assegna un ruolo (Acceleratore/Freno/Frizione) per dispositivo per instradare la posizione del pedale. La sezione Calibrazione è sperimentale.</value></data>
   <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Non ancora testato.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Scegli Colore LED</value></data>
-  <data name="Label_Palette" xml:space="preserve"><value>PALETTE</value></data>
+  <data name="Label_Palette" xml:space="preserve"><value>TAVOLOZZA</value></data>
   <data name="Label_Last" xml:space="preserve"><value>RECENTE</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>REGOLAZIONE FINE · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>ANNULLA</value></data>
@@ -322,7 +322,7 @@
   <data name="Option_Flow" xml:space="preserve"><value>Scorrimento</value></data>
   <data name="Section_Brightness" xml:space="preserve"><value>LUMINOSITÀ</value></data>
   <data name="SliderLabel_Brightness" xml:space="preserve"><value>Luminosità</value></data>
-  <data name="Section_Sleep" xml:space="preserve"><value>SLEEP</value></data>
+  <data name="Section_Sleep" xml:space="preserve"><value>SOSPENSIONE</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Modalità Sleep</value></data>
   <data name="Option_Enabled" xml:space="preserve"><value>Abilitato</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Timeout Sleep</value></data>
@@ -346,8 +346,8 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// mostrato quando gli RPM raggiungono il limitatore</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>COLORI LED BANDIERE</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>ANGOLO DI STERZO</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>SPENTO</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>ACCESO</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Ingressi</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LEDs</value></data>
@@ -355,7 +355,7 @@
   <data name="TabHeader_Buttons" xml:space="preserve"><value>Pulsanti</value></data>
   <data name="TabHeader_Knobs" xml:space="preserve"><value>Manopole</value></data>
   <data name="TabHeader_Files" xml:space="preserve"><value>File</value></data>
-  <data name="TabHeader_Sleep" xml:space="preserve"><value>Sleep</value></data>
+  <data name="TabHeader_Sleep" xml:space="preserve"><value>Sospensione</value></data>
   <data name="Status_SearchingForWheel" xml:space="preserve"><value>Ricerca volante in corso...</value></data>
   <data name="Section_LivePaddles" xml:space="preserve"><value>PADDLE IN TEMPO REALE</value></data>
   <data name="Label_PaddleLeft" xml:space="preserve"><value>SINISTRO</value></data>
@@ -573,7 +573,7 @@ Id: {2}</value></data>
   <data name="Dialog_TelemetrySenderUnavailable" xml:space="preserve"><value>Trasmettitore telemetria non disponibile.</value></data>
   <data name="Dialog_CompletelyRemoveTimeout" xml:space="preserve"><value>completelyRemove(«{0}») è scaduto. Il cruscotto potrebbe essere ancora presente sul volante.</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>CARTELLA</value></data>
-  <data name="Import_Label_Preset" xml:space="preserve"><value>PRESET</value></data>
+  <data name="Import_Label_Preset" xml:space="preserve"><value>PREIMPOSTAZIONE</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PROFILO</value></data>
   <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDALE</value></data>
   <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APPLICA A</value></data>
@@ -607,8 +607,8 @@ Id: {2}</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immediata</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Leve</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Modalità leva</value></data>
-  <data name="Option_StalkButtonBox" xml:space="preserve"><value>Button box</value></data>
-  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
+  <data name="Option_StalkButtonBox" xml:space="preserve"><value>Pulsantiera</value></data>
+  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Simulatore di camion (ETS2/ATS)</value></data>
   <data name="Hint_StalksTruckSim" xml:space="preserve"><value>In modalità truck sim il plugin trasforma le pressioni delle leve in tasti della tastiera per Euro/American Truck Simulator. In modalità button box le leve funzionano come semplici pulsanti.</value></data>
   <data name="Section_StalksKeyMapping" xml:space="preserve"><value>Assegnazione pulsanti</value></data>
   <data name="Subtitle_StalksInteractiveMap" xml:space="preserve"><value>Premi un comando della leva per evidenziarne il pulsante, poi assegna un tasto o uno stadio tergicristalli/luci.</value></data>
@@ -638,8 +638,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Ruoli pedali</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Pedale {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Questo mBooster ospita più di un pedale su una sola connessione. Assegna ogni asse rilevato a un input di gioco. L'ordine predefinito segue il layout Rx/Ry/Rz di Moza (acceleratore/freno/frizione) — riassegna qui se un pedale controlla l'input sbagliato.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configura pedale:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Questo pedale è passivo (senza motore) — gli effetti di vibrazione non si applicano.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>IMPOSTAZIONI CAMBIO</value></data>
@@ -695,27 +695,28 @@ Id: {2}</value></data>
   <data name="Hint_GForceExperimental" xml:space="preserve"><value>Sperimentale — spinge il pedale stesso sotto il piede in proporzione alla G longitudinale in tempo reale (accelerando spinge in avanti, frenando all'indietro), invece di vibrare. Corsa massima del pedale imposta di quanto si muove alla G massima; Velocità di risposta imposta quanto rapidamente il pedale raggiunge la nuova posizione.</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Corsa massima del pedale (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Velocità di risposta (%)</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>SEGNALA UN PROBLEMA</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Invia una segnalazione diagnostica allo sviluppatore</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Descrivi il problema</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Descrivi il problema: cosa hai fatto, cosa ha fatto il volante o il display, e quando è iniziato.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Contatto (opzionale — email o Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>L'invio carica un pacchetto diagnostico (log del plugin e una traccia seriale, con gli identificativi hardware oscurati) allo sviluppatore del plugin.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Invia segnalazione</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Caricamento…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Segnalazione inviata. Riferimento: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Troppe segnalazioni dalla tua connessione di recente — riprova più tardi.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Il pacchetto diagnostico è troppo grande per il caricamento.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Caricamento non riuscito. Controlla la connessione e riprova.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Caricamento bloccato dalla nostra CDN, non dalla tua connessione — usa Esporta bundle.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Descrivi il problema prima di inviare.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Acquisizione diagnostica</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Mantiene in memoria una piccola traccia del traffico seriale (il primo minuto dell'avvio più l'attività recente) così che le segnalazioni includano la connessione. Nulla lascia il tuo PC finché non invii una segnalazione.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>L'acquisizione diagnostica è disattivata.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Avvio: {0} frame ({1} KB, {2}) · Continuo: {3} frame ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>bloccato</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>riempimento</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Attendi un momento prima di inviare un'altra segnalazione.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Salva il pacchetto diagnostico in un file su questo PC (non viene caricato nulla).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Tasti di gioco</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Tergicristalli avanti</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Tergicristalli indietro</value></data>

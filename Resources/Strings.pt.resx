@@ -73,7 +73,7 @@
   <data name="Option_Combined" xml:space="preserve"><value>Combinado</value></data>
   <data name="Option_Split" xml:space="preserve"><value>Separado</value></data>
   <data name="SliderLabel_ClutchSplitPoint" xml:space="preserve"><value>Ponto de mordida da embreagem</value></data>
-  <data name="Option_Knob" xml:space="preserve"><value>Knob</value></data>
+  <data name="Option_Knob" xml:space="preserve"><value>Botão rotativo</value></data>
   <data name="SliderLabel_LeftStickMode" xml:space="preserve"><value>Modo do stick esquerdo</value></data>
   <data name="SliderLabel_JoystickAssignment" xml:space="preserve"><value>Atribuição do joystick</value></data>
   <data name="Option_None" xml:space="preserve"><value>Nenhum</value></data>
@@ -242,7 +242,7 @@
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// painéis carregados no volante</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Estado</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Título</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
+  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Nome da pasta</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Última modificação</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>EXCLUIR</value></data>
@@ -366,14 +366,14 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// exibidas quando o RPM entra na zona vermelha</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>CORES DOS LEDS DE BANDEIRA</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>ÂNGULO DE DIREÇÃO</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>DESL.</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>LIG.</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Entradas</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Painel</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LEDs</value></data>
   <data name="TabHeader_Rpm" xml:space="preserve"><value>RPM</value></data>
   <data name="TabHeader_Buttons" xml:space="preserve"><value>Botões</value></data>
-  <data name="TabHeader_Knobs" xml:space="preserve"><value>Knobs</value></data>
+  <data name="TabHeader_Knobs" xml:space="preserve"><value>Botões rotativos</value></data>
   <data name="TabHeader_Files" xml:space="preserve"><value>Arquivos</value></data>
   <data name="TabHeader_Sleep" xml:space="preserve"><value>Suspensão</value></data>
   <data name="Status_SearchingForWheel" xml:space="preserve"><value>Procurando volante...</value></data>
@@ -592,7 +592,7 @@ Id: {2}</value></data>
   <data name="Dialog_TelemetrySenderUnavailable" xml:space="preserve"><value>Emissor de telemetria indisponível.</value></data>
   <data name="Dialog_CompletelyRemoveTimeout" xml:space="preserve"><value>completelyRemove("{0}") expirou. O painel ainda pode estar presente no volante.</value></data>
   <data name="Import_Label_Folder" xml:space="preserve"><value>PASTA</value></data>
-  <data name="Import_Label_Preset" xml:space="preserve"><value>PRESET</value></data>
+  <data name="Import_Label_Preset" xml:space="preserve"><value>PREDEFINIÇÃO</value></data>
   <data name="Import_Label_Profile" xml:space="preserve"><value>PERFIL</value></data>
   <data name="Import_Label_SubjectRole" xml:space="preserve"><value>PEDAL</value></data>
   <data name="Import_Label_ApplyTo" xml:space="preserve"><value>APLICAR A</value></data>
@@ -703,6 +703,7 @@ Id: {2}</value></data>
   <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Muitos relatórios da sua conexão recentemente — tente novamente mais tarde.</value></data>
   <data name="Status_BugReportTooLarge" xml:space="preserve"><value>O pacote de diagnóstico é grande demais para enviar.</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Falha no envio. Verifique sua conexão e tente novamente.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Envio bloqueado pela nossa CDN, não pela sua conexão — use Exportar pacote.</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Descreva o problema antes de enviar.</value></data>
   <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Captura de diagnóstico</value></data>
   <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Mantém um pequeno trace em memória do tráfego serial (o primeiro minuto da inicialização mais a atividade recente) para que os relatórios de erro incluam a conexão/handshake. Nada sai do seu PC até você enviar um relatório.</value></data>

@@ -694,6 +694,7 @@
   <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Arf Awoo Bark Wan!</value></data>
   <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Wuff Howl Ruff!</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Ruff Arf Yap!</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Arf Rrrf Bark Yap Woof!</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Yap Bork!</value></data>
   <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Yip!</value></data>
   <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Rrrf Barff Yowff Grr Ruff Wan!</value></data>

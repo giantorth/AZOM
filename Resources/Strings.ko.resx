@@ -343,8 +343,8 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// RPM이 레드라인에 도달하면 표시</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>플래그 LED 색상</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>조향각</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>끄기</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>켜기</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>입력</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>대시보드</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LED</value></data>
@@ -634,8 +634,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>페달 역할</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>페달 {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>이 mBooster는 하나의 연결에 여러 페달을 호스팅합니다. 감지된 각 축을 게임 입력에 할당하세요. 기본 순서는 Moza의 Rx/Ry/Rz 레이아웃(가속/브레이크/클러치)을 따릅니다 — 페달이 잘못된 입력을 구동하면 여기서 다시 매핑하세요.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>페달 구성:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>이 페달은 패시브(모터 없음)이므로 진동 효과가 적용되지 않습니다.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>시프터 설정</value></data>
@@ -691,27 +691,28 @@ Id: {2}</value></data>
   <data name="Hint_GForceExperimental" xml:space="preserve"><value>실험적 — 진동 대신 실시간 종방향 G에 비례해 페달 자체를 발 아래에서 밀어냅니다(가속 시 앞으로, 제동 시 뒤로). 최대 페달 이동은 최대 G에서 얼마나 움직일지, 응답 속도는 페달이 새 위치까지 얼마나 빨리 이동할지 정합니다.</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>최대 페달 이동 (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>응답 속도 (%)</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>문제 신고</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>개발자에게 진단 보고서 보내기</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>문제를 설명해 주세요</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>문제를 설명해 주세요: 무엇을 했는지, 휠이나 대시보드가 어떻게 반응했는지, 언제부터 시작됐는지.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>연락처 (선택 — 이메일 또는 Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>제출하면 진단 번들(플러그인 로그와 시리얼 추적, 하드웨어 식별자는 가려짐)이 플러그인 개발자에게 업로드됩니다.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>버그 신고 보내기</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>업로드 중…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>신고가 접수되었습니다. 참조: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>최근 이 연결에서 너무 많은 신고가 접수되었습니다 — 나중에 다시 시도해 주세요.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>진단 번들이 너무 커서 업로드할 수 없습니다.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>업로드에 실패했습니다. 연결을 확인한 후 다시 시도해 주세요.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>연결 문제가 아니라 저희 CDN에서 업로드를 차단했습니다 — 번들 내보내기를 사용해 주세요.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>제출하기 전에 문제를 설명해 주세요.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>진단 캡처</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>시리얼 트래픽의 짧은 추적을 메모리에 보관합니다(시작 후 첫 1분과 최근 활동). 버그 신고에 연결/핸드셰이크가 포함됩니다. 신고를 보내기 전까지 PC를 벗어나는 데이터는 없습니다.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>진단 캡처가 꺼져 있습니다.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>시작: {0} 프레임 ({1} KB, {2}) · 롤링: {3} 프레임 ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>멈춤</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>채우는 중</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>다른 신고를 보내기 전에 잠시 기다려 주세요.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>진단 번들을 이 PC의 파일로 저장합니다(업로드되지 않음).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>게임 키</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>와이퍼 앞으로</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>와이퍼 뒤로</value></data>
