@@ -193,11 +193,6 @@ namespace MozaPlugin.Resources
         public static string Option_Ab9Layout7R2 => Get("Option_Ab9Layout7R2");
         public static string Option_Ab9LayoutR8 => Get("Option_Ab9LayoutR8");
         public static string Option_Sequential => Get("Option_Sequential");
-        public static string Option_Ab9LayoutUnknown0A => Get("Option_Ab9LayoutUnknown0A");
-        public static string Option_Ab9LayoutUnknown0B => Get("Option_Ab9LayoutUnknown0B");
-        public static string Option_Ab9LayoutUnknown0C => Get("Option_Ab9LayoutUnknown0C");
-        public static string Option_Ab9LayoutUnknown0D => Get("Option_Ab9LayoutUnknown0D");
-        public static string Option_Ab9LayoutUnknown0E => Get("Option_Ab9LayoutUnknown0E");
         public static string Section_Ab9StatusProbe => Get("Section_Ab9StatusProbe");
         public static string Label_Ab9PollLive => Get("Label_Ab9PollLive");
         public static string Label_Ab9LayoutReadback => Get("Label_Ab9LayoutReadback");

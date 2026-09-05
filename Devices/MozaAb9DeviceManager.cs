@@ -25,15 +25,7 @@ namespace MozaPlugin.Devices
         SevenPlusR_L2 = 0x07,
         RPlusEight   = 0x08,
         Sequential   = 0x09,
-        // Past the known set. Nothing is known about whether the firmware accepts
-        // these — exposed only so they can be tried on hardware, and deliberately
-        // left out of SimHubRegistrar.Ab9Layouts so Ab9LayoutNext/Prev can't land a
-        // user on one. Promote a value out of this block once it is identified.
-        Unknown0A = 0x0A,
-        Unknown0B = 0x0B,
-        Unknown0C = 0x0C,
-        Unknown0D = 0x0D,
-        Unknown0E = 0x0E,
+        // 0x0A..0x0E were tried on hardware and do nothing — the set ends at 0x09.
     }
 
     /// <summary>

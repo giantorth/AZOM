@@ -119,11 +119,6 @@
   <data name="Option_Ab9Layout7R1" xml:space="preserve"><value>7+R 레이아웃 1</value></data>
   <data name="Option_Ab9Layout7R2" xml:space="preserve"><value>7+R 레이아웃 2</value></data>
   <data name="Option_Sequential" xml:space="preserve"><value>시퀀셜</value></data>
-  <data name="Option_Ab9LayoutUnknown0A" xml:space="preserve"><value>알 수 없음 (0x0A)</value></data>
-  <data name="Option_Ab9LayoutUnknown0B" xml:space="preserve"><value>알 수 없음 (0x0B)</value></data>
-  <data name="Option_Ab9LayoutUnknown0C" xml:space="preserve"><value>알 수 없음 (0x0C)</value></data>
-  <data name="Option_Ab9LayoutUnknown0D" xml:space="preserve"><value>알 수 없음 (0x0D)</value></data>
-  <data name="Option_Ab9LayoutUnknown0E" xml:space="preserve"><value>알 수 없음 (0x0E)</value></data>
   <data name="Option_HPattern" xml:space="preserve"><value>H패턴</value></data>
   <data name="Label_ShifterType" xml:space="preserve"><value>시프터 유형</value></data>
   <data name="Section_Feel" xml:space="preserve"><value>조작감</value></data>

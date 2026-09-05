@@ -2811,14 +2811,6 @@
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R2}" Tag="7"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR8}"  Tag="8"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Sequential}"   Tag="9"/>
-                                    <!-- Past the known set: untested probes, no evidence the
-                                         firmware accepts them. Read the result back on the
-                                         status card's layout line. -->
-                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown0A}" Tag="10"/>
-                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown0B}" Tag="11"/>
-                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown0C}" Tag="12"/>
-                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown0D}" Tag="13"/>
-                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutUnknown0E}" Tag="14"/>
                                 </ComboBox>
                             </ctrl:SectionCard>
                         </Grid>
