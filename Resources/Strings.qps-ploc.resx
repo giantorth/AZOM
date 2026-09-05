@@ -181,9 +181,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Ruff!</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Bark-point!</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Wroof!</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Snarf!</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Yap!</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Vroom!</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Grr!</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Yap!</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Grrowl!</value></data>
@@ -729,6 +731,7 @@
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Bark Arf!</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>WOOF PER PUP!</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Nap · Barff!</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Nap · Howl!</value></data>

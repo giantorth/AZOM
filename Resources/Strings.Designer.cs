@@ -150,6 +150,7 @@ namespace MozaPlugin.Resources
         public static string Section_Position => Get("Section_Position");
         public static string Subtitle_LiveHandbrakeInput => Get("Subtitle_LiveHandbrakeInput");
         public static string Label_Position => Get("Label_Position");
+        public static string Label_InputForce => Get("Label_InputForce");
         public static string Section_Calibration => Get("Section_Calibration");
         public static string Subtitle_PullHandbrakeFully => Get("Subtitle_PullHandbrakeFully");
         public static string Button_StartCalibration => Get("Button_StartCalibration");
@@ -243,9 +244,11 @@ namespace MozaPlugin.Resources
         public static string Label_Test => Get("Label_Test");
         public static string Section_Lockup => Get("Section_Lockup");
         public static string Section_Threshold => Get("Section_Threshold");
+        public static string Section_BitePoint => Get("Section_BitePoint");
         public static string Section_EngineContinuous => Get("Section_EngineContinuous");
         public static string SliderLabel_FrequencyHz => Get("SliderLabel_FrequencyHz");
         public static string SliderLabel_Smoothness => Get("SliderLabel_Smoothness");
+        public static string SliderLabel_Gain => Get("SliderLabel_Gain");
         public static string SliderLabel_TriggerLevel => Get("SliderLabel_TriggerLevel");
         public static string SliderLabel_VibrationDecay => Get("SliderLabel_VibrationDecay");
         public static string SliderLabel_OnsetTempC => Get("SliderLabel_OnsetTempC");

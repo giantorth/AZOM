@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Δοκιμή</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Κλείδωμα</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Κατώφλι</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Σημείο συμπλέκτη</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Δόνηση κινητήρα</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Συχνότητα (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Ομαλότητα</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Ενίσχυση</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Επίπεδο ενεργοποίησης</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Απόσβεση δόνησης</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// πειραματικό — ενδέχεται να μην υποστηρίζεται από firmware mBooster</value></data>
@@ -738,6 +740,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Δύναμη εισόδου</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ ΑΝΑ LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Αδράνεια · Σταθερό</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Αδράνεια · Αναπνοή</value></data>

@@ -63,23 +63,98 @@ namespace MozaPlugin
                 var dict = profile.MBoosterSettings;
 
                 // Lazily migrate a transient transport-keyed entry to the serial
-                // key in the current profile. A serial-keyed entry, if one
-                // already exists (the user's saved config from a prior session),
-                // wins — the transport entry is a just-created placeholder.
+                // key in the current profile.
+                //
+                // A brand-new transport-keyed placeholder gets created (below)
+                // the instant the device is first detected, BEFORE its serial
+                // has been read back — this is normal and happens every single
+                // session. If the user starts editing (dragging a curve node,
+                // say) in the brief window before OnMBoosterSerialResolved
+                // fires and migrates it, those edits land on THIS placeholder.
+                // The old version of this migration always kept whichever
+                // object was ALREADY under the serial key and silently deleted
+                // the transport-keyed one — meaning a live edit made in that
+                // window was discarded outright, with no warning, the moment
+                // the serial resolved (bug: a real drag-tested curve edit
+                // vanished, reverting to whatever stale data pre-dated it, even
+                // though the whole session shut down cleanly afterwards).
+                //
+                // Fix: an untouched placeholder (see IsUntouchedMBoosterPlaceholder)
+                // still loses to whatever's already at the serial key, same as
+                // before. But once the transport-keyed entry holds real,
+                // user-visible data, it wins — it can only have gotten that data
+                // via a live edit moments ago (it started as an empty placeholder
+                // THIS session), so it's the freshest thing we know about. Only
+                // log (not silently overwrite) when the serial-keyed side ALSO
+                // already holds real data — a genuine two-real-datasets conflict
+                // this heuristic can't perfectly resolve, but at least it's now
+                // visible instead of an invisible, permanent data loss.
                 if (!string.Equals(original, key, StringComparison.OrdinalIgnoreCase)
                     && dict.TryGetValue(original, out var stale))
                 {
-                    if (!dict.ContainsKey(key)) dict[key] = stale;
+                    bool staleUntouched = IsUntouchedMBoosterPlaceholder(stale);
+                    bool keyHasEntry = dict.TryGetValue(key, out var existing);
+                    if (!keyHasEntry)
+                    {
+                        dict[key] = stale;
+                    }
+                    else if (!staleUntouched)
+                    {
+                        if (!IsUntouchedMBoosterPlaceholder(existing))
+                            MozaLog.Warn($"[AZOM/mBooster] GetOrCreateMBoosterSettings: BOTH the transport-keyed entry ('{original}') and the serial-keyed entry ('{key}') hold real data in profile '{profile.Name}' — keeping the transport-keyed (more recently touched) one; the serial-keyed one's prior values are discarded.");
+                        dict[key] = stale;
+                    }
                     dict.Remove(original);
                 }
 
                 if (!dict.TryGetValue(key, out var s) || s == null)
                 {
+                    // Diagnostic trail for the "curve values wrong until profile
+                    // reload" class of bug — this is the moment a caller gets
+                    // handed a brand-new, all-defaults placeholder instead of
+                    // the real saved entry, e.g. because `key` is still the raw
+                    // transport identity (serial not resolved/re-keyed yet) at
+                    // the moment the settings UI first seeds from it.
+                    MozaLog.Info($"[AZOM/mBooster] GetOrCreateMBoosterSettings: NEW placeholder for key='{key}' (original='{original}', resolvedSerial={!string.Equals(original, key, StringComparison.OrdinalIgnoreCase)}) in profile '{profile.Name}'");
                     s = new MBoosterDeviceSettings();
                     dict[key] = s;
                 }
                 return s;
             }
+        }
+
+        /// <summary>
+        /// True if every field GetOrCreateMBoosterSettings's re-key migration
+        /// cares about is still at its untouched sentinel/default — i.e. this
+        /// looks exactly like the placeholder GetOrCreateMBoosterSettings
+        /// itself creates for a just-detected device, not something a user
+        /// (or an import/migration) has actually written real values into.
+        /// Used to decide which of two colliding entries (transport-keyed vs
+        /// serial-keyed) is safe to discard during migration — see the caller.
+        /// Deliberately does NOT check the effect settings (Abs/Lockup/etc.)
+        /// or CustomEffects: those aren't part of the bug this guards against,
+        /// and their own field-level defaults are less clear-cut, so skipping
+        /// them only makes this check slightly less strict, never wrong in a
+        /// way that would newly discard real data it didn't already discard.
+        /// </summary>
+        private static bool IsUntouchedMBoosterPlaceholder(MBoosterDeviceSettings s)
+        {
+            return s.Role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled
+                && s.AxisRoles == null
+                && s.Direction < 0 && s.Min < 0 && s.Max < 0
+                && s.CurveY == null && s.CurveX == null
+                && s.SensorOutputRatioPct < 0 && s.MaxThresholdKg < 0
+                && s.InputCurveY == null && s.InputCurveX == null
+                && s.DeadzoneKg < 0 && s.MaxForceKg < 0
+                && s.TravelStartMm < 0 && s.TravelEndMm < 0
+                && s.EndstopFrontStiffness < 0 && s.EndstopEndStiffness < 0
+                && s.NaturalFrictionPct < 0
+                && string.IsNullOrEmpty(s.DisplayName)
+                && (s.Pedals == null || s.Pedals.Count == 0)
+                && s.SegmentedDamping.Divider1Pressed < 0 && s.SegmentedDamping.Divider2Pressed < 0
+                && s.SegmentedDamping.Seg1Pressed < 0 && s.SegmentedDamping.Seg2Pressed < 0 && s.SegmentedDamping.Seg3Pressed < 0
+                && s.SegmentedDamping.Divider1Released < 0 && s.SegmentedDamping.Divider2Released < 0
+                && s.SegmentedDamping.Seg1Released < 0 && s.SegmentedDamping.Seg2Released < 0 && s.SegmentedDamping.Seg3Released < 0;
         }
 
         /// <summary>
@@ -93,6 +168,12 @@ namespace MozaPlugin
         private void OnMBoosterSerialResolved(string identity, string serial)
         {
             if (IsShuttingDown || string.IsNullOrEmpty(identity) || string.IsNullOrEmpty(serial)) return;
+            // Diagnostic trail alongside GetOrCreateMBoosterSettings's own
+            // placeholder-creation log — if this fires well AFTER the settings
+            // UI has already seeded from a transport-keyed placeholder for the
+            // same identity, that's the race: the UI showed defaults/stale data
+            // before this re-key ever ran, and nothing told it to reseed.
+            MozaLog.Info($"[AZOM/mBooster] OnMBoosterSerialResolved: identity={MBoosterDeviceController.ShortIdentity(identity)} serial={serial}");
             _mboosterSerialByIdentity[identity] = "mbooster:" + serial;
             try
             {
@@ -329,6 +410,143 @@ namespace MozaPlugin
                 }
             }
             return changed;
+        }
+
+        // Old 5-node output curve's fixed X breakpoints — what CurveX
+        // defaulted to (and what InputCurveY was always implicitly fixed
+        // at) before the redesign to 6 nodes. Used only by the one-shot
+        // migration below.
+        private static readonly float[] LegacyMBoosterCurveDefaultX = { 20, 40, 60, 80, 100 };
+
+        /// <summary>
+        /// One-shot migration (see
+        /// <see cref="MozaPluginSettings.MBoosterCurveArraysMigratedTo6"/>):
+        /// resamples every saved mBooster CurveY/CurveX (Sim Input Mapping)
+        /// and InputCurveY (Pedal Feel) array from its old 5-node shape to
+        /// the current 6-node one, across every profile's master settings
+        /// and every chained pedal — preserving each curve's visual shape
+        /// instead of letting the ordinary "wrong length = unset" guards
+        /// elsewhere silently discard it to a default. CurveX itself does
+        /// not carry over (the old dragged X positions don't map cleanly
+        /// onto the new node count) — only the resulting Y-shape does; a
+        /// fresh CurveX default takes over on the next edit.
+        /// </summary>
+        private void MigrateMBoosterCurveArraysTo6()
+        {
+            var profiles = _settings?.ProfileStore?.Profiles;
+            if (profiles == null) return;
+            foreach (var profile in profiles)
+            {
+                if (profile?.MBoosterSettings == null) continue;
+                foreach (var device in profile.MBoosterSettings.Values)
+                {
+                    if (device == null) continue;
+                    MigrateOneMBoosterCurveSet(device);
+                    if (device.Pedals != null)
+                        foreach (var pedal in device.Pedals.Values)
+                            if (pedal != null) MigrateOneMBoosterCurveSet(pedal);
+                }
+            }
+        }
+
+        private static void MigrateOneMBoosterCurveSet(global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig cfg)
+        {
+            const int oldNodeCount = 5;
+            if (cfg.CurveY != null && cfg.CurveY.Length == oldNodeCount)
+            {
+                var oldXs = (cfg.CurveX != null && cfg.CurveX.Length == oldNodeCount)
+                    ? cfg.CurveX : LegacyMBoosterCurveDefaultX;
+                var newY = new float[global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SimInputMappingNodeCount];
+                for (int i = 0; i < newY.Length; i++)
+                {
+                    double x = (i + 1) * 100.0 / 6.0;
+                    newY[i] = (float)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.EvaluateCurveArbitraryX(oldXs, cfg.CurveY, x);
+                }
+                cfg.CurveY = newY;
+                cfg.CurveX = null;
+            }
+            if (cfg.InputCurveY != null && cfg.InputCurveY.Length == oldNodeCount)
+            {
+                var newInput = new float[global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount];
+                for (int i = 0; i < newInput.Length; i++)
+                {
+                    double x = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.FeelCurveFractions[i] * 100.0;
+                    newInput[i] = (float)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.EvaluateCurveArbitraryX(LegacyMBoosterCurveDefaultX, cfg.InputCurveY, x);
+                }
+                cfg.InputCurveY = newInput;
+            }
+        }
+
+        // The Sim Input Mapping curve's default X breakpoints used to be
+        // 100/7 * k (last node ~85.7%, not 100% — see DefaultCurveX's
+        // history in Devices/MBooster/MozaMBoosterRegistry.cs). Any profile
+        // that hit MBoosterCurveArraysMigratedTo6, or simply clicked a preset
+        // button, under that bug got a CurveY baked to one of these too-low
+        // shapes. Matched against UI.SettingsControl's MBoosterCurvePresets
+        // (old → new) so the follow-up migration below can restore the exact
+        // preset shape a user actually clicked, not just the default.
+        private static readonly float[][] OldMBoosterCurvePresetsSeventhsBug =
+        {
+            new float[] { 14, 29, 43, 57, 71, 86 }, // Linear
+            new float[] { 5, 12, 30, 70, 88, 95 },  // S Curve
+            new float[] { 4, 9, 16, 25, 41, 66 },   // Exponential
+            new float[] { 34, 59, 75, 84, 91, 96 }, // Parabolic
+        };
+        private static readonly float[][] NewMBoosterCurvePresetsSeventhsBug =
+        {
+            new float[] { 17, 33, 50, 67, 83, 100 }, // Linear
+            new float[] { 6, 16, 50, 84, 94, 100 },  // S Curve
+            new float[] { 5, 11, 20, 35, 61, 100 },  // Exponential
+            new float[] { 39, 65, 80, 89, 95, 100 }, // Parabolic
+        };
+
+        /// <summary>
+        /// One-shot follow-up migration (see
+        /// <see cref="MozaPluginSettings.MBoosterCurveArraysFixedSeventhsBug"/>):
+        /// a saved Sim Input Mapping curve that exactly matches one of the
+        /// old, too-low preset shapes (baked in by the 100/7 breakpoint bug,
+        /// either directly via a preset button or via
+        /// <see cref="MigrateMBoosterCurveArraysTo6"/> before this fix) is
+        /// swapped for the corresponding corrected shape. A curve the user
+        /// has since custom-dragged away from any preset is left alone —
+        /// the original 5-node source is long gone, so there's nothing
+        /// reliable to re-derive it from; a fresh Linear/S-Curve/etc. click
+        /// or a small manual touch-up fixes it going forward.
+        /// </summary>
+        private void FixMBoosterCurveArraysSeventhsBug()
+        {
+            var profiles = _settings?.ProfileStore?.Profiles;
+            if (profiles == null) return;
+            foreach (var profile in profiles)
+            {
+                if (profile?.MBoosterSettings == null) continue;
+                foreach (var device in profile.MBoosterSettings.Values)
+                {
+                    if (device == null) continue;
+                    FixOneMBoosterCurveSeventhsBug(device);
+                    if (device.Pedals != null)
+                        foreach (var pedal in device.Pedals.Values)
+                            if (pedal != null) FixOneMBoosterCurveSeventhsBug(pedal);
+                }
+            }
+        }
+
+        private static void FixOneMBoosterCurveSeventhsBug(global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig cfg)
+        {
+            if (cfg.CurveX != null) return; // user has dragged X — not a stock preset shape
+            if (cfg.CurveY == null || cfg.CurveY.Length != global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SimInputMappingNodeCount) return;
+            for (int p = 0; p < OldMBoosterCurvePresetsSeventhsBug.Length; p++)
+            {
+                var old = OldMBoosterCurvePresetsSeventhsBug[p];
+                bool match = true;
+                for (int i = 0; i < old.Length; i++)
+                    if (Math.Abs(cfg.CurveY[i] - old[i]) > 0.01f) { match = false; break; }
+                if (match)
+                {
+                    cfg.CurveY = (float[])NewMBoosterCurvePresetsSeventhsBug[p].Clone();
+                    return;
+                }
+            }
         }
 
         /// <summary>

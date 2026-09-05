@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Thử</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Khóa bánh</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Ngưỡng</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Điểm bắt côn</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Rung động cơ</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Tần số (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Độ mượt</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Độ khuếch đại</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Mức kích hoạt đầu vào</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Độ suy giảm rung</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// thử nghiệm — có thể không được firmware mBooster áp dụng</value></data>
@@ -739,6 +741,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Lực đầu vào</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>MÀU THEO TỪNG LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Chờ · Cố định</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Chờ · Nhịp thở</value></data>

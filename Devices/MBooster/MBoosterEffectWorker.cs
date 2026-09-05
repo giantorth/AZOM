@@ -12,10 +12,13 @@ namespace MozaPlugin.Devices.MBooster
     /// Owns per-effect synthesis state (phase, elapsed, last amplitude) and
     /// the telemetry → freq/intensity mapping per protocol note § 4.
     ///
-    /// One worker per <see cref="MBoosterDeviceController"/>. The shared
-    /// <c>StreamKind.MBoosterEffect</c> lane on the device's connection
-    /// coalesces frames if the writer lags — at 50 Hz with one frame per
-    /// tick this is harmless (older tick gets dropped, newer tick lands).
+    /// One worker per pedal axis on a <see cref="MBoosterDeviceController"/>,
+    /// each with its OWN <c>StreamKind.MBoosterEffect</c>/
+    /// <c>MBoosterEffectAxis1</c>/<c>MBoosterEffectAxis2</c> lane on the
+    /// device's connection. A lane coalesces frames if the writer lags — at
+    /// 50 Hz with one frame per tick this is harmless (older tick gets
+    /// dropped, newer tick lands) and, being per axis, identical for every
+    /// pedal in a chain.
     /// </summary>
     internal sealed class MBoosterEffectWorker : IDisposable
     {
@@ -58,6 +61,10 @@ namespace MozaPlugin.Devices.MBooster
         // ProcessGearShiftEffect) — same cap as the other Engine-slot
         // reusers.
         private const double GearShiftScaleMax = 0.10;
+        // Bite Point (Clutch-only) shares Engine's wire shape too (see
+        // ProcessBitePointEffect) — same cap as the other Engine-slot
+        // reusers.
+        private const double BitePointScaleMax = 0.10;
         // Fixed one-shot pulse duration for Gear Shift — the only mBooster
         // effect that's a genuine self-terminating pulse rather than a
         // level-triggered continuous effect. See UpdateGearShiftRequest.
@@ -90,7 +97,13 @@ namespace MozaPlugin.Devices.MBooster
         private EffectState _engine;
         private EffectState _roadTexture;
         private EffectState _gforce;
+        private EffectState _bitePoint;
         private bool _thresholdLatched; // hysteresis flag for the Threshold effect (doc § 4)
+        // Hysteresis flag for the Bite Point effect (Clutch-only) — same
+        // pattern as _thresholdLatched, but latches on a FALLING edge (the
+        // pedal releasing past the trigger, not pressing past it). See
+        // UpdateBitePointRequest.
+        private bool _bitePointLatched;
         // Debounce countdown for the Gear Shift effect, decremented each
         // tick by TickPeriodSec — separate from EffectState.ElapsedSec
         // (which resets every time the pulse (re)activates) since the
@@ -143,6 +156,7 @@ namespace MozaPlugin.Devices.MBooster
         private volatile bool _lockupTestSustained;
         private volatile bool _thresholdTestSustained;
         private volatile bool _gforceTestSustained;
+        private volatile bool _bitePointTestSustained;
 
         // Custom effects' sustained Test toggles — same semantics as the five
         // built-ins above (runs indefinitely, live-tracks Frequency/Intensity,
@@ -260,17 +274,23 @@ namespace MozaPlugin.Devices.MBooster
 
         /// <summary>
         /// Emit a motor frame (already addressed to this pedal's device id) for
-        /// this pedal. The primary (device 0x12) uses the coalescing stream lane
-        /// so its effects follow the latest-wins priority ladder; chained pedals
-        /// (0x1d/0x1e) use the one-shot FIFO so they don't clobber the primary's
-        /// single shared StreamKind lane. In the common one-effect-per-pedal case
-        /// this is equivalent; only simultaneous effects on ONE chained pedal
-        /// skip the ladder (rare).
+        /// this pedal, on THIS axis's own coalescing stream lane — so every
+        /// axis gets identical delivery and the latest-wins priority ladder
+        /// works per pedal.
+        ///
+        /// Chained axes used to fall back to the one-shot FIFO instead, to
+        /// avoid clobbering the single shared StreamKind lane. But that FIFO
+        /// delivers EVERY frame where the stream lane coalesces, so a chained
+        /// brake got the full ~50 Hz noise stream while the throttle on the
+        /// stream lane dropped frames whenever the write loop lagged — the
+        /// brake's Road Texture felt far stronger for identical settings. It
+        /// also queued ~50 motor frames/sec PER chained axis onto the paced
+        /// FIFO, starving everything else sharing it. Each axis now has its
+        /// own lane (StreamKind.MBoosterEffect / MBoosterEffectAxis1/2).
         /// </summary>
         private void SendMotor(byte[] frame)
         {
-            if (_isPrimary) _device.SendMotorStream(frame);
-            else _device.SendOneShot(frame);
+            _device.SendMotorStream(frame, _pedalAxisIndex);
         }
 
         private struct EffectState
@@ -376,6 +396,9 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>Turn Threshold's sustained test toggle on/off. See <see cref="_thresholdTestSustained"/>.</summary>
         public void SetThresholdTestSustained(bool on) => _thresholdTestSustained = on;
 
+        /// <summary>Turn Bite Point's sustained test toggle on/off. See <see cref="_bitePointTestSustained"/>.</summary>
+        public void SetBitePointTestSustained(bool on) => _bitePointTestSustained = on;
+
         /// <summary>Turn G-Force's sustained test toggle on/off. See <see cref="_gforceTestSustained"/>.</summary>
         public void SetGForceTestSustained(bool on) => _gforceTestSustained = on;
 
@@ -467,12 +490,13 @@ namespace MozaPlugin.Devices.MBooster
                 UpdateThresholdRequest(effects, brakeSignal, snap, ref _threshold);
                 UpdateRoadTextureRequest(effects, snap, ref _roadTexture);
                 UpdateGForceRequest(effects, snap, ref _gforce);
+                UpdateBitePointRequest(effects, snap, role, ref _bitePoint);
 
                 // --- Apply per-effect activation edges + emit motor frame ------
                 //
-                // All vibration effects share ONE latest-wins motor stream slot
-                // (MozaSerialConnection StreamKind.MBoosterEffect — SendStream
-                // overwrites the pending value), so when more than one effect is
+                // All of THIS axis's vibration effects share its one latest-wins
+                // motor stream slot (SendMotor — SendStream overwrites the
+                // pending value), so when more than one effect is
                 // active in the same tick only the LAST frame emitted here
                 // reaches the motor. Emission order is therefore a priority
                 // ladder, lowest first: the two continuous "ambient" effects
@@ -512,17 +536,22 @@ namespace MozaPlugin.Devices.MBooster
                 ProcessEffect(MBoosterEffectId.Abs,       ref _abs);
                 ProcessEffect(MBoosterEffectId.Lockup,    ref _lockup);
                 ProcessEffect(MBoosterEffectId.Threshold, ref _threshold);
-                // Traction Control, Wheel Spin, and Gear Shift — same wheel-slip
-                // -adjacent cue tier as ABS/Lockup/Threshold, emitted last so
-                // they always win over ambient vibration. None has a verified
-                // wire effect-type of its own (unlike ABS's confirmed type 1),
-                // so — like Custom Effects — all three reuse Engine's
-                // already-verified frame shape (effect type 4) rather than an
-                // invented, unconfirmed protocol ID (see each one's Process*
-                // method for details).
+                // Traction Control, Wheel Spin, Gear Shift, and Bite Point —
+                // same wheel-slip-adjacent cue tier as ABS/Lockup/Threshold,
+                // emitted last so they always win over ambient vibration.
+                // None has a verified wire effect-type of its own (unlike
+                // ABS's confirmed type 1), so — like Custom Effects — all
+                // four reuse Engine's already-verified frame shape (effect
+                // type 4) rather than an invented, unconfirmed protocol ID
+                // (see each one's Process*/UpdateBitePointRequest method
+                // for details). Bite Point is additionally hard-gated to
+                // the Clutch role inside UpdateBitePointRequest itself, so
+                // it stays silent here (IntensityRequest 0) on any other
+                // role regardless of this ordering.
                 ProcessTractionControlEffect(ref _tc);
                 ProcessWheelSpinEffect(ref _wheelSpin);
                 ProcessGearShiftEffect(ref _gearShift);
+                ProcessBitePointEffect(ref _bitePoint);
             }
 
             // Brake Fade is NOT a vibration effect — it rewrites the ACTUAL
@@ -1076,6 +1105,114 @@ namespace MozaPlugin.Devices.MBooster
             return hz;
         }
 
+        // Bite Point (Clutch-only) — tactile feedback at the pedal position
+        // where clutch engagement begins. Modeled on UpdateThresholdRequest's
+        // trigger/hysteresis shape, with three deliberate differences:
+        // (1) the trigger compares against THIS pedal's own raw HID
+        // position (PedalHid()), not game telemetry — there's no reliable
+        // SimHub clutch channel, and a bite point is a physical pedal
+        // characteristic anyway, confirmed with the user; (2) it's a
+        // FALLING-edge trigger (fires as the pedal RELEASES past the
+        // trigger level, the opposite direction from Threshold's rising-
+        // brake-pressure trigger — a bite point is encountered letting the
+        // clutch up, not pressing it down); (3) it's hard-gated to the
+        // Clutch role right here in the request function, so the effect is
+        // genuinely inert on any other role even if a saved profile
+        // somehow has it configured — stronger than Threshold/ABS/Lockup's
+        // own UI-only role hiding (see UI/SettingsControl.xaml.cs's
+        // UpdateMBoosterConfigVisibilityForRole), matching Brake Fade's
+        // worker-level role restriction instead (see the PedalRole check
+        // in Tick()).
+        private void UpdateBitePointRequest(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, MBoosterRole role, ref EffectState st)
+        {
+            if (role != MBoosterRole.Clutch)
+            {
+                st.IntensityRequest = 0;
+                st.FreqHz = 0;
+                _bitePointLatched = false;
+                return;
+            }
+
+            double freqHz = ClampBitePointFreq(effects?.BitePoint?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz);
+            double smoothness01 = Clamp01((effects?.BitePoint?.SmoothnessPct ?? 100) / 100.0);
+            st.SmoothnessRequest01 = smoothness01;
+            double triggerLevel = Clamp01((effects?.BitePoint?.TriggerLevelPct ?? MBoosterUiConstants.BitePointTriggerMinPct) / 100.0);
+            // Release (re-arm) level sits ABOVE the trigger, not below —
+            // this is a falling-edge trigger, so re-arming requires the
+            // pedal to be pressed back down past the same 30-point gap
+            // Threshold uses, just in the opposite direction.
+            double releaseLevel = Math.Min(1, triggerLevel + 0.3);
+
+            double pedalPos = Clamp01(PedalHid());
+
+            // Sustained test toggle shares the same falling-edge hysteresis
+            // as real gameplay — see UpdateThresholdRequest's identical
+            // rationale. Only Frequency/Intensity/Smoothness are
+            // live-tracked from settings; the hysteresis logic itself (and
+            // _bitePointLatched) is shared with the real path below since
+            // only one of the two runs per tick.
+            if (_bitePointTestSustained)
+            {
+                if (!_bitePointLatched && pedalPos <= triggerLevel)
+                    _bitePointLatched = true;
+                else if (_bitePointLatched && pedalPos > releaseLevel)
+                    _bitePointLatched = false;
+
+                if (!_bitePointLatched)
+                {
+                    st.IntensityRequest = 0;
+                    st.FreqHz = 0;
+                    return;
+                }
+                double testScale = ((effects?.BitePoint?.IntensityPct ?? 0) / 100.0) * BitePointScaleMax;
+                st.IntensityRequest = Clamp01(testScale);
+                st.FreqHz = freqHz;
+                return;
+            }
+
+            if (effects?.BitePoint == null || !effects.BitePoint.Enabled)
+            {
+                st.IntensityRequest = 0;
+                st.FreqHz = 0;
+                _bitePointLatched = false;
+                return;
+            }
+
+            // Same GameRunning gate Engine/ABS/Lockup/Threshold use — even
+            // though the trigger signal itself is raw pedal position (not
+            // telemetry), the effect still shouldn't fire outside an active
+            // driving session (menu, garage, replay).
+            if (!snap.GameRunning)
+            {
+                st.IntensityRequest = 0;
+                st.FreqHz = 0;
+                _bitePointLatched = false;
+                return;
+            }
+
+            if (!_bitePointLatched && pedalPos <= triggerLevel)
+                _bitePointLatched = true;
+            else if (_bitePointLatched && pedalPos > releaseLevel)
+                _bitePointLatched = false;
+
+            if (!_bitePointLatched)
+            {
+                st.IntensityRequest = 0;
+                st.FreqHz = 0;
+                return;
+            }
+            st.FreqHz = freqHz;
+            double bitePointScale = (effects.BitePoint.IntensityPct / 100.0) * BitePointScaleMax;
+            st.IntensityRequest = Clamp01(bitePointScale);
+        }
+
+        private static double ClampBitePointFreq(double hz)
+        {
+            if (hz < MBoosterUiConstants.BitePointFreqMinHz) return MBoosterUiConstants.BitePointFreqMinHz;
+            if (hz > MBoosterUiConstants.BitePointFreqMaxHz) return MBoosterUiConstants.BitePointFreqMaxHz;
+            return hz;
+        }
+
         // Road Texture's Smoothness is still sent as a fixed user-configured
         // percentage (the firmware applies it internally to the noise
         // signal we stream; see ProcessRoadTextureEffect). Intensity is
@@ -1381,7 +1518,8 @@ namespace MozaPlugin.Devices.MBooster
         /// running continuously the whole time you're driving. The
         /// transmitted Intensity is the user's configured percentage scaled
         /// by that same envelope (<see cref="EffectState.RoadTextureRoughness01"/>)
-        /// every tick.
+        /// and by the user's GainPct (a plain host-side multiplier, no
+        /// envelope of its own) every tick.
         /// </summary>
         private void ProcessRoadTextureEffect(IMBoosterEffects? effects, ref EffectState st)
         {
@@ -1408,7 +1546,8 @@ namespace MozaPlugin.Devices.MBooster
             if (noise < -1) noise = -1; else if (noise > 1) noise = 1;
             short noiseSample = (short)Math.Round(noise * short.MaxValue);
             ushort noiseRaw = unchecked((ushort)noiseSample);
-            double effectiveIntensityPct = (effects?.RoadTexture?.IntensityPct ?? 0) * st.RoadTextureRoughness01;
+            double gain01 = (effects?.RoadTexture?.GainPct ?? 100) / 100.0;
+            double effectiveIntensityPct = (effects?.RoadTexture?.IntensityPct ?? 0) * st.RoadTextureRoughness01 * gain01;
             ushort intensityRaw = MozaMBoosterProtocol.EncodeRoadTextureLevel(effectiveIntensityPct);
             ushort smoothnessRaw = MozaMBoosterProtocol.EncodeRoadTextureLevel(effects?.RoadTexture?.SmoothnessPct ?? 0);
 
@@ -1635,6 +1774,20 @@ namespace MozaPlugin.Devices.MBooster
         private void ProcessGearShiftEffect(ref EffectState st) =>
             ProcessEffect(MBoosterEffectId.Engine, ref st,
                 s => MBoosterEffectSynthesizer.SynthesizeGearShift(s.IntensityRequest, s.PhaseRad, s.ElapsedSec, GearShiftPulseDurationSec));
+
+        /// <summary>
+        /// Activation-edge + frame-emission path for Bite Point (Clutch-
+        /// only) — same Engine-wire-slot reuse rationale as Traction
+        /// Control/Wheel Spin/Gear Shift (no verified wire effect type of
+        /// its own), using <see cref="MBoosterEffectSynthesizer.SynthesizeBitePoint"/>
+        /// for the waveform. Competes with the real Engine effect and any
+        /// active Custom Effects/Traction Control/Wheel Spin/Gear Shift for
+        /// that one wire slot — see the ordering note at this method's call
+        /// site in Tick().
+        /// </summary>
+        private void ProcessBitePointEffect(ref EffectState st) =>
+            ProcessEffect(MBoosterEffectId.Engine, ref st,
+                s => MBoosterEffectSynthesizer.SynthesizeBitePoint(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01));
 
         // ===== Helpers ====================================================
 

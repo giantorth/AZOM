@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Тест</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Блокировка</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Порог</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Точка сцепления</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Вибрация двигателя</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Частота (Гц)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Плавность</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Усиление</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// экспериментально — прошивка mBooster может это игнорировать</value></data>
@@ -739,6 +741,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR закрыт — переключено на Стабильный</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// усиление по полосам · 100% = нейтраль · 500% = максимум</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ЧУВСТВИТЕЛЬНОСТЬ</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Входное усилие</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>ЦВЕТА ПО СВЕТОДИОДАМ</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Ожидание · Постоянный</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Ожидание · Дыхание</value></data>

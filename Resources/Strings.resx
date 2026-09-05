@@ -89,6 +89,7 @@
   <data name="Section_Position" xml:space="preserve"><value>POSITION</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// live handbrake input</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Position</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Input Force</value></data>
   <data name="Section_Calibration" xml:space="preserve"><value>CALIBRATION</value></data>
   <data name="Subtitle_PullHandbrakeFully" xml:space="preserve"><value>// pull the handbrake fully once</value></data>
   <data name="Button_StartCalibration" xml:space="preserve"><value>START CALIBRATION</value></data>
@@ -182,9 +183,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Test</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Lockup</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Threshold</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Bite Point</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Engine Vibration</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequency (hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Smoothness</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Gain</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Trigger Input Level</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibration Decay</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Onset Temperature (°C)</value></data>

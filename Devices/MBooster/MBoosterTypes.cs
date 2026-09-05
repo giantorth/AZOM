@@ -18,6 +18,25 @@ namespace MozaPlugin.Devices.MBooster
         public const float TravelMinGapMm = 3.8f;
         public const float TravelMaxGapMm = 32.1f;
 
+        // Pedal Feel Max Force/Deadzone slider bounds, role-scoped — a
+        // Throttle or Clutch pedal is a much lighter spring than a brake's
+        // load cell, so both get their own narrower Max Force range instead
+        // of the Brake-shaped 0-200kg (same 4-20kg for both — shared
+        // constant, not duplicated per role). Deadzone differs per role
+        // (Clutch's spring has more built-in play than Throttle's), so it
+        // stays a separate constant each. Selected in
+        // UpdateMBoosterConfigVisibilityForRole.
+        public const float ThrottleMaxForceMinKg = 4f;
+        public const float ThrottleMaxForceMaxKg = 20f;
+        public const float ThrottleDeadzoneMinKg = 0f;
+        public const float ThrottleDeadzoneMaxKg = 5f;
+        public const float ClutchDeadzoneMinKg = 0f;
+        public const float ClutchDeadzoneMaxKg = 8f;
+        public const float BrakeMaxForceMinKg = 0f;
+        public const float BrakeMaxForceMaxKg = 200f;
+        public const float BrakeDeadzoneMinKg = 0f;
+        public const float BrakeDeadzoneMaxKg = 40f;
+
         // Engine Vibration's hardware-safe frequency range. No longer a
         // user-facing slider bound — Engine's frequency is telemetry-derived
         // (see MBoosterEffectWorker.UpdateEngineRequest); these clamp the
@@ -61,6 +80,19 @@ namespace MozaPlugin.Devices.MBooster
         // MBoosterEffectSettings.TriggerLevelPct.
         public const float ThresholdTriggerMinPct = 50f;
         public const float ThresholdTriggerMaxPct = 100f;
+
+        // Bite Point's (Clutch-only) fixed frequency slider bounds — wider/
+        // lower than Threshold's, reaching down into a slower, more
+        // distinct pulse range.
+        public const float BitePointFreqMinHz = 2f;
+        public const float BitePointFreqMaxHz = 100f;
+
+        // Bite Point's Trigger Input Level slider bounds — full 0-100%
+        // range, unlike Threshold's 50-100%: a clutch's bite point can sit
+        // anywhere across the pedal's travel depending on the car. See
+        // MBoosterEffectWorker.UpdateBitePointRequest.
+        public const float BitePointTriggerMinPct = 0f;
+        public const float BitePointTriggerMaxPct = 100f;
 
         // Brake Fade's Onset Temperature slider bounds, in the same unit
         // BrakeTempC normalizes to (Celsius) — see
@@ -134,6 +166,17 @@ namespace MozaPlugin.Devices.MBooster
         public const float SegDampDivider1ReleasedDefaultPct = 20f;
         public const float SegDampDivider2ReleasedDefaultPct = 70f;
         public const float SegDampSegDefaultPct = 0f;
+
+        // Node counts for the two mBooster curve editors (both were 5-point
+        // originally). Sim Input Mapping (CurveY/CurveX) is purely host-side,
+        // no wire command — see MozaMBoosterRegistry.EvaluateCurveArbitraryX.
+        // Pedal Feel (InputCurveY) is a REAL hardware write, populating
+        // mbooster-brake-feelcurve-1..6 (cmdId 0xAB selectors 0x08-0x0D) —
+        // see MozaMBoosterRegistry.ComputeFeelCurveY and
+        // MBoosterDeviceController.PushFeelCurveResync. See
+        // docs/protocol/devices/mbooster.md "Sim Input Mapping" / "Pedal Feel".
+        public const int SimInputMappingNodeCount = 6;
+        public const int PedalFeelNodeCount = 6;
     }
 
     /// <summary>
@@ -171,35 +214,56 @@ namespace MozaPlugin.Devices.MBooster
         public int IntensityPct { get; set; } = 50; // 0..100
 
         // Fixed vibration frequency, in Hz. Consumed by ABS (5-30Hz), Lockup
-        // (10-100Hz), and Threshold (5-100Hz) — see MBoosterUiConstants for
-        // each effect's *FreqMinHz/MaxHz bounds. All four used to derive
-        // their frequency from telemetry (Engine: RPM; ABS: activation
-        // depth; Lockup/Threshold: brake position); ABS/Lockup/Threshold's
-        // mappings were replaced with this user-set fixed value as each was
-        // rebuilt. Engine has since reverted to its original RPM-derived
-        // model (see MBoosterEffectWorker.UpdateEngineRequest) — this field
-        // is unused for Engine, kept only so older saved profiles still
-        // deserialize.
+        // (10-100Hz), Threshold (5-100Hz), and Bite Point (2-100Hz) — see
+        // MBoosterUiConstants for each effect's *FreqMinHz/MaxHz bounds. All
+        // four used to derive their frequency from telemetry (Engine: RPM;
+        // ABS: activation depth; Lockup/Threshold: brake position);
+        // ABS/Lockup/Threshold's mappings were replaced with this user-set
+        // fixed value as each was rebuilt; Bite Point (Clutch-only) was
+        // built fixed-frequency from the start. Engine has since reverted
+        // to its original RPM-derived model (see
+        // MBoosterEffectWorker.UpdateEngineRequest) — this field is unused
+        // for Engine, kept only so older saved profiles still deserialize.
         public float FrequencyHz { get; set; } = 100;
 
-        // Pulse modulation depth, ABS-only for now, 0..100. Controls the
-        // depth of the sine ripple in MBoosterEffectSynthesizer.SynthesizeAbs:
-        // 100 (default) reproduces the exact original verified formula
-        // (0.9 + 0.1*sin, depth 0.1 — "do not modify without verifying
-        // against the protocol document"); 0 widens it to a full 0..1 swing
-        // (0.5 + 0.5*sin, matching Engine's shape) for a sharper, choppier
-        // pulse. Values between are a host-side interpolation, not from the
-        // protocol note. Default 100 preserves pre-existing behavior for
-        // profiles that predate this slider.
+        // Pulse modulation depth, ABS and Bite Point (Clutch-only), 0..100.
+        // Controls the depth of the sine ripple in
+        // MBoosterEffectSynthesizer.SynthesizeAbs/SynthesizeBitePoint (same
+        // formula, separate functions): 100 (default) reproduces the exact
+        // original verified formula (0.9 + 0.1*sin, depth 0.1 — "do not
+        // modify without verifying against the protocol document"); 0
+        // widens it to a full 0..1 swing (0.5 + 0.5*sin, matching Engine's
+        // shape) for a sharper, choppier pulse. Values between are a
+        // host-side interpolation, not from the protocol note. Default 100
+        // preserves pre-existing behavior for profiles that predate this
+        // slider.
         public int SmoothnessPct { get; set; } = 100;
 
-        // Threshold-only, 50..100 (MBoosterUiConstants.ThresholdTriggerMinPct/
+        // Road Texture-only, 0..100 — a second, purely host-side multiplier
+        // on top of IntensityPct (see MBoosterEffectWorker
+        // .ProcessRoadTextureEffect: effectiveIntensityPct is scaled by
+        // GainPct/100 after the bump-envelope scaling). Added because users
+        // found the bump/kerb pulse too strong even after turning
+        // IntensityPct down, since Intensity alone only spans the same
+        // 0..100 range the envelope already modulates. Default 100 (no
+        // attenuation) preserves pre-existing behavior for profiles that
+        // predate this slider.
+        public int GainPct { get; set; } = 100;
+
+        // Threshold: 50..100 (MBoosterUiConstants.ThresholdTriggerMinPct/
         // MaxPct) — the brake position (%) at which the rising-edge trigger
-        // fires. The falling/release threshold stays a fixed 30 points
-        // below this (same hysteresis gap the original fixed 0.6/0.3
-        // thresholds had) rather than being independently configurable.
-        // Default 60 exactly reproduces the original verified trigger
-        // point. See MBoosterEffectWorker.UpdateThresholdRequest.
+        // fires (fires as brake pressure INCREASES past this level). Bite
+        // Point (Clutch-only): 0..100 (BitePointTriggerMinPct/MaxPct,
+        // full range — a clutch's bite point can sit anywhere across the
+        // pedal's travel, unlike a brake threshold) — the pedal position at
+        // which the FALLING-edge trigger fires (fires as the pedal
+        // RELEASES past this level, the opposite direction from Threshold,
+        // since a bite point is encountered letting the clutch up, not
+        // pressing it down; see MBoosterEffectWorker.UpdateBitePointRequest).
+        // Both keep the same fixed 30-point hysteresis gap between trigger
+        // and release rather than being independently configurable.
+        // Default 60 exactly reproduces Threshold's original verified
+        // trigger point. See MBoosterEffectWorker.UpdateThresholdRequest.
         public int TriggerLevelPct { get; set; } = 60;
 
         // Threshold-only, 0..100 — how much the pulse fades after its
@@ -262,6 +326,7 @@ namespace MozaPlugin.Devices.MBooster
                 IntensityPct = IntensityPct,
                 FrequencyHz = FrequencyHz,
                 SmoothnessPct = SmoothnessPct,
+                GainPct = GainPct,
                 TriggerLevelPct = TriggerLevelPct,
                 DecayPct = DecayPct,
                 BrakeFadeOnsetC = BrakeFadeOnsetC,
@@ -314,6 +379,14 @@ namespace MozaPlugin.Devices.MBooster
         public float Seg2Released { get; set; } = -1;
         public float Seg3Released { get; set; } = -1;
 
+        // Master on/off for the whole feature. Off is a software-side
+        // convention, not a separate wire command: it sends the same
+        // BuildSegmentedDampingFrame with all six segment-damping fields
+        // forced to 0% (dividers left as-is — they're inert once every
+        // segment damps at 0%). Defaults true so untouched profiles match
+        // Pit House's own factory-enabled state.
+        public bool DampingEnabled { get; set; } = true;
+
         public MBoosterSegmentedDampingSettings Clone() =>
             new MBoosterSegmentedDampingSettings
             {
@@ -327,6 +400,7 @@ namespace MozaPlugin.Devices.MBooster
                 Seg1Released = Seg1Released,
                 Seg2Released = Seg2Released,
                 Seg3Released = Seg3Released,
+                DampingEnabled = DampingEnabled,
             };
     }
 
@@ -405,6 +479,9 @@ namespace MozaPlugin.Devices.MBooster
         MBoosterEffectSettings WheelSpin { get; set; }
         MBoosterEffectSettings GearShift { get; set; }
         MBoosterEffectSettings GForce { get; set; }
+        // Clutch-only — see MBoosterEffectWorker.UpdateBitePointRequest and
+        // MBoosterUiConstants.BitePointTriggerMinPct/MaxPct/FreqMinHz/MaxHz.
+        MBoosterEffectSettings BitePoint { get; set; }
         System.Collections.Generic.List<MBoosterCustomEffect> CustomEffects { get; set; }
     }
 
@@ -430,6 +507,7 @@ namespace MozaPlugin.Devices.MBooster
         float MaxThresholdKg { get; set; }
         // Pedal Feel
         float[]? InputCurveY { get; set; }
+        float[]? InputCurveX { get; set; }
         float DeadzoneKg { get; set; }
         float MaxForceKg { get; set; }
         float TravelStartMm { get; set; }
@@ -437,6 +515,7 @@ namespace MozaPlugin.Devices.MBooster
         float EndstopFrontStiffness { get; set; }
         float EndstopEndStiffness { get; set; }
         float NaturalFrictionPct { get; set; }
+        bool NaturalFrictionEnabled { get; set; }
         MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
     }
 
@@ -456,22 +535,29 @@ namespace MozaPlugin.Devices.MBooster
         public int Direction { get; set; } = -1;
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
-        public float[]? CurveY { get; set; } = null;   // 5-point output curve
+        public float[]? CurveY { get; set; } = null;   // 6-point output curve (host-side only)
         public float[]? CurveX { get; set; } = null;   // draggable node X (null = fixed breakpoints)
 
         // Sim Input Mapping (see MBoosterDeviceSettings for the field semantics).
         public float SensorOutputRatioPct { get; set; } = -1;
         public float MaxThresholdKg { get; set; } = -1;
 
-        // Pedal Feel (host-side shaping + brake-only wire calibration).
+        // Pedal Feel — InputCurveY (6-point), Deadzone, and MaxForce are ALL
+        // real brake-only wire calibration — see MBoosterDeviceSettings for
+        // the field semantics.
         public float[]? InputCurveY { get; set; } = null;
-        public float DeadzoneKg { get; set; } = 0;
-        public float MaxForceKg { get; set; } = 200;
+        // X position (0-100% of the Deadzone-Max Force span) of each Pedal
+        // Feel node — see MBoosterDeviceSettings.InputCurveX.
+        public float[]? InputCurveX { get; set; } = null;
+        public float DeadzoneKg { get; set; } = -1;
+        public float MaxForceKg { get; set; } = -1;
         public float TravelStartMm { get; set; } = -1;
         public float TravelEndMm { get; set; } = -1;
         public float EndstopFrontStiffness { get; set; } = -1;
         public float EndstopEndStiffness { get; set; } = -1;
         public float NaturalFrictionPct { get; set; } = -1;
+        // Master on/off — see MBoosterDeviceSettings.NaturalFrictionEnabled.
+        public bool NaturalFrictionEnabled { get; set; } = true;
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
@@ -484,6 +570,9 @@ namespace MozaPlugin.Devices.MBooster
         public MBoosterEffectSettings WheelSpin { get; set; } = new MBoosterEffectSettings { FrequencyHz = 30 };
         public MBoosterEffectSettings GearShift { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
         public MBoosterEffectSettings GForce { get; set; } = new MBoosterEffectSettings { MaxTravelMm = 10, ResponseSpeedPct = 50 };
+        // Clutch-only — see MBoosterDeviceSettings.BitePoint for the field
+        // rationale (same defaults).
+        public MBoosterEffectSettings BitePoint { get; set; } = new MBoosterEffectSettings { FrequencyHz = 40, TriggerLevelPct = 50, SmoothnessPct = 100 };
         public List<MBoosterCustomEffect> CustomEffects { get; set; } = new List<MBoosterCustomEffect>();
 
         public MBoosterPedalSettings Clone() =>
@@ -497,6 +586,7 @@ namespace MozaPlugin.Devices.MBooster
                 SensorOutputRatioPct = SensorOutputRatioPct,
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
+                InputCurveX = InputCurveX == null ? null : (float[])InputCurveX.Clone(),
                 DeadzoneKg = DeadzoneKg,
                 MaxForceKg = MaxForceKg,
                 TravelStartMm = TravelStartMm,
@@ -504,6 +594,7 @@ namespace MozaPlugin.Devices.MBooster
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
+                NaturalFrictionEnabled = NaturalFrictionEnabled,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
@@ -514,6 +605,7 @@ namespace MozaPlugin.Devices.MBooster
                 WheelSpin = WheelSpin?.Clone() ?? new MBoosterEffectSettings(),
                 GearShift = GearShift?.Clone() ?? new MBoosterEffectSettings(),
                 GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
+                BitePoint = BitePoint?.Clone() ?? new MBoosterEffectSettings(),
                 CustomEffects = CustomEffects?.Select(c => c.Clone()).ToList() ?? new List<MBoosterCustomEffect>(),
             };
     }
@@ -598,6 +690,11 @@ namespace MozaPlugin.Devices.MBooster
         // default to 60/20, exactly reproducing the original verified
         // 0.6-brake trigger and 80% sustain.
         public MBoosterEffectSettings Threshold { get; set; } = new MBoosterEffectSettings { FrequencyHz = 70, TriggerLevelPct = 60, DecayPct = 20 };
+        // Clutch-only — TriggerLevelPct defaults to a rough mid-travel
+        // guess (50), unlike Threshold's confirmed 60; a bite point varies
+        // by car and the user is expected to tune it. See
+        // MBoosterEffectWorker.UpdateBitePointRequest.
+        public MBoosterEffectSettings BitePoint { get; set; } = new MBoosterEffectSettings { FrequencyHz = 40, TriggerLevelPct = 50, SmoothnessPct = 100 };
         public MBoosterEffectSettings Engine    { get; set; } = new MBoosterEffectSettings { IntensityPct = 50 };
 
         // Road Texture (effect type 9) reuses IntensityPct and SmoothnessPct
@@ -621,8 +718,13 @@ namespace MozaPlugin.Devices.MBooster
         //   load-cell force to reach 100%, capped at
         //   MBoosterUiConstants.BrakeFadeMaxThresholdKg — this is what
         //   actually makes the pedal feel "softer" (more effort needed for
-        //   the same signal), unlike the host-side-only MaxForceKg, which
-        //   has no wire command and wouldn't affect what the game receives.
+        //   the same signal). MaxForceKg is now also a real wire calibration
+        //   (see docs/protocol/devices/mbooster.md "Pedal Feel"), but Brake
+        //   Fade deliberately still ramps MaxThresholdKg, not MaxForceKg:
+        //   Threshold rescales the sensor's own 0-100% span, while Max Force
+        //   only lowers the effort needed below whatever that span already
+        //   is — ramping it couldn't demand MORE force than Threshold
+        //   already caps at, so it can't reproduce "harder to press."
         // Both restore to their configured values as brake temp cools. If
         // the user has never configured a given base value, that ONE
         // calibration stays fully inert (the other can still ramp
@@ -641,19 +743,24 @@ namespace MozaPlugin.Devices.MBooster
         public int Direction { get; set; } = -1;
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
-        public float[]? CurveY { get; set; } = null;   // 5-point output curve
+
+        // Sim Input Mapping output curve (6-point) — PURELY host-side, no
+        // wire command at all. Remaps the pedal's raw HID position (which
+        // by this point already reflects Deadzone/Max Force/the Pedal Feel
+        // curve's hardware shaping) into what AZOM reports as game
+        // telemetry (MozaData.{Throttle,Brake,Clutch}Position) — see
+        // MozaMBoosterRegistry.OnHidAxisUpdate/EvaluateCurveArbitraryX and
+        // docs/protocol/devices/mbooster.md "Sim Input Mapping". CurveY
+        // holds the 6 node Y-values; CurveX (below) holds their X
+        // positions, draggable in the curve editor. Null = identity / no
+        // remapping — existing profiles are unaffected until the user
+        // opens this section.
+        public float[]? CurveY { get; set; } = null;
 
         // X position (0..100) of each output-curve node, draggable in the
         // Sim Input Mapping curve editor. Null = default fixed breakpoints
-        // (20/40/60/80/100 — identical to every other curve in the app).
-        // There is no hardware command for this (unlike the wheelbase's own
-        // FFB curve, which has base-ffb-curve-x1..x4) — moving a node here
-        // instead RESAMPLES the (CurveX, CurveY) shape at the fixed
-        // 20/40/60/80/100 breakpoints and pushes those 5 values through the
-        // existing mbooster-throttle-y1..y5 commands, so "100% output before
-        // 100% input" works using only the wire commands that actually
-        // exist. See MozaMBoosterRegistry.EvaluateCurveArbitraryX and
-        // docs/protocol/devices/mbooster.md "Sim Input Mapping".
+        // (100/6 * k for k=1..6, last node at 100% — see
+        // MozaMBoosterRegistry.DefaultCurveX).
         public float[]? CurveX { get; set; } = null;
 
         // Per-pedal calibration for the ADDITIONAL pedals on a chained mBooster
@@ -683,39 +790,58 @@ namespace MozaPlugin.Devices.MBooster
         // value is already on the device.
         public float MaxThresholdKg { get; set; } = -1;
 
-        // Pedal Feel (Pit House-style). Host-side only — there is no wire
-        // command for this; it shapes the raw HID axis position BEFORE it
-        // becomes MozaData.{Throttle,Brake,Clutch}Position (and before the
-        // effect worker's brake-position fallback), independent of CurveY
-        // (which still writes to the device's own output-curve command
-        // unchanged). Null = identity / no shaping — existing profiles are
-        // unaffected until the user opens the new Pedal Feel section. See
-        // MozaMBoosterRegistry.EvaluateInputCurve and
+        // Pedal Feel input curve (6-point, Pit House-style) — REAL hardware
+        // calibration: its nodes (0-100% of the Deadzone-Max Force span)
+        // populate mbooster-brake-feelcurve-1..6 directly (cmdId 0xAB
+        // selectors 0x08-0x0D). Null = use the default Linear shape
+        // (MozaMBoosterRegistry.FeelCurveFractions) — existing profiles are
+        // unaffected until the user opens this section. See
+        // MozaMBoosterRegistry.ComputeFeelCurveY,
+        // MBoosterDeviceController.PushFeelCurveResync, and
         // docs/protocol/devices/mbooster.md "Pedal Feel".
         public float[]? InputCurveY { get; set; } = null;
 
-        // Deadzone at the start of pedal travel, in kg of force (0..40).
-        // Host-side only, applied before InputCurveY (a physical/sensor
-        // characteristic — the resting force before the load cell means
-        // anything — should shape the signal before the user's "feel"
-        // curve does). See MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce.
-        // 0 = off (default).
-        public float DeadzoneKg { get; set; } = 0;
+        // X position of each Pedal Feel node, draggable in the curve editor
+        // exactly like Sim Input Mapping's CurveX — ALSO real hardware
+        // calibration though, unlike CurveX: reverse-engineered from
+        // pedal-feel-node{2,5}-{x,y}-adjust.pcapng (four isolated
+        // single-node-drag captures), which showed a second, previously-
+        // undocumented cmdId 0xAB selector family (0x01-0x06, one per node,
+        // distinct from feelcurve-1..6's 0x08-0x0D) always written alongside
+        // the node's own feelcurve-N write — sent first. UNLIKE InputCurveY,
+        // this is a percentage (0-100) of the fixed 0-200kg full scale, NOT
+        // the Deadzone-Max Force span — confirmed by 4 throttle/clutch
+        // Deadzone/Max Force sweeps that left this curve at its default and
+        // saw the X selectors stay bit-for-bit constant throughout (see
+        // MozaMBoosterRegistry.FeelCurveFractions for the capture list).
+        // Null = default fixed breakpoints (MozaMBoosterRegistry
+        // .FeelCurveFractions). See MozaMBoosterRegistry.ComputeFeelCurveX
+        // and MBoosterDeviceController.PushFeelCurveResync.
+        public float[]? InputCurveX { get; set; } = null;
 
-        // Force (kg, 0..200) at which the Pedal Feel input curve's X-axis
-        // reaches 100%. Host-side only. Raw 0-100% pedal travel isn't a
-        // fixed 0-200kg scale — 100% raw is whatever MaxThresholdKg (Sim
-        // Input Mapping) currently calibrates the device itself to reach
-        // 100% at (200kg is only a fallback guess when MaxThresholdKg is
-        // still -1/unset — see MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce).
-        // 200 = off IF the device's real threshold is also 200kg; if it's
-        // lower (real Pit House captures commonly show ~100-125kg), 200
-        // has no additional effect beyond whatever the device already
-        // saturates at, since there's no headroom above the device's own
-        // calibrated max for software to require more force. Lower it if
-        // you never press hard enough to reach the curve's right edge
-        // otherwise.
-        public float MaxForceKg { get; set; } = 200;
+        // Deadzone at the start of pedal travel, in kg of force (0..40) —
+        // REAL hardware calibration (wire command mbooster-brake-deadzone,
+        // cmdId 0xAB selector 0x07), reverse-engineered from
+        // deadzone-0-5-11-14.pcapng (bug bundle 5VR5AQ8Y). Same kg encoding
+        // as MaxThresholdKg — see MozaMBoosterProtocol.EncodeThresholdKg and
+        // MBoosterDeviceController.PushFeelCurveResync. -1 = "not yet set /
+        // no override", same sentinel convention as every other real
+        // calibration field, so a fresh profile never overwrites whatever
+        // the device already has. Previously host-side-only (0 = off
+        // default); see docs/protocol/devices/mbooster.md "Pedal Feel".
+        public float DeadzoneKg { get; set; } = -1;
+
+        // Force (kg, 0..200) at which the pedal's raw HID axis reaches
+        // 100% travel — REAL hardware calibration (wire command
+        // mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
+        // engineered from max-force-24-75-128-166-200.pcapng (bug bundle
+        // 5VR5AQ8Y). Same kg encoding as MaxThresholdKg. Confirmed NOT
+        // clamped to MaxThresholdKg on the wire (128/166kg sent while
+        // Threshold read back 125kg) — it's an independent parameter, not
+        // a rescale of Threshold's own ceiling. -1 = "not yet set / no
+        // override". Previously host-side-only (200 = off default); see
+        // docs/protocol/devices/mbooster.md "Pedal Feel".
+        public float MaxForceKg { get; set; } = -1;
 
         // Start/End of pedal travel, in mm (Pit House's own calibration
         // control, not a host-side shim). Reverse-engineered from two real
@@ -745,8 +871,8 @@ namespace MozaPlugin.Devices.MBooster
         public float EndstopEndStiffness { get; set; } = -1;
 
         // Natural Friction (Pit House-style), 0-100%. Real hardware write
-        // (not host-side-only like Deadzone/MaxForce) — reverse-engineered
-        // from two real Pit House USB captures (a toggle on/off, and a
+        // (like Deadzone/MaxForce above) — reverse-engineered from two
+        // real Pit House USB captures (a toggle on/off, and a
         // 0/25/50/75/100% slider sweep): wire commands
         // mbooster-brake-friction-0/-1 (cmdId 0xAE with a selector byte,
         // always written together with the same value), 2-byte int, fixed
@@ -757,6 +883,15 @@ namespace MozaPlugin.Devices.MBooster
         // TravelStartMm/EndstopFrontStiffness, so a fresh profile never
         // overwrites whatever value is already on the device.
         public float NaturalFrictionPct { get; set; } = -1;
+
+        // Master on/off for Natural Friction. Not a separate wire concept —
+        // Pit House's own toggle-off capture simply sent raw 0 (see the doc
+        // comment above), so AZOM's toggle reproduces that in software: off
+        // forces the pushed value to 0% regardless of NaturalFrictionPct,
+        // same pattern as MBoosterSegmentedDampingSettings.DampingEnabled.
+        // Defaults true so untouched profiles behave as before this toggle
+        // existed.
+        public bool NaturalFrictionEnabled { get; set; } = true;
 
         // Segmented Damping (Pit House-style) — see
         // MBoosterSegmentedDampingSettings and
@@ -783,6 +918,7 @@ namespace MozaPlugin.Devices.MBooster
                 GForce = GForce?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
+                BitePoint = BitePoint?.Clone() ?? new MBoosterEffectSettings(),
                 Engine = Engine?.Clone() ?? new MBoosterEffectSettings(),
                 RoadTexture = RoadTexture?.Clone() ?? new MBoosterEffectSettings(),
                 BrakeFade = BrakeFade?.Clone() ?? new MBoosterEffectSettings(),
@@ -795,6 +931,7 @@ namespace MozaPlugin.Devices.MBooster
                 SensorOutputRatioPct = SensorOutputRatioPct,
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
+                InputCurveX = InputCurveX == null ? null : (float[])InputCurveX.Clone(),
                 DeadzoneKg = DeadzoneKg,
                 MaxForceKg = MaxForceKg,
                 TravelStartMm = TravelStartMm,
@@ -802,6 +939,7 @@ namespace MozaPlugin.Devices.MBooster
                 EndstopFrontStiffness = EndstopFrontStiffness,
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
+                NaturalFrictionEnabled = NaturalFrictionEnabled,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 DisplayName = DisplayName,
             };

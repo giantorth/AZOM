@@ -175,9 +175,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Teste</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Travamento</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Limiar</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Ponto de embreagem</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Vibração do motor</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequência (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Suavidade</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Ganho</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Nível de entrada do gatilho</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decaimento da vibração</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Temperatura de início (°C)</value></data>
@@ -738,6 +740,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR fechado — alterado para Estável</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// ganho por banda · 100% = neutro · 500% = reforço máx.</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILIDADE</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Força de entrada</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>CORES POR LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Inativo · Constante</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Inativo · Respiração</value></data>

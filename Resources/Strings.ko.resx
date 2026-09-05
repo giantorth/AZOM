@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>테스트</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>락업</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>임계값</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>반클러치 지점</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>엔진 진동</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>주파수 (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>부드러움</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>게인</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>트리거 입력 레벨</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>진동 감쇠</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 실험적 기능 — mBooster 펌웨어가 적용하지 않을 수 있음</value></data>
@@ -738,6 +740,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>입력 힘</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>LED별 색상</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>대기 · 고정</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>대기 · 호흡</value></data>

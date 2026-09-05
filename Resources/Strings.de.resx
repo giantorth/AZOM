@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Testen</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Blockieren</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Schwellwert</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Schleifpunkt</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Motorvibration</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequenz (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Glätte</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Verstärkung</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Auslöseschwelle</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrationsabklingen</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// experimentell — wird ggf. nicht von der mBooster-Firmware übernommen</value></data>
@@ -739,6 +741,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Eingabekraft</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>LED-FARBEN EINZELN</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Ruhe · Konstant</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Ruhe · Atmen</value></data>

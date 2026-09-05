@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>测试</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>锁死</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>阈值</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>离合点</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>发动机震动</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>频率 (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>平滑度</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>增益</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>触发输入电平</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>振动衰减</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 实验性 — mBooster 固件可能不予响应</value></data>
@@ -739,6 +741,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>输入力值</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>单颗灯珠颜色</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>待机 · 常亮</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>待机 · 呼吸</value></data>

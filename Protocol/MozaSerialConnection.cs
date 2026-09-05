@@ -37,9 +37,9 @@ namespace MozaPlugin.Protocol
         Ab9TriggerRpm = 14,      // 0x0D start of the engine-vib sine (RPM-tracked)
         Ab9TriggerExtra = 15,    // spare 0x0D lane
         Ab9LowRate = 16,         // unused — 0x08 shift constant-force rides the one-shot FIFO
-        // mBooster motor-write lane (single slot per connection; the worker
-        // emits one frame per ~20 ms tick across all four effects, so a
-        // shared lane is sufficient — latest-wins on the writer-lag edge).
+        // mBooster motor-write lane for pedal axis 0. Each axis runs its own
+        // worker and needs its OWN latest-wins lane — see MBoosterEffectAxis1/2
+        // at 44+ for the chained axes.
         MBoosterEffect = 17,
 
         // ── LED lanes (absolute slots 29+) ───────────────────────────────────
@@ -88,6 +88,20 @@ namespace MozaPlugin.Protocol
         BaseLfeEngine = 41,   // wire id 1
         BaseLfeAbs = 42,      // wire id 2
         BaseLfeOsc0 = 43,     // wire id 0 (continuous-tone lane; ShakeIt only)
+
+        // ── mBooster chained-axis motor lanes (absolute slots 44+) ───────────
+        // One lane per pedal axis. Axis 0 keeps MBoosterEffect (17); a CHAINED
+        // lane's axes 1/2 get these. Every axis runs its own effect worker at
+        // ~50 Hz, but there used to be only the single slot at 17, so the
+        // non-primary axes were shunted onto the paced one-shot FIFO instead
+        // (MBoosterEffectWorker.SendMotor). That FIFO delivers EVERY frame
+        // while the stream lane coalesces latest-wins, so a chained brake got
+        // the full 50 Hz noise stream while the throttle on the stream lane
+        // dropped frames whenever the write loop lagged — the brake's Road
+        // Texture felt far stronger than the throttle's for identical
+        // settings. Same transport for every axis now.
+        MBoosterEffectAxis1 = 44,
+        MBoosterEffectAxis2 = 45,
     }
 
     /// <summary>Device family targeted by the serial probe fallback (registry-empty case).</summary>
@@ -137,11 +151,12 @@ namespace MozaPlugin.Protocol
         //            FIFO (the rim drops unpaced bursts). See the LED StreamKind members.
         //   41..43 — wheelbase LFE lanes (the three summed host-rendered oscillator
         //            streams: engine id1, ABS id2, Osc0 id0).
+        //   44..45 — mBooster chained-axis motor lanes (axes 1/2; axis 0 is slot 17).
         // A CM2 on its own USB connection runs at base 0 on THAT connection, so the
         // second block is only used when two pipelines share one connection.
         // NOTE: keep this >= (highest StreamKind + 1). The static ctor below
         // asserts the regions are disjoint and fit.
-        private const int StreamSlotCount = 44;
+        private const int StreamSlotCount = 46;
 
         // Startup slot-layout invariant: the LED lanes (29+) must not alias the
         // wheel value pipeline (0..10), AB9/mBooster (11..17), or the CM2 second
@@ -157,11 +172,16 @@ namespace MozaPlugin.Protocol
                 "LED stream slots must start after the CM2 value pipeline (18..28)");
             System.Diagnostics.Debug.Assert(ledLast < StreamSlotCount,
                 "StreamSlotCount too small for the LED stream slots");
-            const int lfeLast = (int)StreamKind.BaseLfeOsc0;     // 43 (highest slot overall)
+            const int lfeLast = (int)StreamKind.BaseLfeOsc0;     // 43
             System.Diagnostics.Debug.Assert(lfeLast > ledLast,
                 "wheelbase LFE stream slots must start after the LED lanes");
             System.Diagnostics.Debug.Assert(lfeLast < StreamSlotCount,
                 "StreamSlotCount too small for the wheelbase LFE stream slots");
+            const int mbLast = (int)StreamKind.MBoosterEffectAxis2; // 45 (highest slot overall)
+            System.Diagnostics.Debug.Assert((int)StreamKind.MBoosterEffectAxis1 > lfeLast,
+                "mBooster chained-axis stream slots must start after the LFE lanes");
+            System.Diagnostics.Debug.Assert(mbLast < StreamSlotCount,
+                "StreamSlotCount too small for the mBooster chained-axis stream slots");
         }
 
         // Ports held by a live connection — probe path skips these (Wine pty

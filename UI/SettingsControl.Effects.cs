@@ -198,15 +198,16 @@ namespace MozaPlugin.UI
         ///
         /// The same gate hides the Pedal Feel controls that are real hardware
         /// writes on brake-named SINGLETON cmdIds — Travel (0x84/0x85), End Stop
-        /// (0xB2), Natural Friction (0xAE) and Segmented Damping (0xB7). None of
-        /// them carries a per-pedal selector, so editing them from a passive
-        /// pedal's page didn't configure that pedal — it silently overwrote the
-        /// ACTIVE pedal's registers (bundle KY3HK4QP: the passive throttle page's
+        /// (0xB2), Deadzone/Max Force (0xAB selectors 0x07/0x0E), Natural
+        /// Friction (0xAE) and Segmented Damping (0xB7). None of them carries a
+        /// per-pedal selector, so editing them from a passive pedal's page
+        /// didn't configure that pedal — it silently overwrote the ACTIVE
+        /// pedal's registers (bundle KY3HK4QP: the passive throttle page's
         /// 3.8/35.9mm travel is what the brake unit committed as Params 48/49).
         /// Inferred from the wire shape rather than from a Pit House capture of a
         /// passive-pedal edit — see docs/protocol/devices/mbooster.md.
-        /// Host-side-only controls (Deadzone, Max Force, the input curve) and the
-        /// per-role output curve stay visible for every pedal.
+        /// The input curve (host-side-only) and the per-role output curve stay
+        /// visible for every pedal.
         /// </summary>
         private void UpdateMBoosterEffectPassiveState()
         {
@@ -218,6 +219,7 @@ namespace MozaPlugin.UI
             MBoosterEffectsPassiveNote.Visibility = passive ? Visibility.Visible : Visibility.Collapsed;
             var hwVisibility = passive ? Visibility.Collapsed : Visibility.Visible;
             MBoosterTravelEndstopPanel.Visibility = hwVisibility;
+            MBoosterDeadzoneMaxForcePanel.Visibility = hwVisibility;
             MBoosterNaturalFrictionPanel.Visibility = hwVisibility;
             MBoosterSegDampCard.Visibility = hwVisibility;
         }
@@ -230,8 +232,47 @@ namespace MozaPlugin.UI
         /// </summary>
         private void UpdateMBoosterConfigVisibilityForRole()
         {
-            bool isBrake = MBoosterSelectedPedalRolePrefix() == "brake";
+            string? rolePrefix = MBoosterSelectedPedalRolePrefix();
+            bool isBrake = rolePrefix == "brake";
+            bool isThrottle = rolePrefix == "throttle";
+            bool isClutch = rolePrefix == "clutch";
             MBoosterBrakeOnlyPanel.Visibility = isBrake ? Visibility.Visible : Visibility.Collapsed;
+
+            // Max Force/Deadzone slider bounds are role-scoped: Throttle and
+            // Clutch are both much lighter springs than a brake's load cell,
+            // so they share Max Force's narrower 4-20kg range instead of the
+            // Brake-shaped 0-200kg. Deadzone differs per role (Clutch's own
+            // spring has more built-in play than Throttle's). Set BEFORE
+            // SeedMBoosterConfigControls seeds the actual value (this method
+            // runs earlier in RefreshMBoosterTab — see call site) so the
+            // seeded value never gets silently clamped by stale bounds.
+            MBoosterMaxForceSlider.Minimum = (isThrottle || isClutch) ? MBoosterUiConstants.ThrottleMaxForceMinKg : MBoosterUiConstants.BrakeMaxForceMinKg;
+            MBoosterMaxForceSlider.Maximum = (isThrottle || isClutch) ? MBoosterUiConstants.ThrottleMaxForceMaxKg : MBoosterUiConstants.BrakeMaxForceMaxKg;
+            MBoosterDeadzoneSlider.Minimum = isThrottle ? MBoosterUiConstants.ThrottleDeadzoneMinKg
+                : isClutch ? MBoosterUiConstants.ClutchDeadzoneMinKg : MBoosterUiConstants.BrakeDeadzoneMinKg;
+            MBoosterDeadzoneSlider.Maximum = isThrottle ? MBoosterUiConstants.ThrottleDeadzoneMaxKg
+                : isClutch ? MBoosterUiConstants.ClutchDeadzoneMaxKg : MBoosterUiConstants.BrakeDeadzoneMaxKg;
+
+            // Effects list is role-scoped too: ABS, Lockup, Threshold, and
+            // Brake Fade are all brake-specific (ABS/Lockup/Threshold trigger
+            // off brake signal or rewrite brake-only calibration; Brake Fade
+            // is hard-restricted to the Brake role at the worker level
+            // already — see MBoosterEffectWorker.Tick). Engine Vibration, TC,
+            // Wheel Spin, Gear Shift, G-Force, and Road Texture are already
+            // role-agnostic and fully functional on Throttle/Clutch pedals,
+            // so they stay visible for both. Brake keeps showing every card.
+            var brakeOnlyEffectVisibility = (isThrottle || isClutch) ? Visibility.Collapsed : Visibility.Visible;
+            MBoosterAbsExpander.Visibility = brakeOnlyEffectVisibility;
+            MBoosterLockupExpander.Visibility = brakeOnlyEffectVisibility;
+            MBoosterThresholdExpander.Visibility = brakeOnlyEffectVisibility;
+            MBoosterBrakeFadeExpander.Visibility = brakeOnlyEffectVisibility;
+
+            // Bite Point is the opposite — Clutch-only (tactile feedback at
+            // the clutch's engagement point has no meaning for Brake or
+            // Throttle), hidden for both of those and shown only for
+            // Clutch. See MBoosterEffectWorker.UpdateBitePointRequest for
+            // the matching worker-level role gate.
+            MBoosterBitePointExpander.Visibility = isClutch ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // Force every device-gated mBooster panel visible for the no-hardware
@@ -247,17 +288,31 @@ namespace MozaPlugin.UI
             MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
             MBoosterBrakeOnlyPanel.Visibility = Visibility.Visible;
             MBoosterTravelEndstopPanel.Visibility = Visibility.Visible;
+            MBoosterDeadzoneMaxForcePanel.Visibility = Visibility.Visible;
             MBoosterNaturalFrictionPanel.Visibility = Visibility.Visible;
             MBoosterSegDampCard.Visibility = Visibility.Visible;
+            MBoosterAbsExpander.Visibility = Visibility.Visible;
+            MBoosterLockupExpander.Visibility = Visibility.Visible;
+            MBoosterThresholdExpander.Visibility = Visibility.Visible;
+            MBoosterBrakeFadeExpander.Visibility = Visibility.Visible;
+            MBoosterBitePointExpander.Visibility = Visibility.Visible;
+            // No real role to resolve without hardware — Brake-shaped bounds
+            // are as good a demo default as any (matches this panel's other
+            // "show everything" choices above).
+            MBoosterMaxForceSlider.Minimum = MBoosterUiConstants.BrakeMaxForceMinKg;
+            MBoosterMaxForceSlider.Maximum = MBoosterUiConstants.BrakeMaxForceMaxKg;
+            MBoosterDeadzoneSlider.Minimum = MBoosterUiConstants.BrakeDeadzoneMinKg;
+            MBoosterDeadzoneSlider.Maximum = MBoosterUiConstants.BrakeDeadzoneMaxKg;
 
             // Seed every control to its default once. The curve editors take no
             // node data of their own — they two-way bind to the hidden data-store
             // sliders (BindEditorToSliders), so without a seed those sliders sit at
             // 0 and the editors draw a collapsed/garbage curve. A null target makes
-            // both seeders fall back to MBoosterDefaultCurve (linear 20/40/60/80/100)
-            // and sane per-control defaults; the seed writes go through _suppressor
-            // so the slider ValueChanged handlers (which would no-op on the null
-            // target anyway) stay quiet while the bindings still update the editors.
+            // both seeders fall back to their own Linear-preset default array
+            // (MBoosterOutputCurveDefault / MBoosterInputCurveDefault) and sane
+            // per-control defaults; the seed writes go through _suppressor so the
+            // slider ValueChanged handlers (which would no-op on the null target
+            // anyway) stay quiet while the bindings still update the editors.
             if (_mboosterDemoSeeded) return;
             using (_suppressor.Begin())
             {
@@ -605,6 +660,82 @@ namespace MozaPlugin.UI
             CurrentMBoosterController()?.SetThresholdTestActive(MBoosterThresholdTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
         }
 
+        // Bite Point (Clutch-only) — tactile feedback at the pedal position
+        // where clutch engagement begins. See MBoosterEffectWorker
+        // .UpdateBitePointRequest for the falling-edge trigger/hysteresis
+        // logic and the hard Clutch-role gate.
+        private void MBoosterBitePointEnable_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).Enabled = MBoosterBitePointEnable.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+        // Pedal position (%) at which the falling-edge trigger fires —
+        // fires as the pedal RELEASES past this level (opposite direction
+        // from Threshold's rising-brake trigger). The rearm level stays a
+        // fixed 30 points ABOVE this. See MBoosterEffectSettings
+        // .TriggerLevelPct and MBoosterEffectWorker.UpdateBitePointRequest.
+        private void MBoosterBitePointTriggerLevel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max((int)MBoosterUiConstants.BitePointTriggerMinPct, Math.Min((int)MBoosterUiConstants.BitePointTriggerMaxPct, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointTriggerLevelValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).TriggerLevelPct = v;
+            _plugin.SaveSettings();
+        }
+        // Fixed vibration frequency (2-100Hz). See MBoosterEffectSettings
+        // .FrequencyHz and MBoosterEffectWorker.UpdateBitePointRequest.
+        private void MBoosterBitePointFrequencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max((int)MBoosterUiConstants.BitePointFreqMinHz, Math.Min((int)MBoosterUiConstants.BitePointFreqMaxHz, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointFrequencyValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).FrequencyHz = v;
+            _plugin.SaveSettings();
+        }
+        // Pulse modulation depth — same ripple-depth control as ABS's
+        // Smoothness (MBoosterEffectSynthesizer.SynthesizeBitePoint uses
+        // the identical formula). See MBoosterEffectSettings.SmoothnessPct.
+        private void MBoosterBitePointSmoothness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointSmoothnessValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).SmoothnessPct = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterBitePointIntensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointIntensityValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).IntensityPct = v;
+            _plugin.SaveSettings();
+        }
+        // Sustained test toggle — skips the Enabled/GameRunning gates
+        // (there's no live game session needed to test a pedal-position
+        // trigger), but shares the SAME falling-edge hysteresis latch and
+        // Clutch-role gate as the real path, vibrating continuously at the
+        // live Frequency/Intensity/Smoothness slider values once the pedal
+        // crosses the Trigger Input Level. See
+        // MBoosterDeviceController.SetBitePointTestActive and
+        // MBoosterEffectWorker's _bitePointTestSustained.
+        private void MBoosterBitePointTestToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            CurrentMBoosterController()?.SetBitePointTestActive(MBoosterBitePointTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
+        }
+
         private void MBoosterEngineEnable_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -667,6 +798,16 @@ namespace MozaPlugin.UI
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             (s.RoadTexture ??= new MBoosterEffectSettings()).SmoothnessPct = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterRoadTextureGain_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(0, Math.Min(100, (int)Math.Round(e.NewValue)));
+            MBoosterRoadTextureGainValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.RoadTexture ??= new MBoosterEffectSettings()).GainPct = v;
             _plugin.SaveSettings();
         }
         // Sustained test toggle — bypasses Enabled and the game-running/

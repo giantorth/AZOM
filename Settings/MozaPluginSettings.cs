@@ -278,6 +278,24 @@ namespace MozaPlugin.Settings
         // VerboseWireDebugLog=true. See MozaPlugin.Init.
         public bool VerboseWireDebugLogDefaultMigrated { get; set; }
 
+        // One-shot marker for the migration that resamples every saved
+        // mBooster CurveY/CurveX/InputCurveY array from its old 5-node
+        // shape to the current 6-node one, preserving each curve's visual
+        // shape instead of silently discarding it to a default. See
+        // MozaPlugin.Init and MozaPlugin.MBooster's
+        // MigrateMBoosterCurveArraysTo6.
+        public bool MBoosterCurveArraysMigratedTo6 { get; set; }
+
+        // One-shot marker for the follow-up migration that fixes the Sim
+        // Input Mapping curve's default X breakpoints — they were 100/7 * k
+        // (last node ~85.7%, inherited from the disproven/removed curve7
+        // mechanism), capping Linear/preset/migrated curves at ~86% output
+        // instead of reaching 100%. Any profile already run through
+        // MBoosterCurveArraysMigratedTo6, or that clicked a preset button,
+        // baked in the too-low shape. See MozaPlugin.Init and
+        // FixMBoosterCurveArraysSeventhsBug.
+        public bool MBoosterCurveArraysFixedSeventhsBug { get; set; }
+
         // Where wheelbase LFE effects come from. The plugin's own LFE tab and a
         // SimHub ShakeIt haptics device would sum on the wire, so exactly one owns
         // it. ShakeIt mode is what puts HapticsFeature in the base's device.json,

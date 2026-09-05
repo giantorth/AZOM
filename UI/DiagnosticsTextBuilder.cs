@@ -329,7 +329,8 @@ namespace MozaPlugin.UI
                     $"travel={FmtMm(cfg.TravelStartMm)}..{FmtMm(cfg.TravelEndMm)} " +
                     $"endstop={FmtRaw(cfg.EndstopFrontStiffness)}/{FmtRaw(cfg.EndstopEndStiffness)} " +
                     $"friction={FmtPct(cfg.NaturalFrictionPct)} " +
-                    $"inCurve={(cfg.InputCurveY != null ? "set" : "—")}");
+                    $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
+                    $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")}");
             }
         }
 

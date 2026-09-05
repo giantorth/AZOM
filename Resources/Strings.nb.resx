@@ -174,9 +174,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Test</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Låsing</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Terskel</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Klopunkt</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Motorvibrasjon</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frekvens (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Glatthet</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Forsterkning</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// eksperimentelt — kanskje ikke respektert av mBooster-firmware</value></data>
@@ -744,6 +746,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR lukket — byttet til Stabil</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Inngangskraft</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>FARGER PER LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Hvile · Konstant</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Hvile · Pust</value></data>

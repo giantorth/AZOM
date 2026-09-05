@@ -154,18 +154,54 @@ namespace MozaPlugin.UI
             // Track the SELECTED pedal's own axis, not always the master's —
             // otherwise every pedal page showed the master (throttle) input.
             int idx = _mboosterEffectPedalIndex;
-            double shaped = (idx >= 0 && idx < selected.LastAxisPositions.Length)
-                ? selected.LastAxisPositions[idx] : selected.LastHidPosition;
             double preCurve = (idx >= 0 && idx < selected.LastAxisRawPercentPreCurve.Length)
                 ? selected.LastAxisRawPercentPreCurve[idx] : selected.LastRawPercentPreCurve;
-            int pct = (int)Math.Round(shaped * 100);
-            if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+            // TRUE raw reading — % of Max Force's own hardware ceiling, i.e.
+            // the physical force the user is actually applying to the pedal,
+            // captured in OnHidAxisUpdate BEFORE the host-side Max Threshold
+            // rescale. This is the Pedal Feel curve's real input domain
+            // (Deadzone-Max Force span) and what "Input Force" should show —
+            // preCurve above is post-Threshold-rescale now (Sim Input
+            // Mapping's own, different domain), not this pedal's raw input.
+            double rawInput = (idx >= 0 && idx < selected.LastAxisRawPercentPreThreshold.Length)
+                ? selected.LastAxisRawPercentPreThreshold[idx] : 0.0;
 
-            // Input Curve sees the pre-shaping value (what it actually
-            // receives); the output curve sees the post-Pedal-Feel value
-            // (what's effectively sent onward).
-            MBoosterInputCurveEditor.LiveX = preCurve;
-            MBoosterCurveEditor.LiveX = pct;
+            // Pedal Feel's curve is now a REAL hardware effect (see
+            // MozaMBoosterRegistry.ComputeFeelCurveX) — the device reshapes
+            // the raw force before this HID read ever sees it, so AZOM has
+            // no live TRUE "input to that curve" value to plot (that would
+            // need the raw pre-reshape force, which AZOM never receives).
+            // Best available proxy: rawInput — positionally correct against
+            // the curve's own Deadzone-Max Force X axis (unlike preCurve,
+            // which is now Threshold-rescaled and belongs to a different
+            // domain), even though it can't reflect the device's own
+            // internal reshaping.
+            // The Sim Input Mapping curve is the opposite: purely host-side
+            // (see EvaluateCurveArbitraryX), so its live marker uses
+            // preCurve exactly — the already-hardware-shaped, Threshold-
+            // rescaled position that's actually fed INTO this curve, not
+            // pct (which is the curve's own output).
+            MBoosterInputCurveEditor.LiveX = hidConnected ? rawInput : double.NaN;
+            MBoosterCurveEditor.LiveX = preCurve;
+
+            // Live "position % · kg force" readout above the Pedal Feel
+            // curve editor (MBoosterPedalFeelLiveLabel) — the raw force the
+            // user is applying to the pedal, independent of Max Threshold's
+            // sim-facing output scaling. kg is an estimate, not a directly-
+            // read sensor value: rawInput/100 * Max Force's own kg ceiling
+            // (the reference its own 100% represents — see OnHidAxisUpdate),
+            // falling back to 200kg if Max Force itself is unset.
+            if (hidConnected)
+            {
+                var cfg = PeekMBoosterEffectTarget();
+                double fullScaleKg = (cfg != null && cfg.MaxForceKg >= 0) ? cfg.MaxForceKg : 200.0;
+                double kg = rawInput / 100.0 * fullScaleKg;
+                MBoosterPedalFeelLiveLabel.Text = $"{Strings.Label_InputForce}: {rawInput:F0}% · {kg:F1} kg";
+            }
+            else
+            {
+                MBoosterPedalFeelLiveLabel.Text = Strings.Label_InputForce;
+            }
 
             // Effects card pedal trace — same 30 Hz cadence as the Inputs
             // tab's pedal bars above, and the same merged 0-100 values

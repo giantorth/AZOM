@@ -139,6 +139,29 @@ namespace MozaPlugin
                     _settings.VerboseWireDebugLog = false;
                 }
 
+                // The mBooster CurveY/CurveX (Sim Input Mapping) and
+                // InputCurveY (Pedal Feel) arrays moved from 5 to 6 nodes.
+                // Every other call site treats a wrong-length array as
+                // "unset" and falls back to a default shape — fine for new
+                // profiles, but it would silently discard an existing
+                // user's tuned curve the first time this version runs.
+                // Resample once instead, preserving each curve's shape.
+                if (!_settings.MBoosterCurveArraysMigratedTo6)
+                {
+                    _settings.MBoosterCurveArraysMigratedTo6 = true;
+                    MigrateMBoosterCurveArraysTo6();
+                }
+
+                // Follow-up fix for the 100/7-breakpoint bug (see
+                // FixMBoosterCurveArraysSeventhsBug) — separate flag/pass so
+                // it also catches profiles that only clicked a preset button
+                // and never went through the 5->6 migration above.
+                if (!_settings.MBoosterCurveArraysFixedSeventhsBug)
+                {
+                    _settings.MBoosterCurveArraysFixedSeventhsBug = true;
+                    FixMBoosterCurveArraysSeventhsBug();
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.

@@ -302,13 +302,26 @@ namespace MozaPlugin.Protocol
         /// data points: 4 kg → 1311 exactly, and an unlabeled capture whose
         /// raw value decoded to ~126 kg, matching an independently-reported
         /// real Pit House setting of ~125 kg.
+        /// BUG (fixed): at kg=200 exactly, this formula rounds to 65536
+        /// (0x10000) — one bit past the 16-bit range every consumer of this
+        /// encoding actually uses on the wire (Max Force/Deadzone/Feel Curve
+        /// nodes are 2-byte fields; even Max Threshold's 4-byte field only
+        /// ever carries a 16-bit-range value). The old bounds check compared
+        /// against int.MaxValue, which never caught this, so BuildWriteInt's
+        /// byte-packing silently truncated 0x10000 to 0x0000 for any 2-byte
+        /// command — sending 0kg instead of ~200kg for Max Force's own
+        /// slider maximum (confirmed via azom-max-force-sweep.pcapng: the
+        /// wire write for Max Force=200 was literally raw=0). Clamping to
+        /// 65535 instead matches Pit House's own observed encoding — its
+        /// max-force-140-threshold-4-200sweep.pcapng capture sent Threshold
+        /// =200kg as raw 0xFFFF (65535), not 0x10000.
         /// </summary>
         public static int EncodeThresholdKg(double kg)
         {
             if (double.IsNaN(kg) || kg <= 0) return 0;
             double raw = Math.Round(kg * 65536.0 / 200.0);
             if (raw <= 0) return 0;
-            if (raw >= int.MaxValue) return int.MaxValue;
+            if (raw >= 65535.0) return 65535;
             return (int)raw;
         }
 
@@ -346,29 +359,6 @@ namespace MozaPlugin.Protocol
         {
             if (raw <= 0) return 0;
             return raw * 53.5 / 65536.0;
-        }
-
-        /// <summary>
-        /// EXPERIMENTAL / unverified — encoding for the <c>mbooster-brake-
-        /// curve7-*</c> commands (cmdId 0xAB) spotted alongside a Travel
-        /// Start write in pedal_travel.pcapng (see
-        /// MozaCommandDatabase.cs and MozaMBoosterRegistry.ResampleCurveAtSevenths).
-        /// Values decoded near <c>selector/7 * 65535</c>, i.e. a plain
-        /// fraction-of-full-scale over the 0-65535 range — same
-        /// "value * 65535 / fullscale" family as <see cref="EncodeEndstopStiffness"/>,
-        /// with fullscale = 100 (a curve-node percentage, 0-100 like
-        /// <c>MBoosterDeviceSettings.CurveY</c>): <c>raw = round(pct * 65535 / 100)</c>.
-        /// Not cross-checked against a second capture — treat with more
-        /// suspicion than this file's other Encode/Decode pairs.
-        /// </summary>
-        public static int EncodeCurve7Point(double pct)
-        {
-            if (double.IsNaN(pct)) pct = 0;
-            pct = Math.Max(0, Math.Min(100, pct));
-            double raw = Math.Round(pct * 65535.0 / 100.0);
-            if (raw <= 0) return 0;
-            if (raw >= 0xFFFF) return 0xFFFF;
-            return (int)raw;
         }
 
         /// <summary>
