@@ -1313,6 +1313,15 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.Limit,              v => profile.Limit              = v,
                   () => _data.Limit,                v => _data.Limit                = v,
                   "base-limit");
+            // No control sets max-angle on its own — the rotation slider and
+            // the "Rotation" catalog entry both write it from the limit — so a
+            // profile at sentinel follows its own limit. Without this the
+            // sentinel never resolves (Apply's seed source is at sentinel too),
+            // the register is never written and _data.MaxAngle stays -1, which
+            // blanks the steering-angle readout, AZOM.MaxAngle/SteeringAngle
+            // and @internal/SteeringWheelAngle.
+            if (profile.MaxAngle < 0 && profile.Limit >= 0)
+                profile.MaxAngle = profile.Limit;
             Apply(() => profile.MaxAngle,           v => profile.MaxAngle           = v,
                   () => _data.MaxAngle,             v => _data.MaxAngle             = v,
                   "base-max-angle");

@@ -34,7 +34,7 @@ namespace MozaPlugin.UI
         private void RequestAllSettings()
         {
             _device.ReadSettings(
-                "base-limit", "base-ffb-strength", "base-torque", "base-speed",
+                "base-limit", "base-max-angle", "base-ffb-strength", "base-torque", "base-speed",
                 "base-damper", "base-friction", "base-inertia", "base-spring",
                 "main-get-damper-gain", "main-get-friction-gain",
                 "main-get-inertia-gain", "main-get-spring-gain",
