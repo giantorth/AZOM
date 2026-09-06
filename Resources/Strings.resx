@@ -89,6 +89,7 @@
   <data name="Section_Position" xml:space="preserve"><value>POSITION</value></data>
   <data name="Subtitle_LiveHandbrakeInput" xml:space="preserve"><value>// live handbrake input</value></data>
   <data name="Label_Position" xml:space="preserve"><value>Position</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Input Force</value></data>
   <data name="Section_Calibration" xml:space="preserve"><value>CALIBRATION</value></data>
   <data name="Subtitle_PullHandbrakeFully" xml:space="preserve"><value>// pull the handbrake fully once</value></data>
   <data name="Button_StartCalibration" xml:space="preserve"><value>START CALIBRATION</value></data>
@@ -182,9 +183,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Test</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Lockup</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Threshold</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Bite Point</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Engine Vibration</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frequency (hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Smoothness</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Gain</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Trigger Input Level</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibration Decay</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Onset Temperature (°C)</value></data>
@@ -711,6 +714,7 @@ Id: {2}</value></data>
   <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
   <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Upload blocked by our CDN, not your connection — use Export Bundle instead.</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
   <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
   <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
@@ -764,6 +768,17 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Torque</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Scale</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>EDIT IN STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NEW DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Open the selected dashboard in MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Create a new dashboard in MOZA Dashboard Studio, sized for the connected display</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Opened in MOZA Dashboard Studio — press Refresh when you're done to reload the library.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio not found. Install MOZA Pit House to use the dashboard editor.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Could not start MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Select a dashboard with a file on disk to edit it.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>No display info from the device yet — Studio will open without a pre-selected device.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio saves new dashboards to {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashboard library reloaded ({0} dashboards).</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Layout 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Layout</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Layout</value></data>

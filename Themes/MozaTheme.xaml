@@ -416,9 +416,73 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Vertical EQ bar variant (used by MozaEqualizer custom control) -->
-    <Style x:Key="MozaSliderVertical" TargetType="Slider" BasedOn="{StaticResource MozaSlider}">
+    <!-- Vertical slider variant — e.g. the mBooster Deadzone slider next to
+         the Pedal Feel curve editor. MozaSlider's own ControlTemplate draws
+         a fixed-height horizontal bar (Height="6", HorizontalAlignment=
+         Stretch) that doesn't reflow for Orientation="Vertical" alone, so
+         this is a genuine transposed template (Width="6" track,
+         VerticalAlignment=Stretch fill), not just an Orientation override. -->
+    <Style x:Key="MozaSliderVertical" TargetType="Slider">
+        <Setter Property="MinWidth" Value="22"/>
         <Setter Property="Orientation" Value="Vertical"/>
+        <Setter Property="Background" Value="{StaticResource BgTrackBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource CyanFillBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid HorizontalAlignment="Center" MinWidth="22">
+                        <Border x:Name="TrackBg"
+                                Width="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                HorizontalAlignment="Center"
+                                SnapsToDevicePixels="True"/>
+                        <Track x:Name="PART_Track" Orientation="Vertical"
+                               Maximum="{TemplateBinding Maximum}"
+                               Minimum="{TemplateBinding Minimum}"
+                               Value="{TemplateBinding Value}">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource MozaRepeatButtonStyle}"
+                                              Command="Slider.DecreaseLarge"
+                                              Foreground="{TemplateBinding Foreground}">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Background="{TemplateBinding Background}">
+                                                <Rectangle Margin="8,0" Width="6"
+                                                           Fill="{TemplateBinding Foreground}"
+                                                           RadiusX="2" RadiusY="2"
+                                                           Effect="{StaticResource CyanGlowSoftEffect}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Stretch"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource MozaRepeatButtonStyle}"
+                                              Command="Slider.IncreaseLarge"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource MozaThumbStyle}"
+                                       Width="22" Height="14"
+                                       Foreground="{TemplateBinding Foreground}"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ============================================================ -->
@@ -1156,11 +1220,12 @@
                       Data="{Binding Seg2Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <Path Fill="{TemplateBinding AccentBrush}" Opacity="0.55"
                       Data="{Binding Seg3Rect, RelativeSource={RelativeSource TemplatedParent}}"/>
-                <!-- Step line tracing the three segments' current values —
+                <!-- Smoothed line tracing the three segments' current values —
                      white so it reads clearly against the accent-coloured
                      bars (same convention as MozaCurveEditor's live-position
-                     overlay), giving the damping profile one continuous
-                     shape instead of three separate bars to compare by eye. -->
+                     overlay), giving the damping profile one continuous,
+                     rounded shape instead of three separate bars (or a sharp
+                     step) to compare by eye. -->
                 <Path Stroke="White" StrokeThickness="2"
                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                       Fill="{x:Null}" Opacity="0.9"

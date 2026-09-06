@@ -22,7 +22,7 @@
   <data name="Button_CalibrateCenter" xml:space="preserve"><value>ΒΑΘΜΟΝΟΜΗΣΗ ΚΕΝΤΡΟΥ</value></data>
   <data name="Brand_Mcu" xml:space="preserve"><value>MCU</value></data>
   <data name="Brand_Mosfet" xml:space="preserve"><value>MOSFET</value></data>
-  <data name="Brand_Motor" xml:space="preserve"><value>MOTOR</value></data>
+  <data name="Brand_Motor" xml:space="preserve"><value>ΜΟΤΕΡ</value></data>
   <data name="Section_CoreSettings" xml:space="preserve"><value>ΒΑΣΙΚΕΣ ΡΥΘΜΙΣΕΙΣ</value></data>
   <data name="Section_GearshiftVibration" xml:space="preserve"><value>ΔΟΝΗΣΗ ΑΛΛΑΓΗΣ ΤΑΧΥΤΗΤΑΣ</value></data>
   <data name="SliderLabel_WheelRotationAngle" xml:space="preserve"><value>Γωνία Περιστροφής Τιμονιού</value></data>
@@ -53,7 +53,7 @@
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// σύρετε τους 5 κόμβους για να διαμορφώσετε την απόκριση</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>ΓΡΑΜΜΙΚΟ</value></data>
-  <data name="Button_SCurve" xml:space="preserve"><value>S CURVE</value></data>
+  <data name="Button_SCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>ΕΚΘΕΤΙΚΟ</value></data>
   <data name="Button_Parabolic" xml:space="preserve"><value>ΠΑΡΑΒΟΛΙΚΟ</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>ΔΙΑΦΟΡΑ</value></data>
@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Δοκιμή</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Κλείδωμα</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Κατώφλι</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Σημείο συμπλέκτη</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Δόνηση κινητήρα</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Συχνότητα (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Ομαλότητα</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Ενίσχυση</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Επίπεδο ενεργοποίησης</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Απόσβεση δόνησης</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// πειραματικό — ενδέχεται να μην υποστηρίζεται από firmware mBooster</value></data>
@@ -219,8 +221,8 @@
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// Οθόνες φορτωμένες στο τιμόνι</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Κατάσταση</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Τίτλος</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
+  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Όνομα φακέλου</value></data>
+  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Άθροισμα ελέγχου</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση CoAP SDK server</value></data>
@@ -304,7 +306,7 @@
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>ΜΙΚΡΟΡΥΘΜΙΣΗ · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>ΑΚΥΡΩΣΗ</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>ΟΚ</value></data>
-  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>MOZA WHEEL BASE · AMBIENT LEDS</value></data>
+  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>ΒΑΣΗ ΤΙΜΟΝΙΟΥ MOZA · ΦΩΤΙΣΜΟΣ ΠΕΡΙΒΑΛΛΟΝΤΟΣ</value></data>
   <data name="Label_BaseModel" xml:space="preserve"><value>Μοντέλο βάσης</value></data>
   <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>Δεν εντοπίστηκαν ambient LED βάσης. Οι βάσεις R9/R12 δεν έχουν LED strip· αυτός ο πίνακας ενεργοποιείται μόνο σε βάσεις R21/R25/R27.</value></data>
   <data name="Section_Mode" xml:space="preserve"><value>ΛΕΙΤΟΥΡΓΙΑ</value></data>
@@ -343,8 +345,8 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// Εμφανίζεται όταν το RPM φτάνει στο redline</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ LED ΣΗΜΑΙΑΣ</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>ΓΩΝΙΑ ΤΙΜΟΝΙΟΥ</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>ΑΝΕΝΕΡΓΟ</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>ΕΝΕΡΓΟ</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Είσοδοι</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Πίνακας</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LED</value></data>
@@ -354,12 +356,12 @@
   <data name="TabHeader_Files" xml:space="preserve"><value>Αρχεία</value></data>
   <data name="TabHeader_Sleep" xml:space="preserve"><value>Αδράνεια</value></data>
   <data name="Status_SearchingForWheel" xml:space="preserve"><value>Αναζήτηση τιμονιού...</value></data>
-  <data name="Section_LivePaddles" xml:space="preserve"><value>LIVE PADDLES</value></data>
+  <data name="Section_LivePaddles" xml:space="preserve"><value>ΠΑΛΕΤΕΣ ΣΕ ΖΩΝΤΑΝΗ ΠΡΟΒΟΛΗ</value></data>
   <data name="Label_PaddleLeft" xml:space="preserve"><value>ΑΡΙΣΤΕΡΑ</value></data>
   <data name="Label_PaddleRight" xml:space="preserve"><value>ΔΕΞΙΑ</value></data>
   <data name="Label_PaddleCombined" xml:space="preserve"><value>ΣΥΝΔΥΑΣΜΕΝΟ</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>ΕΝΕΡΓΑ ΚΟΥΜΠΙΑ</value></data>
-  <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
+  <data name="Section_Joystick" xml:space="preserve"><value>ΧΕΙΡΙΣΤΗΡΙΟ</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// Διαμόρφωση Joystick</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Δεν έχει αναφερθεί ακόμα διαμόρφωση Joystick από το τιμόνι. Συνδέστε το τιμόνι και περιμένετε να ολοκληρωθεί η ανίχνευση.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Ενεργοποίηση τηλεμετρίας οθόνης</value></data>
@@ -604,7 +606,7 @@ Id: {2}</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Διακόπτες</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Λειτουργία διακόπτη</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Κουτί κουμπιών</value></data>
-  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
+  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Προσομοιωτής φορτηγού (ETS2/ATS)</value></data>
   <data name="Hint_StalksTruckSim" xml:space="preserve"><value>Στη λειτουργία truck sim το πρόσθετο μετατρέπει τα πατήματα των διακοπτών σε πλήκτρα πληκτρολογίου για το Euro/American Truck Simulator. Στη λειτουργία κουτιού κουμπιών οι διακόπτες λειτουργούν ως απλά κουμπιά.</value></data>
   <data name="Section_StalksKeyMapping" xml:space="preserve"><value>Αντιστοίχιση κουμπιών</value></data>
   <data name="Subtitle_StalksInteractiveMap" xml:space="preserve"><value>Πάτησε έναν διακόπτη για να επισημανθεί το κουμπί του και μετά αντιστοίχισε ένα πλήκτρο ή στάδιο υαλοκαθαριστήρων/φώτων.</value></data>
@@ -634,8 +636,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Ρόλοι πεντάλ</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Πεντάλ {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Αυτό το mBooster φιλοξενεί περισσότερα από ένα πεντάλ σε μία σύνδεση. Αντιστοιχίστε κάθε ανιχνευμένο άξονα σε μια είσοδο παιχνιδιού. Η προεπιλεγμένη σειρά ακολουθεί τη διάταξη Rx/Ry/Rz της Moza (γκάζι/φρένο/συμπλέκτης) — επαναντιστοιχίστε εδώ αν ένα πεντάλ οδηγεί λάθος είσοδο.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Ρύθμιση πεντάλ:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Αυτό το πεντάλ είναι παθητικό (χωρίς μοτέρ) — τα εφέ δόνησης δεν ισχύουν.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ ΛΕΒΙΕ</value></data>
@@ -691,27 +693,28 @@ Id: {2}</value></data>
   <data name="Hint_GForceExperimental" xml:space="preserve"><value>Πειραματικό — σπρώχνει το ίδιο το πεντάλ κάτω από το πόδι σας ανάλογα με τη ζωντανή διαμήκη επιτάχυνση (η επιτάχυνση σπρώχνει μπροστά, το φρενάρισμα πίσω), αντί να δονείται. Η Μέγιστη διαδρομή πεντάλ ορίζει πόσο μετακινείται στη μέγιστη δύναμη G· η Ταχύτητα απόκρισης ορίζει πόσο γρήγορα φτάνει το πεντάλ στη νέα θέση.</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Μέγιστη διαδρομή πεντάλ (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Ταχύτητα απόκρισης (%)</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>ΑΝΑΦΟΡΑ ΠΡΟΒΛΗΜΑΤΟΣ</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Αποστολή αναφοράς διαγνωστικών στον προγραμματιστή</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα: τι κάνατε, τι έκανε το τιμόνι ή το ταμπλό, και πότε ξεκίνησε.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Επικοινωνία (προαιρετικό — email ή Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Με την υποβολή αποστέλλεται ένα πακέτο διαγνωστικών (αρχεία καταγραφής του πρόσθετου και ίχνος σειριακής επικοινωνίας, με τα αναγνωριστικά υλικού αφαιρεμένα) στον προγραμματιστή.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Υποβολή αναφοράς σφάλματος</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Αποστολή…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Η αναφορά υποβλήθηκε. Κωδικός: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Πολλές αναφορές από τη σύνδεσή σας πρόσφατα — δοκιμάστε ξανά αργότερα.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Το πακέτο διαγνωστικών είναι πολύ μεγάλο για αποστολή.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Η αποστολή απέτυχε. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Η αποστολή μπλοκαρίστηκε από το CDN μας, όχι από τη σύνδεσή σας — χρησιμοποιήστε την Εξαγωγή πακέτου.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα πριν την υποβολή.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Καταγραφή διαγνωστικών</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Διατηρεί μικρό ίχνος της σειριακής επικοινωνίας στη μνήμη (το πρώτο λεπτό της εκκίνησης και την πρόσφατη δραστηριότητα), ώστε οι αναφορές σφαλμάτων να περιλαμβάνουν τη σύνδεση. Τίποτα δεν φεύγει από τον υπολογιστή σας μέχρι να υποβάλετε αναφορά.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Η καταγραφή διαγνωστικών είναι απενεργοποιημένη.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Εκκίνηση: {0} καρέ ({1} KB, {2}) · Κυλιόμενο: {3} καρέ ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>παγωμένο</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>πλήρωση</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Περιμένετε λίγο πριν υποβάλετε άλλη αναφορά.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Αποθήκευση του πακέτου διαγνωστικών σε αρχείο σε αυτόν τον υπολογιστή (δεν αποστέλλεται τίποτα).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Πλήκτρα παιχνιδιού</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Υαλοκαθαριστήρες εμπρός</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Υαλοκαθαριστήρες πίσω</value></data>
@@ -737,6 +740,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Δύναμη εισόδου</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ ΑΝΑ LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Αδράνεια · Σταθερό</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Αδράνεια · Αναπνοή</value></data>
@@ -756,6 +760,17 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Ροπή</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Ροπή</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Κλίμακα</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ΕΠΕΞΕΡΓΑΣΙΑ ΣΤΟ STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>ΝΕΟ DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Άνοιγμα του επιλεγμένου dashboard στο MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Δημιουργία νέου dashboard στο MOZA Dashboard Studio, στο μέγεθος της συνδεδεμένης οθόνης</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Άνοιξε στο MOZA Dashboard Studio — πατήστε Ανανέωση όταν τελειώσετε για επαναφόρτωση της βιβλιοθήκης.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Δεν βρέθηκε το MOZA Dashboard Studio. Εγκαταστήστε το MOZA Pit House για να χρησιμοποιήσετε τον επεξεργαστή.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Δεν ήταν δυνατή η εκκίνηση του MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Επιλέξτε ένα dashboard που έχει αρχείο στον δίσκο για να το επεξεργαστείτε.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Δεν υπάρχουν ακόμη πληροφορίες οθόνης από τη συσκευή — το Studio θα ανοίξει χωρίς προεπιλεγμένη συσκευή.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Το Studio αποθηκεύει τα νέα dashboards στο {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Η βιβλιοθήκη dashboard φορτώθηκε ξανά ({0} dashboards).</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Διάταξη 5+R 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Διάταξη R+5</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Διάταξη R+6</value></data>

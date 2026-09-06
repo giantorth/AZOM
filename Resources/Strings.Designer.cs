@@ -150,6 +150,7 @@ namespace MozaPlugin.Resources
         public static string Section_Position => Get("Section_Position");
         public static string Subtitle_LiveHandbrakeInput => Get("Subtitle_LiveHandbrakeInput");
         public static string Label_Position => Get("Label_Position");
+        public static string Label_InputForce => Get("Label_InputForce");
         public static string Section_Calibration => Get("Section_Calibration");
         public static string Subtitle_PullHandbrakeFully => Get("Subtitle_PullHandbrakeFully");
         public static string Button_StartCalibration => Get("Button_StartCalibration");
@@ -252,9 +253,11 @@ namespace MozaPlugin.Resources
         public static string Label_Test => Get("Label_Test");
         public static string Section_Lockup => Get("Section_Lockup");
         public static string Section_Threshold => Get("Section_Threshold");
+        public static string Section_BitePoint => Get("Section_BitePoint");
         public static string Section_EngineContinuous => Get("Section_EngineContinuous");
         public static string SliderLabel_FrequencyHz => Get("SliderLabel_FrequencyHz");
         public static string SliderLabel_Smoothness => Get("SliderLabel_Smoothness");
+        public static string SliderLabel_Gain => Get("SliderLabel_Gain");
         public static string SliderLabel_TriggerLevel => Get("SliderLabel_TriggerLevel");
         public static string SliderLabel_VibrationDecay => Get("SliderLabel_VibrationDecay");
         public static string SliderLabel_OnsetTempC => Get("SliderLabel_OnsetTempC");
@@ -772,6 +775,7 @@ namespace MozaPlugin.Resources
         public static string Status_BugReportRateLimited => Get("Status_BugReportRateLimited");
         public static string Status_BugReportTooLarge => Get("Status_BugReportTooLarge");
         public static string Status_BugReportFailed => Get("Status_BugReportFailed");
+        public static string Status_BugReportEdgeBlocked => Get("Status_BugReportEdgeBlocked");
         public static string Status_BugReportNeedDescription => Get("Status_BugReportNeedDescription");
         public static string Status_BugReportCooldown => Get("Status_BugReportCooldown");
         public static string Label_DiagnosticCapture => Get("Label_DiagnosticCapture");
@@ -824,5 +828,16 @@ namespace MozaPlugin.Resources
         public static string Option_GraphTorque => Get("Option_GraphTorque");
         public static string Label_Torque => Get("Label_Torque");
         public static string Label_GraphScale => Get("Label_GraphScale");
+        public static string Button_EditInStudio => Get("Button_EditInStudio");
+        public static string Button_NewDashboard => Get("Button_NewDashboard");
+        public static string Tooltip_EditInStudio => Get("Tooltip_EditInStudio");
+        public static string Tooltip_NewDashboard => Get("Tooltip_NewDashboard");
+        public static string Studio_Launched => Get("Studio_Launched");
+        public static string Studio_NotInstalled => Get("Studio_NotInstalled");
+        public static string Studio_LaunchFailed => Get("Studio_LaunchFailed");
+        public static string Studio_NoEditablePath => Get("Studio_NoEditablePath");
+        public static string Studio_NoDeviceInfo => Get("Studio_NoDeviceInfo");
+        public static string Studio_NewDashboardSavesTo => Get("Studio_NewDashboardSavesTo");
+        public static string Studio_LibraryReloaded => Get("Studio_LibraryReloaded");
     }
 }

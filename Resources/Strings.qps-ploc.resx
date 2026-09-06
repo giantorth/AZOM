@@ -181,9 +181,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Ruff!</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Bark-point!</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Wroof!</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Snarf!</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Yap!</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Vroom!</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Grr!</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Yap!</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Grrowl!</value></data>
@@ -694,6 +696,7 @@
   <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Arf Awoo Bark Wan!</value></data>
   <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Wuff Howl Ruff!</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Ruff Arf Yap!</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Arf Rrrf Bark Yap Woof!</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Yap Bork!</value></data>
   <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Yip!</value></data>
   <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Rrrf Barff Yowff Grr Ruff Wan!</value></data>
@@ -728,6 +731,7 @@
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Bark Arf!</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>WOOF PER PUP!</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Nap · Barff!</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Nap · Howl!</value></data>
@@ -747,6 +751,17 @@
   <data name="Option_GraphTorque" xml:space="preserve"><value>Growl!</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Yap!</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Ruff!</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>SNIFF!</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>WOOF…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Awoo Bork Yip Wuff MOZA Dashboard Studio!</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Yowl Wan Snarf Grrowl MOZA Dashboard Studio Arf Howl!</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Wuff MOZA Dashboard Studio Yip Yip — Bork Awoo Snarf Howl!</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Grrowl MOZA Dashboard Studio Wan Wan. Snarf MOZA Pit House Yowl!</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Yelp MOZA Dashboard Studio Wuff: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Bork Wan Yip Snarf Awoo!</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Wan Wan Yowl — Studio Grrowl Arf Howl!</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio Wuff Bork Yip {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Snarf Awoo Bork ({0} Wuff).</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Arf!</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Woof!</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Yip!</value></data>

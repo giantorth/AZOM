@@ -45,6 +45,26 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
+        /// BITE POINT (Clutch-only) — same oscillating-pulse shape as
+        /// <see cref="SynthesizeAbs"/> (identical formula, own function so
+        /// each effect can be tuned/verified independently later, same
+        /// rationale as <see cref="SynthesizeTractionControl"/>). Not a
+        /// protocol-verified reference — a deliberate reuse of ABS's
+        /// already-tuned "feel" for a tactile engagement cue, gated by
+        /// pedal position rather than a wheel-slip/activation signal (see
+        /// MBoosterEffectWorker.UpdateBitePointRequest).
+        /// </summary>
+        public static double SynthesizeBitePoint(double intensity, double phase, double smoothness01)
+        {
+            if (double.IsNaN(smoothness01)) smoothness01 = 1.0;
+            else if (smoothness01 < 0) smoothness01 = 0;
+            else if (smoothness01 > 1) smoothness01 = 1;
+            double depth = 0.5 - 0.4 * smoothness01;
+            double wave = (1.0 - depth) + depth * Math.Sin(phase);
+            return wave * intensity;
+        }
+
+        /// <summary>
         /// TRACTION CONTROL — same oscillating-pulse shape as
         /// <see cref="SynthesizeAbs"/> (identical formula, own function so
         /// each effect can be tuned/verified independently later). Unlike

@@ -6,6 +6,25 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Added
 
+- **Custom images in dashboards you author now upload.** Dashboard Studio keeps widget
+  images in MOZA's shared image pool rather than beside the `.mzdash`, so the uploader
+  only ever found images for dashboards downloaded from the wheel; anything you added in
+  Studio was silently dropped and rendered blank. It now searches both locations, and logs
+  every path it tried when an image really is missing.
+- **The dashboard library populates on first launch** instead of staying empty until you
+  pressed Refresh. The picker seeded itself before the library had finished loading and
+  then latched; it now re-seeds as the library fills in.
+- **Edit dashboards in MOZA Dashboard Studio.** The Files tab can open the selected
+  dashboard directly in MOZA's editor, or start a new one already sized for the connected
+  display. Needs MOZA Pit House installed; the buttons stay disabled when it isn't.
+  The dashboard library refreshes on its own a few seconds after you save in Studio.
+- **The dashboard library now includes MOZA Dashboard Studio's own folder** as well as the one
+  you configured, so a dashboard you just authored in Studio shows up without repointing
+  anything. Neither folder is a superset of the other; on a duplicate name your configured
+  folder wins. The Files tab lists every folder the library reads.
+- **The Files tab remembers your upload source.** The local-file / dashboard-library choice,
+  the selected library dashboard, and the folder the file picker opens in now persist across
+  tab switches and restarts.
 - **Master Channel Defaults editor.** One dialog (Dashboard tab → Master Defaults) sets the
   plugin-wide default mapping for every telemetry channel, with the same property picker and
   ƒ(x) formula editor as the per-dashboard list. Per-dashboard overrides still win.

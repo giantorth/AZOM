@@ -37,9 +37,9 @@ namespace MozaPlugin.Protocol
         Ab9TriggerRpm = 14,      // 0x0D start of the engine-vib sine (RPM-tracked)
         Ab9TriggerExtra = 15,    // spare 0x0D lane
         Ab9LowRate = 16,         // unused — 0x08 shift constant-force rides the one-shot FIFO
-        // mBooster motor-write lane (single slot per connection; the worker
-        // emits one frame per ~20 ms tick across all four effects, so a
-        // shared lane is sufficient — latest-wins on the writer-lag edge).
+        // mBooster motor-write lane for pedal axis 0. Each axis runs its own
+        // worker and needs its OWN latest-wins lane — see MBoosterEffectAxis1/2
+        // at 44+ for the chained axes.
         MBoosterEffect = 17,
 
         // ── LED lanes (absolute slots 29+) ───────────────────────────────────
@@ -88,6 +88,20 @@ namespace MozaPlugin.Protocol
         BaseLfeEngine = 41,   // wire id 1
         BaseLfeAbs = 42,      // wire id 2
         BaseLfeOsc0 = 43,     // wire id 0 (continuous-tone lane; ShakeIt only)
+
+        // ── mBooster chained-axis motor lanes (absolute slots 44+) ───────────
+        // One lane per pedal axis. Axis 0 keeps MBoosterEffect (17); a CHAINED
+        // lane's axes 1/2 get these. Every axis runs its own effect worker at
+        // ~50 Hz, but there used to be only the single slot at 17, so the
+        // non-primary axes were shunted onto the paced one-shot FIFO instead
+        // (MBoosterEffectWorker.SendMotor). That FIFO delivers EVERY frame
+        // while the stream lane coalesces latest-wins, so a chained brake got
+        // the full 50 Hz noise stream while the throttle on the stream lane
+        // dropped frames whenever the write loop lagged — the brake's Road
+        // Texture felt far stronger than the throttle's for identical
+        // settings. Same transport for every axis now.
+        MBoosterEffectAxis1 = 44,
+        MBoosterEffectAxis2 = 45,
     }
 
     /// <summary>Device family targeted by the serial probe fallback (registry-empty case).</summary>
@@ -137,11 +151,12 @@ namespace MozaPlugin.Protocol
         //            FIFO (the rim drops unpaced bursts). See the LED StreamKind members.
         //   41..43 — wheelbase LFE lanes (the three summed host-rendered oscillator
         //            streams: engine id1, ABS id2, Osc0 id0).
+        //   44..45 — mBooster chained-axis motor lanes (axes 1/2; axis 0 is slot 17).
         // A CM2 on its own USB connection runs at base 0 on THAT connection, so the
         // second block is only used when two pipelines share one connection.
         // NOTE: keep this >= (highest StreamKind + 1). The static ctor below
         // asserts the regions are disjoint and fit.
-        private const int StreamSlotCount = 44;
+        private const int StreamSlotCount = 46;
 
         // Startup slot-layout invariant: the LED lanes (29+) must not alias the
         // wheel value pipeline (0..10), AB9/mBooster (11..17), or the CM2 second
@@ -157,11 +172,16 @@ namespace MozaPlugin.Protocol
                 "LED stream slots must start after the CM2 value pipeline (18..28)");
             System.Diagnostics.Debug.Assert(ledLast < StreamSlotCount,
                 "StreamSlotCount too small for the LED stream slots");
-            const int lfeLast = (int)StreamKind.BaseLfeOsc0;     // 43 (highest slot overall)
+            const int lfeLast = (int)StreamKind.BaseLfeOsc0;     // 43
             System.Diagnostics.Debug.Assert(lfeLast > ledLast,
                 "wheelbase LFE stream slots must start after the LED lanes");
             System.Diagnostics.Debug.Assert(lfeLast < StreamSlotCount,
                 "StreamSlotCount too small for the wheelbase LFE stream slots");
+            const int mbLast = (int)StreamKind.MBoosterEffectAxis2; // 45 (highest slot overall)
+            System.Diagnostics.Debug.Assert((int)StreamKind.MBoosterEffectAxis1 > lfeLast,
+                "mBooster chained-axis stream slots must start after the LFE lanes");
+            System.Diagnostics.Debug.Assert(mbLast < StreamSlotCount,
+                "StreamSlotCount too small for the mBooster chained-axis stream slots");
         }
 
         // Ports held by a live connection — probe path skips these (Wine pty
@@ -229,6 +249,52 @@ namespace MozaPlugin.Protocol
         // never enter the cross-thread-dispose crash window. Keyed by port name.
         private static readonly ConcurrentDictionary<string, byte> _probeInFlight =
             new ConcurrentDictionary<string, byte>();
+
+        // Per-port blocked-probe backoff. A port whose Open() keeps hanging (a
+        // non-MOZA CDC device, or one another process holds open) used to be
+        // re-probed on every sweep forever.
+        //
+        // The interval is CAPPED, never retired: probing a port must never stop
+        // permanently. The whole reason ProbeWithTimeout abandons threads is the
+        // Wine freshly-powered-base wedge, where Open() hangs on a port that IS
+        // a MOZA base and only opens in time a few sweeps later. A give-up rule
+        // would blind exactly that port for the rest of the session, and the
+        // abandoned thread's late (responded, reachable) cannot rescue it — on
+        // the timeout path it lands in locals of a call that already returned.
+        //
+        // Keyed per PORT, not per ProbeKind: a wedged Open() is a property of
+        // the port. The value is immutable and replaced wholesale, so a
+        // concurrent reader on another lane's reconnect timer sees one reference,
+        // never a torn pair. Written only from the probe sweep (reconnect-timer
+        // ThreadPool callback) — ConcurrentDictionary, no lock, per the hard rule
+        // in docs/DEVELOPMENT.md § Threading model.
+        private static readonly ConcurrentDictionary<string, ProbeBackoff> _probeBackoff =
+            new ConcurrentDictionary<string, ProbeBackoff>();
+
+        private sealed class ProbeBackoff
+        {
+            public readonly int Consecutive;
+            public readonly DateTime NextEligibleUtc;
+
+            public ProbeBackoff(int consecutive, DateTime nextEligibleUtc)
+            {
+                Consecutive = consecutive;
+                NextEligibleUtc = nextEligibleUtc;
+            }
+        }
+
+        private const int ProbeBackoffBaseMs = 10_000;
+        private const int ProbeBackoffMaxMs = 300_000;
+
+        /// <summary>Retry interval after <paramref name="consecutive"/> blocked
+        /// probe cycles: ProbeBackoffBaseMs doubled per cycle, capped at
+        /// ProbeBackoffMaxMs. The shift is clamped so a long-lived wedge can't
+        /// overflow it.</summary>
+        private static long ProbeBackoffFor(int consecutive)
+        {
+            int steps = Math.Min(Math.Max(consecutive, 1) - 1, 20);
+            return Math.Min((long)ProbeBackoffBaseMs << steps, ProbeBackoffMaxMs);
+        }
 
         // Priority lane: unpaced FIFO for tiny, time-critical frames (fc:00 session
         // acks). Drained ahead of one-shot every WriteLoop iteration so an ack
@@ -1753,6 +1819,12 @@ namespace MozaPlugin.Protocol
                 return nb.CompareTo(na); // Descending - check high ports first
             });
 
+            // Reset blocked-probe backoff for ports that have left the
+            // enumeration since the last sweep: an unplug/replug may be
+            // different hardware, so it starts over at the full probe cadence
+            // instead of inheriting a widened interval.
+            PruneProbeBackoff(ports);
+
             // Saved-port hint: probe the remembered port first so registry-less
             // discovery (Wine/Proton) revalidates it before sweeping the full
             // list. The probe reply still decides — a different device on that
@@ -1961,6 +2033,15 @@ namespace MozaPlugin.Protocol
             // abandoned at the deadline (see _probeInFlight docs) and self-cleans
             // when the syscall finally returns.
 
+            // Blocked-probe backoff (see _probeBackoff). Silent while the
+            // interval is unexpired — suppressing the per-sweep spam is the
+            // whole point. Getting past this line therefore means we are on the
+            // FIRST attempt of a backoff step, which is what keeps the two
+            // MozaLog.Debug lines below to one-per-step instead of twice-per-sweep.
+            _probeBackoff.TryGetValue(portName, out var backoff);
+            if (backoff != null && DateTime.UtcNow < backoff.NextEligibleUtc)
+                return (false, false);
+
             // A prior probe on this port hung in Open() and was abandoned (see
             // _probeInFlight docs). Its SerialPort still owns the OS handle, so
             // a new Open() here would fail anyway — and, more importantly,
@@ -1968,9 +2049,11 @@ namespace MozaPlugin.Protocol
             // a not-ready CDC-ACM port. Skip until that thread self-cleans.
             if (_probeInFlight.ContainsKey(portName))
             {
-                MozaLog.Debug(
-                    $"[AZOM] Probe {portName}: skipped — a prior probe is still " +
-                    "blocked in Open() (port not ready); will retry once it clears.");
+                // The prior probe's Open() still has not returned. Count it as
+                // another blocked cycle so a permanently-wedged port widens its
+                // interval instead of relogging this on every sweep.
+                NoteProbeBlocked(portName, backoff,
+                    "skipped — a prior probe is still blocked in Open() (port not ready)");
                 return (false, false);
             }
 
@@ -2021,12 +2104,63 @@ namespace MozaPlugin.Protocol
                 // thread, removes the in-flight marker) when the syscall finally
                 // returns; until then this port is skipped above. The thread is
                 // IsBackground, so it never blocks process exit.
-                MozaLog.Debug(
-                    $"[AZOM] Probe {portName}: timed out after {timeoutMs}ms — abandoning " +
-                    "blocked probe thread (not force-closing cross-thread; port marked in-flight).");
+                NoteProbeBlocked(portName, backoff,
+                    $"timed out after {timeoutMs}ms — abandoning blocked probe thread " +
+                    "(not force-closing cross-thread; port marked in-flight)");
                 return (false, false);
             }
+
+            // Open() returned inside the deadline, so the port is responsive
+            // whatever it answered — clear any backoff it had accumulated. A
+            // slow-but-real port (the Wine freshly-powered-base case the abandon
+            // path exists for) recovers its full probe cadence here.
+            _probeBackoff.TryRemove(portName, out _);
             return (responded, reachable);
+        }
+
+        /// <summary>
+        /// Record a blocked/timed-out probe cycle for <paramref name="portName"/>
+        /// and widen its retry interval. Logs once per widening step — callers
+        /// only get here after the previous window expired — and goes quiet once
+        /// the interval reaches its ceiling, while still retrying at that
+        /// interval forever (the port is never given up on).
+        /// </summary>
+        private static void NoteProbeBlocked(string portName, ProbeBackoff? prior, string what)
+        {
+            int n = (prior?.Consecutive ?? 0) + 1;
+            long ms = ProbeBackoffFor(n);
+            bool wasAlreadyCapped = prior != null && ProbeBackoffFor(prior.Consecutive) >= ProbeBackoffMaxMs;
+
+            _probeBackoff[portName] = new ProbeBackoff(n, DateTime.UtcNow.AddMilliseconds(ms));
+
+            if (wasAlreadyCapped) return;   // ceiling already announced — stay quiet
+
+            if (ms < ProbeBackoffMaxMs)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Probe {portName}: {what} — next attempt in {ms / 1000}s (blocked {n}).");
+                return;
+            }
+
+            MozaLog.Debug(
+                $"[AZOM] Probe {portName}: {what} — blocked {n} times; settling at one attempt " +
+                $"every {ms / 1000}s and logging no further. Likely not a MOZA port, or held " +
+                "open by another process.");
+        }
+
+        /// <summary>
+        /// Drop backoff entries for ports no longer in the enumeration, so an
+        /// unplug/replug returns to the full probe cadence.
+        /// </summary>
+        private static void PruneProbeBackoff(string[] currentPorts)
+        {
+            if (_probeBackoff.IsEmpty) return;
+            // ConcurrentDictionary.Keys is a snapshot — safe to remove while iterating.
+            foreach (var known in _probeBackoff.Keys)
+            {
+                if (Array.IndexOf(currentPorts, known) < 0)
+                    _probeBackoff.TryRemove(known, out _);
+            }
         }
 
         private static int ExtractPortNumber(string portName)

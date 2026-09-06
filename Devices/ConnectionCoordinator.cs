@@ -128,6 +128,11 @@ namespace MozaPlugin.Devices
                 // The serial port may have dropped during a wheel swap.
                 if (_detectionState.NewWheelDetected || _detectionState.OldWheelDetected)
                     _plugin.ResetWheelDetection("Serial reconnecting — resetting wheel detection");
+                // Keyed on the BASE latch, not the wheel flags: an earlier rim reset
+                // may have cleared those already, and the base must still re-probe on
+                // the new port. Self-skips when a caller above already reset it.
+                if (_detectionState.BaseDetected)
+                    _plugin.ResetBaseDetection("Serial reconnecting — resetting base detection");
 
                 if (_connection.Connect())
                 {
@@ -490,13 +495,9 @@ namespace MozaPlugin.Devices
             // must re-land on the base-aux pipe. Clear base flags so the base-aux
             // prober re-detects (mirrors OnBaseDisconnected's intent without losing
             // the physical base — it's still plugged in).
-            _detectionState.BaseDetected = false;
-            _detectionState.BaseAmbientLedSupported = false;
-            _detectionState.BaseAmbientProbed = false;
-            _detectionState.BaseEq10Probed = false;
-            _detectionState.BaseFwVersionLogged = false;
-            _detectionState.BaseFwVersionProbeRetries = 0;
+            _detectionState.ResetBase();
             _detectionState.BaseOwner = null;
+            _data.ClearBaseIdentity();
             _data.BaseSettingsRead = false;
             try { _plugin.PendingResponses.Clear(); } catch { }
 
@@ -791,13 +792,9 @@ namespace MozaPlugin.Devices
         internal void OnBaseDisconnected()
         {
             if (MozaPlugin.IsShuttingDown) return;
-            _detectionState.BaseDetected = false;
-            _detectionState.BaseAmbientLedSupported = false;
-            _detectionState.BaseAmbientProbed = false;
-            _detectionState.BaseEq10Probed = false;
-            _detectionState.BaseFwVersionLogged = false;
-            _detectionState.BaseFwVersionProbeRetries = 0;
+            _detectionState.ResetBase();
             _data.IsBaseConnected = false;
+            _data.ClearBaseIdentity();
             _data.BaseSettingsRead = false;
             var baseDm = _baseManager?.DeviceManager;
             if (baseDm != null && ReferenceEquals(_detectionState.BaseOwner, baseDm))

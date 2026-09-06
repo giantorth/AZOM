@@ -94,10 +94,10 @@ namespace MozaPlugin.Devices.MBooster
         // (mbooster-brake-threshold); -1 until it answers. Live only, never
         // persisted and never copied into MBoosterDeviceSettings.MaxThresholdKg:
         // that field's -1 means "user set no override", and seeding it would make
-        // the plugin start writing the value back on every connect. Used purely as
-        // ApplyDeadzoneAndMaxForce's fullScaleKg reference in place of the old
-        // hardcoded 200kg guess. Volatile: written on the serial read thread, read
-        // by the HID thread and the UI.
+        // the plugin start writing the value back on every connect. Surfaced in
+        // Diagnostics (see DiagnosticsTextBuilder) as a read-back sanity check.
+        // Volatile: written on the serial read thread, read by the HID thread
+        // and the UI.
         private volatile float _deviceReportedMaxThresholdKg = -1;
         public float DeviceReportedMaxThresholdKg
         {
@@ -246,8 +246,22 @@ namespace MozaPlugin.Devices.MBooster
         // Per-axis pre-input-curve percent (0..100) — the same signal as
         // LastRawPercentPreCurve (after deadzone/max-force, before the input
         // curve) but for EVERY pedal, so the settings tab's live curve markers
-        // track whichever pedal is selected, not just the master.
+        // track whichever pedal is selected, not just the master. NOTE: since
+        // MozaMBoosterRegistry.OnHidAxisUpdate added the host-side Max
+        // Threshold rescale, this is "% of Threshold's span" (the Sim Input
+        // Mapping curve's own input domain) — see LastAxisRawPercentPreThreshold
+        // below for the true raw reading (% of Max Force's span) instead.
         public readonly double[] LastAxisRawPercentPreCurve = new double[MaxAxes];
+
+        // Per-axis TRUE raw HID percent (0..100), captured BEFORE the host-side
+        // Max Threshold rescale (see MozaMBoosterRegistry.OnHidAxisUpdate) —
+        // i.e. genuinely "% of Max Force's own hardware ceiling", the physical
+        // force the user is actually applying to the pedal. This is the
+        // Pedal Feel curve's real input domain (Deadzone-Max Force span), and
+        // what the "Input Force" live label/marker should show — unlike
+        // LastAxisRawPercentPreCurve, which is now post-Threshold-rescale and
+        // represents the Sim Input Mapping curve's own (different) domain.
+        public readonly double[] LastAxisRawPercentPreThreshold = new double[MaxAxes];
 
         // Highest axis index + 1 the HID has reported for this lane: 1 for a
         // lone pedal, up to 3 for a full chain. 0 until the first axis update.
@@ -1121,13 +1135,30 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Send a motor-write frame via the latest-wins stream lane (worker
         /// path). Stream lane coalesces stale frames if writer lag piles up,
-        /// which is the correct behaviour at 50 Hz cadence.
+        /// which is the correct behaviour at 50 Hz cadence. Each pedal axis
+        /// gets its OWN lane so a chained lane's axes can't coalesce each
+        /// other away — and so every axis gets identical delivery. Routing an
+        /// axis to the one-shot FIFO instead is what made a chained brake's
+        /// Road Texture far stronger than the throttle's (see the
+        /// MBoosterEffectAxis1/2 comment in StreamKind).
         /// </summary>
-        public void SendMotorStream(byte[] frame)
+        public void SendMotorStream(byte[] frame, int axisIndex)
         {
             if (frame == null || !_connection.IsConnected) return;
-            _connection.SendStream(StreamKind.MBoosterEffect, frame);
+            _connection.SendStream(StreamSlotForAxis(axisIndex), frame);
         }
+
+        /// <summary>Per-axis motor stream lane. Axes beyond the mapped ones
+        /// share axis 0's lane — the device only ever drives three motor ids
+        /// (MozaMBoosterProtocol.MotorDeviceIds), so that branch is unreachable
+        /// today and only guards a future axis-count bump from an out-of-range
+        /// slot (which SendStream would drop with a loud warning).</summary>
+        private static StreamKind StreamSlotForAxis(int axisIndex) => axisIndex switch
+        {
+            1 => StreamKind.MBoosterEffectAxis1,
+            2 => StreamKind.MBoosterEffectAxis2,
+            _ => StreamKind.MBoosterEffect,
+        };
 
         /// <summary>
         /// Send a one-shot (typically a disable or test-fire frame) via the
@@ -1182,34 +1213,57 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
-        /// EXPERIMENTAL / unverified — resend the output curve at 7
-        /// breakpoints (<c>mbooster-brake-curve7-*</c>, cmdId 0xAB) after a
-        /// real hardware calibration write. pedal_travel.pcapng showed Pit
-        /// House doing exactly this alongside a Travel Start write, and
-        /// omitting it is what made Travel Start/End silently no-op on
-        /// hardware despite the raw register write reading back fine — see
-        /// MozaCommandDatabase.cs's mbooster-brake-curve7-* comment. Callers
-        /// use this after any of Travel/Endstop/Ratio/Threshold's own writes
-        /// on the theory that the same firmware requirement applies to all of
-        /// them, not just Travel — unconfirmed for the others.
+        /// Write Deadzone, Max Force, and the Pedal Feel curve's 6 nodes on
+        /// BOTH axes between them (cmdId 0xAB selectors 0x01-0x0E) as one
+        /// atomic burst — CONFIRMED real hardware calibration. The Y half
+        /// (selectors 0x07-0x0E: Deadzone, 6 nodes, Max Force) is reverse-
+        /// engineered from max-force-24-75-128-166-200.pcapng and
+        /// deadzone-0-5-11-14.pcapng (bug bundle 5VR5AQ8Y): every Deadzone or
+        /// Max Force change in both captures resent the whole 8-value family
+        /// together, not just the field that moved — same "no partial
+        /// update" shape as Segmented Damping. The X half (selectors
+        /// 0x01-0x06, one per node) is reverse-engineered from
+        /// pedal-feel-node{2,5}-{x,y}-adjust.pcapng: every isolated single-
+        /// node drag (on EITHER axis) wrote that node's X selector and its Y
+        /// selector together, X first — sent here in the same order for
+        /// consistency, though a full resync's exact intra-burst ordering is
+        /// unconfirmed to matter. All fields use the identical kg encoding
+        /// as Max Threshold (<see cref="MozaMBoosterProtocol.EncodeThresholdKg"/>).
+        /// <paramref name="inputCurveY"/>/<paramref name="inputCurveX"/> are
+        /// the Pedal Feel curve's own 6 user-adjustable nodes per axis
+        /// (0-100%, null/wrong-length = use the default Linear shape) — Y is
+        /// a percentage of the Deadzone-Max Force span, X of the fixed
+        /// 0-200kg full scale (the two axes are NOT interchangeable — see
+        /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveY"/> and
+        /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveX"/>).
         /// </summary>
-        public void PushCurve7Resync(float[]? curveX, float[]? curveY, byte device)
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device)
         {
-            var curve7 = MozaMBoosterRegistry.ResampleCurveAtSevenths(curveX, curveY);
-            for (int i = 0; i < curve7.Length; i++)
-                SendIntWrite($"mbooster-brake-curve7-{i + 1}", MozaMBoosterProtocol.EncodeCurve7Point(curve7[i]), device);
+            SendIntWrite("mbooster-brake-deadzone", MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg), device);
+            var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
+            var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
+            for (int i = 0; i < midY.Length; i++)
+            {
+                SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midX[i]), device);
+                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midY[i]), device);
+            }
+            SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
         }
 
         // ── Coalescing gate for UI-driven calibration writes ──
-        // A slider raises ValueChanged per tick, and every one of these commands
-        // is a flash-backed calibration register that additionally drags a
-        // 6-frame PushCurve7Resync burst behind it. Bundle KY3HK4QP shows what
-        // that costs unthrottled: a ~2 s Max Threshold drag emitted 77 threshold
-        // + 462 curve7 frames, ~40 writes/second into flash. So UI writes are
-        // parked in a latest-wins slot per (device, command) and flushed once the
-        // user stops moving, collapsing a whole drag into one write set. Same
-        // pending+coalesce+throttle shape HardwareApplier.QueueWheelCfgWrite uses
-        // for the wheel's own flash-backed writes, minus its change cache.
+        // A slider raises ValueChanged per tick, and every one of these
+        // commands is a flash-backed calibration register — writing it on
+        // every tick of a drag would hammer flash unnecessarily. (An
+        // earlier design also dragged a 6-frame curve7 resync behind every
+        // write here, motivated by bundle KY3HK4QP's "~2s Max Threshold
+        // drag emitted 77 threshold + 462 curve7 frames" cost — that resync
+        // was later removed as unconfirmed/unneeded, but the coalescing
+        // below is still worth it purely for the primary writes.) UI writes
+        // are parked in a latest-wins slot per (device, command) and
+        // flushed once the user stops moving, collapsing a whole drag into
+        // one write set. Same pending+coalesce+throttle shape
+        // HardwareApplier.QueueWheelCfgWrite uses for the wheel's own
+        // flash-backed writes, minus its change cache.
         //
         // The connect-time apply (MozaPlugin.ApplyMBoosterToHardware) deliberately
         // does NOT go through this — it fires once and must not be deferred.
@@ -1539,6 +1593,15 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (on && !_connection.IsConnected) return;
             WorkerFor(pedalIndex)?.SetThresholdTestSustained(on);
+        }
+
+        /// <summary>Turn Bite Point's (Clutch-only) sustained test toggle on/off for
+        /// pedal <paramref name="pedalIndex"/> — same live-tracking and always-allow-off
+        /// semantics as SetThresholdTestActive.</summary>
+        public void SetBitePointTestActive(bool on, int pedalIndex = 0)
+        {
+            if (on && !_connection.IsConnected) return;
+            WorkerFor(pedalIndex)?.SetBitePointTestSustained(on);
         }
 
         /// <summary>

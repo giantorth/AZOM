@@ -22,7 +22,7 @@
   <data name="Button_CalibrateCenter" xml:space="preserve"><value>HIỆU CHỈNH TÂM</value></data>
   <data name="Brand_Mcu" xml:space="preserve"><value>MCU</value></data>
   <data name="Brand_Mosfet" xml:space="preserve"><value>MOSFET</value></data>
-  <data name="Brand_Motor" xml:space="preserve"><value>MOTOR</value></data>
+  <data name="Brand_Motor" xml:space="preserve"><value>ĐỘNG CƠ</value></data>
   <data name="Section_CoreSettings" xml:space="preserve"><value>CÀI ĐẶT CHÍNH</value></data>
   <data name="Section_GearshiftVibration" xml:space="preserve"><value>RUNG SANG SỐ</value></data>
   <data name="SliderLabel_WheelRotationAngle" xml:space="preserve"><value>Góc xoay vô lăng</value></data>
@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Thử</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Khóa bánh</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Ngưỡng</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Điểm bắt côn</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Rung động cơ</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Tần số (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Độ mượt</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Độ khuếch đại</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Mức kích hoạt đầu vào</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Độ suy giảm rung</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// thử nghiệm — có thể không được firmware mBooster áp dụng</value></data>
@@ -635,8 +637,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Vai trò bàn đạp</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Bàn đạp {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>mBooster này lưu trữ nhiều bàn đạp trên một kết nối. Gán mỗi trục được phát hiện cho một đầu vào trò chơi. Thứ tự mặc định theo bố cục Rx/Ry/Rz của Moza (ga/phanh/côn) — gán lại tại đây nếu một bàn đạp điều khiển sai đầu vào.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Cấu hình bàn đạp:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Bàn đạp này là loại thụ động (không có động cơ) — hiệu ứng rung không áp dụng.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>CÀI ĐẶT CẦN SỐ</value></data>
@@ -692,27 +694,28 @@ Id: {2}</value></data>
   <data name="Hint_GForceExperimental" xml:space="preserve"><value>Thử nghiệm — đẩy chính bàn đạp dưới chân bạn tỷ lệ với lực G dọc theo thời gian thực (tăng tốc đẩy về phía trước, phanh đẩy về phía sau), thay vì rung. Hành trình bàn đạp tối đa đặt mức di chuyển ở lực G tối đa; Tốc độ phản hồi đặt tốc độ bàn đạp đạt tới vị trí mới.</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Hành trình bàn đạp tối đa (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Tốc độ phản hồi (%)</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>BÁO CÁO SỰ CỐ</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Gửi báo cáo chẩn đoán cho người phát triển</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Mô tả sự cố</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Mô tả sự cố: bạn đã làm gì, vô lăng hoặc màn hình đã làm gì, và nó bắt đầu khi nào.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Liên hệ (không bắt buộc — email hoặc Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Khi gửi, một gói chẩn đoán (bản ghi plugin và dấu vết cổng nối tiếp, đã ẩn định danh phần cứng) sẽ được tải lên cho người phát triển plugin.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Gửi báo cáo lỗi</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Đang tải lên…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Đã gửi báo cáo. Mã tham chiếu: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Gần đây có quá nhiều báo cáo từ kết nối của bạn — vui lòng thử lại sau.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Gói chẩn đoán quá lớn để tải lên.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Tải lên thất bại. Vui lòng kiểm tra kết nối và thử lại.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Việc tải lên bị CDN của chúng tôi chặn, không phải do kết nối của bạn — hãy dùng Xuất gói.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Vui lòng mô tả sự cố trước khi gửi.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Bản ghi chẩn đoán</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Giữ một dấu vết nhỏ của lưu lượng cổng nối tiếp trong bộ nhớ (phút đầu khi khởi động cùng hoạt động gần đây) để báo cáo lỗi bao gồm quá trình kết nối. Không có gì rời khỏi máy của bạn cho đến khi bạn gửi báo cáo.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Bản ghi chẩn đoán đang tắt.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Khởi động: {0} khung ({1} KB, {2}) · Liên tục: {3} khung ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>đã đóng băng</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>đang lấp</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Vui lòng đợi một chút trước khi gửi báo cáo khác.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Lưu gói chẩn đoán thành tệp trên máy này (không tải lên gì cả).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Phím trò chơi</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Gạt mưa tiến</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Gạt mưa lùi</value></data>
@@ -738,6 +741,7 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Lực đầu vào</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>MÀU THEO TỪNG LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Chờ · Cố định</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Chờ · Nhịp thở</value></data>
@@ -757,6 +761,17 @@ Id: {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Mô-men xoắn</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Mô-men xoắn</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Tỷ lệ</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>SỬA TRONG STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>BẢNG ĐIỀU KHIỂN MỚI…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Mở bảng điều khiển đã chọn trong MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Tạo bảng điều khiển mới trong MOZA Dashboard Studio, đúng kích thước màn hình đang kết nối</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Đã mở trong MOZA Dashboard Studio — xong thì bấm Làm mới để nạp lại thư viện.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Không tìm thấy MOZA Dashboard Studio. Cài MOZA Pit House để dùng trình chỉnh sửa bảng điều khiển.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Không khởi động được MOZA Dashboard Studio: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Chọn một bảng điều khiển có tệp trên đĩa để chỉnh sửa.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Chưa có thông tin màn hình từ thiết bị — Studio sẽ mở mà không chọn sẵn thiết bị.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lưu bảng điều khiển mới vào {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Đã nạp lại thư viện bảng điều khiển ({0} bảng).</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Bố cục 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Bố cục</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Bố cục</value></data>

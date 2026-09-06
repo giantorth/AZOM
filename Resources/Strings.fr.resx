@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Tester</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Blocage</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Seuil</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Point de patinage</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Vibration moteur</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Fréquence (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Douceur</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Gain</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Niveau de déclenchement</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Décroissance de la vibration</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// expérimental — peut ne pas être pris en compte par le firmware du mBooster</value></data>
@@ -343,8 +345,8 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// affichées au passage en zone rouge</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>COULEURS LED DES DRAPEAUX</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>ANGLE DU VOLANT</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>ARRÊT</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>MARCHE</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Entrées</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Tableau de bord</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LEDs</value></data>
@@ -635,8 +637,8 @@ Id : {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Rôles des pédales</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Pédale {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Ce mBooster héberge plusieurs pédales sur une seule connexion. Attribuez chaque axe détecté à une entrée de jeu. L'ordre par défaut suit la disposition Rx/Ry/Rz de Moza (accélérateur/frein/embrayage) — réattribuez ici si une pédale pilote la mauvaise entrée.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configurer la pédale :</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Cette pédale est passive (sans moteur) — les effets de vibration ne s'appliquent pas.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>RÉGLAGES DU LEVIER</value></data>
@@ -692,27 +694,28 @@ Id : {2}</value></data>
   <data name="Hint_GForceExperimental" xml:space="preserve"><value>Expérimental — pousse la pédale elle-même sous votre pied proportionnellement à la G longitudinale en temps réel (accélérer pousse vers l'avant, freiner vers l'arrière), au lieu de vibrer. Course maximale de la pédale définit son déplacement à pleine G ; Vitesse de réponse définit la rapidité avec laquelle la pédale atteint la nouvelle position.</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Course maximale de la pédale (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Vitesse de réponse (%)</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>SIGNALER UN PROBLÈME</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Envoyer un rapport de diagnostic au développeur</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Décrivez le problème</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Décrivez le problème : ce que vous avez fait, ce que le volant ou le tableau de bord a fait, et quand cela a commencé.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (facultatif — e-mail ou Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>L'envoi transmet une archive de diagnostic (journaux du plugin et une trace série, identifiants matériels masqués) au développeur du plugin.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Envoyer le rapport de bug</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Envoi…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Rapport envoyé. Référence : {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Trop de rapports envoyés depuis votre connexion récemment — réessayez plus tard.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>L'archive de diagnostic est trop volumineuse pour être envoyée.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Échec de l'envoi. Vérifiez votre connexion et réessayez.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Envoi bloqué par notre CDN, pas par votre connexion — utilisez Exporter l'archive.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Veuillez décrire le problème avant d'envoyer.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Capture de diagnostic</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Conserve en mémoire une petite trace du trafic série (la première minute du démarrage plus l'activité récente) afin que les rapports incluent la connexion. Rien ne quitte votre PC avant l'envoi d'un rapport.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>La capture de diagnostic est désactivée.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Démarrage : {0} trames ({1} KB, {2}) · Glissant : {3} trames ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>figé</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>remplissage</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Veuillez patienter un instant avant d'envoyer un autre rapport.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Enregistrer l'archive de diagnostic dans un fichier sur ce PC (rien n'est envoyé).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Touches du jeu</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Essuie-glaces suivant</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Essuie-glaces précédent</value></data>
@@ -738,6 +741,7 @@ Id : {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR fermée — retour à Stable</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// gain par bande · 100 % = neutre · 500 % = boost max</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILITÉ</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Force d'entrée</value></data>
   <data name="Section_PerLedColors" xml:space="preserve"><value>COULEURS PAR LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Repos · Constant</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Repos · Respiration</value></data>
@@ -757,6 +761,17 @@ Id : {2}</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Couple</value></data>
   <data name="Label_Torque" xml:space="preserve"><value>Couple</value></data>
   <data name="Label_GraphScale" xml:space="preserve"><value>Échelle</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ÉDITER DANS STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NOUVEAU TABLEAU…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Ouvrir le tableau de bord sélectionné dans MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Créer un tableau de bord dans MOZA Dashboard Studio, aux dimensions de l'écran connecté</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Ouvert dans MOZA Dashboard Studio — appuyez sur Actualiser une fois terminé pour recharger la bibliothèque.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio introuvable. Installez MOZA Pit House pour utiliser l'éditeur de tableau de bord.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Impossible de démarrer MOZA Dashboard Studio : {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Sélectionnez un tableau de bord possédant un fichier sur le disque pour l'éditer.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Aucune info d'écran reçue de l'appareil — Studio s'ouvrira sans appareil présélectionné.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio enregistre les nouveaux tableaux de bord dans {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Bibliothèque de tableaux de bord rechargée ({0} tableaux).</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Disposition 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Disposition</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Disposition</value></data>

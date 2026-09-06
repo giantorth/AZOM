@@ -142,12 +142,29 @@ namespace MozaPlugin.UI
             // WPF can fire Loaded more than once if the control is reparented
             // (SimHub's tab containers do this during settings-panel layout).
             // Calling Start() twice would double the tick rate.
+            bool wasRunning = _refreshTimer.IsEnabled;
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
             if (!_steeringAngleTimer.IsEnabled) _steeringAngleTimer.Start();
             if (_bandwidthTimer != null && !_bandwidthTimer.IsEnabled) _bandwidthTimer.Start();
             // Starts the ~15 Hz torque poll only if that graph is the selected
             // one; same reparenting-safe IsEnabled guard as the others.
             ApplyBaseGraphMode();
+
+            // A genuine (re)load — not just a redundant Loaded firing while
+            // everything's already running — means this control's timers were
+            // stopped (OnUnloadedStopTimers) for however long it was off-screen
+            // (navigated away to another plugin's page, or the settings window
+            // was closed). RefreshMBoosterTab never ran during that window, so
+            // if the active SimHub profile changed while this page was hidden,
+            // waiting for _refreshTimer's first post-reload tick would show up
+            // to 500ms of the PREVIOUS profile's mBooster values the instant the
+            // tab becomes visible again. Force one immediate, synchronous
+            // reseed instead of waiting for that first tick.
+            if (!wasRunning)
+            {
+                _mboosterUiSeeded = false;
+                RefreshMBoosterTab();
+            }
         }
 
         private void OnUnloadedStopTimers(object sender, RoutedEventArgs e)

@@ -129,7 +129,7 @@ namespace MozaPlugin.Sdk
         // means "no value existed → restore by deleting the value." File
         // existence is the authoritative signal that a redirect is active
         // and must be undone, even across a SimHub crash.
-        private static string RegistryBackupPath =>
+        internal static string RegistryBackupPath =>
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SimHub", "MozaPlugin", "CoapStub", "registry-backup.path");
@@ -734,7 +734,7 @@ namespace MozaPlugin.Sdk
         /// Used by the snapshot guard so we never treat our stub as the user's
         /// original PitHouse value. Tolerant of unnormalizable input.
         /// </summary>
-        private static bool IsOwnStubPath(string candidate)
+        internal static bool IsOwnStubPath(string candidate)
         {
             string Normalize(string p)
             {

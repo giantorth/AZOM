@@ -65,6 +65,23 @@ namespace MozaPlugin.UI
         private string? _mboosterSeededProfileName;
         private string? _mboosterSeededIdentity;
 
+        // The exact MBoosterDeviceSettings INSTANCE last seeded from — not
+        // just a string identity check, because MozaPlugin
+        // .GetOrCreateMBoosterSettings can return a genuinely DIFFERENT
+        // object for the SAME identity string across two calls: it first
+        // hands back a fresh, all-defaults placeholder keyed by the raw
+        // transport identity (before the device's serial has been read
+        // back), then — once OnMBoosterSerialResolved fires, asynchronously,
+        // on the connection thread — silently swaps in the real, saved
+        // profile object under the resolved serial key. If this tab's first
+        // seed pass raced that swap, the string-only checks above never
+        // noticed the object underneath had changed, so the tab kept
+        // displaying the placeholder's all-defaults values forever instead
+        // of the actual saved profile (the values were never lost — this
+        // was a display bug, not a persistence one). Comparing the object
+        // reference catches that swap and forces a proper reseed.
+        private MBoosterDeviceSettings? _mboosterSeededSettings;
+
         // Custom Effects (Experimental) — dynamic per-device list, rebuilt
         // (not incrementally synced) on every seed/device-switch. See
         // PopulateMBoosterCustomEffectsList.
@@ -162,8 +179,36 @@ namespace MozaPlugin.UI
                         _mboosterEffectPedalIndex = sameDeviceRetargetAxis;
                     else
                     {
+                        // First-ever selection (a brand-new SettingsControl, or
+                        // the previously-selected device vanished entirely) —
+                        // this used to always land on axis 0, even when axis 0
+                        // isn't actually wired (a standalone unit's sole pedal
+                        // commonly reports on a non-zero axis — see the
+                        // ConnectedAxes-based retarget above, and
+                        // MBoosterDeviceController's own ConnectedAxes doc
+                        // comment). Connectivity is frequently ALREADY known at
+                        // this point from the persisted cache (seeded well
+                        // before the live "PD Linked" diagnostic confirms it —
+                        // see MozaPlugin.LookupMBoosterKnownPedals), so defaulting
+                        // to axis 0 blindly showed this device's (often
+                        // long-stale/orphaned) axis-0 flat-field data — e.g. a
+                        // Sim Input Mapping/Pedal Feel curve nobody's touched in
+                        // ages — until a later refresh tick corrected the axis
+                        // once the live diagnostic caught up. Pick the first
+                        // known-connected axis instead, same as the retarget
+                        // logic above; fall back to axis 0 only when
+                        // connectivity isn't known yet at all.
                         _mboosterSelectedIdentity = devices[0].Identity;
-                        _mboosterEffectPedalIndex = 0;
+                        var initialConnected = devices[0].ConnectedAxes;
+                        int initialAxis = 0;
+                        if (initialConnected != null)
+                        {
+                            for (int axis = 0; axis < initialConnected.Length; axis++)
+                            {
+                                if (initialConnected[axis]) { initialAxis = axis; break; }
+                            }
+                        }
+                        _mboosterEffectPedalIndex = initialAxis;
                     }
                 }
 
@@ -243,21 +288,52 @@ namespace MozaPlugin.UI
             // instead of here — this 500ms pass felt sluggish for direct
             // pedal feedback.
 
+            // Resynced on EVERY pass, not gated by the seed-once latch below —
+            // both depend on state that can resolve strictly AFTER the tab's
+            // first seed: the pedal's Role may still be sitting on a fresh,
+            // Disabled-default MBoosterDeviceSettings if this first seed raced
+            // OnMBoosterSerialResolved (which migrates the real saved settings
+            // in under the device's serial key, asynchronously, once the
+            // serial has actually been read back over the wire — see
+            // MozaPlugin.GetOrCreateMBoosterSettings/OnMBoosterSerialResolved);
+            // AxisTypes (passive-pedal detection) similarly only populates once
+            // the 0x0E diagnostic arrives. Neither call bumps _mboosterUiSeeded
+            // above, and re-selecting the identity string never changes once
+            // that race resolves, so gating these behind the seed-once latch
+            // left a pedal that's genuinely Brake (or genuinely active)
+            // permanently showing as if it weren't, from first tab-open until
+            // the user forced a reseed some other way (switching pedals/
+            // profiles). Cheap, idempotent Visibility pushes — safe every tick,
+            // same reasoning as the per-row Role/IsSelected resync above.
+            UpdateMBoosterEffectPassiveState();
+            UpdateMBoosterConfigVisibilityForRole();
+
             // Re-seed when the active profile or the selected device changed
-            // since the last seed — otherwise the gate below keeps the
-            // previously-seeded values on screen while edits write to the
-            // now-current profile/device (mBooster settings are per-profile,
-            // per-device).
-            var currentProfileName = _plugin?.Settings?.ProfileStore?.CurrentProfile?.Name;
+            // since the last seed, OR the settings object itself is a
+            // different instance than last time (see _mboosterSeededSettings)
+            // — otherwise the gate below keeps the previously-seeded values
+            // on screen while edits write to the now-current profile/device
+            // (mBooster settings are per-profile, per-device).
+            if (_plugin == null) return;
+            var s = _plugin.GetOrCreateMBoosterSettings(selected.Identity);
+            var currentProfileName = _plugin.Settings?.ProfileStore?.CurrentProfile?.Name;
             if (!string.Equals(currentProfileName, _mboosterSeededProfileName, StringComparison.Ordinal)
-                || !string.Equals(selected.Identity, _mboosterSeededIdentity, StringComparison.OrdinalIgnoreCase))
+                || !string.Equals(selected.Identity, _mboosterSeededIdentity, StringComparison.OrdinalIgnoreCase)
+                || !ReferenceEquals(s, _mboosterSeededSettings))
                 _mboosterUiSeeded = false;
 
             if (_mboosterUiSeeded) return;
-            // Seed slider/checkbox values from the profile entry. _plugin is
-            // never null past Init (the constructor stores it); guard anyway.
-            if (_plugin == null) return;
-            var s = _plugin.GetOrCreateMBoosterSettings(selected.Identity);
+            // Diagnostic trail for the "curve values wrong until profile
+            // reload" bug — logs exactly what this seed pass is about to push
+            // into the curve editors, timestamped, so it can be correlated
+            // against GetOrCreateMBoosterSettings's "NEW placeholder" log and
+            // OnMBoosterSerialResolved's re-key log from the same session.
+            {
+                var fxLog = PeekMBoosterEffectTarget();
+                string Fmt(float[]? a) => a == null ? "null" : "[" + string.Join(",", a) + "]";
+                MozaLog.Info($"[AZOM\\mBooster] RefreshMBoosterTab seeding: profile='{currentProfileName}' identity='{selected.Identity}' pedalIdx={_mboosterEffectPedalIndex} "
+                    + $"CurveY={Fmt(fxLog?.CurveY)} CurveX={Fmt(fxLog?.CurveX)} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
+            }
             using (_suppressor.Begin())
             {
                 // Role is seeded per-row by the device rows block above (each
@@ -267,8 +343,6 @@ namespace MozaPlugin.UI
                 // settled on. (Test toggles are never persisted;
                 // SeedMBoosterEffectControls always clears them.)
                 SeedMBoosterEffectControls(PeekMBoosterEffectTarget());
-                UpdateMBoosterEffectPassiveState();
-                UpdateMBoosterConfigVisibilityForRole();
                 MBoosterBrakeFadeEnable.IsChecked = s.BrakeFade?.Enabled ?? false;
                 MBoosterBrakeFadeOnsetSlider.Value = s.BrakeFade?.BrakeFadeOnsetC ?? 550;
                 SetValueText(MBoosterBrakeFadeOnsetValue, MBoosterBrakeFadeOnsetSlider.Value.ToString("F0"));
@@ -280,6 +354,7 @@ namespace MozaPlugin.UI
             _mboosterUiSeeded = true;
             _mboosterSeededProfileName = currentProfileName;
             _mboosterSeededIdentity = selected.Identity;
+            _mboosterSeededSettings = s;
         }
 
         /// <summary>Click handler for a pedal row's label Button (see
@@ -375,8 +450,47 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
             if (role != MBoosterRole.Disabled)
                 ClearDuplicateMBoosterRoleAssignments(identity, axisIndex, role);
+            // Throttle's and Clutch's Max Force/Deadzone ranges are narrower
+            // than Brake's — a pedal freshly reassigned to either may still
+            // be carrying an out-of-range stored value from whatever role it
+            // had before (e.g. 140kg from Brake). Clamp it into range and
+            // re-push immediately, targeting THIS specific axis (not
+            // necessarily the one selected in the UI — see
+            // PushMBoosterFeelCurve's axis-explicit overload).
+            if ((role == MBoosterRole.Throttle || role == MBoosterRole.Clutch) && controller != null)
+            {
+                var cfg = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.GetOrCreatePedalConfig(s, axisIndex, controller.SoleConnectedAxis());
+                if (cfg != null)
+                {
+                    float dzMin = role == MBoosterRole.Clutch ? MBoosterUiConstants.ClutchDeadzoneMinKg : MBoosterUiConstants.ThrottleDeadzoneMinKg;
+                    float dzMax = role == MBoosterRole.Clutch ? MBoosterUiConstants.ClutchDeadzoneMaxKg : MBoosterUiConstants.ThrottleDeadzoneMaxKg;
+                    bool clamped = false;
+                    if (cfg.MaxForceKg >= 0)
+                    {
+                        float mf = Math.Max(MBoosterUiConstants.ThrottleMaxForceMinKg, Math.Min(MBoosterUiConstants.ThrottleMaxForceMaxKg, cfg.MaxForceKg));
+                        if (Math.Abs(mf - cfg.MaxForceKg) > 0.0001f) { cfg.MaxForceKg = mf; clamped = true; }
+                    }
+                    if (cfg.DeadzoneKg >= 0)
+                    {
+                        float dz = Math.Max(dzMin, Math.Min(dzMax, cfg.DeadzoneKg));
+                        if (Math.Abs(dz - cfg.DeadzoneKg) > 0.0001f) { cfg.DeadzoneKg = dz; clamped = true; }
+                    }
+                    if (clamped)
+                    {
+                        _plugin.SaveSettings();
+                        PushMBoosterFeelCurve(cfg, controller, axisIndex);
+                    }
+                }
+            }
             if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase) && axisIndex == _mboosterEffectPedalIndex)
+            {
                 UpdateMBoosterConfigVisibilityForRole();
+                // Bounds just changed above — re-seed so a value that was
+                // just clamped (or simply out of the new role's range on
+                // screen) doesn't keep showing a stale number.
+                using (_suppressor.Begin())
+                    SeedMBoosterConfigControls(PeekMBoosterEffectTarget());
+            }
         }
 
         /// <summary>Bumps every OTHER known pedal row currently showing
@@ -527,6 +641,16 @@ namespace MozaPlugin.UI
             MBoosterThresholdDecay.Value = fx?.Threshold?.DecayPct ?? 20;
             SetValueText(MBoosterThresholdDecayValue, (fx?.Threshold?.DecayPct ?? 20).ToString());
             MBoosterThresholdTestToggle.IsChecked = false;
+            MBoosterBitePointEnable.IsChecked = fx?.BitePoint?.Enabled ?? false;
+            MBoosterBitePointTriggerLevel.Value = fx?.BitePoint?.TriggerLevelPct ?? 50;
+            SetValueText(MBoosterBitePointTriggerLevelValue, (fx?.BitePoint?.TriggerLevelPct ?? 50).ToString());
+            MBoosterBitePointFrequencySlider.Value = fx?.BitePoint?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz;
+            SetValueText(MBoosterBitePointFrequencyValue, MBoosterBitePointFrequencySlider.Value.ToString("F0"));
+            MBoosterBitePointSmoothness.Value = fx?.BitePoint?.SmoothnessPct ?? 100;
+            SetValueText(MBoosterBitePointSmoothnessValue, (fx?.BitePoint?.SmoothnessPct ?? 100).ToString());
+            MBoosterBitePointIntensity.Value = fx?.BitePoint?.IntensityPct ?? 50;
+            SetValueText(MBoosterBitePointIntensityValue, (fx?.BitePoint?.IntensityPct ?? 50).ToString());
+            MBoosterBitePointTestToggle.IsChecked = false;
             MBoosterEngineEnable.IsChecked    = fx?.Engine?.Enabled       ?? false;
             MBoosterEngineIntensity.Value     = fx?.Engine?.IntensityPct  ?? 50;
             SetValueText(MBoosterEngineIntensityValue, (fx?.Engine?.IntensityPct ?? 50).ToString());
@@ -536,6 +660,8 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterRoadTextureIntensityValue, (fx?.RoadTexture?.IntensityPct ?? 50).ToString());
             MBoosterRoadTextureSmoothness.Value = fx?.RoadTexture?.SmoothnessPct ?? 50;
             SetValueText(MBoosterRoadTextureSmoothnessValue, (fx?.RoadTexture?.SmoothnessPct ?? 50).ToString());
+            MBoosterRoadTextureGain.Value = fx?.RoadTexture?.GainPct ?? 100;
+            SetValueText(MBoosterRoadTextureGainValue, (fx?.RoadTexture?.GainPct ?? 100).ToString());
             MBoosterRoadTextureTestToggle.IsChecked = false;
             MBoosterGForceEnable.IsChecked = fx?.GForce?.Enabled ?? false;
             MBoosterGForceMaxTravel.Value = fx?.GForce?.MaxTravelMm ?? 10;
@@ -558,18 +684,20 @@ namespace MozaPlugin.UI
             int max = fx?.Max ?? -1;
             MBoosterMaxSlider.Value = max >= 0 ? max : 0;
             SetValueText(MBoosterMaxValue, MBoosterMaxSlider.Value.ToString("F0"));
-            var curve = (fx?.CurveY != null && fx.CurveY.Length == 5) ? fx.CurveY : MBoosterDefaultCurve;
+            var curve = (fx?.CurveY != null && fx.CurveY.Length == MBoosterUiConstants.SimInputMappingNodeCount) ? fx.CurveY : MBoosterOutputCurveDefault;
             MBoosterY1Slider.Value = curve[0]; SetValueText(MBoosterY1Value, curve[0].ToString("F0"));
             MBoosterY2Slider.Value = curve[1]; SetValueText(MBoosterY2Value, curve[1].ToString("F0"));
             MBoosterY3Slider.Value = curve[2]; SetValueText(MBoosterY3Value, curve[2].ToString("F0"));
             MBoosterY4Slider.Value = curve[3]; SetValueText(MBoosterY4Value, curve[3].ToString("F0"));
             MBoosterY5Slider.Value = curve[4]; SetValueText(MBoosterY5Value, curve[4].ToString("F0"));
-            var curveX = (fx?.CurveX != null && fx.CurveX.Length == 5) ? fx.CurveX : MBoosterDefaultCurve;
+            MBoosterY6Slider.Value = curve[5]; SetValueText(MBoosterY6Value, curve[5].ToString("F0"));
+            var curveX = (fx?.CurveX != null && fx.CurveX.Length == MBoosterUiConstants.SimInputMappingNodeCount) ? fx.CurveX : MBoosterOutputCurveDefault;
             MBoosterX1Slider.Value = curveX[0]; SetValueText(MBoosterX1Value, curveX[0].ToString("F0"));
             MBoosterX2Slider.Value = curveX[1]; SetValueText(MBoosterX2Value, curveX[1].ToString("F0"));
             MBoosterX3Slider.Value = curveX[2]; SetValueText(MBoosterX3Value, curveX[2].ToString("F0"));
             MBoosterX4Slider.Value = curveX[3]; SetValueText(MBoosterX4Value, curveX[3].ToString("F0"));
             MBoosterX5Slider.Value = curveX[4]; SetValueText(MBoosterX5Value, curveX[4].ToString("F0"));
+            MBoosterX6Slider.Value = curveX[5]; SetValueText(MBoosterX6Value, curveX[5].ToString("F0"));
             // Sim Input Mapping
             float ratio = fx?.SensorOutputRatioPct ?? -1;
             MBoosterRatioSlider.Value = ratio >= 0 ? ratio : 0;
@@ -578,12 +706,22 @@ namespace MozaPlugin.UI
             MBoosterMaxThresholdSlider.Value = thr >= 0 ? thr : 100;
             SetValueText(MBoosterMaxThresholdValue, MBoosterMaxThresholdSlider.Value.ToString("F0"));
             // Pedal Feel
-            var inputCurve = (fx?.InputCurveY != null && fx.InputCurveY.Length == 5) ? fx.InputCurveY : MBoosterDefaultCurve;
+            var inputCurve = (fx?.InputCurveY != null && fx.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
+                ? fx.InputCurveY : MBoosterInputCurveDefault;
             MBoosterInputY1Slider.Value = inputCurve[0]; SetValueText(MBoosterInputY1Value, inputCurve[0].ToString("F0"));
             MBoosterInputY2Slider.Value = inputCurve[1]; SetValueText(MBoosterInputY2Value, inputCurve[1].ToString("F0"));
             MBoosterInputY3Slider.Value = inputCurve[2]; SetValueText(MBoosterInputY3Value, inputCurve[2].ToString("F0"));
             MBoosterInputY4Slider.Value = inputCurve[3]; SetValueText(MBoosterInputY4Value, inputCurve[3].ToString("F0"));
             MBoosterInputY5Slider.Value = inputCurve[4]; SetValueText(MBoosterInputY5Value, inputCurve[4].ToString("F0"));
+            MBoosterInputY6Slider.Value = inputCurve[5]; SetValueText(MBoosterInputY6Value, inputCurve[5].ToString("F0"));
+            var inputCurveX = (fx?.InputCurveX != null && fx.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
+                ? fx.InputCurveX : MBoosterInputCurveDefault;
+            MBoosterInputX1Slider.Value = inputCurveX[0]; SetValueText(MBoosterInputX1Value, inputCurveX[0].ToString("F0"));
+            MBoosterInputX2Slider.Value = inputCurveX[1]; SetValueText(MBoosterInputX2Value, inputCurveX[1].ToString("F0"));
+            MBoosterInputX3Slider.Value = inputCurveX[2]; SetValueText(MBoosterInputX3Value, inputCurveX[2].ToString("F0"));
+            MBoosterInputX4Slider.Value = inputCurveX[3]; SetValueText(MBoosterInputX4Value, inputCurveX[3].ToString("F0"));
+            MBoosterInputX5Slider.Value = inputCurveX[4]; SetValueText(MBoosterInputX5Value, inputCurveX[4].ToString("F0"));
+            MBoosterInputX6Slider.Value = inputCurveX[5]; SetValueText(MBoosterInputX6Value, inputCurveX[5].ToString("F0"));
             float ts = fx?.TravelStartMm ?? -1;
             MBoosterTravelRangeSlider.LowValue = ts >= 0 ? ts : MBoosterUiConstants.TravelMinMm;
             float te = fx?.TravelEndMm ?? -1;
@@ -594,16 +732,24 @@ namespace MozaPlugin.UI
             float ee = fx?.EndstopEndStiffness ?? -1;
             MBoosterEndstopEndSlider.Value = ee >= 0 ? ee : 1;
             SetValueText(MBoosterEndstopEndValue, MBoosterEndstopEndSlider.Value.ToString("F0"));
-            MBoosterDeadzoneSlider.Value = fx?.DeadzoneKg ?? 0;
-            SetValueText(MBoosterDeadzoneValue, (fx?.DeadzoneKg ?? 0).ToString("F1"));
-            ApplyMBoosterMaxForceCeiling(fx);
-            MBoosterMaxForceSlider.Value = Math.Min(fx?.MaxForceKg ?? 200, MBoosterMaxForceSlider.Maximum);
+            float dz = fx?.DeadzoneKg ?? -1;
+            MBoosterDeadzoneSlider.Value = dz >= 0 ? dz : 0;
+            SetValueText(MBoosterDeadzoneValue, MBoosterDeadzoneSlider.Value.ToString("F1"));
+            float mf = fx?.MaxForceKg ?? -1;
+            MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));
             float nf = fx?.NaturalFrictionPct ?? -1;
             MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
             SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
+            bool frictionEnabled = fx?.NaturalFrictionEnabled ?? true;
+            MBoosterNaturalFrictionEnable.IsChecked = frictionEnabled;
+            MBoosterNaturalFrictionSlider.IsEnabled = frictionEnabled;
 
             var sd = fx?.SegmentedDamping;
+            bool dampingEnabled = sd?.DampingEnabled ?? true;
+            MBoosterSegDampEnable.IsChecked = dampingEnabled;
+            MBoosterSegDampPressedPlot.IsEnabled = dampingEnabled;
+            MBoosterSegDampReleasedPlot.IsEnabled = dampingEnabled;
             MBoosterSegDampPressedPlot.Divider1 = (sd?.Divider1Pressed ?? -1) >= 0 ? sd!.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct;
             MBoosterSegDampPressedPlot.Divider2 = (sd?.Divider2Pressed ?? -1) >= 0 ? sd!.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct;
             MBoosterSegDampPressedPlot.Seg1Value = (sd?.Seg1Pressed ?? -1) >= 0 ? sd!.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
@@ -615,29 +761,6 @@ namespace MozaPlugin.UI
             MBoosterSegDampReleasedPlot.Seg1Value = (sd?.Seg1Released ?? -1) >= 0 ? sd!.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg2Value = (sd?.Seg2Released ?? -1) >= 0 ? sd!.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg3Value = (sd?.Seg3Released ?? -1) >= 0 ? sd!.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct;
-        }
-
-        /// <summary>
-        /// Cap the Max Force slider at the force the pedal's raw HID axis
-        /// actually reaches 100% at (<see cref="MozaMBoosterRegistry.ResolveFullScaleKg"/>).
-        /// Above that point the device has already pegged its own output, so
-        /// there is no resolution left for software to require more force —
-        /// every position past it was silently inert, which with Max Threshold
-        /// at 140kg left the whole top 30% of a 0-200 slider doing nothing
-        /// (bundle KY3HK4QP). The XAML's static "200" end label would then be
-        /// wrong, so it is rewritten to match.
-        /// </summary>
-        private void ApplyMBoosterMaxForceCeiling(IMBoosterPedalConfig? fx)
-        {
-            double ceiling = MozaMBoosterRegistry.ResolveFullScaleKg(fx, CurrentMBoosterController());
-            if (ceiling <= 0) ceiling = 200;
-            MBoosterMaxForceSlider.Maximum = ceiling;
-            MBoosterMaxForceRangeEndLabel.Text = ceiling.ToString("F0");
-            if (MBoosterMaxForceSlider.Value > ceiling)
-            {
-                MBoosterMaxForceSlider.Value = ceiling;
-                SetValueText(MBoosterMaxForceValue, ceiling.ToString("F0"));
-            }
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()
