@@ -531,17 +531,29 @@ namespace MozaPlugin.Settings
         public bool TelemetryEnabled { get; set; } = false;
 
         /// <summary>
-        /// Plugin-global per-channel default mapping overrides (channel URL → SimHub
-        /// property path or formula), edited via the master channel mapper. Sits
-        /// between <c>Data/Telemetry.json</c>'s <c>simhub_property</c> and the
-        /// per-dashboard overrides in <see cref="MozaProfile.TelemetryChannelMappings"/>,
-        /// which still win. Absent URL = that channel keeps its JSON default.
-        /// Newtonsoft replaces this instance on load and drops the comparer — read it
-        /// through <see cref="Telemetry.Dashboard.DashboardProfileStore.SetDefaultOverrides"/>'s
-        /// normalised snapshot, never by direct indexing.
+        /// LEGACY drain source only — the master channel mapper's defaults now live on
+        /// their own profile store, <see cref="ChannelDefaultsStore"/>. Nothing reads
+        /// this at runtime; <c>ProfileCoordinator.MigrateMasterDefaultsToProfiles</c>
+        /// copies it into that store's first profile once, guarded by
+        /// <see cref="MasterDefaultsMigratedToProfiles"/>, then clears it.
         /// </summary>
         public Dictionary<string, string> TelemetryDefaultMappings { get; set; }
             = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>One-shot sentinel for the master-defaults drain above. Set the
+        /// first time the profile system initialises on this build, so a user who
+        /// afterwards clears the migrated profile's mappings doesn't get them
+        /// re-seeded.</summary>
+        public bool MasterDefaultsMigratedToProfiles { get; set; } = false;
+
+        /// <summary>
+        /// The master channel mapper's own profile list — independent of
+        /// <see cref="ProfileStore"/> above, with its own selector in that dialog and
+        /// its own per-game switching. Serialized in this same blob, so both stores
+        /// persist through one SaveCommonSettings.
+        /// </summary>
+        public MozaChannelDefaultsStore ChannelDefaultsStore { get; set; }
+            = new MozaChannelDefaultsStore();
 
         // Name of the active dashboard profile (empty = use first available)
         public string TelemetryProfileName { get; set; } = "";

@@ -1086,9 +1086,10 @@ namespace MozaPlugin.Devices.Ui
         }
 
         // ── Master channel mapper (Telemetry.json defaults) ─────────────
-        // The card-header button opens the plugin-global default editor. Its edits sit
-        // BELOW the per-dashboard overrides this page writes, so a channel customised
-        // here keeps its per-dashboard value; everything else follows the new default.
+        // The card-header button opens the per-game default editor (the active SimHub
+        // profile's set). Its edits sit BELOW the per-dashboard overrides this page
+        // writes, so a channel customised here keeps its per-dashboard value;
+        // everything else follows the new default.
 
         /// <summary>Hide the master-mapper button on the FSR1 and CM1 surfaces — their
         /// field defaults come from Fsr1DashboardCatalog / Cm1DashboardCatalog, not

@@ -662,6 +662,11 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, Dictionary<string, Dictionary<string, string>>> TelemetryChannelMappings { get; set; }
             = new Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>();
 
+        // NOTE: the master channel mapper's defaults are deliberately NOT here. They
+        // live on their own profile store (MozaChannelDefaultsStore), independent of
+        // this one, so a user can pair one set of channel defaults with any device
+        // profile without the two lists having to line up.
+
         // ===== FSR V1 group-0x42 dashboard field mappings =====
         // The FSR V1 display wheel renders fixed-schema records, not tier-def
         // channels, so its per-field assignments need their own store (each value

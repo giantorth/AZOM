@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.Devices.Ui;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 using MozaPlugin.Telemetry.Dashboard;
 using SimHub.Plugins.OutputPlugins.Dash.GLCDTemplating;
 using SimHub.Plugins.OutputPlugins.Dash.TemplatingCommon;
@@ -17,14 +18,23 @@ using SimHub.Plugins.OutputPlugins.GraphicalDash.Models;
 namespace MozaPlugin.UI
 {
     /// <summary>
-    /// Master channel mapper — edits the plugin-global DEFAULT mapping for every
-    /// channel declared in <c>Data/Telemetry.json</c>. These defaults apply to every
-    /// dashboard on every wheel/dash surface; a per-dashboard override set from a
-    /// device page's channel-mapping list still wins over them.
+    /// Master channel mapper — edits the DEFAULT mapping for every channel declared
+    /// in <c>Data/Telemetry.json</c>. These defaults apply to every dashboard on every
+    /// wheel/dash surface; a per-dashboard override set from a device page's
+    /// channel-mapping list still wins over them.
     ///
     /// Resolution order per channel URL:
     ///   per-dashboard override  >  THIS  >  Telemetry.json simhub_property
     ///                                       >  StringChannelDefaults
+    ///
+    /// <para>The set lives on <see cref="MozaChannelDefaultsProfile"/>, in a profile
+    /// store of its OWN (<see cref="MozaChannelDefaultsStore"/>) — unrelated to the
+    /// device profiles the Options tab manages. The <c>ProfileList</c> at the top is
+    /// SimHub's control driving that store, so these sets are created, named, cloned,
+    /// switched and exported here, and picking one has no effect on the device profile
+    /// (no ApplyProfile, no hardware writes). SimHub still switches the set for the
+    /// running game on its own; either source raises <c>CurrentProfileChanged</c> and
+    /// rebuilds the rows.</para>
     ///
     /// Rows reuse <see cref="ChannelMappingRow"/>, so the pencil (simple property
     /// list) and ƒ(x) (SimHub NCalc / js: formula dialog) editors behave exactly as
@@ -58,12 +68,75 @@ namespace MozaPlugin.UI
             _backdropSource = backdropSource;
             InitializeComponent();
             ChannelList.ItemsSource = _rows;
+
+            // ProfileList wires its inner combobox to whatever DataContext it gets —
+            // here the channel-defaults store, NOT the device-profile store the
+            // Options tab drives.
+            _profileStore = _plugin.Settings?.ChannelDefaultsStore;
+            if (_profileStore != null)
+                ProfileSelector.DataContext = _profileStore;
+
             BuildRows();
             ApplyFilter();
+
+            // Subscribe only after the first build: binding the combo above can settle
+            // its SelectedItem back onto the store, and a CurrentProfileChanged landing
+            // mid-construction would run RebuildRows against a half-built list — then
+            // BuildRows here would append a second copy of all ~450 rows. Follows the
+            // active profile from both directions afterwards: this combo, and a game
+            // switch behind our back.
+            if (_profileStore != null)
+                _profileStore.CurrentProfileChanged += OnCurrentProfileChanged;
+
             // Owner isn't assigned until after the ctor returns, so resolve the
             // backdrop once the window is realized but before it first renders.
             SourceInitialized += (_, __) => ApplyHostBackdrop();
             Closed += OnClosed;
+        }
+
+        // ── Active profile ─────────────────────────────────────────────────
+
+        // Held so the Closed handler detaches from the SAME store instance we
+        // subscribed on (ClearSettings can swap the store while we're open).
+        private readonly MozaChannelDefaultsStore? _profileStore;
+
+        /// <summary>The channel-defaults profile the rows are editing.</summary>
+        private MozaChannelDefaultsProfile? ActiveProfile => _profileStore?.CurrentProfile;
+
+        /// <summary>Rebuild the rows against the newly-active profile. Fires from this
+        /// dialog's own selector AND from SimHub switching the set for a running game,
+        /// on whichever thread it raised the event, so it marshals to the dispatcher.
+        /// ProfileCoordinator subscribed at Init and so runs first — the new set is
+        /// already published by the time we repaint.</summary>
+        private void OnCurrentProfileChanged(object? sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(RebuildRows));
+                return;
+            }
+            RebuildRows();
+        }
+
+        /// <summary>Re-seed every row from the active profile. Any pending edit belongs
+        /// to the profile we're leaving, so it is cancelled rather than carried over.</summary>
+        private void RebuildRows()
+        {
+            // The edit itself was already persisted synchronously by SetProfileDefault;
+            // only the re-resolve is pending, and ApplyProfile has just done one for the
+            // profile we're switching TO. Drop the timer rather than firing a redundant
+            // pass over the senders.
+            _reResolveDebounce?.Stop();
+
+            foreach (var r in _allRows)
+            {
+                r.PropertyChanged -= OnRowPropertyChanged;
+                if (r.IsEditing) r.CancelEdit();
+            }
+            _allRows.Clear();
+            _rows.Clear();
+            BuildRows();
+            ApplyFilter();
         }
 
         // ── Host backdrop ──────────────────────────────────────────────────
@@ -136,6 +209,10 @@ namespace MozaPlugin.UI
 
         private void BuildRows()
         {
+            // Idempotent: RebuildRows re-enters this on every profile switch, and a
+            // stale row surviving here would show the previous game's mapping.
+            _allRows.Clear();
+
             var props = _plugin.GetAllSimHubPropertyNames();
             var engine = _plugin.ChannelFormulaEngine;
 
@@ -143,7 +220,7 @@ namespace MozaPlugin.UI
             // back with the default (ordinal) comparer, so a case difference in a URL
             // would otherwise read as "not overridden".
             var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var stored = _plugin.Settings?.TelemetryDefaultMappings;
+            var stored = ActiveProfile?.Mappings;
             if (stored != null)
                 foreach (var kv in stored)
                     if (!string.IsNullOrEmpty(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
@@ -220,7 +297,7 @@ namespace MozaPlugin.UI
             string value = string.Equals(row.SimHubProperty, row.DefaultProperty, StringComparison.Ordinal)
                 ? ""
                 : row.SimHubProperty;
-            _plugin.ChannelMapping.SetGlobalDefault(row.Url, value);
+            _plugin.ChannelMapping.SetProfileDefault(row.Url, value);
             ScheduleReResolve();
             RefreshOverriddenCount();
         }
@@ -327,9 +404,10 @@ namespace MozaPlugin.UI
             row.SimHubProperty = row.DefaultProperty;
         }
 
+        // Resets the ACTIVE profile's defaults only — other games keep theirs.
         private void ResetAll_Click(object sender, RoutedEventArgs e)
         {
-            _plugin.ChannelMapping.ClearGlobalDefaults();
+            _plugin.ChannelMapping.ClearProfileDefaults();
             // Re-seed the rows from their pristine defaults without re-firing the
             // per-row persist path 450 times — the store is already cleared.
             foreach (var r in _allRows)
@@ -345,6 +423,8 @@ namespace MozaPlugin.UI
 
         private void OnClosed(object? sender, EventArgs e)
         {
+            if (_profileStore != null)
+                _profileStore.CurrentProfileChanged -= OnCurrentProfileChanged;
             foreach (var r in _allRows) r.PropertyChanged -= OnRowPropertyChanged;
             // Land any edit made inside the debounce window before the dialog goes away.
             if (_reResolveDebounce != null && _reResolveDebounce.IsEnabled) FlushReResolve();

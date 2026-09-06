@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
+using MozaPlugin.Settings;
 using MozaPlugin.Telemetry.Dashboard;
 
 namespace MozaPlugin.Telemetry
 {
     /// <summary>
-    /// Per-channel SimHub-property overrides and the plugin-global default
-    /// overrides ("master channel mapper"). Extracted from MozaPlugin.
+    /// Per-channel SimHub-property overrides and the master channel defaults.
+    /// Extracted from MozaPlugin.
     ///
-    /// <para>Resolution order, highest first: per-dashboard override (profile ×
-    /// page × dashboard × channel) → global default → <c>simhub_property</c> from
+    /// <para>Resolution order, highest first: per-dashboard override (device profile ×
+    /// page × dashboard × channel) → the active channel-defaults profile →
+    /// <c>simhub_property</c> from
     /// Data/Telemetry.json. Either override level also forces the channel's scale to
     /// 1 — Telemetry.json's <c>simhub_scale</c> is calibrated for its own property, so
     /// inheriting it silently zeroed integer channels and saturated the percent ones
@@ -227,28 +229,37 @@ namespace MozaPlugin.Telemetry
             _plugin.SaveSettings();
         }
 
-        // ===== Master channel mapper: plugin-global default overrides =====
+        // ===== Master channel mapper: the channel-defaults profile =====
         // Layer 2 of the mapping resolution — per-dashboard overrides above still
-        // win, Telemetry.json's simhub_property is below. Stored flat on
-        // MozaPluginSettings; DashboardProfileStore holds the live snapshot the
-        // profile builders read.
+        // win, Telemetry.json's simhub_property is below. Stored on the active
+        // MozaChannelDefaultsProfile, a store of its own that is independent of the
+        // device profiles; DashboardProfileStore holds the live snapshot the profile
+        // builders read. That snapshot is a single static, so every push republishes
+        // the CURRENT set — see PushProfileDefaults' call sites in ProfileCoordinator.
 
-        /// <summary>Push the persisted global default overrides into the profile store
-        /// so subsequent profile builds resolve against them.</summary>
-        internal void PushGlobalDefaults()
-            => DashboardProfileStore.SetDefaultOverrides(_plugin.Settings?.TelemetryDefaultMappings);
+        /// <summary>The channel-defaults profile in force. Null before the store has
+        /// initialised.</summary>
+        private MozaChannelDefaultsProfile? ActiveProfile
+            => _plugin.Settings?.ChannelDefaultsStore?.CurrentProfile;
 
-        /// <summary>Set or clear one channel's global default mapping. An empty property
-        /// removes the entry (revert to the Telemetry.json default) — same semantics as
-        /// <see cref="Set"/>. COW like the per-dashboard map: the tick and serial-read
-        /// threads read the store's snapshot, so build fresh and swap.</summary>
-        internal void SetGlobalDefault(string channelUrl, string propertyPath)
+        /// <summary>Publish the active channel-defaults profile into the dashboard
+        /// profile store so subsequent profile builds resolve against it. Must run on
+        /// every switch — the published snapshot is global, the source is not.</summary>
+        internal void PushProfileDefaults()
+            => DashboardProfileStore.SetDefaultOverrides(ActiveProfile?.Mappings);
+
+        /// <summary>Set or clear one channel's default mapping on the active
+        /// channel-defaults profile. An empty property removes the entry (revert to the
+        /// Telemetry.json default) — same semantics as <see cref="Set"/>. COW like the
+        /// per-dashboard map: the tick and serial-read threads read the store's
+        /// snapshot, so build fresh and swap.</summary>
+        internal void SetProfileDefault(string channelUrl, string propertyPath)
         {
             if (string.IsNullOrEmpty(channelUrl)) return;
-            var settings = _plugin.Settings;
-            if (settings == null) return;
+            var profile = ActiveProfile;
+            if (profile == null) return;
 
-            var old = settings.TelemetryDefaultMappings;
+            var old = profile.Mappings;
             var next = old != null
                 ? new Dictionary<string, string>(old, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -257,22 +268,23 @@ namespace MozaPlugin.Telemetry
             if (trimmed.Length == 0) next.Remove(channelUrl);
             else next[channelUrl] = trimmed;
 
-            settings.TelemetryDefaultMappings = next;
-            PushGlobalDefaults();
+            profile.Mappings = next;
+            PushProfileDefaults();
             _plugin.SaveSettings();
         }
 
-        /// <summary>Drop every global default override — all channels revert to their
-        /// Telemetry.json values.</summary>
-        internal void ClearGlobalDefaults()
+        /// <summary>Drop every default override on the active channel-defaults profile —
+        /// all its channels revert to their Telemetry.json values. Other profiles in the
+        /// store are untouched.</summary>
+        internal void ClearProfileDefaults()
         {
-            var settings = _plugin.Settings;
-            if (settings == null) return;
-            if (settings.TelemetryDefaultMappings == null || settings.TelemetryDefaultMappings.Count == 0)
+            var profile = ActiveProfile;
+            if (profile == null) return;
+            if (profile.Mappings == null || profile.Mappings.Count == 0)
                 return;
-            settings.TelemetryDefaultMappings =
+            profile.Mappings =
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            PushGlobalDefaults();
+            PushProfileDefaults();
             _plugin.SaveSettings();
         }
 

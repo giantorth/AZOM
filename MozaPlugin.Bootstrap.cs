@@ -105,10 +105,10 @@ namespace MozaPlugin
                 if (_settings.ProfileStore == null)
                     _settings.ProfileStore = new MozaProfileStore();
 
-                // Publish the master-mapper default overrides before anything can
-                // build a profile, so the first cold-start tier-def already carries
-                // them (no dashboard switch needed to pick them up).
-                _channelMapping.PushGlobalDefaults();
+                // NOTE: the master-mapper defaults live on their own profile store now,
+                // so they can only be published once that store has picked its active
+                // profile — ProfileCoordinator.InitChannelDefaultsStore does it, still
+                // ahead of the first telemetry-profile build.
 
                 // Migrate the legacy Stable/Dev update channel enum to the
                 // channel-id scheme. The dev channel is gone (dev-latest is no
@@ -693,6 +693,12 @@ namespace MozaPlugin
                     _telemetrySender = new TelemetrySender(_connection);
                     s_persistentTelemetrySender = _telemetrySender;
                 }
+                // A reused sender carries the PRIOR game's channel bindings — Init ran
+                // InitProfileSystem (and possibly ApplyProfile) before _telemetrySender
+                // was even assigned, so that path's re-resolve reached nothing. Rebind
+                // now that it is wired. No-ops on a fresh sender.
+                try { _channelMapping.ReResolveAll(); } catch { }
+
                 // FSR V1 display driver — own timer/lane on the wheelbase connection,
                 // started lazily once an FSR1 wheel is detected (StartFsr1DriverIfNeeded).
                 _fsr1Driver = new Telemetry.Display.Fsr1DisplayDriver(_connection, _propertyResolver.ResolveAsDouble);

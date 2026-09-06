@@ -183,8 +183,8 @@
         <ctrl:SectionCard Title="{x:Static res:Strings.Section_ChannelMappings}"
                           Icon="{StaticResource IconDiag}">
             <!-- Header-right slot (HeaderedContentControl.Header): opens the master
-                 channel mapper, which edits the plugin-global Telemetry.json defaults
-                 the per-dashboard list below overrides. Hidden on FSR1/CM1 surfaces —
+                 channel mapper, which edits the active profile's per-game Telemetry.json
+                 defaults that the per-dashboard list below overrides. Hidden on FSR1/CM1 surfaces —
                  their field defaults come from their own catalogs, not Telemetry.json. -->
             <ctrl:SectionCard.Header>
                 <Button x:Name="MasterMapperButton" Padding="10,2"

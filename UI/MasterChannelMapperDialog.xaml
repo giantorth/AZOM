@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:res="clr-namespace:MozaPlugin.Resources"
+        xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
         Title="{x:Static res:Strings.Title_MasterChannelDefaults}"
         Width="960" Height="720" MinWidth="640" MinHeight="380"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
@@ -32,21 +33,35 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Filter + overridden count (data line, no hints) -->
+        <!-- Filter + profile selector + overridden count (data line, no hints) -->
         <Grid Grid.Row="0" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <!-- Center, not the Stretch default: this row is Height="Auto" and the
+                 ProfileList beside it is a tall composite (dropdown + New/Clone/Edit/
+                 Manage), so a stretching TextBox grows to match it. -->
             <TextBox Grid.Column="0" x:Name="FilterBox"
                      TextChanged="FilterBox_TextChanged"
+                     VerticalAlignment="Center"
                      FontFamily="{StaticResource FontMono}"
                      Padding="8,5"
                      Foreground="{StaticResource TextBrush}"
                      Background="{StaticResource BgDeepBrush}"
                      BorderBrush="{StaticResource BorderBrush}"
                      BorderThickness="1"/>
-            <TextBlock Grid.Column="1" x:Name="OverriddenCountText"
+            <!-- This dialog's OWN profile list — SimHub's ProfileList control bound
+                 (via DataContext, in code-behind) to MozaChannelDefaultsStore, a store
+                 separate from the device profiles on the Options tab. Gives the
+                 dropdown plus New / Clone / Edit / Manage, so these sets are created
+                 and named here; switching one has no effect on the device profile.
+                 CurrentProfileChanged rebuilds the rows. -->
+            <profilescommon:ProfileList Grid.Column="1" x:Name="ProfileSelector"
+                                        MinWidth="260" Margin="10,0,0,0"
+                                        VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="2" x:Name="OverriddenCountText"
                        Style="{StaticResource MutedHintText}"
                        FontFamily="{StaticResource FontMono}"
                        VerticalAlignment="Center" Margin="16,0,0,0"/>
