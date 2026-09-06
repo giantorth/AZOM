@@ -233,8 +233,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>CLEAR ALL SETTINGS &amp; PROFILES</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>This will reset all plugin settings and profiles to their defaults.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD UPLOAD</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// push a .mzdash file to the connected wheel</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>SOURCE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Local .mzdash file</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard library</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>PICK .MZDASH…</value></data>
@@ -242,18 +240,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Dashboard:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>UPLOAD NOW</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>idle</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Dashboard name:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Raw size:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>In flight:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Last ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Last ack status byte:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>WHEEL FILES</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// dashboards loaded onto the wheel</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>State</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Title</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Last modified</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>DELETE</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Enable CoAP SDK server</value></data>
@@ -566,8 +555,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Folder: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload queued — pushing "{0}" to the wheel…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload not started — wheel not connected or no management session yet.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Upload complete (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Upload stopped (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Upload complete (status 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Upload stopped at {0}% (status 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Pick a .mzdash file to upload</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza dashboard (*.mzdash)|*.mzdash|All files (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Select folder containing .mzdash dashboard files</value></data>
@@ -772,13 +761,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>NEW DASHBOARD…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Open the selected dashboard in MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Create a new dashboard in MOZA Dashboard Studio, sized for the connected display</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Opened in MOZA Dashboard Studio — press Refresh when you're done to reload the library.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio not found. Install MOZA Pit House to use the dashboard editor.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Could not start MOZA Dashboard Studio: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Select a dashboard with a file on disk to edit it.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>No display info from the device yet — Studio will open without a pre-selected device.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio saves new dashboards to {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashboard library reloaded ({0} dashboards).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Opened in Studio — press Refresh when done.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio not found — install MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio failed to start: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Select a dashboard with a file on disk.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>No display info yet — opening without a device.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Saves to {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Library reloaded — {0} dashboards.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Layout 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Layout</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Layout</value></data>
@@ -788,4 +777,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Layout read-back</value></data>
   <data name="Label_State" xml:space="preserve"><value>State</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>State error</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Status:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Uploading - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Complete - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Stopped - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>UPLOAD SOURCE</value></data>
 </root>

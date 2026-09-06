@@ -202,8 +202,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ALLE EINSTELLUNGEN &amp; PROFILE LÖSCHEN</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Damit werden alle Plugin-Einstellungen und Profile auf ihre Standardwerte zurückgesetzt.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-UPLOAD</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// eine .mzdash-Datei an das verbundene Lenkrad senden</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>QUELLE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Lokale .mzdash-Datei</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard-Bibliothek</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>.MZDASH WÄHLEN…</value></data>
@@ -211,18 +209,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Dashboard:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>JETZT HOCHLADEN</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>im Leerlauf</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Dashboard-Name:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Rohgröße:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>In Übertragung:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Letztes ACK bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Letztes ACK-Statusbyte:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>LENKRAD-DATEIEN</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// auf dem Lenkrad geladene Dashboards</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Status</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Titel</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Verzeichnis</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Zuletzt geändert</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>LÖSCHEN</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP-SDK-Server aktivieren</value></data>
@@ -535,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Ordner: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload in Warteschlange – „{0}“ wird an das Lenkrad gesendet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload nicht gestartet – Lenkrad nicht verbunden oder noch keine Verwaltungssitzung.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Upload abgeschlossen (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Upload gestoppt (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Upload abgeschlossen (Status 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Upload bei {0} % gestoppt (Status 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Wählen Sie eine .mzdash-Datei zum Hochladen</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-Dashboard (*.mzdash)|*.mzdash|Alle Dateien (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Ordner mit .mzdash-Dashboard-Dateien auswählen</value></data>
@@ -765,13 +754,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>NEUES DASHBOARD…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Das ausgewählte Dashboard in MOZA Dashboard Studio öffnen</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Ein neues Dashboard in MOZA Dashboard Studio erstellen, passend zum verbundenen Display</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>In MOZA Dashboard Studio geöffnet — danach auf Aktualisieren klicken, um die Bibliothek neu zu laden.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio nicht gefunden. Installieren Sie MOZA Pit House, um den Dashboard-Editor zu nutzen.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>MOZA Dashboard Studio konnte nicht gestartet werden: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Wählen Sie ein Dashboard mit einer Datei auf der Festplatte, um es zu bearbeiten.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Noch keine Display-Infos vom Gerät — Studio öffnet ohne vorausgewähltes Gerät.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio speichert neue Dashboards unter {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashboard-Bibliothek neu geladen ({0} Dashboards).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>In Studio geöffnet — danach Aktualisieren drücken.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio nicht gefunden — MOZA Pit House installieren.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio konnte nicht starten: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Dashboard mit Datei auf der Festplatte wählen.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Noch keine Display-Infos — Öffnen ohne Gerät.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Speichert unter {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Bibliothek neu geladen — {0} Dashboards.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Layout 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Layout</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Layout</value></data>
@@ -781,4 +770,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Layout-Rücklesung</value></data>
   <data name="Label_State" xml:space="preserve"><value>Status</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Statusfehler</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Status:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Wird hochgeladen - {0} %</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Abgeschlossen - 100 %</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Gestoppt - {0} %</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>UPLOAD-QUELLE</value></data>
 </root>

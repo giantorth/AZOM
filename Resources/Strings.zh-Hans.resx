@@ -202,8 +202,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>清除所有设置与配置文件</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>此操作会将所有插件设置和配置文件恢复为默认值。</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>仪表盘上传</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// 将 .mzdash 文件推送至已连接的方向盘</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>来源</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>本地 .mzdash 文件</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>仪表盘库</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>选择 .MZDASH…</value></data>
@@ -211,18 +209,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>仪表盘:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>立即上传</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>空闲</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>仪表盘名称:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>原始大小:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>传输中:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>上次 ACK bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>上次 ACK 状态字节:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>方向盘文件</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// 已加载到方向盘上的仪表盘</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>状态</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>标题</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>目录名</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>哈希值</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>最后修改</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 CoAP SDK 服务器</value></data>
@@ -535,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>文件夹：{0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>上传已排队——正在将 “{0}” 推送到方向盘…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>未开始上传——方向盘未连接或尚无管理会话。</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>上传完成 (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>上传已停止 (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>上传完成（状态 0x{0}）</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>上传在 {0}% 停止（状态 0x{1}）</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>选择要上传的 .mzdash 文件</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 仪表盘 (*.mzdash)|*.mzdash|所有文件 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>选择包含 .mzdash 仪表盘文件的文件夹</value></data>
@@ -765,13 +754,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>新建仪表盘…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>在 MOZA Dashboard Studio 中打开所选仪表盘</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>在 MOZA Dashboard Studio 中新建仪表盘，尺寸匹配已连接的显示屏</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>已在 MOZA Dashboard Studio 中打开 — 完成后点击「刷新」重新加载库。</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>未找到 MOZA Dashboard Studio。请安装 MOZA Pit House 以使用仪表盘编辑器。</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>无法启动 MOZA Dashboard Studio：{0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>请选择磁盘上存在文件的仪表盘才能编辑。</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>尚未收到设备的显示屏信息 — Studio 将在未预选设备的情况下打开。</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio 会将新仪表盘保存到 {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>已重新加载仪表盘库（{0} 个）。</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>已在 Studio 中打开 — 完成后点击「刷新」。</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>未找到 Dashboard Studio — 请安装 MOZA Pit House。</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio 启动失败：{0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>请选择磁盘上有文件的仪表盘。</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>暂无显示屏信息 — 将不预选设备打开。</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>保存到 {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>已重新加载库 — {0} 个仪表盘。</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R 布局 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 布局</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 布局</value></data>
@@ -781,4 +770,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>布局回读</value></data>
   <data name="Label_State" xml:space="preserve"><value>状态</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>状态错误</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>状态：</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>上传中 - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>已完成 - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>已停止 - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>上传来源</value></data>
 </root>

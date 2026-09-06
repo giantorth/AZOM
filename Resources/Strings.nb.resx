@@ -207,8 +207,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>TØM ALLE INNSTILLINGER OG PROFILER</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Dette tilbakestiller alle plugin-innstillinger og profiler til standardverdiene.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-OPPLASTING</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// send en .mzdash-fil til tilkoblet ratt</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>KILDE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Lokal .mzdash-fil</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard-bibliotek</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>VELG .MZDASH…</value></data>
@@ -216,18 +214,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Dashboard:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>LAST OPP NÅ</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>på tomgang</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Dashboard-navn:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Rå størrelse:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Underveis:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Siste ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Siste ack status-byte:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>RATTFILER</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// dashboards lastet inn på rattet</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Status</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tittel</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Mappenavn</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sist endret</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SLETT</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Aktiver CoAP SDK-server</value></data>
@@ -540,8 +529,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Mappe: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Opplasting i kø – sender «{0}» til rattet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Opplasting ikke startet – rattet er ikke tilkoblet eller ingen administrasjonsøkt ennå.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Opplasting fullført (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Opplasting stoppet (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Opplasting fullført (status 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Opplasting stoppet ved {0} % (status 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Velg en .mzdash-fil å laste opp</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-dashbord (*.mzdash)|*.mzdash|Alle filer (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Velg mappe som inneholder .mzdash-dashbordfiler</value></data>
@@ -770,13 +759,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>NYTT DASHBORD…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Åpne det valgte dashbordet i MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Lag et nytt dashbord i MOZA Dashboard Studio, tilpasset den tilkoblede skjermen</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Åpnet i MOZA Dashboard Studio — trykk Oppdater når du er ferdig for å laste biblioteket på nytt.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>Fant ikke MOZA Dashboard Studio. Installer MOZA Pit House for å bruke dashbordredigereren.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Kunne ikke starte MOZA Dashboard Studio: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Velg et dashbord som har en fil på disken for å redigere det.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ingen skjerminfo fra enheten ennå — Studio åpnes uten forhåndsvalgt enhet.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lagrer nye dashbord i {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashbordbiblioteket lastet på nytt ({0} dashbord).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Åpnet i Studio — trykk Oppdater når du er ferdig.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Fant ikke Dashboard Studio — installer MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio startet ikke: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Velg et dashbord med en fil på disken.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ingen skjerminfo ennå — åpner uten enhet.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Lagrer i {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Biblioteket lastet på nytt — {0} dashbord.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R-oppsett 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5-oppsett</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6-oppsett</value></data>
@@ -786,4 +775,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Tilbakelesing av oppsett</value></data>
   <data name="Label_State" xml:space="preserve"><value>Status</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Statusfeil</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Status:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Laster opp - {0} %</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Fullført - 100 %</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Stoppet - {0} %</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>OPPLASTINGSKILDE</value></data>
 </root>

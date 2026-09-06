@@ -231,8 +231,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Boof Wuff Wroof Rrrf!</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>Grrowl Bork Woof!</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Grrowl!</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>BARK…</value></data>
@@ -240,18 +238,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Bark!</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>Yowff!</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Grrowl!</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Arf!</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>RUFF!!</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Wroof!</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Boof!</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>BARK!!</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>Howl Wroof!</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Snarf!</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Wuff!</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Wuff!</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Awoo!</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Yap!</value></data>
@@ -563,8 +552,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Wan {0}!</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Boof Yap {0} Yap Arf…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Yowl Howl Bark Snarf!</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Bork Yip Wuff {0} Wan Bark Rrrf {1} Yowff Yowl Yap {2} Awoo Wroof Barff!</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Yowl Boof Wroof {0} Bork Grr Bark {1} Wroof Howl Snarf {2} Grr Yowff Woof!</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Bork Yip Wuff (Yowl 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Yowl Boof Wroof {0}% (Grr 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Grrowl Wroof!</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Boof Barff!</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Yip Ruff!</value></data>
@@ -755,13 +744,13 @@
   <data name="Button_NewDashboard" xml:space="preserve"><value>WOOF…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Awoo Bork Yip Wuff MOZA Dashboard Studio!</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Yowl Wan Snarf Grrowl MOZA Dashboard Studio Arf Howl!</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Wuff MOZA Dashboard Studio Yip Yip — Bork Awoo Snarf Howl!</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>Grrowl MOZA Dashboard Studio Wan Wan. Snarf MOZA Pit House Yowl!</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Yelp MOZA Dashboard Studio Wuff: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Bork Wan Yip Snarf Awoo!</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Wan Wan Yowl — Studio Grrowl Arf Howl!</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio Wuff Bork Yip {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Snarf Awoo Bork ({0} Wuff).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Wuff Studio Yip — Bork Awoo Snarf!</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Grrowl Dashboard Studio — Snarf MOZA Pit House!</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Yelp Studio Wuff: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Bork Wan Yip Snarf!</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Wan Wan Yowl — Grrowl Arf!</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Wuff Bork {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Snarf Awoo Bork — {0} Wuff.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Arf!</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Woof!</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Yip!</value></data>
@@ -771,4 +760,9 @@
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Yap!</value></data>
   <data name="Label_State" xml:space="preserve"><value>Arf!</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Grrr!</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Yowl:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Bork Yip - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Awoo Wroof - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Yowl Boof - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>BORK YIP SNARF</value></data>
 </root>

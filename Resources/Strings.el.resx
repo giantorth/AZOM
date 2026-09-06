@@ -202,8 +202,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ ΟΛΩΝ ΤΩΝ ΡΥΘΜΙΣΕΩΝ &amp; ΠΡΟΦΙΛ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Αυτό θα επαναφέρει όλες τις ρυθμίσεις plugin και τα προφίλ στις προεπιλογές τους.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ΜΕΤΑΦΟΡΤΩΣΗ ΟΘΟΝΗΣ</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// αποστολή .mzdash στο συνδεδεμένο τιμόνι</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>ΠΗΓΗ</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Τοπικό αρχείο .mzdash</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Βιβλιοθήκη οθονών</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>ΕΠΙΛΟΓΗ .MZDASH…</value></data>
@@ -211,18 +209,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Οθόνη:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>ΜΕΤΑΦΟΡΤΩΣΗ ΤΩΡΑ</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>αδράνεια</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Όνομα οθόνης:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Μέγεθος:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Σε εξέλιξη:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Τελευταία επιβεβαίωση bytes_written / σύνολο:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Τελευταίο byte κατάστασης επιβεβαίωσης:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ΑΡΧΕΙΑ ΤΙΜΟΝΙΟΥ</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// Οθόνες φορτωμένες στο τιμόνι</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Κατάσταση</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Τίτλος</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Όνομα φακέλου</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Άθροισμα ελέγχου</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση CoAP SDK server</value></data>
@@ -534,8 +523,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Φάκελος: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Η αποστολή σε ουρά — μεταφορά «{0}» στο τιμόνι…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Η αποστολή δεν ξεκίνησε — το τιμόνι δεν είναι συνδεδεμένο ή δεν υπάρχει ακόμη συνεδρία διαχείρισης.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Η αποστολή ολοκληρώθηκε (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Η αποστολή σταμάτησε (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Η αποστολή ολοκληρώθηκε (κατάσταση 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Η αποστολή σταμάτησε στο {0}% (κατάσταση 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Επιλέξτε ένα αρχείο .mzdash για αποστολή</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Ταμπλό Moza (*.mzdash)|*.mzdash|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Επιλέξτε φάκελο που περιέχει αρχεία ταμπλό .mzdash</value></data>
@@ -764,13 +753,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>ΝΕΟ DASHBOARD…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Άνοιγμα του επιλεγμένου dashboard στο MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Δημιουργία νέου dashboard στο MOZA Dashboard Studio, στο μέγεθος της συνδεδεμένης οθόνης</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Άνοιξε στο MOZA Dashboard Studio — πατήστε Ανανέωση όταν τελειώσετε για επαναφόρτωση της βιβλιοθήκης.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>Δεν βρέθηκε το MOZA Dashboard Studio. Εγκαταστήστε το MOZA Pit House για να χρησιμοποιήσετε τον επεξεργαστή.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Δεν ήταν δυνατή η εκκίνηση του MOZA Dashboard Studio: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Επιλέξτε ένα dashboard που έχει αρχείο στον δίσκο για να το επεξεργαστείτε.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Δεν υπάρχουν ακόμη πληροφορίες οθόνης από τη συσκευή — το Studio θα ανοίξει χωρίς προεπιλεγμένη συσκευή.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Το Studio αποθηκεύει τα νέα dashboards στο {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Η βιβλιοθήκη dashboard φορτώθηκε ξανά ({0} dashboards).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Άνοιξε στο Studio — πατήστε Ανανέωση όταν τελειώσετε.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Δεν βρέθηκε το Dashboard Studio — εγκαταστήστε το MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Το Studio δεν ξεκίνησε: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Επιλέξτε dashboard με αρχείο στον δίσκο.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Καμία πληροφορία οθόνης ακόμη — άνοιγμα χωρίς συσκευή.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Αποθήκευση στο {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Η βιβλιοθήκη φορτώθηκε ξανά — {0} dashboards.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Διάταξη 5+R 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Διάταξη R+5</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Διάταξη R+6</value></data>
@@ -780,4 +769,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Ανάγνωση διάταξης</value></data>
   <data name="Label_State" xml:space="preserve"><value>Κατάσταση</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Σφάλμα κατάστασης</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Κατάσταση:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Αποστολή - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Ολοκληρώθηκε - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Σταμάτησε - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>ΠΗΓΗ ΑΠΟΣΤΟΛΗΣ</value></data>
 </root>

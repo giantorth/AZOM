@@ -202,8 +202,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>EFFACER TOUS LES RÉGLAGES ET PROFILS</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Cela réinitialisera tous les réglages et profils du plugin à leurs valeurs par défaut.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TÉLÉVERSEMENT DU TABLEAU DE BORD</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// envoyer un fichier .mzdash vers le volant connecté</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>SOURCE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Fichier .mzdash local</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Bibliothèque de tableaux de bord</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>CHOISIR .MZDASH…</value></data>
@@ -211,18 +209,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Tableau de bord :</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>TÉLÉVERSER MAINTENANT</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>inactif</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Nom du tableau de bord :</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Taille brute :</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5 :</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>En cours :</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Dernier ack bytes_written / total :</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Octet d'état du dernier ack :</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>FICHIERS DU VOLANT</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// tableaux de bord chargés sur le volant</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>État</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Titre</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Dossier</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hachage</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Dernière modification</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SUPPRIMER</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Activer le serveur SDK CoAP</value></data>
@@ -535,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Dossier : {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Téléversement en file d'attente — envoi de « {0} » vers le volant…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Téléversement non démarré — volant non connecté ou aucune session de gestion pour l'instant.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Téléversement terminé (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Téléversement arrêté (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Téléversement terminé (statut 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Téléversement arrêté à {0} % (statut 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Sélectionnez un fichier .mzdash à téléverser</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Tableau de bord Moza (*.mzdash)|*.mzdash|Tous les fichiers (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Sélectionnez le dossier contenant les fichiers de tableau de bord .mzdash</value></data>
@@ -765,13 +754,13 @@ Id : {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>NOUVEAU TABLEAU…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Ouvrir le tableau de bord sélectionné dans MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Créer un tableau de bord dans MOZA Dashboard Studio, aux dimensions de l'écran connecté</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Ouvert dans MOZA Dashboard Studio — appuyez sur Actualiser une fois terminé pour recharger la bibliothèque.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio introuvable. Installez MOZA Pit House pour utiliser l'éditeur de tableau de bord.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Impossible de démarrer MOZA Dashboard Studio : {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Sélectionnez un tableau de bord possédant un fichier sur le disque pour l'éditer.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Aucune info d'écran reçue de l'appareil — Studio s'ouvrira sans appareil présélectionné.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio enregistre les nouveaux tableaux de bord dans {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Bibliothèque de tableaux de bord rechargée ({0} tableaux).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Ouvert dans Studio — appuyez sur Actualiser une fois terminé.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio introuvable — installez MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Échec du démarrage de Studio : {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Sélectionnez un tableau de bord avec un fichier sur le disque.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Aucune info d'écran — ouverture sans appareil.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Enregistre dans {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Bibliothèque rechargée — {0} tableaux.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Disposition 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Disposition</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Disposition</value></data>
@@ -781,4 +770,9 @@ Id : {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Relecture de disposition</value></data>
   <data name="Label_State" xml:space="preserve"><value>État</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Erreur d'état</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Statut :</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Téléversement - {0} %</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Terminé - 100 %</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Arrêté - {0} %</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>SOURCE DU TÉLÉVERSEMENT</value></data>
 </root>

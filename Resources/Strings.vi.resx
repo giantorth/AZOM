@@ -202,8 +202,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>XÓA TẤT CẢ CÀI ĐẶT &amp; HỒ SƠ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Thao tác này sẽ đặt lại toàn bộ cài đặt và hồ sơ của plugin về mặc định.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>TẢI LÊN BẢNG ĐIỀU KHIỂN</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// đẩy một tệp .mzdash lên vô lăng đang kết nối</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>NGUỒN</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Tệp .mzdash cục bộ</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Thư viện bảng điều khiển</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>CHỌN .MZDASH…</value></data>
@@ -211,18 +209,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Bảng điều khiển:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>TẢI LÊN NGAY</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>nhàn rỗi</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Tên bảng điều khiển:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Kích thước thô:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Đang truyền:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Ack cuối bytes_written / tổng:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Byte trạng thái ack cuối:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>TỆP TRÊN VÔ LĂNG</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// các bảng điều khiển đã nạp lên vô lăng</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Trạng thái</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tiêu đề</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Thư mục</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Mã băm</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sửa đổi lần cuối</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>XÓA</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Bật máy chủ CoAP SDK</value></data>
@@ -535,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Thư mục: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Đã đưa tải lên vào hàng đợi — đang gửi "{0}" đến vô-lăng…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Chưa bắt đầu tải lên — vô-lăng chưa kết nối hoặc chưa có phiên quản lý.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Tải lên hoàn tất (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Đã dừng tải lên (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Tải lên hoàn tất (trạng thái 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Đã dừng tải lên ở {0}% (trạng thái 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Chọn tệp .mzdash để tải lên</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Bảng đồng hồ Moza (*.mzdash)|*.mzdash|Tất cả tệp (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Chọn thư mục chứa các tệp bảng đồng hồ .mzdash</value></data>
@@ -765,13 +754,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>BẢNG ĐIỀU KHIỂN MỚI…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Mở bảng điều khiển đã chọn trong MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Tạo bảng điều khiển mới trong MOZA Dashboard Studio, đúng kích thước màn hình đang kết nối</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Đã mở trong MOZA Dashboard Studio — xong thì bấm Làm mới để nạp lại thư viện.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>Không tìm thấy MOZA Dashboard Studio. Cài MOZA Pit House để dùng trình chỉnh sửa bảng điều khiển.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Không khởi động được MOZA Dashboard Studio: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Chọn một bảng điều khiển có tệp trên đĩa để chỉnh sửa.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Chưa có thông tin màn hình từ thiết bị — Studio sẽ mở mà không chọn sẵn thiết bị.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lưu bảng điều khiển mới vào {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Đã nạp lại thư viện bảng điều khiển ({0} bảng).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Đã mở trong Studio — xong thì bấm Làm mới.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Không thấy Dashboard Studio — hãy cài MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio không khởi động được: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Chọn bảng điều khiển có tệp trên đĩa.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Chưa có thông tin màn hình — mở mà không chọn thiết bị.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Lưu vào {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Đã nạp lại thư viện — {0} bảng.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Bố cục 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Bố cục</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Bố cục</value></data>
@@ -781,4 +770,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Đọc lại bố cục</value></data>
   <data name="Label_State" xml:space="preserve"><value>Trạng thái</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Lỗi trạng thái</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Trạng thái:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Đang tải lên - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Hoàn tất - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Đã dừng - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>NGUỒN TẢI LÊN</value></data>
 </root>

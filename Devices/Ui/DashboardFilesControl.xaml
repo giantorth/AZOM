@@ -13,53 +13,102 @@
                 <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaTheme.xaml"/>
                 <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Implicit chrome, mirroring DashboardManagementControl. Without
+                 it this control falls through to SimHub's app styles — bold
+                 DataGrid text and system-white headers. -->
+            <Style TargetType="Button" BasedOn="{StaticResource MozaButton}"/>
+            <Style TargetType="ComboBox" BasedOn="{StaticResource MozaCombo}"/>
+            <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            </Style>
+            <Style TargetType="Separator">
+                <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="Height" Value="1"/>
+            </Style>
+            <Style TargetType="DataGrid">
+                <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="VerticalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="RowBackground" Value="{StaticResource BgCardBrush}"/>
+                <Setter Property="AlternatingRowBackground" Value="{StaticResource BgCard2Brush}"/>
+            </Style>
+            <!-- Headers read as headers from the darker band + brighter
+                 foreground, not from weight — nothing in this table is bold. -->
+            <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="{StaticResource BgCard2Brush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                <Setter Property="Padding" Value="8,6"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+            </Style>
+            <Style TargetType="DataGridRow">
+                <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+            </Style>
+            <Style TargetType="DataGridCell">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="8,2"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DataGridCell">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
     <StackPanel>
 
-        <ctrl:SectionCard Title="{x:Static res:Strings.Section_DashboardUpload}"
-                          Subtitle="{x:Static res:Strings.Subtitle_DashboardUpload}"
-                          Icon="{StaticResource IconDiag}">
+        <!-- Upload workflow (left) + its source settings (right), side by side
+             in a two-column grid — the paired-card pattern the Dashboard tab
+             uses. What you DO lives left; what you CONFIGURE lives right. -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+        <ctrl:SectionCard Grid.Column="0"
+                          Title="{x:Static res:Strings.Section_DashboardUpload}"
+                          Icon="{StaticResource IconDiag}" Margin="0,0,7,14">
             <StackPanel>
-                <TextBlock Text="{x:Static res:Strings.Label_Source}" Style="{StaticResource MutedHintText}" Margin="0,0,0,6"/>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <RadioButton x:Name="UploadSourceFileRadio" Content="{x:Static res:Strings.Option_LocalMzdashFile}"
-                                 GroupName="WiUploadSource" IsChecked="True"
-                                 Margin="0,0,16,0" VerticalAlignment="Center"
-                                 Foreground="{StaticResource TextBrush}"
-                                 Click="UploadSourceRadio_Click"/>
-                    <RadioButton x:Name="UploadSourceLibraryRadio" Content="{x:Static res:Strings.Option_DashboardLibrary}"
-                                 GroupName="WiUploadSource"
-                                 VerticalAlignment="Center"
-                                 Foreground="{StaticResource TextBrush}"
-                                 Click="UploadSourceRadio_Click"/>
-                </StackPanel>
-                <StackPanel x:Name="UploadFilePanel" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Button Content="{x:Static res:Strings.Button_PickMzdash}" Margin="0,0,8,0" Click="UploadPickFile_Click"/>
-                    <TextBlock x:Name="UploadPickedFileText" VerticalAlignment="Center"
+                <Grid x:Name="UploadFilePanel" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="{x:Static res:Strings.Button_PickMzdash}" Margin="0,0,8,0" Click="UploadPickFile_Click"/>
+                    <TextBlock Grid.Column="1" x:Name="UploadPickedFileText" VerticalAlignment="Center"
                                Style="{StaticResource MutedHintText}"
-                               Text="{x:Static res:Strings.Status_NoFileSelected}" TextTrimming="CharacterEllipsis"
-                               MaxWidth="500"/>
-                </StackPanel>
-                <StackPanel x:Name="UploadLibraryPanel" Margin="0,0,0,8"
-                            Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <Button Content="{x:Static res:Strings.Button_SetFolder}" Click="UploadSetFolder_Click" Margin="0,0,4,0"
-                                ToolTip="{x:Static res:Strings.Tooltip_SetFolder}"/>
-                        <Button Content="{x:Static res:Strings.Button_AutoDetect}" Click="UploadAutoDetect_Click" Margin="0,0,4,0"
-                                ToolTip="{x:Static res:Strings.Tooltip_AutoDetect}"/>
-                        <TextBlock x:Name="UploadFolderInfo" Style="{StaticResource MutedHintText}"
-                                   VerticalAlignment="Center" Margin="8,0,0,0"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="400"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{x:Static res:Strings.Label_Dashboard}" VerticalAlignment="Center" Width="100"/>
-                        <ComboBox x:Name="UploadLibraryCombo" Width="280" Margin="0,0,8,0"
-                                  SelectionChanged="UploadLibraryCombo_SelectionChanged"/>
-                        <Button Content="{x:Static res:Strings.Button_Refresh}" Click="UploadLibraryRefresh_Click"/>
-                    </StackPanel>
-                </StackPanel>
+                               Text="{x:Static res:Strings.Status_NoFileSelected}" TextTrimming="CharacterEllipsis"/>
+                </Grid>
+                <Grid x:Name="UploadLibraryPanel" Margin="0,0,0,8" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.Label_Dashboard}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox Grid.Column="1" x:Name="UploadLibraryCombo" Margin="0,0,8,0"
+                              SelectionChanged="UploadLibraryCombo_SelectionChanged"/>
+                    <Button Grid.Column="2" Content="{x:Static res:Strings.Button_Refresh}" Click="UploadLibraryRefresh_Click"/>
+                </Grid>
                 <!-- MOZA Dashboard Studio. Edit passes the selected dashboard's
                      absolute .mzdash path as a bare positional argument (forward
                      slashes) — the exact form PitHouse uses, and it accepts any
@@ -68,57 +117,72 @@
                      sibling AFTER UploadLibraryPanel, not inside it: editing is
                      useful in local-file mode too, and that panel is collapsed
                      there. -->
-                <StackPanel x:Name="StudioPanel" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Button x:Name="StudioEditButton" Content="{x:Static res:Strings.Button_EditInStudio}"
+                <!-- Grid, not a horizontal StackPanel: the status column takes
+                     the pane's remaining width instead of a fixed MaxWidth, so
+                     messages only ellipsise when genuinely out of room. -->
+                <Grid x:Name="StudioPanel" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" x:Name="StudioEditButton" Content="{x:Static res:Strings.Button_EditInStudio}"
                             ToolTip="{x:Static res:Strings.Tooltip_EditInStudio}"
                             Margin="0,0,8,0" Click="StudioEdit_Click"/>
-                    <Button x:Name="StudioCreateButton" Content="{x:Static res:Strings.Button_NewDashboard}"
+                    <Button Grid.Column="1" x:Name="StudioCreateButton" Content="{x:Static res:Strings.Button_NewDashboard}"
                             ToolTip="{x:Static res:Strings.Tooltip_NewDashboard}"
                             Margin="0,0,8,0" Click="StudioCreate_Click"/>
-                    <TextBlock x:Name="StudioStatusText" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="2" x:Name="StudioStatusText" VerticalAlignment="Center"
                                Style="{StaticResource MutedHintText}"
-                               TextTrimming="CharacterEllipsis" MaxWidth="420"/>
-                </StackPanel>
+                               TextTrimming="CharacterEllipsis"/>
+                </Grid>
                 <Separator Margin="0,8,0,12"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                     <Button x:Name="UploadNowButton" Content="{x:Static res:Strings.Button_UploadNow}" MinWidth="120"
                             Style="{StaticResource MozaButtonPrimary}"
                             Click="UploadNow_Click"/>
+                    <!-- Blank at rest — the Status line below already says idle.
+                         This slot only carries the transient upload hints
+                         (queued / not started / complete / stopped / errors). -->
                     <TextBlock x:Name="UploadStatusText" VerticalAlignment="Center"
-                               Style="{StaticResource MutedHintText}" Margin="14,0,0,0"
+                               Style="{StaticResource MutedHintText}" Margin="14,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="{x:Static res:Strings.Label_UploadStatus}" Style="{StaticResource KvKeyText}"/>
+                    <TextBlock x:Name="UploadInfoProgressText" Style="{StaticResource KvValueText}"
                                Text="{x:Static res:Strings.Status_Idle}"/>
                 </StackPanel>
-                <Grid Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static res:Strings.Label_DashboardName}" Style="{StaticResource KvKeyText}" Margin="0,3"/>
-                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="UploadInfoNameText" Style="{StaticResource KvValueText}" Margin="0,3" Text="—"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static res:Strings.Label_RawSize}" Style="{StaticResource KvKeyText}" Margin="0,3"/>
-                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="UploadInfoRawSizeText" Style="{StaticResource KvValueText}" Margin="0,3" Text="—"/>
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static res:Strings.Label_Md5}" Style="{StaticResource KvKeyText}" Margin="0,3"/>
-                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="UploadInfoMd5Text" Style="{StaticResource KvValueText}" Margin="0,3" Text="—"/>
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static res:Strings.Label_InFlight}" Style="{StaticResource KvKeyText}" Margin="0,3"/>
-                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="UploadInfoInFlightText" Style="{StaticResource KvValueText}" Margin="0,3" Text="—"/>
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{x:Static res:Strings.Label_LastAckBytes}" Style="{StaticResource KvKeyText}" Margin="0,3"/>
-                    <TextBlock Grid.Row="4" Grid.Column="1" x:Name="UploadInfoProgressText" Style="{StaticResource KvValueText}" Margin="0,3" Text="—"/>
-                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{x:Static res:Strings.Label_LastAckStatus}" Style="{StaticResource KvKeyText}" Margin="0,3"/>
-                    <TextBlock Grid.Row="5" Grid.Column="1" x:Name="UploadInfoStatusByteText" Style="{StaticResource KvValueText}" Margin="0,3" Text="—"/>
-                </Grid>
             </StackPanel>
         </ctrl:SectionCard>
 
+            <ctrl:SectionCard Grid.Column="1"
+                              Title="{x:Static res:Strings.Section_UploadSource}"
+                              Icon="{StaticResource IconOptions}" Margin="7,0,0,14">
+                <StackPanel>
+                    <!-- No "Source" label: the card title already says it. -->
+                    <ctrl:SegmentedControl x:Name="UploadSourceSelector" SelectedIndex="0"
+                                           Margin="0,0,0,10"
+                                           SelectionChanged="UploadSourceSelector_SelectionChanged">
+                        <ListBoxItem Content="{x:Static res:Strings.Option_LocalMzdashFile}"/>
+                        <ListBoxItem Content="{x:Static res:Strings.Option_DashboardLibrary}"/>
+                    </ctrl:SegmentedControl>
+                    <!-- Folder pickers only mean anything in library mode; shown
+                         and hidden with the combo row in the card to the left. -->
+                    <StackPanel x:Name="UploadFolderPanel" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Button Content="{x:Static res:Strings.Button_SetFolder}" Click="UploadSetFolder_Click" Margin="0,0,4,0"
+                                    ToolTip="{x:Static res:Strings.Tooltip_SetFolder}"/>
+                            <Button Content="{x:Static res:Strings.Button_AutoDetect}" Click="UploadAutoDetect_Click"
+                                    ToolTip="{x:Static res:Strings.Tooltip_AutoDetect}"/>
+                        </StackPanel>
+                        <TextBlock x:Name="UploadFolderInfo" Style="{StaticResource MutedHintText}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </StackPanel>
+            </ctrl:SectionCard>
+        </Grid>
+
         <ctrl:SectionCard Title="{x:Static res:Strings.Section_WheelFiles}"
-                          Subtitle="{x:Static res:Strings.Subtitle_WheelFiles}"
                           Icon="{StaticResource IconDiag}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
@@ -130,7 +194,8 @@
                 <DataGrid x:Name="WheelFilesGrid" AutoGenerateColumns="False" IsReadOnly="True"
                           CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
                           SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          BorderThickness="1" RowHeight="24">
+                          BorderThickness="1" RowHeight="28"
+                          PreviewMouseWheel="WheelFilesGrid_PreviewMouseWheel">
                     <DataGrid.CellStyle>
                         <!-- Non-focusable cells: without this the DataGrid eats
                              the first click to move cell focus and the row's
@@ -140,12 +205,15 @@
                         </Style>
                     </DataGrid.CellStyle>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_State}" Binding="{Binding State}" Width="80"/>
+                        <!-- Star-sized Title so the grid tracks the pane width
+                             instead of overflowing on a narrow window. DirName
+                             and Hash are deliberately not shown: DirName mostly
+                             repeats Title (and is in the delete dialog), and
+                             the hash isn't actionable from here. -->
+                        <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_State}" Binding="{Binding State}" Width="Auto" MinWidth="70"/>
                         <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_Title}" Binding="{Binding Title}" Width="*"/>
-                        <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_DirName}" Binding="{Binding DirName}" Width="200"/>
-                        <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_Hash}" Binding="{Binding HashShort}" Width="120"/>
-                        <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_LastModified}" Binding="{Binding LastModified}" Width="170"/>
-                        <DataGridTemplateColumn Header="" Width="150">
+                        <DataGridTextColumn Header="{x:Static res:Strings.DataGridHeader_LastModified}" Binding="{Binding LastModified}" Width="150"/>
+                        <DataGridTemplateColumn Header="" Width="130">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">

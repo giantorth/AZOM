@@ -202,8 +202,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ОЧИСТИТЬ ВСЕ НАСТРОЙКИ И ПРОФИЛИ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Это сбросит все настройки и профили плагина к значениям по умолчанию.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ЗАГРУЗКА ПАНЕЛИ</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// отправка файла .mzdash на подключённый руль</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>ИСТОЧНИК</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Локальный файл .mzdash</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Библиотека панелей</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>ВЫБРАТЬ .MZDASH…</value></data>
@@ -211,18 +209,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Панель:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>ЗАГРУЗИТЬ СЕЙЧАС</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>ожидание</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Имя панели:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Размер:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>В процессе:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Последний ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Байт статуса последнего ack:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ФАЙЛЫ РУЛЯ</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// панели, загруженные на руль</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Состояние</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Название</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Папка</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Хеш</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Изменено</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>УДАЛИТЬ</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Включить сервер CoAP SDK</value></data>
@@ -535,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Папка: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Загрузка в очереди — отправка «{0}» на руль…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Загрузка не начата — руль не подключён или сеанс управления ещё не установлен.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Загрузка завершена (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Загрузка остановлена (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Загрузка завершена (статус 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Загрузка остановлена на {0}% (статус 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Выберите файл .mzdash для загрузки</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Панель Moza (*.mzdash)|*.mzdash|Все файлы (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Выберите папку с файлами панелей .mzdash</value></data>
@@ -765,13 +754,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>НОВЫЙ ДАШБОРД…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Открыть выбранный дашборд в MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Создать дашборд в MOZA Dashboard Studio под размер подключённого экрана</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Открыто в MOZA Dashboard Studio — по завершении нажмите «Обновить», чтобы перечитать библиотеку.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio не найден. Установите MOZA Pit House, чтобы использовать редактор дашбордов.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Не удалось запустить MOZA Dashboard Studio: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Выберите дашборд, у которого есть файл на диске, чтобы его редактировать.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>От устройства ещё нет данных о дисплее — Studio откроется без выбранного устройства.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio сохраняет новые дашборды в {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Библиотека дашбордов перечитана ({0} шт.).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Открыто в Studio — нажмите «Обновить» по завершении.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio не найден — установите MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio не запустился: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Выберите дашборд с файлом на диске.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Данных о дисплее нет — открытие без устройства.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Сохраняет в {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Библиотека перечитана — {0} шт.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Схема 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Схема</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Схема</value></data>
@@ -781,4 +770,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Обратное чтение раскладки</value></data>
   <data name="Label_State" xml:space="preserve"><value>Состояние</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Ошибка состояния</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Статус:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Загрузка - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Завершено - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Остановлено - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>ИСТОЧНИК ЗАГРУЗКИ</value></data>
 </root>

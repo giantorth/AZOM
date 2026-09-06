@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.Telemetry.Dashboard;
@@ -101,10 +102,13 @@ namespace MozaPlugin.Devices.Ui
 
         // ── Upload source pickers ───────────────────────────────────────
 
-        private void UploadSourceRadio_Click(object sender, RoutedEventArgs e)
+        // Segment 0 = local .mzdash file, segment 1 = dashboard library.
+        private bool LibraryMode => UploadSourceSelector?.SelectedIndex == 1;
+
+        private void UploadSourceSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
-            bool libMode = UploadSourceLibraryRadio?.IsChecked == true;
+            bool libMode = LibraryMode;
             ApplyUploadSourceVisibility(libMode);
             if (libMode) SeedUploadLibrary(force: false);
             if (_plugin?.Settings != null)
@@ -122,10 +126,13 @@ namespace MozaPlugin.Devices.Ui
                 UploadFilePanel.Visibility = libMode ? Visibility.Collapsed : Visibility.Visible;
             if (UploadLibraryPanel != null)
                 UploadLibraryPanel.Visibility = libMode ? Visibility.Visible : Visibility.Collapsed;
+            // Lives in the source card to the right, but tracks the same mode.
+            if (UploadFolderPanel != null)
+                UploadFolderPanel.Visibility = libMode ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
-        /// Re-apply the persisted source radio. Plugin-global, so the wheel page
+        /// Re-apply the persisted source selection. Plugin-global, so the wheel page
         /// and the CM2 dash page share it — see the field comment on
         /// <see cref="MozaPluginSettings.DashboardUploadSourceMode"/>.
         /// Idempotent: safe to re-run on every page revisit.
@@ -137,8 +144,7 @@ namespace MozaPlugin.Devices.Ui
                        == global::MozaPlugin.Settings.DashboardUploadSource.Library;
             using (_suppressor.Begin())
             {
-                if (UploadSourceLibraryRadio != null) UploadSourceLibraryRadio.IsChecked = lib;
-                if (UploadSourceFileRadio != null) UploadSourceFileRadio.IsChecked = !lib;
+                if (UploadSourceSelector != null) UploadSourceSelector.SelectedIndex = lib ? 1 : 0;
                 ApplyUploadSourceVisibility(lib);
             }
             // Outside the suppressor: SeedUploadLibrary opens its own scope and
@@ -239,7 +245,7 @@ namespace MozaPlugin.Devices.Ui
         /// </summary>
         private string? ResolveEditablePath()
         {
-            if (UploadSourceLibraryRadio?.IsChecked != true)
+            if (!LibraryMode)
                 return System.IO.File.Exists(_uploadPickedSourceLabel) ? _uploadPickedSourceLabel : null;
             if (UploadLibraryCombo?.SelectedItem is not string name || _plugin?.DashCache == null)
                 return null;
@@ -483,7 +489,7 @@ namespace MozaPlugin.Devices.Ui
             _uploadPickedSourceDirectory = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
             if (UploadStatusText != null
                 && UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_CannotResolveBytes))
-                UploadStatusText.Text = Strings.Status_Idle;
+                UploadStatusText.Text = "";
             if (_plugin.Settings != null)
             {
                 _plugin.Settings.LastUploadLibraryName = name;
@@ -527,11 +533,28 @@ namespace MozaPlugin.Devices.Ui
             public string State { get; set; } = "";       // "enabled" / "disabled"
             public string Title { get; set; } = "";
             public string DirName { get; set; } = "";
+            // Not shown in the grid; still part of the rebind signature so a
+            // hash change on an otherwise-identical row refreshes it.
             public string Hash { get; set; } = "";
-            public string HashShort => string.IsNullOrEmpty(Hash) ? "" :
-                (Hash.Length > 12 ? Hash.Substring(0, 12) + "…" : Hash);
             public string LastModified { get; set; } = "";
             public string Id { get; set; } = "";
+        }
+
+        // DataGrid's template wraps its rows in a ScrollViewer that marks the
+        // wheel event handled even though this grid is unbounded and never
+        // scrolls itself, so SimHub's host scroller never sees it. Re-raise on
+        // the parent. (The sibling DashboardManagementControl uses ItemsControl,
+        // which has no inner ScrollViewer and needs none of this.)
+        private void WheelFilesGrid_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (e.Handled) return;
+            e.Handled = true;
+            if (((FrameworkElement)sender).Parent is not UIElement parent) return;
+            parent.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+            {
+                RoutedEvent = MouseWheelEvent,
+                Source = sender,
+            });
         }
 
         private void WheelFilesRefresh_Click(object sender, RoutedEventArgs e)
@@ -707,7 +730,7 @@ namespace MozaPlugin.Devices.Ui
             // would quietly replace what the user is about to upload.
             // Deliberately do NOT consume the count here, so switching back to
             // library mode re-seeds on the next tick.
-            if (UploadSourceLibraryRadio?.IsChecked != true) return;
+            if (!LibraryMode) return;
             SeedUploadLibrary(force: true);   // updates _lastLibraryNameCount
         }
 
@@ -786,42 +809,30 @@ namespace MozaPlugin.Devices.Ui
 
         private void RefreshDashboardUploadStatus()
         {
-            if (UploadInfoNameText == null || _plugin == null || _data == null) return;
+            if (UploadInfoProgressText == null || _plugin == null || _data == null) return;
             var ts = ActiveSender;
 
-            string activeName = ts?.MzdashName ?? "";
-            string displayName = !string.IsNullOrEmpty(_uploadPickedName)
-                ? _uploadPickedName
-                : (!string.IsNullOrEmpty(activeName) ? activeName : "—");
-            UploadInfoNameText.Text = displayName;
-
-            int rawSize = _uploadPickedContent?.Length ?? ts?.MzdashContent?.Length ?? 0;
-            UploadInfoRawSizeText.Text = rawSize > 0 ? $"{rawSize:N0} bytes" : "—";
-
-            byte[]? bytes = _uploadPickedContent ?? ts?.MzdashContent;
-            UploadInfoMd5Text.Text = bytes != null && bytes.Length > 0
-                ? FileTransferBuilder.Md5Hex(FileTransferBuilder.ComputeMd5(bytes))
-                : "—";
-
             bool inFlight = ts?.IsUploadInFlight ?? false;
-            UploadInfoInFlightText.Text = inFlight ? "yes" : "no";
-            UploadInfoInFlightText.Foreground = inFlight ? Brushes.Goldenrod : Brushes.Gray;
-
             uint bw = ts?.UploadLastBytesWritten ?? 0;
             uint total = ts?.UploadLastTotalSize ?? 0;
-            UploadInfoProgressText.Text = total == 0
-                ? "—"
-                : $"{bw:N0} / {total:N0}" + (bw == total && total != 0 ? "  (complete)" : "");
-
             byte status = ts?.UploadLastStatusByte ?? 0;
-            UploadInfoStatusByteText.Text = status == 0 ? "—" : $"0x{status:X2}";
+            int pct = total == 0 ? 0 : (int)(bw * 100L / total);
+
+            UploadInfoProgressText.Text =
+                  inFlight    ? string.Format(Strings.Upload_StatusUploading, pct)
+                : total == 0  ? Strings.Status_Idle
+                : bw == total ? Strings.Upload_StatusComplete
+                              : string.Format(Strings.Upload_StatusStopped, pct);
+            UploadInfoProgressText.Foreground = inFlight
+                ? (Brush)(TryFindResource("AmberBrush") ?? Brushes.Goldenrod)
+                : (Brush)(TryFindResource("TextDimBrush") ?? Brushes.Gray);
 
             if (UploadStatusText != null && !inFlight && total != 0)
             {
                 if (bw == total)
-                    UploadStatusText.Text = string.Format(Strings.Upload_Complete, bw, total, status.ToString("X2"));
+                    UploadStatusText.Text = string.Format(Strings.Upload_Complete, status.ToString("X2"));
                 else if (UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
-                    UploadStatusText.Text = string.Format(Strings.Upload_Stopped, bw, total, status.ToString("X2"));
+                    UploadStatusText.Text = string.Format(Strings.Upload_Stopped, pct, status.ToString("X2"));
             }
 
             // Enable the upload button only when the wheel is connected and a

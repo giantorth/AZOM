@@ -225,8 +225,6 @@
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>LIMPAR TODAS AS CONFIGURAÇÕES E PERFIS</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Isto redefinirá todas as configurações e perfis do plugin para os padrões.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ENVIO DE PAINEL</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// envia um arquivo .mzdash ao volante conectado</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>ORIGEM</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Arquivo .mzdash local</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Biblioteca de painéis</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>ESCOLHER .MZDASH…</value></data>
@@ -234,18 +232,9 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Painel:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>ENVIAR AGORA</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>ocioso</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Nome do painel:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Tamanho bruto:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Em trânsito:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Último ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Byte de status do último ack:</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ARQUIVOS DO VOLANTE</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// painéis carregados no volante</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Estado</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Título</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Nome da pasta</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Última modificação</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>EXCLUIR</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ativar servidor CoAP SDK</value></data>
@@ -557,8 +546,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Pasta: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Envio na fila — enviando "{0}" para o volante…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Envio não iniciado — volante desconectado ou sem sessão de gerenciamento ainda.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Envio concluído (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Envio interrompido (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Envio concluído (estado 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Envio interrompido em {0}% (estado 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Escolha um arquivo .mzdash para enviar</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Painel Moza (*.mzdash)|*.mzdash|Todos os arquivos (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Selecione a pasta com arquivos de painel .mzdash</value></data>
@@ -764,13 +753,13 @@ Id: {2}</value></data>
   <data name="Button_NewDashboard" xml:space="preserve"><value>NOVO PAINEL…</value></data>
   <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Abrir o painel selecionado no MOZA Dashboard Studio</value></data>
   <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Criar um painel novo no MOZA Dashboard Studio, dimensionado para o ecrã ligado</value></data>
-  <data name="Studio_Launched" xml:space="preserve"><value>Aberto no MOZA Dashboard Studio — carregue em Atualizar quando terminar para recarregar a biblioteca.</value></data>
-  <data name="Studio_NotInstalled" xml:space="preserve"><value>MOZA Dashboard Studio não encontrado. Instale o MOZA Pit House para usar o editor de painéis.</value></data>
-  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Não foi possível iniciar o MOZA Dashboard Studio: {0}</value></data>
-  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Selecione um painel com ficheiro em disco para o editar.</value></data>
-  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ainda sem informação de ecrã do dispositivo — o Studio abrirá sem dispositivo pré-selecionado.</value></data>
-  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>O Studio guarda os painéis novos em {0}</value></data>
-  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Biblioteca de painéis recarregada ({0} painéis).</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Aberto no Studio — carregue em Atualizar ao terminar.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio não encontrado — instale o MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>O Studio não arrancou: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Selecione um painel com ficheiro em disco.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ainda sem info de ecrã — a abrir sem dispositivo.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Guarda em {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Biblioteca recarregada — {0} painéis.</value></data>
   <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Layout 5+R 2</value></data>
   <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Layout R+5</value></data>
   <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Layout R+6</value></data>
@@ -780,4 +769,9 @@ Id: {2}</value></data>
   <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Releitura de disposição</value></data>
   <data name="Label_State" xml:space="preserve"><value>Estado</value></data>
   <data name="Label_StateError" xml:space="preserve"><value>Erro de estado</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Estado:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>A enviar - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Concluído - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Interrompido - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>ORIGEM DO ENVIO</value></data>
 </root>
