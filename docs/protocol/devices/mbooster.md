@@ -9,8 +9,8 @@ Threshold, Engine) per the documented protocol.
 **Multi-device:** the plugin supports more than one mBooster on the
 same host concurrently (one each for throttle / brake / clutch is the
 canonical layout). Each unit gets its own [`MozaSerialConnection`](../../../Protocol/MozaSerialConnection.cs)
-under [`MBoosterDeviceController`](../../../Devices/MBoosterDeviceController.cs);
-all controllers are owned by [`MozaMBoosterRegistry`](../../../Devices/MozaMBoosterRegistry.cs).
+under [`MBoosterDeviceController`](../../../Devices/MBooster/MBoosterDeviceController.cs);
+all controllers are owned by [`MozaMBoosterRegistry`](../../../Devices/MBooster/MozaMBoosterRegistry.cs).
 
 ## Reference protocol
 
@@ -19,7 +19,7 @@ The user-supplied protocol note in
 is the authoritative wire-format reference. It includes verified
 known-good frames against real hardware captures + the host-side
 synthesizer formulas the plugin reproduces verbatim (see
-[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)).
+[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)).
 
 The plugin-side implementation diverges from the protocol note in only
 two ways:
@@ -196,7 +196,7 @@ type, heartbeat) arrives on the base's `0x0E` channel with source byte
 The plugin registers a ROUTED mBooster lane for this hookup: when the
 pedal sub-device is detected on a base/hub pipe, its identity is probed
 at `0x19` and — model-name `mBooster` being the discriminator against
-plain SGP pedals, which answer the same identity groups — an
+plain CRP/SRP pedals, which answer the same identity groups — an
 `MBoosterDeviceController` is registered over the shared pipe. All
 mbooster-* traffic (identity, calibration, `0xb1` motor frames,
 keepalive) addresses `0x19`; `0x1d`/`0x1e` are never used on a shared
@@ -300,7 +300,7 @@ they aren't coalesced.
 
 ## Effect synthesis
 
-[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)
+[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
 reproduces protocol note § 4 verbatim:
 
 | Effect    | Waveform                                                    |
@@ -504,10 +504,32 @@ need to reverse-engineer Pit House's exact noise algorithm to work
 correctly — any reasonable road-like noise generator satisfies the wire
 contract, since the actual shaping happens firmware-side. See
 `MBoosterEffectSynthesizer.SynthesizeRoadTextureNoise` (a deterministic
-value-noise generator, smoothstep-interpolated between pseudo-random
-keyframes every 0.35s to loosely match the observed oscillation rate —
-explicitly *not* a decoded replica of Pit House's own algorithm, since
-that wasn't necessary or knowable from this evidence).
+value-noise generator, explicitly *not* a decoded replica of Pit House's
+own algorithm, since that wasn't necessary or knowable from this
+evidence).
+
+**The ~1.3-1.6 peaks/sec rate above is NOT trusted as Pit House's real
+oscillation rate.** It reads the frame-by-frame sample sequence *as* the
+waveform, which only holds if the noise is band-limited well under the
+frame rate — nothing here established that, and road chatter is exactly
+the case where it wouldn't be. Near-full-range excursions (±32700) at
+~1.4/sec is the signature of *undersampled* broadband noise. It is also
+physically implausible on its face: an effect Pit House ships as "Road
+Texture", through a vibration motor, making full-scale excursions ~1.4
+times a second is a slow ram, not texture.
+
+The generator originally targeted that rate and consequently felt like
+"running over a speedbump every 2 seconds" on real hardware (bug report
+`NWS6EY7X`: 13 zero crossings in 18.1 s of emitted samples, 0.72-2.12 s
+apart — the plugin faithfully reproducing the suspect number). It is now
+two octaves, grain-dominant, and no longer targets that rate.
+
+Note this does **not** disturb the architectural finding in this section.
+"Intensity/Smoothness don't shape the noise" is a *comparative* result
+across 4 settings each — it holds whether or not the absolute rate was
+aliased, since it would have been aliased identically at every setting.
+Settling the true rate needs a fresh Pit House road-texture capture read
+with frame timestamps, not sample indices.
 
 Because the payload shape differs so much from the other four effects,
 Road Texture doesn't go through the shared `ProcessEffect`/
@@ -841,7 +863,7 @@ already built for the telemetry channel-mapper, applied to
 own copy of the sync/serialize logic
 (`Expression`/`ApplyEditedFormula`/`MakeExpression`/
 `ApplyStoredToExpression`/`SerializeExpression`) mirroring
-`Devices/WheelUi/ChannelMappingRow.cs` line-for-line minus the FSR1/CM1
+`Devices/Ui/ChannelMappingRow.cs` line-for-line minus the FSR1/CM1
 boundary-stepper baggage that doesn't apply here:
 
 - **Pencil** → the simple inline editor: a filterable, virtualized list
@@ -1987,12 +2009,12 @@ equivalent of `ImportPlan.TouchedMBoosters`.
 ## Source-of-truth files in this repo
 
 - Protocol primitives — [`Protocol/MozaMBoosterProtocol.cs`](../../../Protocol/MozaMBoosterProtocol.cs)
-- Effect synthesis — [`Devices/MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)
-- Settings types — [`Devices/MBoosterTypes.cs`](../../../Devices/MBoosterTypes.cs)
-- Per-device controller — [`Devices/MBoosterDeviceController.cs`](../../../Devices/MBoosterDeviceController.cs)
-- 50 Hz effect worker — [`Devices/MBoosterEffectWorker.cs`](../../../Devices/MBoosterEffectWorker.cs)
-- Multi-device registry — [`Devices/MozaMBoosterRegistry.cs`](../../../Devices/MozaMBoosterRegistry.cs)
+- Effect synthesis — [`Devices/MBooster/MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
+- Settings types — [`Devices/MBooster/MBoosterTypes.cs`](../../../Devices/MBooster/MBoosterTypes.cs)
+- Per-device controller — [`Devices/MBooster/MBoosterDeviceController.cs`](../../../Devices/MBooster/MBoosterDeviceController.cs)
+- 50 Hz effect worker — [`Devices/MBooster/MBoosterEffectWorker.cs`](../../../Devices/MBooster/MBoosterEffectWorker.cs)
+- Multi-device registry — [`Devices/MBooster/MozaMBoosterRegistry.cs`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
-- Profile storage — [`UI/MozaProfile.cs`](../../../UI/MozaProfile.cs) (`MBoosterSettings` dict)
+- Profile storage — [`Settings/MozaProfile.cs`](../../../Settings/MozaProfile.cs) (`MBoosterSettings` dict)
 - UI tab — [`UI/SettingsControl.xaml`](../../../UI/SettingsControl.xaml) (`MBoosterTab`) + handlers in `SettingsControl.xaml.cs` under "mBooster tab — multi-device"
 - PitHouse preset import — [`UI/Import/PitHousePedalsMapper.cs`](../../../UI/Import/PitHousePedalsMapper.cs) (mBooster) + [`UI/Import/PitHouseCrpPedalsMapper.cs`](../../../UI/Import/PitHouseCrpPedalsMapper.cs) (CRP/SRP) + wizard [`UI/Import/PitHouseImportControl.xaml.cs`](../../../UI/Import/PitHouseImportControl.xaml.cs)

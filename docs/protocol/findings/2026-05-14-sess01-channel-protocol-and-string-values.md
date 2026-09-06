@@ -113,7 +113,7 @@ Decoded — **all compression codes match `Data/Telemetry.json` exactly**:
 | 0x0F | float_6000_1 | 16 |
 
 These codes match the existing
-[`Telemetry/Protocol/CompressionTable.cs`](../../Telemetry/Protocol/CompressionTable.cs)
+[`Telemetry/Frames/CompressionTable.cs`](../../../Telemetry/Frames/CompressionTable.cs)
 registry. **No new compression code is introduced** by this finding — the
 existing table is correct and complete for bit-packed channels.
 
@@ -123,7 +123,7 @@ existing table is correct and complete for bit-packed channels.
 in either tier-def record.** Strings are deliberately omitted from the bit-
 packed subscription system and carried separately via type=0x05 records
 (below). String channels do not need an entry in
-[`Telemetry/Protocol/CompressionTable.cs`](../../Telemetry/Protocol/CompressionTable.cs);
+[`Telemetry/Frames/CompressionTable.cs`](../../../Telemetry/Frames/CompressionTable.cs);
 they aren't bit-packed at all.
 
 ## Type=0x05 — String value push (h2b)
@@ -242,7 +242,7 @@ rejection of the other) needs verification — see follow-up section.
    right reason is that they go on a separate transport.
 2. **Plugin needs a sess=0x01 catalog parser** to learn the per-dashboard idx
    assignments. The catalog parser at
-   [`Telemetry/Protocol/ChannelCatalogParser.cs`](../../Telemetry/Protocol/ChannelCatalogParser.cs)
+   [`Telemetry/Frames/ChannelCatalogParser.cs`](../../../Telemetry/Frames/ChannelCatalogParser.cs)
    (or wherever the existing kind=8 parser lives) needs a sibling for the
    sess=0x01 type=0x04 stream.
 3. **Plugin needs a type=0x05 string-value emitter** on sess=0x01. Per-

@@ -18,9 +18,9 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Options</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Import</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>About</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Help</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Disconnected</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>REFRESH</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Performance Output</value></data>
@@ -220,28 +220,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Port 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Port 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PROFILES</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>SETTINGS</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Apply profile settings on launch</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>WHEEL LED OUTPUT</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// rpm + buttons throttling</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Recommended: leave LED options below OFF unless you experience LED issues.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Limit updates to wheel</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Only send LED data when it actually changes.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Always resend bitmask</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Always send the LED bitmask with color updates, even if unchanged. Causes extra traffic.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB DETECTION</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Disable serial-probe fallback (advanced)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Only required if plugin is talking to incorrect device.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Disable active-shifter detection (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Skip the active-shifter reconnect probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD TELEMETRY</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Upload dashboard on connect</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Download dashboards from wheel</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Wheel firmware era:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Attempt to detect from wheel handshake</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 era — (URL subscription)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 era — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detects the wheel&apos;s firmware era from its handshake and picks the matching protocol. Override only if telemetry does not work.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Show all tabs (advanced)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>DEVICE DEFINITIONS</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>REDEPLOY ALL DEFINITIONS</value></data>
@@ -249,10 +232,8 @@
   <data name="Section_Reset" xml:space="preserve"><value>RESET</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>CLEAR ALL SETTINGS &amp; PROFILES</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>This will reset all plugin settings and profiles to their defaults.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard upload is in development and does NOT currently push files to the wheel.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD UPLOAD</value></data>
   <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// push a .mzdash file to the connected wheel</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Status reflects the latest wheel ack.</value></data>
   <data name="Label_Source" xml:space="preserve"><value>SOURCE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Local .mzdash file</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard library</value></data>
@@ -267,32 +248,16 @@
   <data name="Label_InFlight" xml:space="preserve"><value>In flight:</value></data>
   <data name="Label_LastAckBytes" xml:space="preserve"><value>Last ack bytes_written / total:</value></data>
   <data name="Label_LastAckStatus" xml:space="preserve"><value>Last ack status byte:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Note: Uploads require the wheel to be connected and a management session negotiated.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>WHEEL FILES</value></data>
   <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// dashboards loaded onto the wheel</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Delete is temporarily disabled.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>State</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Title</value></data>
   <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
   <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Last modified</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>DELETE</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Disabled temporarily.</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// enable this option to prevent PitHouse from launching automatically</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Provides official MOZA SDK support for games that require it — such as iRacing, or any game that uses 360 Hz mode. The plugin runs an embedded CoAP SDK control server on loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>While enabled, the plugin runs a small stand-in process that appears in your process list as "MOZA Pit House.exe". This is expected — it lets MOZA SDK apps find PitHouse by name. It exits automatically when you disable this or close SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Enable CoAP SDK server</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP CONTROL</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// plain CBOR-over-UDP control surface</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>This is a legacy UDP control for setting steering angle. The only known use is the RSF version of Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Enable UDP control server</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP control</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>RECENT REQUESTS</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// last 20 requests per server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>ABOUT</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Open-source SimHub plugin</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -381,7 +346,7 @@
   <data name="Option_On" xml:space="preserve"><value>On</value></data>
   <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>Standby Animation</value></data>
   <data name="Option_Constant" xml:space="preserve"><value>Constant</value></data>
-  <data name="Option_Breath" xml:space="preserve"><value>Breath</value></data>
+  <data name="Option_Breath" xml:space="preserve"><value>Breathe</value></data>
   <data name="Option_Cycle" xml:space="preserve"><value>Cycle</value></data>
   <data name="Option_Rainbow" xml:space="preserve"><value>Rainbow</value></data>
   <data name="Option_Flow" xml:space="preserve"><value>Flow</value></data>
@@ -448,6 +413,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Edit SimHub property binding</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Edit as a formula (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>RESET TO DEFAULTS</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>MASTER DEFAULTS</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Master Channel Defaults</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>RESET ALL DEFAULTS</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>CLOSE</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} of {1} overridden</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Restore the default</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Master channel mapper unavailable (see log)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RESET FIELD</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>SPLIT FIELD</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>BIT-SPLIT</value></data>
@@ -526,14 +498,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>EDITING · KNOB 1 · ACTIVE</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>FILL RING WITH SELECTED</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>COPY THIS KNOB TO ALL</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Dashboard upload not working yet</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>SLEEP LIGHT</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// what the wheel shows after the idle timeout elapses</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Speed</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Color</value></data>
   <data name="Section_Language" xml:space="preserve"><value>LANGUAGE</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Language</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Close and re-open this settings page to apply the new language. Auto follows SimHub's language setting, then the OS.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Requires restart on change.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORT PROFILE…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Import PitHouse Preset</value></data>
@@ -572,7 +543,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>The connected wheel</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} not added in SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>A MOZA dashboard is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>This wheelbase has an ambient LED strip, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0} to drive the strip.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>The wheelbase is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Wheel '{1}' is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>the MOZA COM port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knob Indicators</value></data>
@@ -580,9 +551,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Starting…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Stopped</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Running (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Server not started — enable with the toggle above</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>No requests yet</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>No requests yet — third-party tools only talk here when they read or write a setting</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Stub manager</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>capturing… (always-capture is on — click Stop when ready)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>capturing… (open another tab and use the device, then come back to stop)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>exported to {0}</value></data>
@@ -662,7 +631,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Shifter</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flight Simulation</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive timeout</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>How long to keep refreshing the LEDs after telemetry stops before the wheel can sleep. 0 = stop immediately.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>How long to keep refreshing the LEDs after telemetry stops before the wheel can sleep.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Display Rotation</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Smooth</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immediate</value></data>
@@ -733,7 +702,7 @@ Id: {2}</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Import</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Export</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Road Rumble</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>REPORT A PROBLEM</value></data>
   <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
@@ -779,4 +748,23 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR closed — switched to Stable</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// per-band gain · 100% = neutral · 500% = max boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSITIVITY</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>PER-LED COLORS</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Idle · Constant</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Idle · Breathe</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Sleep · Breathe</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Animation speed (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Breathing speed (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>IDLE EFFECT</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Idle Animation</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Wheelbase LFE source</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Plugin LFE tab</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requires SimHub 9.12 or newer.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Device definition updated. Restart SimHub to apply.</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon compatibility</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graph</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandwidth</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Torque</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Scale</value></data>
 </root>

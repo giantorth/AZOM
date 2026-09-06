@@ -6,7 +6,7 @@ using System.Windows.Shapes;
 using MozaPlugin.Devices;
 using MozaPlugin.Resources;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Settings tabs for the passive HGP (H-pattern) and SGP (sequential) shifters.
@@ -135,8 +135,8 @@ namespace MozaPlugin
         {
             int v = on ? 1 : 0;
             if (_data != null) ShifterStateFor(model).Direction = v;
-            if (model == ShifterModelKind.Hgp) _plugin.WriteIfHgpDetected("shifter-direction", v);
-            else _plugin.WriteIfSgpDetected("shifter-direction", v);
+            if (model == ShifterModelKind.Hgp) _plugin.HardwareApplier.WriteIfHgpDetected("shifter-direction", v);
+            else _plugin.HardwareApplier.WriteIfSgpDetected("shifter-direction", v);
             _plugin.SaveSettings();
         }
 
@@ -156,8 +156,8 @@ namespace MozaPlugin
         {
             int v = on ? 2 : 1;   // wire range {1,2}
             if (_data != null) ShifterStateFor(model).PaddleSync = v;
-            if (model == ShifterModelKind.Hgp) _plugin.WriteIfHgpDetected("shifter-paddle-sync", v);
-            else _plugin.WriteIfSgpDetected("shifter-paddle-sync", v);
+            if (model == ShifterModelKind.Hgp) _plugin.HardwareApplier.WriteIfHgpDetected("shifter-paddle-sync", v);
+            else _plugin.HardwareApplier.WriteIfSgpDetected("shifter-paddle-sync", v);
             _plugin.SaveSettings();
         }
 
@@ -179,8 +179,8 @@ namespace MozaPlugin
             if (v != 0 && v != 1) return;
             if (_data != null) _data.ShifterHgp.ApplyMode = v;
             MozaLog.Info($"[AZOM] User set Hgp shifter-type (apply-mode) = {v}");
-            _plugin.WriteIfHgpDetected("shifter-apply-mode", v);
-            _plugin.ReadIfHgpDetected("shifter-apply-mode");
+            _plugin.HardwareApplier.WriteIfHgpDetected("shifter-apply-mode", v);
+            _plugin.HardwareApplier.ReadIfHgpDetected("shifter-apply-mode");
         }
 
         private void SgpLed1Combo_Changed(object sender, SelectionChangedEventArgs e) => OnShifterColorChanged();
@@ -196,7 +196,7 @@ namespace MozaPlugin
             int s1 = ResolveShifterColor(SgpLed1Combo.SelectedIndex, _data?.ShifterSgp.Led1Index ?? -1);
             int s2 = ResolveShifterColor(SgpLed2Combo.SelectedIndex, _data?.ShifterSgp.Led2Index ?? -1);
             if (_data != null) { _data.ShifterSgp.Led1Index = s1; _data.ShifterSgp.Led2Index = s2; }
-            _plugin.WriteArrayIfSgpDetected("shifter-colors", new byte[] { (byte)s1, (byte)s2 });
+            _plugin.HardwareApplier.WriteArrayIfSgpDetected("shifter-colors", new byte[] { (byte)s1, (byte)s2 });
             _plugin.SaveSettings();
         }
 
@@ -213,13 +213,13 @@ namespace MozaPlugin
             int v = (int)Math.Round(e.NewValue);
             SgpBrightnessValue.Text = v.ToString();
             if (_data != null) _data.ShifterSgp.Brightness = v;
-            _plugin.WriteIfSgpDetected("shifter-brightness", v);
+            _plugin.HardwareApplier.WriteIfSgpDetected("shifter-brightness", v);
             _plugin.SaveSettings();
         }
 
         private void HgpCalStartButton_Click(object sender, RoutedEventArgs e)
         {
-            _plugin.WriteIfHgpDetected("shifter-cal-start", 1);
+            _plugin.HardwareApplier.WriteIfHgpDetected("shifter-cal-start", 1);
             if (HgpCalStatus != null)
             {
                 HgpCalStatus.Text = Strings.Subtitle_ShifterCalibrate;

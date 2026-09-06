@@ -7,8 +7,9 @@ using System.Windows.Media;
 using MozaPlugin.Devices.StalksTruckSim;
 using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Stalks settings tab: mode selector (Button box / Truck sim), the interactive

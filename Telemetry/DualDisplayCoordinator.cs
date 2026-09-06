@@ -1,6 +1,7 @@
 using System;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Telemetry
 {
@@ -150,7 +151,7 @@ namespace MozaPlugin.Telemetry
                 _plugin._cm2Sender.Rebind(conn); // no-op when already on this connection
 
             var cm2 = _plugin._cm2Sender;
-            cm2.Policy = Era.EraPolicy.For(_plugin.ActiveTelemetryWheelEra);
+            cm2.Policy = Era.EraPolicy.For(Era.MozaWheelEra.Auto);
             cm2.PropertyResolver = _plugin.PropertyResolver.ResolveAsDouble;
             cm2.PropertyStringResolver = _plugin.PropertyResolver.ResolveAsString;
             cm2.UploadDashboard = false;

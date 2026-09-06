@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI.Import
 {
@@ -540,12 +541,12 @@ namespace MozaPlugin.UI.Import
                 }
                 if (!any) return;
 
-                int n = global::MozaPlugin.Devices.MBoosterUiConstants.SimInputMappingNodeCount;
+                int n = global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SimInputMappingNodeCount;
                 var y = new float[n];
                 for (int i = 0; i < n; i++)
                 {
                     double x = (i + 1) * 100.0 / 6.0;
-                    y[i] = (float)global::MozaPlugin.Devices.MozaMBoosterRegistry.EvaluateCurveArbitraryX(PitHouseOutputCurveX, y5, x);
+                    y[i] = (float)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.EvaluateCurveArbitraryX(PitHouseOutputCurveX, y5, x);
                 }
 
                 var oldCurve = _read.CurveY;

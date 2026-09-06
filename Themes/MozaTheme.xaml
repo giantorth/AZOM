@@ -7,13 +7,23 @@
     <!-- Color tokens                                                  -->
     <!-- ============================================================ -->
 
-    <!-- Backgrounds -->
+    <!-- Backgrounds. Every Bg* token below is a TRANSLUCENT overlay — it darkens
+         or lightens whatever SimHub already painted underneath the plugin page.
+         They only look right when something opaque is behind them, so anything
+         living in its own HWND (a Window, a Popup) must paint SurfaceOpaque first
+         and layer these on top; used alone on a Window they composite against the
+         system white brush and read as light grey. -->
     <Color x:Key="BgDeepColor">#20000000</Color>
     <Color x:Key="BgPanelColor">#10000000</Color>
     <Color x:Key="BgCardColor">#08FFFFFF</Color>
     <Color x:Key="BgCard2Color">#10FFFFFF</Color>
     <Color x:Key="BgCardHoverColor">#18FFFFFF</Color>
     <Color x:Key="BgTrackColor">#18000000</Color>
+    <!-- The one OPAQUE surface: the base a detached HWND paints before layering
+         the Bg* overlays on top. Same hue/saturation family as the palette, set
+         well below the #FF1E242A the combo popups use inline — a full-size window
+         at that lighter value reads as a grey slab next to the plugin page. -->
+    <Color x:Key="SurfaceOpaqueColor">#FF12161A</Color>
 
     <!-- Borders -->
     <Color x:Key="BorderColor">#FF20262B</Color>
@@ -51,6 +61,7 @@
     <SolidColorBrush x:Key="BgCard2Brush" Color="{StaticResource BgCard2Color}"/>
     <SolidColorBrush x:Key="BgCardHoverBrush" Color="{StaticResource BgCardHoverColor}"/>
     <SolidColorBrush x:Key="BgTrackBrush" Color="{StaticResource BgTrackColor}"/>
+    <SolidColorBrush x:Key="SurfaceOpaqueBrush" Color="{StaticResource SurfaceOpaqueColor}"/>
 
     <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
     <SolidColorBrush x:Key="BorderBrightBrush" Color="{StaticResource BorderBrightColor}"/>

@@ -5,8 +5,9 @@ namespace MozaPlugin.Telemetry.Era
     /// axis (tier-def session, encoding, preamble policy, blind-retransmit,
     /// upload header, init handshake) via <see cref="EraPolicy"/>.
     ///
-    /// Two live eras supported. <see cref="Auto"/> probes the wheel and
-    /// picks one at session start (see <c>TelemetrySender.ResolveAutoPolicy</c>).
+    /// Two live eras supported. The plugin always runs <see cref="Auto"/> —
+    /// there is no user-facing override — so the era is probed from the wheel
+    /// and pinned at session start (see <c>TelemetrySender.ResolveAutoPolicy</c>).
     /// </summary>
     /// <remarks>
     /// Era families (verified against bridge captures and the wheel simulator
@@ -21,11 +22,9 @@ namespace MozaPlugin.Telemetry.Era
     /// (the compact builder is reused when no wheel catalog is advertised).</item>
     /// </list>
     ///
-    /// Value 2 is a retired hole (the defunct Era2025); it is never written
-    /// anymore, so a persisted 2 unambiguously means a legacy Era2025 pick and
-    /// is migrated to <see cref="Auto"/> on read. Because the values are NOT
-    /// contiguous, the settings UI maps combo index ↔ enum explicitly rather
-    /// than casting (see <c>SettingsControl.EraComboOrder</c>).
+    /// Value 2 is a retired hole (the defunct Era2025). Nothing persists an
+    /// era any more — the per-wheel-page pick and its settings dict were
+    /// removed along with the UI selector.
     /// </remarks>
     public enum MozaWheelEra
     {
@@ -35,7 +34,7 @@ namespace MozaPlugin.Telemetry.Era
         /// <summary>V0 URL subscription. R9, older CSP.</summary>
         Era2024 = 1,
 
-        // 2 = retired Era2025 (hole). Migrated to Auto on read.
+        // 2 = retired Era2025 (hole).
 
         /// <summary>V2 compact + Type02 metadata. Post-2026-04 CSP, R5+W17,
         /// KS Pro, and VGS-class wheels.</summary>

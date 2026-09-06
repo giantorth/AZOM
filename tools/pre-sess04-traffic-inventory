@@ -13,7 +13,7 @@ from pathlib import Path
 from collections import defaultdict, Counter
 
 sys.path.insert(0, str(Path(__file__).parent))
-from moza_bridge import load_bridge
+from moza_bridge import load_bridge, BRIDGE_DIR
 from moza_trace import load_trace, resolve_trace
 
 
@@ -95,7 +95,7 @@ def collect_h2b_sigs_ours(trace_arg, window_end_rel):
 
 
 def main():
-    base = Path("/home/rorth/src/moza-simhub-plugin/sim/logs")
+    base = BRIDGE_DIR
     # Pick captures spanning April 28 — May 14
     captures = sorted(base.glob("bridge-*.jsonl"))
 

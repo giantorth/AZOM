@@ -13,12 +13,14 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import struct
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Optional
 
-SIM_LOG_DIR = Path(__file__).resolve().parent.parent / "sim" / "logs"
+# See moza_bridge.BRIDGE_DIR — capture dir is caller-supplied.
+SIM_LOG_DIR = Path(os.environ.get("MOZA_TRACE_DIR") or Path.cwd())
 
 
 @dataclass

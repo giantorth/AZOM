@@ -2,6 +2,92 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.6.0]
+
+### Added
+
+- **Master Channel Defaults editor.** One dialog (Dashboard tab → Master Defaults) sets the
+  plugin-wide default mapping for every telemetry channel, with the same property picker and
+  ƒ(x) formula editor as the per-dashboard list. Per-dashboard overrides still win.
+- **Dashboard file management.** A new Files tab on the wheel and dash pages uploads a `.mzdash`
+  to the device — from your dashboard folder or a picked file — and lists, enables and deletes
+  the dashboards it already holds.
+- **Wheelbase LEDs and LFE are now a single SimHub device** on SimHub 9.12+, shipping a set of
+  ShakeIt default effects. A **Wheelbase LFE source** option (Options tab) chooses between the
+  plugin's LFE tab and SimHub ShakeIt.
+- **Wheelbase ambient LED controls** — per-LED colours for both strips, idle and sleep effects
+  with their own animation speeds, and the sleep timeout. R16 Ultra strip length added.
+- **Wheelbase product images** — the base now shows its own render in SimHub's Devices list.
+- **Knob mode selector for wheels without knob LEDs.** Rims with rotary encoders but no LED
+  rings now get the same BUTTON/KNOB selector, sized to the wheel's real encoder count.
+- **Live wheelbase torque graph.** A selector on the Base tab switches the right-hand chart
+  between the serial-traffic graph and live motor torque in Nm, scaled to the base's rated
+  output so you can read headroom at a glance. Torque is sampled at 10 Hz while that graph is
+  on screen and the poll stops when it isn't.
+- **`AZOM.CurrentTorque` property** — live motor torque in Nm for dashboards and overlays,
+  refreshed on the same status sweep as the temperatures.
+- **Forza Horizon compatibility toggle** (Options tab → Game Compatibility) reads and sets the
+  wheelbase's compatibility mode, including a value MOZA Pit House set.
+
+### Fixed
+
+- **Per-zone LED brightness sliders now work.** SimHub's "Brightness limiter and balance"
+  sliders only scaled live colour frames, so a zone set to Static had no reachable dimmer at
+  all; each zone (RPM / buttons / knobs) now writes its own firmware brightness register.
+- **Knob rings no longer go dark when nothing is assigned to them.** The plugin claimed every
+  ring as soon as SimHub offered the encoders channel and held them black; they now stay on the
+  wheel's own colours until an effect actually lights them.
+- **Switching the knob LEDs to Static no longer blacks them out.** It re-sent an unread palette
+  over the wheel's colours and addressed ring LEDs by knob number; it now sends the palette you
+  saved, addresses every ring LED, and reads the wheel's colours back when you have none.
+- **A wheelbase that doesn't answer the firmware question is asked again** for ~25 s. That
+  answer unlocks LFE haptics and the 10-band equalizer, and one missed reply used to leave both
+  switched off until a restart.
+- **Wheelbase identity is latched.** A rim swap or brief reconnect blanked the base model, which
+  reverted a 6-LED base to the 9-LED wire layout mid-session — three LEDs dark and the bar spread
+  over the wrong length.
+- **Two wheel settings were tracked under the wrong command name** — RPM display mode and knob
+  brightness — so the wheel's stored value never primed the plugin's cache. Settings are also
+  verified with a read-back now.
+- **Locked wheel identity and LED caches survive a plugin reload.**
+- **The display watchdog no longer kills a live session.**
+- **A base- or hub-relayed HGP is no longer reported as an SGP.** Both answer the same settings
+  reads, so the model is now decided by the device-type reply.
+- **A channel override no longer inherits the built-in scale.** The bundled scale is calibrated
+  for its own property, so overriding one silently zeroed integer channels and saturated
+  percentages; reverting an override restores the default property *and* scale.
+- **The clutch axis reads again under Wine/Proton**, which renames it to a usage the HID reader
+  didn't track.
+- **FSR1 gap/delta no longer goes stale.** Pages whose record carries no gap slot showed whatever
+  the firmware last cached; a small gap-bearing record is now interleaved to keep it fresh.
+- **FSR1 damage gauges read green when undamaged** — the gauge leaves 0 unlit, so per-part damage
+  is biased by one.
+- **More FSR1 catalog and dashboard field corrections.**
+- **Dashboard catalog chunks arriving out of order are reassembled** instead of leaving holes;
+  keepalive and buffer cleanup fixed alongside.
+- **Several dashboard uploads in a row now work**, and deleting a dashboard no longer leaves a
+  gap in the device's list.
+- **Linux/Proton — MOZA ports are found through sysfs** by VID/PID and opened through Wine's own
+  COM mapping, which clears the resyncs and clustered chunk loss seen on the raw device path.
+- **Linux/Proton — fixed a cold-start crash** when the hardware is first attached, and the log
+  spam from device enumeration.
+
+### Changed
+
+- **Base tab header tidied.** Calibrate Center now sits directly under the steering arc it acts
+  on, and the performance-output and graph selectors share one row instead of stacking.
+- **The diagnostics report now includes the wheelbase itself.** A "Base identity" section reports
+  the base model and firmware — including whether the firmware question was ever answered — plus
+  whether LFE haptics and the 10-band equalizer are unlocked and which condition is failing.
+- **The wheel firmware era override has been removed.** Auto mode is now the default.
+- **Legacy USB Detection options have been removed.** AB9 / AB6 detection always runs, and 
+  serial-probe fallback always remains an option.
+- **Limit updates to wheel and Always resend bitmask have been removed.** Both are now always off.
+- **The SDK tab is gone.** Its CoAP and UDP control toggles moved to the Options tab; request
+  activity is now logged to the diagnostics bundle instead of an on-screen list.
+- **The About tab is now Help**, and Updates and Report a problem swapped places between it and
+  the Options tab.
+
 ## [1.5.7]
 
 ### Changed

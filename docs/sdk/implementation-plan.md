@@ -106,7 +106,7 @@ MozaPlugin/
 │           ├── SteerLockWriteHandler.cs          PacketId 3 — MotSetSteer_LimitAngle / MaximumAngle → base-{limit,max-angle}
 │           └── SteerLockReadHandler.cs           PacketId 4 — MotGetSteer_* read-back via Head.ReplyPort
 ├── UI/SettingsControl.xaml + .Sdk.cs             "Third-party SDK" tab
-├── UI/MozaPluginSettings.cs                      SdkEmulationEnabled / SdkCoapPort / SdkBindLoopbackOnly / ControlUdpPort
+├── Settings/MozaPluginSettings.cs                      SdkEmulationEnabled / SdkCoapPort / SdkBindLoopbackOnly / ControlUdpPort
 └── MozaPlugin.csproj                             Embed PitHouseStub.exe as resource
 
 PitHouseStub/                                     ← sibling project

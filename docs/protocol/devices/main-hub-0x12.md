@@ -73,8 +73,8 @@ Note: get and set commands in this group use **different** command IDs (unlike m
 
 | Command | ID | Dir | Bytes | Type | Notes |
 |---------|----|-----|-------|------|-------|
-| set-compat-mode | `13` | W | 1 | int | |
-| get-compat-mode | `17` | R | 1 | int | |
+| set-compat-mode | `13` | W | 1 | int | `1` = **Forza Horizon compatibility** (PitHouse's toggle of that name), `0` = off. Persistent base-side state — survives as `get-compat-mode`, and it is a single global mode, not per-game or per-profile. |
+| get-compat-mode | `17` | R | 1 | int | Readback of the above. PitHouse polls it at ~0.5 Hz whenever the panel is open. |
 | get-ble-mode | `46` | R | 1 | int | 0 = off, 0x55 = on |
 | set-ble-mode | `47` | W | 1 | int | |
 | get-led-status | `08` | R | 1 | int | |
@@ -93,6 +93,23 @@ Note: get and set commands in this group use **different** command IDs (unlike m
 | set-inertia-gain | `4E 0A` | W | 1 | int | |
 | get-friction-gain | `4F 0B` | R | 1 | int | |
 | set-friction-gain | `4E 0B` | W | 1 | int | |
+
+**`compat-mode` verification** — real R16 Ultra, PitHouse bridge capture
+`bridge-pithouse-features-20260828-061341.jsonl`. Clicking PitHouse's
+"Forza Horizon compatibility" emitted exactly one write in a 925 s session:
+
+```
+h2b  7E 02 1F 12 13 01 [chk]     ← set-compat-mode = 1
+b2h  7E 02 9F 21 13 01 [chk]     ← echo/ack
+```
+
+`get-compat-mode` was polled at ~0.5 Hz across the whole session and returned
+`00` for 218 replies, then `01` for every reply after t+844.08 — 687 ms after
+the write, bounded by the poll interval rather than the apply time.
+
+The plugin registers `main-set-compat-mode` / `main-get-compat-mode`
+(`Protocol/MozaCommandDatabase.cs`) but has no caller for either, so a base
+left in compat-mode `1` by PitHouse is invisible to it.
 
 ### Group `0x20` / `0x22` (32 / 34) — Base Ambient LEDs
 

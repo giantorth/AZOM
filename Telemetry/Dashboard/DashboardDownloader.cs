@@ -188,7 +188,10 @@ namespace MozaPlugin.Telemetry.Dashboard
             MozaLog.Debug($"[AZOM] DashboardDownloader: using session 0x{_session:X2}");
 
             // ── Phase 3: Build and send download request ──────────────────
-            _retransmitter.Clear();
+            // Scoped to the FT session: a blanket Clear() also wiped live
+            // 0x01/0x02 chunks (FF init handshake, property pushes, tier-def)
+            // that are current-generation and still unacked.
+            _retransmitter.DropSession(_session);
 
             // DIAGNOSTIC: Replay PitHouse's exact frames to test if the
             // issue is request content vs session setup. If PitHouse bytes

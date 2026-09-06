@@ -40,7 +40,7 @@ These are returned from BOTH `dev=0x12` AND `dev=0x13` queries.
 
 ### Implementation
 
-Sim: [`_build_device_identity`](../../../sim/wheel_sim.py) installs the
+Sim: [`_build_device_identity`](https://github.com/giantorth/moza-simulator) installs the
 `base_identity` block under both `dev=0x12` and `dev=0x13` keys
 explicitly. Plugin reads identity from either alias and stores in the same
 field — there's no "hub identity" vs "base identity" distinction

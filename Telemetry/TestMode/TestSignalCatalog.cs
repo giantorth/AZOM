@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using MozaPlugin.Telemetry.Protocol;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.TestMode
 {

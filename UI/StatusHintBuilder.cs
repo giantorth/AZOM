@@ -150,14 +150,21 @@ namespace MozaPlugin.UI
                         string.Format(Strings.Banner_ProfileNotAddedDash_Body, dashDeviceName)));
                 }
 
-                // Rule 4: ProfileNotAddedBaseAmbient
-                if (detection.BaseAmbientLedSupported && !plugin.BaseAmbientDeviceExtensionActive)
+                // Rule 4: ProfileNotAddedBase. Wheelbase definitions are
+                // per model now, so name the one the user actually has to add;
+                // fall back to the legacy shared name while the model is unknown.
+                bool baseDeviceExpected =
+                    detection.BaseAmbientLedSupported || plugin.WheelbaseWantsShakeItHaptics;
+                if (baseDeviceExpected && !plugin.BaseAmbientDeviceExtensionActive)
                 {
-                    const string baseDeviceName = "MOZA Wheel Base";
+                    var basePrefix = Devices.BaseModelInfo.ExtractPrefix(plugin.Data?.BaseModelName);
+                    string baseDeviceName = basePrefix.Length != 0
+                        ? "MOZA " + Devices.BaseModelInfo.GetFriendlyName(basePrefix)
+                        : "MOZA Wheel Base";
                     list.Add(new StatusHint(
-                        StatusHintKind.ProfileNotAddedBaseAmbient,
+                        StatusHintKind.ProfileNotAddedBase,
                         string.Format(Strings.Banner_ProfileNotAdded_TitleFmt, baseDeviceName),
-                        string.Format(Strings.Banner_ProfileNotAddedBaseAmbient_Body, baseDeviceName)));
+                        string.Format(Strings.Banner_ProfileNotAddedBase_Body, baseDeviceName)));
                 }
 
                 // Rule 5: ProfileNotAddedWheel

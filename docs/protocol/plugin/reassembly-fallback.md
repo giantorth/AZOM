@@ -30,7 +30,7 @@ separate path owned by `TelemetrySender` (`_tileServerParser` →
 The magic-scan fallback is what kept the plugin parsing session 0x04
 directory listings correctly even before sim's envelope was matched to the
 real-wheel format (2026-04-22). It mirrors the `_scan` helper in
-[`sim/wheel_sim.py`](../../../sim/wheel_sim.py).
+[`sim/wheel_sim.py`](https://github.com/giantorth/moza-simulator).
 
 ### Why the offset path can fail
 

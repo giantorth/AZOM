@@ -103,8 +103,8 @@ User-visible: dashboard switches no longer halt the test pattern post-cycle; tir
 | Catalog persist | `Telemetry/TelemetrySender.cs:898` | `Reset()` → `ClearBuffer()` |
 | Inbound CRC | `Telemetry/TelemetrySender.cs` (~2516, ~2580) | Validate CRC32 LE; expose reject counters |
 | Strict URL bytes | `Telemetry/Frames/ChannelCatalogParser.cs` | All-printable-ASCII check before accept |
-| Blind retransmit early-exit | `Telemetry/TelemetrySender.cs:2837` + `Diagnostics/SessionRetransmitter.cs` | New `Contains` API; `AllBlindChunksAcked` helper |
+| Blind retransmit early-exit | `Telemetry/TelemetrySender.cs:2837` + `Telemetry/Sessions/SessionRetransmitter.cs` | New `Contains` API; `AllBlindChunksAcked` helper |
 | ConfigJson resilience | `Telemetry/Dashboard/ConfigJsonClient.cs` + `Telemetry/TelemetrySender.cs` | Split `Reset` / `HardReset`; tiered gap recovery; narrowed watchdog |
 | WriteBudget | `Protocol/WriteBudget.cs` + `Protocol/MozaSerialConnection.cs` | Raise targets, remove stream-lane gate, monotonic peak |
-| State guards | `Telemetry/TelemetrySender.cs` + `Devices/MozaWheelSettingsControl.xaml.cs` | Cooldown gate on kind=4; UI lock; preamble extension |
+| State guards | `Telemetry/TelemetrySender.cs` + `Devices/Ui/MozaWheelSettingsControl.xaml.cs` | Cooldown gate on kind=4; UI lock; preamble extension |
 | Growth + re-sync | `Telemetry/TelemetrySender.cs` | `TickGrowSubscriptionIfCatalogStable` + `ScheduleCatalogResyncProbe` |
