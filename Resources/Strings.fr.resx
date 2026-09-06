@@ -772,4 +772,13 @@ Id : {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Aucune info d'écran reçue de l'appareil — Studio s'ouvrira sans appareil présélectionné.</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio enregistre les nouveaux tableaux de bord dans {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Bibliothèque de tableaux de bord rechargée ({0} tableaux).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Disposition 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Disposition</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Disposition</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 Disposition</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>SONDAGE D'ÉTAT</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Sondage en direct</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Relecture de disposition</value></data>
+  <data name="Label_State" xml:space="preserve"><value>État</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Erreur d'état</value></data>
 </root>

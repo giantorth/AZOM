@@ -91,6 +91,65 @@ namespace MozaPlugin.UI
                 Ab9GearShiftDebounceSlider.Value = ab9DbMs;
                 Ab9GearShiftDebounceValue.Text = $"{ab9DbMs} ms";
             }
+
+            RefreshAb9StatusProbe();
+        }
+
+        // ===== AB9 status probe (diagnostic) =====
+
+        // Environment.TickCount of the last polled probe; the panel refresh runs at
+        // 500 ms and the probe is 13 frames, so it is throttled to ~1 Hz.
+        private int _ab9ProbeLastTickMs;
+        private const int Ab9ProbeIntervalMs = 1000;
+
+        private void Ab9StatusProbeButton_Click(object sender, RoutedEventArgs e)
+        {
+            _plugin?.Ab9Manager?.RequestStatusProbe();
+            _ab9ProbeLastTickMs = Environment.TickCount;
+        }
+
+        // Renders the last probe result and, while the toggle is on, re-issues the
+        // reads. Called from RefreshAb9Tab, so it only runs with the panel open and
+        // the AB9 tab present. Send() just enqueues on the write lane — no blocking
+        // work lands on the dispatcher.
+        private void RefreshAb9StatusProbe()
+        {
+            var data = _data;
+            if (data == null) return;
+
+            if (Ab9StatusPollCheck.IsChecked == true)
+            {
+                int now = Environment.TickCount;
+                if (unchecked(now - _ab9ProbeLastTickMs) >= Ab9ProbeIntervalMs)
+                {
+                    _ab9ProbeLastTickMs = now;
+                    _plugin?.Ab9Manager?.RequestStatusProbe();
+                }
+            }
+
+            Ab9State2bValue.Text     = FormatAb9Raw(data.Ab9State2b);
+            Ab9StateErr2bValue.Text  = FormatAb9Raw(data.Ab9StateErr2b);
+            Ab9Mcu2bValue.Text       = FormatAb9Temp(data.Ab9McuTemp2b);
+
+            int mode = data.Ab9ModeReadback;
+            Ab9ModeReadbackValue.Text = mode == MozaData.NoAb9Reading
+                ? "—" : $"0x{mode:X2} ({mode})";
+        }
+
+        // Em dash = the register never answered, which is the probe's whole point,
+        // so no reading can be confused with "absent".
+        private static string FormatAb9Raw(int raw)
+            => raw == MozaData.NoAb9Reading ? "—" : $"{raw} (0x{raw:X4})";
+
+        // raw/100 degrees C, the same scaling the wheelbase uses (a live AB9 MCU
+        // reads 0x0ED8 = 38.0 C, where the protocol notes' x0.1 would claim 380 C).
+        // A raw 0 is an unpopulated register, not 0.00 C on a powered device, so it
+        // prints bare — deriving a temperature from it would invent a reading.
+        private static string FormatAb9Temp(int raw)
+        {
+            if (raw == MozaData.NoAb9Reading) return "—";
+            if (raw == 0) return "0 (0x0000)";
+            return $"{raw} (0x{raw:X4}) · {raw / 100.0:F1} °C";
         }
 
         private void SetAb9Slider(Slider slider, TextBox value, byte v)

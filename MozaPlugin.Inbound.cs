@@ -425,6 +425,11 @@ namespace MozaPlugin
                 _hardwareApplier.ApplyAb9ToHardware(_settings?.ProfileStore?.CurrentProfile);
             }
 
+            // Status-probe + layout read-back values. Every other ab9-* name falls
+            // through the switch untouched, so this stays a no-op for the ten
+            // stored-setting reads the connect burst already issues.
+            _data?.UpdateFromCommand(r.Name, r.IntValue);
+
             MozaLog.Debug($"[AZOM/AB9] {r.Name} = {r.IntValue}");
         }
     }

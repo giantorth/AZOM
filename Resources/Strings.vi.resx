@@ -772,4 +772,13 @@ Id: {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Chưa có thông tin màn hình từ thiết bị — Studio sẽ mở mà không chọn sẵn thiết bị.</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lưu bảng điều khiển mới vào {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Đã nạp lại thư viện bảng điều khiển ({0} bảng).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Bố cục 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Bố cục</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Bố cục</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 Bố cục</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>DÒ TRẠNG THÁI</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Dò trực tiếp</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Đọc lại bố cục</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Trạng thái</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Lỗi trạng thái</value></data>
 </root>

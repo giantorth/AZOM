@@ -560,6 +560,17 @@ namespace MozaPlugin.Protocol
             AddCommand("ab9-status-d4-read",       "ab9", 0x1E, 0xFF, new byte[] { 0xD4 }, 2, "int");
             AddCommand("ab9-status-5d-read",       "ab9", 0x1E, 0xFF, new byte[] { 0x5D }, 2, "int");
 
+            // Status registers. The AB9's own main answers the wheelbase's read-only
+            // group 0x2B on dev 0x12, same read shape as base-mcu-temp
+            // (7E 03 2B 12 <cmd> 00 00). Only the registers that carry data are asked;
+            // measured against bundle W603C6RV, mosfet-temp (05), motor-temp (06) and
+            // live-torque (07) reply a flat 0x0000 every time and group 0x1E answers
+            // nothing at all for these, so neither is worth a frame.
+            // docs/protocol/devices/ab9-shifter.md § Status registers.
+            AddCommand("ab9-2b-state",             "ab9", 0x2B, 0xFF, new byte[] { 1 }, 2, "int");
+            AddCommand("ab9-2b-state-err",         "ab9", 0x2B, 0xFF, new byte[] { 2 }, 2, "int");
+            AddCommand("ab9-2b-mcu-temp",          "ab9", 0x2B, 0xFF, new byte[] { 4 }, 2, "int");
+
             // Identity-probe responses. Empty CommandId = wildcard; the response
             // group alone disambiguates. Requires busHint="ab9" so dev 0x12 collisions
             // with the wheelbase main don't match base-* first.

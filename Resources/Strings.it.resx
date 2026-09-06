@@ -775,4 +775,13 @@ Id: {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Nessuna info sul display dal dispositivo — Studio si aprirà senza dispositivo preselezionato.</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio salva le nuove dashboard in {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Libreria dashboard ricaricata ({0} dashboard).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Schema 5+R 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Schema R+5</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Schema R+6</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>Schema R+8</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>SONDAGGIO DI STATO</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Sondaggio dal vivo</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Rilettura layout</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Stato</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Errore di stato</value></data>
 </root>

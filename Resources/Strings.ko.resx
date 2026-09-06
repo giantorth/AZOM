@@ -771,4 +771,13 @@ Id: {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>아직 장치에서 디스플레이 정보를 받지 못했습니다 — Studio가 장치 선택 없이 열립니다.</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio는 새 대시보드를 {0} 에 저장합니다</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>대시보드 라이브러리를 다시 읽었습니다 (대시보드 {0}개).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R 레이아웃 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 레이아웃</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 레이아웃</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 레이아웃</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>상태 조회</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>실시간 조회</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>레이아웃 되읽기</value></data>
+  <data name="Label_State" xml:space="preserve"><value>상태</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>상태 오류</value></data>
 </root>

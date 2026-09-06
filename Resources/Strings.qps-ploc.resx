@@ -762,4 +762,13 @@
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Wan Wan Yowl — Studio Grrowl Arf Howl!</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio Wuff Bork Yip {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Snarf Awoo Bork ({0} Wuff).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Arf!</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Woof!</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>Awoo!</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>SNIFF!!</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Bork!</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Yap!</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Arf!</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Grrr!</value></data>
 </root>

@@ -777,4 +777,13 @@ Id: {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ingen skjerminfo fra enheten ennå — Studio åpnes uten forhåndsvalgt enhet.</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio lagrer nye dashbord i {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Dashbordbiblioteket lastet på nytt ({0} dashbord).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R-oppsett 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5-oppsett</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6-oppsett</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8-oppsett</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>STATUSAVSPØRRING</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Avspør live</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Tilbakelesing av oppsett</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Status</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Statusfeil</value></data>
 </root>

@@ -2931,11 +2931,17 @@
                                               Title="{x:Static res:Strings.Section_MechanicalLayout}" Icon="{StaticResource IconShift}">
                                 <ComboBox x:Name="Ab9ModeCombo" Margin="0,4" HorizontalAlignment="Stretch"
                                           SelectionChanged="Ab9ModeCombo_Changed">
+                                    <!-- Tag = the 0x1F/D3 layout byte. Ordered by that byte,
+                                         which interleaves the R+n layouts with the n+R ones. -->
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout5R1}" Tag="0"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout5R2}" Tag="1"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR5}"  Tag="2"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR6}"  Tag="3"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout6R1}" Tag="4"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout6R2}" Tag="5"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R1}" Tag="6"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R2}" Tag="7"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR8}"  Tag="8"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Sequential}"   Tag="9"/>
                                 </ComboBox>
                             </ctrl:SectionCard>
@@ -3093,6 +3099,64 @@
                         </StackPanel>
 
                         </Grid>
+
+                        <!-- The AB9's main answers the wheelbase's read-only status group
+                             0x2B on its own dev 0x12. Only the registers that carry data
+                             are shown: the base's mosfet / motor / torque registers reply
+                             a constant zero here and group 0x1E answers nothing for them,
+                             so neither is asked. Header is a register identifier, not
+                             prose. docs/protocol/devices/ab9-shifter.md -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Ab9StatusProbe}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button x:Name="Ab9StatusProbeButton" Margin="0,0,14,0"
+                                            Content="{x:Static res:Strings.Button_ReadFromDevice}"
+                                            Click="Ab9StatusProbeButton_Click"/>
+                                    <TextBlock Text="{x:Static res:Strings.Label_Ab9PollLive}"
+                                               Style="{StaticResource LabelText}" Margin="0,0,8,0"/>
+                                    <ctrl:OffOnToggle x:Name="Ab9StatusPollCheck" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="grp 0x2B  dev 0x12"
+                                               Style="{StaticResource SliderRangeEndLabel}" Margin="9,0,0,4"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_State}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="Ab9State2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_StateError}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="Ab9StateErr2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Brand_Mcu}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="Ab9Mcu2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <TextBlock Text="{x:Static res:Strings.Label_Ab9LayoutReadback}"
+                                               Style="{StaticResource LabelText}" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="Ab9ModeReadbackValue" Style="{StaticResource ValueText}"
+                                               TextAlignment="Left" Text="—"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
 
                     </StackPanel>
                 </ScrollViewer>

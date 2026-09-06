@@ -127,9 +127,9 @@ Both produce ACK response: `7E 03 AA 31 43 0x 05 [chk]` (echo with group|0x80, d
 |---------|----|-------|------|-------|
 | state | `01` | 2 | int | |
 | state-err | `02` | 2 | int | |
-| mcu-temp | `04` | 2 | int | |
-| mosfet-temp | `05` | 2 | int | |
-| motor-temp | `06` | 2 | int | |
+| mcu-temp | `04` | 2 | int | **BE16, raw ÷ 100 = °C.** Measured `0F 3C` = 3900 → 39.0 °C (bundle `W603C6RV`). |
+| mosfet-temp | `05` | 2 | int | Same scaling. Measured `0E A0`…`0E AD` → 37.4–37.6 °C, dithering a few counts. |
+| motor-temp | `06` | 2 | int | Same scaling. Measured `09 D8`…`09 E2` → 25.2–25.3 °C. |
 | live-torque | `07` | 2 | int | **Live motor torque.** BE16 biased by +500, 0.1 Nm per count — `torque_Nm = (raw - 500) / 10.0`, sign carries direction. Read-only live measurement; nothing is written to enable it. PitHouse's **torque curve** panel is a pure reader: opening it starts an ~18 Hz poll of this register alone (no temps alongside) and closing it stops the poll, so the poll's presence *is* the feature's on/off state. |
 
 **`live-torque` (`07`) verification** — real R16 Ultra, PitHouse bridge capture

@@ -574,16 +574,22 @@ namespace MozaPlugin.Integration
             return profile.Ab9;
         }
 
-        // The six mechanical layouts in UI-combo order (cf. SettingsControl's
-        // Ab9ModeCombo): action-name suffix + the invariant label the
-        // AZOM.Ab9Layout property reports (matches the English UI strings).
+        // The ten mechanical layouts in UI-combo order (cf. SettingsControl's
+        // Ab9ModeCombo, which orders by the 0x1F/D3 layout byte): action-name suffix
+        // + the invariant label the AZOM.Ab9Layout property reports (matches the
+        // English UI strings). Ab9LayoutNext/Prev cycles this list, so every entry
+        // here must be a layout a user can safely land on.
         private static readonly (Ab9Mode Mode, string Suffix, string Label)[] Ab9Layouts =
         {
             (Ab9Mode.FivePlusR_L1,  "5R1",        "5+R Layout 1"),
+            (Ab9Mode.FivePlusR_L2,  "5R2",        "5+R Layout 2"),
+            (Ab9Mode.RPlusFive,     "R5",         "R+5 Layout"),
+            (Ab9Mode.RPlusSix,      "R6",         "R+6 Layout"),
             (Ab9Mode.SixPlusR_L1,   "6R1",        "6+R Layout 1"),
             (Ab9Mode.SixPlusR_L2,   "6R2",        "6+R Layout 2"),
             (Ab9Mode.SevenPlusR_L1, "7R1",        "7+R Layout 1"),
             (Ab9Mode.SevenPlusR_L2, "7R2",        "7+R Layout 2"),
+            (Ab9Mode.RPlusEight,    "R8",         "R+8 Layout"),
             (Ab9Mode.Sequential,    "Sequential", "Sequential"),
         };
 

@@ -771,4 +771,13 @@ Id: {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Δεν υπάρχουν ακόμη πληροφορίες οθόνης από τη συσκευή — το Studio θα ανοίξει χωρίς προεπιλεγμένη συσκευή.</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Το Studio αποθηκεύει τα νέα dashboards στο {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Η βιβλιοθήκη dashboard φορτώθηκε ξανά ({0} dashboards).</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Διάταξη 5+R 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Διάταξη R+5</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Διάταξη R+6</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>Διάταξη R+8</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>ΑΝΙΧΝΕΥΣΗ ΚΑΤΑΣΤΑΣΗΣ</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Ζωντανή δειγματοληψία</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Ανάγνωση διάταξης</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Κατάσταση</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Σφάλμα κατάστασης</value></data>
 </root>

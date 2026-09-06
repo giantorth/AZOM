@@ -772,4 +772,13 @@ Id: {2}</value></data>
   <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>尚未收到设备的显示屏信息 — Studio 将在未预选设备的情况下打开。</value></data>
   <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Studio 会将新仪表盘保存到 {0}</value></data>
   <data name="Studio_LibraryReloaded" xml:space="preserve"><value>已重新加载仪表盘库（{0} 个）。</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R 布局 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 布局</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 布局</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 布局</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>状态探测</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>实时轮询</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>布局回读</value></data>
+  <data name="Label_State" xml:space="preserve"><value>状态</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>状态错误</value></data>
 </root>

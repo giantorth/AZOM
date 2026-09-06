@@ -140,6 +140,30 @@ namespace MozaPlugin
         public double LiveTorqueNm =>
             Math.Abs(LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
 
+        // AB9 status registers, read off the AB9's own pipe on group 0x2B (dev 0x12).
+        // Only the ones that carry data: the wheelbase's mosfet/motor/torque registers
+        // reply a constant zero on an AB9 and aren't asked. NoAb9Reading = never
+        // answered. Temperature is raw/100 degrees C, same scaling as the wheelbase's.
+        public const int NoAb9Reading = -1;
+
+        public volatile int Ab9State2b = NoAb9Reading;
+        public volatile int Ab9StateErr2b = NoAb9Reading;
+        public volatile int Ab9McuTemp2b = NoAb9Reading;
+
+        /// <summary>Layout byte the AB9 reports for itself (group 0x1E cmd 0xD3) —
+        /// the only way to tell whether a written layout stuck or the firmware
+        /// substituted something. <see cref="NoAb9Reading"/> until it answers.</summary>
+        public volatile int Ab9ModeReadback = NoAb9Reading;
+
+        /// <summary>Clear every probe reading back to "never answered". Called at
+        /// AB9 connect so an unplug/swap can't leave the previous device's numbers
+        /// standing next to the new one's silence.</summary>
+        public void ResetAb9Probe()
+        {
+            Ab9State2b = Ab9StateErr2b = Ab9McuTemp2b = NoAb9Reading;
+            Ab9ModeReadback = NoAb9Reading;
+        }
+
         // State
         public volatile int BaseState;
         public volatile int BaseStateError;
@@ -795,6 +819,14 @@ namespace MozaPlugin
                 // detection trigger (DeviceProber), and a cosmetic graph must
                 // not become a second detection source.
                 case "base-live-torque":    LiveTorqueRaw = value; break;
+
+                // AB9 status registers (diagnostic). Routed here only from the AB9
+                // pipe's own inbound handler, which parses with busHint "ab9" —
+                // these can never be fed a wheelbase reply.
+                case "ab9-2b-state":        Ab9State2b = value; break;
+                case "ab9-2b-state-err":    Ab9StateErr2b = value; break;
+                case "ab9-2b-mcu-temp":     Ab9McuTemp2b = value; break;
+                case "ab9-mode-read":       Ab9ModeReadback = value; break;
 
                 // State
                 case "base-state":          BaseState = value; break;
