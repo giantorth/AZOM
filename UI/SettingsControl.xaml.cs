@@ -146,8 +146,7 @@ namespace MozaPlugin.UI
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
             if (!_steeringAngleTimer.IsEnabled) _steeringAngleTimer.Start();
             if (_bandwidthTimer != null && !_bandwidthTimer.IsEnabled) _bandwidthTimer.Start();
-            // Starts the ~15 Hz torque poll only if that graph is the selected
-            // one; same reparenting-safe IsEnabled guard as the others.
+            // Card visibility only — the torque sampler is plugin-side and always on.
             ApplyBaseGraphMode();
 
             // A genuine (re)load — not just a redundant Loaded firing while
@@ -180,9 +179,6 @@ namespace MozaPlugin.UI
             _steeringAngleTimer.Stop();
             _rotationReadbackTimer.Stop();
             _bandwidthTimer?.Stop();
-            // The torque poll lives on the plugin, not here; clear its gate so
-            // a closed panel stops the wire reads.
-            _plugin.TorqueGraphActive = false;
 
             UnsubscribeStalks();
             // Closing the settings panel takes the sustained Engine/ABS/

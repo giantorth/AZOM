@@ -392,8 +392,9 @@
                                          RIGHTmost, so each pair is declared in the order that
                                          reads label-then-control on screen.
                                          The graph selector swaps the bandwidth card for the
-                                         live-torque card and gates the plugin's background 10 Hz
-                                         wire poll, so picking Bandwidth stops that traffic. -->
+                                         live-torque card. Display only — the plugin's torque
+                                         sampler runs at one rate either way, since the AZOM
+                                         torque properties read from it with this panel shut. -->
                                     <DockPanel Margin="0,0,0,12" LastChildFill="False">
                                         <TextBlock DockPanel.Dock="Left"
                                                    Text="{x:Static res:Strings.Label_PerformanceOutput}"
@@ -526,12 +527,14 @@
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
-                                        <!-- Live wheelbase torque (base status reg 0x07). Single
-                                             series: the wire value is signed only to say which way
-                                             the base pulls, and torque is torque either way, so the
-                                             magnitude is what gets plotted. MaxValue is set from
-                                             code each tick (floored auto-scale) because no rated-Nm
-                                             figure is available per base model. -->
+                                        <!-- Live wheelbase torque (base status reg 0x07), 2-minute
+                                             window. Single series: the wire value is signed only to
+                                             say which way the base pulls, and torque is torque either
+                                             way, so the magnitude is what gets plotted (the signed
+                                             reading is AZOM.CurrentTorqueRaw). MaxValue is set from
+                                             code each tick — the base's rated Nm where
+                                             BaseModelInfo knows it, floored auto-scale where it
+                                             doesn't. -->
                                         <Border Grid.Column="1" x:Name="TorqueCard" Style="{StaticResource InnerCardBorder}"
                                                 Padding="10,8" Margin="7,0,0,0" Visibility="Collapsed">
                                             <StackPanel>

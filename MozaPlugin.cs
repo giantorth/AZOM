@@ -163,25 +163,25 @@ namespace MozaPlugin
         private Timer _tempHistoryTimer = null!;
         internal UI.TemperatureHistory TemperatureHistory => _tempHistory;
 
-        // Live-torque history for the Base-tab graph. Sampled on a background
-        // timer, NOT on the WPF dispatcher: at graph-useful rates the per-sample
-        // work (a wire read plus a geometry rebuild) is far too much to put on
-        // the UI thread, which is what the first cut of this got wrong.
-        // 300 × 100 ms = 30 s window.
-        private const int TorqueHistorySamples = 300;
-        private const int TorqueHistoryIntervalMs = 100;
+        // Live-torque history for the Base-tab graph, and the sole feed for the
+        // AZOM.CurrentTorque* / MaxTorque properties. Sampled on a background
+        // timer, NOT on the WPF dispatcher: the per-sample work (a wire read plus
+        // a geometry rebuild) is far too much to put on the UI thread, which is
+        // what the first cut of this got wrong. 600 × 200 ms = 2 min window.
+        //
+        // One uniform rate whether or not the panel is open: a UI-gated rate left
+        // the properties reading at the 5 s status sweep for every setup that
+        // never opens the Base tab, and a dual rate would make the ring's time
+        // axis lie. Costs ~80 B/s, ~0.7% of the 11520 B/s ceiling.
+        private const int TorqueHistorySamples = 600;
+        private const int TorqueHistoryIntervalMs = 200;
         private readonly UI.TorqueHistory _torqueHistory =
             new UI.TorqueHistory(TorqueHistorySamples);
         private Timer _torqueHistoryTimer = null!;
         internal UI.TorqueHistory TorqueHistory => _torqueHistory;
 
-        /// <summary>Set by the settings panel: true only while the Base tab is
-        /// loaded AND the torque graph is the selected one. Gates the wire poll,
-        /// so choosing Bandwidth (or closing the panel) takes it off the wire.
-        /// AZOM.CurrentTorque is therefore live while that graph is up and holds its
-        /// last value otherwise — no permanent 10 Hz traffic for a property most
-        /// setups never read.</summary>
-        internal volatile bool TorqueGraphActive;
+        // Game-start edge latch for the per-session torque peak (AZOM.MaxTorque).
+        private bool _lastGameRunningForTorquePeak;
         // CAS re-entry guard: a 5 s reconnect tick can outlast its interval
         // (probe fallback ~600 ms/port under Wine, Disconnect joins at 1 s) —
         // overlapping ticks must not run TryConnect* concurrently on a lane.
@@ -386,11 +386,9 @@ namespace MozaPlugin
         {
             "base-mcu-temp", "base-mosfet-temp", "base-motor-temp",
             "base-state",
-            // Keeps AZOM.CurrentTorque always-live at this timer's 0.2 Hz, the same
-            // guarantee the temp properties have, for one extra 8-byte read per
-            // 5 s (~3 B/s). The Base-tab graph's 10 Hz sampler is what provides
-            // real resolution, and only while that graph is on screen.
-            "base-live-torque",
+            // base-live-torque is deliberately NOT here: SampleTorqueHistory reads
+            // it unconditionally at 5 Hz on the same base-owning pipe, so a copy
+            // on this sweep would just double-read the register every 5 s.
         };
 
         // --- Per-device settings read commands ---

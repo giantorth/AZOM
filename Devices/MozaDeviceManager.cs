@@ -384,7 +384,7 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Send a settings read WITHOUT registering it with the retry tracker.
-        /// For high-rate live polls (the Base-tab torque graph, ~15 Hz): tracked
+        /// For high-rate live polls (the live-torque sampler, 5 Hz): tracked
         /// reads are keyed by command name and retransmitted on a 200 ms-and-up
         /// backoff, so re-tracking one name faster than its own backoff piles
         /// retransmits on top of the poll. A dropped reply here should cost one

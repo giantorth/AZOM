@@ -140,6 +140,24 @@ namespace MozaPlugin
         public double LiveTorqueNm =>
             Math.Abs(LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
 
+        /// <summary>Signed live torque in Nm; the sign is which way the base is
+        /// pulling. Feeds AZOM.CurrentTorqueRaw.</summary>
+        public double LiveTorqueSignedNm =>
+            (LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
+
+        // Peak |torque| since the last ResetLiveTorquePeak(), in wire counts so
+        // the compare-and-store below stays an int (no Interlocked on a double).
+        // Reset per game session by MozaPlugin.DataUpdate; feeds AZOM.MaxTorque.
+        public volatile int LiveTorquePeakDeviation;
+
+        // Rejected as garbage by the peak-hold: 100 Nm, ~4x the largest MOZA base.
+        private const int LiveTorqueMaxPlausibleDeviation = 1000;
+
+        /// <summary>Session peak torque in Nm; 0 until the first reading.</summary>
+        public double LiveTorquePeakNm => LiveTorquePeakDeviation / 10.0;
+
+        public void ResetLiveTorquePeak() => LiveTorquePeakDeviation = 0;
+
         // AB9 status registers, read off the AB9's own pipe on group 0x2B (dev 0x12).
         // Only the ones that carry data: the wheelbase's mosfet/motor/torque registers
         // reply a constant zero on an AB9 and aren't asked. NoAb9Reading = never
@@ -816,9 +834,20 @@ namespace MozaPlugin
 
                 // Live torque. Deliberately does NOT set IsBaseConnected: it
                 // shares read group 43 with base-mcu-temp, which is the base
-                // detection trigger (DeviceProber), and a cosmetic graph must
-                // not become a second detection source.
-                case "base-live-torque":    LiveTorqueRaw = value; break;
+                // detection trigger (DeviceProber), and a graph/property feed
+                // must not become a second detection source.
+                case "base-live-torque":
+                    LiveTorqueRaw = value;
+                    // Peak-hold only. A spurious BE16 costs the live value one
+                    // sample but would latch the session peak forever, so the
+                    // plausibility bound guards the peak alone — the stored raw
+                    // stays verbatim, since full scale is unmeasured (see
+                    // docs/protocol/devices/wheelbase-0x13.md).
+                    int torqueDev = Math.Abs(value - LiveTorqueZeroBias);
+                    if (torqueDev > LiveTorquePeakDeviation
+                        && torqueDev <= LiveTorqueMaxPlausibleDeviation)
+                        LiveTorquePeakDeviation = torqueDev;
+                    break;
 
                 // AB9 status registers (diagnostic). Routed here only from the AB9
                 // pipe's own inbound handler, which parses with busHint "ab9" —

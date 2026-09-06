@@ -31,16 +31,16 @@ namespace MozaPlugin.Devices
         /// ambient strip at all (R3/R5/R9/R12 silently drop the 0xA2 read) — not
         /// "unknown", which falls through to <see cref="DefaultLedsPerStrip"/>.
         ///
-        /// <c>RatedNm</c> is the model's peak torque, used only to scale the
-        /// Base-tab torque graph. <c>0</c> means "not established" and the graph
-        /// falls back to auto-scaling — deliberately the case for R3/R5, whose
-        /// ratings are fractional (not simply the model number) and were never
-        /// confirmed from a MOZA-sourced string here. Do not guess them.
+        /// <c>RatedNm</c> is the model's peak torque, scaling the Base-tab torque
+        /// graph and reported as <c>AZOM.TorqueLimit</c>. <c>0</c> means "not
+        /// established" — an unrecognised model — and the graph falls back to
+        /// auto-scaling. It is a double because the rating is not always the model
+        /// number: the R5 is 5.5 Nm.
         /// </summary>
-        public static readonly (string Prefix, string FriendlyName, int LedsPerStrip, int RatedNm)[] KnownModels =
+        public static readonly (string Prefix, string FriendlyName, int LedsPerStrip, double RatedNm)[] KnownModels =
         {
-            ("R3",  "R3",  0, 0),
-            ("R5",  "R5",  0, 0),
+            ("R3",  "R3",  0, 3),
+            ("R5",  "R5",  0, 5.5),
             ("R9",  "R9",  0, 9),
             ("R12", "R12", 0, 12),
             ("R16", "R16", 6, 16),
@@ -50,7 +50,7 @@ namespace MozaPlugin.Devices
         };
 
         /// <summary>Model peak torque in Nm, or 0 when not established.</summary>
-        public static int RatedNm(string? baseModelName)
+        public static double RatedNm(string? baseModelName)
         {
             var prefix = ExtractPrefix(baseModelName);
             if (prefix.Length == 0)

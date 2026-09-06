@@ -525,9 +525,10 @@ namespace MozaPlugin
                 _tempHistoryTimer.Start();
 
                 // Live-torque sampler. Runs for the plugin's life like the temp
-                // sampler, but every tick no-ops unless TorqueGraphActive — this
-                // one issues a wire read, so it must not poll for a panel that
-                // is shut or showing the bandwidth graph.
+                // sampler, and like it is UI-independent: it is the only feed for
+                // the AZOM torque properties, which dashboards read with the
+                // settings panel shut. Unlike the temp sampler each tick issues a
+                // wire read — see SampleTorqueHistory for the cost.
                 _torqueHistoryTimer = new Timer(TorqueHistoryIntervalMs);
                 _torqueHistoryTimer.Elapsed += SampleTorqueHistory;
                 _torqueHistoryTimer.AutoReset = true;

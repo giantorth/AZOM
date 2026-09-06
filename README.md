@@ -227,7 +227,10 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | `AZOM.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.BaseState` | int | Wheelbase state |
-| `AZOM.CurrentTorque` | double | Live motor torque in Nm, unsigned (direction is not reported). Refreshed on the same 5 s status sweep as the temperatures, and at 10 Hz while the Base tab's Torque graph is on screen |
+| `AZOM.CurrentTorque` | double | Live motor torque in Nm, unsigned — direction is dropped, so this is the magnitude whichever way the base is pulling. Refreshed at 5 Hz whether or not the settings panel is open |
+| `AZOM.CurrentTorqueRaw` | double | The same live torque in Nm, signed: the sign is the direction the base is pulling |
+| `AZOM.MaxTorque` | double | Highest `AZOM.CurrentTorque` seen this session, in Nm. Resets when a game starts |
+| `AZOM.TorqueLimit` | double | The wheelbase's rated peak torque in Nm (R9 = 9, R16 = 16, R25 = 25 …); `-1` if the base model isn't recognised. Fixed per base — for your configured output limit see `AZOM.Torque` |
 | `AZOM.MaxAngle` | int | Max steering angle (degrees) |
 | `AZOM.ClutchSplitPoint` | int | Clutch split point (%) for the current wheel, as shown on the wheel device page (Paddles Mode = Combined) |
 | `AZOM.HidConnected` | bool | Whether a device HID surface is being read (live input is available) |
@@ -254,7 +257,7 @@ The numeric ones read `-1` when the value isn't available — the plugin is stil
 | Property | Type | Range | Description |
 |----------|------|-------|-------------|
 | `AZOM.FfbStrength` | int | 0–100 | Game FFB strength (%) |
-| `AZOM.Torque` | int | 50–100 | Base torque output (%) |
+| `AZOM.Torque` | int | 50–100 | Base torque output limit (%) — the setting, not the rating; see `AZOM.TorqueLimit` |
 | `AZOM.Rotation` | int | 60–2700 | Wheel rotation angle (degrees) |
 | `AZOM.WheelSpeedLimit` | int | 0–200 | Maximum wheel speed (%) |
 | `AZOM.Interpolation` | int | 0–10 | FFB interpolation |

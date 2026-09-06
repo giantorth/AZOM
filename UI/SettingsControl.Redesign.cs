@@ -24,8 +24,8 @@ namespace MozaPlugin.UI
     public partial class SettingsControl
     {
         // ---- Bandwidth sparkline state (600 samples = 5 min @ 500ms tick,
-        // matches the temperature history window so both graphs on the Base tab
-        // share the same horizontal timescale). ----
+        // matching the temperature history window so those two share a
+        // horizontal timescale; the torque card that replaces this one is 2 min). ----
         private const int BandwidthSamples = 600;
         private readonly ObservableCollection<double> _bwInSamples = new ObservableCollection<double>();
         private readonly ObservableCollection<double> _bwOutSamples = new ObservableCollection<double>();
@@ -43,7 +43,9 @@ namespace MozaPlugin.UI
         // fed by a background timer) exactly like the temperature graph. This
         // class only renders a snapshot on the shared 500 ms refresh tick and
         // owns no timer of its own: the first cut sampled on the WPF dispatcher
-        // and made the panel lag.
+        // and made the panel lag. Its window is 2 min, NOT the 5 min the two
+        // graphs beside it show — 5 min at a property-useful sample rate is more
+        // points than the card can resolve.
         private const double TorqueScaleFloorNm = 2.0;  // only used when the rating is unknown
         private double _torqueScaleNm;                  // last MaxValue pushed; avoids redundant sets
 
@@ -528,9 +530,9 @@ namespace MozaPlugin.UI
             ApplyBaseGraphMode();
         }
 
-        /// <summary>Show the selected card and enable the background torque poll
-        /// only for the torque graph — picking Bandwidth must take that traffic
-        /// off the wire, not just hide the chart.</summary>
+        /// <summary>Show the selected card. Purely visual: the torque sampler on
+        /// the plugin runs at one rate regardless, so the history is already
+        /// populated whichever card was last selected.</summary>
         private void ApplyBaseGraphMode()
         {
             bool torque = _plugin.Settings.BaseTabGraph == Settings.BaseGraphMode.Torque;
@@ -539,11 +541,6 @@ namespace MozaPlugin.UI
                 BandwidthCard.Visibility = torque ? Visibility.Collapsed : Visibility.Visible;
             if (TorqueCard != null)
                 TorqueCard.Visibility = torque ? Visibility.Visible : Visibility.Collapsed;
-
-            // IsLoaded matters because ApplyBaseGraphMode also runs from
-            // InitRedesignControls, before the control is loaded. Polling the
-            // wire for an unloaded panel is what this gate exists to prevent.
-            _plugin.TorqueGraphActive = torque && IsLoaded;
         }
 
         // Renders a snapshot of the plugin-side history. Called from the shared
@@ -560,16 +557,20 @@ namespace MozaPlugin.UI
 
             bool connected = _data.IsBaseConnected;
             double nm = connected ? _data.LiveTorqueNm : 0.0;
-            double peak = hist.PeakNm;
+            // Two different peaks by design. The legend shows the per-game-session
+            // one users also get as AZOM.MaxTorque; the autoscale fallback below
+            // uses the ring's own never-reset peak, because a ceiling that drops
+            // back at every game start would rescale the trace mid-session.
+            double peak = _data.LiveTorquePeakNm;
 
             // Ceiling is the base's RATED torque, so the trace shows real
             // headroom instead of being restretched every time a new peak
             // arrives. Auto-scale (floored) only when the rating isn't
             // established — see BaseModelInfo.RatedNm.
-            int rated = Devices.BaseModelInfo.RatedNm(_data.BaseModelName);
+            double rated = Devices.BaseModelInfo.RatedNm(_data.BaseModelName);
             double scale = rated > 0
                 ? rated
-                : Math.Max(TorqueScaleFloorNm, Math.Ceiling(peak));
+                : Math.Max(TorqueScaleFloorNm, Math.Ceiling(hist.PeakNm));
 
             if (TorqueGraphViz != null)
             {
@@ -586,7 +587,12 @@ namespace MozaPlugin.UI
             if (TorquePeakText != null)
                 TorquePeakText.Text = peak > 0 ? $"max {peak:F1} Nm" : "";
             if (TorqueScaleText != null)
-                TorqueScaleText.Text = rated > 0 ? $"{scale:F0} Nm" : $"{scale:F0} Nm (auto)";
+            {
+                // Ratings aren't all whole numbers (R5 = 5.5), so only spend the
+                // decimal where there is one.
+                string scaleNm = scale == Math.Floor(scale) ? $"{scale:F0}" : $"{scale:F1}";
+                TorqueScaleText.Text = rated > 0 ? $"{scaleNm} Nm" : $"{scaleNm} Nm (auto)";
+            }
         }
 
         private static string FormatBytesPerSec(double bps)

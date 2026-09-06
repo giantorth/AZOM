@@ -37,6 +37,14 @@ namespace MozaPlugin
             // StandbyCoordinator.Apply). Done first so a stale-instance early-out below
             // doesn't make the feed look quiet.
             _standby?.NoteDataUpdate(data.GameRunning);
+            // AZOM.MaxTorque is a per-game-session peak: clear it on the game-start
+            // edge, the same false→true edge TelemetrySender.SetGameRunning uses.
+            // The rolling graph ring is deliberately NOT cleared — its own peak
+            // feeds the graph's autoscale fallback, and blanking a 2-minute trace
+            // mid-session reads as a glitch.
+            if (data.GameRunning && !_lastGameRunningForTorquePeak)
+                _data?.ResetLiveTorquePeak();
+            _lastGameRunningForTorquePeak = data.GameRunning;
             // Feed the truck-sim stalk controller the current game context so it can
             // gate keyboard output to a running ETS2/ATS session.
             try { _stalksController?.SetGameContext(pluginManager.GameName, data.GameRunning); } catch { }

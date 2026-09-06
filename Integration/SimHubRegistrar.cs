@@ -39,11 +39,22 @@ namespace MozaPlugin.Integration
             _plugin.AttachDelegate("AZOM.BaseState", () => _plugin.Data?.BaseState ?? 0);
             // Live motor torque in Nm, unsigned — direction is dropped, since
             // torque is torque whichever way the wheel is turning (this is how
-            // PitHouse graphs it too). Always live: base-live-torque rides the
-            // 5 s StatusPollCommands sweep alongside the temps. The Base tab's
-            // Torque graph adds a 10 Hz sampler on top while it is on screen, so
-            // this reads at 0.2 Hz normally and 10 Hz with that graph up.
+            // PitHouse graphs it too). CurrentTorqueRaw is the same reading with
+            // the direction sign kept. Both refresh at 5 Hz off
+            // MozaPlugin.SampleTorqueHistory, panel open or not.
             _plugin.AttachDelegate("AZOM.CurrentTorque", () => _plugin.Data?.LiveTorqueNm ?? 0.0);
+            _plugin.AttachDelegate("AZOM.CurrentTorqueRaw", () => _plugin.Data?.LiveTorqueSignedNm ?? 0.0);
+            // Peak |torque| this game session — cleared on each game start by
+            // MozaPlugin.DataUpdate, and by the plugin reload a game switch causes.
+            _plugin.AttachDelegate("AZOM.MaxTorque", () => _plugin.Data?.LiveTorquePeakNm ?? 0.0);
+            // The base model's rated peak, the figure the Base-tab graph scales to.
+            // -1 = not established (an unrecognised model). Distinct from
+            // AZOM.Torque, which is the user's own output limit as a percentage.
+            _plugin.AttachDelegate("AZOM.TorqueLimit", () =>
+            {
+                double rated = BaseModelInfo.RatedNm(_plugin.Data?.BaseModelName);
+                return rated > 0 ? rated : -1.0;
+            });
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);
 
             // Every wheelbase setting, in the same display units the Base-tab

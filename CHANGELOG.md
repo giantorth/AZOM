@@ -41,10 +41,13 @@ All notable changes to the AZOM plugin are documented here.
   rings now get the same BUTTON/KNOB selector, sized to the wheel's real encoder count.
 - **Live wheelbase torque graph.** A selector on the Base tab switches the right-hand chart
   between the serial-traffic graph and live motor torque in Nm, scaled to the base's rated
-  output so you can read headroom at a glance. Torque is sampled at 10 Hz while that graph is
-  on screen and the poll stops when it isn't.
-- **`AZOM.CurrentTorque` property** — live motor torque in Nm for dashboards and overlays,
-  refreshed on the same status sweep as the temperatures.
+  output so you can read headroom at a glance. The chart covers two minutes, and it is already
+  filled in when you open the tab.
+- **Four torque properties for dashboards and overlays**, all refreshed at 5 Hz whether or not
+  the settings panel is open: `AZOM.CurrentTorque` (live Nm, unsigned),
+  `AZOM.CurrentTorqueRaw` (the same reading with the direction sign kept),
+  `AZOM.MaxTorque` (the session's highest, reset at each game start) and
+  `AZOM.TorqueLimit` (the base's rated peak — 16 Nm on an R16).
 - **Forza Horizon compatibility toggle** (Options tab → Game Compatibility) reads and sets the
   wheelbase's compatibility mode, including a value MOZA Pit House set.
 

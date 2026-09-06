@@ -195,18 +195,16 @@ namespace MozaPlugin
         }
 
         // Background feed for live torque: the Base-tab graph's history ring and
-        // the AZOM.CurrentTorque property. Gated on TorqueGraphActive — unlike the
-        // temperature sampler this one issues a wire read, and 10 Hz of it is not
-        // worth paying permanently for a property most setups never read. Enable
-        // the Base tab's Torque graph to make it live.
+        // the whole AZOM.CurrentTorque* / MaxTorque family. Ungated — the
+        // properties are read by dashboards with the settings panel shut, and one
+        // uniform rate is also what keeps the ring's time axis honest.
         //
-        // Costs one 8-byte read + 8-byte reply per tick while active: ~160 B/s at
-        // 10 Hz, ~1.4% of the 11520 B/s ceiling. Runs off the WPF dispatcher; the
-        // UI only ever renders a snapshot on its existing 500 ms tick.
+        // Costs one 8-byte read + 8-byte reply per tick: ~80 B/s at 5 Hz, ~0.7% of
+        // the 11520 B/s ceiling. Runs off the WPF dispatcher; the UI only ever
+        // renders a snapshot on its existing 500 ms tick.
         private void SampleTorqueHistory(object sender, ElapsedEventArgs e)
         {
             if (IsShuttingDown) return;
-            if (!TorqueGraphActive) return;
             var data = _data;
             if (data == null) return;
 
@@ -217,10 +215,14 @@ namespace MozaPlugin
                     _torqueHistory.Record(0.0);
                     return;
                 }
+                // Route to whichever pipe owns the base, the same way
+                // HardwareApplier.BaseManager does: after a base→hub migration the
+                // primary is hub-bound and a read sent there never reaches the base.
+                var dm = DetectionState.BaseOwner ?? _deviceManager;
                 // Untracked: a dropped reply costs one sample, where a tracked
                 // read re-registered at this rate would stack retransmits on its
                 // own backoff.
-                _deviceManager?.ReadSettingUntracked("base-live-torque");
+                dm?.ReadSettingUntracked("base-live-torque");
                 _torqueHistory.Record(data.LiveTorqueNm);
             }
             catch (Exception ex) { MozaLog.Warn($"[AZOM] Torque-history sample failed: {ex.Message}"); }
