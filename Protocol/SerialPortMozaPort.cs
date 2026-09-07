@@ -28,6 +28,10 @@ namespace MozaPlugin.Protocol
         }
 
         public bool IsOpen => _sp.IsOpen;
+        // SerialPort.Read blocks until at least one byte arrives or ReadTimeout
+        // (500 ms) expires, then throws — so this path genuinely needs the
+        // BytesToRead gate in ReadLoop.
+        public bool ReadReturnsImmediately => false;
         public int BytesToRead => _sp.BytesToRead;
         public int Read(byte[] buffer, int offset, int count) => _sp.Read(buffer, offset, count);
         public void Write(byte[] buffer, int offset, int count) => _sp.Write(buffer, offset, count);

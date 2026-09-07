@@ -5,6 +5,7 @@ using MozaPlugin.Devices;
 using MozaPlugin.Telemetry;
 using SimHub.Plugins.OutputPlugins.Dash.GLCDTemplating;
 using SimHub.Plugins.OutputPlugins.Dash.TemplatingCommon;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI
 {
@@ -15,7 +16,7 @@ namespace MozaPlugin.UI
     /// every other mBooster settings type, persisted via Newtonsoft.Json), so
     /// this row supplies the <see cref="INotifyPropertyChanged"/> binding
     /// surface an <c>ItemsControl</c> template needs, plus a callback to
-    /// persist on every edit. Mirrors <c>Devices/WheelUi/ChannelMappingRow.cs</c>'s
+    /// persist on every edit. Mirrors <c>Devices/Ui/ChannelMappingRow.cs</c>'s
     /// role for the (unrelated) channel-mapping list.
     /// </summary>
     internal sealed class MBoosterCustomEffectRow : INotifyPropertyChanged

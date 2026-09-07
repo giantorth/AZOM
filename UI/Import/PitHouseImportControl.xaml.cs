@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using MozaPlugin.Devices;
 using MozaPlugin.Resources;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI.Import
 {
@@ -56,6 +57,17 @@ namespace MozaPlugin.UI.Import
         {
             _plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
             _customPathOverride = plugin.Settings?.PitHousePresetsPathOverride;
+            // Scan on first Loaded, not here: SimHub constructs the settings pane
+            // on every game switch, and the scan reads + parses every preset file.
+            Loaded += OnFirstLoaded;
+        }
+
+        private bool _listsLoaded;
+
+        private void OnFirstLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_listsLoaded) return;
+            _listsLoaded = true;
             RefreshLists();
         }
 
@@ -63,7 +75,10 @@ namespace MozaPlugin.UI.Import
         //  Picker phase
         // ------------------------------------------------------------
 
-        private void RefreshLists()
+        // Bumped per refresh so a slow scan can't publish over a newer one.
+        private int _refreshGeneration;
+
+        private async void RefreshLists()
         {
             var root = PitHouseFolderScanner.ResolvePresetsRoot(_customPathOverride);
             if (root == null)
@@ -78,8 +93,21 @@ namespace MozaPlugin.UI.Import
 
             FolderHintText.Text = root;
 
-            var motors = PitHouseFolderScanner.ListCategory(root, PitHouseFolderScanner.Category.Motor);
-            var pedals = PitHouseFolderScanner.ListCategory(root, PitHouseFolderScanner.Category.Pedals);
+            int gen = ++_refreshGeneration;
+            List<PitHouseFolderScanner.PresetHeader> motors, pedals;
+            try
+            {
+                // File reads + JSON/zip parsing per preset — off the dispatcher.
+                (motors, pedals) = await System.Threading.Tasks.Task.Run(() =>
+                    (PitHouseFolderScanner.ListCategory(root, PitHouseFolderScanner.Category.Motor),
+                     PitHouseFolderScanner.ListCategory(root, PitHouseFolderScanner.Category.Pedals)));
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] PitHouse preset scan failed: {ex.Message}");
+                return;
+            }
+            if (gen != _refreshGeneration) return;
 
             MotorList.ItemsSource = motors;
             PedalsList.ItemsSource = pedals;

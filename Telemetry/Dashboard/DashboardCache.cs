@@ -40,6 +40,17 @@ namespace MozaPlugin.Telemetry.Dashboard
         public int WheelCacheCount { get { lock (_lock) return _byHash.Count; } }
         public int FolderProfileCount { get { lock (_lock) return _folderProfiles.Count; } }
 
+        /// <summary>
+        /// O(1) change signal for <see cref="CachedNames"/>. Not the deduped
+        /// count — it exists so a UI poll can notice the library filling in
+        /// (folder scan on wheel detect, wheel download) without rebuilding the
+        /// whole name list on every tick.
+        /// </summary>
+        public int CachedNameCount
+        {
+            get { lock (_lock) return _nameToHash.Count + _folderProfiles.Count; }
+        }
+
         // --- User folder library (fallback after wheel cache) ---
         private readonly Dictionary<string, MultiStreamProfile> _folderProfiles =
             new Dictionary<string, MultiStreamProfile>(StringComparer.OrdinalIgnoreCase);
@@ -282,7 +293,20 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// Scan a user-configured folder for .mzdash files and parse them.
         /// These act as a fallback library when wheel cache misses.
         /// </summary>
-        public void LoadFromFolder(string folderPath)
+        public void LoadFromFolder(string folderPath) => LoadFromFolders(new[] { folderPath });
+
+        /// <summary>
+        /// Scan several folders into the one folder-library, in order.
+        /// Entries are keyed by profile name and LATER FOLDERS WIN, so callers
+        /// pass least-authoritative first.
+        ///
+        /// <para>Two trees matter in practice and neither is a superset of the
+        /// other: MOZA Dashboard Studio authors into its own <c>projectRoot</c>
+        /// (<c>_dashes\dashes</c>), while PitHouse syncs a per-wheel copy to
+        /// <c>_dashes\&lt;wheel-uid&gt;</c>. Loading only one hides whatever the
+        /// user most recently created in the other.</para>
+        /// </summary>
+        public void LoadFromFolders(IReadOnlyList<string?> folderPaths)
         {
             lock (_lock)
             {
@@ -292,8 +316,24 @@ namespace MozaPlugin.Telemetry.Dashboard
                 _folderHashes.Clear();
             }
 
-            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
-                return;
+            if (folderPaths == null) return;
+            var scanned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var folderPath in folderPaths)
+            {
+                if (string.IsNullOrEmpty(folderPath)) continue;
+                string full;
+                try { full = Path.GetFullPath(folderPath!); }
+                catch { full = folderPath!; }
+                // The configured folder and Studio's root are often the same
+                // directory — scanning twice is just wasted parsing.
+                if (!scanned.Add(full)) continue;
+                ScanFolder(full);
+            }
+        }
+
+        private void ScanFolder(string folderPath)
+        {
+            if (!Directory.Exists(folderPath)) return;
 
             foreach (var file in Directory.GetFiles(folderPath, "*.mzdash", SearchOption.AllDirectories))
             {
@@ -326,7 +366,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
             }
 
-            MozaLog.Debug($"[AZOM] DashboardCache: {FolderProfileCount} profiles loaded from folder '{folderPath}'");
+            // Count is cumulative across every folder scanned this pass.
+            MozaLog.Debug($"[AZOM] DashboardCache: {FolderProfileCount} folder profiles after scanning '{folderPath}'");
         }
 
         /// <summary>

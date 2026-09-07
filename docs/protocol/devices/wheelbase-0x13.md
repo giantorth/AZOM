@@ -127,9 +127,36 @@ Both produce ACK response: `7E 03 AA 31 43 0x 05 [chk]` (echo with group|0x80, d
 |---------|----|-------|------|-------|
 | state | `01` | 2 | int | |
 | state-err | `02` | 2 | int | |
-| mcu-temp | `04` | 2 | int | |
-| mosfet-temp | `05` | 2 | int | |
-| motor-temp | `06` | 2 | int | |
+| mcu-temp | `04` | 2 | int | **BE16, raw ÷ 100 = °C.** Measured `0F 3C` = 3900 → 39.0 °C (bundle `W603C6RV`). |
+| mosfet-temp | `05` | 2 | int | Same scaling. Measured `0E A0`…`0E AD` → 37.4–37.6 °C, dithering a few counts. |
+| motor-temp | `06` | 2 | int | Same scaling. Measured `09 D8`…`09 E2` → 25.2–25.3 °C. |
+| live-torque | `07` | 2 | int | **Live motor torque.** BE16 biased by +500, 0.1 Nm per count — `torque_Nm = (raw - 500) / 10.0`, sign carries direction. Read-only live measurement; nothing is written to enable it. PitHouse's **torque curve** panel is a pure reader: opening it starts an ~18 Hz poll of this register alone (no temps alongside) and closing it stops the poll, so the poll's presence *is* the feature's on/off state. |
+
+**`live-torque` (`07`) verification** — real R16 Ultra, PitHouse bridge capture
+`bridge-pithouse-features-20260828-061341.jsonl`:
+
+```
+h2b  7E 03 2B 13 07 00 00 [chk]     ← poll, ~18 Hz (50 ms nominal)
+b2h  7E 03 AB 31 07 01 F4 [chk]     ← reply: reg echo + BE16 value (0x01F4 = 500 = 0.0 Nm)
+```
+
+| Wheel state | raw | Nm |
+|---|---|---|
+| idle, untouched (±1 count dither) | `499`–`500` | 0.0 |
+| hand-wiggled, both directions | `467`…`538` | −3.3 … +3.8 |
+| held static against a stop (PitHouse UI read 6 Nm) | `440` plateau, 437–445 over 40 s | −6.0 |
+
+The static hold is what distinguishes torque from angular velocity: steady force
+with no rotation holds a *sustained* offset, where a velocity channel would
+return to the 500 bias.
+
+The sign is only which way the wheelbase is pulling. PitHouse's torque graph
+plots the **unsigned magnitude** — `Math.Abs(raw - 500) / 10.0` — because torque
+is torque regardless of direction; that is why a raw `440` displays as `6 Nm`
+and not `-6 Nm`. Consumers wanting a plottable value should do the same.
+
+Full scale (the clip point) is not yet measured — nothing in this capture drove
+the value beyond ±60 counts.
 
 ### Group `0x2C` (44) — Motor run-state / partner-API extension (write-only)
 
@@ -251,6 +278,18 @@ which returns the hardware model string (`RS21-D05-MC WB`), not a numeric versio
 > query at dev `0x13` (`base-fw-version-b`) — and takes the first answer, with
 > `0x12` winning if more than one lands. Which of the three an R12 answers, if
 > any, is not yet confirmed on hardware.
+>
+> The detect-time burst rides the `BaseAmbientProbed` latch and so fires exactly
+> once; in that bundle it was also *never retried*, because the read was tracked
+> against a `PendingResponseTracker` that `MozaPlugin.Instance` had not published
+> yet (fixed by constructor injection in the same commit). Since a lost reply
+> costs the whole session — no LFE, no 10-band EQ, no "Wheelbase LFE haptics"
+> device — `PollStatusCore` now re-issues all three probes on its 5 s tick while
+> `BaseFwVersion == 0`, up to 5 rounds (~25 s past detect), on the pipe that owns
+> the base. The resolved state is reported in the diagnostics bundle's
+> `=== Base identity ===` section (`FW (numeric)` + which probe answered), which
+> is what distinguishes a **silent** base from a genuinely old one — both read
+> `LFE support: no`.
 
 The 4 version bytes are in **wire order `[major, minor, build, patch]`** — MOZA's
 PitHouse UI displays the last two swapped: wire `01 02 18 09` is shown `1.2.9.24`,

@@ -8,7 +8,7 @@ using MozaPlugin.Diagnostics;
 using MozaPlugin.Resources;
 using MozaPlugin.UI.BugReport;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl: the About-tab "Report a
     // problem" flow and the shared diagnostics-bundle assembly used by both the
@@ -162,19 +162,19 @@ namespace MozaPlugin
                 SetBugReportReference(null);
                 SetBugReportStatus(Strings.Status_BugReportUploading);
 
-                // Assemble on the UI thread (light: snapshots + text), then
-                // compress off-thread (heavier) so the pane stays responsive.
+                // Assemble AND compress off-thread: the two capture redaction passes
+                // and the diagnostics dump are not light on a big rolling capture.
                 bool rollingOmitted = false;
-                var content = BuildBundleContent(
-                    BuildReportText(description, contact, version, os, rollingOmitted), includeRolling: true);
-                byte[] bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(content));
+                string reportText = BuildReportText(description, contact, version, os, rollingOmitted);
+                byte[] bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(
+                    BuildBundleContent(reportText, includeRolling: true)));
 
                 if (bundle.Length > BugReportService.MaxUploadBytes)
                 {
                     rollingOmitted = true;
-                    content = BuildBundleContent(
-                        BuildReportText(description, contact, version, os, rollingOmitted), includeRolling: false);
-                    bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(content));
+                    string reportTextNoRolling = BuildReportText(description, contact, version, os, rollingOmitted);
+                    bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(
+                        BuildBundleContent(reportTextNoRolling, includeRolling: false)));
                     if (bundle.Length > BugReportService.MaxUploadBytes)
                     {
                         SetBugReportStatus(Strings.Status_BugReportTooLarge);
@@ -208,7 +208,10 @@ namespace MozaPlugin
                         // "denied every time" report actionable when the user
                         // quotes the line, and it also sits in the exported
                         // bundle's upload-log.txt.
-                        SetBugReportStatus(AppendShortCode(Strings.Status_BugReportFailed, result.ShortCode));
+                        SetBugReportStatus(AppendShortCode(
+                            result.EdgeBlocked ? Strings.Status_BugReportEdgeBlocked
+                                               : Strings.Status_BugReportFailed,
+                            result.ShortCode));
                         break;
                 }
             }

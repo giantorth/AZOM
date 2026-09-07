@@ -21,20 +21,37 @@ for the full read-only command table.
 
 `AB` = `0x2B | 0x80`; `0x31` = nibble-swap of `0x13`.
 
-**Observed sub-cmds and response values** (from
-[`sim/wheel_sim.py`](../../../sim/wheel_sim.py) `_plugin_probe_rsp`,
-captures verified across multiple connects):
+**Observed sub-cmds and response values.** The left column is the placeholder
+[`sim/wheel_sim.py`](https://github.com/giantorth/moza-simulator) `_plugin_probe_rsp`
+returns; the right is real hardware, from bundle `W603C6RV` (wheelbase on one pipe,
+AB9 on another, both polled for ~80 s):
 
-| Sub-cmd | Resp value | DB name | Notes |
-|---------|------------|---------|-------|
-| `0x01` | `00 00` | `state` | Operating state |
-| `0x02` | `00 00` | `state-err` | Last error code |
-| `0x04` | `01 2C` | `mcu-temp` | BE u16 = 300 (raw °C ×10 = 30.0 °C) |
-| `0x05` | `01 2C` | `mosfet-temp` | BE u16 = 300 |
-| `0x06` | `01 2C` | `motor-temp` | BE u16 = 300 |
+| Sub-cmd | Sim value | Measured (real base) | DB name | Notes |
+|---------|-----------|----------------------|---------|-------|
+| `0x01` | `00 00` | `00 02` | `state` | Operating state |
+| `0x02` | `00 00` | `00 00` | `state-err` | Last error code |
+| `0x04` | `01 2C` | `0F 3C` = 3900 | `mcu-temp` | **39.0 °C** |
+| `0x05` | `01 2C` | `0E A0`…`0E AD` = 3744–3757 | `mosfet-temp` | 37.4–37.6 °C, dithers by a few counts |
+| `0x06` | `01 2C` | `09 D8`…`09 E2` = 2520–2530 | `motor-temp` | 25.2–25.3 °C |
+| `0x07` | — | `01 F2`/`01 F3` = 498/499 | `live-torque` | ~0 Nm at rest (+500 bias) |
 
-Temperature decoding follows the
-[`ServiceParameter` × 0.1 transform](../telemetry/service-parameter-transforms.md).
+**Temperature scaling is raw ÷ 100 → °C** (2026-09-01, corrected). This page
+previously cited the
+[`ServiceParameter` × 0.1 transform](../telemetry/service-parameter-transforms.md)
+and read the sim's `01 2C` placeholder as 30.0 °C. Both were wrong for this group:
+
+- ×0.1 puts the measured MCU at **390 °C** and the motor at 252 °C. ÷100 gives
+  39.0 / 25.2 °C, which matches a warm but ordinary wheelbase, and the three
+  sensors rank sensibly (MCU hottest, motor coolest).
+- The `ServiceParameter` table is explicitly scoped to **device settings**
+  (groups 31–100) for the Pit House settings UI, not to this read-only status
+  group, so its temperature row never applied here in the first place.
+- `01 2C` is a hardcoded simulator constant, not a captured value — no real base
+  has been seen returning it, and it is identical across all three sensors.
+
+`MozaData` stores the raw wire value; `SettingsControl.SliderHelpers.ConvertTemp`
+and `SimHubPropertyResolver.ConvertTemp` both divide by 100. The shipped code was
+already correct — this page was the outlier.
 
 PitHouse polls the temperature triplet (`04`/`05`/`06`) every state-change
 event (pause, session end, focus change). The bare `state` and `state-err`
@@ -44,4 +61,16 @@ dev `0x13` with payload `02 00 00` is also observed — this is the synthetic
 directly by the sim's `_PROBE_SYNTH` table (it expects only that the response
 arrives framed; payload echoed verbatim).
 
-Plugin does not implement these polls.
+**Plugin implementation.** `MozaPlugin.StatusPollCommands` polls `01`/`04`/`05`/`06`/`07`
+on the 5 s status timer, and the Base tab's torque graph adds a 10 Hz untracked
+`07` poll while it is on screen. The first `base-mcu-temp` reply is also the base
+detection trigger (`DeviceProber`).
+
+The **AB9 answers this same group on its own dev `0x12`** (bundle `W603C6RV`,
+234 probes / 234 replies) — the group is not wheelbase-only. Frames are the base's
+shape with the device byte swapped: `7E 03 2B 12 <cmd> 00 00` → `AB 21 <cmd> <hi> <lo>`.
+Only `01` (state, read `00 08`) and `04` (mcu-temp, `0E D8`…`0F 3C` → 31–39 °C, its
+own sensor — distinct from the base's at the same timestamps) carry values;
+`02` reads zero and `05`/`06`/`07` are flat `0x0000`. The AB9's own read group `0x1E`
+carries none of these: ids `04`–`07` were asked 39× each and answered zero times.
+Device page: [`../devices/ab9-shifter.md`](../devices/ab9-shifter.md).

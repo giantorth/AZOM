@@ -37,12 +37,13 @@ namespace MozaPlugin.Telemetry.Display
         // _sender.SlotInFieldA until then). Reset on hot-swap.
         private int _detectedSlotFieldA = -1;
 
-        // Last slot the host emitted FF kind=4 to. STATIC: survives plugin
-        // instance recycle within a single SimHub process (game-switch path)
-        // so the new game's profile-apply can skip the always-spurious 11 s
-        // restart when targeting the same dashboard. Resets across SimHub
-        // process boundary.
-        private static int _lastEmittedKind4Slot = -1;
+        // Last slot the host emitted FF kind=4 to. Per tracker: the persistent
+        // main sender (and its tracker) already survives the game-switch reload,
+        // so the new game's profile-apply still skips the spurious restart when
+        // targeting the same dashboard — and the wheel and CM2 senders never see
+        // each other's slot (a static here made a wheel switch to the CM2's last
+        // slot read as an echo).
+        private int _lastEmittedKind4Slot = -1;
         public int LastEmittedKind4Slot => _lastEmittedKind4Slot;
 
         public WheelSlotTracker(TelemetrySender sender)

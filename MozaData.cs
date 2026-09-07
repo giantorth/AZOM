@@ -1,4 +1,5 @@
 using System;
+using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin
 {
@@ -125,6 +126,62 @@ namespace MozaPlugin
         public volatile int MotorTemp;
         public volatile bool UseFahrenheit;
 
+        // Live motor torque, raw wire value: BE16 biased by +500 (500 = zero),
+        // 0.1 Nm per count. The sign is direction only — plot the magnitude via
+        // LiveTorqueNm. 500 (= 0.0 Nm) is the correct pre-read default, since a
+        // never-read register must not graph as a phantom 50 Nm.
+        public volatile int LiveTorqueRaw = LiveTorqueZeroBias;
+
+        public const int LiveTorqueZeroBias = 500;
+
+        /// <summary>Unsigned live torque in Nm. Direction is discarded — torque
+        /// is torque whichever way the wheel is turning, which is how PitHouse
+        /// graphs it too.</summary>
+        public double LiveTorqueNm =>
+            Math.Abs(LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
+
+        /// <summary>Signed live torque in Nm; the sign is which way the base is
+        /// pulling. Feeds AZOM.CurrentTorqueRaw.</summary>
+        public double LiveTorqueSignedNm =>
+            (LiveTorqueRaw - LiveTorqueZeroBias) / 10.0;
+
+        // Peak |torque| since the last ResetLiveTorquePeak(), in wire counts so
+        // the compare-and-store below stays an int (no Interlocked on a double).
+        // Reset per game session by MozaPlugin.DataUpdate; feeds AZOM.MaxTorque.
+        public volatile int LiveTorquePeakDeviation;
+
+        // Rejected as garbage by the peak-hold: 100 Nm, ~4x the largest MOZA base.
+        private const int LiveTorqueMaxPlausibleDeviation = 1000;
+
+        /// <summary>Session peak torque in Nm; 0 until the first reading.</summary>
+        public double LiveTorquePeakNm => LiveTorquePeakDeviation / 10.0;
+
+        public void ResetLiveTorquePeak() => LiveTorquePeakDeviation = 0;
+
+        // AB9 status registers, read off the AB9's own pipe on group 0x2B (dev 0x12).
+        // Only the ones that carry data: the wheelbase's mosfet/motor/torque registers
+        // reply a constant zero on an AB9 and aren't asked. NoAb9Reading = never
+        // answered. Temperature is raw/100 degrees C, same scaling as the wheelbase's.
+        public const int NoAb9Reading = -1;
+
+        public volatile int Ab9State2b = NoAb9Reading;
+        public volatile int Ab9StateErr2b = NoAb9Reading;
+        public volatile int Ab9McuTemp2b = NoAb9Reading;
+
+        /// <summary>Layout byte the AB9 reports for itself (group 0x1E cmd 0xD3) —
+        /// the only way to tell whether a written layout stuck or the firmware
+        /// substituted something. <see cref="NoAb9Reading"/> until it answers.</summary>
+        public volatile int Ab9ModeReadback = NoAb9Reading;
+
+        /// <summary>Clear every probe reading back to "never answered". Called at
+        /// AB9 connect so an unplug/swap can't leave the previous device's numbers
+        /// standing next to the new one's silence.</summary>
+        public void ResetAb9Probe()
+        {
+            Ab9State2b = Ab9StateErr2b = Ab9McuTemp2b = NoAb9Reading;
+            Ab9ModeReadback = NoAb9Reading;
+        }
+
         // State
         public volatile int BaseState;
         public volatile int BaseStateError;
@@ -161,58 +218,64 @@ namespace MozaPlugin
         public volatile bool HandbrakeButtonPressed;
 
         // Core settings
-        public volatile int Limit;
-        public volatile int MaxAngle;
-        public volatile int FfbStrength;
-        public volatile int Torque;
-        public volatile int Speed;
+        public volatile int Limit = -1;
+        public volatile int MaxAngle = -1;
+        public volatile int FfbStrength = -1;
+        public volatile int Torque = -1;
+        public volatile int Speed = -1;
 
         // Wheelbase effects
-        public volatile int Damper;
-        public volatile int Friction;
-        public volatile int Inertia;
-        public volatile int Spring;
+        public volatile int Damper = -1;
+        public volatile int Friction = -1;
+        public volatile int Inertia = -1;
+        public volatile int Spring = -1;
 
         // Protection
-        public volatile int Protection;
+        public volatile int Protection = -1;
         public volatile int ProtectionMode;
-        public volatile int NaturalInertia;
+        public volatile int NaturalInertia = -1;
 
         // High speed damping
-        public volatile int SpeedDamping;
-        public volatile int SpeedDampingPoint;
+        public volatile int SpeedDamping = -1;
+        public volatile int SpeedDampingPoint = -1;
 
         // Soft limit
-        public volatile int SoftLimitStiffness;
+        public volatile int SoftLimitStiffness = -1;
         public volatile int SoftLimitStrength;
-        public volatile int SoftLimitRetain;
+        public volatile int SoftLimitRetain = -1;
 
         // FFB misc
-        public volatile int FfbReverse;
+        public volatile int FfbReverse = -1;
         public volatile int FfbDisable;
-        public volatile int TempStrategy;        // cmd 0x1E base — also exposed in
+        public volatile int TempStrategy = -1;   // cmd 0x1E base — also exposed in
                                                   // PitHouse as "Performance output"
                                                   // (0 = Reserved, 1 = Full).
-        public volatile int GearshiftVibration;  // cmd 0x2E base — 0..5 intensity.
+        public volatile int GearshiftVibration = -1;  // cmd 0x2E base — 0..5 intensity.
 
         // Game effects
-        public volatile int GameDamper;
-        public volatile int GameFriction;
-        public volatile int GameInertia;
-        public volatile int GameSpring;
+        public volatile int GameDamper = -1;
+        public volatile int GameFriction = -1;
+        public volatile int GameInertia = -1;
+        public volatile int GameSpring = -1;
 
         // Main device
-        public volatile int WorkMode;
+        public volatile int WorkMode = -1;
         public volatile int LedStatus;
-        public volatile int Interpolation;
+        public volatile int Interpolation = -1;
 
         // ===== Wheel LED settings =====
-        public volatile int WheelTelemetryMode;     // 0=Off, 1=Telemetry, 2=Static
+        // Per-group LED mode: 0=Off, 1=SimHub/Telemetry, 2=Static. -1 = NOT YET READ
+        // BACK from the wheel — the sentinel every other layer already uses (profile,
+        // overlay, extension settings). It must not default to 0: "Off" is a real user
+        // choice that suppresses the live colour stream for that group, so a 0 default
+        // would blank button and knob LEDs on every cold connect until the readback
+        // landed. Consumers gate on an explicit 0/2 and treat -1 as "no opinion".
+        public volatile int WheelTelemetryMode = -1;
         public volatile int WheelTelemetryIdleEffect;
         public volatile int WheelButtonsIdleEffect;
         public volatile int WheelKnobIdleEffect;
-        public volatile int WheelKnobLedMode;
-        public volatile int WheelButtonsLedMode;
+        public volatile int WheelKnobLedMode = -1;
+        public volatile int WheelButtonsLedMode = -1;
         // Per-group idle-effect SPEED (cmd 0x1E [group] [effect_id] [BE u16 ms]).
         // We track only the last ms value committed for each group; the effect_id
         // byte is always paired from the corresponding *IdleEffect field at write
@@ -229,10 +292,39 @@ namespace MozaPlugin
         public volatile int WheelPaddlesMode;
         public volatile int WheelClutchPoint;
         public volatile int WheelKnobMode;
+        // True once the wheel has answered a wheel-knob-mode read. WheelKnobMode is a
+        // plain int defaulting to 0, so "answered 0 (Buttons)" and "never answered" are
+        // otherwise indistinguishable — and that distinction is what decides whether the
+        // legacy All-Rotaries selector is offered on a wheel with no per-knob support.
+        public volatile bool WheelKnobModeSupported;
         // Per-rotary-encoder signal mode (newer firmware). 0=Buttons, 1=Knob. -1 = unknown/no response yet.
         public readonly int[] WheelKnobSignalModes = { -1, -1, -1, -1, -1 };
         // True once at least one per-knob response has arrived, indicating firmware supports [42, N].
         public volatile bool WheelKnobSignalModeSupported;
+
+        // Bit n set => the wheel answered wheel-knob-signal-mode for LOGICAL knob n,
+        // i.e. that encoder exists and its input mode is configurable. This is the
+        // encoder capability; WheelModelInfo.KnobCount is the knob-LED capability and
+        // is 0 on most rims that do have encoders. Discovered by sweeping the reads
+        // (DeviceProber.BuildNewWheelLedReadCommands) rather than catalogued per model.
+        // Written on the serial read thread, read on the UI thread — Interlocked CAS,
+        // no lock, per the threading rules.
+        private int _wheelKnobSignalModeMask;
+
+        public int WheelKnobSignalModeMask => System.Threading.Volatile.Read(ref _wheelKnobSignalModeMask);
+
+        private void SetKnobSignalModePresent(int logicalKnob)
+        {
+            if (logicalKnob < 0 || logicalKnob >= WheelKnobMax) return;
+            int bit = 1 << logicalKnob;
+            int prev;
+            do
+            {
+                prev = _wheelKnobSignalModeMask;
+                if ((prev & bit) != 0) return;
+            } while (System.Threading.Interlocked.CompareExchange(
+                         ref _wheelKnobSignalModeMask, prev | bit, prev) != prev);
+        }
 
         // Store a wheel-knob-signal-mode{firmwareIndex} response into the slot for
         // the LOGICAL knob it controls. Most wheels are identity; the KS Pro
@@ -246,6 +338,7 @@ namespace MozaPlugin
                 .SignalModeLogicalKnob(firmwareIndex);
             if (logical >= 0 && logical < WheelKnobSignalModes.Length)
                 WheelKnobSignalModes[logical] = value;
+            SetKnobSignalModePresent(logical);
             WheelKnobSignalModeSupported = true;
         }
         public volatile int WheelStickMode;
@@ -351,18 +444,70 @@ namespace MozaPlugin
         public readonly byte[][] DashRpmBlinkColors = InitRpmColorArray();
         public readonly byte[][] DashFlagColors = InitFlagColorArray();
 
-        // ===== Base ambient LED settings (R21/R25/R27 family — 18 LEDs / 2 strips) =====
+        // ===== Base ambient LED settings (2 strips; 6 LEDs each on R16 Ultra, 9 on R21/R25/R27 — see BaseModelInfo) =====
         // -1 = not yet read from device.
-        public volatile int BaseAmbientBrightness = -1;     // 0..255
-        public volatile int BaseAmbientStandbyMode = -1;    // 0=const, 1=?, 2=breath, 3=cycle, 4=rainbow, 5=flow
+        public volatile int BaseAmbientBrightness = -1;     // 0..100 (percent)
+        public volatile int BaseAmbientStandbyMode = -1;    // 0=off, 1=constant, 2=breathing, 3=cycle, 4=rainbow, 5=sand flow
         public volatile int BaseAmbientIndicatorState = -1; // 0=off, 1=on
-        public volatile int BaseAmbientSleepMode = -1;      // 0=disabled, 1=enabled
-        public volatile int BaseAmbientSleepTimeout = -1;   // value range TBD
+        public volatile int BaseAmbientSleepMode = -1;      // sleep light effect: 0=off, 1=breathe
+        public volatile int BaseAmbientSleepTimeout = -1;   // minutes
+        // Animation interval in ms per standby mode, indexed by mode 0..5.
+        // Only modes 2..5 have a register — off and constant have nothing to
+        // time, and `1E 00` / `1E 01` are never read or written.
+        public readonly int[] BaseAmbientStandbyIntervals = NewNegativeOnes(6);
+        // Sleep breathing speed in ms (`0x23 [sleep-mode]`). Distinct from the
+        // standby breath interval, which is `1E 02`.
+        public volatile int BaseAmbientSleepBreathInterval = -1;
         public readonly byte[] BaseAmbientStartupColor = new byte[] { 0, 0, 0 };
         public readonly byte[] BaseAmbientShutdownColor = new byte[] { 0, 0, 0 };
-        // Diagnostic only — stitched from group 0x07 cmd 0x01 + cmd 0x02 reads
-        // against dev 0x12 (e.g. "R25 Black # MOT-1 -V01"). Not used for gating.
+
+        // Per-LED palettes. Indexed [strip 0..1][led], sized to the largest
+        // known strip (9) so the arrays never need resizing when the base model
+        // resolves; only the first LedsPerStrip entries are read or written.
+        //
+        // Idle palettes are per standby mode: the mode byte in
+        // `0x20 [strip] [mode] [led]` is the standby-mode number, and only
+        // modes 1 (constant) and 2 (breathing) have a stored palette — the
+        // animated modes generate their own colours. Sleep has a single palette
+        // (`0x25 [strip] 01 [led]`, sleep effect 1 = breathe).
+        // See docs/protocol/leds/base-ambient-0x20-0x22.md.
+        public readonly byte[][] BaseAmbientIdleColorsConstant = InitBaseAmbientPalette();
+        public readonly byte[][] BaseAmbientIdleColorsBreath = InitBaseAmbientPalette();
+        public readonly byte[][] BaseAmbientSleepColors = InitBaseAmbientPalette();
+        // Stitched from group 0x07 cmd 0x01 + cmd 0x02 reads against dev 0x12
+        // (e.g. "R16 Black # MOT-3-V01"). Selects the ambient strip geometry via
+        // BaseModelInfo — see BaseAmbientLedsPerStrip below.
         public volatile string BaseModelName = "";
+
+        // Resolved ambient LEDs-per-strip, latched once the base model name is
+        // known. 0 = not resolved yet.
+        //
+        // STATIC-backed and deliberately NOT cleared by ClearWheelIdentity, for
+        // the same reason as BaseFwVersion: that method fires on rim swaps AND
+        // transient reconnects, where the BASE is unchanged — but it blanks
+        // BaseModelName. The LED emitter picks its chunk shapes and bitmask width
+        // from this every frame, so losing it mid-session silently reverted a
+        // 6-LED base to the 9-LED wire layout: chunk 2 addressed LEDs 5..8, and
+        // the three that don't exist went dark while the bar spread over 9
+        // positions instead of 6 (bundle JCFNRS7W).
+        private static volatile int s_baseAmbientLedsPerStrip;
+        public int BaseAmbientLedsPerStrip
+        {
+            get => s_baseAmbientLedsPerStrip;
+            set => s_baseAmbientLedsPerStrip = value;
+        }
+
+        /// <summary>
+        /// Ambient LEDs per strip to use right now: the latched value when the
+        /// model has been identified, else derived from whatever model name is
+        /// currently held (which falls back to the 9-LED default when empty).
+        /// Every ambient consumer — wire emitter, UI, device definition — must go
+        /// through this rather than reading BaseModelName directly.
+        /// </summary>
+        public int ResolvedAmbientLedsPerStrip
+            => s_baseAmbientLedsPerStrip > 0
+                ? s_baseAmbientLedsPerStrip
+                : Devices.BaseModelInfo.LedsPerStrip(BaseModelName);
         // ===== Base identity (device 0x13 — direct probes, mirror of the
         // Wheel identity fields). Populated by base-model-name / base-sw-version
         // / base-hw-version / base-hw-sub / base-mcu-uid / base-identity-11
@@ -383,14 +528,27 @@ namespace MozaPlugin
         // a fresh MozaData) — the base isn't re-detected over the persistent wire,
         // so base-fw-version isn't re-read; without persistence BaseSupportsLfe
         // would drop to false after every game switch. Deliberately NOT cleared by
-        // ClearWheelIdentity: that fires on wheel-rim swaps AND transient reconnects
-        // (e.g. sleep/wake, where the tty drops and re-opens), but the BASE is
-        // unchanged — zeroing it there made the LFE card vanish on wake. It persists
-        // and is overwritten by the next base-fw-version read, which the prober
-        // re-issues on every base re-detection (reconnect re-arms BaseAmbientProbed),
-        // so a physically-swapped base still re-reads the correct value on reconnect.
+        // ClearWheelIdentity or ClearBaseIdentity: both can fire while the BASE is
+        // unchanged (rim swap, or a tty that drops and re-opens on sleep/wake), and
+        // zeroing it there makes the LFE card vanish on wake. It persists and is
+        // overwritten by the next base-fw-version read, which the prober re-issues on
+        // every base re-detection — DeviceDetectionState.ResetBase clears the latches
+        // that gate it, so a physically-swapped base re-reads the correct value.
         private static volatile int s_baseFwVersion;
         public int BaseFwVersion { get => s_baseFwVersion; set => s_baseFwVersion = value; }
+
+        // Human-readable note on which base-fw probe answered, or "unanswered".
+        // Static for the same reason as the version itself. A bug bundle needs this
+        // to tell a SILENT base apart from a genuinely old one — both leave
+        // BaseSupportsLfe false, and only one of them is a bug (bundle 65HZBQJT: an
+        // R12 whose dev-0x12 group-0x04 probe was never answered at all, which took
+        // hex archaeology on the wire capture to establish).
+        private static volatile string s_baseFwVersionSource = "unanswered";
+        public string BaseFwVersionSource
+        {
+            get => s_baseFwVersionSource;
+            set => s_baseFwVersionSource = value ?? "unanswered";
+        }
 
         // Minimum base firmware for the wheelbase LFE effects (complex gearshift,
         // engine vibration, ABS). Captured on 1.2.10.10; the prior non-LFE build
@@ -440,6 +598,9 @@ namespace MozaPlugin
 
         // ===== Main device =====
         public volatile int BleMode;               // 0=On, 85=Off
+        // Forza Horizon compatibility. Plain polarity: 1=On, 0=Off — do NOT copy
+        // BleMode's inverted convention. -1 = not read back yet.
+        public volatile int CompatMode = -1;
 
         // ===== Pedals settings =====
         public volatile int PedalsThrottleDir;
@@ -490,6 +651,12 @@ namespace MozaPlugin
         // `01 02 XX 06`) from a base/hub-relayed shifter, used to tell HGP from SGP
         // where the PID isn't visible. Model-agnostic — it's what RESOLVES the model.
         public volatile byte[] RelayShifterDeviceType = System.Array.Empty<byte>();
+        // Relay-only scratch: model-name (grp 0x07) / hw-version (grp 0x08) replies from
+        // a base/hub-relayed shifter, if it answers those groups at all. Model-agnostic
+        // like RelayShifterDeviceType — logged by DeviceProber so a support bundle shows
+        // whether 0x1A self-describes; nothing depends on them yet.
+        public volatile string RelayShifterModelName = string.Empty;
+        public volatile string RelayShifterHwVersion = string.Empty;
 
         private ShifterState? ShifterFor(Devices.ShifterModelKind model) =>
             model == Devices.ShifterModelKind.Hgp ? ShifterHgp :
@@ -535,6 +702,16 @@ namespace MozaPlugin
                 if (arrayValue != null) RelayShifterDeviceType = (byte[])arrayValue.Clone();
                 return true;
             }
+            if (name == "shifter-model-name" || name == "shifter-hw-version")
+            {
+                if (arrayValue != null)
+                {
+                    var s = ParseNullTerminatedString(arrayValue);
+                    if (name == "shifter-model-name") RelayShifterModelName = s;
+                    else RelayShifterHwVersion = s;
+                }
+                return true;
+            }
             UpdateShifter(model, name, intValue);
             if (arrayValue != null) UpdateShifterArray(model, name, arrayValue);
             return true;
@@ -549,12 +726,66 @@ namespace MozaPlugin
         public volatile int HubPedals2Power = -1;
         public volatile int HubPedals3Power = -1;
 
+        private static int[] NewNegativeOnes(int count)
+        {
+            var arr = new int[count];
+            for (int i = 0; i < count; i++) arr[i] = -1;
+            return arr;
+        }
+
         private static byte[][] InitColorArray(int count)
         {
             var arr = new byte[count][];
             for (int i = 0; i < count; i++)
                 arr[i] = new byte[] { 0, 0, 0 };
             return arr;
+        }
+
+        // Base ambient per-LED palettes are flat arrays with a FIXED stride of
+        // MaxLedsPerStrip, so an index stays valid whether the resolved base has
+        // 6 or 9 LEDs per strip. Entries past the real strip length are unused.
+        private static byte[][] InitBaseAmbientPalette()
+            => InitColorArray(2 * Devices.BaseModelInfo.MaxLedsPerStrip);
+
+        // Pull strip / mode / led out of a base-ambient per-LED command name.
+        // Shapes: "base-ambient-led-color-strip0-mode1-led4" and
+        // "base-ambient-sleep-led-color-strip1-led2" (no mode segment; mode
+        // comes back as -1). Names are generated by MozaCommandDatabase, so the
+        // segments are always present and single-digit.
+        private static bool TryParseBaseAmbientLedName(
+            string commandName, out int strip, out int mode, out int led)
+        {
+            strip = -1; mode = -1; led = -1;
+            strip = ParseSegmentDigit(commandName, "-strip");
+            mode = ParseSegmentDigit(commandName, "-mode");
+            led = ParseSegmentDigit(commandName, "-led");
+            return strip >= 0 && led >= 0;
+        }
+
+        // Digits immediately following the last occurrence of <marker>.
+        private static int ParseSegmentDigit(string s, string marker)
+        {
+            int at = s.LastIndexOf(marker, System.StringComparison.Ordinal);
+            if (at < 0) return -1;
+            int i = at + marker.Length;
+            int value = -1;
+            while (i < s.Length && s[i] >= '0' && s[i] <= '9')
+            {
+                value = (value < 0 ? 0 : value * 10) + (s[i] - '0');
+                i++;
+            }
+            return value;
+        }
+
+        /// <summary>
+        /// Flat index into the base ambient palettes for a (strip, led) pair.
+        /// Returns -1 when either coordinate is out of range.
+        /// </summary>
+        public static int BaseAmbientPaletteIndex(int strip, int led)
+        {
+            if (strip < 0 || strip > 1) return -1;
+            if (led < 0 || led >= Devices.BaseModelInfo.MaxLedsPerStrip) return -1;
+            return strip * Devices.BaseModelInfo.MaxLedsPerStrip + led;
         }
 
         /// <summary>
@@ -600,6 +831,31 @@ namespace MozaPlugin
                 case "base-mcu-temp":       McuTemp = value; IsBaseConnected = true; break;
                 case "base-mosfet-temp":    MosfetTemp = value; break;
                 case "base-motor-temp":     MotorTemp = value; break;
+
+                // Live torque. Deliberately does NOT set IsBaseConnected: it
+                // shares read group 43 with base-mcu-temp, which is the base
+                // detection trigger (DeviceProber), and a graph/property feed
+                // must not become a second detection source.
+                case "base-live-torque":
+                    LiveTorqueRaw = value;
+                    // Peak-hold only. A spurious BE16 costs the live value one
+                    // sample but would latch the session peak forever, so the
+                    // plausibility bound guards the peak alone — the stored raw
+                    // stays verbatim, since full scale is unmeasured (see
+                    // docs/protocol/devices/wheelbase-0x13.md).
+                    int torqueDev = Math.Abs(value - LiveTorqueZeroBias);
+                    if (torqueDev > LiveTorquePeakDeviation
+                        && torqueDev <= LiveTorqueMaxPlausibleDeviation)
+                        LiveTorquePeakDeviation = torqueDev;
+                    break;
+
+                // AB9 status registers (diagnostic). Routed here only from the AB9
+                // pipe's own inbound handler, which parses with busHint "ab9" —
+                // these can never be fed a wheelbase reply.
+                case "ab9-2b-state":        Ab9State2b = value; break;
+                case "ab9-2b-state-err":    Ab9StateErr2b = value; break;
+                case "ab9-2b-mcu-temp":     Ab9McuTemp2b = value; break;
+                case "ab9-mode-read":       Ab9ModeReadback = value; break;
 
                 // State
                 case "base-state":          BaseState = value; break;
@@ -649,6 +905,7 @@ namespace MozaPlugin
                 case "main-get-led-status":    LedStatus = value; break;
                 case "main-get-interpolation": Interpolation = value; break;
                 case "main-get-ble-mode":      BleMode = value; break;
+                case "main-get-compat-mode":   CompatMode = value; break;
 
                 // Wheel LED settings
                 case "wheel-telemetry-mode":        WheelTelemetryMode = value; break;
@@ -667,7 +924,7 @@ namespace MozaPlugin
                 // (mode<<16)|ms is wrong. The array path extracts ms.
                 case "wheel-paddles-mode":           WheelPaddlesMode = value - 1; break; // raw 1/2/3 → display 0/1/2
                 case "wheel-clutch-point":           WheelClutchPoint = value; break;
-                case "wheel-knob-mode":              WheelKnobMode = value; break;
+                case "wheel-knob-mode":              WheelKnobMode = value; WheelKnobModeSupported = true; break;
                 case "wheel-knob-signal-mode0":      StoreKnobSignalMode(0, value); break;
                 case "wheel-knob-signal-mode1":      StoreKnobSignalMode(1, value); break;
                 case "wheel-knob-signal-mode2":      StoreKnobSignalMode(2, value); break;
@@ -693,6 +950,19 @@ namespace MozaPlugin
                 case "base-ambient-indicator-state": BaseAmbientIndicatorState = value; break;
                 case "base-ambient-sleep-mode":      BaseAmbientSleepMode = value; break;
                 case "base-ambient-sleep-timeout":   BaseAmbientSleepTimeout = value; break;
+                case "base-ambient-sleep-breath-interval": BaseAmbientSleepBreathInterval = value; break;
+                case "base-ambient-standby-interval-mode0":
+                case "base-ambient-standby-interval-mode1":
+                case "base-ambient-standby-interval-mode2":
+                case "base-ambient-standby-interval-mode3":
+                case "base-ambient-standby-interval-mode4":
+                case "base-ambient-standby-interval-mode5":
+                {
+                    int mode = commandName[commandName.Length - 1] - '0';
+                    if (mode >= 0 && mode < BaseAmbientStandbyIntervals.Length)
+                        BaseAmbientStandbyIntervals[mode] = value;
+                    break;
+                }
 
                 // FFB Equalizer
                 case "base-equalizer1": Equalizer1 = value; break;
@@ -801,7 +1071,7 @@ namespace MozaPlugin
             // responses arrive leaves `_data` at hardcoded defaults and the
             // swatches come up empty on a profile with no saved colors.
             if (_ledColorEditArmed
-                && Devices.MozaLedDeviceManager.IsLiveAnywhere()
+                && Devices.Led.MozaLedDeviceManager.IsLiveAnywhere()
                 && IsWheelLedColorCommand(commandName))
                 return;
 
@@ -861,6 +1131,33 @@ namespace MozaPlugin
             {
                 if (data.Length >= 3)
                     SetColor(BaseAmbientShutdownColor, data);
+            }
+            // Per-LED idle palette: base-ambient-led-color-strip{s}-mode{m}-led{l}.
+            // Mode is the standby-mode number; only 1 (constant) and 2 (breathing)
+            // carry a palette.
+            else if (commandName.StartsWith("base-ambient-led-color-strip"))
+            {
+                if (data.Length >= 3
+                    && TryParseBaseAmbientLedName(commandName, out int strip, out int mode, out int led))
+                {
+                    int i = BaseAmbientPaletteIndex(strip, led);
+                    if (i >= 0)
+                    {
+                        if (mode == 1) SetColor(BaseAmbientIdleColorsConstant[i], data);
+                        else if (mode == 2) SetColor(BaseAmbientIdleColorsBreath[i], data);
+                    }
+                }
+            }
+            // Per-LED sleep palette: base-ambient-sleep-led-color-strip{s}-led{l}.
+            else if (commandName.StartsWith("base-ambient-sleep-led-color-strip"))
+            {
+                if (data.Length >= 3
+                    && TryParseBaseAmbientLedName(commandName, out int strip, out _, out int led))
+                {
+                    int i = BaseAmbientPaletteIndex(strip, led);
+                    if (i >= 0)
+                        SetColor(BaseAmbientSleepColors[i], data);
+                }
             }
             // Shifter (SGP) LEDs + relayed device-type are model-aware — routed via
             // UpdateShifterArray/TryUpdateShifter, not this shared method.
@@ -1018,8 +1315,27 @@ namespace MozaPlugin
                 // build) — swap data[2]/data[3] — so the >= threshold compare in
                 // BaseSupportsLfe orders pre-LFE (1.2.9.24) BELOW LFE (1.2.10.10).
                 // Packing in raw wire order would misgate (0x01021809 > 0x01020A0A).
+                //
+                // BaseFwVersionSource records which probe won, for the diagnostics
+                // dump. Both dev-0x12 request shapes (len-4 and the zero-length
+                // short form) parse under the name "base-fw-version", so it names
+                // the DEVICE, not the request shape; the reply payload length rides
+                // along so a bundle can show whether the two ever differ.
                 if (data.Length >= 4)
+                {
                     BaseFwVersion = (data[0] << 24) | (data[1] << 16) | (data[3] << 8) | data[2];
+                    BaseFwVersionSource = commandName == "base-fw-version"
+                        ? $"base-fw-version (dev 0x12, {data.Length}B reply)"
+                        : $"base-fw-version-b (dev 0x13, {data.Length}B reply)";
+                }
+                else if (BaseFwVersion == 0)
+                {
+                    // Answered, but too short to decode — materially different from
+                    // "unanswered" when triaging why LFE is off. Only recorded while
+                    // the version is still unknown, so a runt reply can't overwrite
+                    // the note for a probe that already succeeded.
+                    BaseFwVersionSource = $"{commandName} answered with {data.Length}B — too short to decode";
+                }
             }
             else if (commandName == "wheel-identity-11")
             {
@@ -1080,6 +1396,13 @@ namespace MozaPlugin
             WheelHwSubVersion = "";
             WheelSubDeviceCount = 0;
             WheelDevicePresence = 0;
+            // Knob-encoder capability is per-rim and must not survive a swap: a CS Pro's
+            // four answers would otherwise draw four selectors on a 2-encoder rim. The
+            // mode VALUES (WheelKnobSignalModes / WheelKnobMode) are deliberately left
+            // alone — the per-wheel overlay is their truth, not this mirror.
+            System.Threading.Interlocked.Exchange(ref _wheelKnobSignalModeMask, 0);
+            WheelKnobSignalModeSupported = false;
+            WheelKnobModeSupported = false;
             WheelMcuUid = System.Array.Empty<byte>();
             WheelDeviceType = System.Array.Empty<byte>();
             WheelCapabilities = System.Array.Empty<byte>();
@@ -1094,19 +1417,10 @@ namespace MozaPlugin
             DisplayDeviceType = System.Array.Empty<byte>();
             DisplayCapabilities = System.Array.Empty<byte>();
             DisplayIdentity11 = System.Array.Empty<byte>();
-            // Base identity — clear alongside wheel/display so a fresh
-            // connection re-probes and DeviceCatalog doesn't serve stale
-            // Motor / Wheel Base manifest entries from a previous session.
-            BaseModelName = "";
-            BaseSwVersion = "";
-            BaseHwVersion = "";
-            BaseHwSubVersion = "";
-            BaseMcuUid = System.Array.Empty<byte>();
-            BaseIdentity11 = System.Array.Empty<byte>();
-            // NOTE: BaseFwVersion is intentionally NOT cleared here — see its field
-            // comment. It's a BASE property; a wheel-rim/transient identity reset
-            // must not blank it or the LFE card blinks out on sleep/wake. The prober
-            // overwrites it on the next base re-detection.
+            // Base identity is NOT cleared here — see ClearBaseIdentity. This reset
+            // fires on rim hot-swaps and presence misses, where the base is still
+            // attached; blanking base identity there empties the SDK DeviceCatalog
+            // and the prober never re-reads it.
             Last28x00Byte5 = 0;
             Last28x00ByteValid = false;
             Last28x01Byte4 = 0;
@@ -1115,6 +1429,30 @@ namespace MozaPlugin
             Last28xReplyTickMs = 0;
             _serialPartA = "";
             _serialPartB = "";
+        }
+
+        /// <summary>
+        /// Clear wheelbase identity. Separate from <see cref="ClearWheelIdentity"/>
+        /// because that one is rim-scoped: only a caller that knows the BASE went
+        /// away (connection loss, deliberate disable, pipe migration) may blank this.
+        /// <para>
+        /// Callers MUST also call <see cref="Devices.DeviceDetectionState.ResetBase"/>
+        /// — DeviceProber re-reads these fields only when the base-detect latches are
+        /// clear, and <c>DeviceCatalog</c> suppresses the Motor / Wheel Base manifest
+        /// entries iRacing needs whenever <see cref="BaseMcuUid"/> is empty.
+        /// </para>
+        /// </summary>
+        public void ClearBaseIdentity()
+        {
+            BaseModelName = "";
+            BaseSwVersion = "";
+            BaseHwVersion = "";
+            BaseHwSubVersion = "";
+            BaseMcuUid = System.Array.Empty<byte>();
+            BaseIdentity11 = System.Array.Empty<byte>();
+            // BaseFwVersion is intentionally NOT cleared — see its field comment.
+            // It is static-backed and survives resets so the LFE card doesn't blink
+            // out; the prober overwrites it on the next base detect.
         }
 
         public static string ParseNullTerminatedString(byte[] data)

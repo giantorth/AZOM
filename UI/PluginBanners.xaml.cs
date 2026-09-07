@@ -35,8 +35,9 @@ namespace MozaPlugin.UI
 
         /// <summary>
         /// Optional in-app navigation for the SDK nudge's "Configure" button
-        /// (plugin pane: switch to the SDK tab). Null on device pages → the
-        /// Configure button is hidden (there is no SDK tab to reach from a device
+        /// (plugin pane: switch to the Options tab, where the SDK toggles live).
+        /// Null on device pages → the Configure button is hidden (there is no
+        /// such tab to reach from a device
         /// page); Dismiss still works and persists.
         /// </summary>
         public Action? ConfigureSdkInApp { get; set; }
@@ -266,7 +267,7 @@ namespace MozaPlugin.UI
             var s = MozaPlugin.Instance?.Settings;
             bool show = s != null && !s.SdkEmulationEnabled && !s.SdkPromptDismissed;
             SdkPromptBanner.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            // Configure can only reach the SDK tab on the plugin pane.
+            // Configure can only reach the Options tab on the plugin pane.
             if (SdkPromptConfigureButton != null)
                 SdkPromptConfigureButton.Visibility =
                     ConfigureSdkInApp != null ? Visibility.Visible : Visibility.Collapsed;
@@ -299,11 +300,11 @@ namespace MozaPlugin.UI
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = url,
                     UseShellExecute = true,
-                });
+                })) { }
             }
             catch (Exception ex)
             {

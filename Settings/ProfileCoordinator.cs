@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using SimHub.Plugins;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
-using MozaPlugin.Telemetry.Era;
 using Timer = System.Timers.Timer;
 
 namespace MozaPlugin.Settings
@@ -12,7 +11,7 @@ namespace MozaPlugin.Settings
     /// Settings persistence (debounced save, clear/reset) plus the SimHub
     /// profile system: profile-store init/subscription, profile apply, and the
     /// per-wheel-page accessor family (overlay, telemetry enable/name/path,
-    /// sleep/idle bundles, firmware era) with the wheel-reported seed methods.
+    /// sleep/idle bundles) with the wheel-reported seed methods.
     /// Settings are read live via <c>_plugin.Settings</c>; only the moved
     /// <see cref="ClearSettings"/> replaces the backing field.
     /// </summary>
@@ -33,7 +32,7 @@ namespace MozaPlugin.Settings
             string? activeDashKey = null;
             try
             {
-                var cands = _plugin.GetActiveDashboardKeyCandidates();
+                var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
                 if (cands.Count > 0) activeDashKey = cands[0];
             }
             catch { /* candidate resolver is conservative; ignore early-init errors */ }
@@ -140,6 +139,8 @@ namespace MozaPlugin.Settings
             _plugin.TelemetrySender?.Stop();
             _plugin._settings = new MozaPluginSettings();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
+            // InitProfileSystem re-pushes the master-mapper defaults from the
+            // freshly-seeded profile, replacing the cleared set's snapshot.
             InitProfileSystem();
         }
 
@@ -179,6 +180,12 @@ namespace MozaPlugin.Settings
             store.CurrentProfileChanged += OnProfileChanged;
             _subscribedProfileStore = store;
 
+            // The master mapper's channel defaults ride a store of their own. Bring it
+            // up here — before the apply below, so the defaults are published ahead of
+            // any telemetry-profile build — but keep it off the device-profile
+            // lifecycle: switching one must never switch the other.
+            InitChannelDefaultsStore();
+
             // Apply the initially selected profile
             if (store.CurrentProfile != null)
             {
@@ -190,6 +197,107 @@ namespace MozaPlugin.Settings
             }
         }
 
+        // Tracks the channel-defaults store we subscribed on, mirroring
+        // _subscribedProfileStore above (ClearSettings replaces both).
+        private MozaChannelDefaultsStore? _subscribedChannelDefaultsStore;
+
+        /// <summary>
+        /// Bring up the master mapper's own profile store: seed, drain the legacy
+        /// plugin-global set into it, let SimHub pick the profile for the running game,
+        /// then publish it. Deliberately independent of the device-profile store — the
+        /// only thing the two share is this method's call site.
+        /// </summary>
+        private void InitChannelDefaultsStore()
+        {
+            var store = _plugin.Settings?.ChannelDefaultsStore;
+            if (store == null) return;
+
+            if (store.Profiles.Count == 0)
+                store.Profiles.Add(new MozaChannelDefaultsProfile { Name = "Default" });
+
+            // Drain before Init so the profile SimHub selects already carries them.
+            MigrateMasterDefaultsToProfiles(store);
+
+            store.Init();
+
+            if (_subscribedChannelDefaultsStore != null
+                && !ReferenceEquals(_subscribedChannelDefaultsStore, store))
+                _subscribedChannelDefaultsStore.CurrentProfileChanged -= OnChannelDefaultsProfileChanged;
+            store.CurrentProfileChanged += OnChannelDefaultsProfileChanged;
+            _subscribedChannelDefaultsStore = store;
+
+            // Publish before anything can build a telemetry profile, so the first
+            // cold-start tier-def already resolves against these defaults (no dashboard
+            // switch needed to pick them up).
+            _plugin.ChannelMapping.PushProfileDefaults();
+        }
+
+        /// <summary>A different channel-defaults profile became active (the master
+        /// mapper's selector, or SimHub switching it for the running game). Republish —
+        /// the dashboard store's snapshot is one process-wide static — then rebind the
+        /// live senders. No hardware writes: this store holds nothing but mappings.</summary>
+        private void OnChannelDefaultsProfileChanged(object sender, EventArgs e)
+        {
+            var name = _plugin.Settings?.ChannelDefaultsStore?.CurrentProfile?.Name;
+            MozaLog.Info($"[AZOM] Channel defaults profile changed: {name ?? "<none>"}");
+            _plugin.ChannelMapping.PushProfileDefaults();
+            // Wire-neutral (only each channel's SimHubProperty changes), so a live
+            // sender picks the new bindings up on its next frame with no tier-def
+            // re-emit. No-ops until a catalog generation is committed.
+            try { _plugin.ChannelMapping.ReResolveAll(); }
+            catch (Exception ex) { MozaLog.Warn("[AZOM] Channel defaults re-resolve failed: " + ex.Message); }
+        }
+
+        /// <summary>
+        /// One-shot drain of the retired plugin-global master channel defaults
+        /// (<c>MozaPluginSettings.TelemetryDefaultMappings</c>) into the channel-defaults
+        /// store's first profile. Fill-only: a URL that profile already maps wins, so a
+        /// re-run could never clobber a user edit. Clears the legacy dict afterwards so
+        /// nothing reads it again.
+        ///
+        /// <para>Sentinel-guarded rather than keyed on the legacy dict being empty: a
+        /// user who drains, then clears those mappings, must not get them re-seeded on
+        /// the next launch.</para>
+        /// </summary>
+        private void MigrateMasterDefaultsToProfiles(MozaChannelDefaultsStore store)
+        {
+            var settings = _plugin.Settings;
+            if (settings == null || settings.MasterDefaultsMigratedToProfiles) return;
+            settings.MasterDefaultsMigratedToProfiles = true;
+
+            var legacy = settings.TelemetryDefaultMappings;
+            if (legacy == null || legacy.Count == 0) return;
+
+            // Seeded above, so this is the "Default" profile on a first migration; on a
+            // store that already has profiles it is whichever sorts first — either way
+            // the user's single global set has exactly one sensible landing place.
+            var target = store.Profiles.Count > 0 ? store.Profiles[0] : null;
+            if (target == null) return;
+
+            // COW: PushProfileDefaults may already have published this dict's reference.
+            var next = target.Mappings != null
+                ? new Dictionary<string, string>(target.Mappings, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            int added = 0;
+            foreach (var kv in legacy)
+            {
+                if (string.IsNullOrEmpty(kv.Key) || string.IsNullOrWhiteSpace(kv.Value)) continue;
+                if (next.ContainsKey(kv.Key)) continue;
+                next[kv.Key] = kv.Value.Trim();
+                added++;
+            }
+            if (added > 0) target.Mappings = next;
+
+            settings.TelemetryDefaultMappings =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            MozaLog.Info($"[AZOM] Migrated {added} master channel default(s) "
+                         + $"into channel-defaults profile \"{target.Name}\"");
+            // Land it now rather than waiting for an unrelated save. ScheduleSave, not
+            // SaveSettings — the latter runs CaptureFromCurrent against the DEVICE
+            // profile, and a partial device read could write sentinels into it.
+            ScheduleSave();
+        }
+
         /// <summary>End()/CleanupPartialInit teardown: detach the CurrentProfileChanged
         /// subscription so an in-flight profile-change callback cannot reach the
         /// plugin during teardown.</summary>
@@ -198,6 +306,9 @@ namespace MozaPlugin.Settings
             if (_subscribedProfileStore != null)
                 _subscribedProfileStore.CurrentProfileChanged -= OnProfileChanged;
             _subscribedProfileStore = null;
+            if (_subscribedChannelDefaultsStore != null)
+                _subscribedChannelDefaultsStore.CurrentProfileChanged -= OnChannelDefaultsProfileChanged;
+            _subscribedChannelDefaultsStore = null;
         }
 
         private void OnProfileChanged(object sender, EventArgs e)
@@ -300,14 +411,21 @@ namespace MozaPlugin.Settings
             if (profile == null) return null;
             var g = _plugin.GetCurrentWheelPageGuid();
             if (!g.HasValue) return null;
-            if (profile.WheelOverridesByPageGuid == null)
-                profile.WheelOverridesByPageGuid = new Dictionary<Guid, WheelOverride>();
-            if (!profile.WheelOverridesByPageGuid.TryGetValue(g.Value, out var ov) || ov == null)
+            // COW swap, like the sleep/idle bundles: the profile store serializes
+            // this dict while the UI and SimHub's SetSettings path insert into it.
+            lock (_pageBundleSwapLock)
             {
+                var dict = profile.WheelOverridesByPageGuid;
+                if (dict != null && dict.TryGetValue(g.Value, out var ov) && ov != null)
+                    return ov;
                 ov = new WheelOverride();
-                profile.WheelOverridesByPageGuid[g.Value] = ov;
+                var next = dict == null
+                    ? new Dictionary<Guid, WheelOverride>()
+                    : new Dictionary<Guid, WheelOverride>(dict);
+                next[g.Value] = ov;
+                profile.WheelOverridesByPageGuid = next;
+                return ov;
             }
-            return ov;
         }
 
         /// <summary>
@@ -378,10 +496,17 @@ namespace MozaPlugin.Settings
             {
                 var g = _plugin.GetCurrentWheelPageGuid();
                 if (!g.HasValue) return;
-                if (_plugin.Settings == null) return;
-                if (_plugin.Settings.WheelTelemetryEnabledByPageGuid == null)
-                    _plugin.Settings.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
-                _plugin.Settings.WheelTelemetryEnabledByPageGuid[g.Value] = value;
+                var s = _plugin.Settings;
+                if (s == null) return;
+                // COW swap: the save debounce serializes this dict off-thread.
+                lock (_pageBundleSwapLock)
+                {
+                    var next = s.WheelTelemetryEnabledByPageGuid == null
+                        ? new Dictionary<Guid, bool>()
+                        : new Dictionary<Guid, bool>(s.WheelTelemetryEnabledByPageGuid);
+                    next[g.Value] = value;
+                    s.WheelTelemetryEnabledByPageGuid = next;
+                }
             }
         }
 
@@ -420,9 +545,14 @@ namespace MozaPlugin.Settings
             {
                 var s = _plugin.Settings;
                 if (s == null) return;
-                if (s.WheelTelemetryEnabledByPageGuid == null)
-                    s.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
-                s.WheelTelemetryEnabledByPageGuid[MozaPlugin.Cm2PageGuid] = value;
+                lock (_pageBundleSwapLock)
+                {
+                    var next = s.WheelTelemetryEnabledByPageGuid == null
+                        ? new Dictionary<Guid, bool>()
+                        : new Dictionary<Guid, bool>(s.WheelTelemetryEnabledByPageGuid);
+                    next[MozaPlugin.Cm2PageGuid] = value;
+                    s.WheelTelemetryEnabledByPageGuid = next;
+                }
             }
         }
 
@@ -470,10 +600,16 @@ namespace MozaPlugin.Settings
             {
                 var g = _plugin.GetCurrentWheelPageGuid();
                 if (!g.HasValue) return;
-                if (_plugin.Settings == null) return;
-                if (_plugin.Settings.WheelMzdashFolderByPageGuid == null)
-                    _plugin.Settings.WheelMzdashFolderByPageGuid = new Dictionary<Guid, string>();
-                _plugin.Settings.WheelMzdashFolderByPageGuid[g.Value] = value ?? "";
+                var s = _plugin.Settings;
+                if (s == null) return;
+                lock (_pageBundleSwapLock)
+                {
+                    var next = s.WheelMzdashFolderByPageGuid == null
+                        ? new Dictionary<Guid, string>()
+                        : new Dictionary<Guid, string>(s.WheelMzdashFolderByPageGuid);
+                    next[g.Value] = value ?? "";
+                    s.WheelMzdashFolderByPageGuid = next;
+                }
             }
         }
 
@@ -693,65 +829,5 @@ namespace MozaPlugin.Settings
             if (changed) PersistSettings();
         }
 
-        /// <summary>
-        /// Firmware era for the current wheel page. Reads the per-page-GUID
-        /// override for the connected wheel; when no wheel has identified yet
-        /// (UI opened before hardware came up), falls back to the
-        /// <see cref="MozaDeviceConstants.WheelGenericGuid"/> bucket so the
-        /// user's pick made before the wheel was visible still applies.
-        /// Returns <see cref="MozaWheelEra.Auto"/> only when neither bucket
-        /// holds an explicit value.
-        /// </summary>
-        internal MozaWheelEra ActiveTelemetryWheelEra
-        {
-            get
-            {
-                if (_plugin.Settings?.WheelTelemetryEraByPageGuid == null) return MozaWheelEra.Auto;
-                var g = _plugin.GetCurrentWheelPageGuid();
-                if (g.HasValue
-                    && _plugin.Settings.WheelTelemetryEraByPageGuid.TryGetValue(g.Value, out var v)
-                    && v >= 0)
-                    return MigrateStoredEra(v);
-                if (Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic)
-                    && _plugin.Settings.WheelTelemetryEraByPageGuid.TryGetValue(generic, out var gv)
-                    && gv >= 0)
-                    return MigrateStoredEra(gv);
-                return MozaWheelEra.Auto;
-            }
-            set
-            {
-                if (_plugin.Settings == null) return;
-                if (_plugin.Settings.WheelTelemetryEraByPageGuid == null)
-                    _plugin.Settings.WheelTelemetryEraByPageGuid = new Dictionary<Guid, int>();
-                // Specific wheel identified → write the per-wheel override.
-                // Otherwise stash under WheelGenericGuid so the user's pick
-                // survives until the wheel shows up; the getter falls back
-                // to this bucket when the per-wheel entry is missing.
-                var g = _plugin.GetCurrentWheelPageGuid();
-                if (!g.HasValue
-                    && Guid.TryParse(MozaDeviceConstants.WheelGenericGuid, out var generic))
-                    g = generic;
-                if (!g.HasValue) return;
-                _plugin.Settings.WheelTelemetryEraByPageGuid[g.Value] = (int)value;
-            }
-        }
-
-        /// <summary>
-        /// Map a persisted era int onto the current <see cref="MozaWheelEra"/>
-        /// values. The defunct Era2025 was stored as 2 (now a retired hole) and
-        /// is migrated to <see cref="MozaWheelEra.Auto"/> so the wheel is
-        /// re-probed rather than pinned to a hallucinated era. Existing
-        /// Era2024 (1) and Era2026 (3) picks are preserved; anything else
-        /// (including 0 and the retired 2) falls back to Auto.
-        /// </summary>
-        private static MozaWheelEra MigrateStoredEra(int stored)
-        {
-            switch (stored)
-            {
-                case (int)MozaWheelEra.Era2024: return MozaWheelEra.Era2024;
-                case (int)MozaWheelEra.Era2026: return MozaWheelEra.Era2026;
-                default: return MozaWheelEra.Auto;
-            }
-        }
     }
 }

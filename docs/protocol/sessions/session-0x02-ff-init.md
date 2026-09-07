@@ -29,7 +29,7 @@ chunks and the wheel reassembles before parsing.
 
 `size` includes the 4-byte kind prefix; total wire bytes per record =
 `size + 9`. The inner CRC covers the entire kindAndValue blob, not
-just the payload. Builder is `Protocol/SessionPropertyPushBuilder.WrapFfRecord`.
+just the payload. Builder is `Telemetry/Sessions/SessionPropertyPushBuilder.WrapFfRecord`.
 
 ## Init handshake (host → wheel)
 
@@ -269,7 +269,7 @@ some sessions and ~40 s in others; neither is required.
 `TelemetrySender.TickEmitDeviceLogPoll()` (slow path, ~1/min) emits the request
 via `PropertyPushQueue.SendU32(kind, value, sessionOverride)`. Inbound records
 are lifted off sessions 0x01/0x02 by `Telemetry/Sessions/FfRecordStream` +
-`Protocol/FfRecordReader` (CRC-validated — see below), parsed by
+`Telemetry/Sessions/FfRecordReader` (CRC-validated — see below), parsed by
 `Diagnostics/DeviceLogParser`, and stored in `Diagnostics/DeviceLogStore` for
 the Diagnostics tab and the `device-display-log.txt` bundle entry. The receipt
 is emitted from the tick thread, never the serial read thread, so the session
@@ -407,7 +407,7 @@ beyond what the wheel's input handler can recover from cleanly.
    payloads, or whether a minimal valid record (empty list, or only the
    records the host has authority over) is sufficient.
 5. Build `BuildSessionInitField8Body` / `BuildSessionInitField11Body` in
-   `Protocol/SessionPropertyPushBuilder` that mint per-session-correct
+   `Telemetry/Sessions/SessionPropertyPushBuilder` that mint per-session-correct
    records. Then emit from `SendSessionInitHandshake` ONCE per cold
    start, gated against re-emission across restart cycles unless the
    wheel itself invalidates session state (e.g. across a sess=0x02

@@ -14,6 +14,13 @@ namespace MozaPlugin.Protocol
     {
         bool IsOpen { get; }
         int BytesToRead { get; }
+        /// <summary>True when <see cref="Read"/> returns whatever is buffered
+        /// right now (possibly zero bytes) instead of blocking until the
+        /// requested count arrives or a timeout expires. Ports that return
+        /// immediately must NOT have their reads gated on
+        /// <see cref="BytesToRead"/> — see the ReadLoop comment for why that
+        /// gate loses data on the Wine device path.</summary>
+        bool ReadReturnsImmediately { get; }
         int Read(byte[] buffer, int offset, int count);
         void Write(byte[] buffer, int offset, int count);
         void DiscardInBuffer();

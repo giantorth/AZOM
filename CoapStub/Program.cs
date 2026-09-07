@@ -225,16 +225,38 @@ namespace MozaPlugin.CoapStub
             lock (_traceGate) { _trace?.Flush(); }
         }
 
+        // One file per launch with a 2 s heartbeat: cap the file and prune old
+        // ones, or a rig that runs SimHub for weeks fills the folder unattended.
+        private const long TraceMaxBytes = 4L * 1024 * 1024;
+        private static readonly TimeSpan TraceKeep = TimeSpan.FromDays(7);
+        private static long _traceBytes;
+        private static bool _traceCapped;
+
         private static void OpenTrace(string[] args)
         {
             string dir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SimHub", "MozaPlugin", "CoapStub");
             Directory.CreateDirectory(dir);
+            PruneOldTraces(dir);
             int pid = Process.GetCurrentProcess().Id;
             long stamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string path = Path.Combine(dir, $"stub-trace-{pid}-{stamp}.log");
             _trace = new StreamWriter(path, append: false, Encoding.UTF8) { AutoFlush = true };
+        }
+
+        private static void PruneOldTraces(string dir)
+        {
+            try
+            {
+                var cutoff = DateTime.UtcNow - TraceKeep;
+                foreach (var f in Directory.GetFiles(dir, "stub-trace-*.log"))
+                {
+                    try { if (File.GetLastWriteTimeUtc(f) < cutoff) File.Delete(f); }
+                    catch { /* in use by a live stub, or permissions — skip */ }
+                }
+            }
+            catch { /* best effort */ }
         }
 
         private static void LogHeader(string[] args)
@@ -264,7 +286,18 @@ namespace MozaPlugin.CoapStub
             var stamped = $"[{DateTime.UtcNow:HH:mm:ss.fff}] {line}";
             lock (_traceGate)
             {
-                try { _trace?.WriteLine(stamped); }
+                if (_traceCapped) return;
+                try
+                {
+                    _traceBytes += stamped.Length + 2;
+                    if (_traceBytes > TraceMaxBytes)
+                    {
+                        _traceCapped = true;
+                        _trace?.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] trace cap reached ({TraceMaxBytes} bytes) — logging stopped");
+                        return;
+                    }
+                    _trace?.WriteLine(stamped);
+                }
                 catch { /* writer may be closed during exit */ }
             }
         }

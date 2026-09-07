@@ -9,8 +9,8 @@ Threshold, Engine) per the documented protocol.
 **Multi-device:** the plugin supports more than one mBooster on the
 same host concurrently (one each for throttle / brake / clutch is the
 canonical layout). Each unit gets its own [`MozaSerialConnection`](../../../Protocol/MozaSerialConnection.cs)
-under [`MBoosterDeviceController`](../../../Devices/MBoosterDeviceController.cs);
-all controllers are owned by [`MozaMBoosterRegistry`](../../../Devices/MozaMBoosterRegistry.cs).
+under [`MBoosterDeviceController`](../../../Devices/MBooster/MBoosterDeviceController.cs);
+all controllers are owned by [`MozaMBoosterRegistry`](../../../Devices/MBooster/MozaMBoosterRegistry.cs).
 
 ## Reference protocol
 
@@ -19,7 +19,7 @@ The user-supplied protocol note in
 is the authoritative wire-format reference. It includes verified
 known-good frames against real hardware captures + the host-side
 synthesizer formulas the plugin reproduces verbatim (see
-[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)).
+[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)).
 
 The plugin-side implementation diverges from the protocol note in only
 two ways:
@@ -33,13 +33,13 @@ two ways:
 
 ## USB identification
 
-| Field           | Value                                       |
-|-----------------|---------------------------------------------|
-| Vendor ID       | `0x346E` (Gudsen / Moza)                    |
-| Product ID      | `0x0008`                                    |
-| Category        | `MozaDeviceCategory.MBooster`               |
-| HID match       | VID+PID (no name regex — see [`MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs)) |
-| Baud rate       | 115200                                      |
+| Field           | Value                                                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vendor ID       | `0x346E` (Gudsen / Moza)                                                                                                                                            |
+| Product ID      | `0x0008`                                                                                                                                                            |
+| Category        | `MozaDeviceCategory.MBooster`                                                                                                                                       |
+| HID match       | VID+PID (no name regex — see [`MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs))                                                                              |
+| Baud rate       | 115200                                                                                                                                                              |
 | Stable identity | USB device instance segment from the registry walk; fallback to the device instance ID surfaced by `HidDevice.DevicePath` — see `MBoosterDeviceController.Identity` |
 
 ## Chain topology & connectivity diagnostics
@@ -62,7 +62,7 @@ line separates them.
 Support bundle KY3HK4QP (W17, 1.5.5) is the full failure. The device
 reported:
 
-```
+```text
 Throttle pedal is connected, type: passive pedal
 Brake    pedal is connected, type: active pedal
 Clutch   pedal is connected, type: passive pedal
@@ -74,9 +74,9 @@ plugin read `PD Linked`'s count of 3 as a chain and addressed the brake at
 `0x1d`. The capture's response tally is unambiguous:
 
 | Target | Writes sent | Responses / write-echoes (`a4 21`) |
-|---|---|---|
-| `0x12` | 16 | **16** |
-| `0x1d` | 1212 | **0** |
+| ------ | ----------- | ---------------------------------- |
+| `0x12` | 16          | **16**                             |
+| `0x1d` | 1212        | **0**                              |
 
 Reads: 52 to `0x12` all answered; 16 to `0x1d`/`0x1e` answered **none**.
 Every RX frame in both capture files carries source byte `21` (= `0x12`
@@ -146,13 +146,13 @@ The only reliable connectivity source is the group-`0x0E` firmware
 diagnostic stream, which the device re-emits about once a minute in one
 of two dialects:
 
-| | Short form (device-type `01-02-00-08`, 3 HID axes) | Long form (device-type `01-02-07-05`, 4 HID axes) |
-|---|---|---|
-| Connectivity | `PD Linked:[T 0 B 1 C 0]` | `Pedals connected state: [throttle 0 brake 1 clutch 0]` |
-| Per-pedal type | `Brake pedal is connected, type: active pedal` / `Throttle pedal is not connected !` | same |
-| Sensor dir | `Sensor Dir:[T 1 B -1 C -1]` | `Sensor direction: [throttle 1 brake -1 clutch -1]` |
-| Output dir | `OP Dir:[T 0 B 0 C 0]` | `Output direction: [throttle 0 brake 0 clutch 0]` |
-| Pot angles | `T-PD:[min … max … angle …]` | `Throttle calibrate theta:[min … max … angle …]` |
+|                | Short form (device-type `01-02-00-08`, 3 HID axes)                                   | Long form (device-type `01-02-07-05`, 4 HID axes)       |
+| -------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Connectivity   | `PD Linked:[T 0 B 1 C 0]`                                                            | `Pedals connected state: [throttle 0 brake 1 clutch 0]` |
+| Per-pedal type | `Brake pedal is connected, type: active pedal` / `Throttle pedal is not connected !` | same                                                    |
+| Sensor dir     | `Sensor Dir:[T 1 B -1 C -1]`                                                         | `Sensor direction: [throttle 1 brake -1 clutch -1]`     |
+| Output dir     | `OP Dir:[T 0 B 0 C 0]`                                                               | `Output direction: [throttle 0 brake 0 clutch 0]`       |
+| Pot angles     | `T-PD:[min … max … angle …]`                                                         | `Throttle calibrate theta:[min … max … angle …]`        |
 
 `MBoosterDeviceController.LogPedalDiagnosticIfRelevant` parses both
 connectivity forms into `ConnectedAxes` (which pedal slots exist — drives
@@ -196,7 +196,7 @@ type, heartbeat) arrives on the base's `0x0E` channel with source byte
 The plugin registers a ROUTED mBooster lane for this hookup: when the
 pedal sub-device is detected on a base/hub pipe, its identity is probed
 at `0x19` and — model-name `mBooster` being the discriminator against
-plain SGP pedals, which answer the same identity groups — an
+plain CRP/SRP pedals, which answer the same identity groups — an
 `MBoosterDeviceController` is registered over the shared pipe. All
 mbooster-* traffic (identity, calibration, `0xb1` motor frames,
 keepalive) addresses `0x19`; `0x1d`/`0x1e` are never used on a shared
@@ -224,7 +224,7 @@ stuffing routines handle all framing.
 Built inline by [`MozaMBoosterProtocol.BuildMotorFrame`](../../../Protocol/MozaMBoosterProtocol.cs).
 14 bytes pre-stuffing.
 
-```
+```text
 7e  09  24  12   b1  EF  EN  00   P1  FH  FL  AH  AL   CK
                  │   │   │   │    │   └─┴─freq u16 BE
                  │   │   │   │    └ param1 (1..255)
@@ -236,18 +236,18 @@ Built inline by [`MozaMBoosterProtocol.BuildMotorFrame`](../../../Protocol/MozaM
 
 **Effect IDs** (enum [`MBoosterEffectId`](../../../Protocol/MozaMBoosterProtocol.cs)):
 
-| ID  | Name      | ParamK | Trigger condition (host-side, doc § 4) |
-|-----|-----------|--------|----------------------------------------|
-| `1` | ABS       | 2000   | `absActive > 0.1` from SimHub          |
+| ID  | Name      | ParamK | Trigger condition (host-side, doc § 4)                                                                   |
+| --- | --------- | ------ | -------------------------------------------------------------------------------------------------------- |
+| `1` | ABS       | 2000   | `absActive > 0.1` from SimHub                                                                            |
 | `2` | Lockup    | 2640   | Heavy brake (>0.8) + wheels < 30 % of vehicle speed (fallback: brake > 0.9 when wheel speed unavailable) |
-| `3` | Threshold | 3080   | Rising edge on brake > 0.6; release at < 0.3 (hysteresis) |
-| `4` | Engine    | 1000   | `rpm > 0.8 × idleRpm` — runs continuously |
+| `3` | Threshold | 3080   | Rising edge on brake > 0.6; release at < 0.3 (hysteresis)                                                |
+| `4` | Engine    | 1000   | `rpm > 0.8 × idleRpm` — runs continuously                                                                |
 
 **Known-good frames** (verified against the protocol note's hardware
 captures — diff against these in a `SerialTrafficCapture` export to
 confirm wire correctness):
 
-```
+```text
 ABS on, 22Hz, amp=0x08e8:  7e 09 24 12 b1 01 01 00 5a 1c 28 08 e8 0b
 ABS off:                   7e 09 24 12 b1 01 00 00 00 00 00 00 00 7c
 Lockup on, 55Hz, ramp 0:   7e 09 24 12 b1 02 01 00 30 46 66 00 00 5a
@@ -286,7 +286,7 @@ the motor after the port closes.
 
 All motor frames go through a single per-connection lane:
 
-```
+```text
 StreamKind.MBoosterEffect = 17
 ```
 
@@ -300,15 +300,15 @@ they aren't coalesced.
 
 ## Effect synthesis
 
-[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)
+[`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
 reproduces protocol note § 4 verbatim:
 
 | Effect    | Waveform                                                    |
-|-----------|-------------------------------------------------------------|
-| ABS       | `wave = 0.9 + 0.1 * sin(phase); amp = wave * intensity`      |
-| Lockup    | `ramp = clamp(elapsed / 0.5, 0, 1); amp = ramp * intensity`  |
-| Threshold | 5 Hz envelope: 20 ms full + 120 ms 80 % + 60 ms gap          |
-| Engine    | `wave = 0.5 + 0.5 * sin(phase); amp = wave * intensity`      |
+| --------- | ----------------------------------------------------------- |
+| ABS       | `wave = 0.9 + 0.1 * sin(phase); amp = wave * intensity`     |
+| Lockup    | `ramp = clamp(elapsed / 0.5, 0, 1); amp = ramp * intensity` |
+| Threshold | 5 Hz envelope: 20 ms full + 120 ms 80 % + 60 ms gap         |
+| Engine    | `wave = 0.5 + 0.5 * sin(phase); amp = wave * intensity`     |
 
 Engine intensity is clamped to 10 % at apply time (doc § 4 default
 `engineScale = 0.01`, clamped to `[0, 0.1]`) — engine runs
@@ -464,7 +464,7 @@ firmware — sustained valid frames, not silently dropped.
 **The wire payload shape is materially different from the other four**,
 reverse-engineered from the stepped capture:
 
-```
+```text
 7e  09  24  12   b1  09  EN   SH   SL   NH  NL   IH   IL   CK
                  │   │   │    └─┴─smoothness u16 BE  └─┴─intensity u16 BE
                  │   │   └ enable (0 = off, 1 = on)
@@ -504,10 +504,32 @@ need to reverse-engineer Pit House's exact noise algorithm to work
 correctly — any reasonable road-like noise generator satisfies the wire
 contract, since the actual shaping happens firmware-side. See
 `MBoosterEffectSynthesizer.SynthesizeRoadTextureNoise` (a deterministic
-value-noise generator, smoothstep-interpolated between pseudo-random
-keyframes every 0.35s to loosely match the observed oscillation rate —
-explicitly *not* a decoded replica of Pit House's own algorithm, since
-that wasn't necessary or knowable from this evidence).
+value-noise generator, explicitly *not* a decoded replica of Pit House's
+own algorithm, since that wasn't necessary or knowable from this
+evidence).
+
+**The ~1.3-1.6 peaks/sec rate above is NOT trusted as Pit House's real
+oscillation rate.** It reads the frame-by-frame sample sequence *as* the
+waveform, which only holds if the noise is band-limited well under the
+frame rate — nothing here established that, and road chatter is exactly
+the case where it wouldn't be. Near-full-range excursions (±32700) at
+~1.4/sec is the signature of *undersampled* broadband noise. It is also
+physically implausible on its face: an effect Pit House ships as "Road
+Texture", through a vibration motor, making full-scale excursions ~1.4
+times a second is a slow ram, not texture.
+
+The generator originally targeted that rate and consequently felt like
+"running over a speedbump every 2 seconds" on real hardware (bug report
+`NWS6EY7X`: 13 zero crossings in 18.1 s of emitted samples, 0.72-2.12 s
+apart — the plugin faithfully reproducing the suspect number). It is now
+two octaves, grain-dominant, and no longer targets that rate.
+
+Note this does **not** disturb the architectural finding in this section.
+"Intensity/Smoothness don't shape the noise" is a *comparative* result
+across 4 settings each — it holds whether or not the absolute rate was
+aliased, since it would have been aliased identically at every setting.
+Settling the true rate needs a fresh Pit House road-texture capture read
+with frame timestamps, not sample indices.
 
 Because the payload shape differs so much from the other four effects,
 Road Texture doesn't go through the shared `ProcessEffect`/
@@ -841,7 +863,7 @@ already built for the telemetry channel-mapper, applied to
 own copy of the sync/serialize logic
 (`Expression`/`ApplyEditedFormula`/`MakeExpression`/
 `ApplyStoredToExpression`/`SerializeExpression`) mirroring
-`Devices/WheelUi/ChannelMappingRow.cs` line-for-line minus the FSR1/CM1
+`Devices/Ui/ChannelMappingRow.cs` line-for-line minus the FSR1/CM1
 boundary-stepper baggage that doesn't apply here:
 
 - **Pencil** → the simple inline editor: a filterable, virtualized list
@@ -938,21 +960,29 @@ Calibration card (Direction / Min Raw / Max Raw / Read from device /
 Apply) surfaces this as experimental with a yellow warning.
 
 Every one of these registers is **flash-backed**, and each write
-additionally drags the 6-frame [curve7 resync](#pedal-feel-host-side-only)
+additionally drags the 6-frame [curve7 resync](#pedal-feel)
 behind it, so the slider handlers must not write per tick. Bundle KY3HK4QP
-shows the cost unthrottled: a ~2 s Max Threshold drag emitted 77 threshold
-+ 462 curve7 frames — ~40 writes/second into flash. UI writes are therefore
-parked latest-wins per (device, command) and flushed once the drag settles
+(AZOM's own traffic, not a Pit House capture — the plugin unconditionally
+tacked the resync onto every calibration write at the time) shows the cost
+unthrottled: a ~2 s Max Threshold drag emitted 77 threshold and 462 curve7
+frames — ~40 writes/second into flash. UI writes are therefore parked
+latest-wins per (device, command) and flushed once the drag settles
 (`MBoosterDeviceController.QueueCalibWrite`, ~400 ms quiet window — the
 same shape `HardwareApplier.QueueWheelCfgWrite` uses for the wheel's own
 flash-backed writes). The resync rides *inside* the parked action so it can
 never be reordered ahead of the write it commits. The connect-time apply
 (`MozaPlugin.ApplyMBoosterToHardware`) fires immediately and is not parked.
+**Update (bug bundle 5VR5AQ8Y):** an isolated real Pit House capture of
+Max Threshold alone (`max-threshold-4-41-105-153-200.pcapng`) shows zero
+curve7 traffic — Pit House itself never sent the 462 frames the KY3HK4QP
+number implied were needed. The resync is no longer sent for Max
+Threshold (nor for Deadzone/Max Force — see below); this quiet-window
+parking still applies to whichever calibrations still carry it.
 
 ## Sim Input Mapping
 
-Two real hardware calibrations plus the per-role output curve, all on the
-pedal's own unit (`MotorDeviceForRole` — see
+Two real hardware calibrations, plus a purely host-side output curve, all
+on the pedal's own unit (`MotorDeviceForRole` — see
 [Chain topology](#chain-topology--connectivity-diagnostics)).
 
 - **Sensor Output Ratio** (`SensorOutputRatioPct`, 0–100%) — blends the
@@ -967,54 +997,194 @@ pedal's own unit (`MotorDeviceForRole` — see
   1311 exactly; an unlabeled capture decoding to ~126 kg against an
   independently-reported real Pit House setting of ~125 kg). See
   `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`.
-- **Output curve** — 5 points through `mbooster-{throttle,brake,clutch}-y1..y5`,
-  resampled at the fixed 20/40/60/80/100 breakpoints the wire supports (see
-  `MozaMBoosterRegistry.ResampleCurveAtFixedBreakpoints`; a horizontally
-  dragged node has no wire command of its own).
+  **CORRECTED**: earlier text here claimed this write "recalibrates the
+  sensor's own full-scale range on the DEVICE" (raw HID axis reads
+  `MaxThresholdKg` of force at 100%). Hardware testing disproved that: the
+  write demonstrably reaches the device and reads back correctly (same
+  "write succeeds ⇒ assumed real" reasoning that also mis-closed the Max
+  Force "does nothing" reports twice — KY3HK4QP, 5VR5AQ8Y — before *that*
+  turned out to need the Pedal Feel curve to actually have a shape), but
+  changing it does not change how much force the raw HID axis needs to
+  reach 100%, confirmed with Max Force held constant and Threshold swept
+  full range both directions. The raw HID axis's 100% is actually **Max
+  Force's own kg ceiling** (the Pedal Feel curve's real hardware full
+  scale — see below). Max Threshold is therefore implemented **host-side**
+  instead (`MozaMBoosterRegistry.OnHidAxisUpdate`): it rescales the raw
+  position — already 0–100% of Max Force's span — into 0–100% of
+  Threshold's span (`posPct * (MaxForceKg / ThresholdKg)`, clamped to 100)
+  before the Sim Input Mapping curve ever sees it, the same category as
+  Sim Input Mapping's own CurveY/CurveX below (no wire command actually
+  does the real work). The `mbooster-brake-threshold` write is still sent
+  (harmless, matches whatever Pit House itself does with the field even if
+  it isn't the mechanism that matters) but AZOM no longer depends on it.
+- **Output curve** (`CurveY`/`CurveX`, 6 nodes + an implicit fixed origin
+  at (0,0)) — **REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed
+  **purely host-side, with no wire command at all**. It used to be
+  believed to write through `mbooster-{throttle,brake,clutch}-y1..y5`
+  (15 commands, confirmed-real but for the wrong shape) and, in an
+  even earlier iteration, an experimental `curve7` resync (`0xAB`
+  selectors `0x01`-`0x06`) — both are now removed; see
+  [Removed: `y1..y5` and `curve7`](#removed-y1y5-and-curve7-historical)
+  below. What this curve actually does: it remaps the pedal's raw HID
+  position — which by the time AZOM reads it already reflects Deadzone,
+  Max Force, and the Pedal Feel curve's real hardware shaping (see
+  [Pedal Feel](#pedal-feel) below) — into whatever value AZOM reports as
+  game telemetry (`MozaData.{Throttle,Brake,Clutch}Position`). Applied in
+  `MozaMBoosterRegistry.OnHidAxisUpdate` via
+  `EvaluateCurveArbitraryX(cfg.CurveX, cfg.CurveY, posPct)`, in the exact
+  spot `InputCurveY`'s host-side application used to occupy before Pedal
+  Feel moved to hardware. Nodes are draggable both vertically (`CurveY`)
+  and horizontally (`CurveX`, via `AllowHorizontalDrag` on the curve
+  editor) — a dragged last node lets "100% output" happen before "100%
+  input," since the evaluator plateaus at the last node's Y beyond its X
+  (same trick as before, just now the ONLY consumer of the shaped value
+  is AZOM's own telemetry, not a second wire push). Default (un-dragged)
+  breakpoints are `100/6 × k` for k=1..6 (≈16.67/33.33/50/66.67/83.33/100%),
+  evenly spaced with the last node at exactly 100% — so an untouched
+  curve maps full input to full output, and "100% before 100%" only
+  happens once a user explicitly drags the last node inward. **Bug,
+  fixed**: this used to be `100/7 × k` (last node ~85.71%, not 100%),
+  inherited from matching the (now-removed, disproven) `curve7`
+  mechanism's own selectors purely so a never-dragged node would render
+  identically to the old experimental shape — which meant Linear (and
+  every other preset) topped out around 86% instead of reaching 100%.
+  `MozaPlugin.FixMBoosterCurveArraysSeventhsBug` is a one-shot migration
+  that repairs any profile that saved one of the old preset shapes.
 
-Both calibrations use the shared `-1` "not yet set / no override" sentinel,
-so a fresh profile never overwrites what is already on the device.
+Both hardware calibrations use the shared `-1` "not yet set / no override"
+sentinel, so a fresh profile never overwrites what is already on the
+device. `CurveY`/`CurveX` are `null` by default (identity / no remapping)
+— existing profiles are unaffected until a user opens this section.
 
-Max Threshold **is** the raw HID axis's full scale: at 100% travel the axis
-reads exactly `MaxThresholdKg` of force, and the device pegs its own output
-there. That makes it the reference every host-side kg-space control is
-expressed against (`MozaMBoosterRegistry.ResolveFullScaleKg`, resolved in
-three rungs: the user's own override, else the device's
-`mbooster-brake-threshold` read-back, else a 200 kg last resort).
+## Pedal Feel
 
-Getting that reference wrong, or failing to land the write, makes Max
-Threshold read as **inverted** — it enters the host-side path only as the
-`ApplyDeadzoneAndMaxForce` *denominator*, so raising it shrinks both the
-deadzone and the Max Force ceiling in raw-travel terms and the reported
-pedal position rises *faster*. When the hardware write does land the two
-effects cancel exactly (shaped output ends up a function of force and Max
-Force alone), which is what makes the control feel correct. Bundle
-KY3HK4QP hit precisely this: the write was going to a phantom device id.
-The device read-back is now consumed (it is deliberately *not* copied into
-`MaxThresholdKg`, whose `-1` means "user set no override" — seeding it
-would make the plugin write the value back on every connect).
+A card to the left of Sim Input Mapping holds `InputCurveY` on
+`MBoosterDeviceSettings` — 6 nodes.
+**FURTHER REVISED**: each node is also draggable horizontally via
+`InputCurveX` — see [Node X position](#pedal-feel-node-x-position) below;
+the "Y-only (no X-dragging)" claim that used to be here was wrong.
+**REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed **real hardware
+calibration**, not host-side shaping. It directly populates the 6
+interpolated selectors already reverse-engineered for Deadzone/Max Force
+(`mbooster-brake-feelcurve-1..6`, cmdId `0xAB` selectors `0x08`-`0x0D` —
+see [Deadzone / Max Force](#deadzone--max-force--revised-real-hardware-calibration-not-host-side-bug-bundle-5vr5aq8y)
+below) — Deadzone (`0x07`) and Max Force (`0x0E`) stay their own separate
+anchor sliders, untouched by the curve. Each node's UI value is a
+percentage (0-100%) of the Deadzone→Max Force span; the wire value per
+node is `kg = deadzoneKg + (nodePct/100) × (maxForceKg − deadzoneKg)`,
+encoded via the same `MozaMBoosterProtocol.EncodeThresholdKg` every kg
+field in this family uses. See `MozaMBoosterRegistry.ComputeFeelCurve`
+and `MBoosterDeviceController.PushFeelCurveResync`.
 
-## Pedal Feel (host-side only)
+Since the device now shapes this curve's effect into the raw HID axis
+itself, the OLD host-side application (`MozaMBoosterRegistry
+.EvaluateInputCurve`, applied to the raw HID position before it became
+`c.LastHidPosition`/game telemetry) has been **removed** — keeping it
+would have double-applied the curve on top of what the hardware already
+did, the same class of bug the original Deadzone/Max Force host-side
+implementation had. `CurveY` (Sim Input Mapping, above) is unaffected —
+it's a completely separate, still-host-side remap that runs where
+`EvaluateInputCurve` used to.
 
-A card above Sim Input Mapping holds a second 5-point curve,
-`InputCurveY` on `MBoosterDeviceSettings`. Unlike `CurveY`, this one has
-**no wire command at all** — it's pure host-side shaping, applied in
-`MozaMBoosterRegistry.OnHidAxisUpdate` to the raw HID axis position
-before it becomes `c.LastHidPosition`, i.e. before it reaches
-`MozaData.{Throttle,Brake,Clutch}Position` (game telemetry) *and*
-before the effect worker's brake-position test-pulse fallback. `CurveY`
-is completely unaffected — it still writes to the device's own
-output-curve command exactly as before.
+The curve's default (un-dragged) X breakpoints — `{8.049, 19.495, 44.245,
+72.433, 90.040, 97.910}%` of the Deadzone→Max Force span — are the SAME
+constants documented under Deadzone/Max Force below
+(`MozaMBoosterRegistry.FeelCurveFractions`), now reframed twice over: they
+were originally measured as a fixed interpolation *formula*, then
+recognized as Pit House's own un-dragged default SHAPE (Y=X trivially
+holds for any untouched curve regardless of the real breakpoint spacing),
+and — see [Node X position](#pedal-feel-node-x-position) immediately below —
+now confirmed to be draggable on the wire too, not just visually. `null`
+(the default, on either `InputCurveY` or `InputCurveX`) means "use this
+Linear default" — existing profiles are unaffected until a user opens this
+section. Same passive-pedal protection as Deadzone/Max Force
+(`MBoosterDeadzoneMaxForcePanel` in `SettingsControl.xaml`) — this is a
+brake-named singleton `0xAB` write with no per-pedal selector, so editing
+it from a passive pedal's page would overwrite the active pedal's
+registers instead.
 
-`MozaMBoosterRegistry.EvaluateInputCurve` reproduces
-`MozaControls.MozaCurveEditor`'s Catmull-Rom rendering exactly (same
-1/6-tangent formula, anchored at the origin), inverted via bisection to
-solve X(t)=x for the requested input X — so the applied shaping always
-matches what's drawn on screen. Verified: the Linear preset is an exact
-identity function (not just at the 5 breakpoints), and the S-Curve
-preset interpolates smoothly through all 5 breakpoints. `null` (the
-default) means no shaping — existing profiles are unaffected until a
-user opens this section.
+### Pedal Feel default curve shape and node X domain — REVISED (mBooster "Deadzone slider does nothing" report)
+
+**REVISED**: the `{8.049, 19.495, 44.245, 72.433, 90.040, 97.910}%` default
+shape claimed above is **wrong**, and the node X domain claim ("percentage
+of the Deadzone→Max Force span, same as Y") is wrong for X specifically.
+A report that the Deadzone slider had no perceptible effect on
+Throttle/Clutch mBoosters prompted four fresh isolated sweeps —
+`clutch-0-8kg-deadzone-sweep.pcapng`, `clutch-4-20kg-maxforce-sweep.pcapng`,
+`throttle-0-6kg-deadzone-sweep.pcapng`, `throttle-4-20kg-maxforce-sweep
+.pcapng` — each holding the curve at its un-dragged default and sweeping
+only Deadzone or only Max Force:
+
+- **Y nodes** (`0x08`-`0x0D`): `(value − deadzone) / (maxForce − deadzone)`
+  landed within ~0.005 of **`k/7` for k=1..6** (evenly-spaced sevenths) at
+  every sweep point, on both roles — not the asymmetric constants above.
+  Those constants were measured off a single Brake unit's un-dragged curve
+  in the original `max-force-24-75-128-166-200.pcapng` /
+  `deadzone-0-5-11-14.pcapng` captures and assumed to be the factory
+  Linear default; that unit had almost certainly already picked up a
+  non-default curve from earlier testing in the same session. The
+  `(value − deadzone) / (maxForce − deadzone)` RELATIONSHIP for Y itself
+  still holds exactly — only the specific fraction constants were wrong.
+- **X nodes** (`0x01`-`0x06`): stayed **bit-for-bit identical** across an
+  entire Deadzone sweep AND an entire Max Force sweep, on both roles —
+  proving X is NOT relative to this pedal's own Deadzone-Max Force span at
+  all, contrary to the claim above. The constant values landed within
+  ~0.15kg of `k/7 × 200` — i.e. evenly-spaced sevenths of the fixed
+  0-200kg full scale every other Pedal Feel field shares (the original
+  node-drag captures that established X as real, `pedal-feel-node{2,5}-
+  {x,y}-adjust.pcapng`, happened to be taken at the degenerate 0kg/200kg
+  anchors, so they couldn't distinguish "relative to Deadzone-Max Force"
+  from "relative to the fixed 0-200kg scale" — both formulas coincide when
+  deadzone=0 and maxForce=200).
+
+Net effect of the bug: on every Deadzone or Max Force edit, AZOM was
+recomputing BOTH the Y nodes (with the wrong shape) AND the X nodes
+(rescaled to the wrong, pedal-specific span instead of the fixed 0-200kg
+one) and pushing all 8 values together — likely handing the firmware a
+badly warped curve on each edit, which could easily read as "the Deadzone
+slider doesn't do anything" rather than a visibly wrong curve. Fixed in
+`MozaMBoosterRegistry.FeelCurveFractions` (now `k/7`) and by splitting the
+single `ComputeFeelCurve` into `ComputeFeelCurveY` (deadzone-relative,
+unchanged) and `ComputeFeelCurveX` (fixed 0-200kg scale, independent of
+Deadzone/Max Force) — see `MBoosterDeviceController.PushFeelCurveResync`.
+The customized (non-null `InputCurveX`) case now also uses the fixed
+0-200kg scale for consistency; this hasn't been independently re-verified
+against a customized-curve capture on a non-degenerate Deadzone/Max Force
+pair, so treat that specific case as inferred rather than confirmed.
+
+### Pedal Feel node X position
+
+**REVISED**: each of the 6 Pedal Feel nodes is draggable on BOTH axes —
+`InputCurveX` on `MBoosterDeviceSettings`/`MBoosterPedalSettings`, a real
+hardware write exactly like `InputCurveY`, not just a UI convenience.
+Reverse-engineered from four isolated single-node-drag Pit House captures,
+`pedal-feel-node{2,5}-{x,y}-adjust.pcapng` (one node dragged on one axis
+only, per capture): every drag — on EITHER axis — wrote TWO `0xAB`
+selectors together, X first: the node's own `feelcurve-N` Y selector
+(`0x08`-`0x0D`, already known) AND a second, distinct selector equal to
+the node's own 1-based index (`0x01`-`0x06`), using the identical
+kg-relative-to-Deadzone/Max-Force-span encoding as Y. Node 2's low
+selector read back `0x02` = 19.29% (user-reported drag target ≈20%); node
+5's read back `0x05` ≈ 60% (user-reported drag target ≈64% — the
+imprecision here is attributed to eyeballing an on-screen drag rather
+than a scale mismatch, since kg-scale and percent-of-span encodings are
+numerically identical at the default 0kg/200kg anchors these captures
+were taken at).
+
+This selector range (`0x01`-`0x06`) is the SAME one an earlier, less
+rigorous investigation spotted exactly once — alongside an unrelated
+Travel Start write, not an isolated node drag — and removed as an
+unconfirmed guess wired to the wrong curve entirely (see
+[Removed: `y1..y5` and `curve7`](#removed-y1y5-and-curve7-historical)
+below); these new isolated single-axis captures are the missing evidence
+that investigation lacked, and settle it: it's Pedal Feel's own node X,
+not a Sim Input Mapping mechanism and not a universal per-write resync.
+New wire command names (`mbooster-brake-feelcurve-x-1..6`) were added
+rather than reusing the old removed `mbooster-brake-curve7-N` names, to
+avoid conflating with that disproven theory. Pushed by the SAME
+`MBoosterDeviceController.PushFeelCurveResync` atomic burst as Deadzone/
+Max Force/`InputCurveY` — never attached to any other calibration write,
+learning from the earlier mechanism's "resync everything" mistake.
 
 The same card also has a **Start/End of Travel (mm)** control —
 `TravelStartMm`/`TravelEndMm` on `MBoosterDeviceSettings`. Unlike every
@@ -1096,6 +1266,17 @@ when off and restores the last slider value when on. See
 "not yet set / no override" sentinel convention as
 `EndstopFrontStiffness`/`EndstopEndStiffness`.
 
+AZOM's own UI (`MBoosterNaturalFrictionEnable`,
+`NaturalFrictionEnabled` on both `MBoosterDeviceSettings` and
+`MBoosterPedalSettings`, default `true`) reproduces that exact behavior
+rather than inventing a new wire concept: switching it off pushes raw 0
+immediately (`MBoosterNaturalFrictionEnable_Changed`) without touching
+the stored `NaturalFrictionPct`, and disables the slider so a drag can't
+implicitly re-enable it; switching back on restores whatever the slider
+currently shows. `MozaPlugin.ApplyMBoosterToHardware` mirrors the same
+zero-forcing on connect so a profile saved with friction switched off
+reconnects silent rather than restoring its last on-wire value.
+
 **Segmented Damping** (labeled "SEGMENTED DAMPING" with its own card, two
 plots — "When Pressed" and "When Released") is Pit House's "simulate a
 damping force independent of in-game output, dividing pedal travel into
@@ -1124,7 +1305,7 @@ including ones unrelated to whatever the user was actually dragging in
 that particular capture, proving this is always a whole-feature
 snapshot, never a partial update:
 
-```
+```text
 cmd=0xB7  Div1Pressed  Div2Pressed  Div1Released  Div2Released
           Seg1Pressed  Seg1Released  Seg2Pressed  Seg2Released  Seg3Pressed  Seg3Released
 ```
@@ -1172,66 +1353,149 @@ divider or a segment on EITHER plot, at which point any still-unset
 field on the OTHER plot is filled from the factory defaults above rather
 than left blank (the wire frame has no concept of "not sent" per field).
 
-The same card also has two force-based sliders, both host-side only and
-both applied in `MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce`, which
-runs *before* `EvaluateInputCurve`:
+**Enable toggle** (`MBoosterSegDampEnable`,
+`MBoosterSegmentedDampingSettings.DampingEnabled`, default `true`): not a
+separate wire command — Pit House's own "toggle off/on" capture
+(mentioned above) showed all-zero segment values on disable, so AZOM's
+toggle reproduces that exactly in software: switching it off sends the
+same `BuildSegmentedDampingFrame` with all six segment fields forced to
+`0%` (dividers untouched, since they're inert once every segment damps
+at 0%), both from the UI (`SettingsControl.PushSegmentedDamping`) and on
+connect (`MozaPlugin.ApplyMBoosterToHardware`). Switching it back on
+resumes whatever divider/segment values were last stored (or factory
+defaults for a still-untouched profile).
 
-- **Deadzone** (`DeadzoneKg`, 0–40kg, default 0 = off) — force below
-  this clamps to 0.
-- **Max Force** (`MaxForceKg`, 0–200kg, default 200 = off) — the force
-  at which the *input curve's* X-axis reaches 100%. Lets a user who
-  never presses past, say, 100kg use the curve's full 0–100% range
-  instead of only ever reaching its midpoint.
+### Deadzone / Max Force — REVISED: real hardware calibration, not host-side (bug bundle 5VR5AQ8Y)
 
-**Update**: originally both were combined into a kg-space remap that
-treated raw 0–100% travel as a fixed 0–200kg full scale. That's wrong
-whenever the device's real calibration isn't 200kg — and real Pit
-House captures already on file for `MaxThresholdKg` show ~100-125kg,
-not 200kg. Raw 100% travel is only ever as many kg as
-`MaxThresholdKg` (Sim Input Mapping, a genuine hardware calibration —
-see above) currently says it is; past that point the device itself
-has already pegged its own output at 100%, so there is no more
-resolution left for software to detect additional force. Concretely,
-the bug this caused: setting Max Force to 200kg (its slider max) was
-silently a no-op whenever `MaxThresholdKg` was lower, because
-`hiPercent` degenerated to the same 100% raw-travel point the axis
-already saturates at — pressing anywhere near the device's real max
-already read as 100% input, never requiring the full 200kg the slider
-implied.
+The same card also has two force-based sliders, **Deadzone** (`DeadzoneKg`,
+0–40kg) and **Max Force** (`MaxForceKg`, 0–200kg). These were originally
+implemented as a purely host-side kg-space remap
+(`MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce`, applied to the raw HID
+axis position before `EvaluateInputCurve`, and clamped to whatever
+`MaxThresholdKg` currently resolved to — see git history for that design
+and the ceiling bug it needed, `SettingsControl.ApplyMBoosterMaxForceCeiling`).
 
-Fixed by threading the pedal's actual full scale through as
-`ApplyDeadzoneAndMaxForce`'s `fullScaleKg` reference, resolved by
-`MozaMBoosterRegistry.ResolveFullScaleKg` — the user's own
-`MaxThresholdKg` override, else the value the DEVICE reported for
-`mbooster-brake-threshold` (`MBoosterDeviceController
-.DeviceReportedMaxThresholdKg` — a real read-back, live only and never
-persisted), else the historical 200 kg last resort. Force below the
-deadzone clamps to 0, and everything between the deadzone and Max Force
-rescales linearly to 0–100%, same as before — just against the real
-reference scale instead of a hardcoded one. (This used to be spelled out
-in a UI hint, `Hint_DeadzoneScaleAssumption`, but that string was never
-actually filled in for English — only other locales had it translated —
-so the English UI showed a blank line; the hint has since been removed
-entirely rather than backfilled.)
+Two more bug reports for "Max Force does nothing" (5VR5AQ8Y, following
+KY3HK4QP) prompted two fresh Pit House USB captures made specifically to
+settle the question: `max-force-24-75-128-166-200.pcapng` (Threshold held
+fixed, Max Force dragged through 75/128/166kg) and
+`deadzone-0-5-11-14.pcapng` (Max Force held fixed at 24kg, Deadzone
+dragged through 5/11/14kg). Both confirm the user's own description of
+Pit House's real behavior: Deadzone and Max Force **are** real hardware
+calibration, not a host-side shim — the previous design's core assumption
+was wrong.
 
-Practical implication for users: Max Force can only ever *lower* the
-effort needed to reach 100% below the pedal's real full scale — it can't
-demand *more* force than the device's own calibration already saturates
-at, so getting a genuine "200kg to reach 100%" feel requires setting Max
-Threshold to 200kg first (Sim Input Mapping), not just Max Force. Every
-Max Force position above the full scale was therefore silently inert,
-which with Max Threshold at 140 kg left the top 30% of a 0–200 slider
-doing nothing — reported as "Max force seems to be doing absolutely
-nothing" in bundle KY3HK4QP. The slider's `Maximum` (and its end label)
-are now clamped to the resolved full scale
-(`SettingsControl.ApplyMBoosterMaxForceCeiling`), re-applied whenever Max
-Threshold changes.
+Every drag stop in both captures wrote the same family: cmdId `0xAB`
+(the same command `mbooster-brake-curve7-*` above uses, but a
+**different, previously-undiscovered selector range**), fixed `0x00`
+byte, one of 8 selectors, 2-byte big-endian value using the *identical*
+kg encoding as `MaxThresholdKg` (`raw = round(kg * 65536 / 200)` — see
+`MozaMBoosterProtocol.EncodeThresholdKg`, reused as-is):
 
-Both remain host-side only: they shape
-`MozaData.{Throttle,Brake,Clutch}Position`, which feeds the `AZOM.*`
-properties, the pedal traces and the live curve markers — **not** the
-game, which reads the pedal's HID directly, and not the pedal's own feel.
-There is no wire command for either.
+- **selector `0x07` = Deadzone** (`mbooster-brake-deadzone`) — confirmed
+  exact: 5/11/14kg encoded and decoded back to 5.0/11.0/14.0kg.
+- **selector `0x0E` = Max Force** (`mbooster-brake-maxforce`) — confirmed
+  exact: 75/128/166kg encoded and decoded back to 75.0/128.0/166.0kg.
+- **selectors `0x08`–`0x0D`** = 6 interpolated points between the two
+  anchors. Computing `(value - deadzone) / (maxForce - deadzone)` for
+  each of the 6 across all 6 write bursts (3 per capture) landed on the
+  same constant per selector every time (std-dev < 0.0001), confirming a
+  fixed shape independent of which endpoint moved:
+  `{0.08049, 0.19495, 0.44245, 0.72433, 0.90040, 0.97910}` for selectors
+  `0x08`.. `0x0D` respectively — see
+  `MozaMBoosterRegistry.ComputeFeelCurve`/`FeelCurveFractions` and
+  `MBoosterDeviceController.PushFeelCurveResync`, which pushes all 8
+  values as one burst (same "no partial update" shape as Segmented
+  Damping — the device has no way to change one point in isolation).
+  Why these specific fractions, rather than an evenly-spaced ramp: not
+  determined — treated as an empirically-measured constant, same
+  epistemic status as the Segmented Damping factory defaults above.
+
+Selector `0x04` also rides along unchanged in every single burst across
+both captures (raw `0x9126`, every time) — it doesn't correlate with
+either Deadzone or Max Force, so it's presumably some other Pedal Feel
+field Pit House's UI flushes as part of the same batch. Not needed for
+Deadzone/Max Force to work and not written by AZOM's own push.
+
+**Max Force is confirmed NOT clamped to Max Threshold on the wire** —
+128kg and 166kg were sent as Max Force while Max Threshold read back as
+125kg (`mbooster-brake-threshold` readback, same read-all poll that
+confirmed selector `0x07`). This directly contradicts the original
+design's ceiling logic (`ApplyMBoosterMaxForceCeiling`,
+`ResolveFullScaleKg` — both removed): Max Force is an independent
+parameter, not a rescale of Threshold's own span. The slider's range is
+simply the fixed 0–200kg the XAML always declared.
+
+Like every other real calibration field, both use the shared `-1` "not
+yet set / no override" sentinel (previously 0/200 = "off"), so a fresh
+profile never overwrites whatever the device already has; once either is
+set, the missing one falls back to a sane "off" default (0kg deadzone,
+200kg max force) so the write is always a complete, valid curve. Same
+brake-named-singleton passive-pedal gating as Travel/End Stop/Friction/
+Segmented Damping applies (`MBoosterDeadzoneMaxForcePanel` in
+`SettingsControl.xaml`) — cmdId `0xAB`'s selectors carry no per-pedal
+address either, so editing them from a passive pedal's page would
+overwrite the active pedal's registers the same way KY3HK4QP found for
+Travel.
+
+**Further revision**: `InputCurveY`'s 6 nodes are what populate selectors
+`0x08`-`0x0D` above — see [Pedal Feel](#pedal-feel). An earlier pass
+through this doc (during the same investigation) described those 6
+selectors as a fixed, non-adjustable interpolation formula and treated
+`InputCurveY` as staying host-side; that turned out to be wrong once the
+user clarified Pedal Feel is specifically the curve meant to change the
+pedal's physical feel. `FeelCurveFractions` (the constant array measured
+below) is kept, just reframed as the curve's default/Linear shape rather
+than a hard rule.
+
+### Removed: `y1..y5` and `curve7` (historical)
+
+Two mechanisms this investigation built, then removed once the Sim Input
+Mapping / Pedal Feel split above was clarified — kept here for context,
+matching this doc's convention of preserving past-bug/decision history
+rather than deleting it:
+
+- **`mbooster-{throttle,brake,clutch}-y1..y5`** (cmdIds 14-29,
+  non-sequential per role, 4-byte float, group 35/36) — a genuinely
+  confirmed-via-capture wire mechanism, believed to be the Sim Input
+  Mapping output curve's real encoding (5 points at fixed 20/40/60/80/100%
+  breakpoints). Removed once it became clear the output curve is purely
+  host-side (see above) — the confirmed capture evidence for these 15
+  commands existing is not in question, only whether AZOM's output curve
+  should be sending them, and it turns out it shouldn't.
+- **`curve7`** (`0xAB` selectors `0x01`-`0x06`, cmdId shared with the
+  entirely separate Deadzone/Max Force/Pedal-Feel-curve family at
+  selectors `0x07`-`0x0E` above) — at the time, EXPERIMENTAL/unconfirmed:
+  spotted exactly once, alongside a Travel Start write in
+  `pedal_travel.pcapng`,
+  and speculatively wired into `QueueMBoosterCalibPush` (`SettingsControl
+  .xaml.cs`) as an automatic resync tacked onto EVERY other calibration
+  write (Direction/Min/Max/CurveY/Travel/Endstop/Friction/SegmentedDamping/
+  Ratio), on the theory the same firmware requirement applied broadly.
+  This session's more rigorous, isolated captures directly disconfirmed it
+  for Max Threshold and Deadzone/Max Force specifically (zero `0xAB`
+  selector `0x01`-`0x06` traffic alongside their real writes) — and once
+  neither redesigned curve needed it either, the whole mechanism (
+  `ResampleCurveAtSevenths`, `EncodeCurve7Point`, `PushCurve7Resync`, the 6
+  `AddCommand` entries, and every `needsCurve7Resync`/`includeCurve7Resync`
+  call site) was removed rather than kept half-justified for Travel alone
+  — Travel's own write already reads back correctly without it (per the
+  original Travel writeup above); only the resync's *additional* benefit
+  was ever unconfirmed, not the base write.
+  **Later confirmed, not disproven**: this exact selector range turned out
+  to be real after all — just not a universal resync, and not tied to
+  Travel/Sim Input Mapping/`stroke_curve` (all speculated elsewhere in this
+  doc). Four fresh isolated captures that actually dragged individual
+  Pedal Feel nodes (rather than an unrelated control) showed `0x01`-`0x06`
+  is that curve's own per-node X position — see
+  [Pedal Feel node X position](#pedal-feel-node-x-position) above, added
+  back under new command names (`mbooster-brake-feelcurve-x-1..6`) so as
+  not to resurrect the old, wrong `curve7`/universal-resync theory.
+
+Net effect: Direction/Min/Max/Travel/Endstop/Friction/SegmentedDamping/
+Ratio/Threshold no longer drag any resync behind their writes — just the
+one write each already documented above, with `QueueCalibWrite`'s 400ms
+debounce still doing its job of collapsing a drag into one write set.
 
 ### Traction Control — new effect, no verified wire type
 
@@ -1278,7 +1542,7 @@ raw wheel-slip physics heuristic in `UpdateWheelSpinRequest` — the
 acceleration-side counterpart to Lockup's braking-side heuristic (see
 "Lockup rebuild" above):
 
-```
+```text
 isSpinning = throttle > 0.8 && vehicleSpeed < 40 && avgWheelSpeed > vehicleSpeed * 1.3
 ```
 
@@ -1463,14 +1727,14 @@ mapping") holds the Pit House-parity controls, all still under
   identity; dragging the last node from X=100 to X=60 (Y unchanged)
   makes breakpoints 60/80/100 all resample to that node's Y.
 
-| Command                       | Group (R/W) | CmdId | Bytes | Type  |
-|-------------------------------|-------------|-------|-------|-------|
-| `mbooster-throttle-dir/min/max` | 35 / 36   | 1/2/3 | 2     | int   |
-| `mbooster-brake-dir/min/max`    | 35 / 36   | 4/5/6 | 2     | int   |
-| `mbooster-clutch-dir/min/max`   | 35 / 36   | 7/8/9 | 2     | int   |
-| `mbooster-{throttle,brake,clutch}-y1..y5` | 35 / 36 | 14-29 | 4 | float |
-| `mbooster-{throttle,brake,clutch}-output` | 37 / —  | 1/2/3 | 2 | int   |
-| `mbooster-brake-angle-ratio`    | 35 / 36   | 26    | 4     | float |
+| Command                                   | Group (R/W) | CmdId | Bytes | Type  |
+| ----------------------------------------- | ----------- | ----- | ----- | ----- |
+| `mbooster-throttle-dir/min/max`           | 35 / 36     | 1/2/3 | 2     | int   |
+| `mbooster-brake-dir/min/max`              | 35 / 36     | 4/5/6 | 2     | int   |
+| `mbooster-clutch-dir/min/max`             | 35 / 36     | 7/8/9 | 2     | int   |
+| `mbooster-{throttle,brake,clutch}-y1..y5` | 35 / 36     | 14-29 | 4     | float |
+| `mbooster-{throttle,brake,clutch}-output` | 37 / —      | 1/2/3 | 2     | int   |
+| `mbooster-brake-angle-ratio`              | 35 / 36     | 26    | 4     | float |
 
 All targeted at device id `0x12` on the mBooster's own CDC port. The
 plugin's [`MozaResponseParser`](../../../Protocol/MozaResponseParser.cs)
@@ -1492,7 +1756,7 @@ position bar stuck at 0 despite the device showing "Connected"): the
 "shared prefix, differing only in trailing interface index" theory
 above is **wrong**. A real capture showed:
 
-```
+```text
 HID: 9&1bd82a3a&0&0000
 CDC: 8&1709245b&0&0000
 ```
@@ -1575,7 +1839,7 @@ three sections** — but only its own role gets the extended block (effects,
 travel limits, damping/friction, force curves). The other two hold just the
 device-wide snapshot:
 
-```
+```text
 channlRoleType, outdir, min, max, nonlinear1..5, press_combine
 ```
 
@@ -1599,23 +1863,23 @@ Prefixed `<p>` = `throttle` / `brake` / `clutch`. Every effect field is
 host-rendered (see [Effect synthesis](#effect-synthesis)); the calibration
 rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
 
-| PitHouse key | Plugin field | Notes |
-|---|---|---|
-| `<p>_outdir` | `Direction` | `mbooster-<p>-dir` |
-| `<p>_min` / `<p>_max` | *(not imported)* | **unit mismatch**, see below |
-| `<p>_nonlinear1..5` | `CurveY[0..4]` | output curve, `mbooster-<p>-y1..y5`; both sides are 0–100 |
-| `<p>_abs_switch/_amp/_freq/_smoothness` | `Abs.Enabled/.IntensityPct/.FrequencyHz/.SmoothnessPct` | brake-only in PitHouse |
-| `<p>_lockup_switch/_amp/_freq` | `Lockup.*` | brake-only |
-| `<p>_brakethreshold_switch/_amp/_freq` | `Threshold.Enabled/.IntensityPct/.FrequencyHz` | brake-only |
-| `<p>_brakethreshold_trigger_input` | `Threshold.TriggerLevelPct` | same 50–100 range |
-| `<p>_brakethreshold_fade_amount` | `Threshold.DecayPct` | UI label "Vibration Decay" |
-| `<p>_tc_switch/_amp/_freq` | `TractionControl.*` | |
-| `<p>_wheel_slip_switch/_amp/_freq` | `WheelSpin.*` | plugin's range (30–80 Hz) is narrower than PitHouse's |
-| `<p>_gear_shift_vibration_switch/_amp/_freq` | `GearShift.*` | plugin's `VibrateOnNeutral`/`DebounceMs` have no PitHouse counterpart |
-| `<p>_road_texture_switch/_intensity/_smoothness` | `RoadTexture.*` | |
-| `<p>_machinelimit_min` / `_max` | `TravelStartMm` / `TravelEndMm` | **inferred**, see below |
-| `<p>_softlimit_hardness_press` / `_release` | `EndstopFrontStiffness` / `EndstopEndStiffness` | **inferred**, see below |
-| `brake_press_combine` | `SensorOutputRatioPct` | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
+| PitHouse key                                     | Plugin field                                            | Notes                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `<p>_outdir`                                     | `Direction`                                             | `mbooster-<p>-dir`                                                                     |
+| `<p>_min` / `<p>_max`                            | *(not imported)*                                        | **unit mismatch**, see below                                                           |
+| `<p>_nonlinear1..5`                              | `CurveY[0..4]`                                          | output curve, `mbooster-<p>-y1..y5`; both sides are 0–100                              |
+| `<p>_abs_switch/_amp/_freq/_smoothness`          | `Abs.Enabled/.IntensityPct/.FrequencyHz/.SmoothnessPct` | brake-only in PitHouse                                                                 |
+| `<p>_lockup_switch/_amp/_freq`                   | `Lockup.*`                                              | brake-only                                                                             |
+| `<p>_brakethreshold_switch/_amp/_freq`           | `Threshold.Enabled/.IntensityPct/.FrequencyHz`          | brake-only                                                                             |
+| `<p>_brakethreshold_trigger_input`               | `Threshold.TriggerLevelPct`                             | same 50–100 range                                                                      |
+| `<p>_brakethreshold_fade_amount`                 | `Threshold.DecayPct`                                    | UI label "Vibration Decay"                                                             |
+| `<p>_tc_switch/_amp/_freq`                       | `TractionControl.*`                                     |                                                                                        |
+| `<p>_wheel_slip_switch/_amp/_freq`               | `WheelSpin.*`                                           | plugin's range (30–80 Hz) is narrower than PitHouse's                                  |
+| `<p>_gear_shift_vibration_switch/_amp/_freq`     | `GearShift.*`                                           | plugin's `VibrateOnNeutral`/`DebounceMs` have no PitHouse counterpart                  |
+| `<p>_road_texture_switch/_intensity/_smoothness` | `RoadTexture.*`                                         |                                                                                        |
+| `<p>_machinelimit_min` / `_max`                  | `TravelStartMm` / `TravelEndMm`                         | **inferred**, see below                                                                |
+| `<p>_softlimit_hardness_press` / `_release`      | `EndstopFrontStiffness` / `EndstopEndStiffness`         | **inferred**, see below                                                                |
+| `brake_press_combine`                            | `SensorOutputRatioPct`                                  | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
 
 Values are clamped to the plugin's own slider bounds (`MBoosterUiConstants`)
 on import, and the travel pair additionally honours `TravelMinGapMm` /
@@ -1693,13 +1957,13 @@ name the mBooster goes to the CRP surface whenever CRP-family pedals are
 detected; with none detected it stays on the mBooster path so the "no mBooster
 pedal attached" note is what the user sees.
 
-| PitHouse key | Plugin field | Wire command |
-|---|---|---|
-| `<p>_outdir` | `MozaProfile.Pedals<P>Dir` | `pedals-<p>-dir` |
-| `<p>_min` / `<p>_max` | `Pedals<P>Min` / `Pedals<P>Max` | `pedals-<p>-min` / `-max` |
-| `<p>_nonlinear1..5` | `Pedals<P>Curve[0..4]` | `pedals-<p>-y1..y5` |
-| `brake_press_combine` | `PedalsBrakeAngleRatio` | `pedals-brake-angle-ratio` |
-| `<p>_channlRoleType` | *(not imported)* | — (CRP roles are fixed) |
+| PitHouse key          | Plugin field                    | Wire command               |
+| --------------------- | ------------------------------- | -------------------------- |
+| `<p>_outdir`          | `MozaProfile.Pedals<P>Dir`      | `pedals-<p>-dir`           |
+| `<p>_min` / `<p>_max` | `Pedals<P>Min` / `Pedals<P>Max` | `pedals-<p>-min` / `-max`  |
+| `<p>_nonlinear1..5`   | `Pedals<P>Curve[0..4]`          | `pedals-<p>-y1..y5`        |
+| `brake_press_combine` | `PedalsBrakeAngleRatio`         | `pedals-brake-angle-ratio` |
+| `<p>_channlRoleType`  | *(not imported)*                | — (CRP roles are fixed)    |
 
 `min`/`max` **are** imported here, unlike on the mBooster path: the CRP fields
 are percent on both sides (`MozaProfile.PedalsThrottleMin` is documented 0-100,
@@ -1731,21 +1995,26 @@ equivalent of `ImportPlan.TouchedMBoosters`.
   16.1–47.0, the same range as `brake_forcelimit_min/max` (11/47, ⇒ likely
   **kg**). The throttle preset's equivalents are lighter throughout
   (4.3–12.0 kg vs the brake's 16–47), which is what a throttle-vs-brake pedal
-  pair should look like. The plugin's `mbooster-brake-curve7-1..6` family
-  (`0xAB`, 6 selectors, fed by `ResampleCurveAtSevenths`) is a shape candidate
-  for `stroke_curve`, but curve7 is always *derived* from `(CurveX, CurveY)`
-  and has no settings field of its own, so this stays unmapped until a capture
-  confirms it.
+  pair should look like. The old `mbooster-brake-curve7-1..6` family this
+  paragraph originally pointed at (`0xAB`, 6 selectors, fed by
+  `ResampleCurveAtSevenths`) was removed as an unconfirmed guess (see
+  "Removed: y1..y5 and curve7") — but that exact `0xAB` `0x01`-`0x06`
+  selector range was later confirmed real, as Pedal Feel's own per-node X
+  position (`InputCurveX`, see [Pedal Feel node X position]
+  (#pedal-feel-node-x-position)), which is a plausible match for
+  `stroke_curve` on its face (position-along-travel, mm-scale) — still
+  unconfirmed against this specific PitHouse-export field until a capture
+  ties the two together.
 
 ## Source-of-truth files in this repo
 
 - Protocol primitives — [`Protocol/MozaMBoosterProtocol.cs`](../../../Protocol/MozaMBoosterProtocol.cs)
-- Effect synthesis — [`Devices/MBoosterEffectSynthesizer.cs`](../../../Devices/MBoosterEffectSynthesizer.cs)
-- Settings types — [`Devices/MBoosterTypes.cs`](../../../Devices/MBoosterTypes.cs)
-- Per-device controller — [`Devices/MBoosterDeviceController.cs`](../../../Devices/MBoosterDeviceController.cs)
-- 50 Hz effect worker — [`Devices/MBoosterEffectWorker.cs`](../../../Devices/MBoosterEffectWorker.cs)
-- Multi-device registry — [`Devices/MozaMBoosterRegistry.cs`](../../../Devices/MozaMBoosterRegistry.cs)
+- Effect synthesis — [`Devices/MBooster/MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
+- Settings types — [`Devices/MBooster/MBoosterTypes.cs`](../../../Devices/MBooster/MBoosterTypes.cs)
+- Per-device controller — [`Devices/MBooster/MBoosterDeviceController.cs`](../../../Devices/MBooster/MBoosterDeviceController.cs)
+- 50 Hz effect worker — [`Devices/MBooster/MBoosterEffectWorker.cs`](../../../Devices/MBooster/MBoosterEffectWorker.cs)
+- Multi-device registry — [`Devices/MBooster/MozaMBoosterRegistry.cs`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
-- Profile storage — [`UI/MozaProfile.cs`](../../../UI/MozaProfile.cs) (`MBoosterSettings` dict)
+- Profile storage — [`Settings/MozaProfile.cs`](../../../Settings/MozaProfile.cs) (`MBoosterSettings` dict)
 - UI tab — [`UI/SettingsControl.xaml`](../../../UI/SettingsControl.xaml) (`MBoosterTab`) + handlers in `SettingsControl.xaml.cs` under "mBooster tab — multi-device"
 - PitHouse preset import — [`UI/Import/PitHousePedalsMapper.cs`](../../../UI/Import/PitHousePedalsMapper.cs) (mBooster) + [`UI/Import/PitHouseCrpPedalsMapper.cs`](../../../UI/Import/PitHouseCrpPedalsMapper.cs) (CRP/SRP) + wizard [`UI/Import/PitHouseImportControl.xaml.cs`](../../../UI/Import/PitHouseImportControl.xaml.cs)

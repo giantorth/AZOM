@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
-using MozaPlugin.Telemetry.Protocol;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -483,14 +483,29 @@ namespace MozaPlugin.Telemetry.Frames
         /// </summary>
         public static uint Crc32(byte[] data, int offset, int length)
         {
+            // Table-driven: this runs on the serial read thread for every inbound
+            // chunk (catalog, tile-server, FF records) and per outbound chunk.
+            var table = s_crc32Table;
             uint crc = 0xFFFFFFFF;
-            for (int i = offset; i < offset + length; i++)
-            {
-                crc ^= data[i];
-                for (int bit = 0; bit < 8; bit++)
-                    crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
-            }
+            int end = offset + length;
+            for (int i = offset; i < end; i++)
+                crc = table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
             return crc ^ 0xFFFFFFFF;
+        }
+
+        private static readonly uint[] s_crc32Table = BuildCrc32Table();
+
+        private static uint[] BuildCrc32Table()
+        {
+            var table = new uint[256];
+            for (uint n = 0; n < 256; n++)
+            {
+                uint c = n;
+                for (int bit = 0; bit < 8; bit++)
+                    c = (c & 1) != 0 ? (c >> 1) ^ 0xEDB88320 : c >> 1;
+                table[n] = c;
+            }
+            return table;
         }
     }
 }

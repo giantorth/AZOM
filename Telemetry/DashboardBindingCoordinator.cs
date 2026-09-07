@@ -8,6 +8,7 @@ using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Telemetry
 {
@@ -215,7 +216,11 @@ namespace MozaPlugin.Telemetry
                 sender.Stop();
                 Interlocked.Exchange(ref _plugin._telemetryStartRequested, 0);
             }
-            if (desired != null && sender.StateIsIdle)
+            // StartInner leaves the state Idle while it sleeps out the silence gate,
+            // so Idle alone is not "no start in flight" — check StartInProgress too
+            // (as EnsureCm2Pipeline does) or a UI-thread apply swaps the connection
+            // under a start that then opens sessions on the wrong pipe.
+            if (desired != null && sender.StateIsIdle && !sender.StartInProgress)
                 sender.Rebind(desired);
 
             // The wheel screen must NEVER get the standalone Enable (0x0F) frame (it
@@ -233,19 +238,22 @@ namespace MozaPlugin.Telemetry
 
             // Source from the current wheel's overlay (single source of truth).
             // When no wheel is identified yet, ActiveTelemetry* return defaults
-            // → era Auto, paths empty, no profile loaded. The sender stays idle
-            // until wheel-model-name resolves the page GUID.
+            // → paths empty, no profile loaded. The sender stays idle until
+            // wheel-model-name resolves the page GUID.
             string telemPath = _plugin.ActiveTelemetryMzdashPath;
             string telemName = _plugin.ActiveTelemetryProfileName;
-            MozaWheelEra era = _plugin.ActiveTelemetryWheelEra;
 
-            sender.Policy = EraPolicy.For(era);
+            // Era is always Auto — TelemetrySender.ResolveAutoPolicy pins the
+            // real era from the wheel's catalog/model at session start.
+            sender.Policy = EraPolicy.For(MozaWheelEra.Auto);
             // Upload/download UI is hidden while feature is in development;
             // force both off regardless of saved settings.
             sender.UploadDashboard = false;
             sender.SetDownloadEnabled(false);
             if (_plugin.Settings.EnableAutoTestOnConnect)
                 sender.EnableAutoTest(_plugin);
+            else
+                sender.DisableAutoTest();
 
             // Resolve active multi-stream profile and raw mzdash content.
             // Precedence: custom file → cached by name → builtin embedded → null (sender synthesises from catalog).

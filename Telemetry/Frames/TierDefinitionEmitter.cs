@@ -4,6 +4,7 @@ using System.Threading;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Era;
 using MozaPlugin.Telemetry.TestMode;
+using MozaPlugin.Telemetry;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -29,7 +30,7 @@ namespace MozaPlugin.Telemetry.Frames
         private int _tierDefBlindSentRounds;
         private int _tierDefBlindLastTickCount;
         private static int TierDefBlindMaxRounds
-            => global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs.Length;
+            => global::MozaPlugin.Telemetry.RetryBackoff.TierDefBlindMs.Length;
 
         // Tier-def binding completeness (last emission). Channels whose URL
         // isn't in the wheel's catalog get chIndex=0 → wheel can't bind them.
@@ -80,14 +81,39 @@ namespace MozaPlugin.Telemetry.Frames
             _lastSubscriptionDiag = null;
         }
 
+        /// <summary>Drop the previous tier-def emission's chunks from the
+        /// retransmit queue. A new flagBase supersedes them, so replaying them
+        /// would push a stale generation at the wheel. Scoped to exactly those
+        /// chunks — <see cref="_tierDefBlindFrames"/> is an exact record of the
+        /// tier-def chunks the retransmitter holds, since both are populated
+        /// only under BlindRetransmitTierDef. Everything else queued (FF init
+        /// handshake, property pushes, value frames) is current-generation on a
+        /// seq counter that is NOT reset here, so it stays ackable and keeps its
+        /// retx cover.</summary>
+        public void DropTrackedTierDefChunks()
+        {
+            var frames = _tierDefBlindFrames;
+            _tierDefBlindFrames = null;
+            _tierDefBlindSentRounds = 0;
+            _tierDefBlindLastTickCount = 0;
+            if (frames == null) return;
+            foreach (var frame in frames)
+            {
+                if (frame == null || frame.Length < 10) continue;
+                _sender.Retransmitter.Drop(frame[6], frame[8] | (frame[9] << 8));
+            }
+        }
+
         /// <summary>
         /// Spin-wait for the wheel's catalog push to go quiet. Returns when
         /// last catalog activity is older than <paramref name="quietMs"/>.
         /// </summary>
         public void WaitForChannelCatalogQuiet(int quietMs, int timeoutMs)
         {
-            int deadline = Environment.TickCount + timeoutMs;
-            while (Environment.TickCount < deadline)
+            // Difference form: TickCount wraps every 24.9 days and an additive
+            // deadline near the wrap skips the wait entirely.
+            int started = Environment.TickCount;
+            while (unchecked(Environment.TickCount - started) < timeoutMs)
             {
                 if (_sender.StateIsIdle || !_sender.ConnectionIsConnected) return;
                 int lastAct = _sender.CatalogParser.LastActivityMs;
@@ -673,7 +699,7 @@ namespace MozaPlugin.Telemetry.Frames
                 _tierDefBlindFrames = null;
                 return;
             }
-            var schedule = global::MozaPlugin.Protocol.RetryBackoff.TierDefBlindMs;
+            var schedule = global::MozaPlugin.Telemetry.RetryBackoff.TierDefBlindMs;
             int gateMs = schedule[Math.Min(_tierDefBlindSentRounds, schedule.Length - 1)];
             if (Environment.TickCount - _tierDefBlindLastTickCount < gateMs) return;
 

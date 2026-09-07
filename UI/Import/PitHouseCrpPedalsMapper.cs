@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Newtonsoft.Json.Linq;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.UI.Import
 {

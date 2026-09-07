@@ -80,7 +80,8 @@ def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--ours", default=None)
-    ap.add_argument("--pithouse", default="/home/rorth/src/moza-simhub-plugin/sim/logs/bridge-20260514-170002.jsonl")
+    ap.add_argument("--pithouse", required=True,
+                    help="PitHouse bridge JSONL capture (see MOZA_TRACE_DIR)")
     ap.add_argument("--anchor-sess01", action='store_true',
                     help="report timing relative to host sess=01 open instead of trace start")
     args = ap.parse_args()

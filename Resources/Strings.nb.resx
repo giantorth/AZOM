@@ -16,9 +16,9 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Alternativer</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Importer</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>Om</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Hjelp</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Frakoblet</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>OPPDATER</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Ytelsesutgang</value></data>
@@ -172,11 +172,13 @@
   <data name="Label_Enable" xml:space="preserve"><value>Aktiver</value></data>
   <data name="Button_Test1s" xml:space="preserve"><value>Test 1s</value></data>
   <data name="Label_Test" xml:space="preserve"><value>Test</value></data>
-  <data name="Section_Lockup" xml:space="preserve"><value>Lockup</value></data>
+  <data name="Section_Lockup" xml:space="preserve"><value>Låsing</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Terskel</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Klopunkt</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Motorvibrasjon</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Frekvens (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Glatthet</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Forsterkning</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// eksperimentelt — kanskje ikke respektert av mBooster-firmware</value></data>
@@ -192,28 +194,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Port 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Port 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>PROFILER</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>INNSTILLINGER</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Bruk profilinnstillinger ved start</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>RATT-LED-UTGANG</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// strupning av RPM + knapper</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Anbefalt: la LED-alternativene under stå AV med mindre du opplever LED-problemer.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Begrens oppdateringer til rattet</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Send kun LED-data når noe faktisk endrer seg.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Send alltid bitmasken på nytt</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Send alltid LED-bitmasken sammen med fargeoppdateringer, selv om den er uendret. Gir ekstra trafikk.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB-DETEKSJON</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Deaktiver seriell-probe-fallback (avansert)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Trengs bare hvis pluginen snakker med feil enhet.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Deaktiver active-shifter-deteksjon (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Hopp over active-shifter-reconnect-probe.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>DASHBOARD-TELEMETRI</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Last opp dashboard ved tilkobling</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Last ned dashboard fra rattet</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Ratt-firmware-versjon:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Auto — Forsøk å detektere fra ratt-handshake</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024-versjon — (URL-abonnement)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026-versjon — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Auto detekterer rattets firmware-versjon fra handshake og velger riktig protokoll. Overstyr kun hvis telemetrien ikke virker.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Vis alle faner (avansert)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ENHETSDEFINISJONER</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>DISTRIBUER ALLE DEFINISJONER PÅ NYTT</value></data>
@@ -221,11 +206,7 @@
   <data name="Section_Reset" xml:space="preserve"><value>TILBAKESTILL</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>TØM ALLE INNSTILLINGER OG PROFILER</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Dette tilbakestiller alle plugin-innstillinger og profiler til standardverdiene.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Dashboard-opplasting er under utvikling og sender for øyeblikket IKKE filer til rattet.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>DASHBOARD-OPPLASTING</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// send en .mzdash-fil til tilkoblet ratt</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Status viser siste bekreftelse fra rattet.</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>KILDE</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Lokal .mzdash-fil</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Dashboard-bibliotek</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>VELG .MZDASH…</value></data>
@@ -233,38 +214,13 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Dashboard:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>LAST OPP NÅ</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>på tomgang</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Dashboard-navn:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Rå størrelse:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Underveis:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Siste ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Siste ack status-byte:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Merk: Opplasting krever at rattet er tilkoblet og at en administrasjonsøkt er etablert.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>RATTFILER</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// dashboards lastet inn på rattet</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Sletting er midlertidig deaktivert.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Status</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tittel</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sist endret</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SLETT</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Midlertidig deaktivert.</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP-SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// aktiver dette alternativet for å hindre at PitHouse starter automatisk</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Gir offisiell MOZA SDK-støtte for spill som krever det — som iRacing, eller spill som bruker 360 Hz-modus. Pluginen kjører en innebygd CoAP SDK-kontrollserver på loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Når aktivert kjører pluginen en liten stand-in-prosess som vises i prosesslisten som «MOZA Pit House.exe». Dette er forventet — det lar MOZA SDK-apper finne PitHouse via navnet. Den avsluttes automatisk når du deaktiverer dette eller lukker SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Aktiver CoAP SDK-server</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP-KONTROLL</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// rå CBOR-over-UDP-kontrollflate</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Dette er en eldre UDP-kontroll for å sette rattvinkel. Eneste kjente bruk er RSF-versjonen av Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Aktiver UDP-kontrollserver</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Port</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>STATUS</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP-server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP-kontroll</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>SISTE FORESPØRSLER</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// siste 20 forespørsler per server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>OM</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// SimHub-plugin med åpen kildekode</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -420,6 +376,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Rediger SimHub-egenskapskobling</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Rediger som formel (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>TILBAKESTILL TIL STANDARD</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>GLOBALE STANDARDER</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Globale kanalstandarder</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>TILBAKESTILL ALLE STANDARDER</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>LUKK</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} av {1} overstyrt</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Gjenopprett standarden</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Global kanaltilordning utilgjengelig (se logg)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>TILBAKESTILL FELT</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>DEL FELT</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>DEL BIT</value></data>
@@ -498,14 +461,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>REDIGERER · BRYTER 1 · AKTIV</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>FYLL RING MED VALGT</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>KOPIER DENNE BRYTEREN TIL ALLE</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Dashboard-opplasting fungerer ikke ennå</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>HVILELYS</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// hva rattet viser etter at tomgangs-timeouten utløper</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Hastighet</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Farge</value></data>
   <data name="Section_Language" xml:space="preserve"><value>SPRÅK</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Språk</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Lukk og åpne denne innstillings-siden på nytt for å bruke det nye språket. Auto følger SimHub sitt språkvalg, deretter OS-et.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Krever omstart ved endring.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORTER PROFIL…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Importer PitHouse-forhåndsinnstilling</value></data>
@@ -544,7 +506,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Det tilkoblede rattet</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} er ikke lagt til i SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Et MOZA-dashbord er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Denne wheelbasen har en ambient LED-stripe, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0} for å styre stripen.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Wheelbasen er tilkoblet, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Rattet «{1}» er tilkoblet, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA-COM-porten</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knappindikatorer</value></data>
@@ -552,9 +514,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Starter…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Stoppet</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Kjører (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Serveren er ikke startet – aktiver den med bryteren over</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Ingen forespørsler ennå</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Ingen forespørsler ennå – tredjepartsverktøy kommuniserer her bare når de leser eller skriver en innstilling</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Stub-behandler</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>tar opp… (alltid-opptak er på – klikk Stopp når du er klar)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>tar opp… (åpne en annen fane og bruk enheten, kom så tilbake for å stoppe)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>eksportert til {0}</value></data>
@@ -569,8 +529,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Mappe: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Opplasting i kø – sender «{0}» til rattet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Opplasting ikke startet – rattet er ikke tilkoblet eller ingen administrasjonsøkt ennå.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Opplasting fullført (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Opplasting stoppet (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Opplasting fullført (status 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Opplasting stoppet ved {0} % (status 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Velg en .mzdash-fil å laste opp</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-dashbord (*.mzdash)|*.mzdash|Alle filer (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Velg mappe som inneholder .mzdash-dashbordfiler</value></data>
@@ -634,14 +594,14 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Girspak</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flysimulering</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-tidsavbrudd</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Hvor lenge LED-ene oppdateres etter at telemetrien stopper før rattet kan gå i hvilemodus. 0 = stopp umiddelbart.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Hvor lenge LED-ene oppdateres etter at telemetrien stopper før rattet kan gå i hvilemodus.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Skjermrotasjon</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Jevn</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Umiddelbar</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Spaker</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Spakmodus</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Knappeboks</value></data>
-  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
+  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Trucksimulator (ETS2/ATS)</value></data>
   <data name="Hint_StalksTruckSim" xml:space="preserve"><value>I truck sim-modus gjør programtillegget spakbevegelser om til tastaturtaster for Euro/American Truck Simulator. I knappeboks-modus fungerer spakene som vanlige knapper.</value></data>
   <data name="Section_StalksKeyMapping" xml:space="preserve"><value>Knappetilordning</value></data>
   <data name="Subtitle_StalksInteractiveMap" xml:space="preserve"><value>Trykk på en spakkontroll for å utheve knappen, og tildel deretter en tast eller vindusvisker-/lystrinn.</value></data>
@@ -671,8 +631,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Pedalroller</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Pedal {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Denne mBooster er vert for mer enn ett pedal på én tilkobling. Tildel hver oppdaget akse til en spillinngang. Standardrekkefølgen følger Mozas Rx/Ry/Rz-oppsett (gass/brems/clutch) — tilordne på nytt her hvis et pedal styrer feil inngang.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Konfigurer pedal:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Denne pedalen er passiv (ingen motor) — vibrasjonseffekter gjelder ikke.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>GIRSPAK-INNSTILLINGER</value></data>
@@ -724,27 +684,32 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Bremsefading (Eksperimentell)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Starttemperatur (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Eksperimentell — skriver de ekte maskinvarekalibreringene for Sluttpunkt for bevegelse og Maks terskel mens den er aktiv (mer bevegelse og mer kraft kreves), og gjenoppretter deretter dine konfigurerte verdier etter hvert som bremsene kjøles ned. Krever at disse allerede er satt i Pedalfølelse / Sim-inngangskartlegging — har ellers ingen effekt.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-kraft (Treghetsbasert pedalfølelse) (Eksperimentell)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Eksperimentell — skyver selve pedalen under foten din i forhold til sanntids langsgående G (akselerasjon skyver forover, bremsing skyver bakover), i stedet for å vibrere. Maks pedalvandring angir hvor langt den beveger seg ved full G; Responshastighet angir hvor raskt pedalen når den nye posisjonen.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Maks pedalvandring (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Responshastighet (%)</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>MELD ET PROBLEM</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send en diagnoserapport til utvikleren</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Beskriv problemet</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beskriv problemet: hva du gjorde, hva rattet eller dashbordet gjorde, og når det startet.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (valgfritt — e-post eller Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Innsending laster opp en diagnosepakke (plugin-logger og et seriell-spor, med maskerte maskinvare-ID-er) til plugin-utvikleren.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Send feilrapport</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Laster opp…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Rapport sendt. Referanse: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>For mange rapporter fra tilkoblingen din nylig — prøv igjen senere.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Diagnosepakken er for stor til å lastes opp.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Opplasting mislyktes. Sjekk tilkoblingen og prøv igjen.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Opplasting blokkert av vår CDN, ikke av tilkoblingen din — bruk Eksporter pakke.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Beskriv problemet før du sender.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnoseopptak</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Holder et lite spor av seriell trafikk i minnet (det første minuttet av oppstart pluss nylig aktivitet), slik at feilrapporter inkluderer tilkoblingen. Ingenting forlater PC-en din før du sender en rapport.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnoseopptak er av.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Oppstart: {0} rammer ({1} KB, {2}) · Løpende: {3} rammer ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>frosset</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>fyller</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Vent et øyeblikk før du sender en ny rapport.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Lagre diagnosepakken som en fil på denne PC-en (ingenting lastes opp).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Spilltaster</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Viskere frem</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Viskere tilbake</value></data>
@@ -770,4 +735,49 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR lukket — byttet til Stabil</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Inngangskraft</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>FARGER PER LED</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Hvile · Konstant</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Hvile · Pust</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Dvale · Pust</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Animasjonshastighet (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Pustehastighet (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>HVILEEFFEKT</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hvileanimasjon</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Kilde for LFE i rattbasen</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>LFE-fanen i programtillegget</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Krever SimHub 9.12 eller nyere.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Enhetsdefinisjonen er oppdatert. Start SimHub på nytt for å bruke den.</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-kompatibilitet</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graf</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Båndbredde</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Dreiemoment</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Dreiemoment</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Skala</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>REDIGER I STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>NYTT DASHBORD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Åpne det valgte dashbordet i MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Lag et nytt dashbord i MOZA Dashboard Studio, tilpasset den tilkoblede skjermen</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Åpnet i Studio — trykk Oppdater når du er ferdig.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Fant ikke Dashboard Studio — installer MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio startet ikke: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Velg et dashbord med en fil på disken.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Ingen skjerminfo ennå — åpner uten enhet.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Lagrer i {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Biblioteket lastet på nytt — {0} dashbord.</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R-oppsett 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5-oppsett</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6-oppsett</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8-oppsett</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>STATUSAVSPØRRING</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Avspør live</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Tilbakelesing av oppsett</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Status</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Statusfeil</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Status:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Laster opp - {0} %</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Fullført - 100 %</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Stoppet - {0} %</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>OPPLASTINGSKILDE</value></data>
 </root>

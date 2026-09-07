@@ -13,6 +13,8 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// DescriptorUniqueId GUIDs for the MOZA device definitions.
         /// These are permanent — changing them orphans existing user device instances.
+        /// Wheels and wheelbases are keyed per model through the registry below;
+        /// only the fixed-identity devices are constants here.
         /// </summary>
         public const string DashCm2Guid       = "6a2d9b0f-8b1e-4d32-9c18-1f5ec8a81025";
         // CM1 base-bridged dash (group-0x35, dev 0x14). Its own identity so it
@@ -21,10 +23,19 @@ namespace MozaPlugin.Devices
         public const string DashCm1Guid       = "86f772c3-0cab-4f1b-baa8-39eb178420f9";
         public const string WheelGenericGuid  = "ed153fcb-774d-4cea-97db-5f7096cd1099";
         public const string WheelOldProtoGuid = "5e70f006-ba71-4987-9e88-840d650b12ef";
-        // Wheelbase ambient LED strip (18 LEDs across two physical 9-LED strips).
-        // Deployed only for bases that respond to a base-ambient-brightness probe
-        // (R21 / R25 / R27 family). R9 / R12 don't have this strip — no device.
+        // LEGACY shared "MOZA Wheel Base" identity, from before wheelbases got
+        // per-model definitions. Still matched by IsBaseDevice so an instance a
+        // user added under the old definition keeps routing to the base extension
+        // until they re-add the model-named device.
         public const string BaseAmbientGuid   = "b8361c60-1bbd-4497-8cb4-af5df7db7251";
+
+        /// <summary>
+        /// Registry key namespace for wheelbase models. Base tokens ("R16") and
+        /// wheel model prefixes live in one GUID registry, so bases are stored
+        /// under "base:R16" — otherwise a base could collide with a wheel prefix
+        /// and GetWheelModelPrefix would hand a base GUID to the wheel extension.
+        /// </summary>
+        private const string BaseKeyPrefix = "base:";
 
         /// <summary>Marker prefix returned by GetWheelModelPrefix for old-protocol devices.</summary>
         public const string OldProtocolMarker = "__old__";
@@ -121,6 +132,14 @@ namespace MozaPlugin.Devices
                     if (!PrefixToGuid.ContainsKey(prefix))
                         Register(prefix, GenerateUuidV5(prefix));
                 }
+
+                // 4. Same for wheelbase models, under the base: key namespace.
+                foreach (var (prefix, _, _, _) in BaseModelInfo.KnownModels)
+                {
+                    var key = BaseKeyPrefix + prefix;
+                    if (!PrefixToGuid.ContainsKey(key))
+                        Register(key, GenerateUuidV5(key));
+                }
             }
         }
 
@@ -211,8 +230,44 @@ namespace MozaPlugin.Devices
             {
                 foreach (var kvp in GuidToPrefix)
                 {
+                    // Wheelbase entries share this registry; they are not wheels.
+                    if (kvp.Value.StartsWith(BaseKeyPrefix, StringComparison.Ordinal))
+                        continue;
                     if (Matches(deviceTypeId, kvp.Key))
                         return kvp.Value;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get or create the device GUID for a wheelbase model token (e.g. "R16").
+        /// </summary>
+        public static string ResolveBaseGuid(string baseModelPrefix) =>
+            ResolveWheelGuid(BaseKeyPrefix + baseModelPrefix);
+
+        /// <summary>
+        /// Resolve the wheelbase model token from a SimHub DeviceTypeID, or null
+        /// when the id is not a per-model base device. The legacy shared identity
+        /// resolves to an empty string — a base device, but of unknown model.
+        /// </summary>
+        public static string? GetBaseModelPrefix(string deviceTypeId)
+        {
+            if (string.IsNullOrEmpty(deviceTypeId))
+                return null;
+
+            if (Matches(deviceTypeId, BaseAmbientGuid))
+                return "";
+
+            lock (_registryLock)
+            {
+                foreach (var kvp in GuidToPrefix)
+                {
+                    if (!kvp.Value.StartsWith(BaseKeyPrefix, StringComparison.Ordinal))
+                        continue;
+                    if (Matches(deviceTypeId, kvp.Key))
+                        return kvp.Value.Substring(BaseKeyPrefix.Length);
                 }
             }
 
@@ -225,9 +280,9 @@ namespace MozaPlugin.Devices
             && (Matches(deviceTypeId, DashCm2Guid)
                 || Matches(deviceTypeId, DashCm1Guid));
 
-        /// <summary>Returns true if the DeviceTypeID is the wheel base ambient LED device.</summary>
-        public static bool IsBaseAmbientDevice(string deviceTypeId) =>
-            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, BaseAmbientGuid);
+        /// <summary>Returns true if the DeviceTypeID is a wheelbase device — either a
+        /// per-model definition or the legacy shared "MOZA Wheel Base" identity.</summary>
+        public static bool IsBaseDevice(string deviceTypeId) => GetBaseModelPrefix(deviceTypeId) != null;
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>

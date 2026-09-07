@@ -103,7 +103,10 @@ namespace MozaPlugin
         private static void Record(string level, string message)
         {
             if (string.IsNullOrEmpty(message)) return;
-            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {level,-5} {message}";
+            // Invariant: the ':' separator and the calendar follow the OS culture
+            // otherwise, and the bundle tooling parses this prefix.
+            var line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture)
+                + " " + level.PadRight(5) + " " + message;
             lock (_gate)
             {
                 _lines.AddLast(line);

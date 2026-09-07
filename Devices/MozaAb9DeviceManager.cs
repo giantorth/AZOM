@@ -12,12 +12,20 @@ namespace MozaPlugin.Devices
     /// </summary>
     public enum Ab9Mode : byte
     {
+        // The R+n layouts put reverse ahead of first rather than past top gear.
+        // 0x01/0x02/0x03/0x08 never appeared in a PitHouse capture — that tool
+        // only exercised the other six — but all ten are real device layouts.
         FivePlusR_L1 = 0x00,
+        FivePlusR_L2 = 0x01,
+        RPlusFive    = 0x02,
+        RPlusSix     = 0x03,
         SixPlusR_L1  = 0x04,
         SixPlusR_L2  = 0x05,
         SevenPlusR_L1 = 0x06,
         SevenPlusR_L2 = 0x07,
+        RPlusEight   = 0x08,
         Sequential   = 0x09,
+        // 0x0A..0x0E were tried on hardware and do nothing — the set ends at 0x09.
     }
 
     /// <summary>
@@ -114,7 +122,7 @@ namespace MozaPlugin.Devices
             remove => _connection.MessageReceived -= value;
         }
 
-        public MozaAb9DeviceManager(Func<bool>? disableProbeFallback = null)
+        public MozaAb9DeviceManager()
         {
             // PID filter accepts the AB9 PID and any unknown Moza PID
             // (future-hardware fallback) during registry-based discovery.
@@ -132,8 +140,7 @@ namespace MozaPlugin.Devices
             // docs/protocol/devices/usb-ids.md.
             _connection = new MozaSerialConnection(
                 pid => MozaUsbIds.IsAb9Pid(pid) || !MozaUsbIds.IsKnownMozaPid(pid),
-                MozaProbeTarget.Ab9,
-                disableProbeFallback);
+                MozaProbeTarget.Ab9);
             _connection.CaptureLabel = "ab9";
             // Drop the detection latch when the underlying port dies. Fires on the
             // read/write thread, so this handler MUST stay lightweight (no Join, no
@@ -294,6 +301,37 @@ namespace MozaPlugin.Devices
             _connection.Send(frame);
         }
 
+        // Status registers ride group 0x2B (BuildReadMessage emits the base's
+        // 7E 03 2B 12 <cmd> 00 00 shape). Only the three that carry data — the
+        // wheelbase's other 0x2B registers reply a constant zero on an AB9.
+        private static readonly string[] StatusProbeGroup2b =
+        {
+            "ab9-2b-state", "ab9-2b-state-err", "ab9-2b-mcu-temp",
+        };
+
+        /// <summary>
+        /// Ask the AB9's main for its state, error code and MCU temperature, plus the
+        /// stored layout read-back. Four one-shot frames, paced 4 ms apart by the
+        /// FIFO. Diagnostic only — nothing here configures the device.
+        /// </summary>
+        public void RequestStatusProbe()
+        {
+            if (!_connection.IsConnected) return;
+            foreach (var name in StatusProbeGroup2b)
+                SendAb9StatusRead(name);
+            SendAb9Read(0xD3); // layout read-back — did the device keep what we wrote?
+        }
+
+        private bool SendAb9StatusRead(string commandName)
+        {
+            var cmd = MozaCommandDatabase.Get(commandName);
+            if (cmd == null) return false;
+            var msg = cmd.BuildReadMessage(MozaProtocol.DeviceAb9);
+            if (msg == null) return false;
+            _connection.Send(msg);
+            return true;
+        }
+
         private bool WriteSliderRaw(string commandName, byte value)
         {
             if (!_connection.IsConnected) return false;
@@ -383,9 +421,14 @@ namespace MozaPlugin.Devices
             int slot = Interlocked.Increment(ref _allocAckCount) - 1;
             if (slot < 0 || slot >= FfbAllocSequence.Length) return;
             int shift = 8 * slot;
-            long cur = Interlocked.Read(ref _effectIndexBits);
-            long next = (cur & ~(0xFFL << shift)) | ((long)index << shift);
-            Interlocked.Exchange(ref _effectIndexBits, next);
+            // CAS loop: ResetEffectIndices (reconnect timer) can land between a
+            // plain read and exchange and be silently undone.
+            long cur, next;
+            do
+            {
+                cur = Interlocked.Read(ref _effectIndexBits);
+                next = (cur & ~(0xFFL << shift)) | ((long)index << shift);
+            } while (Interlocked.CompareExchange(ref _effectIndexBits, next, cur) != cur);
             if (slot == FfbAllocSequence.Length - 1)
                 MozaLog.Debug($"[AZOM/AB9] FFB effect indices latched: {DescribeEffectIndices()}");
         }

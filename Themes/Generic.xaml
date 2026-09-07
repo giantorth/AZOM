@@ -443,14 +443,40 @@
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
+                            <!-- Same (0,0) stray-dot guard as Third above, for the same
+                                 reason: a single-series consumer (the Base-tab torque
+                                 graph binds InSamples only) leaves OutTipX/Y at their
+                                 0,0 default, which parked a dot in the default OutBrush
+                                 orange in the upper-left corner. Applied to In as well so
+                                 no future single-series use can reintroduce it. -->
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding OutBrush}"
                                      Canvas.Left="{Binding OutTipX, RelativeSource={RelativeSource TemplatedParent}}"
-                                     Canvas.Top="{Binding OutTipY, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                     Canvas.Top="{Binding OutTipY, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding OutLineGeometry, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
                             <Ellipse Width="6" Height="6"
                                      Fill="{TemplateBinding InBrush}"
                                      Canvas.Left="{Binding InTipX, RelativeSource={RelativeSource TemplatedParent}}"
-                                     Canvas.Top="{Binding InTipY, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                     Canvas.Top="{Binding InTipY, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding InLineGeometry, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
                         </Canvas>
                     </Grid>
                 </ControlTemplate>

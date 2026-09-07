@@ -84,7 +84,7 @@ An prototype implementation will reflect into the active
 `variantHelper`, and append a custom provider to `VariantProviders`. 
 ## Plugin Adapter (as built — `ControlMapper/`)
 
-`ControlMapper/MozaVariantProvider.cs` + `ControlMapper/ControlMapperBridge.cs` implement the
+`Integration/MozaVariantProvider.cs` + `Integration/ControlMapperBridge.cs` implement the
 variant-provider direction above so the Add Source Controller dropdown shows each MOZA wheel
 under its friendly name (CS Pro / KS Pro / KS / FSR V2 / …) and `SharpHelper.AquireController`'s
 per-mapping variant gate dispatches input only to the saved mapping whose stored Variant matches

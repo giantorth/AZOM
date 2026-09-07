@@ -11,9 +11,9 @@ emits none. That over-population + wrap is the streaming-clutter signature.
 Usage:
     python tools/radar_plugin_vs_pithouse.py <plugin.jsonl> <pithouse.jsonl> <replay-stem>
 """
-import sys, json, struct, bisect, math
+import os, sys, json, struct, bisect, math
 from collections import Counter
-sys.path.insert(0, '/home/rorth/src/moza-simhub-plugin/tools')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import radar_verify as rv
 
 WRAP = (1 << 20) / rv.RADAR_Z_SCALE   # ~48.46 m; principal window = +/- WRAP/2

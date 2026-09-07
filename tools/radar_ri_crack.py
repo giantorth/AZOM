@@ -10,7 +10,7 @@ Usage: radar_ri_crack.py <pithouse.jsonl> <replay_stem>
 """
 import sys, json, struct, zlib, bisect, math
 from pathlib import Path
-sys.path.insert(0, '/home/rorth/src/moza-simhub-plugin/tools')
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import radar_verify as rv
 
 PH = sys.argv[1]; STEM = sys.argv[2]

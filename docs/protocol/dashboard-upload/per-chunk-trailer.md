@@ -62,8 +62,14 @@ Verified for upload #2's 4 chunks (`total_compressed = 0x3BA5 = 15269`,
   the wire frame but are not part of the deflate stream. For upload #2,
   every body is padded to `body_len = 4384 = 291 + 4092 + 1` for
   chunks 0–2 (1 trailing byte), and chunk 3 has
-  `body_len = 3285 = 291 + 2993 + 1`. The 1-byte trailing pad is part
-  of the wire framing — drop it when reassembling deflate.
+  `body_len = 3285 = 291 + 2993 + 1`. **The 1 trailing byte is NOT a pad
+  — it is the 8-bit XOR status over `body[:-1]`**, the same formula as
+  the type=0x02 metadata trailer. Verified 27/27 against the 2026-08-16
+  PitHouse ground-truth chunks; the wheel's `FileTransferClient`
+  VALIDATES it and rejects the sub-msg with
+  `Invalid data: Checksum mismatch-- 0 <xor> <len>` (display app log)
+  when it is wrong — while still fc-acking the chunks, so the failure is
+  silent at the session layer. Drop it when reassembling deflate.
 
 ## Chunk-0-only fields (body[291:body_end] for chunk 0)
 
@@ -139,7 +145,8 @@ currently returns a single sub-msg. To match the protocol it needs to:
    yielding `body = shared_prefix(279) + position_envelope(12) + deflate_slice(stride or residual)`.
 5. For the LAST chunk, set `this_chunk_deflate_size` to the actual
    remaining-bytes count (not chunkStride).
-6. Append a 1-byte trailing pad after the deflate slice so
+6. Append the XOR status byte (XOR of every preceding body byte) after
+   the deflate slice so
    `body_len = 291 + this_chunk_deflate_size + 1` (matches capture).
 7. Each chunk becomes a separate type=0x03 sub-msg via the standard
    6-byte sub-msg header (`[0x03][size_LE u16][3 pad bytes]`).

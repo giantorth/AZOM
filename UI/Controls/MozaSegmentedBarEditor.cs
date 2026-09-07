@@ -158,10 +158,13 @@ namespace MozaControls
         public static readonly DependencyProperty PlotBackgroundRectProperty = PlotBackgroundRectKey.DependencyProperty;
         public Geometry? PlotBackgroundRect => (Geometry?)GetValue(PlotBackgroundRectProperty);
 
-        /// <summary>Step line tracing the three segments' current values —
-        /// flat across each segment's travel range, jumping vertically at
-        /// each divider — so the damping profile reads as one continuous
-        /// shape instead of three disconnected bars.</summary>
+        /// <summary>Smoothed line tracing the three segments' current values —
+        /// flat across the middle of each segment's travel range, easing
+        /// through a short Catmull-Rom-style curve around each divider
+        /// instead of jumping vertically — so the damping profile reads as
+        /// one continuous shape instead of three disconnected bars. See
+        /// <see cref="AddSmoothPolyline"/> (same 1/6-tangent Bezier
+        /// conversion <c>MozaCurveEditor</c> uses for its own curves).</summary>
         private static readonly DependencyPropertyKey StepLineGeometryKey =
             DependencyProperty.RegisterReadOnly(nameof(StepLineGeometry), typeof(Geometry), typeof(MozaSegmentedBarEditor), new PropertyMetadata(null));
         public static readonly DependencyProperty StepLineGeometryProperty = StepLineGeometryKey.DependencyProperty;
@@ -429,16 +432,38 @@ namespace MozaControls
             bg.Freeze();
             SetValue(PlotBackgroundRectKey, bg);
 
-            // Step line ON TOP of the bars, at each segment's own height —
-            // flat across its travel range, a vertical jump at each divider —
-            // the same shape the three bars already imply, just traced as one
-            // line so the overall profile is easier to read at a glance.
-            var stepFig = new PathFigure { StartPoint = new Point(EdgePad, YOf(s1v)), IsClosed = false, IsFilled = false };
-            stepFig.Segments.Add(new LineSegment(new Point(d1x, YOf(s1v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(d1x, YOf(s2v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(d2x, YOf(s2v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(d2x, YOf(s3v)), true));
-            stepFig.Segments.Add(new LineSegment(new Point(EdgePad + plotW, YOf(s3v)), true));
+            // Smoothed line ON TOP of the bars, at each segment's own height —
+            // flat across the middle of its travel range, easing through a
+            // short, tight curve right at each divider instead of jumping
+            // vertically — the same shape the three bars already imply, just
+            // traced as one continuous line so the overall profile is easier
+            // to read at a glance. Sized to match Pit House's own rendering
+            // (a quick S right at the divider, flat everywhere else): the
+            // half-width is ~1/4 of the SMALLEST segment's width, measured
+            // against a real Pit House screenshot's proportions (its
+            // transition-to-segment-width ratio came out close to that,
+            // vs. the previous /2.2 divisor here which was visibly wider/
+            // more "curvy" than the reference — a long, gradual bow reaching
+            // deep into each segment instead of a quick kink at the
+            // divider). The 60px ceiling is just a backstop for an unusually
+            // wide segment, not the normal-case constraint; the /4.0 term
+            // does the real work and scales with the control's actual
+            // rendered size. Still shrinks for narrow segments/gaps so the
+            // six control points below can never cross each other or the
+            // plot edges.
+            double transitionHalfWidth = Math.Max(2.0, Math.Min(60.0,
+                Math.Min(d1x - EdgePad, Math.Min(d2x - d1x, EdgePad + plotW - d2x)) / 4.0));
+            var stepPts = new[]
+            {
+                new Point(EdgePad, YOf(s1v)),
+                new Point(d1x - transitionHalfWidth, YOf(s1v)),
+                new Point(d1x + transitionHalfWidth, YOf(s2v)),
+                new Point(d2x - transitionHalfWidth, YOf(s2v)),
+                new Point(d2x + transitionHalfWidth, YOf(s3v)),
+                new Point(EdgePad + plotW, YOf(s3v)),
+            };
+            var stepFig = new PathFigure { StartPoint = stepPts[0], IsClosed = false, IsFilled = false };
+            AddSmoothPolyline(stepFig, stepPts);
             var stepGeom = new PathGeometry();
             stepGeom.Figures.Add(stepFig);
             stepGeom.Freeze();
@@ -460,6 +485,54 @@ namespace MozaControls
             SetValue(Seg1LabelTopKey, LabelTopFor(YOf(s1v)));
             SetValue(Seg2LabelTopKey, LabelTopFor(YOf(s2v)));
             SetValue(Seg3LabelTopKey, LabelTopFor(YOf(s3v)));
+        }
+
+        /// <summary>
+        /// Append a smooth Catmull-Rom-style curve through <paramref name="pts"/>
+        /// to <paramref name="fig"/> as a chain of cubic Bezier segments — same
+        /// 1/6-tangent conversion <c>MozaCurveEditor.Recompute</c> uses for its
+        /// own curves, so this reads as the same "smooth line" visual language
+        /// elsewhere in the app. <paramref name="fig"/>.StartPoint must already
+        /// be set to <c>pts[0]</c>. The first/last points are their own
+        /// duplicated neighbour (rather than wrapping or extrapolating), so the
+        /// curve starts/ends exactly AT <c>pts[0]</c>/<c>pts[^1]</c> with a
+        /// sensible (non-overshooting) tangent instead of curving past them.
+        /// </summary>
+        private static void AddSmoothPolyline(PathFigure fig, Point[] pts)
+        {
+            int n = pts.Length;
+            for (int i = 0; i < n - 1; i++)
+            {
+                Point p0 = i == 0 ? pts[0] : pts[i - 1];
+                Point p1 = pts[i];
+                Point p2 = pts[i + 1];
+                Point p3 = (i + 2 < n) ? pts[i + 2] : pts[n - 1];
+                Point c1, c2;
+                if (p1.Y == p2.Y)
+                {
+                    // A flat run (both endpoints at the same height — the
+                    // plateau segments in Recompute's 6-point layout) must
+                    // stay flat. Reaching past it to p0/p3 at a DIFFERENT
+                    // height (the neighbouring divider transition) leaks a
+                    // phantom slope into this segment's own tangent,
+                    // drawing a small dip/bump right at the plateau's edge
+                    // instead of a straight line — exactly the artifact
+                    // visible right before/after each divider. Force a
+                    // zero-slope tangent instead; the transition segment on
+                    // the other side of the divider still computes its own
+                    // tangent correctly, since IT reaches back into a flat
+                    // neighbour that's at the SAME height as its own near
+                    // endpoint.
+                    c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y);
+                    c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y);
+                }
+                else
+                {
+                    c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
+                    c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
+                }
+                fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
+            }
         }
     }
 }

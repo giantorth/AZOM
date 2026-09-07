@@ -61,7 +61,37 @@ namespace MozaPlugin.Telemetry.Frames
         // seqs and corrupting the size-prefixed TLV walk — symptom: tire URLs
         // at indexes 10/11/13/14 parsed as garbage even though the wire bytes
         // were clean per CRC + per-record validation.
-        private readonly Dictionary<byte, int> _highestSeqAppended = new();
+        // Seqs actually appended to the linear buffer, per session. A SET, not a
+        // high-water mark: the mark conflated "already absorbed" with "at or
+        // below the highest seq seen", so one stray high-seq chunk permanently
+        // locked out every lower seq for the life of the session. Bundle
+        // 7H89M4JA (W17/CS-Pro, 2026-08-21) is the proof — a lone seq=0x0C
+        // landed 2.6 s before the catalog burst, so the burst's real chunks
+        // 0x05..0x0B were rejected on first delivery AND on all 91 of the
+        // wheel's retransmits, leaving catalog indices 1-5 permanently empty
+        // ("dropped gear channel"). Pruned to SeqHistoryWindow below the
+        // contiguous head so it stays bounded.
+        private readonly Dictionary<byte, HashSet<int>> _appendedSeqs = new();
+        // Next seq each session's linear buffer wants. Bytes are concatenated in
+        // SEQ order, never arrival order — an out-of-order chunk spliced in
+        // where it happened to land corrupts the size-prefixed TLV walk just as
+        // badly as a hole does.
+        private readonly Dictionary<byte, int> _nextExpectedSeq = new();
+        // Chunks received above the contiguous head, held until the hole ahead
+        // of them fills. Mirrors the ack-side out-of-order set in
+        // SessionLifecycle.GapAwareCatalogAckSeq — same problem, other layer.
+        private readonly Dictionary<byte, SortedDictionary<int, byte[]>> _pendingChunks = new();
+        private const int MaxPendingChunksPerSession = 256;
+        // How far below the contiguous head individual seqs are still
+        // remembered. Below this a chunk can only be an ancient retransmit,
+        // never evidence that our base was wrong, so it is dropped rather than
+        // triggering a re-base.
+        private const int SeqHistoryWindow = 512;
+        // A hole that never fills would wedge the session forever. If the head
+        // has not advanced this long while chunks are queued behind it, skip the
+        // hole and take the loss (the pre-fix behaviour) rather than stall.
+        private const int PendingStallEscapeMs = 5_000;
+        private readonly Dictionary<byte, int> _headBlockedSinceTickMs = new();
         // Per-session Environment.TickCount of last successful append. Used by
         // the stale-garbage cleanup in TryParse: when a session has buffered
         // bytes but ZERO valid catalog records (sFull+sPrefix+sAbbr+sBackref==0)
@@ -76,6 +106,17 @@ namespace MozaPlugin.Telemetry.Frames
         // would have stayed indefinitely. Dropping the noise lets the next
         // legitimate catalog burst start clean.
         private readonly Dictionary<byte, int> _lastAppendTickMs = new();
+        // Per-session Environment.TickCount of last PROGRESS — a parse pass in
+        // which this session yielded at least one valid catalog record. Seeded
+        // on first append so a session that never parses anything still has a
+        // clock. This, not _lastAppendTickMs, is what the stale-garbage cleanup
+        // measures: bundle VG9V7XB2 (W18/R12, 2026-08-22) had the wheel's
+        // device-log FF records riding sess=0x01 at ~1 Hz, so the arrival-based
+        // test never went stale and the buffer grew 2713 → 5003 B in three
+        // minutes with full=prefix=abbr=backref=0 throughout — heading for the
+        // destructive ClearOverflowingSessions wipe at 64 kB. Bytes arriving is
+        // not progress; records parsing is.
+        private readonly Dictionary<byte, int> _lastProgressTickMs = new();
         // Threshold above which a no-progress session buffer is considered
         // stale noise rather than in-flight catalog data. Set to 30 s — well
         // above any plausible wheel inter-chunk gap during an actual catalog
@@ -271,6 +312,11 @@ namespace MozaPlugin.Telemetry.Frames
         /// <summary>Channel count in the latest catalog, or 0 if none.</summary>
         public int Count => _catalog?.Count ?? 0;
 
+        /// <summary>Size of the current END-marker generation (<see cref="LiveCatalog"/>),
+        /// or 0 before one commits. Diagnostics render this list; <see cref="Count"/>
+        /// is the never-pruned union across every generation.</summary>
+        public int LiveCount => _liveCatalog?.Count ?? 0;
+
         /// <summary>URL → 1-based idx for the current catalog (first-occurrence
         /// wins: stale higher slots ignored after a dashboard switch re-indexes
         /// from 1). Null until the first parse succeeds. Suitable for callers
@@ -307,6 +353,24 @@ namespace MozaPlugin.Telemetry.Frames
         /// <summary>Environment.TickCount of the last AppendChunkIfNew call.
         /// Used by quiet-window waits.</summary>
         public int LastActivityMs => _lastActivityMs;
+
+        /// <summary>True when at least one session is holding out-of-order
+        /// chunks behind an unfilled hole. The tick loop polls this so the stall
+        /// escape stays reachable when the head is stuck and the buffer is
+        /// therefore NOT growing — the growth-gated TryParse call alone would
+        /// never run in that state.</summary>
+        public bool HasPendingChunks
+        {
+            get
+            {
+                lock (_bufferLock)
+                {
+                    foreach (var kv in _pendingChunks)
+                        if (kv.Value.Count > 0) return true;
+                    return false;
+                }
+            }
+        }
 
         /// <summary>Total buffer size across all sessions (for diagnostics and
         /// the "did the buffer grow since last parse?" check). The maximum
@@ -346,32 +410,99 @@ namespace MozaPlugin.Telemetry.Frames
             }
         }
 
-        /// <summary>Seq-aware append: only adds the chunk if seq is greater
-        /// than the highest-seen seq for this session. Drops retransmits
-        /// silently. Returns true on append, false on dedup.</summary>
+        /// <summary>Seq-ORDERED append. Bytes reach the session's linear buffer
+        /// only in seq order: an in-order chunk is appended and drains anything it
+        /// unblocks, a chunk above the head is held until the hole fills, and a
+        /// chunk below the head is either a retransmit (dropped) or proof the head
+        /// was set by a stray chunk (re-base). Returns true if bytes were appended,
+        /// false if the chunk was deduped or queued.</summary>
         public bool AppendChunkIfNew(byte session, int seq, byte[] chunkBytes, int offset, int length)
         {
-            if (chunkBytes == null || length <= 0) return false;
-            bool firstChunkOnSession;
+            // length == 0 is a KEEPALIVE (payload is the 4-byte CRC and nothing
+            // else). It carries no bytes but it DOES consume a sequence number,
+            // so it must run the bookkeeping below. Returning early here stalls
+            // the contiguous head on the keepalive's seq forever: every later
+            // chunk looks like a forward gap, gets parked in _pendingChunks, and
+            // the buffer stops growing — which also stops TickAbsorbCatalogIfChanged
+            // from ever calling TryParse, so the stall escape never runs either.
+            // Bundle A77WDXAV (W17/CS-Pro, 2026-08-23): keepalives at seq 0x11/0x12
+            // froze the head, and the wheel's post-switch catalog re-advertisement
+            // (back-ref records at 0x13-0x18 plus a new END=10) was parked and
+            // never parsed — so the dash kept the previous dashboard's channels.
+            if (chunkBytes == null || length < 0) return false;
+            bool firstChunkOnSession = false;
             lock (_bufferLock)
             {
-                if (_highestSeqAppended.TryGetValue(session, out int prevSeq) && seq <= prevSeq)
+                bool haveBase = _nextExpectedSeq.TryGetValue(session, out int expected);
+
+                if (haveBase)
+                {
+                    if (_appendedSeqs.TryGetValue(session, out var already) && already.Contains(seq))
+                        return false;                       // retransmit of an absorbed chunk
+                    if (_pendingChunks.TryGetValue(session, out var held) && held.ContainsKey(seq))
+                        return false;                       // duplicate of a chunk already queued
+                    if (seq < expected)
+                    {
+                        // Unseen seq below the head. Two causes, one response:
+                        // our base came from a stray chunk that preceded the
+                        // real generation, or the wheel restarted its outbound
+                        // counter for a new burst (documented and observed —
+                        // see SessionDataReassembler's Restart case, and bundle
+                        // EJ92X08Y where sess=0x09 ran 0x5C then restarted at
+                        // 0x0A). Either way the head is wrong and the buffer is
+                        // mis-based, so re-base on this chunk.
+                        //
+                        // Deliberately NOT gated on distance below the head. A
+                        // distance gate reads a counter restart — or a 16-bit
+                        // seq wrap at 0xFFFF→0x0000 — as an ancient retransmit
+                        // and drops it, and every chunk after it, for the life
+                        // of the session: the catalog wedges permanently with
+                        // no recovery path. Genuine retransmits are already
+                        // filtered above by the _appendedSeqs set, which covers
+                        // SeqHistoryWindow of history — far more than the
+                        // wheel's ~1.3 s retransmit timer can outrun.
+                        MozaLog.Debug(
+                            $"[AZOM] Catalog parser: re-basing sess=0x{session:X2} from seq={expected} "
+                            + $"to seq={seq} — unseen chunk below the head means the head was set by a "
+                            + "stray chunk; dropping the mis-based buffer so the generation can reassemble");
+                        DropSessionReassemblyLocked(session);
+                        haveBase = false;
+                    }
+                }
+
+                if (haveBase && seq > expected)
+                {
+                    // Hole ahead of this chunk. Hold it in seq order rather than
+                    // splicing it into the linear buffer out of place.
+                    if (!_pendingChunks.TryGetValue(session, out var pend))
+                    {
+                        pend = new SortedDictionary<int, byte[]>();
+                        _pendingChunks[session] = pend;
+                    }
+                    if (pend.Count < MaxPendingChunksPerSession)
+                    {
+                        var copy = new byte[length];
+                        if (length > 0) Array.Copy(chunkBytes, offset, copy, 0, length);
+                        pend[seq] = copy;
+                        if (!_headBlockedSinceTickMs.ContainsKey(session))
+                            _headBlockedSinceTickMs[session] = Environment.TickCount;
+                    }
                     return false;
-                _highestSeqAppended[session] = seq;
-                if (!_buffersBySession.TryGetValue(session, out var buf))
-                {
-                    buf = new List<byte>();
-                    _buffersBySession[session] = buf;
-                    _sessionOrder.Add(session);
-                    firstChunkOnSession = true;
                 }
-                else
-                {
-                    firstChunkOnSession = false;
-                }
-                for (int i = 0; i < length; i++)
-                    buf.Add(chunkBytes[offset + i]);
+
+                // In order (or establishing the base): append, then drain
+                // whatever this chunk unblocks.
+                firstChunkOnSession = AppendBytesLocked(session, chunkBytes, offset, length);
+                MarkAppendedLocked(session, seq);
+                _nextExpectedSeq[session] = seq + 1;
+                DrainPendingLocked(session);
+
                 _lastAppendTickMs[session] = Environment.TickCount;
+                // Seed the progress clock on first sight of the session so a
+                // buffer that never parses a record still ages out.
+                if (!_lastProgressTickMs.ContainsKey(session))
+                    _lastProgressTickMs[session] = Environment.TickCount;
+                var buf = _buffersBySession[session];
                 // Scan the FULL session buffer (not just the new chunk —
                 // the END marker may straddle chunk boundaries) for the
                 // most recent tag 0x06 size=4 record and capture its u32
@@ -430,6 +561,109 @@ namespace MozaPlugin.Telemetry.Frames
             return true;
         }
 
+        /// <summary>Concatenate one chunk's bytes onto a session's linear
+        /// buffer. Caller holds <c>_bufferLock</c>. Returns true if this created
+        /// the session's buffer.</summary>
+        private bool AppendBytesLocked(byte session, byte[] src, int offset, int length)
+        {
+            bool first = false;
+            if (!_buffersBySession.TryGetValue(session, out var buf))
+            {
+                buf = new List<byte>();
+                _buffersBySession[session] = buf;
+                _sessionOrder.Add(session);
+                first = true;
+            }
+            for (int i = 0; i < length; i++)
+                buf.Add(src[offset + i]);
+            return first;
+        }
+
+        /// <summary>Record a seq as absorbed and prune the history window.
+        /// Caller holds <c>_bufferLock</c>.</summary>
+        private void MarkAppendedLocked(byte session, int seq)
+        {
+            if (!_appendedSeqs.TryGetValue(session, out var set))
+            {
+                set = new HashSet<int>();
+                _appendedSeqs[session] = set;
+            }
+            set.Add(seq);
+            if (set.Count > SeqHistoryWindow * 2)
+            {
+                int cutoff = seq - SeqHistoryWindow;
+                set.RemoveWhere(s => s < cutoff);
+            }
+        }
+
+        /// <summary>Append every held chunk that the newly-arrived head byte
+        /// unblocks, in seq order. Caller holds <c>_bufferLock</c>.</summary>
+        private void DrainPendingLocked(byte session)
+        {
+            if (!_pendingChunks.TryGetValue(session, out var pend) || pend.Count == 0)
+            {
+                _headBlockedSinceTickMs.Remove(session);
+                return;
+            }
+            int expected = _nextExpectedSeq[session];
+            while (pend.TryGetValue(expected, out var bytes))
+            {
+                pend.Remove(expected);
+                AppendBytesLocked(session, bytes, 0, bytes.Length);
+                MarkAppendedLocked(session, expected);
+                expected++;
+            }
+            _nextExpectedSeq[session] = expected;
+            if (pend.Count == 0) _headBlockedSinceTickMs.Remove(session);
+            else _headBlockedSinceTickMs[session] = Environment.TickCount;
+        }
+
+        /// <summary>Drop a session's buffer and all reassembly state so the next
+        /// chunk starts a clean generation. Caller holds <c>_bufferLock</c>.
+        /// Does NOT touch the parsed catalog — back-references from prior
+        /// generations must survive.</summary>
+        private void DropSessionReassemblyLocked(byte session)
+        {
+            if (_buffersBySession.Remove(session))
+                _sessionOrder.Remove(session);
+            _appendedSeqs.Remove(session);
+            _nextExpectedSeq.Remove(session);
+            _pendingChunks.Remove(session);
+            _headBlockedSinceTickMs.Remove(session);
+            _lastAppendTickMs.Remove(session);
+            _lastProgressTickMs.Remove(session);
+            _lastParseLen = 0;
+        }
+
+        /// <summary>Give up on a hole that never filled and resume from the
+        /// lowest held chunk, so one permanently-lost chunk can't wedge a
+        /// session forever. Caller holds <c>_bufferLock</c>.</summary>
+        private void EscapePendingStallLocked()
+        {
+            int now = Environment.TickCount;
+            foreach (var session in _sessionOrder.ToArray())
+            {
+                if (!_headBlockedSinceTickMs.TryGetValue(session, out int since)) continue;
+                if (!_pendingChunks.TryGetValue(session, out var pend) || pend.Count == 0)
+                {
+                    _headBlockedSinceTickMs.Remove(session);
+                    continue;
+                }
+                bool overdue = (now - since) >= PendingStallEscapeMs;
+                bool overfull = pend.Count >= MaxPendingChunksPerSession;
+                if (!overdue && !overfull) continue;
+                int expected = _nextExpectedSeq.TryGetValue(session, out var e) ? e : 0;
+                int resumeAt = -1;
+                foreach (var k in pend.Keys) { resumeAt = k; break; }   // SortedDictionary: lowest
+                MozaLog.Debug(
+                    $"[AZOM] Catalog parser: hole at seq={expected} on sess=0x{session:X2} never filled "
+                    + $"({(overfull ? "queue full" : $"{(now - since) / 1000}s")}, {pend.Count} chunk(s) held) — "
+                    + $"skipping to seq={resumeAt}; that generation stays incomplete until the wheel re-sends");
+                _nextExpectedSeq[session] = resumeAt;
+                DrainPendingLocked(session);
+            }
+        }
+
         /// <summary>Reset the per-session buffers (typically on session restart
         /// or before a forced reparse). Does NOT clear the parsed catalog — the
         /// wheel relies on prior idx→URL bindings for back-references after a
@@ -442,8 +676,12 @@ namespace MozaPlugin.Telemetry.Frames
                 _sessionOrder.Clear();
                 // Drop seq-dedup tracking too — fresh buffer means fresh
                 // session, retransmit memory should not bleed across.
-                _highestSeqAppended.Clear();
+                _appendedSeqs.Clear();
+                _nextExpectedSeq.Clear();
+                _pendingChunks.Clear();
+                _headBlockedSinceTickMs.Clear();
                 _lastAppendTickMs.Clear();
+                _lastProgressTickMs.Clear();
             }
             _lastParseLen = 0;
         }
@@ -481,8 +719,12 @@ namespace MozaPlugin.Telemetry.Frames
                     int wiped = buf.Count;
                     _buffersBySession.Remove(sess);
                     _sessionOrder.RemoveAt(i);
-                    _highestSeqAppended.Remove(sess);
+                    _appendedSeqs.Remove(sess);
+                    _nextExpectedSeq.Remove(sess);
+                    _pendingChunks.Remove(sess);
+                    _headBlockedSinceTickMs.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
+                    _lastProgressTickMs.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
                         $"[AZOM] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
@@ -669,6 +911,9 @@ namespace MozaPlugin.Telemetry.Frames
             lock (_bufferLock)
             {
                 if (_sessionOrder.Count == 0) return;
+                // Give up on any hole that never filled before snapshotting, so a
+                // single lost chunk cannot wedge a session's reassembly forever.
+                EscapePendingStallLocked();
                 snapshots = new List<(byte, byte[])>(_sessionOrder.Count);
                 totalBytes = 0;
                 foreach (var s in _sessionOrder)
@@ -762,16 +1007,22 @@ namespace MozaPlugin.Telemetry.Frames
                 // Diagnostic: hex-dump first 128 bytes of this session's buffer.
                 // Tagged with session id so diag readers can see whether catalog
                 // bytes came from mgmt (0x01) or telemetry (FlagByte) and spot
-                // cross-session straddles if they ever happen.
-                int dumpLen = Math.Min(buffer.Length, 128);
-                var hex = new StringBuilder(dumpLen * 3);
-                for (int d = 0; d < dumpLen; d++)
+                // cross-session straddles if they ever happen. Behind the wire
+                // gate: TryParse runs every 30 ms tick while a catalog burst grows
+                // the buffer, and an unconditional 384-char line per pass evicted
+                // the diagnostic ring.
+                if (MozaLog.WireDebugEnabled)
                 {
-                    if (d > 0) hex.Append('-');
-                    hex.Append(buffer[d].ToString("X2"));
+                    int dumpLen = Math.Min(buffer.Length, 128);
+                    var hex = new StringBuilder(dumpLen * 3);
+                    for (int d = 0; d < dumpLen; d++)
+                    {
+                        if (d > 0) hex.Append('-');
+                        hex.Append(buffer[d].ToString("X2"));
+                    }
+                    MozaLog.Debug(
+                        $"[AZOM] Catalog buffer dump sess=0x{session:X2} ({buffer.Length} bytes): {hex}");
                 }
-                MozaLog.Debug(
-                    $"[AZOM] Catalog buffer dump sess=0x{session:X2} ({buffer.Length} bytes): {hex}");
 
                 // Scan-forward for `04`-tag URL records. Each record encodes its
                 // canonical wheel-firmware idx in the byte at offset i+5 (1-based).
@@ -1246,10 +1497,12 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 // Per-session breakdown — one line per session that contributed URL
                 // records. Lets diag readers spot which session lost which records.
+                // Repeat-suppressed: TryParse re-runs every tick during a burst and
+                // the counters only move when a record lands.
                 foreach (var s in perSessionStats)
                 {
                     int newOnSess = s.distinctIdxAfter - s.distinctIdxBefore;
-                    MozaLog.Debug(
+                    MozaLog.DebugIfChanged("catalog-parse-" + s.session,
                         $"[AZOM] Catalog parse sess=0x{s.session:X2}: " +
                         $"full={s.full} prefix={s.prefix} abbr={s.abbr} " +
                         $"backref={s.backref} backrefFail={s.backrefFail} " +
@@ -1258,21 +1511,30 @@ namespace MozaPlugin.Telemetry.Frames
                 }
                 // Aggregate summary line, preserves the pre-split format for
                 // anyone grepping for "Catalog parse stats: full=...".
-                MozaLog.Debug(
+                MozaLog.DebugIfChanged("catalog-parse-stats",
                     $"[AZOM] Catalog parse stats: full={totalFull} prefix={totalPrefix} " +
                     $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
                     $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +
                     $"distinct-idx={parsed.Count}");
             }
 
-            // Stale-garbage cleanup. Sessions that produced zero valid records
-            // (full+prefix+abbr+backref == 0) AND haven't been appended to in
-            // StaleGarbageThresholdMs are holding non-catalog noise — drop them
-            // so the parser doesn't keep emitting the same backrefFail/sizeReject
-            // counters on every pass, and so subsequent legitimate catalog
-            // chunks start from a clean buffer. Sessions that previously
-            // contributed valid records have those records preserved in
-            // _catalog, so clearing the buffer loses nothing recoverable.
+            // Stale-garbage cleanup. Sessions that have produced zero valid
+            // records (full+prefix+abbr+backref == 0) for StaleGarbageThresholdMs
+            // are holding non-catalog noise — drop them so the parser doesn't
+            // keep emitting the same backrefFail/sizeReject counters on every
+            // pass, and so subsequent legitimate catalog chunks start from a
+            // clean buffer. Sessions that previously contributed valid records
+            // have those records preserved in _catalog, so clearing the buffer
+            // loses nothing recoverable.
+            //
+            // The clock is PROGRESS (_lastProgressTickMs), not arrival. An
+            // arrival-based test only catches a session that also goes quiet;
+            // a wheel that keeps pushing non-catalog bytes on a catalog session
+            // — device-log FF records on sess=0x01, ~1 Hz — resets an
+            // arrival clock forever and the buffer grows unbounded until the
+            // destructive 64 kB ClearOverflowingSessions wipe. Progress-based
+            // subsumes the arrival case: a quiet no-record buffer makes no
+            // progress either.
             // The pre-scan-skipped sessions (no URL/END at all) are NOT in
             // perSessionStats, so iterate _sessionOrder directly and check
             // staleness for any buffer with no current-pass valid records.
@@ -1289,6 +1551,11 @@ namespace MozaPlugin.Telemetry.Frames
                 foreach (var kv in validRecordsBySession)
                     if (kv.Value) _sessionsWithValidUrls.Add(kv.Key);
 
+                // Refresh the progress clock for every session that yielded a
+                // record on this pass, BEFORE the drop scan below.
+                foreach (var kv in validRecordsBySession)
+                    if (kv.Value) _lastProgressTickMs[kv.Key] = nowTick;
+
                 for (int i = _sessionOrder.Count - 1; i >= 0; i--)
                 {
                     byte sess = _sessionOrder[i];
@@ -1298,19 +1565,27 @@ namespace MozaPlugin.Telemetry.Frames
                     // skipped (no URL/END found) — treat as "no valid records".
                     if (validRecordsBySession.TryGetValue(sess, out bool hadValid) && hadValid)
                         continue;
-                    if (!_lastAppendTickMs.TryGetValue(sess, out int lastAppend))
+                    if (!_lastProgressTickMs.TryGetValue(sess, out int lastProgress))
                         continue;
-                    int ageMs = nowTick - lastAppend;
+                    int ageMs = nowTick - lastProgress;
                     if (ageMs < StaleGarbageThresholdMs)
                         continue;
+                    int idleMs = _lastAppendTickMs.TryGetValue(sess, out int lastAppend)
+                        ? nowTick - lastAppend
+                        : -1;
                     int wiped = sBuf.Count;
                     _buffersBySession.Remove(sess);
                     _sessionOrder.RemoveAt(i);
-                    _highestSeqAppended.Remove(sess);
+                    _appendedSeqs.Remove(sess);
+                    _nextExpectedSeq.Remove(sess);
+                    _pendingChunks.Remove(sess);
+                    _headBlockedSinceTickMs.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
+                    _lastProgressTickMs.Remove(sess);
                     MozaLog.Debug(
                         $"[AZOM] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
-                        $"({wiped}B, no valid records, last append {ageMs / 1000}s ago) — " +
+                        $"({wiped}B, no valid records for {ageMs / 1000}s, last append " +
+                        $"{(idleMs < 0 ? "n/a" : idleMs / 1000 + "s")} ago) — " +
                         "wheel sent non-catalog bytes that the parser has been re-rejecting.");
                 }
             }

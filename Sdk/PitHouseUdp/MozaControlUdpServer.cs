@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -50,36 +51,8 @@ namespace MozaPlugin.Sdk.PitHouseUdp
         /// </summary>
         public const int ControlPort = 40288;
 
-        /// <summary>Maximum number of rows retained in <see cref="RecentRequests"/>.</summary>
-        public const int RecentRequestCapacity = 20;
-
-        /// <summary>One row of the rolling recent-requests buffer.</summary>
-        public readonly struct RecentRequest
-        {
-            public DateTime Time { get; }
-            /// <summary>PacketId from the request header, or -1 when CBOR parse failed.</summary>
-            public int PacketId { get; }
-            /// <summary>Handler name (e.g. "SteerLock write"), or "unknown" / "parse-fail" / "error".</summary>
-            public string Operation { get; }
-            /// <summary>Free-text detail (set by the handler) or short error description.</summary>
-            public string Detail { get; }
-            public int DurationMs { get; }
-
-            public RecentRequest(DateTime time, int packetId, string operation, string detail, int durationMs)
-            {
-                Time = time;
-                PacketId = packetId;
-                Operation = operation ?? string.Empty;
-                Detail = detail ?? string.Empty;
-                DurationMs = durationMs;
-            }
-        }
-
         private readonly Dictionary<int, IPitHousePacketHandler> _handlers
             = new Dictionary<int, IPitHousePacketHandler>();
-
-        private readonly object _recentGate = new object();
-        private readonly LinkedList<RecentRequest> _recent = new LinkedList<RecentRequest>();
 
         private readonly object _stateGate = new object();
         private UdpClient? _udp;
@@ -92,6 +65,9 @@ namespace MozaPlugin.Sdk.PitHouseUdp
         // Throttle "unknown PacketId" warnings so a misbehaving client
         // can't flood the log. Sample 1-in-N per distinct PacketId.
         private const int UnknownLogEvery = 60;
+        // Keyed by a wire-supplied id — bounded so a client spraying distinct
+        // PacketIds can't grow the table.
+        private const int MaxUnknownIds = 64;
         private readonly Dictionary<int, int> _unknownCounters = new Dictionary<int, int>();
 
         /// <summary>
@@ -139,33 +115,6 @@ namespace MozaPlugin.Sdk.PitHouseUdp
         {
             get { lock (_stateGate) return _boundPort; }
         }
-
-        /// <summary>
-        /// Rolling buffer of the most recent <see cref="RecentRequestCapacity"/>
-        /// requests, newest last. Returns a snapshot; subsequent mutation does
-        /// not affect the returned list.
-        /// </summary>
-        public IReadOnlyList<RecentRequest> RecentRequests
-        {
-            get
-            {
-                lock (_recentGate)
-                {
-                    var snapshot = new RecentRequest[_recent.Count];
-                    int i = 0;
-                    foreach (var r in _recent) snapshot[i++] = r;
-                    return snapshot;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Raised on the receive thread immediately after a row is appended to
-        /// <see cref="RecentRequests"/>. UI subscribers MUST marshal to the
-        /// dispatcher before touching WPF controls — the listener fires this
-        /// on its own thread.
-        /// </summary>
-        public event Action? RecentRequestAppended;
 
         /// <summary>
         /// Bind the UDP socket and spawn the receive thread. Idempotent.
@@ -372,14 +321,12 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             catch (Exception ex)
             {
                 MozaLog.Debug($"[PitHouseUdp] CBOR parse failed from {remote}: {ex.Message}");
-                AppendRecent(new RecentRequest(DateTime.Now, -1, "parse-fail", ex.Message, (int)sw.ElapsedMilliseconds));
                 return;
             }
 
             if (!_handlers.TryGetValue(packet.PacketId, out var handler))
             {
                 LogUnknownPacketId(packet.PacketId, remote);
-                AppendRecent(new RecentRequest(DateTime.Now, packet.PacketId, "unknown", $"no handler from {remote}", (int)sw.ElapsedMilliseconds));
                 return;
             }
 
@@ -387,32 +334,20 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             try
             {
                 handler.Handle(packet, ctx);
-                AppendRecent(new RecentRequest(DateTime.Now, packet.PacketId, handler.Name, ctx.Summary ?? string.Empty, (int)sw.ElapsedMilliseconds));
+                // Handled requests are low-rate (PitHouse control ops), so log
+                // every one — this is the only record now that the UI list is
+                // gone, and it rides the ring buffer into the bundle.
+                string summary = ctx.Summary ?? string.Empty;
+                MozaLog.Info(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "[PitHouseUdp] PacketId {0} {1}{2} ({3}ms)",
+                    packet.PacketId, handler.Name,
+                    summary.Length == 0 ? string.Empty : " " + summary,
+                    sw.ElapsedMilliseconds));
             }
             catch (Exception ex)
             {
                 MozaLog.Warn($"[PitHouseUdp] handler {handler.Name} threw: {ex.GetType().Name}: {ex.Message}");
-                AppendRecent(new RecentRequest(DateTime.Now, packet.PacketId, handler.Name, $"error: {ex.GetType().Name}: {ex.Message}", (int)sw.ElapsedMilliseconds));
-            }
-        }
-
-        private void AppendRecent(RecentRequest row)
-        {
-            lock (_recentGate)
-            {
-                _recent.AddLast(row);
-                while (_recent.Count > RecentRequestCapacity)
-                    _recent.RemoveFirst();
-            }
-
-            var handler = RecentRequestAppended;
-            if (handler != null)
-            {
-                try { handler(); }
-                catch (Exception ex)
-                {
-                    MozaLog.Debug($"[PitHouseUdp] RecentRequestAppended subscriber threw: {ex.GetType().Name}: {ex.Message}");
-                }
             }
         }
 
@@ -464,7 +399,11 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             int n;
             lock (_unknownCounters)
             {
-                if (!_unknownCounters.TryGetValue(packetId, out n)) n = 0;
+                if (!_unknownCounters.TryGetValue(packetId, out n))
+                {
+                    if (_unknownCounters.Count >= MaxUnknownIds) _unknownCounters.Clear();
+                    n = 0;
+                }
                 n++;
                 _unknownCounters[packetId] = n;
             }

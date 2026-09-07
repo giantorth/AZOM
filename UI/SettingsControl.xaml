@@ -1,9 +1,9 @@
-﻿<UserControl x:Class="MozaPlugin.SettingsControl"
+﻿<UserControl x:Class="MozaPlugin.UI.SettingsControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              xmlns:ctrl="clr-namespace:MozaControls"
-             xmlns:devices="clr-namespace:MozaPlugin.Devices"
+             xmlns:mbooster="clr-namespace:MozaPlugin.Devices.MBooster"
              xmlns:ui="clr-namespace:MozaPlugin.UI"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
              Padding="0"
@@ -357,27 +357,66 @@
                                     <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <ctrl:SteeringArc Grid.Column="0" x:Name="SteeringArcViz"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
-                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
-                                        <Button DockPanel.Dock="Left" x:Name="BaseCalibrateButton"
+                                <!-- Steering arc with Calibrate Center directly beneath it —
+                                     the button acts on what the arc is showing, so it sits
+                                     with it rather than in the right-hand column. -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <ctrl:SteeringArc x:Name="SteeringArcViz"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <!-- Negative top margin is deliberate: SteeringArc is a fixed
+                                         220x220 box whose arc ink bottoms out at y~176 (endpoints
+                                         at 175.03 + 3px stroke) with its readout vertically
+                                         centred, so the lower ~43px of the control is empty. The
+                                         template hardcodes that 220 internally, so shrinking the
+                                         control's Height would clip rather than trim — pulling the
+                                         row up is what actually closes the gap. -30 leaves ~10px
+                                         clear of the dot's lowest travel at full lock. -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                                Margin="0,-30,0,0">
+                                        <Button x:Name="BaseCalibrateButton"
                                                 Content="{x:Static res:Strings.Button_CalibrateCenter}"
                                                 Click="BaseCalibrateButton_Click"
                                                 VerticalAlignment="Center"/>
-                                        <TextBlock DockPanel.Dock="Left" x:Name="BaseCalibrateStatus"
+                                        <TextBlock x:Name="BaseCalibrateStatus"
                                                    Style="{StaticResource MutedHintText}"
                                                    VerticalAlignment="Center"
                                                    Margin="10,0,0,0"/>
-                                        <ctrl:SegmentedControl DockPanel.Dock="Right"
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="18,0,0,0">
+                                    <!-- One row, two selectors: Performance output takes the
+                                         slot the Calibrate button vacated (left), the graph
+                                         selector sits opposite it (right). Declaration order is
+                                         load-bearing in a DockPanel — for Dock="Left" the first
+                                         child is leftmost, for Dock="Right" the first child is
+                                         RIGHTmost, so each pair is declared in the order that
+                                         reads label-then-control on screen.
+                                         The graph selector swaps the bandwidth card for the
+                                         live-torque card. Display only — the plugin's torque
+                                         sampler runs at one rate either way, since the AZOM
+                                         torque properties read from it with this panel shut. -->
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   Text="{x:Static res:Strings.Label_PerformanceOutput}"
+                                                   Style="{StaticResource LabelText}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                        <ctrl:SegmentedControl DockPanel.Dock="Left"
                                                                x:Name="PerformanceOutputCombo"
                                                                SelectionChanged="PerformanceOutputCombo_Changed"
                                                                VerticalAlignment="Center">
                                             <ListBoxItem Content="{x:Static res:Strings.Option_Reserved}"/>
                                             <ListBoxItem Content="{x:Static res:Strings.Option_Full}"/>
                                         </ctrl:SegmentedControl>
+                                        <ctrl:SegmentedControl DockPanel.Dock="Right"
+                                                               x:Name="BaseGraphModeCombo"
+                                                               SelectionChanged="BaseGraphModeCombo_Changed"
+                                                               VerticalAlignment="Center">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_GraphBandwidth}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_GraphTorque}"/>
+                                        </ctrl:SegmentedControl>
                                         <TextBlock DockPanel.Dock="Right"
-                                                   Text="{x:Static res:Strings.Label_PerformanceOutput}"
+                                                   Text="{x:Static res:Strings.Label_BaseGraphMode}"
                                                    Style="{StaticResource LabelText}"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,10,0"/>
@@ -386,8 +425,9 @@
                                          Left  = MCU/MOSFET/Motor rolling temp graph (legend sorts hot→cool).
                                          Right = dual-line bandwidth sparkline (cyan=in, amber=out)
                                          relocated from the About tab so traffic + thermals are visible
-                                         on the same screen. Both halves are inner cards with their own
-                                         legend underneath. -->
+                                         on the same screen, OR the live-torque sparkline — whichever
+                                         BaseGraphModeCombo selects. Both halves are inner cards with
+                                         their own legend underneath. -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -438,7 +478,7 @@
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
-                                        <Border Grid.Column="1" Style="{StaticResource InnerCardBorder}"
+                                        <Border Grid.Column="1" x:Name="BandwidthCard" Style="{StaticResource InnerCardBorder}"
                                                 Padding="10,8" Margin="7,0,0,0">
                                             <StackPanel>
                                                 <!-- MaxValue = serial-port byte cap (115200 baud / 10 bits-per-byte). -->
@@ -484,6 +524,41 @@
                                                 <StackPanel Visibility="Collapsed">
                                                     <TextBlock x:Name="BandwidthInSessionText"/>
                                                     <TextBlock x:Name="BandwidthOutSessionText"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Live wheelbase torque (base status reg 0x07), 2-minute
+                                             window. Single series: the wire value is signed only to
+                                             say which way the base pulls, and torque is torque either
+                                             way, so the magnitude is what gets plotted (the signed
+                                             reading is AZOM.CurrentTorqueRaw). MaxValue is set from
+                                             code each tick — the base's rated Nm where
+                                             BaseModelInfo knows it, floored auto-scale where it
+                                             doesn't. -->
+                                        <Border Grid.Column="1" x:Name="TorqueCard" Style="{StaticResource InnerCardBorder}"
+                                                Padding="10,8" Margin="7,0,0,0" Visibility="Collapsed">
+                                            <StackPanel>
+                                                <ctrl:BandwidthSparkline x:Name="TorqueGraphViz" Height="80"
+                                                                         InBrush="{StaticResource AmberBrush}"
+                                                                         InFillBrush="{StaticResource BwOutFillBrush}"
+                                                                         ShowGridlines="True"/>
+                                                <StackPanel Margin="0,6,0,0">
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                        <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                                                                 Fill="{StaticResource AmberBrush}" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="{x:Static res:Strings.Label_Torque}" Style="{StaticResource KvKeyText}"/>
+                                                        <TextBlock x:Name="TorqueValueText" Text="--"
+                                                                   Style="{StaticResource KvValueText}"
+                                                                   Foreground="{StaticResource AmberBrush}"/>
+                                                        <TextBlock x:Name="TorquePeakText" Style="{StaticResource KvKeyText}"
+                                                                   Margin="8,0,0,0" Opacity="0.7"/>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <TextBlock Text="{x:Static res:Strings.Label_GraphScale}" Style="{StaticResource KvKeyText}"/>
+                                                        <TextBlock x:Name="TorqueScaleText"
+                                                                   Style="{StaticResource KvValueText}"
+                                                                   Foreground="{StaticResource TextFaintBrush}"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
@@ -1845,13 +1920,75 @@
                                     <!-- Left half: Pedal Feel -->
                                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                                         <TextBlock Text="{x:Static res:Strings.Section_PedalFeel}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
-                                        <ctrl:MozaCurveEditor x:Name="MBoosterInputCurveEditor" Height="220"/>
+
+                                        <!-- Deadzone, Max Force, and the Pedal Feel curve are ALL a
+                                             brake-named singleton hardware write (cmdId 0xAB selectors
+                                             0x07-0x0E) — same passive-pedal gating as Travel/End Stop,
+                                             since editing them from a passive pedal's page would
+                                             overwrite the active pedal's registers instead. Placed first
+                                             in this card so the curve (the primary control) is
+                                             immediately visible without scrolling. -->
+                                        <StackPanel x:Name="MBoosterDeadzoneMaxForcePanel">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <!-- MinWidth/MaxWidth/Margin overridden from the SliderLabel style's
+                                                 defaults (MinWidth=180) — that alone was forcing this Auto column
+                                                 far wider than the slider+textbox stack it holds, squeezing the
+                                                 curve editor in the middle column. Wraps onto 2 lines instead. -->
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"
+                                                       MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <!-- Live "position % · kg force" readout, updated at 30 Hz in
+                                                 UpdateMBoosterCurveMarkers alongside this tab's other live
+                                                 displays. kg is a computed estimate (raw position % scaled by
+                                                 this pedal's own Max Threshold, i.e. what force reads 100%
+                                                 travel), not a directly-read sensor value. -->
+                                            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MBoosterPedalFeelLiveLabel" Text="{x:Static res:Strings.Label_InputForce}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <TextBlock Grid.Row="0" Grid.Column="2" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"
+                                                       MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                            <!-- Vertical Deadzone slider, same Height as the curve editor so its
+                                                 0-40kg span lines up top-to-bottom with the curve's own 0-100%
+                                                 span (40kg at the top, matching the curve's top edge; 0kg at the
+                                                 bottom, matching the curve's bottom edge). -->
+                                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0" HorizontalAlignment="Center">
+                                                <Slider x:Name="MBoosterDeadzoneSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
+                                                        TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
+                                                <TextBox x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
+                                                         Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
+                                                         HorizontalAlignment="Center" Width="44" Padding="2,2" Margin="0,8,0,0"
+                                                         KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                         Text="0.0"/>
+                                            </StackPanel>
+                                            <ctrl:MozaCurveEditor Grid.Row="1" Grid.Column="1" x:Name="MBoosterInputCurveEditor" Height="220" NodeCount="6"
+                                                                  AllowHorizontalDrag="True" AnchorAtTopRight="True"
+                                                                  ClampYToAdjacentNodes="True"/>
+                                            <!-- Vertical Max Force slider, same Height/scaling logic as Deadzone
+                                                 above, mirrored to the curve editor's right (0kg bottom, 200kg
+                                                 top). -->
+                                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="6,0,0,0" HorizontalAlignment="Center">
+                                                <Slider x:Name="MBoosterMaxForceSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
+                                                        TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
+                                                <TextBox x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
+                                                         Tag="{Binding ElementName=MBoosterMaxForceSlider}"
+                                                         HorizontalAlignment="Center" Width="44" Padding="2,2" Margin="0,8,0,0"
+                                                         KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                         Text="200"/>
+                                            </StackPanel>
+                                        </Grid>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
                                             <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Linear"/>
                                             <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_SCurve"/>
                                             <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="MBoosterInputCurvePreset_Exponential"/>
                                             <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterInputCurvePreset_Parabolic"/>
                                         </StackPanel>
+                                        </StackPanel><!-- MBoosterDeadzoneMaxForcePanel -->
 
                                         <!-- Travel + End Stop are HARDWARE writes on brake-named singleton
                                              cmdIds (0x84/0x85/0xB2) with no per-pedal selector, so they only
@@ -1893,53 +2030,19 @@
                                                      Text="1"/>
                                         </Grid>
                                         </StackPanel><!-- MBoosterTravelEndstopPanel -->
-                                        <Grid Margin="0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"/>
-                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
-                                            <Slider Grid.Column="2" x:Name="MBoosterDeadzoneSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="40" TickFrequency="0.1" ValueChanged="MBoosterDeadzoneSlider_ValueChanged"/>
-                                            <TextBlock Grid.Column="3" Text="40" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
-                                            <TextBox Grid.Column="4" x:Name="MBoosterDeadzoneValue" Style="{StaticResource SliderValueEditBox}"
-                                                     Tag="{Binding ElementName=MBoosterDeadzoneSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="0.0"/>
-                                        </Grid>
-                                        <Grid Margin="0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"/>
-                                            <TextBlock Grid.Column="1" Text="0" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
-                                            <Slider Grid.Column="2" x:Name="MBoosterMaxForceSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
-                                            <!-- Maximum + this end label are both rewritten at seed time to the
-                                                 pedal's real full-scale force — see ApplyMBoosterMaxForceCeiling. -->
-                                            <TextBlock Grid.Column="3" x:Name="MBoosterMaxForceRangeEndLabel" Text="200" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
-                                            <TextBox Grid.Column="4" x:Name="MBoosterMaxForceValue" Style="{StaticResource SliderValueEditBox}"
-                                                     Tag="{Binding ElementName=MBoosterMaxForceSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="200"/>
-                                        </Grid>
                                         <!-- Natural Friction is another brake-named singleton hardware write
                                              (cmdId 0xAE) — same passive-pedal gating as Travel/End Stop. -->
                                         <Grid x:Name="MBoosterNaturalFrictionPanel" Margin="0,4" ToolTip="{x:Static res:Strings.Hint_NaturalFrictionPedalFeel}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_NaturalFriction}" Style="{StaticResource SliderLabel}"/>
-                                            <Slider Grid.Column="1" x:Name="MBoosterNaturalFrictionSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterNaturalFrictionSlider_ValueChanged"/>
-                                            <TextBox Grid.Column="2" x:Name="MBoosterNaturalFrictionValue" Style="{StaticResource SliderValueEditBox}"
+                                            <ctrl:OffOnToggle Grid.Column="0" x:Name="MBoosterNaturalFrictionEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Margin="0,0,12,0" Checked="MBoosterNaturalFrictionEnable_Changed" Unchecked="MBoosterNaturalFrictionEnable_Changed"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Static res:Strings.SliderLabel_NaturalFriction}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="2" x:Name="MBoosterNaturalFrictionSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterNaturalFrictionSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="3" x:Name="MBoosterNaturalFrictionValue" Style="{StaticResource SliderValueEditBox}"
                                                      Tag="{Binding ElementName=MBoosterNaturalFrictionSlider}"
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="0"/>
@@ -1956,6 +2059,20 @@
                                             <TextBox x:Name="MBoosterInputY4Value" Text="80"/>
                                             <Slider x:Name="MBoosterInputY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY5Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterInputY5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterInputY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputY6Value" Text="100"/>
+                                            <Slider x:Name="MBoosterInputX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX1Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputX1Value" Text="8"/>
+                                            <Slider x:Name="MBoosterInputX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX2Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputX2Value" Text="19"/>
+                                            <Slider x:Name="MBoosterInputX3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX3Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputX3Value" Text="44"/>
+                                            <Slider x:Name="MBoosterInputX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX4Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputX4Value" Text="72"/>
+                                            <Slider x:Name="MBoosterInputX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX5Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputX5Value" Text="90"/>
+                                            <Slider x:Name="MBoosterInputX6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterInputX6Value" Text="98"/>
                                         </StackPanel>
                                     </StackPanel>
 
@@ -1965,9 +2082,17 @@
                                     <!-- Right half: Sim Input Mapping -->
                                     <StackPanel Grid.Column="2" Margin="16,0,0,0">
                                         <TextBlock Text="{x:Static res:Strings.Section_SimInputMapping}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
-                                        <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220"
+                                        <!-- Invisible-but-space-reserving spacer, same style/wrap-width/margin as
+                                             the Pedal Feel Deadzone/Max Force labels on the left, so THIS curve
+                                             starts level with that one instead of sitting a row higher (the left
+                                             curve has that labels row above it; this one otherwise wouldn't). -->
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"
+                                                   MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"
+                                                   Visibility="Hidden"/>
+                                        <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220" NodeCount="6"
                                                               AccentBrush="{StaticResource CyanBrush}"
-                                                              AllowHorizontalDrag="True"/>
+                                                              AllowHorizontalDrag="True"
+                                                              EndpointsOnlyDraggableInX="True"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
                                             <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Linear"/>
                                             <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterCurvePreset_SCurve"/>
@@ -2029,6 +2154,8 @@
                                             <TextBox x:Name="MBoosterY4Value" Text="80"/>
                                             <Slider x:Name="MBoosterY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY5Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterY5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterY6Value" Text="100"/>
                                             <Slider x:Name="MBoosterX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX1Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterX1Value" Text="20"/>
                                             <Slider x:Name="MBoosterX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX2Slider_ValueChanged"/>
@@ -2039,6 +2166,8 @@
                                             <TextBox x:Name="MBoosterX4Value" Text="80"/>
                                             <Slider x:Name="MBoosterX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX5Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterX5Value" Text="100"/>
+                                            <Slider x:Name="MBoosterX6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX6Slider_ValueChanged"/>
+                                            <TextBox x:Name="MBoosterX6Value" Text="100"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
@@ -2051,23 +2180,24 @@
                                               Icon="{StaticResource IconDamper}"
                                               IsCollapsible="True">
                                 <StackPanel>
+                                    <ctrl:OffOnToggle x:Name="MBoosterSegDampEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Margin="0,0,0,12" Checked="MBoosterSegDampEnable_Changed" Unchecked="MBoosterSegDampEnable_Changed"/>
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
-                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
-                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
-                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
-                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
-                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  Divider1Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampPressedPlot_ValuesChanged"/>
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingReleased}" Style="{StaticResource SectionTitleText}" Margin="0,16,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampReleasedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
-                                                                  Divider1Min="{x:Static devices:MBoosterUiConstants.SegDampDivider1MinPct}"
-                                                                  Divider1Max="{x:Static devices:MBoosterUiConstants.SegDampDivider1MaxPct}"
-                                                                  Divider2Min="{x:Static devices:MBoosterUiConstants.SegDampDivider2MinPct}"
-                                                                  Divider2Max="{x:Static devices:MBoosterUiConstants.SegDampDivider2MaxPct}"
-                                                                  MinGap="{x:Static devices:MBoosterUiConstants.SegDampDividerMinGapPct}"
+                                                                  Divider1Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MinPct}"
+                                                                  Divider1Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider1MaxPct}"
+                                                                  Divider2Min="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MinPct}"
+                                                                  Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
+                                                                  MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampReleasedPlot_ValuesChanged"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
@@ -2086,7 +2216,7 @@
 
                             <StackPanel x:Name="MBoosterEffectsCardsPanel">
 
-                            <Expander Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterAbsExpander" Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterAbsEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterAbsEnable_Changed" Unchecked="MBoosterAbsEnable_Changed"/>
@@ -2269,7 +2399,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_Lockup}" IsExpanded="True" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterLockupExpander" Header="{x:Static res:Strings.Section_Lockup}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterLockupEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterLockupEnable_Changed" Unchecked="MBoosterLockupEnable_Changed"/>
@@ -2307,7 +2437,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_Threshold}" IsExpanded="True" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterThresholdExpander" Header="{x:Static res:Strings.Section_Threshold}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <ctrl:OffOnToggle x:Name="MBoosterThresholdEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterThresholdEnable_Changed" Unchecked="MBoosterThresholdEnable_Changed"/>
@@ -2371,6 +2501,70 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
+                            <Expander x:Name="MBoosterBitePointExpander" Header="{x:Static res:Strings.Section_BitePoint}" IsExpanded="True" Margin="0,0,0,10">
+                                <StackPanel Margin="8,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <ctrl:OffOnToggle x:Name="MBoosterBitePointEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Checked="MBoosterBitePointEnable_Changed" Unchecked="MBoosterBitePointEnable_Changed"/>
+                                        <ctrl:OffOnToggle x:Name="MBoosterBitePointTestToggle" Content="{x:Static res:Strings.Label_Test}" VerticalAlignment="Center" Margin="24,0,0,0" Checked="MBoosterBitePointTestToggle_Changed" Unchecked="MBoosterBitePointTestToggle_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TriggerLevel}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointTriggerLevel" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointTriggerLevel_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointTriggerLevelValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointTriggerLevel}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_FrequencyHz}" Style="{StaticResource SliderLabel}"/>
+                                        <TextBlock Grid.Column="1" Text="2" Style="{StaticResource SliderRangeEndLabel}" Margin="0,0,6,0"/>
+                                        <Slider Grid.Column="2" x:Name="MBoosterBitePointFrequencySlider" Style="{StaticResource SettingSlider}" Minimum="2" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointFrequencySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="3" Text="100" Style="{StaticResource SliderRangeEndLabel}" Margin="6,0,0,0"/>
+                                        <TextBox Grid.Column="4" x:Name="MBoosterBitePointFrequencyValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointFrequencySlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="40"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Smoothness}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointSmoothness" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointSmoothness_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointSmoothnessValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointSmoothness}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="100"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Intensity}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointIntensity" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterBitePointIntensity_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointIntensityValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointIntensity}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
                             <Expander Header="{x:Static res:Strings.Section_EngineContinuous}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -2424,9 +2618,22 @@
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="50"/>
                                     </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Gain}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterRoadTextureGain" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterRoadTextureGain_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterRoadTextureGainValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterRoadTextureGain}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="100"/>
+                                    </Grid>
                                 </StackPanel>
                             </Expander>
-                            <Expander Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False" Margin="0,0,0,10">
+                            <Expander x:Name="MBoosterBrakeFadeExpander" Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_BrakeFadeExperimental}"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -2727,11 +2934,17 @@
                                               Title="{x:Static res:Strings.Section_MechanicalLayout}" Icon="{StaticResource IconShift}">
                                 <ComboBox x:Name="Ab9ModeCombo" Margin="0,4" HorizontalAlignment="Stretch"
                                           SelectionChanged="Ab9ModeCombo_Changed">
+                                    <!-- Tag = the 0x1F/D3 layout byte. Ordered by that byte,
+                                         which interleaves the R+n layouts with the n+R ones. -->
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout5R1}" Tag="0"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout5R2}" Tag="1"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR5}"  Tag="2"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR6}"  Tag="3"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout6R1}" Tag="4"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout6R2}" Tag="5"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R1}" Tag="6"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9Layout7R2}" Tag="7"/>
+                                    <ComboBoxItem Content="{x:Static res:Strings.Option_Ab9LayoutR8}"  Tag="8"/>
                                     <ComboBoxItem Content="{x:Static res:Strings.Option_Sequential}"   Tag="9"/>
                                 </ComboBox>
                             </ctrl:SectionCard>
@@ -2889,6 +3102,64 @@
                         </StackPanel>
 
                         </Grid>
+
+                        <!-- The AB9's main answers the wheelbase's read-only status group
+                             0x2B on its own dev 0x12. Only the registers that carry data
+                             are shown: the base's mosfet / motor / torque registers reply
+                             a constant zero here and group 0x1E answers nothing for them,
+                             so neither is asked. Header is a register identifier, not
+                             prose. docs/protocol/devices/ab9-shifter.md -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Ab9StatusProbe}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button x:Name="Ab9StatusProbeButton" Margin="0,0,14,0"
+                                            Content="{x:Static res:Strings.Button_ReadFromDevice}"
+                                            Click="Ab9StatusProbeButton_Click"/>
+                                    <TextBlock Text="{x:Static res:Strings.Label_Ab9PollLive}"
+                                               Style="{StaticResource LabelText}" Margin="0,0,8,0"/>
+                                    <ctrl:OffOnToggle x:Name="Ab9StatusPollCheck" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="grp 0x2B  dev 0x12"
+                                               Style="{StaticResource SliderRangeEndLabel}" Margin="9,0,0,4"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_State}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="Ab9State2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Label_StateError}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="Ab9StateErr2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,12,0"
+                                               Text="{x:Static res:Strings.Brand_Mcu}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="Ab9Mcu2bValue"
+                                               Style="{StaticResource ValueText}" TextAlignment="Left" Text="—"/>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <TextBlock Text="{x:Static res:Strings.Label_Ab9LayoutReadback}"
+                                               Style="{StaticResource LabelText}" Margin="0,0,12,0"/>
+                                    <TextBlock x:Name="Ab9ModeReadbackValue" Style="{StaticResource ValueText}"
+                                               TextAlignment="Left" Text="—"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -3251,105 +3522,7 @@
             <TabItem x:Name="ImportTab" Header="{x:Static res:Strings.TabHeader_Import}"/>
 
 
-            <TabItem x:Name="SdkTab" Header="{x:Static res:Strings.TabHeader_Sdk}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
-                    <StackPanel>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_CoapServer}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_CoapServer}"
-                                          Icon="{StaticResource IconBolt}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
-                                           Text="{x:Static res:Strings.Hint_CoapServerEnabled}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableCoapServer}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
-                                              Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <TextBlock Text="{x:Static res:Strings.Label_PortNumber}" Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock x:Name="SdkCoapPortText"
-                                               Text="40266"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Foreground="{StaticResource TextDimBrush}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,12,0,0"
-                                           Text="{x:Static res:Strings.Hint_CoapStubProcessName}"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_UdpControl}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_UdpControl}"
-                                          Icon="{StaticResource IconBolt}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,10"
-                                           Text="{x:Static res:Strings.Hint_UdpControlEnabled}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
-                                              Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <TextBlock Text="{x:Static res:Strings.Label_PortNumber}" Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock x:Name="UdpControlPortText"
-                                               Text="40288"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Foreground="{StaticResource TextDimBrush}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Status}" Icon="{StaticResource IconDiag}">
-                            <StackPanel>
-                                <TextBlock x:Name="SdkServerStatusText"
-                                           Text="{x:Static res:Strings.Option_Disabled}"
-                                           FontFamily="{StaticResource FontMono}"
-                                           Foreground="{StaticResource TextDimBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,4,0,8"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <Button x:Name="SdkRefreshStatusButton" Content="{x:Static res:Strings.Button_Refresh}"
-                                            Click="SdkRefreshStatusButton_Click" MinWidth="100"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_RecentRequests}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_RecentRequests}"
-                                          Icon="{StaticResource IconDiag}">
-                            <StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Label_CoapServer}"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,0,0,4"/>
-                                <ListBox x:Name="SdkRecentRequestsList"
-                                         FontFamily="{StaticResource FontMono}" FontSize="11"
-                                         Background="{StaticResource BgDeepBrush}"
-                                         Foreground="{StaticResource TextDimBrush}"
-                                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                         Height="180"
-                                         HorizontalContentAlignment="Stretch"/>
-                                <TextBlock Text="{x:Static res:Strings.Label_UdpControlServer}"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,12,0,4"/>
-                                <ListBox x:Name="ControlUdpRecentRequestsList"
-                                         FontFamily="{StaticResource FontMono}" FontSize="11"
-                                         Background="{StaticResource BgDeepBrush}"
-                                         Foreground="{StaticResource TextDimBrush}"
-                                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                         Height="120"
-                                         HorizontalContentAlignment="Stretch"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem Header="{x:Static res:Strings.TabHeader_Options}">
+            <TabItem x:Name="OptionsTab" Header="{x:Static res:Strings.TabHeader_Options}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
 
@@ -3360,11 +3533,48 @@
                             </Grid.ColumnDefinitions>
 
                             <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
-                                              Title="{x:Static res:Strings.Section_Profiles}" Icon="{StaticResource IconBolt}">
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
-                                              Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
+                                              Title="{x:Static res:Strings.Section_Settings}" Icon="{StaticResource IconBolt}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
+                                                  Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="WheelbaseLfeSourceRow" Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_WheelbaseLfeSource}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:SegmentedControl x:Name="WheelbaseLfeSourceCombo" VerticalAlignment="Center"
+                                                               SelectionChanged="WheelbaseLfeSource_Changed">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_WheelbaseLfeSourcePlugin}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_WheelbaseLfeSourceShakeIt}"/>
+                                        </ctrl:SegmentedControl>
+                                        <TextBlock x:Name="WheelbaseLfeSourceStatusText" Text=""
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                                         Persistent base-side state, read back from the device
+                                         rather than stored in settings — so the toggle shows what
+                                         the base actually holds, including a value PitHouse set. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
+                                    </StackPanel>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="45 s"/>
+                                    </Grid>
+                                    <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
+                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
 
@@ -3381,229 +3591,6 @@
                                 </StackPanel>
                             </ctrl:SectionCard>
                         </Grid>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BugReport}"
-                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
-                            <StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Label_BugReportDescription}"
-                                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
-                                <TextBox x:Name="BugReportDescriptionBox" Style="{StaticResource LfeNameBox}"
-                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="2000"
-                                         MinHeight="80" MaxHeight="160"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"
-                                         ToolTip="{x:Static res:Strings.Placeholder_BugReportDescription}"/>
-                                <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
-                                           Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
-                                <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
-                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
-                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                    <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
-                                            Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>
-                                    <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
-                                            Click="SerialCaptureExport_Click" Margin="8,0,0,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
-                                    <Button x:Name="CopyBugReportRefButton" Content="{x:Static res:Strings.Button_CopyReference}"
-                                            Click="CopyBugReportRef_Click" Margin="8,0,0,0"
-                                            Visibility="Collapsed"/>
-                                </StackPanel>
-                                <!-- Read-only TextBox rather than a TextBlock: the
-                                     result line carries the ticket reference (and
-                                     the export path a file path), which the user
-                                     has to be able to select and copy. Own row so
-                                     a long message wraps instead of clipping. -->
-                                <TextBox x:Name="BugReportStatusText"
-                                         Visibility="Collapsed" Margin="0,10,0,0"
-                                         IsReadOnly="True" IsReadOnlyCaretVisible="False"
-                                         Background="Transparent" BorderThickness="0" Padding="0"
-                                         Foreground="{StaticResource TextFaintBrush}"
-                                         FontFamily="{StaticResource FontUi}" FontSize="13"
-                                         TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_WheelLedOutput}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_WheelLedOutput}"
-                                          Icon="{StaticResource IconLed}">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,0,0,8"
-                                           Text="{x:Static res:Strings.Hint_LedOptionsRecommendedOff}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_LimitWheelUpdates}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="LimitWheelUpdatesCheck" VerticalAlignment="Center"
-                                              Checked="LimitWheelUpdatesCheck_Changed" Unchecked="LimitWheelUpdatesCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_OnlySendLedWhenChanged}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_AlwaysResendBitmask}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="AlwaysResendBitmaskCheck" VerticalAlignment="Center"
-                                              Checked="AlwaysResendBitmaskCheck_Changed" Unchecked="AlwaysResendBitmaskCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_AlwaysResendBitmask}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <Grid Margin="0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
-                                    <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
-                                    <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
-                                             Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
-                                             KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                             Text="45 s"/>
-                                </Grid>
-                                <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_UsbDetection}" Icon="{StaticResource IconRefresh}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisableSerialProbe}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="DisableSerialProbeFallbackCheck" VerticalAlignment="Center"
-                                              Checked="DisableSerialProbeFallbackCheck_Changed" Unchecked="DisableSerialProbeFallbackCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_DisableSerialProbe}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_DisableAb9Detection}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="DisableAb9DetectionCheck" VerticalAlignment="Center"
-                                              Checked="DisableAb9DetectionCheck_Changed" Unchecked="DisableAb9DetectionCheck_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_DisableAb9Detection}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_DashboardTelemetry}" Icon="{StaticResource IconDiag}">
-                            <StackPanel>
-                                <!-- Hidden: dashboard upload/download UI collapsed while the feature is
-                                     in development. Runtime values are forced off in MozaPlugin; the
-                                     upload/download scaffolding is intentionally preserved. -->
-                                <StackPanel Visibility="Collapsed">
-                                    <ctrl:OffOnToggle x:Name="UploadDashboardCheck" Content="{x:Static res:Strings.Label_UploadDashboardOnConnect}"
-                                              Margin="0,8,0,4" Checked="UploadDashboard_Changed" Unchecked="UploadDashboard_Changed"/>
-                                    <ctrl:OffOnToggle x:Name="DownloadDashboardCheck" Content="{x:Static res:Strings.Label_DownloadDashboardsFromWheel}"
-                                              Margin="0,8,0,4" Checked="DownloadDashboard_Changed" Unchecked="DownloadDashboard_Changed"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <TextBlock Text="{x:Static res:Strings.Label_WheelFirmwareEra}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <ComboBox x:Name="FirmwareEraCombo" Width="500"
-                                              SelectionChanged="FirmwareEra_Changed">
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEraAuto}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2024}"/>
-                                        <ComboBoxItem Content="{x:Static res:Strings.Option_FirmwareEra2026}"/>
-                                    </ComboBox>
-                                </StackPanel>
-                                <TextBlock TextWrapping="Wrap" Style="{StaticResource MutedHintText}" Margin="0,4,0,0"
-                                           Text="{x:Static res:Strings.Hint_FirmwareEra}"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_DeviceDefinitions}" Icon="{StaticResource IconRefresh}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <Button x:Name="RedeployDefinitionsButton" Content="{x:Static res:Strings.Button_RedeployDefinitions}"
-                                            Click="RedeployDefinitionsButton_Click" MinWidth="120"/>
-                                    <TextBlock x:Name="RedeployDefinitionsStatusText" Text=""
-                                               Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
-                                              Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <Button x:Name="ClearAllSettingsButton" Content="{x:Static res:Strings.Button_ClearAllSettings}"
-                                            Style="{StaticResource MozaButtonDanger}"
-                                            Click="ClearAllSettingsButton_Click"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_ClearAllSettingsWarning}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
-
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem x:Name="AboutTab" Header="{x:Static res:Strings.TabHeader_About}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
-                    <StackPanel>
-
-                        <!-- ============ About / Project links ============ -->
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_About}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_About}"
-                                          Icon="{StaticResource IconShield}">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{x:Static res:Strings.Label_AzomTitle}"
-                                                   FontFamily="{StaticResource FontUi}"
-                                                   FontSize="22" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextBrush}"/>
-                                        <TextBlock x:Name="AboutVersionText"
-                                                   Text="{x:Static res:Strings.Label_VersionPlaceholder}"
-                                                   FontFamily="{StaticResource FontMono}"
-                                                   FontSize="13"
-                                                   Foreground="{StaticResource CyanBrush}"
-                                                   Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <TextBlock TextWrapping="Wrap"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,0,0,16"
-                                           Text="{x:Static res:Strings.Hint_AboutDescription}"/>
-                                <TextBlock TextWrapping="Wrap"
-                                           Style="{StaticResource MutedHintText}"
-                                           FontStyle="Italic"
-                                           Foreground="{StaticResource TextDimBrush}"
-                                           Margin="0,0,0,16"
-                                           Text="{x:Static res:Strings.Hint_ThanksToTesters}"/>
-                                <TextBlock TextWrapping="Wrap"
-                                           Style="{StaticResource MutedHintText}"
-                                           Margin="0,0,0,12"
-                                           Text="{x:Static res:Strings.Hint_SponsorshipsAppreciated}"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <Button Content="{x:Static res:Strings.Button_Github}"
-                                            Click="AboutGitHubButton_Click"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_Github}"/>
-                                    <Button Content="{x:Static res:Strings.Button_JoinDiscord}"
-                                            Click="AboutDiscordButton_Click"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_JoinDiscord}"/>
-                                    <Button Content="{x:Static res:Strings.Button_SponsorDevelopment}"
-                                            Click="AboutSponsorButton_Click"
-                                            Foreground="{StaticResource GreenBrush}"
-                                            BorderBrush="#6639FF88"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_Sponsor}"/>
-                                    <Button Content="{x:Static res:Strings.Button_Kofi}"
-                                            Click="AboutKofiButton_Click"
-                                            Foreground="{StaticResource RedBrush}"
-                                            BorderBrush="#6639FF88"
-                                            Margin="0,0,8,0"
-                                            ToolTip="{x:Static res:Strings.Tooltip_Kofi}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </ctrl:SectionCard>
 
                         <!-- ============ Updates ============
                              Owned by the SettingsControl.UpdateBanner.cs partial.
@@ -3714,10 +3701,193 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
+                        <!-- Hidden: dashboard upload/download UI collapsed while the feature is
+                             in development. Runtime values are forced off in MozaPlugin; the
+                             upload/download scaffolding is intentionally preserved. It kept its
+                             own panel when the enclosing Dashboard-telemetry card (which only
+                             ever showed the retired firmware-era override) was removed. -->
+                        <StackPanel Visibility="Collapsed">
+                            <ctrl:OffOnToggle x:Name="UploadDashboardCheck" Content="{x:Static res:Strings.Label_UploadDashboardOnConnect}"
+                                      Margin="0,8,0,4" Checked="UploadDashboard_Changed" Unchecked="UploadDashboard_Changed"/>
+                            <ctrl:OffOnToggle x:Name="DownloadDashboardCheck" Content="{x:Static res:Strings.Label_DownloadDashboardsFromWheel}"
+                                      Margin="0,8,0,4" Checked="DownloadDashboard_Changed" Unchecked="DownloadDashboard_Changed"/>
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
+                                              Title="{x:Static res:Strings.Section_Sdk}" Icon="{StaticResource IconBolt}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableCoapServer}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
+                                                  Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="SdkCoapStatusText" Text=""
+                                               Style="{StaticResource MutedHintText}"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
+                                                  Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="SdkUdpStatusText" Text=""
+                                               Style="{StaticResource MutedHintText}"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+
+                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
+                                              Title="{x:Static res:Strings.Section_DeviceDefinitions}" Icon="{StaticResource IconRefresh}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <Button x:Name="RedeployDefinitionsButton" Content="{x:Static res:Strings.Button_RedeployDefinitions}"
+                                                Click="RedeployDefinitionsButton_Click" MinWidth="120"/>
+                                        <TextBlock x:Name="RedeployDefinitionsStatusText" Text=""
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
+                                                  Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+                        </Grid>
+
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <Button x:Name="ClearAllSettingsButton" Content="{x:Static res:Strings.Button_ClearAllSettings}"
+                                            Style="{StaticResource MozaButtonDanger}"
+                                            Click="ClearAllSettingsButton_Click"/>
+                                </StackPanel>
+                                <TextBlock Text="{x:Static res:Strings.Hint_ClearAllSettingsWarning}"
+                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem x:Name="HelpTab" Header="{x:Static res:Strings.TabHeader_Help}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
+                    <StackPanel>
+
+                        <!-- ============ About / Project links ============ -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_About}"
+                                          Subtitle="{x:Static res:Strings.Subtitle_About}"
+                                          Icon="{StaticResource IconShield}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{x:Static res:Strings.Label_AzomTitle}"
+                                                   FontFamily="{StaticResource FontUi}"
+                                                   FontSize="22" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock x:Name="AboutVersionText"
+                                                   Text="{x:Static res:Strings.Label_VersionPlaceholder}"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   FontSize="13"
+                                                   Foreground="{StaticResource CyanBrush}"
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock TextWrapping="Wrap"
+                                           Style="{StaticResource MutedHintText}"
+                                           Margin="0,0,0,16"
+                                           Text="{x:Static res:Strings.Hint_AboutDescription}"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           Style="{StaticResource MutedHintText}"
+                                           FontStyle="Italic"
+                                           Foreground="{StaticResource TextDimBrush}"
+                                           Margin="0,0,0,16"
+                                           Text="{x:Static res:Strings.Hint_ThanksToTesters}"/>
+                                <TextBlock TextWrapping="Wrap"
+                                           Style="{StaticResource MutedHintText}"
+                                           Margin="0,0,0,12"
+                                           Text="{x:Static res:Strings.Hint_SponsorshipsAppreciated}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="{x:Static res:Strings.Button_Github}"
+                                            Click="AboutGitHubButton_Click"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_Github}"/>
+                                    <Button Content="{x:Static res:Strings.Button_JoinDiscord}"
+                                            Click="AboutDiscordButton_Click"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_JoinDiscord}"/>
+                                    <Button Content="{x:Static res:Strings.Button_SponsorDevelopment}"
+                                            Click="AboutSponsorButton_Click"
+                                            Foreground="{StaticResource GreenBrush}"
+                                            BorderBrush="#6639FF88"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_Sponsor}"/>
+                                    <Button Content="{x:Static res:Strings.Button_Kofi}"
+                                            Click="AboutKofiButton_Click"
+                                            Foreground="{StaticResource RedBrush}"
+                                            BorderBrush="#6639FF88"
+                                            Margin="0,0,8,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_Kofi}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
                         <!-- Bandwidth visualization was moved to the Base tab's live header
                              (next to the temperature graph) as a single dual-line sparkline. -->
 
-                        <!-- Serial Traffic Capture + Report a problem moved to the Options tab. -->
+                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BugReport}"
+                                          Icon="{StaticResource IconDiag}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportDescription}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="BugReportDescriptionBox" Style="{StaticResource LfeNameBox}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MaxLength="2000"
+                                         MinHeight="80" MaxHeight="160"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto"
+                                         ToolTip="{x:Static res:Strings.Placeholder_BugReportDescription}"/>
+                                <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
+                                           Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
+                                <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
+                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
+                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
+                                            Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>
+                                    <Button x:Name="SerialCaptureExportButton" Content="{x:Static res:Strings.Button_ExportBundle}"
+                                            Click="SerialCaptureExport_Click" Margin="8,0,0,0"
+                                            ToolTip="{x:Static res:Strings.Tooltip_ExportBundle}"/>
+                                    <Button x:Name="CopyBugReportRefButton" Content="{x:Static res:Strings.Button_CopyReference}"
+                                            Click="CopyBugReportRef_Click" Margin="8,0,0,0"
+                                            Visibility="Collapsed"/>
+                                </StackPanel>
+                                <!-- Read-only TextBox rather than a TextBlock: the
+                                     result line carries the ticket reference (and
+                                     the export path a file path), which the user
+                                     has to be able to select and copy. Own row so
+                                     a long message wraps instead of clipping. -->
+                                <TextBox x:Name="BugReportStatusText"
+                                         Visibility="Collapsed" Margin="0,10,0,0"
+                                         IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                                         Background="Transparent" BorderThickness="0" Padding="0"
+                                         Foreground="{StaticResource TextFaintBrush}"
+                                         FontFamily="{StaticResource FontUi}" FontSize="13"
+                                         TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </ctrl:SectionCard>
 
                         <!-- ============ Full Diagnostic Report (expandable) ============ -->
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_FullDiagReport}"

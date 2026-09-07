@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry;
+using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Devices
 {
@@ -15,7 +16,7 @@ namespace MozaPlugin.Devices
 
         internal static readonly string[] BaseSettingsReadCommands = new[]
         {
-            "base-limit", "base-ffb-strength", "main-get-interpolation", "base-torque", "base-speed",
+            "base-limit", "base-max-angle", "base-ffb-strength", "main-get-interpolation", "base-torque", "base-speed",
             "base-damper", "base-friction", "base-inertia", "base-spring",
             "base-protection", "base-natural-inertia",
             "base-speed-damping", "base-speed-damping-point",
@@ -54,7 +55,8 @@ namespace MozaPlugin.Devices
             "wheel-telemetry-mode",
             // Input modes — paddles/clutch/stick exist on every new-protocol wheel.
             // Knob input modes (wheel-knob-mode, wheel-knob-signal-modeN) are
-            // gated below on WheelModelInfo.KnobCount.
+            // deferred to BuildNewWheelLedReadCommands: they go only to models we
+            // have positively identified, so the param-fragile rims never see them.
             //
             // Sleep-light reads (wheel-idle-mode/timeout/speed/color) are
             // deliberately NOT here. This list is issued at first wheel-detect,
@@ -154,9 +156,31 @@ namespace MozaPlugin.Devices
                 cmds.Add("wheel-knob-led-mode");
                 if (info.HasSleepLight)
                     cmds.Add("wheel-knob-idle-effect");
-                // Knob input config (encoder signal mode per knob).
+            }
+
+            // Knob INPUT config (encoder signal mode: BUTTON vs KNOB). Deliberately not
+            // gated on KnobCount: that is the knob-LED capability, and most rims have
+            // rotary encoders with no configurable knob LEDs (KnobCount == 0) — gating
+            // these on it hid the signal-mode selector on every one of them. Issued for
+            // any POSITIVELY IDENTIFIED model; the two early returns above already keep
+            // the param-fragile rims out (FSR V1 reads nothing, and so does the bare
+            // "CS" shape), and an unidentified model stays out for the same reason the
+            // extended LED-group probes below do.
+            //
+            // A catalogued WheelModelInfo.KnobEncoderCount is authoritative and bounds
+            // the sweep exactly — matching PitHouse, which reads 2a [N] only up to the
+            // rim's real count (N=0..3 on a 4-encoder wheel; see
+            // docs/protocol/findings/2026-04-28-wheel-catalog-read.md). An uncatalogued
+            // model sweeps all five and lets the answers drive the UI. That discovery
+            // over-reports — firmware answers every index whether or not the encoder
+            // exists (KS: five answers, three knobs) — so it is a stopgap that keeps the
+            // selector reachable on an unmeasured rim, not a substitute for the count.
+            // A catalogued 0 means "confirmed no configurable encoders" and skips both.
+            if (!ReferenceEquals(info, WheelModelInfo.Default) && info.KnobEncoderCount != 0)
+            {
                 cmds.Add("wheel-knob-mode");
-                for (int i = 0; i < info.KnobCount && i < 5; i++)
+                int sweep = info.KnobEncoderCount > 0 ? System.Math.Min(info.KnobEncoderCount, 5) : 5;
+                for (int i = 0; i < sweep; i++)
                     cmds.Add($"wheel-knob-signal-mode{i}");
             }
 
@@ -209,7 +233,33 @@ namespace MozaPlugin.Devices
             "base-ambient-sleep-timeout",
             "base-ambient-startup-color",
             "base-ambient-shutdown-color",
+            "base-ambient-sleep-breath-interval",
+            "base-ambient-standby-interval-mode2",
+            "base-ambient-standby-interval-mode3",
+            "base-ambient-standby-interval-mode4",
+            "base-ambient-standby-interval-mode5",
         };
+
+        /// <summary>
+        /// Per-LED palette reads for a base with <paramref name="ledsPerStrip"/> LEDs
+        /// per strip: both idle palettes (standby modes 1 and 2) plus the sleep
+        /// palette, across both strips. 6 reads per LED, so 36 on a 6-LED base and
+        /// 54 on a 9-LED one. Modes 3–5 have no palette and are not read.
+        /// </summary>
+        internal static string[] BaseAmbientPerLedReadCommands(int ledsPerStrip)
+        {
+            var list = new List<string>(ledsPerStrip * 6);
+            for (int strip = 0; strip < 2; strip++)
+            {
+                for (int mode = 1; mode <= 2; mode++)
+                    for (int led = 0; led < ledsPerStrip; led++)
+                        list.Add($"base-ambient-led-color-strip{strip}-mode{mode}-led{led}");
+
+                for (int led = 0; led < ledsPerStrip; led++)
+                    list.Add($"base-ambient-sleep-led-color-strip{strip}-led{led}");
+            }
+            return list.ToArray();
+        }
 
         internal static readonly string[] HandbrakeSettingsReadCommands = new[]
         {
@@ -275,6 +325,22 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Lock the responding wheel id on BOTH the device manager (per-instance)
+        /// and the detection bag (survives a persistent-wire plugin reload). The
+        /// manager's default is 0x17, so a wheel that answers elsewhere — ES on the
+        /// base bus 0x13, or 0x15 — loses every "wheel"-class read/write on the next
+        /// Init unless the reload can restore the id it locked here.
+        /// <see cref="_drivesTelemetry"/> keeps the hub / base-aux probers from
+        /// publishing an id for a pipe that isn't the wheel's.
+        /// </summary>
+        private void LockWheelId(byte deviceId)
+        {
+            _deviceManager.LockWheelId(deviceId);
+            if (_drivesTelemetry)
+                _detectionState.LastKnownWheelDeviceId = deviceId;
+        }
+
+        /// <summary>
         /// Log a device identity/capability echo, suppressing verbatim repeats.
         /// These values are constants of the attached hardware — they only change
         /// on a hot-swap — but the read commands are re-issued on every detection
@@ -312,7 +378,7 @@ namespace MozaPlugin.Devices
 
             if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                 _plugin.DeviceDefinitionDeployed = true;
-            _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             MozaLog.Info(bridgedDash
                 ? "[AZOM] Dashboard detected (bridged dash at 0x14 — provisionally deployed the CM2 profile, probing display identity)"
                 : "[AZOM] Dashboard detected");
@@ -334,13 +400,18 @@ namespace MozaPlugin.Devices
         /// reads don't spam the pending tracker.</summary>
         public void MarkHandbrakeDetected(bool issueReads = true)
         {
-            if (_detectionState.HandbrakeDetected) return;
+            if (_detectionState.HandbrakeDetected)
+            {
+                // Flag rode a persistent-wire reload; End() cleared the owner.
+                if (_detectionState.HandbrakeOwner == null) _detectionState.HandbrakeOwner = _deviceManager;
+                return;
+            }
             // Record the owning pipe BEFORE flipping the flag so HardwareApplier
             // (which reads flag-then-owner) never sees detected==true paired with
             // a null/stale owner. First responder across the base + hub pipes wins.
             _detectionState.HandbrakeOwner = _deviceManager;
             _detectionState.HandbrakeDetected = true;
-            _plugin.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyHandbrakeToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
                 _deviceManager.ReadSettings(HandbrakeSettingsReadCommands);
             MozaLog.Info("[AZOM] Handbrake detected");
@@ -350,13 +421,17 @@ namespace MozaPlugin.Devices
         /// See <see cref="MarkHandbrakeDetected"/> for <paramref name="issueReads"/>.</summary>
         public void MarkPedalsDetected(bool issueReads = true)
         {
-            if (_detectionState.PedalsDetected) return;
+            if (_detectionState.PedalsDetected)
+            {
+                if (_detectionState.PedalsOwner == null) _detectionState.PedalsOwner = _deviceManager;
+                return;
+            }
             // Owner first, then flag (see MarkHandbrakeDetected). The owning
             // MozaDeviceManager is this prober's — base pipe for the primary
             // prober, hub pipe for the dedicated hub prober.
             _detectionState.PedalsOwner = _deviceManager;
             _detectionState.PedalsDetected = true;
-            _plugin.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyPedalsToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads)
                 _deviceManager.ReadSettings(PedalsSettingsReadCommands);
             MozaLog.Info("[AZOM] Pedals detected");
@@ -380,58 +455,119 @@ namespace MozaPlugin.Devices
         // with false and issues its own per-model read list from the controller.
         public void MarkHgpDetected(bool issueReads = true)
         {
-            if (_detectionState.HgpDetected) return;
+            if (_detectionState.HgpDetected)
+            {
+                if (_detectionState.HgpOwner == null) _detectionState.HgpOwner = _deviceManager;
+                return;
+            }
             _detectionState.HgpOwner = _deviceManager;
             _detectionState.HgpDetected = true;
-            _plugin.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads) _deviceManager.ReadSettings(HgpSettingsReadCommands);
             MozaLog.Info("[AZOM] HGP shifter detected");
         }
 
         public void MarkSgpDetected(bool issueReads = true)
         {
-            if (_detectionState.SgpDetected) return;
+            if (_detectionState.SgpDetected)
+            {
+                if (_detectionState.SgpOwner == null) _detectionState.SgpOwner = _deviceManager;
+                return;
+            }
             _detectionState.SgpOwner = _deviceManager;
             _detectionState.SgpDetected = true;
-            _plugin.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
             MozaLog.Info("[AZOM] SGP shifter detected");
         }
 
         /// <summary>A base/hub-relayed shifter (single 0x1A bus, no PID) can't be told
-        /// apart at first sight, so probe the two model resolvers: the SGP answers a
-        /// brightness read; the HGP answers the generic device-type identity. Both are
-        /// positive signals — no timeout. No-op once THIS pipe's model is latched — a
-        /// shifter detected elsewhere (e.g. a standalone-USB HGP) says nothing about
-        /// what's behind this base/hub and must not suppress the probe.</summary>
+        /// apart at first sight, so probe the generic device-type identity — the ONE
+        /// signal measured to differ (see <see cref="HgpDeviceType"/>). The settings
+        /// block does NOT discriminate: an HGP behind an R5 answered every group 0x51
+        /// read including brightness and colors, and acked writes to both (bundle
+        /// 32ZD7KHW) — see docs/protocol/devices/shifter-0x1A.md § Telling HGP from SGP.
+        /// The name/hw-version reads are exploratory and untracked; they cost two frames
+        /// and would retire the device-type magic value if 0x1A self-describes.
+        /// No-op once THIS pipe's model is latched — a shifter detected elsewhere (e.g.
+        /// a standalone-USB HGP) says nothing about what's behind this base/hub and must
+        /// not suppress the probe.</summary>
         public void ProbeRelayedShifter()
         {
             if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
-            _deviceManager.ReadSetting("shifter-brightness");
+            _relayShifterProbeRounds++;
             _deviceManager.ReadSetting("shifter-device-type");
+            // Exploratory, so only the first couple of rounds (one repeat in case the
+            // first pair is dropped) — repeating a probe nothing depends on would just
+            // add two frames per PollStatus tick.
+            if (_relayShifterProbeRounds <= 2)
+                _deviceManager.SendNameIdentityProbe(MozaProtocol.DeviceHPattern);
+            // Liveness read, NOT identification — see the shifter-brightness case in
+            // DetectDevices. It has to be a command whose reply doesn't re-enter this
+            // method (shifter-direction does, via its own case), and both models answer
+            // it, so it is the evidence the fallback below keys off.
+            _deviceManager.ReadSetting("shifter-brightness");
+            // Fallback for firmware that answers the settings block but not group 0x04:
+            // once the device-type read has gone unanswered across this many probe rounds
+            // (PollStatus re-fires the presence probe every tick while the model is
+            // Unknown), resolve by elimination off any settings answer. Without it such a
+            // shifter would show no tab at all — the pre-2026-07 behaviour was to always
+            // show one. Deliberately NOT the first-round default: group 0x04 at 0x1A is
+            // answered by both bases seen so far (R5 here, R12 per base-fw-version-b), so
+            // the normal path is the identity reply, not this. Attempted once: if the latch
+            // doesn't land (another pipe already owns the SGP), re-logging it every tick
+            // adds nothing, and the owner gate above lets this pipe resolve normally if
+            // that other shifter goes away.
+            if (!_relayShifterFallbackTried
+                && _relayShifterProbeRounds > RelayShifterDeviceTypeGraceRounds
+                && _relayShifterAnsweredSettingsRead)
+            {
+                _relayShifterFallbackTried = true;
+                MozaLog.Info("[AZOM] Relayed shifter answered settings reads but never the " +
+                    $"group 0x04 device-type after {_relayShifterProbeRounds} probe rounds — " +
+                    "resolving as SGP by elimination");
+                MarkSgpDetected();
+            }
         }
 
-        // The HGP's grp-0x04 device-type reply, awaiting one hardware measurement:
-        // read the "Shifter device-type reply = [...]" log line off a base/hub-relayed
-        // HGP and set this. null = relayed HGP stays unresolved (its tab hidden) rather
-        // than guess. The standalone lane (PID) and the relayed SGP (brightness) don't
-        // need it.
-        private static readonly byte[]? HgpDeviceType = null;
+        // The HGP's grp-0x04 device-type reply, measured 2026-08-21 on a base-relayed HGP
+        // (ES + R5, bundle 32ZD7KHW): `84 a1 01 02 08 01`. A relayed SGP's value has never
+        // been measured, so this is a positive HGP match only — see
+        // docs/protocol/open-questions.md § Relayed HGP/SGP discriminator. The standalone
+        // lane doesn't need it (PID 0x001E / 0x0023 settle the model).
+        private static readonly byte[] HgpDeviceType = { 0x01, 0x02, 0x08, 0x01 };
+
+        // How many ProbeRelayedShifter rounds to wait for a group-0x04 answer before
+        // falling back to elimination. Rounds are driven by the PollStatus presence probe
+        // (~5 s apart), so this is a handful of seconds, not a race with the first reply.
+        private const int RelayShifterDeviceTypeGraceRounds = 3;
+        private int _relayShifterProbeRounds;
+        // Set by any group-0x51 settings answer from this pipe's shifter. Evidence that a
+        // shifter is there and talking — NOT evidence of which model, which is exactly the
+        // conflation that made a relayed HGP report as an SGP.
+        private bool _relayShifterAnsweredSettingsRead;
+        // Edge guard so the elimination fallback logs + latches at most once per pipe.
+        // NOT a "stop probing" latch: the owner gate at the top of ProbeRelayedShifter is
+        // the only thing that ends the probe, so a pipe whose shifter is replaced still
+        // re-resolves once the flags clear.
+        private bool _relayShifterFallbackTried;
 
         /// <summary>Resolve a base/hub-relayed shifter's model from the generic
-        /// device-type identity reply. Logs the raw reply so a support bundle reveals
-        /// the HGP/SGP discriminator, then latches HGP on a positive match. A prior
-        /// brightness answer already positively identifies THIS pipe's SGP, so never
-        /// overrides it (an SGP on another pipe doesn't block resolution here).</summary>
+        /// device-type identity reply — the authoritative discriminator on a lane with no
+        /// PID. Logs the raw reply either way so a support bundle always carries the
+        /// evidence. A match latches HGP; anything else latches SGP by elimination, since
+        /// 0x1A is the shifter's exclusive bus id and there are only two passive models.
+        /// No-op once THIS pipe's model is latched.</summary>
         private void ResolveRelayedShifterModelFromDeviceType()
         {
             var dt = _data.RelayShifterDeviceType;
             if (dt == null || dt.Length == 0) return;
+            bool isHgp = BytesEqual(dt, HgpDeviceType);
             MozaLog.Info($"[AZOM] Shifter device-type reply = [{System.BitConverter.ToString(dt)}] " +
-                "(HGP/SGP identity discriminator; relayed lane)");
+                $"(HGP/SGP identity discriminator; relayed lane) → {(isHgp ? "HGP" : "SGP")}");
             if (_detectionState.ShifterModelForOwner(_deviceManager) != ShifterModelKind.Unknown) return;
-            if (HgpDeviceType != null && BytesEqual(dt, HgpDeviceType))
-                MarkHgpDetected();
+            if (isHgp) MarkHgpDetected();
+            else MarkSgpDetected();
         }
 
         private static bool BytesEqual(byte[] a, byte[] b)
@@ -509,6 +645,55 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
+        /// Ask for the numeric base firmware version (dev 0x12, group 0x04) — the
+        /// sole gate for the wheelbase LFE effects and the 10-band EQ
+        /// (<see cref="MozaData.BaseSupportsLfe"/>). Three shots because a silent
+        /// base disables both outright: the canonical 0x12 request PitHouse sends,
+        /// the same request in its zero-length form, and the same query at dev
+        /// 0x13. An R12 (RS21-D07) on LFE-capable firmware answers none of them at
+        /// 0x12 in the len-4 form — see MozaCommandDatabase.
+        ///
+        /// <para>Called at base detect and, while the version is still unknown,
+        /// re-called from <c>PollStatusCore</c> — the detect-time burst rides the
+        /// <c>BaseAmbientProbed</c> latch, so without the retry a base that drops
+        /// all three replies stays LFE-dead for the whole session with nothing
+        /// re-asking.</para>
+        /// </summary>
+        /// <param name="via">Pipe to ask on. Null → this prober's own manager.
+        /// The poll-tick retry passes <c>DetectionState.BaseOwner</c> so a base
+        /// sitting on the dedicated base-aux pipe (post base→hub migration) is
+        /// asked there rather than on the now-hub-bound primary.</param>
+        internal void SendBaseFwVersionProbes(MozaDeviceManager? via = null)
+        {
+            var dm = via ?? _deviceManager;
+            dm.ReadSetting("base-fw-version");
+            dm.SendBaseFwVersionShortProbe();
+            dm.ReadSetting("base-fw-version-b");
+        }
+
+        /// <summary>
+        /// Write (or refresh, or remove) this wheelbase's SimHub device definition.
+        /// Called from both capability replies — the ambient probe and the firmware
+        /// version — because either can be the one that changes the answer, and the
+        /// deployer's staleness check makes repeats free.
+        /// </summary>
+        private void DeployBaseDefinition(bool ambientDetected)
+        {
+            // Unknown until the firmware version answers. The ambient probe replies
+            // first, so passing plain false there stripped HapticsFeature and the
+            // version reply put it straight back — two writes and a restart banner
+            // on every boot.
+            bool? wantHaptics = _data.BaseFwVersion != 0
+                ? _plugin.WheelbaseWantsShakeItHaptics
+                : (bool?)null;
+
+            if (DeviceDefinitionDeployer.DeployForBaseModel(
+                    _data.BaseModelName, _connection.DiscoveredPid,
+                    ambientDetected, wantHaptics))
+                _plugin.DeviceDefinitionDeployed = true;
+        }
+
+        /// <summary>
         /// Auto-detect connected devices based on response commands.
         /// First sight of a known response flips the matching detection flag
         /// and queues per-device settings reads + Apply*ToHardware.
@@ -549,6 +734,12 @@ namespace MozaPlugin.Devices
                     sender.DetectedDeviceMask |= (1 << (deviceId - 18));
             }
 
+            // Base flag rode a persistent-wire reload; End() cleared the owner —
+            // the first pipe to answer the base probe re-points it.
+            if (commandName == "base-mcu-temp" && _detectionState.BaseDetected
+                && _detectionState.BaseOwner == null)
+                _detectionState.BaseOwner = _deviceManager;
+
             // Base detection — IsBaseConnected was just set by UpdateFromCommand;
             // re-apply the profile so base settings get pushed.
             if (commandName == "base-mcu-temp" && !_detectionState.BaseDetected)
@@ -570,12 +761,21 @@ namespace MozaPlugin.Devices
                 // Capability probe for the wheelbase ambient strip — R21/R25/R27
                 // family replies on group 0xA2; R9/R12 silently drop the read.
                 // Reply is handled in the "base-ambient-brightness" case and
-                // gates DeviceDefinitionDeployer.DeployBaseAmbient.
+                // gates the wheelbase device definition's LED section.
                 if (!_detectionState.BaseAmbientProbed)
                 {
                     _detectionState.BaseAmbientProbed = true;
+                    // Model name FIRST, ambient capability second. The device
+                    // answers FIFO, so this ordering is what makes
+                    // MozaData.BaseModelName populated by the time the ambient
+                    // reply lands — and the ambient reply is what deploys the
+                    // SimHub device definition, whose LED count depends on the
+                    // model (6 LEDs/strip on R16 Ultra vs 9 elsewhere). Probe
+                    // the other way round and the definition is written with
+                    // the fallback geometry. See BaseModelInfo.
+                    _deviceManager.ReadSetting("main-model-name");
+                    _deviceManager.ReadSetting("main-model-name-b");
                     _deviceManager.ReadSetting("base-ambient-brightness");
-                    _deviceManager.ReadSettingForDevice("wheel-model-name", MozaProtocol.DeviceMain);
                     // Base-identity probes (dev 0x13 direct). Populates
                     // MozaData.BaseMcuUid / BaseSwVersion / BaseHwVersion /
                     // BaseHwSubVersion / BaseModelName / BaseIdentity11 so
@@ -599,17 +799,7 @@ namespace MozaPlugin.Devices
                     _deviceManager.ReadSetting("base-hw-sub");
                     _deviceManager.ReadSetting("base-mcu-uid");
                     _deviceManager.ReadSetting("base-identity-11");
-                    // Numeric firmware version (dev 0x12, group 0x04) — gates the
-                    // wheelbase LFE effects via MozaData.BaseSupportsLfe. Three
-                    // shots because a silent base disables LFE outright and this
-                    // read is issued exactly once per detection: the canonical
-                    // 0x12 request PitHouse sends, the same request in its
-                    // zero-length form, and the same query at dev 0x13. An R12
-                    // (RS21-D07) on LFE-capable firmware answers none of them at
-                    // 0x12 in the len-4 form — see MozaCommandDatabase.
-                    _deviceManager.ReadSetting("base-fw-version");
-                    _deviceManager.SendBaseFwVersionShortProbe();
-                    _deviceManager.ReadSetting("base-fw-version-b");
+                    SendBaseFwVersionProbes();
                 }
             }
 
@@ -623,12 +813,16 @@ namespace MozaPlugin.Devices
                     if (!_detectionState.BaseAmbientLedSupported)
                     {
                         _detectionState.BaseAmbientLedSupported = true;
-                        if (DeviceDefinitionDeployer.DeployBaseAmbient(_connection.DiscoveredPid))
-                            _plugin.DeviceDefinitionDeployed = true;
-                        _plugin.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        DeployBaseDefinition(ambientDetected: true);
+                        _plugin.HardwareApplier.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
+                        // Per-LED palettes, sized to the detected strip length so a
+                        // 6-LED base never asks for LEDs 6..8.
+                        int ledsPerStrip = _data.ResolvedAmbientLedsPerStrip;
+                        _deviceManager.ReadSettings(BaseAmbientPerLedReadCommands(ledsPerStrip));
                         MozaLog.Info(
-                            $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}')");
+                            $"[AZOM] Base ambient LEDs detected (model='{(string.IsNullOrEmpty(_data.BaseModelName) ? "unknown" : _data.BaseModelName)}', "
+                            + $"{ledsPerStrip} LEDs/strip)");
                     }
                     break;
 
@@ -646,6 +840,12 @@ namespace MozaPlugin.Devices
                             $"(LFE effects {(_data.BaseSupportsLfe ? "supported" : "unsupported, needs >= 1.2.10.10")}) " +
                             $"via {commandName}");
                     }
+                    // LFE support is only known now, and it decides whether the
+                    // device definition carries a HapticsFeature block. This is
+                    // also the ONLY deploy trigger for a base with no ambient
+                    // strip — nothing else fires for an R5/R9/R12.
+                    DeployBaseDefinition(ambientDetected: _detectionState.BaseAmbientLedSupported);
+
                     // Deferred equalizer7-10 apply+read: the main base sweep runs
                     // before the firmware version is known, and old firmware never
                     // answers these registers. Writes queue before reads so the
@@ -653,7 +853,7 @@ namespace MozaPlugin.Devices
                     if (_data.BaseSupportsEq10 && !_detectionState.BaseEq10Probed)
                     {
                         _detectionState.BaseEq10Probed = true;
-                        _plugin.ApplyBaseToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyBaseToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSettings(BaseEq10ReadCommands);
                     }
                     break;
@@ -665,7 +865,7 @@ namespace MozaPlugin.Devices
                         // Stamp first-detect time for the display-wedge watchdog
                         // (PollStatus bounds the post-detect display-boot wait).
                         _plugin.NoteWheelDetected();
-                        _deviceManager.LockWheelId(deviceId);
+                        LockWheelId(deviceId);
                         // Don't apply here — page GUID isn't resolvable until
                         // wheel-model-name arrives. Apply runs in the
                         // wheel-model-name case below.
@@ -729,7 +929,7 @@ namespace MozaPlugin.Devices
                     {
                         _detectionState.NewWheelDetected = true;
                         _plugin.NoteWheelDetected();
-                        _deviceManager.LockWheelId(deviceId);
+                        LockWheelId(deviceId);
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
                         // FSR V1 never answers serial-a/b (0x10/00,01) or the
@@ -815,13 +1015,14 @@ namespace MozaPlugin.Devices
                             if (initialProfile != null)
                                 _plugin.ApplyProfile(initialProfile);
 
-                            // Auto-load this wheel's mzdash folder if configured.
+                            // Auto-load the dashboard library: this wheel's
+                            // configured mzdash folder plus MOZA Dashboard
+                            // Studio's own project root (see
+                            // MozaPlugin.ReloadDashboardLibrary).
                             var ovFolder = _plugin.ActiveTelemetryMzdashFolder;
-                            if (!string.IsNullOrEmpty(ovFolder) && System.IO.Directory.Exists(ovFolder))
-                            {
-                                MozaLog.Debug($"[AZOM] Loading per-wheel mzdash folder from overlay: {ovFolder}");
-                                _plugin.DashCache?.LoadFromFolder(ovFolder);
-                            }
+                            MozaLog.Debug("[AZOM] Loading dashboard library from: "
+                                + string.Join(", ", _plugin.DashboardLibraryFolders(ovFolder)));
+                            _plugin.ReloadDashboardLibrary(ovFolder);
 
                             try { _plugin.ApplyTelemetrySettings(); }
                             catch (Exception ex)
@@ -982,7 +1183,7 @@ namespace MozaPlugin.Devices
                             // never fires there. Without this re-apply the meter is never
                             // put into telemetry LED mode and its RPM/flag LEDs stay dark
                             // (KS+CM2 bundle 2026-06-06: zero group-0x32 frames on the wire).
-                            try { _plugin.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+                            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
                             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
                         }
                         // Re-arm the wedge-recovery one-shot now that we know
@@ -1057,8 +1258,8 @@ namespace MozaPlugin.Devices
                         // only and never runs for old wheels; the timestamp is cheap
                         // and keeps both branches symmetric.
                         _plugin.NoteWheelDetected();
-                        _deviceManager.LockWheelId(deviceId);
-                        _plugin.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        LockWheelId(deviceId);
+                        _plugin.HardwareApplier.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
                         _deviceManager.ReadSetting("wheel-model-name");
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
@@ -1117,6 +1318,7 @@ namespace MozaPlugin.Devices
                 // First evidence of a base/hub-relayed shifter — probe the model
                 // resolvers. No-op on the standalone lane (already latched by PID).
                 case "shifter-direction":
+                    _relayShifterAnsweredSettingsRead = true;
                     ProbeRelayedShifter();
                     break;
 
@@ -1129,17 +1331,33 @@ namespace MozaPlugin.Devices
                         $"({_detectionState.ShifterModelForOwner(_deviceManager)} lane, dev {deviceId})");
                     break;
 
-                // Only the SGP answers a brightness read — a positive SGP identification
-                // on a relayed pipe (the standalone lane knows this from the PID instead).
+                // A brightness answer is NOT an SGP identification — a relayed HGP answers
+                // it too (0x00), and acks brightness/colors writes, because it stores the
+                // same EEPROM table-9 params with no LEDs wired to them (bundle 32ZD7KHW).
+                // Latching SGP here is what reported that HGP as an SGP. It counts only as
+                // "a shifter on this pipe is answering settings reads", the fallback
+                // evidence in ProbeRelayedShifter; the model comes from device-type. The
+                // value itself is stored by the owner-aware TryUpdateShifter on the inbound
+                // path, and re-read by the per-model list once the model latches.
                 case "shifter-brightness":
-                    MarkSgpDetected();
-                    _data.UpdateShifter(ShifterModelKind.Sgp, "shifter-brightness", value);
+                    _relayShifterAnsweredSettingsRead = true;
                     break;
 
                 // Generic device-type identity reply from a relayed shifter — the
-                // positive HGP signal (SGP is already caught by its brightness answer).
+                // authoritative HGP/SGP discriminator on a lane with no PID.
                 case "shifter-device-type":
                     ResolveRelayedShifterModelFromDeviceType();
+                    break;
+
+                // Exploratory identity reads fired alongside the device-type probe. Logged
+                // raw: a self-describing name string at 0x1A would replace the device-type
+                // magic value as the discriminator (docs/protocol/open-questions.md
+                // § Relayed HGP/SGP discriminator). Nothing depends on them yet.
+                case "shifter-model-name":
+                    MozaLog.Info($"[AZOM] Shifter model-name reply = \"{_data.RelayShifterModelName}\" (relayed lane)");
+                    break;
+                case "shifter-hw-version":
+                    MozaLog.Info($"[AZOM] Shifter hw-version reply = \"{_data.RelayShifterHwVersion}\" (relayed lane)");
                     break;
 
                 case "hub-port1-power":

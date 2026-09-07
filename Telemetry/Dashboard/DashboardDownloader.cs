@@ -104,10 +104,24 @@ namespace MozaPlugin.Telemetry.Dashboard
             byte[] net = SessionDataReassembler.StripCrcTrailer(payload);
             lock (_responseBuffer)
             {
+                // Same ceiling as SessionDataReassembler: a wheel that keeps pushing
+                // on the claimed session must not grow this until the 60 s timeout.
+                if (_responseBuffer.Count + net.Length > MaxResponseBytes)
+                {
+                    if (!_responseOverflowLogged)
+                    {
+                        _responseOverflowLogged = true;
+                        MozaLog.Warn($"[AZOM] DashboardDownloader: response exceeded {MaxResponseBytes} bytes; dropping further chunks");
+                    }
+                    return;
+                }
                 _responseBuffer.AddRange(net);
             }
             _lastChunkTicks = Environment.TickCount;
         }
+
+        private const int MaxResponseBytes = 1 << 20;
+        private bool _responseOverflowLogged;
 
         /// <summary>FC:00 ack on our claimed session. Advances send window.</summary>
         void ISessionConsumer.OnAck(byte session, int ackSeq)
@@ -188,7 +202,10 @@ namespace MozaPlugin.Telemetry.Dashboard
             MozaLog.Debug($"[AZOM] DashboardDownloader: using session 0x{_session:X2}");
 
             // ── Phase 3: Build and send download request ──────────────────
-            _retransmitter.Clear();
+            // Scoped to the FT session: a blanket Clear() also wiped live
+            // 0x01/0x02 chunks (FF init handshake, property pushes, tier-def)
+            // that are current-generation and still unacked.
+            _retransmitter.DropSession(_session);
 
             // DIAGNOSTIC: Replay PitHouse's exact frames to test if the
             // issue is request content vs session setup. If PitHouse bytes
@@ -216,8 +233,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 MozaLog.Debug($"[AZOM] DashboardDownloader: sent {lines.Length} replay frames");
                 // Wait for response
                 _lastChunkTicks = Environment.TickCount;
-                int deadline2 = Environment.TickCount + 60_000;
-                while (!SafeIsSet(_downloadComplete) && Environment.TickCount < deadline2)
+                int started2 = Environment.TickCount;   // difference form: TickCount wraps
+                while (!SafeIsSet(_downloadComplete) && unchecked(Environment.TickCount - started2) < 60_000)
                 {
                     SafeWait(_downloadComplete, 1000);
                     int bufSize; lock (_responseBuffer) { bufSize = _responseBuffer.Count; }
@@ -289,12 +306,12 @@ namespace MozaPlugin.Telemetry.Dashboard
                 // sending back data. Only close after we have response data or
                 // on timeout.
                 _lastChunkTicks = Environment.TickCount;
-                int deadline = Environment.TickCount + timeoutMs;
+                int started = Environment.TickCount;   // difference form: TickCount wraps
                 const int InactivityMs = 15_000;
                 const int PollMs = 1_000;
                 bool closeSent = false;
 
-                while (!SafeIsSet(_downloadComplete) && Environment.TickCount < deadline)
+                while (!SafeIsSet(_downloadComplete) && unchecked(Environment.TickCount - started) < timeoutMs)
                 {
                     SafeWait(_downloadComplete, PollMs);
                     int bufSize;
@@ -319,7 +336,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 {
                     SendSessionClose(_session, (ushort)closeSeq);
                 }
-                if (!SafeIsSet(_downloadComplete) && Environment.TickCount >= deadline)
+                if (!SafeIsSet(_downloadComplete) && unchecked(Environment.TickCount - started) >= timeoutMs)
                     MozaLog.Warn("[AZOM] DashboardDownloader: response timeout");
             }
             finally

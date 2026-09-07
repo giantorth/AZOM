@@ -36,6 +36,21 @@ namespace MozaPlugin.Telemetry.Sessions
         private readonly Dictionary<int, ManualResetEventSlim> _waiters = new();
         private readonly Dictionary<int, byte[]> _replies = new();
 
+        /// <summary>
+        /// The RPC <c>id</c> is a METHOD DISCRIMINATOR, not a correlation
+        /// counter — the wheel's dispatcher ignores calls whose id doesn't
+        /// match the method's canonical value. Ground truth: PitHouse sent
+        /// <c>completelyRemove()</c> twice with <c>"id":10</c> both times
+        /// (bridge-enable-toggle-20260816), and every <c>configJson()</c>
+        /// reply across all captures carries <c>"id":11</c>. A counter id
+        /// (1000+) is silently dropped (observed 2026-08-16).
+        /// </summary>
+        private static readonly Dictionary<string, int> KnownMethodIds = new()
+        {
+            ["completelyRemove"] = 10,
+            ["configJson"] = 11,
+        };
+
         /// <summary>Outbound seq counter for session 0x0a. Tracks the next seq to use
         /// when chunking an outgoing RPC envelope. TelemetrySender used to keep this
         /// inline; it stays on this class so the channel owns its own seq state.</summary>
@@ -63,34 +78,80 @@ namespace MozaPlugin.Telemetry.Sessions
         }
 
         /// <summary>
-        /// Send a host→wheel JSON RPC call on session 0x0a and wait up to
+        /// Send a host→wheel JSON RPC call and wait up to
         /// <paramref name="timeoutMs"/> for the wheel's reply. Returns the decoded
         /// reply bytes on success, null on timeout / abort / error.
         /// </summary>
-        public byte[]? Call(string method, object arg, int timeoutMs = 2000)
+        /// <param name="sendEnvelope">Optional transport override: chunk + send
+        /// the RPC envelope on the caller's session with the caller's seq
+        /// counter, returning false to abort. When the override targets a
+        /// session whose inbound stream is not routed to
+        /// <see cref="HandleReply"/> (e.g. the configJson session 0x09, whose
+        /// blobs feed the state parser), the call returns null after
+        /// <paramref name="timeoutMs"/> even when the wheel accepted it —
+        /// callers must treat null as "no direct reply", not failure.
+        /// Default (null) keeps the legacy session-0x0a path.</param>
+        public byte[]? Call(string method, object arg, int timeoutMs = 2000,
+            Func<byte[], bool>? sendEnvelope = null)
         {
             if (Volatile.Read(ref _disposed) != 0) return null;
             if (!_connection.IsConnected) return null;
 
             int id;
+            bool busy = false;
             var waiter = new ManualResetEventSlim(false);
             lock (_lock)
             {
-                id = _nextId++;
-                _waiters[id] = waiter;
+                // Known methods use their fixed wheel-side id; unknown methods
+                // fall back to the counter (and likely get ignored by current
+                // firmware — log so the gap is visible when a new verb lands).
+                if (KnownMethodIds.TryGetValue(method, out int fixedId))
+                {
+                    id = fixedId;
+                }
+                else
+                {
+                    id = _nextId++;
+                    global::MozaPlugin.MozaLog.Debug(
+                        $"[AZOM] RPC method \"{method}\" has no known fixed id — " +
+                        $"using counter {id}; current firmware may ignore it");
+                }
+                // Replies route on the id alone: a second waiter on a fixed id would
+                // overwrite the first and the two calls would steal each other's reply.
+                if (_waiters.ContainsKey(id))
+                {
+                    global::MozaPlugin.MozaLog.Debug($"[AZOM] RPC \"{method}\" (id {id}) already in flight — call dropped");
+                    busy = true;
+                }
+                else
+                {
+                    _waiters[id] = waiter;
+                }
+            }
+            if (busy)
+            {
+                waiter.Dispose();
+                return null;
             }
 
             byte[] envelope = BuildRpcCallEnvelope(method, arg, id);
-            lock (_seqLock)
+            if (sendEnvelope != null)
             {
-                int seq = OutboundSeq + 1;
-                var frames = TierDefinitionBuilder.ChunkMessage(envelope, 0x0a, ref seq);
-                foreach (var frame in frames)
+                if (!sendEnvelope(envelope)) { CleanupWaiter(id); return null; }
+            }
+            else
+            {
+                lock (_seqLock)
                 {
-                    if (_shouldAbort()) { CleanupWaiter(id); return null; }
-                    _connection.Send(frame);
+                    int seq = OutboundSeq + 1;
+                    var frames = TierDefinitionBuilder.ChunkMessage(envelope, 0x0a, ref seq);
+                    foreach (var frame in frames)
+                    {
+                        if (_shouldAbort()) { CleanupWaiter(id); return null; }
+                        _connection.Send(frame);
+                    }
+                    OutboundSeq = seq;
                 }
-                OutboundSeq = seq;
             }
 
             bool acked = waiter.Wait(timeoutMs);
@@ -190,7 +251,12 @@ namespace MozaPlugin.Telemetry.Sessions
             byte[] compressed = ZlibCompress(uncompressed);
             var env = new byte[9 + compressed.Length];
             env[0] = 0x00;
-            uint c = (uint)compressed.Length;
+            // comp_size = zlib length + 4 (protocol-wide PitHouse convention —
+            // see ConfigJsonClient.BuildConfigJsonReply and
+            // TileServerStateBuilder). The wheel slices the zlib region as
+            // comp_size − 4; the bare length truncates the stream and the
+            // wheel silently drops the message.
+            uint c = (uint)compressed.Length + 4;
             env[1] = (byte)(c & 0xFF); env[2] = (byte)((c >> 8) & 0xFF);
             env[3] = (byte)((c >> 16) & 0xFF); env[4] = (byte)((c >> 24) & 0xFF);
             uint u = (uint)uncompressed.Length;

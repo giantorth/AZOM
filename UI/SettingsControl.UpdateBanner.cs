@@ -11,7 +11,7 @@ using MozaPlugin.Resources;
 using MozaPlugin.UI;
 using MozaPlugin.UI.UpdateCheck;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl that owns the in-plugin
     // update-notification surface: the "update available" banner inside the
@@ -52,10 +52,11 @@ namespace MozaPlugin
 
                 RefreshUpdateNotifications();
                 RefreshLastCheckedText();
-                HookInstallCoordinator();
-                // Tab containers reparent this control, so Loaded/Unloaded fire
-                // repeatedly — re-hook on every Loaded (PluginBanners pattern),
-                // else the banner goes deaf after the first Unloaded.
+                // Hook the process-singleton coordinator from Loaded only (PluginBanners
+                // pattern). Tab containers reparent this control, so Loaded/Unloaded fire
+                // repeatedly — re-hook on every Loaded, else the banner goes deaf after the
+                // first Unloaded. Hooking here would pin a control SimHub builds on every
+                // game switch but never shows.
                 Loaded += OnLoadedRehookUpdateBanner;
                 Unloaded += OnUnloadedCancelUpdateCheck;
             }
@@ -465,9 +466,9 @@ namespace MozaPlugin
 
             try
             {
-                if (MainTabs != null && AboutTab != null)
-                    MainTabs.SelectedItem = AboutTab;
-                // Defer the scroll until the About tab's content is realized.
+                if (MainTabs != null && OptionsTab != null)
+                    MainTabs.SelectedItem = OptionsTab;
+                // Defer the scroll until the Options tab's content is realized.
                 Dispatcher.BeginInvoke(
                     new Action(() => { try { UpdatesSection?.BringIntoView(); } catch { } }),
                     System.Windows.Threading.DispatcherPriority.Background);

@@ -114,8 +114,8 @@
 
         <!-- 3. One-time nudge for users without SDK support enabled. Dismissal
              is persisted (SdkPromptDismissed). Driven by PluginBanners.xaml.cs.
-             The Configure button navigates to the plugin pane's SDK tab and is
-             hidden on device pages (no such tab to reach). -->
+             The Configure button navigates to the plugin pane's Options tab
+             (where the SDK toggles live) and is hidden on device pages. -->
         <Border x:Name="SdkPromptBanner"
                 Visibility="Collapsed" Margin="0,8,0,0"
                 BorderBrush="{StaticResource CyanBrush}" BorderThickness="1"

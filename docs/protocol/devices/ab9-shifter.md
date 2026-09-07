@@ -28,7 +28,7 @@ h2b 7e 02 20 12 07 01  →  b2h a0 21 07 06  +  New Effect Index:6, Type:1.
 **Status (2026-05-31, engine-vib intensity + K corrected against ground-truth RPM)**: a direct USB capture recorded the AB9 stream *and* the wheel-dashboard telemetry (real Rpm/MaxRpm/Gear) simultaneously — `usb-capture/AB9/ab9-pithouse-engine-vibration-intensity-2.pcapng`, freq slider held at 100 Hz, intensity stepped 100→60→40 % with idle↔redline revs at each level (car redline 18800 RPM). Decoded via `tools/ab9-rpm-correlate`. Three corrections to the 2026-05-24 model:
 > 1. **Intensity is the 16-bit `0x0A 0x05` "slot" field, encoded linearly** `field = round(intensity% × 65.5)` (100 %→`0x1996`=6550, 60 %→`0x0F5A`=3930, 40 %→`0x0A3C`=2620; slider-drag intermediates land on intensity×65.5 too). It is **not** the pulse-pair rate, and the field is **not** a DirectInput effect handle — the "binary `0x1996`↔`0x0000`" reading was an artefact of only ever observing 0 % and 100 %.
 > 2. **Pulse-pair (`0x0B`) emission rate is CONSTANT ~48 Hz** (median inter-pair 20.8 ms), flat across rpm-fraction 0.2..1.0 and across intensity 100/60/40 %. amp16 stays `0x2328`. The "1.7→34 Hz, intensity-attenuated" model was wrong.
-> 3. **Pitch: the freq slider is the buzz frequency AT REDLINE**, scaled by RPM fraction below it — `audible = freqSlider × (rpm/maxRpm)`, so `period = FreqTickHz × maxRpm / (rpm × freqSlider)` with `FreqTickHz = median(period × rpm/maxRpm × freq) = 636,553 × 100 ≈ 6.366e7`. The capture (one car, redline 18,800) gives an *effective* `K = period×rpm×freq = 1.197e12`, but a fixed K can't also explain the earlier Cayman GT4 phone-mic (~100 Hz at its 7,700 redline, slider 100); `K = FreqTickHz × maxRpm` reconciles both, so the period scales with the car's redline rather than using a fixed K. (maxRpm-scaling is inferred from reconciling the two cars + the intended slider semantics, not provable within a single-car capture.) Sub-command bytes differed in this capture (`0a04`, `0b01`/`0b02` vs the prior `0a05`, `0b02`/`0b03`) — **resolved 2026-08-06: the 2nd byte is a session-allocated effect index**, see the status block above. Implemented in `Devices/Ab9EngineVibrationWorker.cs` + `MozaAb9DeviceManager.cs`. Sections below retain the 2026-05-24 wording inline; the points above supersede the intensity/slot/pitch claims.
+> 3. **Pitch: the freq slider is the buzz frequency AT REDLINE**, scaled by RPM fraction below it — `audible = freqSlider × (rpm/maxRpm)`, so `period = FreqTickHz × maxRpm / (rpm × freqSlider)` with `FreqTickHz = median(period × rpm/maxRpm × freq) = 636,553 × 100 ≈ 6.366e7`. The capture (one car, redline 18,800) gives an *effective* `K = period×rpm×freq = 1.197e12`, but a fixed K can't also explain the earlier Cayman GT4 phone-mic (~100 Hz at its 7,700 redline, slider 100); `K = FreqTickHz × maxRpm` reconciles both, so the period scales with the car's redline rather than using a fixed K. (maxRpm-scaling is inferred from reconciling the two cars + the intended slider semantics, not provable within a single-car capture.) Sub-command bytes differed in this capture (`0a04`, `0b01`/`0b02` vs the prior `0a05`, `0b02`/`0b03`) — **resolved 2026-08-06: the 2nd byte is a session-allocated effect index**, see the status block above. Implemented in `Devices/Haptics/Ab9EngineVibrationWorker.cs` + `MozaAb9DeviceManager.cs`. Sections below retain the 2026-05-24 wording inline; the points above supersede the intensity/slot/pitch claims.
 
 **Status (2026-05-24, engine-vib intensity correction)**: engine-pulse-pair frame layout was off-by-one against PitHouse (`BuildEnginePulseFrame` wrote 4 zero pad bytes before the phase counter; PitHouse uses 3), so amp16 landed in the device firmware's trailing-zero slot and the firmware was reading our protocol tag byte `0x04` as the amp16 high-byte. Effective device-side amp16 only varied in `0x0400..0x0423` regardless of slider position — root cause of the user-reported binary engine-vib intensity. Frame layout now matches PitHouse byte-for-byte (verified against 17,603 capture frames). Intensity slider now modulates pulse-pair *emission rate* (not amplitude) — amp16 is held at the constant `0x2328` PitHouse uses. See "Engine vibration is host-rendered" and `0x0B 0x02 / 0x0B 0x03` sections below for the corrected protocol facts.
 
@@ -54,7 +54,7 @@ COM6  VID 0x346E  PID 0x1002   HID product string: "MOZA AB6 FFB Base"
 
 HID descriptor: 8 GenericDesktop axes (`0x30`..`0x37`) + 128 buttons — the same generic MOZA composite descriptor the wheelbases report, so it carries no model information.
 
-**There is no AB6 wire capture.** The reporter had `DisableAb9Detection` set, so `TryConnectAb9()` never ran and the port was never opened — their bundle contains 18,759 frames, all labelled `wheelbase`, and zero bytes on COM6. `0x1002` is registered in category `Ab9` and driven by the shared lane on the **assumption** of protocol parity with the AB9. Everything below (groups `0x1E`/`0x1F`/`0x20`, dev `0x12`, the FFB alloc handshake, the engine-vibration stream set) is AB9-measured and unverified on an AB6.
+**There is no AB6 wire capture.** The reporter had the since-retired `DisableAb9Detection` setting on, so `TryConnectAb9()` never ran and the port was never opened — their bundle contains 18,759 frames, all labelled `wheelbase`, and zero bytes on COM6. `0x1002` is registered in category `Ab9` and driven by the shared lane on the **assumption** of protocol parity with the AB9. Everything below (groups `0x1E`/`0x1F`/`0x20`, dev `0x12`, the FFB alloc handshake, the engine-vibration stream set) is AB9-measured and unverified on an AB6.
 
 Open questions the first AB6 capture should settle:
 
@@ -66,18 +66,36 @@ Because the lane opens the port with `CaptureLabel = "ab9"`, any bundle from an 
 
 ### Shifter mode set — `Group 0x1F → dev 0x12, cmd 0xD300`
 
-Six mode-change events at 5/10/15/20/25/30 s in the shifter-mode capture, each one 8-byte CDC OUT frame on the AB9:
+Frame shape: `7E 03 1F 12 D3 00 <val> <chk>`, one 8-byte CDC OUT frame on the AB9.
+Ten layouts, contiguous over `0x00..0x09`:
 
-| PitHouse mode | `Config Data` byte |
-|---------------|--------------------|
-| 5+R Layout 1 | `0x00` |
-| 6+R Layout 1 | `0x04` |
-| 6+R Layout 2 | `0x05` |
-| 7+R Layout 1 | `0x06` |
-| 7+R Layout 2 | `0x07` |
-| Sequential   | `0x09` |
+| Layout | `Config Data` byte | Source |
+|---------------|--------------------|--------|
+| 5+R Layout 1 | `0x00` | capture |
+| 5+R Layout 2 | `0x01` | device owner |
+| R+5 Layout   | `0x02` | device owner |
+| R+6 Layout   | `0x03` | device owner |
+| 6+R Layout 1 | `0x04` | capture |
+| 6+R Layout 2 | `0x05` | capture |
+| 7+R Layout 1 | `0x06` | capture |
+| 7+R Layout 2 | `0x07` | capture |
+| R+8 Layout   | `0x08` | device owner |
+| Sequential   | `0x09` | capture |
 
-Gaps `0x01..0x03`, `0x08` are presumably 5+R Layout 2 / other layouts not exercised. Frame shape: `7E 03 1F 12 D3 00 <val> <chk>`.
+The `R+n` layouts place reverse ahead of first rather than past top gear, which is
+why they interleave with the `n+R` ones instead of forming their own block.
+
+Rows marked *capture* are the six mode-change events at 5/10/15/20/25/30 s in the
+shifter-mode capture — PitHouse only ever exercised those, which is why `0x01..0x03`
+and `0x08` were long recorded here as unexplained gaps. They are not gaps: all four
+are real layouts (2026-09-01). Bundle `W603C6RV` independently shows the firmware
+accepting and persisting `0x03` and `0x08` written from the plugin — `0x03` came back
+at connect from a previous session, so the value round-trips through the AB9's own
+storage rather than merely being echoed.
+
+Read the stored layout back with `7E 01 1E 12 D3` → `9E 21 D3 00 <val>`. That is the
+only way to confirm a write landed: the group-`0x1F` write ack is a bare zero-length
+`7E 00 9F 21 4B` that carries no value echo.
 
 ### Stored-on-device settings — `Group 0x1F → dev 0x12`
 
@@ -297,6 +315,49 @@ Resp:   7E 03 9E 21 <cmdId> <val_hi> <val_lo>  (3-byte payload — cmd + BE 16-b
 Read group `0x1E` toggles to `0x9E` for the response (response bit set). Sliders return **2-byte BE values** (e.g. `00 64` = 100, `00 23` = 35). Analog axis cmds (`0xD7`, `0xD8`) use the full 16-bit range (`66 e7`, `80 01`).
 
 Frequencies during a 40-min session: PitHouse polls 0x1E at **66 Hz** continuously — far more than just a one-shot read on connect. The plugin's current `MozaCommandDatabase` registers `ab9-*` commands with `ReadGroup = WriteGroup = 0x1F` and 1-byte payload, so its read frames have the wrong group AND wrong shape; the real device will not respond to them, which is why the "Probing → AB9 connected" status latch never flips on the AB9 panel.
+
+### Status registers — `Group 0x2B → dev 0x12` (2026-09-01)
+
+The AB9's main answers the **wheelbase's** read-only status group on its own dev
+`0x12` — the group is not `0x13`-only. Same frame shape as `base-mcu-temp`, device
+byte swapped:
+
+```
+7E 03 2B 12 <cmd> 00 00 <chk>   →   AB 21 <cmd> <hi> <lo>
+```
+
+Measured in bundle `W603C6RV` (AB9 on its own pipe, R21-class base on another,
+~80 s of 1 Hz polling, 234 probes / 234 replies — every register answers):
+
+| Cmd | Register | AB9 value | Verdict |
+|---|---|---|---|
+| `01` | state | `00 08` (one `00 02` at connect) | real; the base reads `00 02` |
+| `02` | state-err | `00 00` | zero = no fault |
+| `04` | mcu-temp | `0C 1C` → `0E D8` → `0F 3C` | **real**, 31.0 → 38.0 → 39.0 °C as it warms |
+| `05` | mosfet-temp | `00 00` | unimplemented |
+| `06` | motor-temp | `00 00` | unimplemented |
+| `07` | live-torque | `00 00` | unimplemented |
+
+MCU temperature is the AB9's **own** sensor: it read 38.0 °C at timestamps where the
+base read 39.0 °C on the other pipe, and it tracks a warm-up curve. Scaling is
+raw ÷ 100 → °C, same as the wheelbase — see
+[`../periodic/group-0x2B.md`](../periodic/group-0x2B.md), which also carries the
+correction of that page's old ×0.1 claim.
+
+`05`/`06`/`07` are unimplemented rather than reading zero. The tell is torque: a
+populated torque register idles **at** the `+500` bias (`0x01F4`), the way the base's
+does at `01 F2`/`01 F3` in the same capture. A flat `0x0000` is not 0 Nm, it is −50 Nm
+under that bias — i.e. no value at all. The two dead temperatures never move off zero
+either, where the base's dither by a few counts.
+
+**Group `0x1E` carries none of these.** Cmd ids `04`–`07` were asked 39× each on the
+AB9's own read group and answered **zero** times. Ids `01` and `02` do answer there,
+but they are unrelated registers with their own payload shapes — 1 byte and 5 bytes,
+not the 2-byte BE the `0x2B` side uses — and both read all-zero; purpose unknown.
+
+Plugin: `MozaAb9DeviceManager.RequestStatusProbe()` asks `01`/`02`/`04` plus the
+`0x1E D3` layout read-back, once per connect and on demand from the AB9 tab's status
+card. The unimplemented registers are deliberately not polled.
 
 ### Streaming sub-stream schemas (2026-05-15)
 

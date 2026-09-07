@@ -9,11 +9,11 @@
   <data name="TabHeader_Pedals" xml:space="preserve"><value>踏板</value></data>
   <data name="TabHeader_Ab9Shifter" xml:space="preserve"><value>AB9</value></data>
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
-  <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
+  <data name="TabHeader_Hub" xml:space="preserve"><value>集线器</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>选项</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>导入</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>关于</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>帮助</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>未连接</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>刷新</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>性能输出</value></data>
@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>测试</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>锁死</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>阈值</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>离合点</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>发动机震动</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>频率 (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>平滑度</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>增益</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>触发输入电平</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>振动衰减</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 实验性 — mBooster 固件可能不予响应</value></data>
@@ -187,28 +189,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>端口 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>端口 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>端口 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>配置文件</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>设置</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>启动时应用配置文件设置</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>方向盘 LED 输出</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// RPM 与按键的发送节流</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>建议:除非遇到 LED 异常,否则将下方 LED 选项保持为关闭。</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>限制对方向盘的更新</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>仅在 LED 数据实际变化时才发送。</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>始终重发位掩码</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>在颜色更新时始终发送 LED 位掩码,即使未发生变化。会产生额外流量。</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB 检测</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>禁用串口探测回退(高级)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>仅在插件与错误设备通信时需要启用。</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>禁用主动排挡杆检测 (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>跳过主动排挡杆重连探测。</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>仪表盘遥测</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>连接时上传仪表盘</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>从方向盘下载仪表盘</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>方向盘固件世代:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>自动 — 尝试从方向盘握手信息中识别</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 世代 — (URL 订阅)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 世代 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>自动会从方向盘握手中识别固件世代并选择匹配的协议。仅在遥测无法工作时手动覆盖。</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>显示所有选项卡（高级）</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>设备定义</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>重新部署所有定义</value></data>
@@ -216,11 +201,7 @@
   <data name="Section_Reset" xml:space="preserve"><value>重置</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>清除所有设置与配置文件</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>此操作会将所有插件设置和配置文件恢复为默认值。</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>仪表盘上传功能正在开发中,目前并不会真正把文件推送到方向盘。</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>仪表盘上传</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// 将 .mzdash 文件推送至已连接的方向盘</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>状态反映方向盘最近一次的 ACK。</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>来源</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>本地 .mzdash 文件</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>仪表盘库</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>选择 .MZDASH…</value></data>
@@ -228,38 +209,13 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>仪表盘:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>立即上传</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>空闲</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>仪表盘名称:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>原始大小:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>传输中:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>上次 ACK bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>上次 ACK 状态字节:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>注意:上传需要方向盘已连接并完成管理会话协商。</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>方向盘文件</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// 已加载到方向盘上的仪表盘</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>删除功能已暂时禁用。</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>状态</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>标题</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>目录名</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>最后修改</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>已暂时禁用。</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>CoAP 服务器</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// 启用此选项可阻止 PitHouse 自动启动</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>为需要的游戏提供官方 MOZA SDK 支持,例如 iRacing 或任何使用 360 Hz 模式的游戏。为此,插件会在回环上运行一个内嵌的 CoAP SDK 控制服务器。</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>启用期间,插件会运行一个小型替身进程,在进程列表中显示为“MOZA Pit House.exe”。这是正常现象——它让 MOZA SDK 应用能够按名称找到 PitHouse。当你停用此项或关闭 SimHub 时,它会自动退出。</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 CoAP SDK 服务器</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP 控制</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// 基于 CBOR over UDP 的简单控制接口</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>这是一个用于设置转向角度的旧版 UDP 控制接口。已知的唯一用途是 Richard Burns Rally 的 RSF 版本。</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>启用 UDP 控制服务器</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>端口</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>状态</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP 服务器</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP 控制</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>最近请求</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 每个服务器最近 20 条请求 · 实时</value></data>
   <data name="Section_About" xml:space="preserve"><value>关于</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// 开源 SimHub 插件</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -415,6 +371,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>编辑 SimHub 属性绑定</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>以公式方式编辑（NCalc [property] / js:）</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>重置为默认</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>全局默认值</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>全局通道默认值</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>重置所有默认值</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>已覆盖 {0} / {1}</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>恢复默认值</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>全局通道映射器不可用（见日志）</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>重置字段</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>拆分字段</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>位拆分</value></data>
@@ -493,14 +456,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>正在编辑 · 旋钮 1 · 当前色</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>用所选色填充整圈</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>将此旋钮复制到全部</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  仪表盘上传尚未生效</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>休眠灯</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// 闲置超时后方向盘所显示的画面</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>速度</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>颜色</value></data>
   <data name="Section_Language" xml:space="preserve"><value>语言</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>语言</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>关闭并重新打开此设置页面以应用新语言。“自动”会先跟随 SimHub 的语言设置,再跟随系统语言。</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>更改后需要重启。</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>导入配置…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>导入 PitHouse 预设</value></data>
@@ -539,7 +501,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>已连接的方向盘</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} 尚未在 SimHub 中添加</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>已连接 MOZA 仪表盘，但该设备尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>此底座带有氛围 LED 灯带，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0} 以驱动灯带。</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>底座已连接，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>方向盘 “{1}” 已连接，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 端口</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>旋钮指示灯</value></data>
@@ -547,9 +509,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>正在启动…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>已停止</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>正在运行 (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>服务器未启动——使用上方开关启用</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>暂无请求</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>暂无请求——第三方工具仅在读取或写入设置时才与此通信</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>存根管理器</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>正在捕获…（已开启持续捕获——准备好后点击停止）</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>正在捕获…（打开其他选项卡并使用设备，然后返回此处停止）</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>已导出到 {0}</value></data>
@@ -564,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>文件夹：{0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>上传已排队——正在将 “{0}” 推送到方向盘…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>未开始上传——方向盘未连接或尚无管理会话。</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>上传完成 (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>上传已停止 (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>上传完成（状态 0x{0}）</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>上传在 {0}% 停止（状态 0x{1}）</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>选择要上传的 .mzdash 文件</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 仪表盘 (*.mzdash)|*.mzdash|所有文件 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>选择包含 .mzdash 仪表盘文件的文件夹</value></data>
@@ -629,7 +589,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>换挡器</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>飞行模拟</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>保活超时</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>遥测停止后继续刷新 LED 多久，方向盘才能进入休眠。0 = 立即停止。</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>遥测停止后继续刷新 LED 多久，方向盘才能进入休眠。</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>屏幕旋转</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>平滑</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>立即</value></data>
@@ -666,8 +626,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>踏板角色</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>踏板 {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>此 mBooster 通过一个连接承载多个踏板。将每个检测到的轴分配给游戏输入。默认顺序遵循 Moza 的 Rx/Ry/Rz 布局（油门/刹车/离合）——如果某个踏板驱动了错误的输入，请在此重新映射。</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>配置踏板：</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>此踏板为无源（无马达）——振动效果不适用。</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>换挡器设置</value></data>
@@ -719,27 +679,32 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>刹车热衰减 (实验性)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>起始温度 (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>实验性 — 激活期间会写入真实的行程终点和最大阈值硬件校准值(需要更长行程和更大力度),并在刹车冷却后恢复你配置的数值。需要事先在踏板手感/模拟输入映射中设置好这些值 — 否则不起作用。</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G 力(惯性踏板脚感)(实验性)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>实验性 — 不再依靠振动,而是按实时纵向 G 力成比例推动踏板本身(加速时向前推,制动时向后推)。最大踏板行程决定满 G 时的移动距离;响应速度决定踏板到达新位置的快慢。</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>最大踏板行程 (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>响应速度 (%)</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>报告问题</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>向开发者发送诊断报告</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>描述问题</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>描述问题：你做了什么，方向盘或仪表盘有什么反应，以及从何时开始。</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>联系方式（可选 — 电子邮件或 Discord）</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>提交将向插件开发者上传一个诊断包（插件日志和串口跟踪，硬件标识已脱敏）。</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>提交错误报告</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>正在上传…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>报告已提交。编号：{0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>近期来自你的网络的报告过多 — 请稍后再试。</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>诊断包过大，无法上传。</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>上传失败。请检查网络连接后重试。</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>上传被我们的 CDN 拦截，与你的网络无关 — 请使用导出诊断包。</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>提交前请先描述问题。</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>诊断捕获</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>在内存中保留一小段串口通信记录（启动后的第一分钟以及近期活动），使错误报告包含连接与握手过程。在你提交报告之前，数据不会离开你的电脑。</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>诊断捕获已关闭。</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>启动：{0} 帧（{1} KB，{2}）· 滚动：{3} 帧（{4} KB）</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>已冻结</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>填充中</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>请稍等一会儿再提交另一份报告。</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>将诊断包保存为本机文件（不会上传任何内容）。</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>游戏按键</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>雨刮加挡</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>雨刮减挡</value></data>
@@ -765,4 +730,49 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>输入力值</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>单颗灯珠颜色</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>待机 · 常亮</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>待机 · 呼吸</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>睡眠 · 呼吸</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>动画速度 (毫秒)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>呼吸速度 (毫秒)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>待机效果</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>待机动画</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>轮基 LFE 来源</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>插件 LFE 选项卡</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>需要 SimHub 9.12 或更高版本。</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>设备定义已更新。请重启 SimHub 以应用。</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 兼容性</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>图表</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>带宽</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>扭矩</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>扭矩</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>刻度</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>在 STUDIO 中编辑</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>新建仪表盘…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>在 MOZA Dashboard Studio 中打开所选仪表盘</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>在 MOZA Dashboard Studio 中新建仪表盘，尺寸匹配已连接的显示屏</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>已在 Studio 中打开 — 完成后点击「刷新」。</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>未找到 Dashboard Studio — 请安装 MOZA Pit House。</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio 启动失败：{0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>请选择磁盘上有文件的仪表盘。</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>暂无显示屏信息 — 将不预选设备打开。</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>保存到 {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>已重新加载库 — {0} 个仪表盘。</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R 布局 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 布局</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 布局</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 布局</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>状态探测</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>实时轮询</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>布局回读</value></data>
+  <data name="Label_State" xml:space="preserve"><value>状态</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>状态错误</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>状态：</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>上传中 - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>已完成 - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>已停止 - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>上传来源</value></data>
 </root>

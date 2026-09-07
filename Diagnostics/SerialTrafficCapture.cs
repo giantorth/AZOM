@@ -74,13 +74,27 @@ namespace MozaPlugin.Diagnostics
         private readonly object _fileLock = new object();
         private StreamWriter? _fileSink;
         private string? _fileSinkPath;
-        private int _fileSinkLineCount;
         // Lock-free fast path for the common case where the file sink is
         // closed. RecordTx/RecordRx fires on every serial frame (~250-1000Hz);
         // taking _fileLock just to read a null pointer is wasteful contention.
         // The flag is written under _fileLock so it stays consistent with
         // _fileSink, but read without it on the hot path.
         private volatile bool _fileSinkEnabled;
+        // Off-thread writer. RecordTx/RecordRx run on the serial write and read
+        // threads; a WriteLine plus a periodic synchronous Flush under _fileLock on
+        // both of them was the hot-path stall the buffered sink was meant to
+        // avoid. Lines go into a bounded queue drained by one background thread
+        // that owns the StreamWriter for its lifetime (flushes ~10×/s).
+        private readonly ConcurrentQueue<string> _fileSinkQueue = new ConcurrentQueue<string>();
+        private readonly AutoResetEvent _fileSinkSignal = new AutoResetEvent(false);
+        private Thread? _fileSinkThread;
+        private volatile bool _fileSinkStop;
+        private int _fileSinkQueued;
+        private long _fileSinkDropped;
+        private const int FileSinkQueueCap = 20000;
+        private const int FileSinkFlushIntervalMs = 100;
+        /// <summary>Lines dropped because the writer fell behind the queue cap.</summary>
+        public long FileSinkDroppedLines => Volatile.Read(ref _fileSinkDropped);
 
         public bool Enabled => _enabled;
         public int Count => Volatile.Read(ref _startupCount) + Volatile.Read(ref _rollingCount);
@@ -156,14 +170,21 @@ namespace MozaPlugin.Diagnostics
                 // tick stall → visible test-mode lag. Use OS buffering; flush
                 // periodically (every ~64 lines) to keep crashes from losing
                 // more than a fraction of a second.
-                _fileSink = new StreamWriter(new FileStream(
+                var sink = new StreamWriter(new FileStream(
                     path, FileMode.Create, FileAccess.Write, FileShare.Read,
                     bufferSize: 16384))
                 {
                     AutoFlush = false,
                 };
+                _fileSink = sink;
                 _fileSinkPath = path;
-                _fileSinkLineCount = 0;
+                _fileSinkStop = false;
+                _fileSinkThread = new Thread(() => FileSinkLoop(sink))
+                {
+                    IsBackground = true,
+                    Name = "moza-wire-sink",
+                };
+                _fileSinkThread.Start();
                 _fileSinkEnabled = true;
             }
         }
@@ -175,11 +196,54 @@ namespace MozaPlugin.Diagnostics
 
         private void CloseFileSinkLocked()
         {
-            try { _fileSink?.Flush(); } catch { }
-            try { _fileSink?.Dispose(); } catch { }
+            _fileSinkEnabled = false;
+            var t = _fileSinkThread;
+            _fileSinkThread = null;
+            _fileSinkStop = true;
+            _fileSinkSignal.Set();
+            // The writer drains what is queued, then flushes and disposes the
+            // stream itself; it never takes _fileLock, so joining here is safe.
+            if (t != null) { try { t.Join(2000); } catch { } }
+            while (_fileSinkQueue.TryDequeue(out _)) { }
+            Volatile.Write(ref _fileSinkQueued, 0);
             _fileSink = null;
             _fileSinkPath = null;
-            _fileSinkEnabled = false;
+        }
+
+        private void FileSinkLoop(StreamWriter sink)
+        {
+            try
+            {
+                int lastFlush = Environment.TickCount;
+                bool dirty = false;
+                while (true)
+                {
+                    _fileSinkSignal.WaitOne(FileSinkFlushIntervalMs);
+                    while (_fileSinkQueue.TryDequeue(out var line))
+                    {
+                        Interlocked.Decrement(ref _fileSinkQueued);
+                        sink.WriteLine(line);
+                        dirty = true;
+                    }
+                    bool stopping = _fileSinkStop && _fileSinkQueue.IsEmpty;
+                    if (dirty && (stopping || unchecked(Environment.TickCount - lastFlush) >= FileSinkFlushIntervalMs))
+                    {
+                        sink.Flush();
+                        lastFlush = Environment.TickCount;
+                        dirty = false;
+                    }
+                    if (stopping) break;
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Wire-trace file sink writer stopped: {ex.Message}");
+            }
+            finally
+            {
+                try { sink.Flush(); } catch { }
+                try { sink.Dispose(); } catch { }
+            }
         }
 
         /// <summary>Disable capture and return an ordered snapshot of all entries.</summary>
@@ -303,9 +367,8 @@ namespace MozaPlugin.Diagnostics
             // Tx (host→device) = h2b; Rx (device→host) = b2h.
             // Frame layout: 7E [N] grp dev payload[N] cs. Skip when frame is too short.
             // Caller is expected to have checked _fileSinkEnabled before calling
-            // (saves the redundant lock on the closed-sink hot path); we still
-            // re-check sink != null after the lock below to cover the race
-            // where Close happens between the volatile check and acquiring the lock.
+            // (saves the work on the closed-sink hot path). The line is formatted
+            // here (cheap, allocation only) and handed to the writer thread.
 
             var sb = new StringBuilder(frame.Length * 2 + 96);
             double t = (DateTime.UtcNow - _epoch).TotalSeconds;
@@ -364,17 +427,20 @@ namespace MozaPlugin.Diagnostics
             }
             sb.Append('}');
             string line = sb.ToString();
-            try
+            if (Volatile.Read(ref _fileSinkQueued) >= FileSinkQueueCap)
             {
-                lock (_fileLock)
-                {
-                    var s = _fileSink;
-                    if (s == null) return;
-                    s.WriteLine(line);
-                    if ((++_fileSinkLineCount & 63) == 0) s.Flush();
-                }
+                // Writer has fallen behind (disk stall): drop rather than grow.
+                Interlocked.Increment(ref _fileSinkDropped);
+                return;
             }
-            catch { /* sink may have been closed concurrently — silent drop */ }
+            int queued = Interlocked.Increment(ref _fileSinkQueued);
+            _fileSinkQueue.Enqueue(line);
+            // Wake the writer on the empty→non-empty edge; it drains everything
+            // per wake and has a timed backstop.
+            if (queued == 1)
+            {
+                try { _fileSinkSignal.Set(); } catch (ObjectDisposedException) { }
+            }
         }
 
         private static readonly DateTime _epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -403,7 +469,9 @@ namespace MozaPlugin.Diagnostics
         internal static void AppendEntryPrefix(StringBuilder sb, Entry e)
         {
             var local = e.TimestampUtc.ToLocalTime();
-            sb.Append(local.ToString("yyyy-MM-dd HH:mm:ss.fff"));
+            // Invariant: ':' is the culture's time separator (fi/sv render '.'),
+            // and tools/ parse this column.
+            sb.Append(local.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture));
             sb.Append(' ');
             sb.Append((char)e.Dir);
             sb.Append("  ");

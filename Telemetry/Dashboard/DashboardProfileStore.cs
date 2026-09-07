@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using MozaPlugin.Telemetry.Protocol;
 using MozaPlugin.Telemetry.TestMode;
 using Newtonsoft.Json.Linq;
+using MozaPlugin.Telemetry.Frames;
 
 namespace MozaPlugin.Telemetry.Dashboard
 {
@@ -42,6 +42,123 @@ namespace MozaPlugin.Telemetry.Dashboard
         // The earlier hardcoded UrlFieldMap + DefaultPropertyPaths duplicated
         // that data; kept removed so the JSON stays authoritative.
 
+        // ── Default-mapping overrides (master channel mapper) ─────────────
+        // Layer 2 of the mapping resolution: per-dashboard override (MozaProfile
+        // .TelemetryChannelMappings) > THIS > Telemetry.json simhub_property >
+        // StringChannelDefaults. Static because TelemetrySender constructs a
+        // throwaway store when MozaPlugin.Instance is null — both must see the
+        // same overrides. Copy-on-write: SetDefaultOverrides builds a fresh dict
+        // and reference-swaps; readers snapshot the reference once.
+        //
+        // The SOURCE is a profile (MozaChannelDefaultsProfile.Mappings) but this
+        // snapshot is process-wide, so it holds exactly one profile's set at a
+        // time: ChannelMappingCoordinator.PushProfileDefaults must re-publish on
+        // every switch, and does (ProfileCoordinator.OnChannelDefaultsProfileChanged).
+        private static volatile IReadOnlyDictionary<string, string>? s_defaultOverrides;
+
+        /// <summary>Publish the active profile's default-mapping overrides. Pass null or
+        /// an empty map to clear. Normalises to an OrdinalIgnoreCase dict — the settings
+        /// dict comes back from Newtonsoft with the default comparer.</summary>
+        internal static void SetDefaultOverrides(IReadOnlyDictionary<string, string>? map)
+        {
+            if (map == null || map.Count == 0) { s_defaultOverrides = null; return; }
+            var copy = new Dictionary<string, string>(map.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in map)
+            {
+                if (string.IsNullOrEmpty(kv.Key) || string.IsNullOrWhiteSpace(kv.Value)) continue;
+                copy[kv.Key] = kv.Value.Trim();
+            }
+            s_defaultOverrides = copy.Count > 0 ? copy : null;
+        }
+
+        /// <summary>The effective default binding for a channel: the active profile's
+        /// master default when one is set, else Telemetry.json's own
+        /// <c>simhub_property</c> + <c>simhub_scale</c>.
+        /// Plugin-locked <c>@internal/</c> channels are never overridable (same rule as
+        /// <see cref="ApplyUserMappings"/>).
+        ///
+        /// <para>An override replaces the JSON property, so the JSON's scale — calibrated
+        /// for THAT property's units — must NOT ride along: it silently zeroed integer
+        /// channels (ErsState is uint3/4-bit with scale 0.01, so any mapped value under
+        /// 100 truncated to 0 — bundle 5TE3ZTTR) and saturated the ×100 percent channels.
+        /// An override supplies the value in the channel's own wire unit; a formula
+        /// (<c>[prop]*100</c>) converts when the source unit differs.</para></summary>
+        private static (string property, double scale) ResolveDefaultBinding(
+            string url, TelemetryChannelInfo info)
+        {
+            double jsonScale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+            string json = info.SimHubProperty ?? "";
+            if (IsInternalChannel(json)) return (json, jsonScale);
+            var ov = s_defaultOverrides;
+            if (ov != null && !string.IsNullOrEmpty(url)
+                && ov.TryGetValue(url, out var p) && !string.IsNullOrWhiteSpace(p))
+                return (p.Trim(), 1.0);
+            return (json, jsonScale);
+        }
+
+        /// <summary>The effective default binding for a channel URL, for callers that
+        /// have no <c>TelemetryChannelInfo</c> (the UI's reset-to-default path). False
+        /// when the URL isn't declared in Telemetry.json.</summary>
+        internal bool TryResolveDefaultBinding(string url, out string property, out double scale)
+        {
+            property = "";
+            scale = 1.0;
+            if (string.IsNullOrEmpty(url)) return false;
+            if (!GetTelemetryMap().TryGetValue(url, out var info)) return false;
+            (property, scale) = ResolveDefaultBinding(url, info);
+            return true;
+        }
+
+        /// <summary>One Telemetry.json channel as the master channel mapper sees it.
+        /// <see cref="DefaultProperty"/> is the PRISTINE default (JSON + the
+        /// string-channel fallback) — what a reset returns to — never the profile's
+        /// override.</summary>
+        internal readonly struct TelemetryChannelCatalogEntry
+        {
+            public readonly string Url;
+            public readonly string Name;
+            public readonly string Compression;
+            public readonly string DefaultProperty;
+            public readonly int PackageLevel;
+
+            public TelemetryChannelCatalogEntry(string url, string name, string compression,
+                string defaultProperty, int packageLevel)
+            {
+                Url = url;
+                Name = name;
+                Compression = compression;
+                DefaultProperty = defaultProperty;
+                PackageLevel = packageLevel;
+            }
+        }
+
+        /// <summary>Every channel declared in <c>Data/Telemetry.json</c>, sorted by name,
+        /// for the master channel mapper's list. Independent of any wheel/catalog.</summary>
+        internal IReadOnlyList<TelemetryChannelCatalogEntry> EnumerateTelemetryChannels()
+        {
+            var map = GetTelemetryMap();
+            var list = new List<TelemetryChannelCatalogEntry>(map.Count);
+            foreach (var kv in map)
+            {
+                var info = kv.Value;
+                string def = info.SimHubProperty ?? "";
+                // String channels with no JSON property fall back to StringChannelDefaults
+                // at build time (BuildStringChannel), so that IS their pristine default.
+                if (def.Length == 0
+                    && string.Equals(info.Compression, "string", StringComparison.OrdinalIgnoreCase)
+                    && StringChannelDefaults.ByUrl.TryGetValue(kv.Key, out var sd))
+                    def = sd;
+                list.Add(new TelemetryChannelCatalogEntry(
+                    kv.Key, info.Name, info.Compression, def, info.PackageLevel));
+            }
+            list.Sort((a, b) =>
+            {
+                int c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+                return c != 0 ? c : string.Compare(a.Url, b.Url, StringComparison.OrdinalIgnoreCase);
+            });
+            return list;
+        }
+
         /// <summary>
         /// Build a multi-tier <see cref="MultiStreamProfile"/> from the wheel's
         /// advertised channel catalog. Eliminates the mzdash dependency for
@@ -60,10 +177,10 @@ namespace MozaPlugin.Telemetry.Dashboard
         // ChannelDefinition to MultiStreamProfile.StringChannels.
         private static ChannelDefinition BuildStringChannel(string url, TelemetryChannelInfo info)
         {
-            double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+            var (property, scale) = ResolveDefaultBinding(url, info);
             return BuildStringChannel(
                 url, info.Name, info.Compression, info.Field,
-                info.SimHubProperty ?? "", scale, info.PackageLevel,
+                property, scale, info.PackageLevel,
                 info.Range, info.DataType);
         }
 
@@ -312,7 +429,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         continue;
                     }
                     int bitWidth = CompressionTable.TryGetByName(info.Compression, out var ct) ? ct.BitWidth : 32;
-                    double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+                    var (property, scale) = ResolveDefaultBinding(url, info);
                     ch = new ChannelDefinition
                     {
                         Name = info.Name,
@@ -320,7 +437,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         Compression = info.Compression,
                         BitWidth = bitWidth,
                         SimHubField = info.Field,
-                        SimHubProperty = info.SimHubProperty,
+                        SimHubProperty = property,
                         SimHubPropertyScale = scale,
                         PackageLevel = packageLevel,
                         TestSignal = TestSignalCatalog.Resolve(info.Name, info.Range, info.DataType, info.Compression),
@@ -671,10 +788,9 @@ namespace MozaPlugin.Telemetry.Dashboard
                                 compression = info.Compression;
                                 bitWidth = CompressionTable.TryGetByName(compression, out var ct3) ? ct3.BitWidth : 32;
                                 field = info.Field;
-                                property = info.SimHubProperty ?? "";
+                                (property, scale) = ResolveDefaultBinding(url, info);
                                 level = info.PackageLevel;
                                 chName = info.Name;
-                                scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
                                 rangeStr = info.Range;
                                 dataType = info.DataType;
                             }
@@ -766,10 +882,12 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>
         /// Apply a per-channel user mapping to a loaded profile, overriding
-        /// <see cref="ChannelDefinition.SimHubProperty"/> by channel URL. Entries
-        /// with an empty/whitespace value are ignored (the channel keeps its
+        /// <see cref="ChannelDefinition.SimHubProperty"/> by channel URL — and resetting
+        /// <see cref="ChannelDefinition.SimHubPropertyScale"/> to 1, since the JSON scale
+        /// is calibrated for the JSON property (see <see cref="ResolveDefaultBinding"/>).
+        /// Entries with an empty/whitespace value are ignored (the channel keeps its
         /// JSON default). To revert a user override, remove the entire dashboard
-        /// entry from the settings map (see <c>ClearCurrentDashboardMappings</c>).
+        /// entry from the settings map (see <c>ChannelMappingCoordinator.ClearCurrentDashboard</c>).
         /// Unknown URLs are ignored.
         /// </summary>
         public static void ApplyUserMappings(MultiStreamProfile? profile,
@@ -785,14 +903,22 @@ namespace MozaPlugin.Telemetry.Dashboard
                     if (IsInternalChannel(ch.SimHubProperty)) continue;
 
                     if (overrides.TryGetValue(ch.Url, out var path) && !string.IsNullOrWhiteSpace(path))
+                    {
+                        // Scale before property: a tick landing mid-edit then sees the
+                        // OLD property at scale 1 for one frame, never a torn double.
+                        ch.SimHubPropertyScale = 1.0;
                         ch.SimHubProperty = path.Trim();
+                    }
                 }
             }
             foreach (var ch in profile.StringChannels)
             {
                 if (IsInternalChannel(ch.SimHubProperty)) continue;
                 if (overrides.TryGetValue(ch.Url, out var path) && !string.IsNullOrWhiteSpace(path))
+                {
+                    ch.SimHubPropertyScale = 1.0;
                     ch.SimHubProperty = path.Trim();
+                }
             }
         }
 
@@ -907,7 +1033,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (!byLevel.ContainsKey(level))
                     byLevel[level] = new List<ChannelDefinition>();
 
-                double scale = info.SimHubPropertyScale == 0 ? 1.0 : info.SimHubPropertyScale;
+                var (property, scale) = ResolveDefaultBinding(url, info);
                 byLevel[level].Add(new ChannelDefinition
                 {
                     Name                = info.Name,
@@ -915,7 +1041,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     Compression         = info.Compression,
                     BitWidth            = bits,
                     SimHubField         = info.Field,
-                    SimHubProperty      = info.SimHubProperty ?? "",
+                    SimHubProperty      = property,
                     SimHubPropertyScale = scale,
                     PackageLevel        = level,
                     TestSignal          = TestSignalCatalog.Resolve(info.Name, info.Range, info.DataType, info.Compression),

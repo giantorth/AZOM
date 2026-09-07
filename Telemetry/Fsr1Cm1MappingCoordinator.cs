@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using MozaPlugin.Telemetry.Display;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Telemetry
 {
@@ -69,41 +71,48 @@ namespace MozaPlugin.Telemetry
 
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
             if (profile == null) return;
-            if (profile.Fsr1DashboardMappings == null)
-                profile.Fsr1DashboardMappings = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>();
             var g = _plugin.GetCurrentWheelPageGuid();
             if (!g.HasValue) return;
 
-            bool isDefault = IsDefaultFsr1Mapping(mapping);
+            // Copy-on-write at every level: the 20 ms display tick reads these dicts
+            // (GetActiveFsr1Mappings) while the UI edits them, and the save debounce
+            // serializes them — a published dict is never mutated in place.
+            var maps = profile.Fsr1DashboardMappings;
+            Dictionary<string, Dictionary<string, Fsr1FieldMapping>>? mid = null;
+            Dictionary<string, Fsr1FieldMapping>? inner = null;
+            if (maps != null && maps.TryGetValue(g.Value, out var mid0)) mid = mid0;
+            if (mid != null && mid.TryGetValue(recordKey, out var inner0)) inner = inner0;
 
-            // Removal: only touch the dicts if the entry exists; don't allocate empty branches.
-            if (isDefault)
+            if (IsDefaultFsr1Mapping(mapping))
             {
-                if (profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var mid) && mid != null
-                    && mid.TryGetValue(recordKey, out var inr) && inr != null)
-                {
-                    inr.Remove(fieldId);
-                    if (inr.Count == 0) mid.Remove(recordKey);
-                    if (mid.Count == 0) profile.Fsr1DashboardMappings.Remove(g.Value);
-                    _plugin.SaveSettings();
-                }
+                // Removal: only touch the dicts if the entry exists; don't allocate empty branches.
+                if (inner == null || !inner.ContainsKey(fieldId)) return;
+                var innerNext = new Dictionary<string, Fsr1FieldMapping>(inner, StringComparer.OrdinalIgnoreCase);
+                innerNext.Remove(fieldId);
+                var midNext = new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(mid!, StringComparer.OrdinalIgnoreCase);
+                if (innerNext.Count == 0) midNext.Remove(recordKey); else midNext[recordKey] = innerNext;
+                var mapsNext = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>(maps!);
+                if (midNext.Count == 0) mapsNext.Remove(g.Value); else mapsNext[g.Value] = midNext;
+                profile.Fsr1DashboardMappings = mapsNext;
+                _plugin.SaveSettings();
                 return;
-            }
-
-            if (!profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var middle) || middle == null)
-            {
-                middle = new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(StringComparer.OrdinalIgnoreCase);
-                profile.Fsr1DashboardMappings[g.Value] = middle;
-            }
-            if (!middle.TryGetValue(recordKey, out var inner) || inner == null)
-            {
-                inner = new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
-                middle[recordKey] = inner;
             }
 
             var stored = mapping!.Clone();
             stored.Property = (stored.Property ?? "").Trim();
-            inner[fieldId] = stored;
+            var innerSet = inner == null
+                ? new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, Fsr1FieldMapping>(inner, StringComparer.OrdinalIgnoreCase);
+            innerSet[fieldId] = stored;
+            var midSet = mid == null
+                ? new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(mid, StringComparer.OrdinalIgnoreCase);
+            midSet[recordKey] = innerSet;
+            var mapsSet = maps == null
+                ? new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>()
+                : new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>(maps);
+            mapsSet[g.Value] = midSet;
+            profile.Fsr1DashboardMappings = mapsSet;
             _plugin.SaveSettings();
         }
 
@@ -112,15 +121,18 @@ namespace MozaPlugin.Telemetry
         internal void ClearFsr1FieldOverrides(string recordKey)
         {
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Fsr1DashboardMappings == null) return;
+            var maps = profile?.Fsr1DashboardMappings;
+            if (maps == null) return;
             var g = _plugin.GetCurrentWheelPageGuid();
             if (!g.HasValue) return;
-            if (profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var mid) && mid != null
-                && mid.Remove(recordKey))
-            {
-                if (mid.Count == 0) profile.Fsr1DashboardMappings.Remove(g.Value);
-                _plugin.SaveSettings();
-            }
+            if (!maps.TryGetValue(g.Value, out var mid) || mid == null || !mid.ContainsKey(recordKey)) return;
+            // COW (see SetFsr1FieldMapping).
+            var midNext = new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(mid, StringComparer.OrdinalIgnoreCase);
+            midNext.Remove(recordKey);
+            var mapsNext = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>(maps);
+            if (midNext.Count == 0) mapsNext.Remove(g.Value); else mapsNext[g.Value] = midNext;
+            profile!.Fsr1DashboardMappings = mapsNext;
+            _plugin.SaveSettings();
         }
 
         // ── FSR V1 active dashboard/page index (0..18) ──────────────────────
@@ -138,10 +150,10 @@ namespace MozaPlugin.Telemetry
         internal int GetActiveFsr1Index()
         {
             // While the byte probe is armed it pins the page so a mid-sweep page-report
-            // can't scramble stepping (see MozaPlugin.Fsr1ProbeFrozenIndex). The driver,
+            // can't scramble stepping (see MozaPlugin.Fsr1Probe.FrozenIndex). The driver,
             // probe target, channel UI, and label all read through here, so they stay in
             // agreement on the frozen page for the probe's lifetime.
-            int frozen = _plugin.Fsr1ProbeFrozenIndex;
+            int frozen = _plugin.Fsr1Probe.FrozenIndex;
             if (frozen >= 0) return frozen;
             return RawActiveFsr1Index();
         }
@@ -172,10 +184,16 @@ namespace MozaPlugin.Telemetry
             var g = _plugin.GetCurrentWheelPageGuid();
             if (g.HasValue && _plugin.Settings != null)
             {
-                if (_plugin.Settings.Fsr1ActiveDashboardByWheelGuid == null)
-                    _plugin.Settings.Fsr1ActiveDashboardByWheelGuid = new Dictionary<Guid, int>();
-                changed = !_plugin.Settings.Fsr1ActiveDashboardByWheelGuid.TryGetValue(g.Value, out var prev) || prev != index;
-                _plugin.Settings.Fsr1ActiveDashboardByWheelGuid[g.Value] = index;
+                // COW: written from the UI and the serial read thread (Param-6 follow)
+                // while the save debounce serializes the dict.
+                var cur = _plugin.Settings.Fsr1ActiveDashboardByWheelGuid;
+                changed = cur == null || !cur.TryGetValue(g.Value, out var prev) || prev != index;
+                if (changed)
+                {
+                    var next = cur == null ? new Dictionary<Guid, int>() : new Dictionary<Guid, int>(cur);
+                    next[g.Value] = index;
+                    _plugin.Settings.Fsr1ActiveDashboardByWheelGuid = next;
+                }
                 if (changed && !sendToWheel) _plugin.SaveSettings(); // host path saves after queuing below
             }
             // Dedupe: the wheel PERSISTS the index to EEPROM (Table 7 Param 6) on every
@@ -286,23 +304,24 @@ namespace MozaPlugin.Telemetry
             if (string.IsNullOrEmpty(fieldId)) return;
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
             if (profile == null) return;
-            if (profile.Cm1FieldMappings == null)
-                profile.Cm1FieldMappings = new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>();
-            if (!profile.Cm1FieldMappings.TryGetValue(MozaPlugin.Cm1PageGuid, out var inner) || inner == null)
-            {
-                inner = new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
-                profile.Cm1FieldMappings[MozaPlugin.Cm1PageGuid] = inner;
-            }
+            // COW (see SetFsr1FieldMapping): the 50 ms CM1 driver tick reads these.
+            var maps = profile.Cm1FieldMappings;
+            Dictionary<string, Fsr1FieldMapping>? inner = null;
+            if (maps != null && maps.TryGetValue(MozaPlugin.Cm1PageGuid, out var inner0)) inner = inner0;
             string trimmed = (property ?? "").Trim();
+            var innerNext = inner == null
+                ? new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, Fsr1FieldMapping>(inner, StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(trimmed) && scale == null)
-            {
-                inner.Remove(fieldId);
-                if (inner.Count == 0) profile.Cm1FieldMappings.Remove(MozaPlugin.Cm1PageGuid);
-            }
+                innerNext.Remove(fieldId);
             else
-            {
-                inner[fieldId] = new Fsr1FieldMapping { Property = trimmed, Scale = scale };
-            }
+                innerNext[fieldId] = new Fsr1FieldMapping { Property = trimmed, Scale = scale };
+            var mapsNext = maps == null
+                ? new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>()
+                : new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>(maps);
+            if (innerNext.Count == 0) mapsNext.Remove(MozaPlugin.Cm1PageGuid);
+            else mapsNext[MozaPlugin.Cm1PageGuid] = innerNext;
+            profile.Cm1FieldMappings = mapsNext;
             _plugin.SaveSettings();
         }
 
@@ -310,8 +329,12 @@ namespace MozaPlugin.Telemetry
         internal void ClearCm1Mappings()
         {
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Cm1FieldMappings == null) return;
-            if (profile.Cm1FieldMappings.Remove(MozaPlugin.Cm1PageGuid)) _plugin.SaveSettings();
+            var maps = profile?.Cm1FieldMappings;
+            if (maps == null || !maps.ContainsKey(MozaPlugin.Cm1PageGuid)) return;
+            var next = new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>(maps);
+            next.Remove(MozaPlugin.Cm1PageGuid);
+            profile!.Cm1FieldMappings = next;
+            _plugin.SaveSettings();
         }
 
         private int _cm1PendingSelect = -1;
@@ -336,10 +359,15 @@ namespace MozaPlugin.Telemetry
                 index = Cm1DisplayEmitter.MaxDashboardIndex;
             if (_plugin.Settings != null)
             {
-                if (_plugin.Settings.Cm1ActiveDashboardByGuid == null)
-                    _plugin.Settings.Cm1ActiveDashboardByGuid = new Dictionary<Guid, int>();
-                bool changed = !_plugin.Settings.Cm1ActiveDashboardByGuid.TryGetValue(MozaPlugin.Cm1PageGuid, out var prev) || prev != index;
-                _plugin.Settings.Cm1ActiveDashboardByGuid[MozaPlugin.Cm1PageGuid] = index;
+                var cur = _plugin.Settings.Cm1ActiveDashboardByGuid;
+                bool changed = cur == null || !cur.TryGetValue(MozaPlugin.Cm1PageGuid, out var prev) || prev != index;
+                if (changed)
+                {
+                    // COW, as for the FSR1 index above.
+                    var next = cur == null ? new Dictionary<Guid, int>() : new Dictionary<Guid, int>(cur);
+                    next[MozaPlugin.Cm1PageGuid] = index;
+                    _plugin.Settings.Cm1ActiveDashboardByGuid = next;
+                }
                 if (changed && !sendToWheel) _plugin.SaveSettings();
             }
             if (sendToWheel)

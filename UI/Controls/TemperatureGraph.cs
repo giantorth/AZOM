@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MozaControls
 {
@@ -182,15 +183,31 @@ namespace MozaControls
                 oldNcc.CollectionChanged -= self.OnCollectionChanged;
             if (e.NewValue is INotifyCollectionChanged newNcc)
                 newNcc.CollectionChanged += self.OnCollectionChanged;
-            self.Recompute();
+            self.ScheduleRecompute();
         }
 
-        private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => Recompute();
+        private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => ScheduleRecompute();
 
         protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
         {
             base.OnRenderSizeChanged(sizeInfo);
-            Recompute();
+            ScheduleRecompute();
+        }
+
+        // Coalesce: the host assigns all three series per 500 ms tick, and each
+        // assignment used to rebuild every series' geometry. One render-priority
+        // pass per dispatcher frame rebuilds them once (see BandwidthSparkline).
+        private bool _recomputePending;
+
+        private void ScheduleRecompute()
+        {
+            if (_recomputePending) return;
+            _recomputePending = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
+            {
+                _recomputePending = false;
+                Recompute();
+            }));
         }
 
         private static List<double> Collect(IEnumerable? src)

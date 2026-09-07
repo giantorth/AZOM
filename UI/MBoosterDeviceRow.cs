@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI
 {

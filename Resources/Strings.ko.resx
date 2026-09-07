@@ -11,9 +11,9 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>허브</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>옵션</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>가져오기</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>정보</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>도움말</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>연결 안 됨</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>새로 고침</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>성능 출력</value></data>
@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>테스트</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>락업</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>임계값</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>반클러치 지점</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>엔진 진동</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>주파수 (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>부드러움</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>게인</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>트리거 입력 레벨</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>진동 감쇠</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// 실험적 기능 — mBooster 펌웨어가 적용하지 않을 수 있음</value></data>
@@ -187,28 +189,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>포트 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>포트 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>포트 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>프로필</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>설정</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>시작 시 프로필 설정 적용</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>휠 LED 출력</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// RPM + 버튼 전송 제한</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>권장: LED 문제가 없는 한 아래 LED 옵션은 OFF로 두세요.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>휠 업데이트 제한</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>LED 데이터가 실제로 변경될 때만 전송합니다.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>비트마스크 항상 재전송</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>변경이 없어도 색상 업데이트와 함께 LED 비트마스크를 항상 전송합니다. 추가 트래픽이 발생합니다.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>USB 감지</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>시리얼 프로브 폴백 비활성화 (고급)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>플러그인이 잘못된 장치와 통신하는 경우에만 필요합니다.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 감지 비활성화 (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>액티브 시프터 재연결 프로브를 건너뜁니다.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>연결 시 대시보드 업로드</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>휠에서 대시보드 다운로드</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>휠 펌웨어 세대:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>자동 — 휠 핸드셰이크에서 감지 시도</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>2024 세대 — (URL 구독)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>2026 세대 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>자동은 핸드셰이크에서 휠의 펌웨어 세대를 감지해 맞는 프로토콜을 선택합니다. 텔레메트리가 동작하지 않을 때만 수동으로 변경하세요.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>모든 탭 표시 (고급)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>장치 정의</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>모든 정의 다시 배포</value></data>
@@ -216,11 +201,7 @@
   <data name="Section_Reset" xml:space="preserve"><value>초기화</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>모든 설정 및 프로필 지우기</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>모든 플러그인 설정과 프로필이 기본값으로 초기화됩니다.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>대시보드 업로드는 개발 중이며 현재는 휠로 파일을 전송하지 않습니다.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>대시보드 업로드</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// .mzdash 파일을 연결된 휠로 전송</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>상태는 가장 최근의 휠 ack를 반영합니다.</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>소스</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>로컬 .mzdash 파일</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>대시보드 라이브러리</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>.MZDASH 선택…</value></data>
@@ -228,38 +209,13 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>대시보드:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>지금 업로드</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>대기</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>대시보드 이름:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>원본 크기:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>전송 중:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>마지막 ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>마지막 ack 상태 바이트:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>참고: 업로드하려면 휠이 연결되어 있고 관리 세션이 협상되어 있어야 합니다.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>휠 파일</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// 휠에 로드된 대시보드</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>삭제는 일시적으로 비활성화되어 있습니다.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>상태</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>제목</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>디렉터리 이름</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>해시</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>마지막 수정</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>삭제</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>일시적으로 비활성화됨.</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>CoAP 서버</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// PitHouse 자동 실행을 막으려면 이 옵션을 켜세요</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>iRacing이나 360 Hz 모드를 사용하는 게임처럼 공식 MOZA SDK 지원이 필요한 게임을 위한 기능입니다. 플러그인이 루프백에 내장 CoAP SDK 제어 서버를 실행합니다.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>사용 중에는 프로세스 목록에 "MOZA Pit House.exe"라는 이름의 작은 대리 프로세스가 표시됩니다. 이는 정상이며, MOZA SDK 앱이 이름으로 PitHouse를 찾을 수 있게 해 줍니다. 이 옵션을 끄거나 SimHub를 종료하면 자동으로 종료됩니다.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP SDK 서버 사용</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP 제어</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// 순수 CBOR-over-UDP 제어 인터페이스</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>조향각 설정용 레거시 UDP 제어입니다. 알려진 유일한 용도는 Richard Burns Rally의 RSF 버전입니다.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>UDP 제어 서버 사용</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>포트</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>상태</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP 서버</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP 제어</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>최근 요청</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// 서버당 최근 20개 요청 · 실시간</value></data>
   <data name="Section_About" xml:space="preserve"><value>정보</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// 오픈소스 SimHub 플러그인</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -378,8 +334,8 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// RPM이 레드라인에 도달하면 표시</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>플래그 LED 색상</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>조향각</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>끄기</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>켜기</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>입력</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>대시보드</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LED</value></data>
@@ -415,6 +371,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>SimHub 속성 바인딩 편집</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>수식으로 편집 (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>기본값으로 재설정</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>전역 기본값</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>채널 기본값 관리</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>모든 기본값 재설정</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>닫기</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{1}개 중 {0}개 재정의됨</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>기본값 복원</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>전역 채널 매퍼를 사용할 수 없습니다 (로그 참조)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>필드 초기화</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>필드 분할</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>비트 분할</value></data>
@@ -493,14 +456,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>편집 중 · 노브 1 · 활성</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>선택한 색으로 링 채우기</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>이 노브를 전체에 복사</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  대시보드 업로드는 아직 동작하지 않음</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>절전 라이트</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// 유휴 시간 초과 후 휠에 표시되는 내용</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>속도</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>색상</value></data>
   <data name="Section_Language" xml:space="preserve"><value>언어</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>언어</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>새 언어를 적용하려면 이 설정 페이지를 닫았다가 다시 여세요. 자동은 SimHub의 언어 설정을, 그다음 OS 설정을 따릅니다.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>변경하려면 재시작이 필요합니다.</value></data>
   <data name="Button_ImportProfile" xml:space="preserve"><value>프로필 가져오기…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>PitHouse 프리셋 가져오기</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>파일 찾아보기…</value></data>
@@ -538,7 +500,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>연결된 휠</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0}이(가) SimHub에 추가되지 않았습니다</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>MOZA 대시보드가 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>이 휠베이스에는 앰비언트 LED 스트립이 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 스트립을 제어하려면 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>휠베이스가 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>휠 '{1}'이(가) 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 포트</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>노브 표시등</value></data>
@@ -546,9 +508,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>시작 중…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>중지됨</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>실행 중 (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>서버가 시작되지 않음 — 위의 토글로 활성화하세요</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>아직 요청 없음</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>아직 요청 없음 — 타사 도구는 설정을 읽거나 쓸 때만 여기서 통신합니다</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>스텁 관리자</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>캡처 중… (상시 캡처가 켜져 있음 — 준비되면 중지를 클릭하세요)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>캡처 중… (다른 탭을 열어 장치를 사용한 뒤 돌아와 중지하세요)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>{0}(으)로 내보냄</value></data>
@@ -563,8 +523,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>폴더: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>업로드 대기 중 — "{0}"을(를) 휠로 전송하는 중…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>업로드를 시작하지 못함 — 휠이 연결되지 않았거나 관리 세션이 아직 없습니다.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>업로드 완료 (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>업로드 중지됨 (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>업로드 완료 (상태 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>{0}%에서 업로드 중지됨 (상태 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>업로드할 .mzdash 파일을 선택하세요</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 대시보드 (*.mzdash)|*.mzdash|모든 파일 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>.mzdash 대시보드 파일이 있는 폴더를 선택하세요</value></data>
@@ -628,7 +588,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>시프터</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>비행 시뮬레이션</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>킵얼라이브 시간 제한</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>텔레메트리가 멈춘 후 휠이 절전 모드로 들어가기 전까지 LED를 새로 고치는 시간입니다. 0 = 즉시 중지.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>텔레메트리가 멈춘 후 휠이 절전 모드로 들어가기 전까지 LED를 새로 고치는 시간입니다.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>디스플레이 회전</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>부드럽게</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>즉시</value></data>
@@ -665,8 +625,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>페달 역할</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>페달 {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>이 mBooster는 하나의 연결에 여러 페달을 호스팅합니다. 감지된 각 축을 게임 입력에 할당하세요. 기본 순서는 Moza의 Rx/Ry/Rz 레이아웃(가속/브레이크/클러치)을 따릅니다 — 페달이 잘못된 입력을 구동하면 여기서 다시 매핑하세요.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>페달 구성:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>이 페달은 패시브(모터 없음)이므로 진동 효과가 적용되지 않습니다.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>시프터 설정</value></data>
@@ -718,27 +678,32 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>브레이크 페이드 (실험적)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>시작 온도 (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>실험적 — 활성화되어 있는 동안 실제 하드웨어 캘리브레이션 값인 이동 종료 지점과 최대 임계값을 기록하여(더 많은 이동 거리와 힘이 필요해짐) 브레이크가 식으면서 설정한 값으로 복원합니다. 페달 느낌 / 시뮬레이션 입력 매핑에서 해당 값이 이미 설정되어 있어야 하며, 그렇지 않으면 효과가 없습니다.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>G-포스 (관성 페달 필) (실험적)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>실험적 — 진동 대신 실시간 종방향 G에 비례해 페달 자체를 발 아래에서 밀어냅니다(가속 시 앞으로, 제동 시 뒤로). 최대 페달 이동은 최대 G에서 얼마나 움직일지, 응답 속도는 페달이 새 위치까지 얼마나 빨리 이동할지 정합니다.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>최대 페달 이동 (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>응답 속도 (%)</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>문제 신고</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>개발자에게 진단 보고서 보내기</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>문제를 설명해 주세요</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>문제를 설명해 주세요: 무엇을 했는지, 휠이나 대시보드가 어떻게 반응했는지, 언제부터 시작됐는지.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>연락처 (선택 — 이메일 또는 Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>제출하면 진단 번들(플러그인 로그와 시리얼 추적, 하드웨어 식별자는 가려짐)이 플러그인 개발자에게 업로드됩니다.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>버그 신고 보내기</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>업로드 중…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>신고가 접수되었습니다. 참조: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>최근 이 연결에서 너무 많은 신고가 접수되었습니다 — 나중에 다시 시도해 주세요.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>진단 번들이 너무 커서 업로드할 수 없습니다.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>업로드에 실패했습니다. 연결을 확인한 후 다시 시도해 주세요.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>연결 문제가 아니라 저희 CDN에서 업로드를 차단했습니다 — 번들 내보내기를 사용해 주세요.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>제출하기 전에 문제를 설명해 주세요.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>진단 캡처</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>시리얼 트래픽의 짧은 추적을 메모리에 보관합니다(시작 후 첫 1분과 최근 활동). 버그 신고에 연결/핸드셰이크가 포함됩니다. 신고를 보내기 전까지 PC를 벗어나는 데이터는 없습니다.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>진단 캡처가 꺼져 있습니다.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>시작: {0} 프레임 ({1} KB, {2}) · 롤링: {3} 프레임 ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>멈춤</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>채우는 중</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>다른 신고를 보내기 전에 잠시 기다려 주세요.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>진단 번들을 이 PC의 파일로 저장합니다(업로드되지 않음).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>게임 키</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>와이퍼 앞으로</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>와이퍼 뒤로</value></data>
@@ -764,4 +729,49 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>입력 힘</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>LED별 색상</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>대기 · 고정</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>대기 · 호흡</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>절전 · 호흡</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>애니메이션 속도 (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>호흡 속도 (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>대기 효과</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>대기 애니메이션</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>휠베이스 LFE 소스</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>플러그인 LFE 탭</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>SimHub 9.12 이상이 필요합니다.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>장치 정의가 업데이트되었습니다. 적용하려면 SimHub를 다시 시작하세요.</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 호환성</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>그래프</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>대역폭</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>토크</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>토크</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>범위</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>STUDIO에서 편집</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>새 대시보드…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>선택한 대시보드를 MOZA Dashboard Studio에서 엽니다</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>연결된 디스플레이 크기에 맞춰 MOZA Dashboard Studio에서 새 대시보드를 만듭니다</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Studio에서 열림 — 완료 후 새로 고침을 누르세요.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio를 찾을 수 없음 — MOZA Pit House를 설치하세요.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio 시작 실패: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>디스크에 파일이 있는 대시보드를 선택하세요.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>아직 디스플레이 정보 없음 — 장치 없이 엽니다.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>{0} 에 저장</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>라이브러리 다시 읽음 — 대시보드 {0}개.</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R 레이아웃 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 레이아웃</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 레이아웃</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 레이아웃</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>상태 조회</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>실시간 조회</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>레이아웃 되읽기</value></data>
+  <data name="Label_State" xml:space="preserve"><value>상태</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>상태 오류</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>상태:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>업로드 중 - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>완료 - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>중지됨 - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>업로드 소스</value></data>
 </root>

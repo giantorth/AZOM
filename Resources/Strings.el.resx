@@ -11,9 +11,9 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Hub</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Επιλογές</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Εισαγωγή</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>Σχετικά</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Βοήθεια</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Αποσυνδεδεμένο</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>ΑΝΑΝΕΩΣΗ</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Απόδοση Βάσης</value></data>
@@ -22,7 +22,7 @@
   <data name="Button_CalibrateCenter" xml:space="preserve"><value>ΒΑΘΜΟΝΟΜΗΣΗ ΚΕΝΤΡΟΥ</value></data>
   <data name="Brand_Mcu" xml:space="preserve"><value>MCU</value></data>
   <data name="Brand_Mosfet" xml:space="preserve"><value>MOSFET</value></data>
-  <data name="Brand_Motor" xml:space="preserve"><value>MOTOR</value></data>
+  <data name="Brand_Motor" xml:space="preserve"><value>ΜΟΤΕΡ</value></data>
   <data name="Section_CoreSettings" xml:space="preserve"><value>ΒΑΣΙΚΕΣ ΡΥΘΜΙΣΕΙΣ</value></data>
   <data name="Section_GearshiftVibration" xml:space="preserve"><value>ΔΟΝΗΣΗ ΑΛΛΑΓΗΣ ΤΑΧΥΤΗΤΑΣ</value></data>
   <data name="SliderLabel_WheelRotationAngle" xml:space="preserve"><value>Γωνία Περιστροφής Τιμονιού</value></data>
@@ -53,7 +53,7 @@
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ FFB</value></data>
   <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// σύρετε τους 5 κόμβους για να διαμορφώσετε την απόκριση</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>ΓΡΑΜΜΙΚΟ</value></data>
-  <data name="Button_SCurve" xml:space="preserve"><value>S CURVE</value></data>
+  <data name="Button_SCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>ΕΚΘΕΤΙΚΟ</value></data>
   <data name="Button_Parabolic" xml:space="preserve"><value>ΠΑΡΑΒΟΛΙΚΟ</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>ΔΙΑΦΟΡΑ</value></data>
@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Δοκιμή</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Κλείδωμα</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Κατώφλι</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Σημείο συμπλέκτη</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Δόνηση κινητήρα</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Συχνότητα (Hz)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Ομαλότητα</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Ενίσχυση</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Επίπεδο ενεργοποίησης</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Απόσβεση δόνησης</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// πειραματικό — ενδέχεται να μην υποστηρίζεται από firmware mBooster</value></data>
@@ -187,28 +189,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>Θύρα 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Θύρα 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Θύρα 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>ΠΡΟΦΙΛ</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Εφαρμογή ρυθμίσεων προφίλ κατά την εκκίνηση</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>ΕΞΟΔΟΣ LED ΤΙΜΟΝΙΟΥ</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// Περιορισμός rpm + κουμπιών</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Σύσταση: αφήστε τις παρακάτω επιλογές LED ΑΝΕΝΕΡΓΕΣ εκτός αν αντιμετωπίζετε προβλήματα με τα LED.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Περιορισμός ενημερώσεων στο τιμόνι</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Αποστολή δεδομένων σε LED μόνο όταν αλλάζουν.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Πάντα επαναποστολή bitmask</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Πάντα αποστολή LED bitmask με ενημερώσεις χρώματος, ακόμα και αν δεν άλλαξε. Προκαλεί επιπλέον κίνηση δεδομένων.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>ΑΝΙΧΝΕΥΣΗ USB</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Απενεργοποίηση fallback σειριακής ανίχνευσης (για προχωρημένους)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Απαιτείται μόνο αν το plugin επικοινωνεί με λάθος συσκευή.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Απενεργοποίηση ανίχνευσης active-shifter (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Παράλειψη ανίχνευσης επανασύνδεσης του active-shifter.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ΤΗΛΕΜΕΤΡΙΑ ΟΘΟΝΗΣ ΟΡΓΑΝΩΝ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Μεταφόρτωση οθόνης κατά τη σύνδεση</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Λήψη οθόνης από το τιμόνι</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Έκδοση firmware τιμονιού:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Αυτόματα — Προσπάθεια ανίχνευσης από handshake τιμονιού</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Έκδοση 2024 — (URL subscription)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Έκδοση 2026 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Αυτόματη ανίχνευση της έκδοσης firmware του τιμονιού από το handshake και επιλογή αντίστοιχου πρωτοκόλλου. Αλλάξτε μόνο αν η τηλεμετρία δεν λειτουργεί.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Εμφάνιση όλων των καρτελών (για προχωρημένους)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ΟΡΙΣΜΟΙ ΣΥΣΚΕΥΩΝ</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>ΕΠΑΝΕΓΚΑΤΑΣΤΑΣΗ ΟΛΩΝ ΤΩΝ ΟΡΙΣΜΩΝ</value></data>
@@ -216,11 +201,7 @@
   <data name="Section_Reset" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ ΟΛΩΝ ΤΩΝ ΡΥΘΜΙΣΕΩΝ &amp; ΠΡΟΦΙΛ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Αυτό θα επαναφέρει όλες τις ρυθμίσεις plugin και τα προφίλ στις προεπιλογές τους.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Η μεταφόρτωση οθόνης βρίσκεται υπό ανάπτυξη και ΔΕΝ αποστέλλει αρχεία στο τιμόνι αυτή τη στιγμή.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ΜΕΤΑΦΟΡΤΩΣΗ ΟΘΟΝΗΣ</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// αποστολή .mzdash στο συνδεδεμένο τιμόνι</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Η κατάσταση αντικατοπτρίζει την τελευταία επιβεβαίωση από το τιμόνι.</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>ΠΗΓΗ</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Τοπικό αρχείο .mzdash</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Βιβλιοθήκη οθονών</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>ΕΠΙΛΟΓΗ .MZDASH…</value></data>
@@ -228,38 +209,13 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Οθόνη:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>ΜΕΤΑΦΟΡΤΩΣΗ ΤΩΡΑ</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>αδράνεια</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Όνομα οθόνης:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Μέγεθος:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>Σε εξέλιξη:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Τελευταία επιβεβαίωση bytes_written / σύνολο:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Τελευταίο byte κατάστασης επιβεβαίωσης:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Σημείωση: Οι μεταφορτώσεις απαιτούν συνδεδεμένο τιμόνι και εγκατεστημένη διαχειριστική σύνοδο.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ΑΡΧΕΙΑ ΤΙΜΟΝΙΟΥ</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// Οθόνες φορτωμένες στο τιμόνι</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Η διαγραφή είναι προσωρινά απενεργοποιημένη.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Κατάσταση</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Τίτλος</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>DirName</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Hash</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Προσωρινά απενεργοποιημένο.</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>COAP SERVER</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// ενεργοποιήστε αυτήν την επιλογή για να αποτρέψετε την αυτόματη εκκίνηση του PitHouse</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Παρέχει υποστήριξη επίσημου MOZA SDK για παιχνίδια που το απαιτούν — όπως το iRacing, ή οποιοδήποτε παιχνίδι χρησιμοποιεί λειτουργία 360 Hz. Το plugin εκτελεί ενσωματωμένο CoAP SDK control server σε loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Όταν είναι ενεργό, το plugin εκτελεί μια μικρή βοηθητική διεργασία που εμφανίζεται στη λίστα διεργασιών ως "MOZA Pit House.exe". Αυτό είναι αναμενόμενο — επιτρέπει στις εφαρμογές MOZA SDK να εντοπίζουν το PitHouse. Τερματίζεται αυτόματα όταν απενεργοποιείται ή κλείνει το SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση CoAP SDK server</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>UDP CONTROL</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// CBOR-over-UDP control surface</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Αυτός είναι ένας legacy UDP control για ρύθμιση γωνίας τιμονιού. Η μόνη γνωστή χρήση είναι η RSF έκδοση του Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Ενεργοποίηση UDP control server</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Θύρα</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>ΚΑΤΑΣΤΑΣΗ</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>CoAP server</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>UDP control</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>ΠΡΟΣΦΑΤΑ ΑΙΤΗΜΑΤΑ</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// τελευταία 20 αιτήματα ανά server · live</value></data>
   <data name="Section_About" xml:space="preserve"><value>ΣΧΕΤΙΚΑ</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// Πρόσθετο SimHub ανοιχτού κώδικα</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -339,7 +295,7 @@
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>ΜΙΚΡΟΡΥΘΜΙΣΗ · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>ΑΚΥΡΩΣΗ</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>ΟΚ</value></data>
-  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>MOZA WHEEL BASE · AMBIENT LEDS</value></data>
+  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>ΒΑΣΗ ΤΙΜΟΝΙΟΥ MOZA · ΦΩΤΙΣΜΟΣ ΠΕΡΙΒΑΛΛΟΝΤΟΣ</value></data>
   <data name="Label_BaseModel" xml:space="preserve"><value>Μοντέλο βάσης</value></data>
   <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>Δεν εντοπίστηκαν ambient LED βάσης. Οι βάσεις R9/R12 δεν έχουν LED strip· αυτός ο πίνακας ενεργοποιείται μόνο σε βάσεις R21/R25/R27.</value></data>
   <data name="Section_Mode" xml:space="preserve"><value>ΛΕΙΤΟΥΡΓΙΑ</value></data>
@@ -378,8 +334,8 @@
   <data name="Subtitle_RpmBlinkColors" xml:space="preserve"><value>// Εμφανίζεται όταν το RPM φτάνει στο redline</value></data>
   <data name="Section_FlagLedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ LED ΣΗΜΑΙΑΣ</value></data>
   <data name="Label_SteeringAngle" xml:space="preserve"><value>ΓΩΝΙΑ ΤΙΜΟΝΙΟΥ</value></data>
-  <data name="Toggle_Off" xml:space="preserve"><value>OFF</value></data>
-  <data name="Toggle_On" xml:space="preserve"><value>ON</value></data>
+  <data name="Toggle_Off" xml:space="preserve"><value>ΑΝΕΝΕΡΓΟ</value></data>
+  <data name="Toggle_On" xml:space="preserve"><value>ΕΝΕΡΓΟ</value></data>
   <data name="TabHeader_Inputs" xml:space="preserve"><value>Είσοδοι</value></data>
   <data name="TabHeader_Dashboard" xml:space="preserve"><value>Πίνακας</value></data>
   <data name="TabHeader_Leds" xml:space="preserve"><value>LED</value></data>
@@ -389,12 +345,12 @@
   <data name="TabHeader_Files" xml:space="preserve"><value>Αρχεία</value></data>
   <data name="TabHeader_Sleep" xml:space="preserve"><value>Αδράνεια</value></data>
   <data name="Status_SearchingForWheel" xml:space="preserve"><value>Αναζήτηση τιμονιού...</value></data>
-  <data name="Section_LivePaddles" xml:space="preserve"><value>LIVE PADDLES</value></data>
+  <data name="Section_LivePaddles" xml:space="preserve"><value>ΠΑΛΕΤΕΣ ΣΕ ΖΩΝΤΑΝΗ ΠΡΟΒΟΛΗ</value></data>
   <data name="Label_PaddleLeft" xml:space="preserve"><value>ΑΡΙΣΤΕΡΑ</value></data>
   <data name="Label_PaddleRight" xml:space="preserve"><value>ΔΕΞΙΑ</value></data>
   <data name="Label_PaddleCombined" xml:space="preserve"><value>ΣΥΝΔΥΑΣΜΕΝΟ</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>ΕΝΕΡΓΑ ΚΟΥΜΠΙΑ</value></data>
-  <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
+  <data name="Section_Joystick" xml:space="preserve"><value>ΧΕΙΡΙΣΤΗΡΙΟ</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// Διαμόρφωση Joystick</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Δεν έχει αναφερθεί ακόμα διαμόρφωση Joystick από το τιμόνι. Συνδέστε το τιμόνι και περιμένετε να ολοκληρωθεί η ανίχνευση.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Ενεργοποίηση τηλεμετρίας οθόνης</value></data>
@@ -415,6 +371,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Επεξεργασία σύνδεσης ιδιότητας SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Επεξεργασία ως τύπος (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΣΤΑ ΠΡΟΕΠΙΛΕΓΜΕΝΑ</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>ΓΕΝΙΚΕΣ ΠΡΟΕΠΙΛΟΓΕΣ</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Γενικές προεπιλογές καναλιών</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΟΛΩΝ ΤΩΝ ΠΡΟΕΠΙΛΟΓΩΝ</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>ΚΛΕΙΣΙΜΟ</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} από {1} με παράκαμψη</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Επαναφορά προεπιλογής</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Ο γενικός χαρτογράφος καναλιών δεν είναι διαθέσιμος (δείτε το αρχείο καταγραφής)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ ΠΕΔΙΟΥ</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>ΔΙΑΙΡΕΣΗ ΠΕΔΙΟΥ</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>ΔΙΑΙΡΕΣΗ BIT</value></data>
@@ -493,14 +456,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>ΕΠΕΞΕΡΓΑΣΙΑ · ΠΟΤΕΝΣΙΟΜΕΤΡΟ 1 · ΕΝΕΡΓΟ</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>ΠΛΗΡΩΣΗ ΔΑΚΤΥΛΙΟΥ ΜΕ ΕΠΙΛΕΓΜΕΝΟ</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>ΑΝΤΙΓΡΑΦΗ ΣΕ ΟΛΑ ΤΑ ΠΟΤΕΝΣΙΟΜΕΤΡΑ</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Η μεταφόρτωση πίνακα δεν λειτουργεί ακόμα</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>ΦΩΣ ΑΔΡΑΝΕΙΑΣ</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// Τι εμφανίζει το τιμόνι μετά τη λήξη του χρόνου αδράνειας</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Ταχύτητα</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Χρώμα</value></data>
   <data name="Section_Language" xml:space="preserve"><value>ΓΛΩΣΣΑ</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Γλώσσα</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Κλείστε και ανοίξτε ξανά αυτή τη σελίδα ρυθμίσεων για εφαρμογή της νέας γλώσσας. Η αυτόματη επιλογή ακολουθεί τη γλώσσα του SimHub, και μετά του λειτουργικού συστήματος.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Απαιτεί επανεκκίνηση μετά την αλλαγή.</value></data>
 <data name="Button_ImportProfile" xml:space="preserve"><value>ΕΙΣΑΓΩΓΗ ΠΡΟΦΙΛ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Εισαγωγή Preset PitHouse</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Αναζήτηση αρχείου…</value></data>
@@ -538,7 +500,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>συνδεδεμένο τιμόνι</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>Το {0} δεν έχει προστεθεί στο SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ένα ταμπλό MOZA είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>Αυτή η βάση τιμονιού έχει λωρίδα LED περιβάλλοντος, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0} για να ελέγξετε τη λωρίδα.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Η βάση τιμονιού είναι συνδεδεμένη, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Το τιμόνι «{1}» είναι συνδεδεμένο, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>τη θύρα COM της MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Ενδείξεις περιστροφικών</value></data>
@@ -546,9 +508,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Εκκίνηση…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Σταματημένο</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Εκτελείται (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Ο διακομιστής δεν ξεκίνησε — ενεργοποιήστε τον με τον διακόπτη παραπάνω</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Δεν υπάρχουν ακόμη αιτήματα</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Δεν υπάρχουν ακόμη αιτήματα — τα εργαλεία τρίτων επικοινωνούν εδώ μόνο όταν διαβάζουν ή γράφουν μια ρύθμιση</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Διαχειριστής stub</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>Καταγραφή… (η συνεχής καταγραφή είναι ενεργή — κάντε κλικ στο Διακοπή όταν είστε έτοιμοι)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>Καταγραφή… (ανοίξτε άλλη καρτέλα και χρησιμοποιήστε τη συσκευή, μετά επιστρέψτε για διακοπή)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>εξαγωγή στο {0}</value></data>
@@ -563,8 +523,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Φάκελος: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Η αποστολή σε ουρά — μεταφορά «{0}» στο τιμόνι…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Η αποστολή δεν ξεκίνησε — το τιμόνι δεν είναι συνδεδεμένο ή δεν υπάρχει ακόμη συνεδρία διαχείρισης.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Η αποστολή ολοκληρώθηκε (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Η αποστολή σταμάτησε (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Η αποστολή ολοκληρώθηκε (κατάσταση 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Η αποστολή σταμάτησε στο {0}% (κατάσταση 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Επιλέξτε ένα αρχείο .mzdash για αποστολή</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Ταμπλό Moza (*.mzdash)|*.mzdash|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Επιλέξτε φάκελο που περιέχει αρχεία ταμπλό .mzdash</value></data>
@@ -628,14 +588,14 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Λεβιές ταχυτήτων</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Προσομοίωση πτήσης</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Χρονικό όριο Keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Πόση ώρα θα ανανεώνονται τα LED μετά τη διακοπή τηλεμετρίας πριν το τιμόνι μπει σε αδράνεια. 0 = άμεση διακοπή.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Πόση ώρα θα ανανεώνονται τα LED μετά τη διακοπή τηλεμετρίας πριν το τιμόνι μπει σε αδράνεια.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Περιστροφή οθόνης</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Ομαλή</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Άμεση</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Διακόπτες</value></data>
   <data name="Section_StalkMode" xml:space="preserve"><value>Λειτουργία διακόπτη</value></data>
   <data name="Option_StalkButtonBox" xml:space="preserve"><value>Κουτί κουμπιών</value></data>
-  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Truck sim (ETS2/ATS)</value></data>
+  <data name="Option_StalkTruckSim" xml:space="preserve"><value>Προσομοιωτής φορτηγού (ETS2/ATS)</value></data>
   <data name="Hint_StalksTruckSim" xml:space="preserve"><value>Στη λειτουργία truck sim το πρόσθετο μετατρέπει τα πατήματα των διακοπτών σε πλήκτρα πληκτρολογίου για το Euro/American Truck Simulator. Στη λειτουργία κουτιού κουμπιών οι διακόπτες λειτουργούν ως απλά κουμπιά.</value></data>
   <data name="Section_StalksKeyMapping" xml:space="preserve"><value>Αντιστοίχιση κουμπιών</value></data>
   <data name="Subtitle_StalksInteractiveMap" xml:space="preserve"><value>Πάτησε έναν διακόπτη για να επισημανθεί το κουμπί του και μετά αντιστοίχισε ένα πλήκτρο ή στάδιο υαλοκαθαριστήρων/φώτων.</value></data>
@@ -665,8 +625,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Ρόλοι πεντάλ</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Πεντάλ {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Αυτό το mBooster φιλοξενεί περισσότερα από ένα πεντάλ σε μία σύνδεση. Αντιστοιχίστε κάθε ανιχνευμένο άξονα σε μια είσοδο παιχνιδιού. Η προεπιλεγμένη σειρά ακολουθεί τη διάταξη Rx/Ry/Rz της Moza (γκάζι/φρένο/συμπλέκτης) — επαναντιστοιχίστε εδώ αν ένα πεντάλ οδηγεί λάθος είσοδο.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Ρύθμιση πεντάλ:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Αυτό το πεντάλ είναι παθητικό (χωρίς μοτέρ) — τα εφέ δόνησης δεν ισχύουν.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>ΡΥΘΜΙΣΕΙΣ ΛΕΒΙΕ</value></data>
@@ -718,27 +678,32 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Εξασθένηση Φρένων (Πειραματικό)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Θερμοκρασία Έναρξης (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Πειραματικό — όσο είναι ενεργό, γράφει τις πραγματικές βαθμονομήσεις υλικού για το Τέλος Διαδρομής και το Μέγιστο κατώφλι (απαιτείται περισσότερη διαδρομή και περισσότερη δύναμη), και επαναφέρει τις ρυθμισμένες τιμές σας καθώς κρυώνουν τα φρένα. Απαιτεί να έχουν ήδη οριστεί αυτές οι τιμές στην Αίσθηση Πεντάλ / Αντιστοίχιση Εισόδου Προσομοίωσης — διαφορετικά δεν έχει καμία επίδραση.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Δύναμη G (Αδρανειακή αίσθηση πεντάλ) (Πειραματικό)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Πειραματικό — σπρώχνει το ίδιο το πεντάλ κάτω από το πόδι σας ανάλογα με τη ζωντανή διαμήκη επιτάχυνση (η επιτάχυνση σπρώχνει μπροστά, το φρενάρισμα πίσω), αντί να δονείται. Η Μέγιστη διαδρομή πεντάλ ορίζει πόσο μετακινείται στη μέγιστη δύναμη G· η Ταχύτητα απόκρισης ορίζει πόσο γρήγορα φτάνει το πεντάλ στη νέα θέση.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Μέγιστη διαδρομή πεντάλ (mm)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Ταχύτητα απόκρισης (%)</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>ΑΝΑΦΟΡΑ ΠΡΟΒΛΗΜΑΤΟΣ</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Αποστολή αναφοράς διαγνωστικών στον προγραμματιστή</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα: τι κάνατε, τι έκανε το τιμόνι ή το ταμπλό, και πότε ξεκίνησε.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Επικοινωνία (προαιρετικό — email ή Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Με την υποβολή αποστέλλεται ένα πακέτο διαγνωστικών (αρχεία καταγραφής του πρόσθετου και ίχνος σειριακής επικοινωνίας, με τα αναγνωριστικά υλικού αφαιρεμένα) στον προγραμματιστή.</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Υποβολή αναφοράς σφάλματος</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Αποστολή…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Η αναφορά υποβλήθηκε. Κωδικός: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Πολλές αναφορές από τη σύνδεσή σας πρόσφατα — δοκιμάστε ξανά αργότερα.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Το πακέτο διαγνωστικών είναι πολύ μεγάλο για αποστολή.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Η αποστολή απέτυχε. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Η αποστολή μπλοκαρίστηκε από το CDN μας, όχι από τη σύνδεσή σας — χρησιμοποιήστε την Εξαγωγή πακέτου.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα πριν την υποβολή.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Καταγραφή διαγνωστικών</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Διατηρεί μικρό ίχνος της σειριακής επικοινωνίας στη μνήμη (το πρώτο λεπτό της εκκίνησης και την πρόσφατη δραστηριότητα), ώστε οι αναφορές σφαλμάτων να περιλαμβάνουν τη σύνδεση. Τίποτα δεν φεύγει από τον υπολογιστή σας μέχρι να υποβάλετε αναφορά.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Η καταγραφή διαγνωστικών είναι απενεργοποιημένη.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Εκκίνηση: {0} καρέ ({1} KB, {2}) · Κυλιόμενο: {3} καρέ ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>παγωμένο</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>πλήρωση</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Περιμένετε λίγο πριν υποβάλετε άλλη αναφορά.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Αποθήκευση του πακέτου διαγνωστικών σε αρχείο σε αυτόν τον υπολογιστή (δεν αποστέλλεται τίποτα).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Πλήκτρα παιχνιδιού</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Υαλοκαθαριστήρες εμπρός</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Υαλοκαθαριστήρες πίσω</value></data>
@@ -764,4 +729,49 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Δύναμη εισόδου</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ ΑΝΑ LED</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Αδράνεια · Σταθερό</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Αδράνεια · Αναπνοή</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Ύπνος · Αναπνοή</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Ταχύτητα κίνησης (ms)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Ταχύτητα αναπνοής (ms)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>ΕΦΕ ΑΔΡΑΝΕΙΑΣ</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Κίνηση αδράνειας</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Πηγή LFE βάσης τιμονιού</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Καρτέλα LFE του πρόσθετου</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Απαιτεί SimHub 9.12 ή νεότερο.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Ο ορισμός συσκευής ενημερώθηκε. Επανεκκινήστε το SimHub για εφαρμογή.</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Συμβατότητα Forza Horizon</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>Γράφημα</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Εύρος ζώνης</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Ροπή</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Ροπή</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Κλίμακα</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ΕΠΕΞΕΡΓΑΣΙΑ ΣΤΟ STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>ΝΕΟ DASHBOARD…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Άνοιγμα του επιλεγμένου dashboard στο MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Δημιουργία νέου dashboard στο MOZA Dashboard Studio, στο μέγεθος της συνδεδεμένης οθόνης</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Άνοιξε στο Studio — πατήστε Ανανέωση όταν τελειώσετε.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Δεν βρέθηκε το Dashboard Studio — εγκαταστήστε το MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Το Studio δεν ξεκίνησε: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Επιλέξτε dashboard με αρχείο στον δίσκο.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Καμία πληροφορία οθόνης ακόμη — άνοιγμα χωρίς συσκευή.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Αποθήκευση στο {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Η βιβλιοθήκη φορτώθηκε ξανά — {0} dashboards.</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>Διάταξη 5+R 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>Διάταξη R+5</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>Διάταξη R+6</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>Διάταξη R+8</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>ΑΝΙΧΝΕΥΣΗ ΚΑΤΑΣΤΑΣΗΣ</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Ζωντανή δειγματοληψία</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Ανάγνωση διάταξης</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Κατάσταση</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Σφάλμα κατάστασης</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Κατάσταση:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Αποστολή - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Ολοκληρώθηκε - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Σταμάτησε - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>ΠΗΓΗ ΑΠΟΣΤΟΛΗΣ</value></data>
 </root>

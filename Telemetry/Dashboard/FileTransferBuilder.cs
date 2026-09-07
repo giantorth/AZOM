@@ -298,7 +298,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         ///   [total_compressed_size: u32 BE]           |- 12-byte position envelope
         ///   [this_chunk_deflate_size: u32 BE]         /
         ///   [deflate slice]                           Type03ChunkStride bytes, residual on last
-        ///   [00]                                      1-byte trailing pad
+        ///   [xor status]                              XOR(body[:-1]) — validated by the wheel
         /// </code>
         /// The shared TLV/MD5 prefix is byte-identical across all chunks of one
         /// upload; only the position envelope and deflate slice differ per chunk.
@@ -342,7 +342,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 // deflate slice
                 Buffer.BlockCopy(compressedPayload, sliceStart, body, poff + 12, sliceLen);
 
-                // body[bodyLen-1] is the 1-byte trailing pad — leave as 0x00.
+                // Final byte = XOR(body[:-1]) — the same 8-bit status checksum
+                // the metadata carries. Earlier docs called this a "wire pad";
+                // the wheel's FileTransferClient VALIDATES it and rejects the
+                // sub-msg with "Invalid data: Checksum mismatch-- 0 <xor> <len>"
+                // when it's zero (display log, 2026-08-16). Verified 27/27
+                // against PitHouse ground-truth content chunks.
+                body[bodyLen - 1] = XorBody(body, 0, bodyLen - 1);
 
                 result.Add(Compose(0x03, body, FileTransferWireFormat.New2026_04_Type02));
             }
@@ -472,7 +478,8 @@ namespace MozaPlugin.Telemetry.Dashboard
         //   * Remote staging path = `/_moza_filetransfer_md5_<hex>` (no `/home/root` prefix).
         //   * Body trailer (metadata only): `[bytes_written:u32 BE = 0][total_size:u32 BE]
         //     [ff ff ff ff sentinel][1B XOR status]`. Content sub-msgs have
-        //     no XOR trailer — just the 1-byte wire pad at body end.
+        //     an XOR status trailer as the final body byte, same formula as
+        //     the metadata (validated by the wheel's FileTransferClient).
 
         /// <summary>
         /// Build the body of the type=0x02 metadata sub-msg
@@ -648,31 +655,39 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         /// <summary>
-        /// Build a local temp-file path the same way PitHouse names them.
-        /// Used only as a label in the TLV preamble — the file never actually
-        /// needs to exist on disk for the transfer to succeed.
+        /// Build a local temp-file path the same shape PitHouse names them.
+        /// Used only as a label in the TLV preamble — the file never exists.
+        ///
+        /// The path length is load-bearing: the wheel firmware reads the
+        /// file-transfer sub-msg fields at FIXED byte offsets calibrated to a
+        /// 144-byte LOCAL TLV = 70-char path (34-char dir prefix +
+        /// "_moza_filetransfer_tmp_" + 13-digit unix-ms). Every successful
+        /// PitHouse capture has exactly this length; a longer real path (75
+        /// chars under Proton's "steamuser") shifts the md5/position-envelope
+        /// fields and the wheel answers the metadata with the degenerate
+        /// 72-byte no-md5 ready-ack, then ignores all content (observed
+        /// 2026-08-16, moza-wire-20260816-101613). So: constant synthetic
+        /// prefix, never the real LocalApplicationData.
         /// </summary>
         public static string BuildLocalTempPath(long timestampMs)
-        {
-            string baseDir = Path.Combine(Environment.GetFolderPath(
-                Environment.SpecialFolder.LocalApplicationData), "Temp");
-            return $"{baseDir.Replace('\\', '/')}/_moza_filetransfer_tmp_{timestampMs}";
-        }
+            => $"C:/Users/simhb/AppData/Local/Temp/_moza_filetransfer_tmp_{timestampMs}";
 
         /// <summary>Device staging path the wheel uses for in-flight files.</summary>
         public static string BuildRemoteStagingPath(string md5Hex)
             => $"/home/root/_moza_filetransfer_md5_{md5Hex}";
 
         /// <summary>
-        /// Staging path used by PitHouse 2026-05+ firmware:
-        /// <c>/tmp/_moza_filetransfer_md5_&lt;hex&gt;</c>. The wheel uses this
-        /// path verbatim to write the staged compressed bundle file before
-        /// decompressing it; emitting a bare <c>/</c>-rooted path (the earlier
-        /// guess) made the wheel silently drop the upload because it couldn't
-        /// create the staging file at filesystem root.
+        /// Staging path for <see cref="FileTransferWireFormat.New2026_04_Type02"/>:
+        /// bare <c>/_moza_filetransfer_md5_&lt;hex&gt;</c>. Ground truth from two
+        /// successful PitHouse uploads on 2026-07/08 W17 firmware
+        /// (bridge-20260731 start.json, bridge-upload-groundtruth-20260816
+        /// dashboard bundle): the type=0x03 content 0x70 REMOTE TLV carries the
+        /// bare root-relative form — no <c>/tmp</c> and no <c>/home/root</c>
+        /// prefix. (A 2026-05-era note claimed the bare path failed; that
+        /// firmware also acked cross-session — both behaviors are gone.)
         /// </summary>
         public static string BuildRemoteStagingPathType02(string md5Hex)
-            => $"/tmp/_moza_filetransfer_md5_{md5Hex}";
+            => $"/_moza_filetransfer_md5_{md5Hex}";
 
         /// <summary>Final destination path under the wheel's dashboard resource tree.</summary>
         public static string BuildDashboardDestPath(string dashboardName)

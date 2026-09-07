@@ -77,10 +77,30 @@ namespace MozaPlugin.Devices
         // Edge guard: log the resolved base firmware once per base detect (three
         // probes race for the answer — see DeviceProber's base-fw-version case).
         public volatile bool BaseFwVersionLogged;
+        // Retry budget for the base-fw-version burst on the 5 s poll tick, spent
+        // only while the version is still unknown. The detect-time burst rides the
+        // BaseAmbientProbed latch, so a base that drops all three replies would
+        // otherwise stay LFE-dead for the session. Not volatile: the only
+        // incrementing writer is the poll timer (via Interlocked.Increment, which
+        // needs a by-ref field), and the connect/detect reset paths store 0. A
+        // stale read costs at most one extra probe round, which is why no stronger
+        // ordering is bought here.
+        public int BaseFwVersionProbeRetries;
 
         public volatile bool Group3ColorsRead;
         public volatile string LastKnownWheelModel = "";
-        public int WheelPollMisses;
+        // Wheel bus address the prober locked (0 = never locked). MozaDeviceManager's
+        // _wheelDeviceId is per-instance and defaults to 0x17, but the detected flags
+        // above ride this bag across a persistent-wire plugin reload — so the id has
+        // to ride with them, or the reload's fresh manager silently addresses every
+        // "wheel" command at 0x17 (dead LEDs on ES, which locks 0x13).
+        public volatile byte LastKnownWheelDeviceId;
+        // Interlocked: PollStatus increments it, the UI thread (connection toggle)
+        // and Init reset it.
+        private int _wheelPollMisses;
+        public int WheelPollMisses => Volatile.Read(ref _wheelPollMisses);
+        public int IncrementWheelPollMisses() => Interlocked.Increment(ref _wheelPollMisses);
+        public void ResetWheelPollMisses() => Interlocked.Exchange(ref _wheelPollMisses, 0);
 
         // Flips true when a wheel on a new-protocol-only id (0x17/0x15) ends up
         // classified old-protocol — a current-generation wheel answering like a
@@ -126,13 +146,13 @@ namespace MozaPlugin.Devices
         /// </summary>
         public void ResetAll()
         {
-            BaseDetected = false;
+            // Also picks up BaseFwVersionLogged / BaseFwVersionProbeRetries, which
+            // this method used to leave latched across a reload.
+            ResetBase();
             DashDetected = false;
-            BaseAmbientLedSupported = false;
-            BaseAmbientProbed = false;
-            BaseEq10Probed = false;
             NewWheelDetected = false;
             OldWheelDetected = false;
+            LastKnownWheelDeviceId = 0;
             HandbrakeDetected = false;
             PedalsDetected = false;
             HubDetected = false;
@@ -141,6 +161,17 @@ namespace MozaPlugin.Devices
             SgpDetected = false;
             NewWheelActingOldProtocol = false;
             NewWheelActingOldModel = "";
+            ClearOwners();
+        }
+
+        /// <summary>
+        /// Drop the per-pipe owner refs but keep the *Detected flags. The owners
+        /// are per-plugin-instance managers that End() disposes, so a bag carried
+        /// across a persistent-wire reload must not hand them to the next
+        /// instance; the next Mark*Detected re-points a null owner.
+        /// </summary>
+        public void ClearOwners()
+        {
             PedalsOwner = null;
             HandbrakeOwner = null;
             HgpOwner = null;
@@ -159,10 +190,38 @@ namespace MozaPlugin.Devices
             DashDetected = false;
             ResetWheelLedGroupMask();
             Group3ColorsRead = false;
-            WheelPollMisses = 0;
+            ResetWheelPollMisses();
             LastKnownWheelModel = "";
+            LastKnownWheelDeviceId = 0;
             NewWheelActingOldProtocol = false;
             NewWheelActingOldModel = "";
+        }
+
+        /// <summary>
+        /// Clear the base-detection latches so the prober re-runs the wheelbase
+        /// detect cascade and re-issues its identity probes.
+        /// <para>
+        /// MUST be paired with <see cref="MozaData.ClearBaseIdentity"/>: DeviceProber
+        /// gates the base identity reads (incl. <c>base-mcu-uid</c>) on BOTH
+        /// <see cref="BaseDetected"/> and <see cref="BaseAmbientProbed"/>, so clearing
+        /// the identity without clearing both latches leaves it blank for the rest of
+        /// the session — which empties the SDK <c>DeviceCatalog</c> and makes every
+        /// device-scoped CoAP URI answer 4.04.
+        /// </para>
+        /// <para>
+        /// <see cref="BaseOwner"/> is deliberately NOT cleared here: ownership is
+        /// pipe-specific, so each caller decides whether the pipe that dropped was
+        /// the owning one.
+        /// </para>
+        /// </summary>
+        public void ResetBase()
+        {
+            BaseDetected = false;
+            BaseAmbientLedSupported = false;
+            BaseAmbientProbed = false;
+            BaseEq10Probed = false;
+            BaseFwVersionLogged = false;
+            BaseFwVersionProbeRetries = 0;
         }
     }
 }

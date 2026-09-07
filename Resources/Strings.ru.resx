@@ -11,9 +11,9 @@
   <data name="TabHeader_MBooster" xml:space="preserve"><value>mBooster</value></data>
   <data name="TabHeader_Hub" xml:space="preserve"><value>Хаб</value></data>
   <data name="TabHeader_Options" xml:space="preserve"><value>Параметры</value></data>
-  <data name="TabHeader_Sdk" xml:space="preserve"><value>SDK</value></data>
+  <data name="Section_Sdk" xml:space="preserve"><value>SDK</value></data>
   <data name="TabHeader_Import" xml:space="preserve"><value>Импорт</value></data>
-  <data name="TabHeader_About" xml:space="preserve"><value>О программе</value></data>
+  <data name="TabHeader_Help" xml:space="preserve"><value>Справка</value></data>
   <data name="Status_Disconnected" xml:space="preserve"><value>Отключено</value></data>
   <data name="Button_Refresh" xml:space="preserve"><value>ОБНОВИТЬ</value></data>
   <data name="Label_PerformanceOutput" xml:space="preserve"><value>Режим производительности</value></data>
@@ -169,9 +169,11 @@
   <data name="Label_Test" xml:space="preserve"><value>Тест</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Блокировка</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Порог</value></data>
+  <data name="Section_BitePoint" xml:space="preserve"><value>Точка сцепления</value></data>
   <data name="Section_EngineContinuous" xml:space="preserve"><value>Вибрация двигателя</value></data>
   <data name="SliderLabel_FrequencyHz" xml:space="preserve"><value>Частота (Гц)</value></data>
   <data name="SliderLabel_Smoothness" xml:space="preserve"><value>Плавность</value></data>
+  <data name="SliderLabel_Gain" xml:space="preserve"><value>Усиление</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
   <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// экспериментально — прошивка mBooster может это игнорировать</value></data>
@@ -187,28 +189,11 @@
   <data name="Label_Port1" xml:space="preserve"><value>Порт 1</value></data>
   <data name="Label_Port2" xml:space="preserve"><value>Порт 2</value></data>
   <data name="Label_Port3" xml:space="preserve"><value>Порт 3</value></data>
-  <data name="Section_Profiles" xml:space="preserve"><value>ПРОФИЛИ</value></data>
+  <data name="Section_Settings" xml:space="preserve"><value>НАСТРОЙКИ</value></data>
   <data name="SliderLabel_ApplyProfileOnLaunch" xml:space="preserve"><value>Применять настройки профиля при запуске</value></data>
-  <data name="Section_WheelLedOutput" xml:space="preserve"><value>ВЫХОД СВЕТОДИОДОВ РУЛЯ</value></data>
-  <data name="Subtitle_WheelLedOutput" xml:space="preserve"><value>// ограничение rpm + кнопок</value></data>
-  <data name="Hint_LedOptionsRecommendedOff" xml:space="preserve"><value>Рекомендуется: оставьте параметры светодиодов ниже выключенными, если нет проблем со светодиодами.</value></data>
-  <data name="SliderLabel_LimitWheelUpdates" xml:space="preserve"><value>Ограничить обновления руля</value></data>
-  <data name="Hint_OnlySendLedWhenChanged" xml:space="preserve"><value>Отправлять данные светодиодов только при их изменении.</value></data>
-  <data name="SliderLabel_AlwaysResendBitmask" xml:space="preserve"><value>Всегда отправлять битмаску</value></data>
-  <data name="Hint_AlwaysResendBitmask" xml:space="preserve"><value>Всегда отправлять битмаску светодиодов с обновлениями цвета, даже если она не меняется. Создаёт дополнительный трафик.</value></data>
-  <data name="Section_UsbDetection" xml:space="preserve"><value>ОБНАРУЖЕНИЕ USB</value></data>
-  <data name="SliderLabel_DisableSerialProbe" xml:space="preserve"><value>Отключить резервное последовательное зондирование (расширенное)</value></data>
-  <data name="Hint_DisableSerialProbe" xml:space="preserve"><value>Нужно, только если плагин обращается к неверному устройству.</value></data>
-  <data name="SliderLabel_DisableAb9Detection" xml:space="preserve"><value>Отключить обнаружение активной кулисы (AB9 / AB6)</value></data>
-  <data name="Hint_DisableAb9Detection" xml:space="preserve"><value>Пропустить зондирование переподключения активной кулисы.</value></data>
   <data name="Section_DashboardTelemetry" xml:space="preserve"><value>ТЕЛЕМЕТРИЯ ПАНЕЛИ</value></data>
   <data name="Label_UploadDashboardOnConnect" xml:space="preserve"><value>Загружать панель при подключении</value></data>
   <data name="Label_DownloadDashboardsFromWheel" xml:space="preserve"><value>Скачивать панели с руля</value></data>
-  <data name="Label_WheelFirmwareEra" xml:space="preserve"><value>Эра прошивки руля:</value></data>
-  <data name="Option_FirmwareEraAuto" xml:space="preserve"><value>Авто — определить из рукопожатия руля</value></data>
-  <data name="Option_FirmwareEra2024" xml:space="preserve"><value>Эра 2024 — (подписка по URL)</value></data>
-  <data name="Option_FirmwareEra2026" xml:space="preserve"><value>Эра 2026 — CSP/KSP</value></data>
-  <data name="Hint_FirmwareEra" xml:space="preserve"><value>Авто определяет эру прошивки руля по его рукопожатию и выбирает соответствующий протокол. Переопределяйте, только если телеметрия не работает.</value></data>
   <data name="SliderLabel_ShowAllTabs" xml:space="preserve"><value>Показывать все вкладки (для опытных)</value></data>
   <data name="Section_DeviceDefinitions" xml:space="preserve"><value>ОПРЕДЕЛЕНИЯ УСТРОЙСТВ</value></data>
   <data name="Button_RedeployDefinitions" xml:space="preserve"><value>ПЕРЕУСТАНОВИТЬ ВСЕ ОПРЕДЕЛЕНИЯ</value></data>
@@ -216,11 +201,7 @@
   <data name="Section_Reset" xml:space="preserve"><value>СБРОС</value></data>
   <data name="Button_ClearAllSettings" xml:space="preserve"><value>ОЧИСТИТЬ ВСЕ НАСТРОЙКИ И ПРОФИЛИ</value></data>
   <data name="Hint_ClearAllSettingsWarning" xml:space="preserve"><value>Это сбросит все настройки и профили плагина к значениям по умолчанию.</value></data>
-  <data name="Hint_DashboardUploadNotWorking" xml:space="preserve"><value>Загрузка панели находится в разработке и пока НЕ передаёт файлы на руль.</value></data>
   <data name="Section_DashboardUpload" xml:space="preserve"><value>ЗАГРУЗКА ПАНЕЛИ</value></data>
-  <data name="Subtitle_DashboardUpload" xml:space="preserve"><value>// отправка файла .mzdash на подключённый руль</value></data>
-  <data name="Hint_UploadStatusFormat" xml:space="preserve"><value>Статус отражает последний ack от руля.</value></data>
-  <data name="Label_Source" xml:space="preserve"><value>ИСТОЧНИК</value></data>
   <data name="Option_LocalMzdashFile" xml:space="preserve"><value>Локальный файл .mzdash</value></data>
   <data name="Option_DashboardLibrary" xml:space="preserve"><value>Библиотека панелей</value></data>
   <data name="Button_PickMzdash" xml:space="preserve"><value>ВЫБРАТЬ .MZDASH…</value></data>
@@ -228,38 +209,13 @@
   <data name="Label_Dashboard" xml:space="preserve"><value>Панель:</value></data>
   <data name="Button_UploadNow" xml:space="preserve"><value>ЗАГРУЗИТЬ СЕЙЧАС</value></data>
   <data name="Status_Idle" xml:space="preserve"><value>ожидание</value></data>
-  <data name="Label_DashboardName" xml:space="preserve"><value>Имя панели:</value></data>
-  <data name="Label_RawSize" xml:space="preserve"><value>Размер:</value></data>
-  <data name="Label_Md5" xml:space="preserve"><value>MD5:</value></data>
-  <data name="Label_InFlight" xml:space="preserve"><value>В процессе:</value></data>
-  <data name="Label_LastAckBytes" xml:space="preserve"><value>Последний ack bytes_written / total:</value></data>
-  <data name="Label_LastAckStatus" xml:space="preserve"><value>Байт статуса последнего ack:</value></data>
-  <data name="Hint_UploadRequiresConnection" xml:space="preserve"><value>Примечание: для загрузки требуется подключённый руль и согласованный сеанс управления.</value></data>
   <data name="Section_WheelFiles" xml:space="preserve"><value>ФАЙЛЫ РУЛЯ</value></data>
-  <data name="Subtitle_WheelFiles" xml:space="preserve"><value>// панели, загруженные на руль</value></data>
-  <data name="Hint_DeleteDisabled" xml:space="preserve"><value>Удаление временно отключено.</value></data>
   <data name="DataGridHeader_State" xml:space="preserve"><value>Состояние</value></data>
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Название</value></data>
-  <data name="DataGridHeader_DirName" xml:space="preserve"><value>Папка</value></data>
-  <data name="DataGridHeader_Hash" xml:space="preserve"><value>Хеш</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Изменено</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>УДАЛИТЬ</value></data>
-  <data name="Tooltip_DeleteDisabled" xml:space="preserve"><value>Временно отключено.</value></data>
-  <data name="Section_CoapServer" xml:space="preserve"><value>СЕРВЕР COAP</value></data>
-  <data name="Subtitle_CoapServer" xml:space="preserve"><value>// включите эту опцию, чтобы PitHouse не запускался автоматически</value></data>
-  <data name="Hint_CoapServerEnabled" xml:space="preserve"><value>Обеспечивает официальную поддержку MOZA SDK для игр, которым она нужна, например iRacing или любой игры, использующей режим 360 Гц. Для этого плагин запускает встроенный сервер управления CoAP SDK на loopback.</value></data>
-  <data name="Hint_CoapStubProcessName" xml:space="preserve"><value>Когда включено, плагин запускает небольшой процесс-заместитель, который отображается в списке процессов как «MOZA Pit House.exe». Это нормально: так приложения MOZA SDK находят PitHouse по имени. Он завершается автоматически при отключении этой функции или закрытии SimHub.</value></data>
   <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Включить сервер CoAP SDK</value></data>
-  <data name="Section_UdpControl" xml:space="preserve"><value>УПРАВЛЕНИЕ ПО UDP</value></data>
-  <data name="Subtitle_UdpControl" xml:space="preserve"><value>// простой CBOR-по-UDP интерфейс управления</value></data>
-  <data name="Hint_UdpControlEnabled" xml:space="preserve"><value>Это устаревший интерфейс управления по UDP для задания угла поворота руля. Единственное известное применение — версия RSF игры Richard Burns Rally.</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Включить сервер управления по UDP</value></data>
-  <data name="Label_PortNumber" xml:space="preserve"><value>Порт</value></data>
-  <data name="Label_UdpControlServer" xml:space="preserve"><value>Управление по UDP</value></data>
-  <data name="Section_Status" xml:space="preserve"><value>СТАТУС</value></data>
-  <data name="Label_CoapServer" xml:space="preserve"><value>Сервер CoAP</value></data>
-  <data name="Section_RecentRequests" xml:space="preserve"><value>НЕДАВНИЕ ЗАПРОСЫ</value></data>
-  <data name="Subtitle_RecentRequests" xml:space="preserve"><value>// последние 20 запросов на сервер · в реальном времени</value></data>
   <data name="Section_About" xml:space="preserve"><value>О ПРОГРАММЕ</value></data>
   <data name="Subtitle_About" xml:space="preserve"><value>// плагин SimHub с открытым исходным кодом</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -415,6 +371,13 @@
   <data name="Tooltip_EditMapping" xml:space="preserve"><value>Изменить привязку к свойству SimHub</value></data>
   <data name="Tooltip_EditFormula" xml:space="preserve"><value>Редактировать как формулу (NCalc [property] / js:)</value></data>
   <data name="Button_ResetToDefaults" xml:space="preserve"><value>СБРОСИТЬ ПО УМОЛЧАНИЮ</value></data>
+  <data name="Button_MasterChannelDefaults" xml:space="preserve"><value>ГЛОБАЛЬНЫЕ ЗНАЧЕНИЯ</value></data>
+  <data name="Title_MasterChannelDefaults" xml:space="preserve"><value>Глобальные значения каналов</value></data>
+  <data name="Button_ResetAllDefaults" xml:space="preserve"><value>СБРОСИТЬ ВСЕ ЗНАЧЕНИЯ</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>ЗАКРЫТЬ</value></data>
+  <data name="Status_OverriddenCountFormat" xml:space="preserve"><value>{0} из {1} переопределено</value></data>
+  <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Восстановить значение по умолчанию</value></data>
+  <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Глобальный редактор каналов недоступен (см. журнал)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>СБРОС ПОЛЯ</value></data>
   <data name="Button_SplitField" xml:space="preserve"><value>РАЗДЕЛИТЬ ПОЛЕ</value></data>
   <data name="Button_BitSplit" xml:space="preserve"><value>РАЗДЕЛИТЬ БИТЫ</value></data>
@@ -493,14 +456,13 @@
   <data name="Label_KnobEditing" xml:space="preserve"><value>РЕДАКТИРОВАНИЕ · ЭНКОДЕР 1 · АКТИВНЫЙ</value></data>
   <data name="Button_FillRingWithSelected" xml:space="preserve"><value>ЗАПОЛНИТЬ КОЛЬЦО ВЫБРАННЫМ</value></data>
   <data name="Button_CopyKnobToAll" xml:space="preserve"><value>СКОПИРОВАТЬ ЭНКОДЕР НА ВСЕ</value></data>
-  <data name="Banner_DashboardUploadNotWorkingYet" xml:space="preserve"><value>⚠  Загрузка панели пока не работает</value></data>
   <data name="Section_SleepLight" xml:space="preserve"><value>СВЕТ В РЕЖИМЕ СНА</value></data>
   <data name="Subtitle_SleepLight" xml:space="preserve"><value>// что показывает руль после истечения времени простоя</value></data>
   <data name="SliderLabel_Speed" xml:space="preserve"><value>Скорость</value></data>
   <data name="SliderLabel_Color" xml:space="preserve"><value>Цвет</value></data>
   <data name="Section_Language" xml:space="preserve"><value>ЯЗЫК</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Язык</value></data>
-  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Закройте и снова откройте эту страницу настроек, чтобы применить новый язык. «Авто» следует языку SimHub, затем языку системы.</value></data>
+  <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>После изменения требуется перезапуск.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
   <data name="Button_ImportProfile" xml:space="preserve"><value>ИМПОРТ ПРОФИЛЯ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Импорт пресета PitHouse</value></data>
@@ -539,7 +501,7 @@
   <data name="Banner_WheelFwOutdated_GenericSubject" xml:space="preserve"><value>Подключённый руль</value></data>
   <data name="Banner_ProfileNotAdded_TitleFmt" xml:space="preserve"><value>{0} не добавлен в SimHub</value></data>
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Приборная панель MOZA подключена, но устройство не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
-  <data name="Banner_ProfileNotAddedBaseAmbient_Body" xml:space="preserve"><value>У этой базы есть лента окружающей подсветки, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}, чтобы управлять лентой.</value></data>
+  <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>База подключена, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Руль «{1}» подключён, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>COM-порт MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Индикаторы регуляторов</value></data>
@@ -547,9 +509,7 @@
   <data name="Sdk_Status_Starting" xml:space="preserve"><value>Запуск…</value></data>
   <data name="Sdk_Status_Stopped" xml:space="preserve"><value>Остановлено</value></data>
   <data name="Sdk_Status_RunningPid" xml:space="preserve"><value>Работает (PID {0})</value></data>
-  <data name="Sdk_ServerNotStarted" xml:space="preserve"><value>Сервер не запущен — включите переключателем выше</value></data>
-  <data name="Sdk_NoRequestsYet" xml:space="preserve"><value>Запросов пока нет</value></data>
-  <data name="Sdk_NoRequestsYet_Udp" xml:space="preserve"><value>Запросов пока нет — сторонние инструменты обращаются сюда только при чтении или записи настройки</value></data>
+  <data name="Label_StubManager" xml:space="preserve"><value>Менеджер заглушки</value></data>
   <data name="Status_CapturingClickStop" xml:space="preserve"><value>идёт захват… (постоянный захват включён — нажмите «Стоп», когда будете готовы)</value></data>
   <data name="Status_CapturingOpenTab" xml:space="preserve"><value>идёт захват… (откройте другую вкладку и используйте устройство, затем вернитесь, чтобы остановить)</value></data>
   <data name="Status_ExportedTo" xml:space="preserve"><value>экспортировано в {0}</value></data>
@@ -564,8 +524,8 @@
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Папка: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Загрузка в очереди — отправка «{0}» на руль…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Загрузка не начата — руль не подключён или сеанс управления ещё не установлен.</value></data>
-  <data name="Upload_Complete" xml:space="preserve"><value>Загрузка завершена (bytes_written={0} == total_size={1}, status=0x{2})</value></data>
-  <data name="Upload_Stopped" xml:space="preserve"><value>Загрузка остановлена (bytes_written={0} / total_size={1}, status=0x{2})</value></data>
+  <data name="Upload_Complete" xml:space="preserve"><value>Загрузка завершена (статус 0x{0})</value></data>
+  <data name="Upload_Stopped" xml:space="preserve"><value>Загрузка остановлена на {0}% (статус 0x{1})</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Выберите файл .mzdash для загрузки</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Панель Moza (*.mzdash)|*.mzdash|Все файлы (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Выберите папку с файлами панелей .mzdash</value></data>
@@ -629,7 +589,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Коробка передач</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Авиасимулятор</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Тайм-аут keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Как долго обновлять светодиоды после остановки телеметрии, прежде чем руль перейдёт в спящий режим. 0 = остановить сразу.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Как долго обновлять светодиоды после остановки телеметрии, прежде чем руль перейдёт в спящий режим.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Поворот дисплея</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Плавный</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Мгновенный</value></data>
@@ -666,8 +626,8 @@ Id: {2}</value></data>
   <data name="Section_PedalRoles" xml:space="preserve"><value>Роли педалей</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Педаль {0}</value></data>
   <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Этот mBooster обслуживает несколько педалей по одному подключению. Назначьте каждую обнаруженную ось на игровой вход. Порядок по умолчанию соответствует раскладке Moza Rx/Ry/Rz (газ/тормоз/сцепление) — переназначьте здесь, если педаль управляет не тем входом.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Configure pedal:</value></data>
-  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>This pedal is passive (no motor) — vibration effects don't apply.</value></data>
+  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Настройка педали:</value></data>
+  <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Эта педаль пассивная (без мотора) — вибрационные эффекты не действуют.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
   <data name="Section_ShifterSettings" xml:space="preserve"><value>НАСТРОЙКИ КУЛИСЫ</value></data>
@@ -719,27 +679,32 @@ Id: {2}</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Затухание тормозов (Экспериментально)</value></data>
   <data name="SliderLabel_OnsetTempC" xml:space="preserve"><value>Температура начала (°C)</value></data>
   <data name="Hint_BrakeFadeExperimental" xml:space="preserve"><value>Экспериментально — пока активно, записывает реальные калибровки оборудования для конца хода и макс. порога (требуется больше хода и больше усилия), а затем восстанавливает заданные вами значения по мере остывания тормозов. Требует, чтобы эти значения уже были заданы в разделе «Ощущение педали / Сопоставление ввода симулятора» — иначе не действует.</value></data>
-  <data name="Section_BugReport" xml:space="preserve"><value>Report a problem</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send a diagnostic report to the developer</value></data>
-  <data name="Label_BugReportDescription" xml:space="preserve"><value>Describe the issue</value></data>
-  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
-  <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
-  <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
-  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
-  <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
-  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
-  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>Too many reports from your connection recently — please try again later.</value></data>
-  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>The diagnostic bundle is too large to upload.</value></data>
-  <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload failed. Please check your connection and try again.</value></data>
-  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Please describe the problem before submitting.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnostic capture</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Keep a small in-memory trace of serial traffic (the first minute of startup plus recent activity) so bug reports include the connect/handshake. Nothing leaves your PC until you submit a report.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnostic capture is off.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Startup: {0} frames ({1} KB, {2}) · Rolling: {3} frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frozen</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>filling</value></data>
-  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Please wait a moment before submitting another report.</value></data>
-  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Save the diagnostic bundle to a file on this PC (nothing is uploaded).</value></data>
+  <data name="Section_GForce" xml:space="preserve"><value>Перегрузка (Инерционное ощущение педали) (Экспериментально)</value></data>
+  <data name="Hint_GForceExperimental" xml:space="preserve"><value>Экспериментально — вместо вибрации сама педаль перемещается под вашей ногой пропорционально текущему продольному ускорению (разгон толкает вперёд, торможение — назад). Максимальный ход педали задаёт, насколько она смещается при максимальной перегрузке; Скорость отклика — как быстро педаль приходит в новое положение.</value></data>
+  <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Максимальный ход педали (мм)</value></data>
+  <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Скорость отклика (%)</value></data>
+  <data name="Section_BugReport" xml:space="preserve"><value>СООБЩИТЬ О ПРОБЛЕМЕ</value></data>
+  <data name="Subtitle_BugReport" xml:space="preserve"><value>Отправить диагностический отчёт разработчику</value></data>
+  <data name="Label_BugReportDescription" xml:space="preserve"><value>Опишите проблему</value></data>
+  <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Опишите проблему: что вы делали, как повёл себя руль или приборная панель и когда это началось.</value></data>
+  <data name="Label_BugReportContact" xml:space="preserve"><value>Контакт (необязательно — email или Discord)</value></data>
+  <data name="Hint_BugReportConsent" xml:space="preserve"><value>При отправке разработчику плагина загружается диагностический архив (журналы плагина и трассировка последовательного порта; идентификаторы оборудования скрыты).</value></data>
+  <data name="Button_SubmitBugReport" xml:space="preserve"><value>Отправить отчёт об ошибке</value></data>
+  <data name="Status_BugReportUploading" xml:space="preserve"><value>Отправка…</value></data>
+  <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Отчёт отправлен. Номер: {0}</value></data>
+  <data name="Status_BugReportRateLimited" xml:space="preserve"><value>С вашего подключения недавно отправлено слишком много отчётов — попробуйте позже.</value></data>
+  <data name="Status_BugReportTooLarge" xml:space="preserve"><value>Диагностический архив слишком велик для отправки.</value></data>
+  <data name="Status_BugReportFailed" xml:space="preserve"><value>Не удалось отправить. Проверьте подключение и повторите попытку.</value></data>
+  <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Отправка заблокирована нашей CDN, а не вашим подключением — воспользуйтесь экспортом архива.</value></data>
+  <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Опишите проблему перед отправкой.</value></data>
+  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Диагностическая запись</value></data>
+  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Хранит в памяти небольшую трассировку обмена по последовательному порту (первая минута запуска и недавняя активность), чтобы отчёты включали подключение. Ничего не покидает ваш ПК, пока вы не отправите отчёт.</value></data>
+  <data name="Status_CaptureOff" xml:space="preserve"><value>Диагностическая запись отключена.</value></data>
+  <data name="Status_CaptureSegments" xml:space="preserve"><value>Запуск: {0} кадров ({1} KB, {2}) · Текущее: {3} кадров ({4} KB)</value></data>
+  <data name="Word_Frozen" xml:space="preserve"><value>заморожено</value></data>
+  <data name="Word_Filling" xml:space="preserve"><value>заполнение</value></data>
+  <data name="Status_BugReportCooldown" xml:space="preserve"><value>Подождите немного перед отправкой следующего отчёта.</value></data>
+  <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Сохранить диагностический архив в файл на этом ПК (ничего не отправляется).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Игровые клавиши</value></data>
   <data name="Label_WiperForwardKey" xml:space="preserve"><value>Стеклоочистители вперёд</value></data>
   <data name="Label_WiperBackKey" xml:space="preserve"><value>Стеклоочистители назад</value></data>
@@ -765,4 +730,49 @@ Id: {2}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR закрыт — переключено на Стабильный</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// усиление по полосам · 100% = нейтраль · 500% = максимум</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ЧУВСТВИТЕЛЬНОСТЬ</value></data>
+  <data name="Label_InputForce" xml:space="preserve"><value>Входное усилие</value></data>
+  <data name="Section_PerLedColors" xml:space="preserve"><value>ЦВЕТА ПО СВЕТОДИОДАМ</value></data>
+  <data name="Label_IdleConstant" xml:space="preserve"><value>Ожидание · Постоянный</value></data>
+  <data name="Label_IdleBreathing" xml:space="preserve"><value>Ожидание · Дыхание</value></data>
+  <data name="Label_SleepBreathing" xml:space="preserve"><value>Сон · Дыхание</value></data>
+  <data name="SliderLabel_StandbySpeedMs" xml:space="preserve"><value>Скорость анимации (мс)</value></data>
+  <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Скорость дыхания (мс)</value></data>
+  <data name="Section_IdleEffect" xml:space="preserve"><value>ЭФФЕКТ ОЖИДАНИЯ</value></data>
+  <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Анимация ожидания</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Источник LFE базы</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Вкладка LFE плагина</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Требуется SimHub 9.12 или новее.</value></data>
+  <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
+  <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
+  <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
+  <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>
+  <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
+  <data name="Label_Torque" xml:space="preserve"><value>Крутящий момент</value></data>
+  <data name="Label_GraphScale" xml:space="preserve"><value>Масштаб</value></data>
+  <data name="Button_EditInStudio" xml:space="preserve"><value>ОТКРЫТЬ В STUDIO</value></data>
+  <data name="Button_NewDashboard" xml:space="preserve"><value>НОВЫЙ ДАШБОРД…</value></data>
+  <data name="Tooltip_EditInStudio" xml:space="preserve"><value>Открыть выбранный дашборд в MOZA Dashboard Studio</value></data>
+  <data name="Tooltip_NewDashboard" xml:space="preserve"><value>Создать дашборд в MOZA Dashboard Studio под размер подключённого экрана</value></data>
+  <data name="Studio_Launched" xml:space="preserve"><value>Открыто в Studio — нажмите «Обновить» по завершении.</value></data>
+  <data name="Studio_NotInstalled" xml:space="preserve"><value>Dashboard Studio не найден — установите MOZA Pit House.</value></data>
+  <data name="Studio_LaunchFailed" xml:space="preserve"><value>Studio не запустился: {0}</value></data>
+  <data name="Studio_NoEditablePath" xml:space="preserve"><value>Выберите дашборд с файлом на диске.</value></data>
+  <data name="Studio_NoDeviceInfo" xml:space="preserve"><value>Данных о дисплее нет — открытие без устройства.</value></data>
+  <data name="Studio_NewDashboardSavesTo" xml:space="preserve"><value>Сохраняет в {0}</value></data>
+  <data name="Studio_LibraryReloaded" xml:space="preserve"><value>Библиотека перечитана — {0} шт.</value></data>
+  <data name="Option_Ab9Layout5R2" xml:space="preserve"><value>5+R Схема 2</value></data>
+  <data name="Option_Ab9LayoutR5" xml:space="preserve"><value>R+5 Схема</value></data>
+  <data name="Option_Ab9LayoutR6" xml:space="preserve"><value>R+6 Схема</value></data>
+  <data name="Option_Ab9LayoutR8" xml:space="preserve"><value>R+8 Схема</value></data>
+  <data name="Section_Ab9StatusProbe" xml:space="preserve"><value>ОПРОС СОСТОЯНИЯ</value></data>
+  <data name="Label_Ab9PollLive" xml:space="preserve"><value>Опрос в реальном времени</value></data>
+  <data name="Label_Ab9LayoutReadback" xml:space="preserve"><value>Обратное чтение раскладки</value></data>
+  <data name="Label_State" xml:space="preserve"><value>Состояние</value></data>
+  <data name="Label_StateError" xml:space="preserve"><value>Ошибка состояния</value></data>
+  <data name="Label_UploadStatus" xml:space="preserve"><value>Статус:</value></data>
+  <data name="Upload_StatusUploading" xml:space="preserve"><value>Загрузка - {0}%</value></data>
+  <data name="Upload_StatusComplete" xml:space="preserve"><value>Завершено - 100%</value></data>
+  <data name="Upload_StatusStopped" xml:space="preserve"><value>Остановлено - {0}%</value></data>
+  <data name="Section_UploadSource" xml:space="preserve"><value>ИСТОЧНИК ЗАГРУЗКИ</value></data>
 </root>

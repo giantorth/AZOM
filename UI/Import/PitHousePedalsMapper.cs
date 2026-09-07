@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 
 namespace MozaPlugin.UI.Import
 {
@@ -517,27 +518,44 @@ namespace MozaPlugin.UI.Import
                     c => set(c, nv));
             }
 
-            /// <summary>Output curve: nonlinear1..5 → CurveY, one combined row.</summary>
+            // PitHouse's own preset file format is fixed at 5 points
+            // (nonlinear1..5) at 20/40/60/80/100% — that's external and
+            // won't change. AZOM's CurveY is now 6 points at 100/6 * k
+            // (see MozaMBoosterRegistry.EvaluateCurveArbitraryX /
+            // MBoosterUiConstants.SimInputMappingNodeCount), so the
+            // imported 5-point shape is resampled at the 6 new breakpoints
+            // rather than mapped 1:1 onto the first 5 of 6 slots.
+            private static readonly float[] PitHouseOutputCurveX = { 20, 40, 60, 80, 100 };
+
+            /// <summary>Output curve: nonlinear1..5 → CurveY (resampled to 6 nodes).</summary>
             public void OutputCurve()
             {
-                var y = new float[5];
+                var y5 = new float[5];
                 bool any = false;
                 for (int i = 0; i < 5; i++)
                 {
                     var v = Num("nonlinear" + (i + 1));
                     if (v == null) continue;
-                    y[i] = (float)Clamp(v.Value, 0, 100);
+                    y5[i] = (float)Clamp(v.Value, 0, 100);
                     any = true;
                 }
                 if (!any) return;
 
+                int n = global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SimInputMappingNodeCount;
+                var y = new float[n];
+                for (int i = 0; i < n; i++)
+                {
+                    double x = (i + 1) * 100.0 / 6.0;
+                    y[i] = (float)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.EvaluateCurveArbitraryX(PitHouseOutputCurveX, y5, x);
+                }
+
                 var oldCurve = _read.CurveY;
-                string oldDisplay = oldCurve == null || oldCurve.Length < 5
+                string oldDisplay = oldCurve == null || oldCurve.Length < n
                     ? "(unset)"
-                    : string.Join("/", oldCurve.Take(5).Select(FormatCurvePoint));
+                    : string.Join("/", oldCurve.Take(n).Select(FormatCurvePoint));
                 string newDisplay = string.Join("/", y.Select(FormatCurvePoint));
 
-                Add("Output curve (Y at 20/40/60/80/100%)", oldDisplay, newDisplay,
+                Add("Output curve (Y at 100/6% breakpoints)", oldDisplay, newDisplay,
                     c => c.CurveY = (float[])y.Clone());
             }
 

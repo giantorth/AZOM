@@ -41,7 +41,7 @@ namespace MozaControls
             DependencyProperty.Register(nameof(ActiveColor), typeof(Color), typeof(KnobRingViz),
                 new FrameworkPropertyMetadata(Colors.Cyan,
                     FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
-                    (d, e) => ((KnobRingViz)d).Rebuild()));
+                    (d, e) => ((KnobRingViz)d).OnActiveColorChanged()));
         public Color ActiveColor
         {
             get => (Color)GetValue(ActiveColorProperty);
@@ -84,7 +84,34 @@ namespace MozaControls
             self.Rebuild();
         }
 
-        private void OnCollChanged(object? s, NotifyCollectionChangedEventArgs e) => Rebuild();
+        // A colour write (Replace) only recolours that dot. The host pushes every
+        // slot on its 500 ms tick, and rebuilding the whole ring — 13 ellipses,
+        // 13 brushes, 13 resource lookups — per slot per knob was ~120 rebuilds/s.
+        private void OnCollChanged(object? s, NotifyCollectionChangedEventArgs e)
+        {
+            var colors = RingColors;
+            if (e.Action == NotifyCollectionChangedAction.Replace && colors != null
+                && colors.Count == _ledDots.Count
+                && e.NewStartingIndex >= 0 && e.NewStartingIndex < _ledDots.Count)
+            {
+                _ledDots[e.NewStartingIndex].Fill = FrozenBrush(colors[e.NewStartingIndex]);
+                return;
+            }
+            Rebuild();
+        }
+
+        private void OnActiveColorChanged()
+        {
+            if (_centerDot != null) _centerDot.Fill = FrozenBrush(ActiveColor);
+            else Rebuild();
+        }
+
+        private static SolidColorBrush FrozenBrush(Color c)
+        {
+            var b = new SolidColorBrush(c);
+            b.Freeze();
+            return b;
+        }
 
         private void Rebuild()
         {
@@ -120,7 +147,7 @@ namespace MozaControls
                 var dot = new Ellipse
                 {
                     Width = dotR * 2, Height = dotR * 2,
-                    Fill = new SolidColorBrush(c),
+                    Fill = FrozenBrush(c),
                     StrokeThickness = 1,
                     Cursor = Cursors.Hand,
                     Tag = i,
@@ -143,7 +170,7 @@ namespace MozaControls
             _centerDot = new Ellipse
             {
                 Width = 22, Height = 22,
-                Fill = new SolidColorBrush(ActiveColor),
+                Fill = FrozenBrush(ActiveColor),
                 StrokeThickness = 1,
                 Cursor = Cursors.Hand,
             };

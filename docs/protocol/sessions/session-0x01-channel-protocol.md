@@ -68,10 +68,10 @@ channel record (16 B):
 - `seq` increments by 1 every time the host re-sends a tier-def (any tier —
   fast and slow share one counter).
 - Each tier corresponds to a `package_level` group from
-  [`../../Data/Telemetry.json`](../../Data/Telemetry.json) (30 ms fast tier,
+  [`../../Data/Telemetry.json`](../../../Data/Telemetry.json) (30 ms fast tier,
   2000 ms slow tier, etc.). Tiers are sent as separate type=0x01 records.
 - Compression codes match the
-  [`Telemetry/Protocol/CompressionTable.cs`](../../Telemetry/Protocol/CompressionTable.cs)
+  [`Telemetry/Frames/CompressionTable.cs`](../../../Telemetry/Frames/CompressionTable.cs)
   registry: 0x00 bool, 0x07 float, 0x0D int30, 0x0E percent_1, 0x0F
   float_6000_1, etc.
 - `channel_idx` MUST match the catalog announcement's idx for the same URL —

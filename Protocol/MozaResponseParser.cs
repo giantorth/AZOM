@@ -47,17 +47,22 @@ namespace MozaPlugin.Protocol
                 (data[2] == 0x7C || data[2] == 0xFC) && data[3] == 0x00)
                 return null;
 
-            var payload = new byte[data.Length - 2];
-            Array.Copy(data, 2, payload, 0, payload.Length);
+            // The payload is data[2..]. Indexed in place (this runs per inbound frame
+            // on the dispatch thread) — only the rare display-identity path and the
+            // "array" result materialise a copy.
+            const int PayloadStart = 2;
+            int payloadLength = data.Length - PayloadStart;
 
             byte group = MozaProtocol.ToggleBit7(responseGroup);
             byte deviceId = MozaProtocol.SwapNibbles(responseDeviceId);
 
             // Wrapped Display sub-device identity (0xC3/0x71 + inner response group).
             // Unwrap + tag with "display-" prefix so it doesn't overwrite wheel identity.
-            if (responseGroup == 0xC3 && payload.Length >= 1 &&
-                IsDisplayIdentityResponseGroup(payload[0]))
+            if (responseGroup == 0xC3 && payloadLength >= 1 &&
+                IsDisplayIdentityResponseGroup(data[PayloadStart]))
             {
+                var payload = new byte[payloadLength];
+                Array.Copy(data, PayloadStart, payload, 0, payloadLength);
                 return ParseDisplayIdentity(payload, responseDeviceId);
             }
 
@@ -67,15 +72,17 @@ namespace MozaPlugin.Protocol
             // 0x03e8 (1000), 0x01f4 (500). Parser exposes via "wheel-channel-enable-readback"
             // so logs/diagnostics can show what the wheel committed for each (page,channel).
             if (responseGroup == 0xC0 && responseDeviceId == 0x71
-                && payload.Length >= 5 && payload[0] == 0x1E)
+                && payloadLength >= 5 && data[PayloadStart] == 0x1E)
             {
-                int storedBE = (payload[3] << 8) | payload[4];
-                int packed = (payload[1] << 24) | (payload[2] << 16) | (payload[3] << 8) | payload[4];
+                byte p1 = data[PayloadStart + 1], p2 = data[PayloadStart + 2];
+                byte p3 = data[PayloadStart + 3], p4 = data[PayloadStart + 4];
+                int storedBE = (p3 << 8) | p4;
+                int packed = (p1 << 24) | (p2 << 16) | (p3 << 8) | p4;
                 return new ParsedResponse
                 {
-                    Name = $"wheel-channel-enable-readback[p{payload[1]:X2}c{payload[2]:X2}]",
+                    Name = $"wheel-channel-enable-readback[p{p1:X2}c{p2:X2}]",
                     IntValue = storedBE,
-                    ArrayValue = new byte[] { payload[1], payload[2], payload[3], payload[4] },
+                    ArrayValue = new byte[] { p1, p2, p3, p4 },
                     DeviceId = MozaProtocol.SwapNibbles(responseDeviceId),
                     PayloadLength = packed,
                 };
@@ -163,13 +170,13 @@ namespace MozaPlugin.Protocol
                 if (deviceHint != null && cmd.DeviceType != deviceHint)
                     continue;
 
-                if (payload.Length < cmd.CommandId.Length)
+                if (payloadLength < cmd.CommandId.Length)
                     continue;
 
                 bool idMatch = true;
                 for (int i = 0; i < cmd.CommandId.Length; i++)
                 {
-                    if (cmd.CommandId[i] != 0xFF && payload[i] != cmd.CommandId[i])
+                    if (cmd.CommandId[i] != 0xFF && data[PayloadStart + i] != cmd.CommandId[i])
                     {
                         idMatch = false;
                         break;
@@ -179,24 +186,26 @@ namespace MozaPlugin.Protocol
                 if (!idMatch)
                     continue;
 
-                var valueData = new byte[payload.Length - cmd.CommandId.Length];
-                Array.Copy(payload, cmd.CommandId.Length, valueData, 0, valueData.Length);
+                int valueStart = PayloadStart + cmd.CommandId.Length;
+                int valueLength = payloadLength - cmd.CommandId.Length;
 
-                var result = new ParsedResponse { Name = cmd.Name, DeviceId = deviceId, PayloadLength = valueData.Length };
+                var result = new ParsedResponse { Name = cmd.Name, DeviceId = deviceId, PayloadLength = valueLength };
 
                 if (cmd.PayloadType == "array")
                 {
+                    var valueData = new byte[valueLength];
+                    Array.Copy(data, valueStart, valueData, 0, valueLength);
                     result.ArrayValue = valueData;
-                    result.IntValue = MozaCommand.ParseIntValue(valueData, Math.Min(valueData.Length, 4));
+                    result.IntValue = MozaCommand.ParseIntValue(valueData, Math.Min(valueLength, 4));
                 }
                 else if (cmd.PayloadType == "float")
                 {
-                    result.IntValue = (int)MozaCommand.ParseFloatValue(valueData);
+                    result.IntValue = (int)MozaCommand.ParseFloatValue(data, valueStart);
                 }
                 else
                 {
-                    result.IntValue = MozaCommand.ParseIntValue(valueData,
-                        Math.Min(valueData.Length, cmd.PayloadBytes));
+                    result.IntValue = MozaCommand.ParseIntValue(data, valueStart,
+                        Math.Min(valueLength, cmd.PayloadBytes));
                 }
 
                 return result;

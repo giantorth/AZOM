@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices.StalksTruckSim
 {

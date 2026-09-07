@@ -60,8 +60,13 @@ namespace MozaPlugin.Sdk
         // gets a real handle even before any managed code touches _process.
         private IntPtr _processHandle;
         private SafeJobHandle? _jobHandle;
-        private string _status = "Stopped";
-        private string? _lastError;
+        // Read lock-free by the UI's 500 ms status tick: TryStop deliberately
+        // abandons a Stop() that wedges under Wine while it still holds _gate, and
+        // a getter that waited on the gate pinned the WPF thread behind it.
+        private volatile string _status = "Stopped";
+        private volatile string? _lastError;
+        private volatile bool _runningCached;
+        private volatile int _pidCached;
         private bool _disposed;
         // True between successful ApplyRegistryRedirect and matching restore.
         // Gates RestoreRegistryRedirect so we don't touch the registry on
@@ -69,43 +74,18 @@ namespace MozaPlugin.Sdk
         // step (e.g., CreateProcess failed).
         private bool _redirectApplied;
 
-        /// <summary>True while the spawned process is alive.</summary>
-        public bool IsRunning
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    try { return _process != null && !_process.HasExited; }
-                    catch { return false; }
-                }
-            }
-        }
+        /// <summary>True while the spawned process is alive (as last observed —
+        /// updated on start, explicit stop and the Exited event).</summary>
+        public bool IsRunning => _runningCached;
 
         /// <summary>OS process id of the spawned stub, or null if not running.</summary>
-        public int? ProcessId
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    try { return _process != null && !_process.HasExited ? _process.Id : (int?)null; }
-                    catch { return null; }
-                }
-            }
-        }
+        public int? ProcessId => _runningCached ? _pidCached : (int?)null;
 
         /// <summary>Human-readable status string for surfacing in the UI tab.</summary>
-        public string Status
-        {
-            get { lock (_gate) return _status; }
-        }
+        public string Status => _status;
 
         /// <summary>Most recent error message, if any. Cleared on successful <see cref="Start"/>.</summary>
-        public string? LastError
-        {
-            get { lock (_gate) return _lastError; }
-        }
+        public string? LastError => _lastError;
 
         /// <summary>
         /// Path on disk the stub is extracted to. Exposed for diagnostics/UI.
@@ -129,7 +109,7 @@ namespace MozaPlugin.Sdk
         // means "no value existed → restore by deleting the value." File
         // existence is the authoritative signal that a redirect is active
         // and must be undone, even across a SimHub crash.
-        private static string RegistryBackupPath =>
+        internal static string RegistryBackupPath =>
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SimHub", "MozaPlugin", "CoapStub", "registry-backup.path");
@@ -310,6 +290,8 @@ namespace MozaPlugin.Sdk
                         // can't double-close it if a later step throws.
                         pi.hProcess = IntPtr.Zero;
                         _jobHandle = jobHandle;
+                        _pidCached = p.Id;
+                        _runningCached = true;
                         _status = $"Running (PID {p.Id})";
                         _lastError = null;
                         MozaLog.Info($"[AZOM] CoAP stub started (PID {p.Id}, exe '{exePath}').");
@@ -535,6 +517,47 @@ namespace MozaPlugin.Sdk
             {
                 try { MozaLog.Info($"[AZOM] Orphan-sweep reaped {killed} prior-session stub process(es) — stale wineserver state cleared."); } catch { }
             }
+
+            KillOrphanStubProcessesNative(ourExePath);
+        }
+
+        /// <summary>
+        /// Host-side half of the sweep. An orphan whose wineserver DIED reparents
+        /// to init and is invisible to <see cref="Process.GetProcessesByName"/> —
+        /// the managed sweep above returns 0 candidates while the process is
+        /// demonstrably alive — so the only way to reach it is from outside Wine.
+        /// Runs pre-spawn (see <see cref="s_orphanSweepDone"/>), so our own child
+        /// cannot match.
+        ///
+        /// <para><b>Match pattern.</b> A Wine process's <c>/proc/PID/cmdline</c>
+        /// carries the DOS path, verified live under GE-Proton:
+        /// <c>C:\users\steamuser\AppData\Local\SimHub\MozaPlugin\CoapStub\MOZA Pit
+        /// House.exe --parent-pid N</c>. So the unix path would never match. We
+        /// also can't pass the DOS path verbatim — <c>pkill -f</c> takes an ERE
+        /// and its backslashes would read as escapes (<c>\A</c>, <c>\S</c>, …).
+        /// Instead match the two trailing path components with <c>.</c> standing
+        /// in for the separator, which is both regex-safe and independent of
+        /// which form Wine reports. The <c>CoapStub</c> component is our own
+        /// extraction directory, so a real PitHouse install can't match.</para>
+        /// </summary>
+        private static void KillOrphanStubProcessesNative(string ourExePath)
+        {
+            if (!Protocol.WineNativeExec.Available) return;
+
+            string leaf;
+            try { leaf = Path.GetFileName(ourExePath); }
+            catch { return; }
+            if (string.IsNullOrEmpty(leaf)) return;
+
+            // Only the literal '.' needs escaping; spaces are fine in an ERE and
+            // Regex.Escape would turn them into '\ ', which POSIX leaves undefined.
+            string pattern = "MozaPlugin.CoapStub." + leaf.Replace(".", "\\.");
+            var r = Protocol.WineNativeExec.Run(new[] { "pkill", "-KILL", "-f", pattern }, timeoutMs: 2000);
+            // pkill: 0 = something matched and was signalled, 1 = nothing matched.
+            if (r.Outcome == Protocol.NativeSpawnOutcome.Completed && r.Status == 0)
+                try { MozaLog.Info("[AZOM] Orphan-sweep (host-side) reaped wineserver-less stub(s)"); } catch { }
+            else
+                try { MozaLog.Debug($"[AZOM] Orphan-sweep (host-side): {Protocol.WineNativeExec.LastRun}"); } catch { }
         }
 
         private void OnProcessExited()
@@ -542,6 +565,7 @@ namespace MozaPlugin.Sdk
             lock (_gate)
             {
                 if (_process == null) return;
+                _runningCached = false;
                 int code;
                 try { code = _process.ExitCode; } catch { code = -1; }
 
@@ -649,6 +673,7 @@ namespace MozaPlugin.Sdk
 
                 try { _process.Dispose(); } catch { }
                 _process = null;
+                _runningCached = false;
             }
 
             // Close the raw kernel handle CreateProcess returned. Separate
@@ -693,7 +718,7 @@ namespace MozaPlugin.Sdk
         /// Used by the snapshot guard so we never treat our stub as the user's
         /// original PitHouse value. Tolerant of unnormalizable input.
         /// </summary>
-        private static bool IsOwnStubPath(string candidate)
+        internal static bool IsOwnStubPath(string candidate)
         {
             string Normalize(string p)
             {

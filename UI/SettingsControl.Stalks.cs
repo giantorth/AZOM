@@ -7,8 +7,9 @@ using System.Windows.Media;
 using MozaPlugin.Devices.StalksTruckSim;
 using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 
-namespace MozaPlugin
+namespace MozaPlugin.UI
 {
     /// <summary>
     /// Stalks settings tab: mode selector (Button box / Truck sim), the interactive
@@ -51,6 +52,9 @@ namespace MozaPlugin
             BuildStalkRows();
             StalksButtonList.ItemsSource = _stalkRows;
 
+            // Detach from a reader replaced by a reconnect before re-wiring.
+            if (_stalksReader != null)
+                _stalksReader.StalksButtonChanged -= OnStalksButtonChangedUi;
             _stalksReader = _plugin?.HidReader;
             if (_stalksReader != null)
                 _stalksReader.StalksButtonChanged += OnStalksButtonChangedUi;

@@ -21,7 +21,7 @@ namespace MozaPlugin.UI
         ProfileNotAddedDash,
         // Wheelbase has an ambient LED strip but "MOZA Wheel Base" hasn't
         // been added under SimHub > Devices.
-        ProfileNotAddedBaseAmbient,
+        ProfileNotAddedBase,
         // A wheel was detected (new or old protocol) and its corresponding
         // model-specific device extension is not active in SimHub.
         ProfileNotAddedWheel,

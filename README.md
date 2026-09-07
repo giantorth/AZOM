@@ -63,7 +63,7 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
-**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open About > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
+**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open Options > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
 
 **Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11.8+.
 
@@ -110,7 +110,8 @@ MOZA wheels and dashboards register as native SimHub devices, appearing in SimHu
 - **Model-Aware Connection** — Only the device matching the currently connected wheel reports as connected. Swap wheels and the correct device activates automatically
 - **Separate Wheel & Dashboard Devices** — Each registers independently with its own profile and LED configuration
 - **Individual LED Effects** — SimHub's per-LED effects reach the hardware in both "Combined" and "Individual LEDs Only" (Exclusive) modes. The virtual driver exposes RPM + button LEDs as one contiguous strip (telemetry first, then buttons) so per-LED effects can target the whole sequence; knob ring LEDs are addressable via the Extra/encoders channel
-- **Wheelbase Ambient LEDs** — R21/R25/R27-class wheelbases register as a separate "MOZA Wheel Base" SimHub device exposing the 18-LED ambient ring. Drive it from SimHub's effects pipeline, or use the device page for indicator state, brightness, standby animation (Constant/Breath/Cycle/Rainbow/Flow), sleep mode + timeout, and startup/shutdown colors. R9/R12 bases ship without the LED strip and do not expose this device
+- **Per-Model Wheelbase Device** — Each wheelbase registers as its own SimHub device named for the model ("MOZA R16", "MOZA R21"), with the ambient ring's real LED count (12 on an R16, 18 on R21/R25/R27). Drive it from SimHub's effects pipeline, or use the device page for indicator state, brightness, standby animation (Constant/Breath/Cycle/Rainbow/Flow), sleep mode + timeout, and startup/shutdown colors. R3/R5/R9/R12 bases ship without the LED strip
+- **Wheelbase LFE in ShakeIt** — On LFE-capable firmware (>= 1.2.10.10) the wheelbase device can carry a Haptics section, putting the base's three LFE oscillators in SimHub's ShakeIt Motors editor (5-200 Hz). Options -> Device Definitions picks the source: the plugin's own LFE tab (default) or SimHub ShakeIt — the two would sum on the wire, so exactly one owns it. Switching rewrites the device definition, so SimHub needs a restart
 - **Per-Wheel Idle & Sleep Effects** — Each wheel's device page has RPM / Buttons / Knobs / Sleep tabs for the hardware's own onboard idle animations (Constant, Breathing, Color Cycle, Rainbow, Sand Flow, RGB Pulse), static RPM/flag/knob colors, and the sleep-light mode + color + standby timeout. These play locally on the wheel when SimHub isn't driving effects (game closed, telemetry paused). Sleep settings persist at the wheel level, not per game
 - **360hz and LFE Support** — Supports native control SDK for games that require it (iRacing)
 
@@ -145,7 +146,6 @@ Wheels with an LCD dashboard (Vision GS, CS Pro, KS Pro, and FSR V2 confirmed; o
 - **Hot-reload.** Pick a different layout in the Dashboard dropdown and the plugin re-negotiates the wheel's tier definitions and starts streaming the new channel set without restarting SimHub. If you pick the layout already loaded on the wheel, the plugin detects it and skips the renegotiation.
 - **Channel mapping.** The wheel device page has a "Channel mappings" expander to override which SimHub property drives each dashboard channel. Type 3+ characters to search the live SimHub property list (substring, case-insensitive). Leave blank to use the plugin's built-in default mapping.
 - **String channels.** Dashboards that include text fields (driver name, session type, position labels, etc.) are supported and encoded as UTF-8.
-- **Firmware era.** The Options tab has a "Wheel firmware era" override (Auto / 2024 / 2025 / 2026).
 - **Test pattern.** A "Send Test Pattern" button cycles all mapped channels through known values so you can verify a dashboard is wired up correctly without launching a game.
 
 **Important caveats:**
@@ -164,7 +164,7 @@ All translations are embedded directly into `MozaPlugin.dll` — no per-culture 
 
 ### Hardware Configuration
 
-The plugin panel (Settings > Plugins > AZOM) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, SDK, About). The About tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
+The plugin panel (Settings > Plugins > AZOM) exposes read/write control of wheelbase, wheel, handbrake, pedal, and hub settings — rotation angle, FFB strength, damping, wheelbase/game effects, FFB equalizer, output curves, performance output mode, paddle/clutch/knob/stick modes, handbrake modes, pedal calibration, and hub port enumeration — mirroring what Pithouse offers. Tabs auto-show/hide based on what's connected (Base, Wheel, Handbrake, Pedals, AB9 Shifter, mBooster, Hub, Options, Wheel Files, Help). The Help tab dumps live wheel identity, dashboard state, and session info for bug reports, with serial numbers redacted by default.
 
 The Universal Hub gets its own tab listing each connected port and the device attached to it, polled every 2 seconds.
 
@@ -203,14 +203,14 @@ An experimental calibration section is also available per device, with direction
 
 ### Diagnostics & Serial Capture
 
-The About tab includes a **Serial traffic capture** section for bug reports:
+The Help tab includes a **Serial traffic capture** section for bug reports:
 
 - **Start capture** records every TX/RX serial frame (wheelbase + AB9 pipes) with millisecond timestamps in memory. Nothing is written to disk while capturing, and the buffer is wiped each time SimHub restarts.
 - **Stop capture** reveals the captured frames inline (hex dump, one frame per line) and unlocks the export buttons. Per-direction labels (`T`/`R`) and pipe labels (`wheelbase` / `ab9`) make it easy to correlate with protocol docs.
 - **Export bundle (ZIP)** writes a timestamped archive containing:
   - `manifest.txt` — bundle header (plugin version, OS, capture summary)
   - `serial-capture.txt` — TX/RX frame log
-  - `diagnostics.txt` — snapshot of the About tab's diagnostic report (identity, dashboard state, session info)
+  - `diagnostics.txt` — snapshot of the Help tab's diagnostic report (identity, dashboard state, session info)
   - `moza-log.txt` — every `[Moza]` log line emitted by the plugin since launch (pulled from the in-process `MozaLog` ring buffer, so flush cadence and SimHub log-file location don't matter)
 - **Copy capture to clipboard** copies the frame log without exporting a file.
 
@@ -227,6 +227,10 @@ The plugin exposes these properties for use in SimHub dashboards and overlays:
 | `AZOM.MosfetTemp` | double | MOSFET temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.MotorTemp` | double | Motor temperature (°C or °F, per the temperature-unit setting) |
 | `AZOM.BaseState` | int | Wheelbase state |
+| `AZOM.CurrentTorque` | double | Live motor torque in Nm, unsigned — direction is dropped, so this is the magnitude whichever way the base is pulling. Refreshed at 5 Hz whether or not the settings panel is open |
+| `AZOM.CurrentTorqueRaw` | double | The same live torque in Nm, signed: the sign is the direction the base is pulling |
+| `AZOM.MaxTorque` | double | Highest `AZOM.CurrentTorque` seen this session, in Nm. Resets when a game starts |
+| `AZOM.TorqueLimit` | double | The wheelbase's rated peak torque in Nm (R9 = 9, R16 = 16, R25 = 25 …); `-1` if the base model isn't recognised. Fixed per base — for your configured output limit see `AZOM.Torque` |
 | `AZOM.MaxAngle` | int | Max steering angle (degrees) |
 | `AZOM.ClutchSplitPoint` | int | Clutch split point (%) for the current wheel, as shown on the wheel device page (Paddles Mode = Combined) |
 | `AZOM.HidConnected` | bool | Whether a device HID surface is being read (live input is available) |
@@ -253,7 +257,7 @@ The numeric ones read `-1` when the value isn't available — the plugin is stil
 | Property | Type | Range | Description |
 |----------|------|-------|-------------|
 | `AZOM.FfbStrength` | int | 0–100 | Game FFB strength (%) |
-| `AZOM.Torque` | int | 50–100 | Base torque output (%) |
+| `AZOM.Torque` | int | 50–100 | Base torque output limit (%) — the setting, not the rating; see `AZOM.TorqueLimit` |
 | `AZOM.Rotation` | int | 60–2700 | Wheel rotation angle (degrees) |
 | `AZOM.WheelSpeedLimit` | int | 0–200 | Maximum wheel speed (%) |
 | `AZOM.Interpolation` | int | 0–10 | FFB interpolation |

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -265,11 +266,29 @@ namespace MozaPlugin.Sdk
         {
             if (mcuUid == null || mcuUid.Length == 0)
                 throw new ArgumentException("mcuUid must be non-empty.", nameof(mcuUid));
+            string key = ToHexLower(mcuUid, 0, mcuUid.Length);
+            if (s_idCache.TryGetValue(key, out var cached)) return cached;
+            string id;
             using (var sha1 = SHA1.Create())
             {
                 byte[] hash = sha1.ComputeHash(mcuUid);
-                return ToHexLower(hash, 0, 8);
+                id = ToHexLower(hash, 0, 8);
             }
+            return Remember(key, id);
+        }
+
+        // The CoAP registry re-derives every id on every request that carries an
+        // {id} segment (manifests are rebuilt per call), and SHA1.Create() per id
+        // dominated that path. UIDs are few and fixed for a session, so memoise;
+        // the cap only guards against a pathological identity churn.
+        private static readonly ConcurrentDictionary<string, string> s_idCache =
+            new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        private const int IdCacheCap = 64;
+
+        private static string Remember(string key, string id)
+        {
+            if (s_idCache.Count < IdCacheCap) s_idCache[key] = id;
+            return id;
         }
 
         /// <summary>
@@ -286,6 +305,9 @@ namespace MozaPlugin.Sdk
                 throw new ArgumentException("mcuUid must be non-empty.", nameof(mcuUid));
             if (string.IsNullOrEmpty(suffix))
                 throw new ArgumentException("suffix must be non-empty.", nameof(suffix));
+            string key = ToHexLower(mcuUid, 0, mcuUid.Length) + "|" + suffix;
+            if (s_idCache.TryGetValue(key, out var cached)) return cached;
+            string id;
             using (var sha1 = SHA1.Create())
             {
                 byte[] suffixBytes = Encoding.ASCII.GetBytes(suffix);
@@ -293,8 +315,9 @@ namespace MozaPlugin.Sdk
                 Buffer.BlockCopy(mcuUid, 0, combined, 0, mcuUid.Length);
                 Buffer.BlockCopy(suffixBytes, 0, combined, mcuUid.Length, suffixBytes.Length);
                 byte[] hash = sha1.ComputeHash(combined);
-                return ToHexLower(hash, 0, 8);
+                id = ToHexLower(hash, 0, 8);
             }
+            return Remember(key, id);
         }
 
         /// <summary>

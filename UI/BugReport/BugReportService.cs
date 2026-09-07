@@ -28,6 +28,14 @@ namespace MozaPlugin.UI.BugReport
         // Worker (or a `wrangler dev` URL while testing).
         public const string ReportEndpoint = "https://bugreport.giant.orth.cc/report";
 
+        // Same Worker on workers.dev, which is outside the zone and so cannot be
+        // CDN-challenged. See worker/README.md § HTTP surface.
+        public const string ReportEndpointFallback =
+            "https://moza-bugreport.ryan-894.workers.dev/report";
+
+        // Tried in order; only an edge block or transport failure advances.
+        private static readonly string[] s_endpoints = { ReportEndpoint, ReportEndpointFallback };
+
         public const int MaxDescriptionChars = 2000;
         public const int MaxContactChars = 200;
         // Client-side size guard. The Worker independently rejects oversized
@@ -48,6 +56,9 @@ namespace MozaPlugin.UI.BugReport
             // ("HTTP 403", "network: timeout") so a refused user can quote it.
             public int StatusCode;
             public string? ShortCode;
+            // Refused by the CDN, not the Worker: a retry cannot help, so the UI
+            // offers the browser hand-off.
+            public bool EdgeBlocked;
         }
 
         // Dedicated client (not UpdateCheckService.Http): a multi-MB body upload
@@ -120,7 +131,6 @@ namespace MozaPlugin.UI.BugReport
         {
             var rec = new StringBuilder();
             rec.AppendLine($"=== Attempt {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC ===");
-            rec.AppendLine($"  Request:     POST {ReportEndpoint}");
             rec.AppendLine($"  Bundle:      {bundle.Length:N0} bytes");
             rec.AppendLine($"  Plugin / OS: {version} / {os}");
             rec.AppendLine($"  Wheel:       {model}");
@@ -128,13 +138,82 @@ namespace MozaPlugin.UI.BugReport
                            $"{(string.IsNullOrEmpty(contact) ? "none" : contact.Length + " chars")}");
             rec.AppendLine($"  TLS policy:  {ServicePointManager.SecurityProtocol}");
 
-            Result result;
+            Result result = default;
+            int used = 0;
+            bool edgeBlockSeen = false;
+            try
+            {
+                for (int i = 0; i < s_endpoints.Length; i++)
+                {
+                    used = i;
+                    var attempt = await PostOnceAsync(
+                        s_endpoints[i], rec, bundle, description, contact,
+                        version, os, model, ct).ConfigureAwait(false);
+                    result = attempt.Result;
+                    // Sticky: a primary challenge still wants the hand-off even if the
+                    // fallback then died on transport.
+                    result.EdgeBlocked = edgeBlockSeen |= attempt.EdgeBlocked;
+
+                    if (result.Outcome == Outcome.Success) break;
+                    // A Worker answer is the final word — a blind retry of a 429
+                    // or a rejected body would only double-post.
+                    if (!attempt.EdgeBlocked && !attempt.Transport) break;
+                    if (i + 1 >= s_endpoints.Length) break;
+
+                    rec.AppendLine($"  Failover:    {(attempt.EdgeBlocked ? "CDN edge refusal" : "no response")}" +
+                                   $" — retrying on {s_endpoints[i + 1]}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Anything unexpected still leaves a record behind before it
+                // goes back to the caller's error path.
+                rec.AppendLine($"  Exception:   {DescribeException(ex)}");
+                rec.AppendLine("  Outcome:     unhandled — rethrown to caller");
+                BugReportUploadLog.Record(rec.ToString());
+                throw;
+            }
+
+            if (result.Outcome == Outcome.Success && used > 0)
+                MozaLog.Warn($"[AZOM] Bug report accepted on fallback endpoint {s_endpoints[used]} — " +
+                             "the primary was refused by the CDN edge");
+
+            if (result.Outcome != Outcome.Success)
+                await AppendConnectivityProbeAsync(rec, ct).ConfigureAwait(false);
+
+            BugReportUploadLog.Record(rec.ToString());
+
+            // Failures also go to the plugin log, so a user who sends only the
+            // SimHub log (or no bundle at all) still hands over the whole reason.
+            if (result.Outcome != Outcome.Success)
+                MozaLog.Warn(
+                    $"[AZOM] Bug report not accepted ({result.Outcome}, {result.ShortCode}) — detail follows\n{rec}");
+
+            return result;
+        }
+
+        /// <summary>One POST to one endpoint, plus why it failed if it did.</summary>
+        private struct Attempt
+        {
+            public Result Result;
+            // The CDN answered instead of the Worker, so nothing was stored.
+            public bool EdgeBlocked;
+            // No response at all, excluding a user cancel.
+            public bool Transport;
+        }
+
+        // Content is rebuilt per attempt: an HttpContent is single-use.
+        private static async Task<Attempt> PostOnceAsync(
+            string endpoint, StringBuilder rec, byte[] bundle, string description, string contact,
+            string version, string os, string model, CancellationToken ct)
+        {
+            rec.AppendLine($"  Request:     POST {endpoint}");
             var sw = Stopwatch.StartNew();
             using (var content = BuildMultipartContent(bundle, description, contact, version, os, model))
             {
                 try
                 {
-                    using (var resp = await s_http.PostAsync(ReportEndpoint, content, ct).ConfigureAwait(false))
+                    using (var resp = await s_http.PostAsync(endpoint, content, ct).ConfigureAwait(false))
                     {
                         int code = (int)resp.StatusCode;
                         // Read the body once: on success it carries the ticket,
@@ -153,30 +232,39 @@ namespace MozaPlugin.UI.BugReport
                             string? ticket = null;
                             try { ticket = (string?)JObject.Parse(body)["ticketId"]; } catch { /* body not JSON */ }
                             rec.AppendLine($"  Outcome:     Success (ticket {ticket ?? "not in response"})");
-                            result = new Result
+                            return new Attempt
                             {
-                                Outcome = Outcome.Success,
-                                TicketId = ticket,
-                                StatusCode = code,
-                                ShortCode = $"HTTP {code}",
+                                Result = new Result
+                                {
+                                    Outcome = Outcome.Success,
+                                    TicketId = ticket,
+                                    StatusCode = code,
+                                    ShortCode = $"HTTP {code}",
+                                },
                             };
                         }
-                        else
+
+                        bool edge = IsEdgeBlock(resp, body);
+                        if (edge)
+                            rec.AppendLine("  Edge block:  yes — CDN challenge/block, request never reached the Worker");
+
+                        string errBody = Snip(body, 300);
+                        string detail = string.IsNullOrEmpty(errBody) ? code.ToString() : $"{code}: {errBody}";
+                        var outcome = code == 429 ? Outcome.RateLimited
+                                    : code == 413 ? Outcome.TooLarge
+                                    : Outcome.ServerError;
+                        rec.AppendLine($"  Outcome:     {outcome}");
+                        return new Attempt
                         {
-                            string errBody = Snip(body, 300);
-                            string detail = string.IsNullOrEmpty(errBody) ? code.ToString() : $"{code}: {errBody}";
-                            var outcome = code == 429 ? Outcome.RateLimited
-                                        : code == 413 ? Outcome.TooLarge
-                                        : Outcome.ServerError;
-                            rec.AppendLine($"  Outcome:     {outcome}");
-                            result = new Result
+                            Result = new Result
                             {
                                 Outcome = outcome,
                                 Detail = detail,
                                 StatusCode = code,
                                 ShortCode = $"HTTP {code}",
-                            };
-                        }
+                            },
+                            EdgeBlocked = edge,
+                        };
                     }
                 }
                 catch (Exception ex) when (ex is OperationCanceledException || ex is HttpRequestException)
@@ -188,44 +276,48 @@ namespace MozaPlugin.UI.BugReport
                     rec.AppendLine($"  Response:    none after {sw.ElapsedMilliseconds} ms");
                     rec.AppendLine($"  Exception:   {DescribeException(ex)}");
                     rec.AppendLine("  Outcome:     NetworkError");
-                    result = new Result
+                    return new Attempt
                     {
-                        Outcome = Outcome.NetworkError,
-                        Detail = cancelled ? "cancelled" : DescribeException(ex),
-                        ShortCode = shortCode,
+                        Result = new Result
+                        {
+                            Outcome = Outcome.NetworkError,
+                            Detail = cancelled ? "cancelled" : DescribeException(ex),
+                            ShortCode = shortCode,
+                        },
+                        // A cancel must not burn the fallback; a real fault should.
+                        // Risk accepted: a duplicate store if only the response was lost.
+                        Transport = !cancelled,
                     };
                 }
-                catch (Exception ex)
-                {
-                    // Anything unexpected still leaves a record behind before it
-                    // goes back to the caller's error path.
-                    rec.AppendLine($"  Exception:   {DescribeException(ex)}");
-                    rec.AppendLine("  Outcome:     unhandled — rethrown to caller");
-                    BugReportUploadLog.Record(rec.ToString());
-                    throw;
-                }
             }
+        }
 
-            if (result.Outcome != Outcome.Success)
-                await AppendConnectivityProbeAsync(rec, ct).ConfigureAwait(false);
+        // cf-mitigated is Cloudflare's challenge/block marker; an HTML body is the
+        // other tell, since every Worker answer is JSON or empty.
+        private static bool IsEdgeBlock(HttpResponseMessage resp, string body)
+        {
+            if (resp.Headers.Contains("cf-mitigated")) return true;
 
-            BugReportUploadLog.Record(rec.ToString());
+            var mediaType = resp.Content?.Headers?.ContentType?.MediaType;
+            if (mediaType != null &&
+                mediaType.IndexOf("html", StringComparison.OrdinalIgnoreCase) >= 0) return true;
 
-            // Failures also go to the plugin log, so a user who sends only the
-            // SimHub log (or no bundle at all) still hands over the whole reason.
-            if (result.Outcome != Outcome.Success)
-                MozaLog.Warn(
-                    $"[AZOM] Bug report not accepted ({result.Outcome}, {result.ShortCode}) — detail follows\n{rec}");
-
-            return result;
+            if (!string.IsNullOrEmpty(body))
+            {
+                if (body.IndexOf("challenges.cloudflare.com", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                if (body.IndexOf("cf-browser-verification", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                if (body.IndexOf("Just a moment", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            }
+            return false;
         }
 
         /// <summary>
         /// Runs only after a failed submit. Separates "nothing between us and the
         /// Worker is working" (DNS/TLS/proxy) from "the Worker itself refused":
-        /// a GET of the origin root is answered by the Worker with a 404
-        /// <c>{"error":"not found"}</c>, so anything else — HTML, 403, timeout —
-        /// points at the edge, a corporate proxy, or intercepting AV.
+        /// the Worker serves nothing at the origin root, so its answer there is a
+        /// bodyless 404 carrying <c>cf-ray</c>. Anything else — HTML, a non-empty
+        /// body, 403, timeout — points at the edge, a corporate proxy, or
+        /// intercepting AV.
         /// </summary>
         private static async Task AppendConnectivityProbeAsync(StringBuilder rec, CancellationToken ct)
         {
@@ -343,7 +435,10 @@ namespace MozaPlugin.UI.BugReport
             byte[] bundle, string description, string contact, string version, string os, string model)
         {
             string boundary = "MozaReport" + Guid.NewGuid().ToString("N");
-            var ms = new MemoryStream();
+            // Pre-sized, and handed to the content as a buffer slice below: the
+            // default doubling growth plus a ToArray() copy tripled a 10 MB bundle
+            // in large-object heap space inside the x86 process.
+            var ms = new MemoryStream(bundle.Length + 2048);
             void Ascii(string s) { var b = Encoding.ASCII.GetBytes(s); ms.Write(b, 0, b.Length); }
             void Utf8(string s) { var b = Encoding.UTF8.GetBytes(s); ms.Write(b, 0, b.Length); }
             void Field(string name, string value)
@@ -364,7 +459,7 @@ namespace MozaPlugin.UI.BugReport
             ms.Write(bundle, 0, bundle.Length);
             Ascii($"\r\n--{boundary}--\r\n");
 
-            var httpContent = new ByteArrayContent(ms.ToArray());
+            var httpContent = new ByteArrayContent(ms.GetBuffer(), 0, (int)ms.Length);
             httpContent.Headers.ContentType = MediaTypeHeaderValue.Parse($"multipart/form-data; boundary={boundary}");
             return httpContent;
         }

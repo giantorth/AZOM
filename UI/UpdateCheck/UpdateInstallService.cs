@@ -132,6 +132,21 @@ namespace MozaPlugin.UI.UpdateCheck
             TryDelete(Path.Combine(dir, ZipTempName), log);
         }
 
+        /// <summary>
+        /// The asset URL comes from the persisted settings file (written by the
+        /// update check). Whatever ends up there is downloaded and swapped in as
+        /// the plugin DLL, so only accept https on GitHub's release hosts.
+        /// </summary>
+        internal static bool IsTrustedAssetUrl(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+            if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
+            string host = uri.Host;
+            return string.Equals(host, "github.com", StringComparison.OrdinalIgnoreCase)
+                || host.EndsWith(".github.com", StringComparison.OrdinalIgnoreCase)
+                || host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static void TryDelete(string path, Action<string>? log)
         {
             try
@@ -165,6 +180,8 @@ namespace MozaPlugin.UI.UpdateCheck
         {
             if (string.IsNullOrEmpty(assetUrl))
                 return InstallResult.Fail(InstallErrorKind.Network, "no asset URL");
+            if (!IsTrustedAssetUrl(assetUrl))
+                return InstallResult.Fail(InstallErrorKind.Validation, "asset URL is not an https GitHub release URL");
             if (http == null)
                 return InstallResult.Fail(InstallErrorKind.Unknown, "http client missing");
 
