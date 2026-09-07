@@ -44,6 +44,14 @@ namespace MozaPlugin.Devices.Extensions
         // Set once the swap has been tried, successfully or not, so an
         // unsupported SimHub doesn't re-walk the composite every frame.
         private bool _connectionSwapAttempted;
+        // Same latch for the LED driver swap: without it a host with no
+        // DeviceDriver setter never satisfied ledsDone and InjectDrivers built a
+        // fresh manager on every 60 Hz frame.
+        private bool _ledSwapAttempted;
+        // TryEarlyProviderInstall does six reflective reads per call; ~1 Hz is
+        // plenty for a re-assert that only matters after a profile switch.
+        private int _providerInstallTick = ProviderInstallEveryNFrames;
+        private const int ProviderInstallEveryNFrames = 60;
         // SimHub's motors (Haptics) sub-device, present only when the definition
         // declares HapticsFeature. Held so the channels-provider swap can be
         // re-asserted every tick.
@@ -93,19 +101,22 @@ namespace MozaPlugin.Devices.Extensions
                     if (!sawLeds && instance is LedModuleDevice lmd && lmd.ledModuleSettings != null)
                     {
                         sawLeds = true;
-                        _ledDriver = new MozaBaseLedDeviceManager();
-                        _ledDriver.LedModuleSettings = lmd.ledModuleSettings;
-                        _ledDriver.ExpectedModelPrefix = _modelPrefix;
-
-                        if (LedDriverInjection.CanInject)
+                        if (!_ledSwapAttempted)
                         {
-                            _injectedSettings = lmd.ledModuleSettings;
-                            _originalDriver = LedDriverInjection.Swap(lmd.ledModuleSettings, _ledDriver);
-                            MozaLog.Debug("[AZOM] Injected virtual LED driver for wheel base ambient strip");
-                        }
-                        else
-                        {
-                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (base ambient)");
+                            _ledSwapAttempted = true;
+                            if (LedDriverInjection.CanInject)
+                            {
+                                _ledDriver = new MozaBaseLedDeviceManager();
+                                _ledDriver.LedModuleSettings = lmd.ledModuleSettings;
+                                _ledDriver.ExpectedModelPrefix = _modelPrefix;
+                                _injectedSettings = lmd.ledModuleSettings;
+                                _originalDriver = LedDriverInjection.Swap(lmd.ledModuleSettings, _ledDriver);
+                                MozaLog.Debug("[AZOM] Injected virtual LED driver for wheel base ambient strip");
+                            }
+                            else
+                            {
+                                MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (base ambient)");
+                            }
                         }
                         continue;
                     }
@@ -126,7 +137,7 @@ namespace MozaPlugin.Devices.Extensions
                 // GetInstances() can be empty before SimHub finishes composing the
                 // device, so an empty pass retries on the next tick rather than
                 // giving up (the pre-haptics behaviour).
-                bool ledsDone = !sawLeds || _injectedSettings != null;
+                bool ledsDone = !sawLeds || _ledSwapAttempted;
                 bool connectionDone = !sawConnection || _connectionSwapAttempted;
                 if (!(sawLeds || sawConnection) || !ledsDone || !connectionDone)
                     return;
@@ -321,9 +332,14 @@ namespace MozaPlugin.Devices.Extensions
             // Haptics composite only (the connection sub-device and the motors one
             // are created together). Looked up here rather than in the one-shot
             // injection walk so ordering inside GetInstances() can't lose it.
-            // Re-asserted every tick: a profile switch or a settings reload runs
-            // CreateOutputManager again and stamps SimHub's stock provider back on.
-            TryEarlyProviderInstall();
+            // Re-asserted about once a second: a profile switch or a settings reload
+            // runs CreateOutputManager again and stamps SimHub's stock provider back
+            // on, but that is a rare event and each check is six reflective reads.
+            if (++_providerInstallTick >= ProviderInstallEveryNFrames)
+            {
+                _providerInstallTick = 0;
+                TryEarlyProviderInstall();
+            }
         }
 
         public override void LoadDefaultSettings()

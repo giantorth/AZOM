@@ -300,11 +300,11 @@ namespace MozaPlugin.UI
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = url,
                     UseShellExecute = true,
-                });
+                })) { }
             }
             catch (Exception ex)
             {

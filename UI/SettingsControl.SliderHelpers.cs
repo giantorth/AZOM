@@ -120,18 +120,22 @@ namespace MozaPlugin.UI
         {
             if (box == null || box.Tag is not Slider slider) return;
 
-            string token = ExtractNumericPrefix(box.Text ?? string.Empty);
+            // The boxes render in the current culture, so accept ',' as well as '.'.
+            string token = ExtractNumericPrefix(box.Text ?? string.Empty).Replace(',', '.');
             bool parsed = double.TryParse(token, System.Globalization.NumberStyles.Float,
                                           System.Globalization.CultureInfo.InvariantCulture,
                                           out double parsedValue);
 
             // Target slider value:
-            //   • Valid input → clamped + integer-snapped parse result.
+            //   • Valid input → clamped parse result snapped to the slider's step:
+            //     a TickFrequency below 1 marks a fractional slider (Deadzone 0.1 kg,
+            //     G-force travel 0.5 mm); everything else snaps to whole numbers.
             //   • Empty / invalid input → keep the current slider value; the
             //     bump dance below still fires ValueChanged so the canonical
             //     text gets repainted.
+            double step = slider.TickFrequency > 0 && slider.TickFrequency < 1 ? slider.TickFrequency : 1.0;
             double target = parsed
-                ? Math.Round(Math.Max(slider.Minimum, Math.Min(slider.Maximum, parsedValue)))
+                ? Math.Round(Math.Round(Math.Max(slider.Minimum, Math.Min(slider.Maximum, parsedValue)) / step) * step, 6)
                 : slider.Value;
 
             // ValueChanged is only raised when Value actually changes. If our
@@ -147,9 +151,10 @@ namespace MozaPlugin.UI
             slider.Value = target;
         }
 
-        // Leading numeric token — accepts an optional sign and a single
-        // decimal point, so "120 kph", "100%", " -3.5°", "1100" all parse to
-        // the digit portion. Empty string when no numeric prefix is present.
+        // Leading numeric token — accepts an optional sign and a single decimal
+        // separator ('.' or the comma 8 of the shipped locales render), so
+        // "120 kph", "100%", " -3.5°", "5,5 kg", "1100" all parse to the digit
+        // portion. Empty string when no numeric prefix is present.
         private static string ExtractNumericPrefix(string raw)
         {
             int i = 0, n = raw.Length;
@@ -161,7 +166,7 @@ namespace MozaPlugin.UI
             {
                 char c = raw[i];
                 if (char.IsDigit(c)) { i++; continue; }
-                if (c == '.' && !sawDot) { sawDot = true; i++; continue; }
+                if ((c == '.' || c == ',') && !sawDot) { sawDot = true; i++; continue; }
                 break;
             }
             return (i > start) ? raw.Substring(start, i - start) : string.Empty;

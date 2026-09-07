@@ -42,6 +42,10 @@ namespace MozaPlugin.Telemetry.Display
         private System.Timers.Timer? _timer;
         private int _tickInProgress;
         private volatile bool _running;
+        // Start/Stop race from PollStatus and the serial read thread (via
+        // StartTelemetryIfReady); a check-then-act on _running let two Starts
+        // each create a timer and orphan the first. Leaf lock, never on a tick.
+        private readonly object _lifecycleLock = new object();
         private bool _lastConnected;
 
         private volatile StatusDataBase? _latestGameData;
@@ -73,36 +77,42 @@ namespace MozaPlugin.Telemetry.Display
 
         public void Start()
         {
-            if (_running) return;
-            // Invariant self-check (once/process): every 0x42 catalog record must tile its
-            // data range [5, PayloadLen-1] gaplessly — a gap is a dead byte on the wheel.
-            // Warns if a future catalog edit breaks the partition; no effect in normal runs.
-            if (!s_partitionsValidated)
+            lock (_lifecycleLock)
             {
-                s_partitionsValidated = true;
-                try { Fsr1DashboardCatalog.ValidateDefaultPartitions(); } catch { }
+                if (_running) return;
+                // Invariant self-check (once/process): every 0x42 catalog record must tile its
+                // data range [5, PayloadLen-1] gaplessly — a gap is a dead byte on the wheel.
+                // Warns if a future catalog edit breaks the partition; no effect in normal runs.
+                if (!s_partitionsValidated)
+                {
+                    s_partitionsValidated = true;
+                    try { Fsr1DashboardCatalog.ValidateDefaultPartitions(); } catch { }
+                }
+                _running = true;
+                _tickCounter = 0;
+                _lastStreamedIndex = -1;
+                _lastConnected = _connection.IsConnected;
+                SendDeclarationSweep();
+                _timer = new System.Timers.Timer(TickIntervalMs) { AutoReset = true };
+                _timer.Elapsed += OnTick;
+                _timer.Start();
             }
-            _running = true;
-            _tickCounter = 0;
-            _lastStreamedIndex = -1;
-            _lastConnected = _connection.IsConnected;
-            SendDeclarationSweep();
-            _timer = new System.Timers.Timer(TickIntervalMs) { AutoReset = true };
-            _timer.Elapsed += OnTick;
-            _timer.Start();
             MozaLog.Info("[AZOM] FSR V1 display driver started (group-0x42 → 0x17)");
         }
 
         public void Stop()
         {
-            if (!_running && _timer == null) return;
-            _running = false;
-            if (_timer != null)
+            lock (_lifecycleLock)
             {
-                _timer.Stop();
-                _timer.Elapsed -= OnTick;
-                _timer.Dispose();
-                _timer = null;
+                if (!_running && _timer == null) return;
+                _running = false;
+                if (_timer != null)
+                {
+                    _timer.Stop();
+                    _timer.Elapsed -= OnTick;
+                    _timer.Dispose();
+                    _timer = null;
+                }
             }
             // Clear only the FSR1 wheel-lane slots — leave any co-resident CM2 lane.
             try { _connection.ClearStreamSlots(0, LaneSlotCount); } catch { }
@@ -141,6 +151,9 @@ namespace MozaPlugin.Telemetry.Display
             }
 
             var plugin = MozaPlugin.Instance;
+            // Resolved once per tick (profile + wheel-page lookup) instead of once per
+            // field; the mapping dicts are copy-on-write snapshots.
+            var fsr1Maps = plugin?.GetActiveFsr1Mappings();
             int oneHzEvery = Math.Max(1, (int)Math.Round(1000.0 / TickIntervalMs));
             bool testMode = plugin?.DashboardTestPatternActive ?? false;
             bool probe = plugin?.Fsr1Probe.Active ?? false;
@@ -258,7 +271,10 @@ namespace MozaPlugin.Telemetry.Display
             long ValueForSlot(Fsr1Dashboard dash, Fsr1Slot slot)
             {
                 var f = slot.Field;
-                var m = plugin?.GetFsr1FieldMapping(dash.Key, f.FieldId);
+                Fsr1FieldMapping? m = null;
+                if (fsr1Maps != null && fsr1Maps.TryGetValue(dash.Key, out var inner)
+                    && inner != null && inner.TryGetValue(f.FieldId, out var fm))
+                    m = fm;
                 long outMax = slot.IsByteAligned
                     ? Fsr1DashboardCatalog.OutputMaxFor(slot.Enc, f.FullScale)
                     : Fsr1DashboardCatalog.BitOutputMax(slot.BitWidth, f.FullScale);

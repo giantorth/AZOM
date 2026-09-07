@@ -435,7 +435,10 @@ namespace MozaPlugin.UI.BugReport
             byte[] bundle, string description, string contact, string version, string os, string model)
         {
             string boundary = "MozaReport" + Guid.NewGuid().ToString("N");
-            var ms = new MemoryStream();
+            // Pre-sized, and handed to the content as a buffer slice below: the
+            // default doubling growth plus a ToArray() copy tripled a 10 MB bundle
+            // in large-object heap space inside the x86 process.
+            var ms = new MemoryStream(bundle.Length + 2048);
             void Ascii(string s) { var b = Encoding.ASCII.GetBytes(s); ms.Write(b, 0, b.Length); }
             void Utf8(string s) { var b = Encoding.UTF8.GetBytes(s); ms.Write(b, 0, b.Length); }
             void Field(string name, string value)
@@ -456,7 +459,7 @@ namespace MozaPlugin.UI.BugReport
             ms.Write(bundle, 0, bundle.Length);
             Ascii($"\r\n--{boundary}--\r\n");
 
-            var httpContent = new ByteArrayContent(ms.ToArray());
+            var httpContent = new ByteArrayContent(ms.GetBuffer(), 0, (int)ms.Length);
             httpContent.Headers.ContentType = MediaTypeHeaderValue.Parse($"multipart/form-data; boundary={boundary}");
             return httpContent;
         }

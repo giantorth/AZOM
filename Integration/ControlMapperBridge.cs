@@ -30,7 +30,9 @@ namespace MozaPlugin.Integration
         private const string ControlMapperPluginTypeName =
             "SimHub.Plugins.OutputPlugins.ControlRemapper.ControlMapperPlugin";
 
-        private readonly MozaVariantProvider _provider = new MozaVariantProvider();
+        // Replaced by the entry a prior plugin instance left in VariantProviders
+        // (see Register) — Poll() must drive the instance SimHub actually holds.
+        private MozaVariantProvider _provider = new MozaVariantProvider();
 
         private object? _remapperWorker;
         private IList? _providers;
@@ -208,8 +210,9 @@ namespace MozaPlugin.Integration
                 // restart). Reuse it instead of double-registering.
                 foreach (var existing in providers)
                 {
-                    if (existing is MozaVariantProvider)
+                    if (existing is MozaVariantProvider existingProvider)
                     {
+                        _provider = existingProvider;
                         _providers = providers;
                         _remapperWorker = rw;
                         _registered = true;

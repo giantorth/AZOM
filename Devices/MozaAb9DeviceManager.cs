@@ -421,9 +421,14 @@ namespace MozaPlugin.Devices
             int slot = Interlocked.Increment(ref _allocAckCount) - 1;
             if (slot < 0 || slot >= FfbAllocSequence.Length) return;
             int shift = 8 * slot;
-            long cur = Interlocked.Read(ref _effectIndexBits);
-            long next = (cur & ~(0xFFL << shift)) | ((long)index << shift);
-            Interlocked.Exchange(ref _effectIndexBits, next);
+            // CAS loop: ResetEffectIndices (reconnect timer) can land between a
+            // plain read and exchange and be silently undone.
+            long cur, next;
+            do
+            {
+                cur = Interlocked.Read(ref _effectIndexBits);
+                next = (cur & ~(0xFFL << shift)) | ((long)index << shift);
+            } while (Interlocked.CompareExchange(ref _effectIndexBits, next, cur) != cur);
             if (slot == FfbAllocSequence.Length - 1)
                 MozaLog.Debug($"[AZOM/AB9] FFB effect indices latched: {DescribeEffectIndices()}");
         }

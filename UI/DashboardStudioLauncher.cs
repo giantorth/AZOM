@@ -403,7 +403,7 @@ namespace MozaPlugin.UI
                     UseShellExecute = true,
                     WorkingDirectory = Path.GetDirectoryName(exe) ?? "",
                 };
-                Process.Start(psi);
+                Process.Start(psi)?.Dispose();
                 MozaLog.Info($"[AZOM] Dashboard Studio launched: {what}");
                 return new LaunchResult(LaunchOutcome.Started, exe, null);
             }

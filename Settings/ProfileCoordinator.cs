@@ -411,14 +411,21 @@ namespace MozaPlugin.Settings
             if (profile == null) return null;
             var g = _plugin.GetCurrentWheelPageGuid();
             if (!g.HasValue) return null;
-            if (profile.WheelOverridesByPageGuid == null)
-                profile.WheelOverridesByPageGuid = new Dictionary<Guid, WheelOverride>();
-            if (!profile.WheelOverridesByPageGuid.TryGetValue(g.Value, out var ov) || ov == null)
+            // COW swap, like the sleep/idle bundles: the profile store serializes
+            // this dict while the UI and SimHub's SetSettings path insert into it.
+            lock (_pageBundleSwapLock)
             {
+                var dict = profile.WheelOverridesByPageGuid;
+                if (dict != null && dict.TryGetValue(g.Value, out var ov) && ov != null)
+                    return ov;
                 ov = new WheelOverride();
-                profile.WheelOverridesByPageGuid[g.Value] = ov;
+                var next = dict == null
+                    ? new Dictionary<Guid, WheelOverride>()
+                    : new Dictionary<Guid, WheelOverride>(dict);
+                next[g.Value] = ov;
+                profile.WheelOverridesByPageGuid = next;
+                return ov;
             }
-            return ov;
         }
 
         /// <summary>
@@ -489,10 +496,17 @@ namespace MozaPlugin.Settings
             {
                 var g = _plugin.GetCurrentWheelPageGuid();
                 if (!g.HasValue) return;
-                if (_plugin.Settings == null) return;
-                if (_plugin.Settings.WheelTelemetryEnabledByPageGuid == null)
-                    _plugin.Settings.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
-                _plugin.Settings.WheelTelemetryEnabledByPageGuid[g.Value] = value;
+                var s = _plugin.Settings;
+                if (s == null) return;
+                // COW swap: the save debounce serializes this dict off-thread.
+                lock (_pageBundleSwapLock)
+                {
+                    var next = s.WheelTelemetryEnabledByPageGuid == null
+                        ? new Dictionary<Guid, bool>()
+                        : new Dictionary<Guid, bool>(s.WheelTelemetryEnabledByPageGuid);
+                    next[g.Value] = value;
+                    s.WheelTelemetryEnabledByPageGuid = next;
+                }
             }
         }
 
@@ -531,9 +545,14 @@ namespace MozaPlugin.Settings
             {
                 var s = _plugin.Settings;
                 if (s == null) return;
-                if (s.WheelTelemetryEnabledByPageGuid == null)
-                    s.WheelTelemetryEnabledByPageGuid = new Dictionary<Guid, bool>();
-                s.WheelTelemetryEnabledByPageGuid[MozaPlugin.Cm2PageGuid] = value;
+                lock (_pageBundleSwapLock)
+                {
+                    var next = s.WheelTelemetryEnabledByPageGuid == null
+                        ? new Dictionary<Guid, bool>()
+                        : new Dictionary<Guid, bool>(s.WheelTelemetryEnabledByPageGuid);
+                    next[MozaPlugin.Cm2PageGuid] = value;
+                    s.WheelTelemetryEnabledByPageGuid = next;
+                }
             }
         }
 
@@ -581,10 +600,16 @@ namespace MozaPlugin.Settings
             {
                 var g = _plugin.GetCurrentWheelPageGuid();
                 if (!g.HasValue) return;
-                if (_plugin.Settings == null) return;
-                if (_plugin.Settings.WheelMzdashFolderByPageGuid == null)
-                    _plugin.Settings.WheelMzdashFolderByPageGuid = new Dictionary<Guid, string>();
-                _plugin.Settings.WheelMzdashFolderByPageGuid[g.Value] = value ?? "";
+                var s = _plugin.Settings;
+                if (s == null) return;
+                lock (_pageBundleSwapLock)
+                {
+                    var next = s.WheelMzdashFolderByPageGuid == null
+                        ? new Dictionary<Guid, string>()
+                        : new Dictionary<Guid, string>(s.WheelMzdashFolderByPageGuid);
+                    next[g.Value] = value ?? "";
+                    s.WheelMzdashFolderByPageGuid = next;
+                }
             }
         }
 

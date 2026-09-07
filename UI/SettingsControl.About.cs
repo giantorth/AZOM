@@ -47,11 +47,12 @@ namespace MozaPlugin.UI
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                // The returned Process (when any) is an unmanaged handle — dispose it.
+                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = url,
                     UseShellExecute = true,
-                });
+                })) { }
             }
             catch (Exception ex)
             {
@@ -133,9 +134,9 @@ namespace MozaPlugin.UI
         // "Export bundle" button (in the Report-a-problem card) saves the same
         // bundle locally; BuildBundleContent lives in SettingsControl.BugReport.cs.
 
-        private void SerialCaptureExport_Click(object sender, System.Windows.RoutedEventArgs e)
+        private async void SerialCaptureExport_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
             var modelSlug = DiagnosticsBundleWriter.BuildWheelModelFilenameSlug(_data?.WheelModelName);
             var prefix = string.IsNullOrEmpty(modelSlug) ? "" : modelSlug + "-";
             var dlg = new Microsoft.Win32.SaveFileDialog
@@ -148,10 +149,16 @@ namespace MozaPlugin.UI
             };
             if (dlg.ShowDialog(System.Windows.Window.GetWindow(this)) != true) return;
 
+            var button = sender as System.Windows.Controls.Button;
             try
             {
-                DiagnosticsBundleWriter.Write(dlg.FileName, BuildBundleContent(reportText: null));
-                SetBugReportStatus(string.Format(Strings.Status_ExportedTo, dlg.FileName));
+                if (button != null) button.IsEnabled = false;
+                // Diagnostics dump, two capture redaction passes, settings JSON and
+                // the zip — seconds on a big capture, so off the dispatcher.
+                string path = dlg.FileName;
+                await System.Threading.Tasks.Task.Run(() =>
+                    DiagnosticsBundleWriter.Write(path, BuildBundleContent(reportText: null)));
+                SetBugReportStatus(string.Format(Strings.Status_ExportedTo, path));
             }
             catch (Exception ex)
             {
@@ -162,6 +169,10 @@ namespace MozaPlugin.UI
                     "AZOM",
                     System.Windows.MessageBoxButton.OK,
                     System.Windows.MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (button != null) button.IsEnabled = true;
             }
         }
 

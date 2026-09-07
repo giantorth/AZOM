@@ -224,8 +224,9 @@ namespace MozaPlugin
                         _deviceManager.MarkWheelResponse(dev);
                 }
 
-                _unmatched++;
-                if (_unmatched <= 20 && data.Length >= 2)
+                // Two dispatch threads (primary + dashboard pipe) reach here.
+                int unmatched = System.Threading.Interlocked.Increment(ref _unmatched);
+                if (unmatched <= 20 && data.Length >= 2)
                 {
                     byte grp = MozaProtocol.ToggleBit7(data[0]);
                     byte dev = MozaProtocol.SwapNibbles(data[1]);

@@ -194,13 +194,24 @@ namespace MozaPlugin.Devices.MBooster
         {
             get
             {
+                // Memoised per tick: the getter is read several times per frame and
+                // _settingsLookup takes the plugin-wide settings lock each call.
+                int seq = _tickSeq;
+                if (seq == _targetDeviceSeq) return _targetDeviceCached;
                 var role = PedalRole(_settingsLookup());
                 int roleIdx = role == MBoosterRole.Throttle ? 0
                             : role == MBoosterRole.Brake ? 1
                             : role == MBoosterRole.Clutch ? 2 : -1;
-                return _device.MotorDeviceForRole(roleIdx, _pedalAxisIndex);
+                byte dev = _device.MotorDeviceForRole(roleIdx, _pedalAxisIndex);
+                _targetDeviceCached = dev;
+                _targetDeviceSeq = seq;
+                return dev;
             }
         }
+
+        private int _tickSeq;
+        private int _targetDeviceSeq = -1;
+        private byte _targetDeviceCached;
 
         /// <summary>
         /// Whether THIS worker's pedal axis can actually play an effect: wired,
@@ -334,6 +345,11 @@ namespace MozaPlugin.Devices.MBooster
             _thread.Start();
         }
 
+        /// <summary>Signal the loop to exit without joining — lets a controller stop
+        /// all its workers first so the joins in <see cref="Stop"/> overlap instead of
+        /// costing up to a second each in series.</summary>
+        public void RequestStop() => _stop = true;
+
         public void Stop()
         {
             _stop = true;
@@ -442,6 +458,7 @@ namespace MozaPlugin.Devices.MBooster
 
         private void Tick()
         {
+            unchecked { _tickSeq++; }
             if (_isShuttingDown()) return;
             if (!_device.IsConnected) return;
 

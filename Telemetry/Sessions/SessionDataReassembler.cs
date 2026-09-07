@@ -268,27 +268,15 @@ namespace MozaPlugin.Telemetry.Sessions
         /// the post-2026-05-09 "3-byte" variant. The 3-byte path was a
         /// verification-script tautology (off-by-one on b2h JSONL parsing —
         /// see TelemetrySender.cs catalog-feed comment for the full
-        /// post-mortem). On mismatch we still strip 4 bytes blind so the
-        /// reassembly buffer stays aligned; downstream consumers
-        /// (configJson zlib inflate / RPC reply parse) will reject corrupt
-        /// payloads and the TelemetrySender's per-feed CRC counters
-        /// already record the rejection rate.
+        /// post-mortem). The trailer is stripped blind — not verified — so the
+        /// reassembly buffer stays aligned; downstream consumers (configJson
+        /// zlib inflate / RPC reply parse) reject corrupt payloads and the
+        /// TelemetrySender's per-feed CRC counters already record the rejection
+        /// rate (the dispatcher verifies the CRC before handing the chunk over).
         /// </summary>
         public static byte[] StripCrcTrailer(byte[] chunk)
         {
             if (chunk.Length < 4) return chunk;
-
-            uint wire = (uint)(chunk[chunk.Length - 4]
-                             | (chunk[chunk.Length - 3] << 8)
-                             | (chunk[chunk.Length - 2] << 16)
-                             | (chunk[chunk.Length - 1] << 24));
-            uint calc = TierDefinitionBuilder.Crc32(chunk, 0, chunk.Length - 4);
-            // Note: we don't currently surface mismatch as a per-reassembler
-            // counter here; if a class of corruption ever needs trend
-            // tracking, add one. For now the alignment is what matters —
-            // downstream layers reject malformed data on their own.
-            _ = calc;
-            _ = wire;
 
             var o = new byte[chunk.Length - 4];
             Array.Copy(chunk, 0, o, 0, o.Length);
@@ -341,12 +329,24 @@ namespace MozaPlugin.Telemetry.Sessions
         /// without error. Used as a fallback when envelope-offset decoding
         /// fails because embedded 0x7E in mzdash JSON corrupted the header.
         /// </summary>
+        // The real stream sits within the first few bytes (ack field + envelope);
+        // a buffer that keeps failing past this many candidates is garbage, and
+        // each failed candidate walks the inflater over the whole tail on the
+        // serial read thread.
+        private const int MaxMagicCandidates = 16;
+        // Inflate ceiling. configJson state blobs are tens of KB; anything past
+        // this is a corrupt stream, and an unbounded inflate is an OOM risk in
+        // the x86 process.
+        private const int MaxInflatedBytes = 4 << 20;
+
         public static byte[]? TryDecompressByMagic(byte[] buf)
         {
+            int tried = 0;
             for (int i = 0; i + 2 <= buf.Length; i++)
             {
                 if (buf[i] != 0x78) continue;
                 if (buf[i + 1] != 0x9c && buf[i + 1] != 0xda) continue;
+                if (++tried > MaxMagicCandidates) return null;
                 byte[]? r = DecompressZlib(buf, i);
                 if (r != null && r.Length > 0) return r;
             }
@@ -355,7 +355,8 @@ namespace MozaPlugin.Telemetry.Sessions
 
         /// <summary>
         /// Inflate a zlib stream (`78 9c` / `78 da`) starting at the given
-        /// offset. Returns decompressed bytes or null on corruption.
+        /// offset. Returns decompressed bytes or null on corruption or when the
+        /// output exceeds <see cref="MaxInflatedBytes"/>.
         /// </summary>
         public static byte[]? DecompressZlib(byte[] data, int offset)
         {
@@ -369,9 +370,15 @@ namespace MozaPlugin.Telemetry.Sessions
             using var ms = new MemoryStream(data, start, length);
             using var def = new DeflateStream(ms, CompressionMode.Decompress);
             using var outMs = new MemoryStream();
+            var chunk = new byte[16 * 1024];
             try
             {
-                def.CopyTo(outMs);
+                int n;
+                while ((n = def.Read(chunk, 0, chunk.Length)) > 0)
+                {
+                    if (outMs.Length + n > MaxInflatedBytes) return null;
+                    outMs.Write(chunk, 0, n);
+                }
             }
             catch (InvalidDataException)
             {

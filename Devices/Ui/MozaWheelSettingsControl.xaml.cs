@@ -77,7 +77,11 @@ namespace MozaPlugin.Devices.Ui
             Unloaded += OnUnloaded;
         }
 
-        private void OnRefreshTick(object? sender, EventArgs e) => RefreshWheel();
+        private void OnRefreshTick(object? sender, EventArgs e)
+        {
+            try { RefreshWheel(); }
+            catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-wheel", $"[AZOM] Wheel page tick failed: {ex}"); }
+        }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
@@ -191,6 +195,9 @@ skipReadByMode:
             if (ReferenceEquals(Instance, this)) Instance = null;
             StopInputsLiveTimer();
             _refreshTimer.Stop();
+            // A mid-countdown paddle calibration timer would otherwise root the page.
+            _paddleCalTimer?.Stop();
+            _paddleCalTimer = null;
         }
 
         private bool ResolvePlugin()

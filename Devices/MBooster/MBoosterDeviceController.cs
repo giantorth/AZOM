@@ -239,8 +239,9 @@ namespace MozaPlugin.Devices.MBooster
         // is the master unit's pedal, axis 1 the 2nd chained device, etc.
         // Written per axis by MozaMBoosterRegistry.OnHidAxisUpdate; read whole
         // in MergePositions. LastHidPosition above mirrors axis 0 for the UI
-        // position bar. Element writes race benignly (last-value-wins, same as
-        // LastHidPosition) so no lock is needed.
+        // position bar. Unlocked: on the x86 build a concurrent read of a double
+        // can tear (not last-value-wins), so every consumer clamps to 0..1 and a
+        // torn sample costs one tick of a wrong amplitude, never a crash.
         public readonly double[] LastAxisPositions = new double[MaxAxes];
 
         // Per-axis pre-input-curve percent (0..100) — the same signal as
@@ -765,7 +766,9 @@ namespace MozaPlugin.Devices.MBooster
                     StoreCalib((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
                 string hex = ToHex(data);
                 bool isNew;
-                lock (_chainProbeLogged) isNew = _chainProbeLogged.Add(hex);
+                // Wire-derived key: cap so a response carrying a changing value can't
+                // grow the set for the controller's lifetime.
+                lock (_chainProbeLogged) isNew = _chainProbeLogged.Count < LoggedSetCap && _chainProbeLogged.Add(hex);
                 if (isNew)
                 {
                     string decoded = probe.HasValue
@@ -863,6 +866,8 @@ namespace MozaPlugin.Devices.MBooster
         // Each distinct diagnostic line logged once — the device re-streams these
         // continuously, so an unguarded log would flood the support bundle.
         private readonly HashSet<string> _diagLinesLogged = new HashSet<string>(StringComparer.Ordinal);
+        // Both once-only sets are keyed by device-emitted text; cap them.
+        private const int LoggedSetCap = 256;
 
         // EXPERIMENTAL chain-mapping probe (see ProbeChainDevices): fired once
         // per connection when a chain is detected; each distinct chain-device
@@ -895,7 +900,7 @@ namespace MozaPlugin.Devices.MBooster
                 ascii.IndexOf("pedal is connected", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) < 0)
                 return;
-            lock (_diagLinesLogged) { if (!_diagLinesLogged.Add(ascii)) return; }
+            lock (_diagLinesLogged) { if (_diagLinesLogged.Count >= LoggedSetCap || !_diagLinesLogged.Add(ascii)) return; }
             MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} diag: {ascii}");
 
             // "PD Linked:[T 0 B 1 C 1]" — or, on newer firmware (device-type
@@ -1665,6 +1670,9 @@ namespace MozaPlugin.Devices.MBooster
                     SendAllDisableFrames();
             }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Disable on dispose: {ex.Message}"); }
+            // Signal all three first so their joins overlap (≤1 s total, not ≤3 s
+            // serially on the reconnect timer / End()).
+            foreach (var w in _workers) { try { w.RequestStop(); } catch { } }
             foreach (var w in _workers) { try { w.Stop(); } catch { } }
             try { _connection.MessageReceived -= OnConnectionMessage; } catch { }
             try { _connection.Disconnected -= OnConnectionDisconnected; } catch { }

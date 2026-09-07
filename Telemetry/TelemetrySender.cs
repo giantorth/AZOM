@@ -434,6 +434,7 @@ namespace MozaPlugin.Telemetry
                 byte next = value == 0 ? MozaProtocol.DeviceWheel : value;
                 if (_targetDeviceId == next) return;
                 _targetDeviceId = next;
+                _configJson.CacheKey = next;
                 _frames.InvalidateDisplayConfig();
                 // Rebuild per-tier frame builders with the new dev_id so value
                 // frames address the right device on the next tick.
@@ -1046,19 +1047,17 @@ namespace MozaPlugin.Telemetry
         // ArgumentException("Delegate to an instance method cannot have null 'this'").
         internal void EnableAutoTest(MozaPlugin plugin)
         {
-            if (_autoTest == null)
-            {
-                _autoTest = new DashboardSwitchAutoTest(
-                    this,
-                    plugin.ResolveDashboardProfileByName,
-                    () => plugin.DashCache,
-                    name => { plugin.ActiveTelemetryProfileName = name; });
-            }
-            else
-            {
-                _autoTest.Reset();
-            }
+            // Always rebuild: the delegates capture the plugin instance, and this
+            // sender survives the game-switch reload while that instance does not —
+            // a Reset() here kept the first Init's plugin pinned for the process.
+            _autoTest = new DashboardSwitchAutoTest(
+                this,
+                plugin.ResolveDashboardProfileByName,
+                () => plugin.DashCache,
+                name => { plugin.ActiveTelemetryProfileName = name; });
         }
+
+        internal void DisableAutoTest() => _autoTest = null;
 
         // Serializes Start() against concurrent callers. Without this, two
         // Start() work items on the ThreadPool (e.g. rapid Test-button double-
@@ -1113,7 +1112,10 @@ namespace MozaPlugin.Telemetry
             try { _dashboardDownloader?.Dispose(); } catch { }
             try { _rpc?.Dispose(); } catch { }
             try { _recovery?.Dispose(); } catch { }
-            try { _startSemaphore.Dispose(); } catch { }
+            // _startSemaphore is deliberately not disposed: a Start() can still be
+            // inside Wait()/Release() (callers catch the ObjectDisposedException,
+            // but there is nothing to reclaim — a SemaphoreSlim whose WaitHandle
+            // was never touched holds no OS resource).
         }
 
         internal class TierState

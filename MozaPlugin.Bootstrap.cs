@@ -191,7 +191,7 @@ namespace MozaPlugin
                 {
                     try
                     {
-                        string ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                        string ts = DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
                         string baseDir = AppDomain.CurrentDomain.BaseDirectory ?? ".";
                         string logsDir = System.IO.Path.Combine(baseDir, "Logs");
                         string sinkPath = System.IO.Path.Combine(logsDir, $"moza-wire-{ts}.jsonl");
@@ -272,7 +272,7 @@ namespace MozaPlugin
                         // WheelMissThreshold and fire a spurious hot-swap
                         // ResetWheelDetection (with its 11 s silence gate)
                         // even though the wheel never stopped responding.
-                        DetectionState.WheelPollMisses = 0;
+                        DetectionState.ResetWheelPollMisses();
 
                         // Re-derive WheelModelInfo from the persisted model
                         // name. WheelModelInfo itself is per-instance (set by
@@ -540,13 +540,21 @@ namespace MozaPlugin
                 _retryTimer.Elapsed += (s, e) =>
                 {
                     if (IsShuttingDown) return;
+                    // AutoReset timer: don't let a slow tick overlap the next one
+                    // (double-stepped retransmits / ES brightness settle counter).
+                    if (System.Threading.Interlocked.CompareExchange(ref _retryTickInProgress, 1, 0) != 0) return;
+                    try
+                    {
                     // Each pipe retransmits its own tracked reads on its own Send,
                     // independently — the hub's reads must NOT go out on the base
                     // port and vice versa. Ticked separately so one pipe being
                     // down doesn't stall the other's retransmits.
-                    if (_connection.IsConnected)
+                    // Local: CleanupPartialInit nulls _connection after Stop() and
+                    // neither Stop nor Dispose waits for an in-flight callback.
+                    var conn = _connection;
+                    if (conn != null && conn.IsConnected)
                     {
-                        try { PendingResponses.TickRetransmits(_connection.Send); }
+                        try { PendingResponses.TickRetransmits(conn.Send); }
                         catch (Exception ex) { MozaLog.Warn($"[AZOM] PendingResponseTracker tick failed: {ex.Message}"); }
                     }
                     if (_hubManager != null && _hubManager.IsConnected)
@@ -573,6 +581,8 @@ namespace MozaPlugin
                     // bursty, DataUpdate goes quiet) — see TickEsMasterBrightness (#113).
                     try { TickEsMasterBrightness(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM] ES master-brightness tick failed: {ex.Message}"); }
+                    }
+                    finally { System.Threading.Interlocked.Exchange(ref _retryTickInProgress, 0); }
                 };
                 _retryTimer.AutoReset = true;
                 _retryTimer.Start();
@@ -882,10 +892,16 @@ namespace MozaPlugin
             if (ownTelemetrySender)
             {
                 try { _telemetrySender?.Dispose(); } catch { }
-                try { _fsr1Driver?.Dispose(); } catch { }
-                try { _cm2Sender?.Dispose(); } catch { }
-                try { _cm1Driver?.Dispose(); } catch { }
             }
+            // Per-instance (recreated each Init), never persistent — dispose on every
+            // path as End() does. Gated on ownTelemetrySender, a failed Init on the
+            // persistent wire left these ticking next to the next Init's pair.
+            try { _fsr1Driver?.Dispose(); } catch { }
+            _fsr1Driver = null;
+            try { _cm2Sender?.Dispose(); } catch { }
+            _cm2Sender = null;
+            try { _cm1Driver?.Dispose(); } catch { }
+            _cm1Driver = null;
             // File sink always closes on teardown — new file per Init by design.
             // The in-memory ring stays enabled across the plugin reload (capture
             // is always on) so buffered frames survive game switches — next Init's

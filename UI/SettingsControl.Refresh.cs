@@ -47,30 +47,41 @@ namespace MozaPlugin.UI
             );
         }
 
+        private int _shakeItProbeTick;
+
         private void RefreshDisplay(object sender, EventArgs e)
         {
             // All top-of-pane banners (status hints + update + SDK nudge) are
             // owned by the self-refreshing PluginBanners control now.
 
-            using (_suppressor.Begin())
+            try
             {
-                RefreshBaseTab();
-                RefreshHandbrakeTab();
-                RefreshPedalsTab();
-                RefreshHgpTab();
-                RefreshSgpTab();
-                RefreshHubTab();
-                RefreshAb9Tab();
-                RefreshStalksTab();
-                RefreshMBoosterTab();
-                RefreshOptionsTab();
-                InitTelemetryTab();
-                RefreshSdkStatusTick();
-                // Last: the per-tab refreshes above each set their own tab's
-                // Visibility from detection, so the override only sticks if it
-                // runs after them. Turning it back off needs no undo here —
-                // those same assignments re-collapse on the next tick.
-                ApplyShowAllTabs();
+                using (_suppressor.Begin())
+                {
+                    RefreshBaseTab();
+                    RefreshHandbrakeTab();
+                    RefreshPedalsTab();
+                    RefreshHgpTab();
+                    RefreshSgpTab();
+                    RefreshHubTab();
+                    RefreshAb9Tab();
+                    RefreshStalksTab();
+                    RefreshMBoosterTab();
+                    RefreshOptionsTab();
+                    InitTelemetryTab();
+                    RefreshSdkStatusTick();
+                    // Last: the per-tab refreshes above each set their own tab's
+                    // Visibility from detection, so the override only sticks if it
+                    // runs after them. Turning it back off needs no undo here —
+                    // those same assignments re-collapse on the next tick.
+                    ApplyShowAllTabs();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Unguarded, a throwing tab reaches SimHub's dispatcher handler, which
+                // logs an Error and flushes the log (up to 2 s) — twice a second.
+                MozaLog.DebugIfChanged("ui-tick-settings", $"[AZOM] Settings refresh tick failed: {ex}");
             }
         }
 
@@ -306,9 +317,10 @@ namespace MozaPlugin.UI
             // — that owns the output, and the two must not both edit the base.
             // Stamp the cache while we're on the UI thread — the diagnostics dump
             // (built off the bundle writer's thread) can't enumerate SimHub's
-            // device collection itself.
-            bool? shakeItLfeDeployed = _plugin?.IsShakeItLfeDeviceDeployed;
-            if (_plugin != null) _plugin.ShakeItLfeDeviceDeployedCached = shakeItLfeDeployed;
+            // device collection itself. A walk of SimHub's whole device list, so
+            // every ~10 s rather than every 500 ms tick; it feeds a diagnostics line.
+            if (_plugin != null && (_shakeItProbeTick++ % 20) == 0)
+                _plugin.ShakeItLfeDeviceDeployedCached = _plugin.IsShakeItLfeDeviceDeployed;
             bool lfeSupported = _data.BaseSupportsLfe && _plugin?.WheelbaseLfeRoutedToShakeIt != true;
             BaseLfeTab.Visibility = lfeSupported
                 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;

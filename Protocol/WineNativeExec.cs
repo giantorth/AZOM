@@ -69,7 +69,9 @@ namespace MozaPlugin.Protocol
         private delegate int UnixSpawnvpDelegate(IntPtr argv, int wait);
 
         private static readonly object s_gate = new object();
-        private static bool s_probed;
+        // Set LAST in Probe (after s_spawn is resolved) — a second caller that saw
+        // the flag early read s_spawn == null and skipped the CDC warm-up.
+        private static volatile bool s_probed;
         private static UnixSpawnvpDelegate? s_spawn;
         private static volatile string s_lastRun = "(none)";
 
@@ -85,7 +87,6 @@ namespace MozaPlugin.Protocol
             lock (s_gate)
             {
                 if (s_probed) return;
-                s_probed = true;
                 try
                 {
                     // Gate on IsWine AND a unix root: Wine on macOS has no /sys
@@ -106,6 +107,10 @@ namespace MozaPlugin.Protocol
                 catch (Exception ex)
                 {
                     MozaLog.Debug($"[AZOM] WineNativeExec probe failed: {ex.GetType().Name}: {ex.Message}");
+                }
+                finally
+                {
+                    s_probed = true;
                 }
             }
         }

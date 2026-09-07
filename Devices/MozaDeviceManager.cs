@@ -618,7 +618,11 @@ namespace MozaPlugin.Devices
         /// </summary>
         public void ReadSettingsPaced(string[] commandNames, int gapMs = 10)
         {
-            var token = _shutdownCts.Token;
+            System.Threading.CancellationToken token;
+            // Dispose() can race this call (a stale owner, a late detection reply);
+            // the Token getter is the one line here that throws on a disposed CTS.
+            try { token = _shutdownCts.Token; }
+            catch (ObjectDisposedException) { return; }
             Task.Run(() =>
             {
                 try

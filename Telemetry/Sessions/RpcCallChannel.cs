@@ -98,6 +98,7 @@ namespace MozaPlugin.Telemetry.Sessions
             if (!_connection.IsConnected) return null;
 
             int id;
+            bool busy = false;
             var waiter = new ManualResetEventSlim(false);
             lock (_lock)
             {
@@ -115,7 +116,22 @@ namespace MozaPlugin.Telemetry.Sessions
                         $"[AZOM] RPC method \"{method}\" has no known fixed id — " +
                         $"using counter {id}; current firmware may ignore it");
                 }
-                _waiters[id] = waiter;
+                // Replies route on the id alone: a second waiter on a fixed id would
+                // overwrite the first and the two calls would steal each other's reply.
+                if (_waiters.ContainsKey(id))
+                {
+                    global::MozaPlugin.MozaLog.Debug($"[AZOM] RPC \"{method}\" (id {id}) already in flight — call dropped");
+                    busy = true;
+                }
+                else
+                {
+                    _waiters[id] = waiter;
+                }
+            }
+            if (busy)
+            {
+                waiter.Dispose();
+                return null;
             }
 
             byte[] envelope = BuildRpcCallEnvelope(method, arg, id);

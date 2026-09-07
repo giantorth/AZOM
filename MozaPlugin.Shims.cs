@@ -184,12 +184,26 @@ namespace MozaPlugin
         {
             var modelName = _data?.WheelModelName;
             if (string.IsNullOrEmpty(modelName)) return null;
+            var c = _pageGuidCache;
+            if (c != null && string.Equals(c.Model, modelName, StringComparison.Ordinal)) return c.Guid;
             var prefix = WheelModelInfo.ExtractPrefix(modelName!);
             if (string.IsNullOrEmpty(prefix)) return null;
             var guidStr = MozaDeviceConstants.ResolveWheelGuid(prefix);
             if (!Guid.TryParse(guidStr, out var g)) return null;
+            _pageGuidCache = new PageGuidCache(modelName!, g);
             return g;
         }
+
+        // Memo of the last resolved (model name → page GUID): every per-page settings
+        // accessor and, on FSR1/CM1 wheels, the display tick resolve through here.
+        // Immutable snapshot swapped by reference; only a resolved GUID is cached.
+        private sealed class PageGuidCache
+        {
+            public readonly string Model;
+            public readonly Guid Guid;
+            public PageGuidCache(string model, Guid guid) { Model = model; Guid = guid; }
+        }
+        private volatile PageGuidCache? _pageGuidCache;
 
         // ===== ProfileCoordinator accessor shims (external API surface) =====
         // Wheel overlay + per-wheel-page telemetry/sleep/idle/era accessors live
@@ -264,6 +278,7 @@ namespace MozaPlugin
         // FSR V1 (group-0x42) + CM1 (group-0x35) field mappings and the active
         // dashboard/page index store live in Telemetry/Fsr1Cm1MappingCoordinator.cs.
         internal Fsr1FieldMapping? GetFsr1FieldMapping(string recordKey, string fieldId) => _fsr1Cm1Mapping.GetFsr1FieldMapping(recordKey, fieldId);
+        internal Dictionary<string, Dictionary<string, Fsr1FieldMapping>>? GetActiveFsr1Mappings() => _fsr1Cm1Mapping.GetActiveFsr1Mappings();
         internal void SetFsr1FieldMapping(string recordKey, string fieldId, Fsr1FieldMapping? mapping) => _fsr1Cm1Mapping.SetFsr1FieldMapping(recordKey, fieldId, mapping);
         internal int GetActiveFsr1Index() => _fsr1Cm1Mapping.GetActiveFsr1Index();
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);

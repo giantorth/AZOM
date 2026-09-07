@@ -110,8 +110,10 @@ namespace MozaPlugin.Telemetry.Frames
         /// </summary>
         public void WaitForChannelCatalogQuiet(int quietMs, int timeoutMs)
         {
-            int deadline = Environment.TickCount + timeoutMs;
-            while (Environment.TickCount < deadline)
+            // Difference form: TickCount wraps every 24.9 days and an additive
+            // deadline near the wrap skips the wait entirely.
+            int started = Environment.TickCount;
+            while (unchecked(Environment.TickCount - started) < timeoutMs)
             {
                 if (_sender.StateIsIdle || !_sender.ConnectionIsConnected) return;
                 int lastAct = _sender.CatalogParser.LastActivityMs;

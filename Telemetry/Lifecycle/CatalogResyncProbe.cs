@@ -25,6 +25,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private static readonly long MinIntervalTicks =
             8000L * TimeSpan.TicksPerMillisecond;
 
+        // Interlocked: written on the tick thread, read from PollStatus/UI (x86).
         private long _lastFiredUtcTicks;
 
         /// <summary>True once a probe has actually emitted in this instance.
@@ -32,19 +33,19 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// refresh even when the wheel reports it's already on the target
         /// slot (the probe alone doesn't always cause the wheel to re-push
         /// its catalog, so we may need a full Stop+Start).</summary>
-        public bool HasFired => _lastFiredUtcTicks != 0;
+        public bool HasFired => System.Threading.Interlocked.Read(ref _lastFiredUtcTicks) != 0;
 
         /// <summary>Check whether the throttle interval has elapsed since
         /// the last fire. Does NOT update the timestamp — call
         /// <see cref="MarkFired"/> only when the caller commits to emitting.
         /// </summary>
         public bool IsThrottleClear(long nowUtcTicks)
-            => (nowUtcTicks - _lastFiredUtcTicks) >= MinIntervalTicks;
+            => (nowUtcTicks - System.Threading.Interlocked.Read(ref _lastFiredUtcTicks)) >= MinIntervalTicks;
 
         /// <summary>Stamp the throttle. The caller already passed
         /// <see cref="IsThrottleClear"/> and is about to (or just did) emit
         /// the probe; the timestamp arms the next throttle window AND lights
         /// up <see cref="HasFired"/>.</summary>
-        public void MarkFired(long nowUtcTicks) => _lastFiredUtcTicks = nowUtcTicks;
+        public void MarkFired(long nowUtcTicks) => System.Threading.Interlocked.Exchange(ref _lastFiredUtcTicks, nowUtcTicks);
     }
 }

@@ -52,10 +52,11 @@ namespace MozaPlugin.UI
 
                 RefreshUpdateNotifications();
                 RefreshLastCheckedText();
-                HookInstallCoordinator();
-                // Tab containers reparent this control, so Loaded/Unloaded fire
-                // repeatedly — re-hook on every Loaded (PluginBanners pattern),
-                // else the banner goes deaf after the first Unloaded.
+                // Hook the process-singleton coordinator from Loaded only (PluginBanners
+                // pattern). Tab containers reparent this control, so Loaded/Unloaded fire
+                // repeatedly — re-hook on every Loaded, else the banner goes deaf after the
+                // first Unloaded. Hooking here would pin a control SimHub builds on every
+                // game switch but never shows.
                 Loaded += OnLoadedRehookUpdateBanner;
                 Unloaded += OnUnloadedCancelUpdateCheck;
             }

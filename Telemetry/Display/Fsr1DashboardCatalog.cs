@@ -661,26 +661,37 @@ namespace MozaPlugin.Telemetry.Display
         /// two (0x11 + 0x12). Unmapped indices return empty -> the driver falls back to
         /// the full live set. See docs/protocol/devices/wheel-0x17.md.
         /// </summary>
-        public static Fsr1Dashboard[] ByIndex(int index)
+        public static Fsr1Dashboard[] ByIndex(int index) =>
+            s_byIndex.TryGetValue(index, out var arr) ? arr : System.Array.Empty<Fsr1Dashboard>();
+
+        // Firmware-fixed, so resolved once. ByIndex runs on every 20 ms driver tick
+        // and used to allocate a list, an array and LINQ enumerators per call.
+        // Declared after the two tables above — static initializers run in order.
+        private static readonly Dictionary<int, Fsr1Dashboard[]> s_byIndex = BuildByIndex();
+
+        private static Dictionary<int, Fsr1Dashboard[]> BuildByIndex()
         {
-            if (!IndexToRecordTypes.TryGetValue(index, out var types))
-                return System.Array.Empty<Fsr1Dashboard>();
-            bool hasDesc = IndexDescriptorOverride.TryGetValue(index, out var desc);
-            var list = new List<Fsr1Dashboard>(types.Length);
-            foreach (var t in types)
+            var map = new Dictionary<int, Fsr1Dashboard[]>(IndexToRecordTypes.Count);
+            foreach (var kv in IndexToRecordTypes)
             {
-                var d = ByType(t);
-                if (d == null) continue;
-                if (hasDesc && !d.IsBackground)
-                    d = new Fsr1Dashboard
-                    {
-                        RecordType = d.RecordType, Key = d.Key, Label = d.Label,
-                        PayloadLen = d.PayloadLen, LiveB1 = desc.b1, LiveB2 = desc.b2,
-                        IsLive = d.IsLive, IsBackground = d.IsBackground, Fields = d.Fields,
-                    };
-                list.Add(d);
+                bool hasDesc = IndexDescriptorOverride.TryGetValue(kv.Key, out var desc);
+                var list = new List<Fsr1Dashboard>(kv.Value.Length);
+                foreach (var t in kv.Value)
+                {
+                    var d = ByType(t);
+                    if (d == null) continue;
+                    if (hasDesc && !d.IsBackground)
+                        d = new Fsr1Dashboard
+                        {
+                            RecordType = d.RecordType, Key = d.Key, Label = d.Label,
+                            PayloadLen = d.PayloadLen, LiveB1 = desc.b1, LiveB2 = desc.b2,
+                            IsLive = d.IsLive, IsBackground = d.IsBackground, Fields = d.Fields,
+                        };
+                    list.Add(d);
+                }
+                map[kv.Key] = list.ToArray();
             }
-            return list.ToArray();
+            return map;
         }
 
         // ── Layout resolution ───────────────────────────────────────────────

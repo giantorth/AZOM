@@ -393,6 +393,17 @@ namespace MozaPlugin.Protocol
 
         private void ReadDevice(HidDevice device, HidStream stream, Dictionary<uint, (int min, int max)> usages, bool isHandbrake, MozaHidClass kind = MozaHidClass.Standard, string identity = "")
         {
+            // Every exit path must de-register + dispose the stream: Run() re-enumerates
+            // as soon as this thread ends, and a stream left in _liveStreams is one more
+            // dead entry per pass.
+            bool released = false;
+            void Release()
+            {
+                if (released) return;
+                released = true;
+                lock (_streamsLock) _liveStreams.Remove(stream);
+                try { stream.Dispose(); } catch { }
+            }
             try
             {
                 var descriptor = device.GetReportDescriptor();
@@ -661,11 +672,8 @@ namespace MozaPlugin.Protocol
                 }
                 finally
                 {
-                    // De-register before dispose so Dispose() doesn't try to close
-                    // a stream that's already on its way out.
-                    lock (_streamsLock) _liveStreams.Remove(stream);
-                    // Dispose stream here so Stopped fires while `stopped` is still alive.
-                    try { stream.Dispose(); } catch { }
+                    // De-register + dispose here so Stopped fires while `stopped` is still alive.
+                    Release();
                     // Give receiver a chance to drain Stopped before disposing the event.
                     try { stopped.Wait(500); } catch { }
                     stopped.Dispose();
@@ -674,6 +682,11 @@ namespace MozaPlugin.Protocol
             catch (Exception ex)
             {
                 MozaLog.Debug($"[AZOM] HID device read error ({device.GetFriendlyName()}): {ex.Message}");
+            }
+            finally
+            {
+                // Covers the early returns / throws before receiver.Start.
+                Release();
             }
         }
 

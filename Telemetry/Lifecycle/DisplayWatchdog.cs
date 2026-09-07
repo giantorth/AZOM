@@ -250,7 +250,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
         public void ResetConfigJsonGapTracking()
         {
             _configJsonGapCount = 0;
-            _configJsonGapEpisodeStartUtcTicks = 0;
+            Interlocked.Exchange(ref _configJsonGapEpisodeStartUtcTicks, 0);
             Interlocked.Exchange(ref _configJsonLastPrimeRetryUtcTicks, 0);
             _configJsonGapTickEscalations = 0;
         }
@@ -369,7 +369,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             _s09ScreenlessParked = false;
 
             _configJsonGapCount = 0;
-            _configJsonGapEpisodeStartUtcTicks = 0;
+            Interlocked.Exchange(ref _configJsonGapEpisodeStartUtcTicks, 0);
             Interlocked.Exchange(ref _configJsonLastChunkUtcTicks, 0);
             Interlocked.Exchange(ref _configJsonLastPrimeRetryUtcTicks, 0);
             _configJsonGapTickEscalations = 0;
@@ -789,16 +789,17 @@ namespace MozaPlugin.Telemetry.Lifecycle
         {
             _configJsonGapCount++;
             long nowTicks = DateTime.UtcNow.Ticks;
-            if (_configJsonGapEpisodeStartUtcTicks == 0)
-                _configJsonGapEpisodeStartUtcTicks = nowTicks;
+            // Interlocked like every other *UtcTicks here: Reset() zeroes this from
+            // the Stop thread, and an x86 torn read would fake a huge episode.
+            long episodeStart = Interlocked.CompareExchange(ref _configJsonGapEpisodeStartUtcTicks, nowTicks, 0);
+            if (episodeStart == 0) episodeStart = nowTicks;
             bool haveCachedState = _sender.ConfigJsonHasLastState;
             string tag = $"sess=0x{session:X2}";
             string cachedTag = haveCachedState ? "cached-state" : "no-state";
 
             if (haveCachedState)
             {
-                long episodeMs = (nowTicks - _configJsonGapEpisodeStartUtcTicks)
-                    / TimeSpan.TicksPerMillisecond;
+                long episodeMs = (nowTicks - episodeStart) / TimeSpan.TicksPerMillisecond;
                 MozaLog.Warn(
                     $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
                     $"buffer preserved, keeping cached state (episode {episodeMs}ms)");

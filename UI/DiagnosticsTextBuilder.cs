@@ -26,7 +26,13 @@ namespace MozaPlugin.UI
             => string.IsNullOrEmpty(id) ? "—" : (id.Length > 40 ? id.Substring(0, 40) + "…" : id);
 
         /// <summary>Plugin assembly version (AssemblyInformationalVersion, +sha stripped).</summary>
-        public static string GetPluginVersion()
+        public static string GetPluginVersion() => s_pluginVersion ??= ComputePluginVersion();
+
+        // Fixed for the assembly's lifetime; the banner tick asked for it twice a
+        // second and each call was an attribute reflection.
+        private static string? s_pluginVersion;
+
+        private static string ComputePluginVersion()
         {
             try
             {

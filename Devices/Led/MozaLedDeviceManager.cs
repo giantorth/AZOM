@@ -104,6 +104,20 @@ namespace MozaPlugin.Devices.Led
             }
         }
 
+        // "dash-flag-color1".."dash-flag-color6" — built once; these were
+        // interpolated per flag LED per frame on the 60 Hz Display() path.
+        private static readonly string[] s_dashFlagColorCommands = BuildDashFlagColorCommands();
+
+        private static string[] BuildDashFlagColorCommands()
+        {
+            var names = new string[MozaDeviceConstants.FlagLedCount];
+            for (int i = 0; i < names.Length; i++) names[i] = "dash-flag-color" + (i + 1);
+            return names;
+        }
+
+        private static string DashFlagColorCommand(int i)
+            => i < s_dashFlagColorCommands.Length ? s_dashFlagColorCommands[i] : "dash-flag-color" + (i + 1);
+
         private void RegisterInstance()
         {
             lock (s_instancesLock)
@@ -147,7 +161,9 @@ namespace MozaPlugin.Devices.Led
         // change; _knobStaticHoldReleased latches once we've released ownership due to a
         // static hold and stays set (suppressing re-engagement) until the colours change.
         private Color[]? _lastKnobRawColors;
-        private DateTime _lastKnobColorChangeTime = DateTime.MinValue;
+        // UTC ticks (0 = never), Interlocked: written on the data thread and zeroed
+        // from the UI thread (InvalidateLiveCache); a DateTime tears on x86.
+        private long _lastKnobColorChangeUtcTicks;
         private bool _knobStaticHoldReleased;
 
         // Unassigned-encoders detection. The generated device.json enables
@@ -333,7 +349,7 @@ namespace MozaPlugin.Devices.Led
             _lastButtonBitmask = -1;
             _lastKnobBitmask = -1;
             _lastKnobRawColors = null;
-            _lastKnobColorChangeTime = DateTime.MinValue;
+            Interlocked.Exchange(ref _lastKnobColorChangeUtcTicks, 0L);
             _knobStaticHoldReleased = false;
             // Detection-loss / reload re-opens the grace window: the next connection
             // may be a differently-configured wheel or profile.
@@ -453,7 +469,7 @@ namespace MozaPlugin.Devices.Led
                 _lastKnobs = null;
                 _lastKnobBitmask = -1;
                 _lastKnobRawColors = null;
-                _lastKnobColorChangeTime = DateTime.MinValue;
+                Interlocked.Exchange(ref _lastKnobColorChangeUtcTicks, 0L);
                 _knobStaticHoldReleased = false;
                 // _knobChannelEverLit / _knobBlackSinceUtc deliberately survive: this
                 // runs when a STATIC write just repainted the rings, which is exactly
@@ -819,7 +835,7 @@ namespace MozaPlugin.Devices.Led
                             _lastFlagColors[i] = c;
                             _rpmChangedUtc = DateTime.UtcNow; // flags ride the RPM keepalive row
                             plugin.DeviceManager.WriteArray(
-                                $"dash-flag-color{i + 1}",
+                                DashFlagColorCommand(i),
                                 new byte[] { c.R, c.G, c.B });
                             anySent = true;
                         }
@@ -1003,11 +1019,11 @@ namespace MozaPlugin.Devices.Led
                     if (!ColorsEqual(knobColors, _lastKnobRawColors))
                     {
                         _lastKnobRawColors = (Color[])knobColors.Clone();
-                        _lastKnobColorChangeTime = nowUtc;
+                        Interlocked.Exchange(ref _lastKnobColorChangeUtcTicks, nowUtc.Ticks);
                         _knobStaticHoldReleased = false;
                     }
                     bool knobStaticTimedOut = knobStaticTimeoutMs > 0
-                        && (nowUtc - _lastKnobColorChangeTime).TotalMilliseconds >= knobStaticTimeoutMs;
+                        && (nowUtc.Ticks - Interlocked.Read(ref _lastKnobColorChangeUtcTicks)) / TimeSpan.TicksPerMillisecond >= knobStaticTimeoutMs;
 
                     // Release telemetry ownership of the knobs (active_mask=0 AND
                     // window_mask=0 — exactly the form PitHouse uses; 286/286 knob writes
@@ -1182,7 +1198,7 @@ namespace MozaPlugin.Devices.Led
                     for (int i = 0; i < MozaDeviceConstants.FlagLedCount; i++)
                     {
                         var c = _lastFlagColors[i];
-                        plugin.DeviceManager.WriteArray($"dash-flag-color{i + 1}", new byte[] { c.R, c.G, c.B });
+                        plugin.DeviceManager.WriteArray(DashFlagColorCommand(i), new byte[] { c.R, c.G, c.B });
                     }
             }
             else if (isOldWheel)

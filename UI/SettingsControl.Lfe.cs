@@ -91,8 +91,11 @@ namespace MozaPlugin.UI
             SeedLfeEdge(BaseLfeGearshiftEdgeOptions, BaseLfeGearshiftVibrateOnNeutral, BaseLfeGearshiftDebounceSlider, BaseLfeGearshiftDebounceValue, gs);
 
             // Live formula readouts next to ƒ(x) (shown only when that param has a
-            // formula). Re-evaluated each RefreshDisplay tick. Frequency uses the
-            // channel's own rescale so it matches the value the worker sends.
+            // formula). Re-evaluated each RefreshDisplay tick while the LFE tab is
+            // showing — twelve NCalc evaluations are not worth paying for a hidden
+            // tab. Frequency uses the channel's own rescale so it matches the value
+            // the worker sends.
+            if (!BaseLfeTab.IsSelected) return;
             UpdateLfeCalc(BaseLfeEngineTriggerCalc, eng.TriggerFormula, r => r);
             UpdateLfeCalc(BaseLfeEngineFrequencyCalc, eng.FrequencyFormula, eng.RescaleFreq);
             UpdateLfeCalc(BaseLfeEngineIntensityCalc, eng.IntensityFormula, r => Math.Max(0, Math.Min(100, r)));

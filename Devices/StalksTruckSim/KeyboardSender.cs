@@ -41,7 +41,18 @@ namespace MozaPlugin.Devices.StalksTruckSim
             _worker.Start();
             // Re-assert held keys so games that sample the flash/high-beam key as an
             // edge (ETS2's J) keep it active for the whole hold, not just one frame.
-            _repeatTimer = new Timer(_ => RepeatHeld(), null, RepeatMs, RepeatMs);
+            // Armed only while a key is held (KeyDown/KeyUp): this sender exists for
+            // the plugin's whole life whether or not stalks are in use, and a
+            // permanent 25 Hz wakeup for an idle feature is pure power draw.
+            _repeatTimer = new Timer(_ => RepeatHeld(), null, Timeout.Infinite, Timeout.Infinite);
+        }
+
+        private void SetRepeatArmed(bool armed)
+        {
+            if (_disposed) return;
+            int period = armed ? RepeatMs : Timeout.Infinite;
+            try { _repeatTimer.Change(period, period); }
+            catch (ObjectDisposedException) { }
         }
 
         private void RepeatHeld()
@@ -50,7 +61,7 @@ namespace MozaPlugin.Devices.StalksTruckSim
             ushort[] held;
             lock (_downLock)
             {
-                if (_down.Count == 0) return;
+                if (_down.Count == 0) { SetRepeatArmed(false); return; }
                 held = new ushort[_down.Count];
                 _down.CopyTo(held);
             }
@@ -73,6 +84,7 @@ namespace MozaPlugin.Devices.StalksTruckSim
         {
             if (scan == 0) return;
             lock (_downLock) _down.Add(scan);
+            SetRepeatArmed(true);
             Enqueue(scan, Op.Down);
         }
         public void KeyDown(string keyName) => KeyDown(ScanCode(keyName));
@@ -81,7 +93,9 @@ namespace MozaPlugin.Devices.StalksTruckSim
         public void KeyUp(ushort scan)
         {
             if (scan == 0) return;
-            lock (_downLock) _down.Remove(scan);
+            bool anyHeld;
+            lock (_downLock) { _down.Remove(scan); anyHeld = _down.Count > 0; }
+            if (!anyHeld) SetRepeatArmed(false);
             Enqueue(scan, Op.Up);
         }
         public void KeyUp(string keyName) => KeyUp(ScanCode(keyName));
@@ -92,6 +106,7 @@ namespace MozaPlugin.Devices.StalksTruckSim
         {
             ushort[] held;
             lock (_downLock) { held = new ushort[_down.Count]; _down.CopyTo(held); _down.Clear(); }
+            SetRepeatArmed(false);
             foreach (var s in held) Enqueue(s, Op.Up);
         }
 

@@ -85,12 +85,14 @@ namespace MozaPlugin.UI
         {
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
-            s.CustomEffects ??= new List<MBoosterCustomEffect>();
+            var current = s.CustomEffects ?? new List<MBoosterCustomEffect>();
             var effect = new MBoosterCustomEffect
             {
-                Name = $"{Strings.DefaultName_CustomEffect} {s.CustomEffects.Count + 1}",
+                Name = $"{Strings.DefaultName_CustomEffect} {current.Count + 1}",
             };
-            s.CustomEffects.Add(effect);
+            // COW swap: the 50 Hz effect workers index this list (Pedals uses the
+            // same rule in MozaMBoosterRegistry).
+            s.CustomEffects = new List<MBoosterCustomEffect>(current) { effect };
             _plugin.SaveSettings();
             _mboosterCustomEffectRows.Add(new MBoosterCustomEffectRow(effect, () => _plugin.SaveSettings(), OnCustomEffectTestToggle)
             {
@@ -104,7 +106,8 @@ namespace MozaPlugin.UI
             if ((sender as FrameworkElement)?.Tag is not MBoosterCustomEffectRow row) return;
             if (row.TestActive) CurrentMBoosterController()?.SetCustomEffectTestActive(row.Id, false, _mboosterEffectPedalIndex);
             var s = CurrentMBoosterEffectTarget();
-            s?.CustomEffects?.RemoveAll(c => string.Equals(c.Id, row.Id, StringComparison.Ordinal));
+            if (s?.CustomEffects != null)
+                s.CustomEffects = s.CustomEffects.FindAll(c => !string.Equals(c.Id, row.Id, StringComparison.Ordinal));
             _plugin.SaveSettings();
             _mboosterCustomEffectRows.Remove(row);
         }

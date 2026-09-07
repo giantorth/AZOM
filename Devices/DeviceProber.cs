@@ -400,7 +400,12 @@ namespace MozaPlugin.Devices
         /// reads don't spam the pending tracker.</summary>
         public void MarkHandbrakeDetected(bool issueReads = true)
         {
-            if (_detectionState.HandbrakeDetected) return;
+            if (_detectionState.HandbrakeDetected)
+            {
+                // Flag rode a persistent-wire reload; End() cleared the owner.
+                if (_detectionState.HandbrakeOwner == null) _detectionState.HandbrakeOwner = _deviceManager;
+                return;
+            }
             // Record the owning pipe BEFORE flipping the flag so HardwareApplier
             // (which reads flag-then-owner) never sees detected==true paired with
             // a null/stale owner. First responder across the base + hub pipes wins.
@@ -416,7 +421,11 @@ namespace MozaPlugin.Devices
         /// See <see cref="MarkHandbrakeDetected"/> for <paramref name="issueReads"/>.</summary>
         public void MarkPedalsDetected(bool issueReads = true)
         {
-            if (_detectionState.PedalsDetected) return;
+            if (_detectionState.PedalsDetected)
+            {
+                if (_detectionState.PedalsOwner == null) _detectionState.PedalsOwner = _deviceManager;
+                return;
+            }
             // Owner first, then flag (see MarkHandbrakeDetected). The owning
             // MozaDeviceManager is this prober's — base pipe for the primary
             // prober, hub pipe for the dedicated hub prober.
@@ -446,7 +455,11 @@ namespace MozaPlugin.Devices
         // with false and issues its own per-model read list from the controller.
         public void MarkHgpDetected(bool issueReads = true)
         {
-            if (_detectionState.HgpDetected) return;
+            if (_detectionState.HgpDetected)
+            {
+                if (_detectionState.HgpOwner == null) _detectionState.HgpOwner = _deviceManager;
+                return;
+            }
             _detectionState.HgpOwner = _deviceManager;
             _detectionState.HgpDetected = true;
             _plugin.HardwareApplier.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
@@ -456,7 +469,11 @@ namespace MozaPlugin.Devices
 
         public void MarkSgpDetected(bool issueReads = true)
         {
-            if (_detectionState.SgpDetected) return;
+            if (_detectionState.SgpDetected)
+            {
+                if (_detectionState.SgpOwner == null) _detectionState.SgpOwner = _deviceManager;
+                return;
+            }
             _detectionState.SgpOwner = _deviceManager;
             _detectionState.SgpDetected = true;
             _plugin.HardwareApplier.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
@@ -716,6 +733,12 @@ namespace MozaPlugin.Devices
                 if (deviceId >= 18 && deviceId <= 30 && sender != null)
                     sender.DetectedDeviceMask |= (1 << (deviceId - 18));
             }
+
+            // Base flag rode a persistent-wire reload; End() cleared the owner —
+            // the first pipe to answer the base probe re-points it.
+            if (commandName == "base-mcu-temp" && _detectionState.BaseDetected
+                && _detectionState.BaseOwner == null)
+                _detectionState.BaseOwner = _deviceManager;
 
             // Base detection — IsBaseConnected was just set by UpdateFromCommand;
             // re-apply the profile so base settings get pushed.

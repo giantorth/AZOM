@@ -143,6 +143,9 @@ namespace MozaPlugin.UI
             status.Text = string.Format(instructionFormat, remaining);
             status.Visibility = Visibility.Visible;
 
+            // Held in a field so OnUnloadedStopTimers can stop it: a running
+            // DispatcherTimer roots this control (and _plugin) until it fires.
+            _calCountdownTimer?.Stop();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += (s, _) =>
             {
@@ -153,12 +156,16 @@ namespace MozaPlugin.UI
                     return;
                 }
                 ((DispatcherTimer)s!).Stop();
+                if (ReferenceEquals(_calCountdownTimer, s)) _calCountdownTimer = null;
                 sendStop();
                 status.Text = Strings.Status_Done;
                 startButton.IsEnabled = true;
             };
+            _calCountdownTimer = timer;
             timer.Start();
         }
+
+        private DispatcherTimer? _calCountdownTimer;
 
         private void HbCalStartButton_Click(object sender, RoutedEventArgs e) =>
             RunCalibrationCountdown(HbCalStartButton, HbCalStatus, Strings.Hint_CalibrateHandbrake,

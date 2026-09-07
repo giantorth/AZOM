@@ -65,6 +65,9 @@ namespace MozaPlugin.Sdk.PitHouseUdp
         // Throttle "unknown PacketId" warnings so a misbehaving client
         // can't flood the log. Sample 1-in-N per distinct PacketId.
         private const int UnknownLogEvery = 60;
+        // Keyed by a wire-supplied id — bounded so a client spraying distinct
+        // PacketIds can't grow the table.
+        private const int MaxUnknownIds = 64;
         private readonly Dictionary<int, int> _unknownCounters = new Dictionary<int, int>();
 
         /// <summary>
@@ -396,7 +399,11 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             int n;
             lock (_unknownCounters)
             {
-                if (!_unknownCounters.TryGetValue(packetId, out n)) n = 0;
+                if (!_unknownCounters.TryGetValue(packetId, out n))
+                {
+                    if (_unknownCounters.Count >= MaxUnknownIds) _unknownCounters.Clear();
+                    n = 0;
+                }
                 n++;
                 _unknownCounters[packetId] = n;
             }

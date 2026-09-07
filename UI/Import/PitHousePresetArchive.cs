@@ -79,8 +79,23 @@ namespace MozaPlugin.UI.Import
 
                 using (var s = entry.Open())
                 using (var reader = new StreamReader(s))
-                    return reader.ReadToEnd();
+                {
+                    // User-chosen file, but the zip entry declares its own size —
+                    // bound the inflate so a hostile preset can't exhaust the x86 heap.
+                    var sb = new System.Text.StringBuilder();
+                    var buf = new char[8192];
+                    int n;
+                    while ((n = reader.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        if (sb.Length + n > MaxPresetChars)
+                            throw new InvalidDataException($"{PresetEntryName} exceeds {MaxPresetChars / (1024 * 1024)} MB");
+                        sb.Append(buf, 0, n);
+                    }
+                    return sb.ToString();
+                }
             }
         }
+
+        private const int MaxPresetChars = 16 * 1024 * 1024;
     }
 }

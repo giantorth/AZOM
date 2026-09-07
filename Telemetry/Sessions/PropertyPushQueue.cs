@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Frames;
@@ -21,9 +22,13 @@ namespace MozaPlugin.Telemetry.Sessions
         private readonly TelemetrySender _sender;
 
         // Latest chunk seqs of the most-recent FF property push per
-        // (session, kind). Lookup happens under _sender.Session02SeqLock.
-        private readonly Dictionary<(byte session, uint kind), List<int>> _lastSeqs
-            = new Dictionary<(byte, uint), List<int>>();
+        // (session, kind). Concurrent because SendBody runs under whichever seq
+        // lock the resolved session selects (Form-B wheels resolve FF to 0x01)
+        // while Clear() runs from Stop() — one Dictionary under two different
+        // locks is no lock at all. Each List<int> is only touched by the caller
+        // that removed or stored it.
+        private readonly ConcurrentDictionary<(byte session, uint kind), List<int>> _lastSeqs
+            = new ConcurrentDictionary<(byte, uint), List<int>>();
 
         public PropertyPushQueue(TelemetrySender sender)
         {
@@ -97,11 +102,10 @@ namespace MozaPlugin.Telemetry.Sessions
                 // before queuing the new chunk. Prevents stale brightness=0
                 // retransmits from leaving the display blanked after a quick
                 // slider drag.
-                if (haveKind && _lastSeqs.TryGetValue((session, kind), out var prevSeqs))
+                if (haveKind && _lastSeqs.TryRemove((session, kind), out var prevSeqs))
                 {
                     foreach (int s in prevSeqs)
                         _sender.Retransmitter.Drop(session, s);
-                    prevSeqs.Clear();
                 }
 
                 int seq = System.Math.Max(2,
@@ -124,9 +128,6 @@ namespace MozaPlugin.Telemetry.Sessions
         }
 
         /// <summary>Clear the coalescing index. Called on session reset.</summary>
-        public void Clear()
-        {
-            lock (_sender.Session02SeqLock) _lastSeqs.Clear();
-        }
+        public void Clear() => _lastSeqs.Clear();
     }
 }

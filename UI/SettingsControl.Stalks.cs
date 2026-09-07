@@ -52,6 +52,9 @@ namespace MozaPlugin.UI
             BuildStalkRows();
             StalksButtonList.ItemsSource = _stalkRows;
 
+            // Detach from a reader replaced by a reconnect before re-wiring.
+            if (_stalksReader != null)
+                _stalksReader.StalksButtonChanged -= OnStalksButtonChangedUi;
             _stalksReader = _plugin?.HidReader;
             if (_stalksReader != null)
                 _stalksReader.StalksButtonChanged += OnStalksButtonChangedUi;

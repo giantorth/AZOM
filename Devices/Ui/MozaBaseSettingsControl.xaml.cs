@@ -49,7 +49,11 @@ namespace MozaPlugin.Devices.Ui
             Unloaded += OnUnloaded;
         }
 
-        private void OnRefreshTick(object? sender, EventArgs e) => Refresh();
+        private void OnRefreshTick(object? sender, EventArgs e)
+        {
+            try { Refresh(); }
+            catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-base", $"[AZOM] Base page tick failed: {ex}"); }
+        }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
@@ -82,9 +86,15 @@ namespace MozaPlugin.Devices.Ui
                 return;
             }
 
+            // ResolvePlugin() returning true means both fields were just assigned;
+            // flow analysis can't tie the bool to them, so snapshot into locals.
+            var plugin = _plugin;
+            var data = _data;
+            if (plugin == null || data == null) return;
+
             // Detection-based (matches MozaBaseLedDeviceManager.IsConnected) so the
             // tab reflects detection independent of the lazily-injected LED driver.
-            bool detected = _plugin!.IsBaseAmbientLedSupported;
+            bool detected = plugin.IsBaseAmbientLedSupported;
 
             using (_suppressor.Begin())
             {
@@ -95,15 +105,15 @@ namespace MozaPlugin.Devices.Ui
                 {
                     // 0 off, 1 SimHub mode, 2 on — the selector index IS the register value
                     // written to 0x1C.
-                    SetComboSafe(IndicatorStateCombo, Clamp(_data.BaseAmbientIndicatorState, 0, 2));
+                    SetComboSafe(IndicatorStateCombo, Clamp(data.BaseAmbientIndicatorState, 0, 2));
                     // Standby dropdown index == device mode: 0 off, 1 constant,
                     // 2 breathing, 3 color cycle, 4 rainbow, 5 sand flow.
-                    SetComboSafe(StandbyModeCombo, Clamp(_data.BaseAmbientStandbyMode, 0, 5));
-                    SetComboSafe(SleepModeCombo, Clamp(_data.BaseAmbientSleepMode, 0, 1));
+                    SetComboSafe(StandbyModeCombo, Clamp(data.BaseAmbientStandbyMode, 0, 5));
+                    SetComboSafe(SleepModeCombo, Clamp(data.BaseAmbientSleepMode, 0, 1));
 
-                    BrightnessSlider.Value = Clamp(_data.BaseAmbientBrightness, 0, 100);
+                    BrightnessSlider.Value = Clamp(data.BaseAmbientBrightness, 0, 100);
                     BrightnessValue.Text = $"{(int)BrightnessSlider.Value}";
-                    SleepTimeoutSlider.Value = Clamp(_data.BaseAmbientSleepTimeout, 0, (int)SleepTimeoutSlider.Maximum);
+                    SleepTimeoutSlider.Value = Clamp(data.BaseAmbientSleepTimeout, 0, (int)SleepTimeoutSlider.Maximum);
                     SleepTimeoutValue.Text = $"{(int)SleepTimeoutSlider.Value}";
 
 

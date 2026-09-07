@@ -50,7 +50,11 @@ namespace MozaPlugin.Devices.Ui
             Unloaded += OnUnloaded;
         }
 
-        private void OnRefreshTick(object? sender, EventArgs e) => RefreshDash();
+        private void OnRefreshTick(object? sender, EventArgs e)
+        {
+            try { RefreshDash(); }
+            catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-dash", $"[AZOM] Dash page tick failed: {ex}"); }
+        }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {

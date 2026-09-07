@@ -162,19 +162,19 @@ namespace MozaPlugin.UI
                 SetBugReportReference(null);
                 SetBugReportStatus(Strings.Status_BugReportUploading);
 
-                // Assemble on the UI thread (light: snapshots + text), then
-                // compress off-thread (heavier) so the pane stays responsive.
+                // Assemble AND compress off-thread: the two capture redaction passes
+                // and the diagnostics dump are not light on a big rolling capture.
                 bool rollingOmitted = false;
-                var content = BuildBundleContent(
-                    BuildReportText(description, contact, version, os, rollingOmitted), includeRolling: true);
-                byte[] bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(content));
+                string reportText = BuildReportText(description, contact, version, os, rollingOmitted);
+                byte[] bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(
+                    BuildBundleContent(reportText, includeRolling: true)));
 
                 if (bundle.Length > BugReportService.MaxUploadBytes)
                 {
                     rollingOmitted = true;
-                    content = BuildBundleContent(
-                        BuildReportText(description, contact, version, os, rollingOmitted), includeRolling: false);
-                    bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(content));
+                    string reportTextNoRolling = BuildReportText(description, contact, version, os, rollingOmitted);
+                    bundle = await Task.Run(() => UI.DiagnosticsBundleWriter.BuildBundleBytes(
+                        BuildBundleContent(reportTextNoRolling, includeRolling: false)));
                     if (bundle.Length > BugReportService.MaxUploadBytes)
                     {
                         SetBugReportStatus(Strings.Status_BugReportTooLarge);

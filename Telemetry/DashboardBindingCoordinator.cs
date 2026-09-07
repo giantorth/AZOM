@@ -216,7 +216,11 @@ namespace MozaPlugin.Telemetry
                 sender.Stop();
                 Interlocked.Exchange(ref _plugin._telemetryStartRequested, 0);
             }
-            if (desired != null && sender.StateIsIdle)
+            // StartInner leaves the state Idle while it sleeps out the silence gate,
+            // so Idle alone is not "no start in flight" — check StartInProgress too
+            // (as EnsureCm2Pipeline does) or a UI-thread apply swaps the connection
+            // under a start that then opens sessions on the wrong pipe.
+            if (desired != null && sender.StateIsIdle && !sender.StartInProgress)
                 sender.Rebind(desired);
 
             // The wheel screen must NEVER get the standalone Enable (0x0F) frame (it
@@ -248,6 +252,8 @@ namespace MozaPlugin.Telemetry
             sender.SetDownloadEnabled(false);
             if (_plugin.Settings.EnableAutoTestOnConnect)
                 sender.EnableAutoTest(_plugin);
+            else
+                sender.DisableAutoTest();
 
             // Resolve active multi-stream profile and raw mzdash content.
             // Precedence: custom file → cached by name → builtin embedded → null (sender synthesises from catalog).

@@ -18,8 +18,9 @@ namespace MozaPlugin.Sdk
         private readonly HardwareApplier _hardware;
 
         // Guards the server/stub fields and the persistent static during
-        // transitions (Init, UI toggle, End can all race).
-        private readonly object _gate = new object();
+        // transitions (Init, UI toggle, End can all race). Static so the
+        // process-exit path shares it with the instance transitions.
+        private static readonly object _gate = new object();
 
         private MozaSdkCoapServer? _server;
         private PitHouseUdp.MozaControlUdpServer? _udpServer;
@@ -143,8 +144,10 @@ namespace MozaPlugin.Sdk
                         catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
                         MozaLog.Info("[Sdk] CoAP SDK emulation disabled — stub stopped, registry restored");
                     }
+                    // Only drop the static if that is the stub we just stopped — a
+                    // different live persistent child must not be orphaned.
+                    if (ReferenceEquals(stub, s_persistentStub)) s_persistentStub = null;
                     _stub = null;
-                    s_persistentStub = null;
                 }
             }
         }
@@ -191,10 +194,13 @@ namespace MozaPlugin.Sdk
         /// those out from under it.</summary>
         internal void StopServers()
         {
-            try { _server?.Stop(); _server?.Dispose(); _server = null; }
-            catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
-            try { _udpServer?.Stop(); _udpServer?.Dispose(); _udpServer = null; }
-            catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
+            lock (_gate)
+            {
+                try { _server?.Stop(); _server?.Dispose(); _server = null; }
+                catch (Exception ex) { MozaLog.Warn($"[Sdk] server stop: {ex.Message}"); }
+                try { _udpServer?.Stop(); _udpServer?.Dispose(); _udpServer = null; }
+                catch (Exception ex) { MozaLog.Warn($"[PitHouseUdp] server stop: {ex.Message}"); }
+            }
         }
 
         /// <summary>CleanupPartialInit's stub policy: if this Init reused the
@@ -204,13 +210,16 @@ namespace MozaPlugin.Sdk
         /// wedge can't block cleanup.</summary>
         internal void ReleaseStubAfterFailedInit()
         {
-            bool ownStub = _stub != null && !ReferenceEquals(_stub, s_persistentStub);
-            if (ownStub)
+            lock (_gate)
             {
-                try { _stub?.TryStop(1500); }
-                catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+                bool ownStub = _stub != null && !ReferenceEquals(_stub, s_persistentStub);
+                if (ownStub)
+                {
+                    try { _stub?.TryStop(1500); }
+                    catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+                }
+                _stub = null;
             }
-            _stub = null;
         }
 
         /// <summary>End()'s stub policy. When <paramref name="keepWireAlive"/> we
@@ -220,26 +229,29 @@ namespace MozaPlugin.Sdk
         /// a game switch), stop the stub too and clear the static.</summary>
         internal void ReleaseStubOnEnd(bool keepWireAlive)
         {
-            if (keepWireAlive)
+            lock (_gate)
             {
+                if (keepWireAlive)
+                {
+                    _stub = null;
+                    return;
+                }
+                // Bounded so the End() flow (often runs on the SimHub UI thread)
+                // can't get pinned by a Wine-side wedge in Process.Kill /
+                // JobObject.Dispose.
+                try { _stub?.TryStop(1500); }
+                catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
+                if (_stub != null && ReferenceEquals(_stub, s_persistentStub))
+                    s_persistentStub = null;
                 _stub = null;
-                return;
             }
-            // Bounded so the End() flow (often runs on the SimHub UI thread)
-            // can't get pinned by a Wine-side wedge in Process.Kill /
-            // JobObject.Dispose.
-            try { _stub?.TryStop(1500); }
-            catch (Exception ex) { MozaLog.Warn($"[Sdk] stub stop: {ex.Message}"); }
-            if (_stub != null && ReferenceEquals(_stub, s_persistentStub))
-                s_persistentStub = null;
-            _stub = null;
         }
 
         /// <summary>Process-exit path: stop whatever stub outlived the plugin
         /// instances. Bounded; failures are swallowed by the caller.</summary>
         internal static void StopPersistentStub()
         {
-            s_persistentStub?.TryStop(1500);
+            lock (_gate) s_persistentStub?.TryStop(1500);
         }
 
         /// <summary>True when a persistent stub child is still alive — Init's

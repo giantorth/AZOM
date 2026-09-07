@@ -53,7 +53,10 @@ namespace MozaPlugin.Devices.Ui
             using (_suppressor.Begin())
             {
                 InitializeComponent();
-                ResolvePlugin();
+                // Resolve only — the plugin-event subscriptions belong to Loaded/
+                // Unloaded, or a page SimHub constructs but never shows stays rooted
+                // by the plugin's event lists for the plugin's lifetime.
+                ResolvePlugin(subscribe: false);
             }
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -63,7 +66,11 @@ namespace MozaPlugin.Devices.Ui
             Unloaded += OnUnloaded;
         }
 
-        private void OnRefreshTick(object? sender, EventArgs e) => RefreshDashboardManagement();
+        private void OnRefreshTick(object? sender, EventArgs e)
+        {
+            try { RefreshDashboardManagement(); }
+            catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-dashmgmt", $"[AZOM] Dashboard tab tick failed: {ex}"); }
+        }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
@@ -156,7 +163,7 @@ namespace MozaPlugin.Devices.Ui
             PopulateDashboardCombo();
         }
 
-        private bool ResolvePlugin()
+        private bool ResolvePlugin(bool subscribe = true)
         {
             _plugin = MozaPlugin.Instance;
             if (_plugin == null) return false;
@@ -165,7 +172,7 @@ namespace MozaPlugin.Devices.Ui
             _settings = _plugin.Settings;
 
             // Re-subscribe to dashboard events when plugin instance changes (Refresh tick self-heals on reload).
-            if (!ReferenceEquals(_dashEventSubscribedPlugin, _plugin))
+            if (subscribe && !ReferenceEquals(_dashEventSubscribedPlugin, _plugin))
             {
                 if (_dashEventSubscribedPlugin != null)
                 {
@@ -921,7 +928,12 @@ namespace MozaPlugin.Devices.Ui
                 if (turningOn && !active.IsActive)
                 {
                     _plugin.ApplyTelemetrySettings();
-                    System.Threading.ThreadPool.QueueUserWorkItem(_ => active.Start());
+                    // An exception escaping a pool work item terminates the process.
+                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try { active.Start(); }
+                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Test-pattern sender start failed: {ex.Message}"); }
+                    });
                 }
                 else if (!turningOn && active.IsActive)
                 {

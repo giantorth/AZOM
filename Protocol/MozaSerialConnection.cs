@@ -912,6 +912,10 @@ namespace MozaPlugin.Protocol
             _writeThread?.Join(1000);
             _dispatchThread?.Join(1000);
             DrainRxQueue();
+            // The write lanes have no consumer until the next open; a Send that
+            // slipped in before _running went false would otherwise sit here.
+            while (_priorityQueue.TryDequeue(out _)) { }
+            while (_oneShotQueue.TryDequeue(out _)) { }
         }
 
         private void DrainRxQueue()
@@ -970,7 +974,9 @@ namespace MozaPlugin.Protocol
 
         public void Send(byte[] message)
         {
-            if (message != null)
+            // Nothing drains the lanes while the I/O threads are down (Disconnect);
+            // FinishOpen dropped anything queued in that window anyway.
+            if (message != null && _running)
                 _oneShotQueue.Enqueue(message);
         }
 
@@ -985,7 +991,7 @@ namespace MozaPlugin.Protocol
         /// </summary>
         public void SendPriority(byte[] message)
         {
-            if (message != null)
+            if (message != null && _running)
                 _priorityQueue.Enqueue(message);
         }
 
@@ -1078,6 +1084,12 @@ namespace MozaPlugin.Protocol
                 try { _port?.Close(); } catch { }
                 _port = null;
             }
+            // Release the port-held claim now (Disconnect does the same): until the
+            // reconnect tick reopens, sibling lanes and the migration check would
+            // otherwise still see this closed port as ours.
+            var lastPort = _lastPortName;
+            if (lastPort != null)
+                _activePorts.TryRemove(lastPort, out _);
             while (_priorityQueue.TryDequeue(out _)) { }
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
@@ -1237,8 +1249,8 @@ namespace MozaPlugin.Protocol
                         OnIdleRead();
                         continue;
                     }
-                    for (int i = 0; i < n; i++)
-                        rx.Add(tmp[i]);
+                    // ICollection<T> fast path (one CopyTo), not 4096 bounds-checked Adds.
+                    rx.AddRange(new ArraySegment<byte>(tmp, 0, n));
                     Interlocked.Exchange(ref _consecutiveIoErrors, 0);
                     Interlocked.Exchange(ref _lastRxUtcTicks, DateTime.UtcNow.Ticks);
 
@@ -1281,7 +1293,7 @@ namespace MozaPlugin.Protocol
                         if (frameStart > cursor)
                         {
                             int skipped = frameStart - cursor;
-                            Interlocked.Increment(ref _frameStartScanResyncs);
+                            long resyncNo = Interlocked.Increment(ref _frameStartScanResyncs);
                             // Histogram bucket (cheap — no allocation):
                             int b;
                             if (skipped <= 1) b = 0;
@@ -1296,8 +1308,12 @@ namespace MozaPlugin.Protocol
                             // Sample the actual skipped bytes (capped to
                             // 24 hex chars) so the diagnostics tab can
                             // show what's between frames. Newest-first
-                            // ring buffer with a tiny lock — hits at most
-                            // a few thousand times per session.
+                            // ring buffer with a tiny lock. Sampled: the
+                            // first ring's worth, then every 64th — a noisy
+                            // line resyncs per byte, and the string build
+                            // sits on the read thread.
+                            if (resyncNo <= ResyncSampleCapacity || (resyncNo & 63) == 0)
+                            {
                             int sampleLen = Math.Min(skipped, 12);
                             var sb = new System.Text.StringBuilder(2 + sampleLen * 3);
                             // Trailing bytes of whatever we parsed LAST, before the
@@ -1339,6 +1355,7 @@ namespace MozaPlugin.Protocol
                                 _resyncSamples.AddLast(sample);
                                 while (_resyncSamples.Count > ResyncSampleCapacity)
                                     _resyncSamples.RemoveFirst();
+                            }
                             }
                         }
                         if (frameStart >= rx.Count)
@@ -1546,8 +1563,17 @@ namespace MozaPlugin.Protocol
                 && (DateTime.UtcNow.Ticks - lastRx) > ReadIdleDeadMs * TimeSpan.TicksPerMillisecond)
             {
                 Interlocked.Exchange(ref _lastRxUtcTicks, 0);
-                HandleIoFailure("ReadIdle",
-                    new IOException($"No inbound for >{ReadIdleDeadMs}ms while port open — half-open tty"));
+                // Immediate close, same gate as ForceReconnect. The counting path in
+                // HandleIoFailure can never reach PortDeadThreshold here: nothing
+                // throws on a half-open tty and every successful write resets the
+                // counter, so one breach would just disarm this detector for good.
+                if (_running && Interlocked.CompareExchange(ref _portFailureLogged, 1, 0) == 0)
+                {
+                    string reason = $"ReadIdle: no inbound for >{ReadIdleDeadMs}ms while port open (half-open tty)";
+                    MozaLog.Warn($"[AZOM] {reason} — closing for reconnect");
+                    RecordRuntimeFailure(ConnectionFailureKind.IoFailureAfterOpen, reason);
+                    ClosePortAndNotify();
+                }
                 return;
             }
             Thread.Sleep(2);
@@ -1683,7 +1709,16 @@ namespace MozaPlugin.Protocol
                 int len = MozaProtocol.StuffFrame(msg, stuffBuf);
                 // No lock on Write: only this thread calls it; Close races
                 // resolve via IOException/ObjectDisposedException below.
-                _port?.Write(stuffBuf, 0, len);
+                var port = _port;
+                if (port == null)
+                {
+                    // Closed by ClosePortAndNotify and not yet reopened: nothing left
+                    // the machine, so don't record a phantom TX, charge the budget or
+                    // reset the I/O-error counter.
+                    Interlocked.Increment(ref _framesDropped);
+                    return -1;
+                }
+                port.Write(stuffBuf, 0, len);
                 Interlocked.Exchange(ref _consecutiveIoErrors, 0);
                 SerialTrafficCapture.Instance.RecordTx(CaptureLabel, msg);
                 _budget.Record(len);

@@ -218,10 +218,19 @@ namespace MozaPlugin.UI
         {
             _plugin.HardwareApplier.WriteIfBaseConnected("base-calibration", 1);
             BaseCalibrateStatus.Text = Strings.Status_CalibrationSent;
+            _baseCalStatusTimer?.Stop();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            timer.Tick += (s, _) => { BaseCalibrateStatus.Text = ""; ((DispatcherTimer)s!).Stop(); };
+            timer.Tick += (s, _) =>
+            {
+                BaseCalibrateStatus.Text = "";
+                ((DispatcherTimer)s!).Stop();
+                if (ReferenceEquals(_baseCalStatusTimer, s)) _baseCalStatusTimer = null;
+            };
+            _baseCalStatusTimer = timer;   // stopped by OnUnloadedStopTimers
             timer.Start();
         }
+
+        private DispatcherTimer? _baseCalStatusTimer;
 
     }
 }

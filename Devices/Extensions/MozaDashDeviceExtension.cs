@@ -48,9 +48,13 @@ namespace MozaPlugin.Devices.Extensions
         /// Find the LedModuleDevice sub-device and replace its DeviceDriver
         /// with our MozaDashLedDeviceManager that always reports connected.
         /// </summary>
+        // Latched when the host has no DeviceDriver setter, so the 60 Hz retry
+        // in DataUpdate stops constructing a manager per frame.
+        private bool _injectionGaveUp;
+
         private void InjectLedDriver()
         {
-            if (_driverInjected) return;
+            if (_driverInjected || _injectionGaveUp) return;
 
             try
             {
@@ -58,20 +62,19 @@ namespace MozaPlugin.Devices.Extensions
                 {
                     if (instance is LedModuleDevice lmd && lmd.ledModuleSettings != null)
                     {
+                        if (!LedDriverInjection.CanInject)
+                        {
+                            _injectionGaveUp = true;
+                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (dash)");
+                            return;
+                        }
+
                         _ledDriver = new MozaDashLedDeviceManager();
                         _ledDriver.LedModuleSettings = lmd.ledModuleSettings;
-
-                        if (LedDriverInjection.CanInject)
-                        {
-                            _injectedSettings = lmd.ledModuleSettings;
-                            _originalDriver = LedDriverInjection.Swap(lmd.ledModuleSettings, _ledDriver);
-                            _driverInjected = true;
-                            MozaLog.Debug("[AZOM] Injected virtual LED driver for dashboard");
-                        }
-                        else
-                        {
-                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (dash)");
-                        }
+                        _injectedSettings = lmd.ledModuleSettings;
+                        _originalDriver = LedDriverInjection.Swap(lmd.ledModuleSettings, _ledDriver);
+                        _driverInjected = true;
+                        MozaLog.Debug("[AZOM] Injected virtual LED driver for dashboard");
                         return;
                     }
                 }

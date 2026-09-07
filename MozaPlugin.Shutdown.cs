@@ -131,7 +131,11 @@ namespace MozaPlugin
                 // instance so sub-device tabs (handbrake/pedals/hub/dash) stay
                 // visible across the reload — presence probes don't reliably
                 // re-ACK on the reused wire and would otherwise leave tabs
-                // permanently hidden until SimHub restarts.
+                // permanently hidden until SimHub restarts. The pipe owners are
+                // this instance's managers (disposed below) — drop them so the
+                // next instance's probers re-point rather than write into a
+                // disposed manager.
+                DetectionState.ClearOwners();
                 s_persistentDetectionState = DetectionState;
             }
             else

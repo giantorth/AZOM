@@ -283,7 +283,10 @@ namespace MozaPlugin.Devices.Ui
                     if (absIdx < MozaData.KnobRingLedMax)
                     {
                         var rc = _data.KnobRingColors[absIdx];
-                        viz.RingColors![i] = Color.FromRgb(rc[0], rc[1], rc[2]);
+                        var c = Color.FromRgb(rc[0], rc[1], rc[2]);
+                        // The ObservableCollection indexer raises Replace even for an
+                        // identical value; skip unchanged slots on this 500 ms tick.
+                        if (viz.RingColors![i] != c) viz.RingColors[i] = c;
                     }
                 }
             }

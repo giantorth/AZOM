@@ -74,6 +74,11 @@ namespace MozaPlugin.Devices.Extensions
                 () => _ledDriver?.IsConnected() ?? false);
         }
 
+        // Latched when the host has no DeviceDriver setter: DataUpdate retries the
+        // injection at 60 Hz until _driverInjected, and each attempt used to
+        // construct a manager (registered in a static list) before finding out.
+        private bool _injectionGaveUp;
+
         /// <summary>
         /// Find the LedModuleDevice sub-device and replace its DeviceDriver
         /// with our MozaLedDeviceManager that always reports connected.
@@ -81,7 +86,7 @@ namespace MozaPlugin.Devices.Extensions
         /// </summary>
         private void InjectLedDriver()
         {
-            if (_driverInjected) return;
+            if (_driverInjected || _injectionGaveUp) return;
 
             try
             {
@@ -89,11 +94,17 @@ namespace MozaPlugin.Devices.Extensions
                 {
                     if (instance is LedModuleDevice lmd && lmd.ledModuleSettings != null)
                     {
+                        if (!LedDriverInjection.CanInject)
+                        {
+                            _injectionGaveUp = true;
+                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings");
+                            return;
+                        }
+
                         _ledDriver = new MozaLedDeviceManager();
                         _ledDriver.ExpectedModelPrefix = _expectedModelPrefix;
                         _ledDriver.LedModuleSettings = lmd.ledModuleSettings;
 
-                        if (LedDriverInjection.CanInject)
                         {
                             _injectedSettings = lmd.ledModuleSettings;
                             _originalDriver = LedDriverInjection.Swap(lmd.ledModuleSettings, _ledDriver);
@@ -111,10 +122,6 @@ namespace MozaPlugin.Devices.Extensions
                                 plugin.DeviceExtensionActive = true;
 
                             MozaLog.Debug("[AZOM] Injected virtual LED driver — effects UI should be available");
-                        }
-                        else
-                        {
-                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings");
                         }
                         return;
                     }

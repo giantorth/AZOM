@@ -268,14 +268,22 @@ namespace MozaPlugin
                     "10-band EQ stay disabled (needs >= 1.2.10.10)");
         }
 
+        private int _pollTickInProgress;
+        private int _retryTickInProgress;
+
         private void PollStatus(object sender, ElapsedEventArgs e)
         {
             if (IsShuttingDown) return;
+            // AutoReset timer: a slow tick (Disconnect() joins its I/O threads,
+            // EnsureCm2Pipeline starts/stops a sender) must not overlap the next
+            // one — the miss counter and model-recheck tick are per-tick state.
+            if (System.Threading.Interlocked.CompareExchange(ref _pollTickInProgress, 1, 0) != 0) return;
             // System.Timers.Timer swallows exceptions silently — without this
             // wrapper a deterministic throw halts the whole 5 s detection state
             // machine with no log evidence.
             try { PollStatusCore(); }
             catch (Exception ex) { MozaLog.Warn($"[AZOM] PollStatus tick failed: {ex}"); }
+            finally { System.Threading.Interlocked.Exchange(ref _pollTickInProgress, 0); }
         }
 
         private void PollStatusCore()
@@ -332,16 +340,16 @@ namespace MozaPlugin
             {
                 if (_deviceManager.WheelRespondedSinceLastPoll)
                 {
-                    DetectionState.WheelPollMisses = 0;
+                    DetectionState.ResetWheelPollMisses();
                 }
                 else
                 {
-                    DetectionState.WheelPollMisses++;
-                    if (DetectionState.WheelPollMisses >= WheelMissThreshold)
+                    int misses = DetectionState.IncrementWheelPollMisses();
+                    if (misses >= WheelMissThreshold)
                     {
                         ResetWheelDetection(
                             $"Wheel on ID {_deviceManager.WheelDeviceId} not responding " +
-                            $"({DetectionState.WheelPollMisses} misses) — resetting for hot-swap");
+                            $"({misses} misses) — resetting for hot-swap");
                     }
                 }
                 _deviceManager.ResetWheelResponseFlag();
@@ -577,6 +585,6 @@ namespace MozaPlugin
                 _deviceManager.ReadSetting("hub-port1-power");
         }
 
-        internal volatile int _unmatched;
+        internal int _unmatched;   // Interlocked (two dispatch threads increment it)
     }
 }

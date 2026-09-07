@@ -60,8 +60,13 @@ namespace MozaPlugin.Sdk
         // gets a real handle even before any managed code touches _process.
         private IntPtr _processHandle;
         private SafeJobHandle? _jobHandle;
-        private string _status = "Stopped";
-        private string? _lastError;
+        // Read lock-free by the UI's 500 ms status tick: TryStop deliberately
+        // abandons a Stop() that wedges under Wine while it still holds _gate, and
+        // a getter that waited on the gate pinned the WPF thread behind it.
+        private volatile string _status = "Stopped";
+        private volatile string? _lastError;
+        private volatile bool _runningCached;
+        private volatile int _pidCached;
         private bool _disposed;
         // True between successful ApplyRegistryRedirect and matching restore.
         // Gates RestoreRegistryRedirect so we don't touch the registry on
@@ -69,43 +74,18 @@ namespace MozaPlugin.Sdk
         // step (e.g., CreateProcess failed).
         private bool _redirectApplied;
 
-        /// <summary>True while the spawned process is alive.</summary>
-        public bool IsRunning
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    try { return _process != null && !_process.HasExited; }
-                    catch { return false; }
-                }
-            }
-        }
+        /// <summary>True while the spawned process is alive (as last observed —
+        /// updated on start, explicit stop and the Exited event).</summary>
+        public bool IsRunning => _runningCached;
 
         /// <summary>OS process id of the spawned stub, or null if not running.</summary>
-        public int? ProcessId
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    try { return _process != null && !_process.HasExited ? _process.Id : (int?)null; }
-                    catch { return null; }
-                }
-            }
-        }
+        public int? ProcessId => _runningCached ? _pidCached : (int?)null;
 
         /// <summary>Human-readable status string for surfacing in the UI tab.</summary>
-        public string Status
-        {
-            get { lock (_gate) return _status; }
-        }
+        public string Status => _status;
 
         /// <summary>Most recent error message, if any. Cleared on successful <see cref="Start"/>.</summary>
-        public string? LastError
-        {
-            get { lock (_gate) return _lastError; }
-        }
+        public string? LastError => _lastError;
 
         /// <summary>
         /// Path on disk the stub is extracted to. Exposed for diagnostics/UI.
@@ -310,6 +290,8 @@ namespace MozaPlugin.Sdk
                         // can't double-close it if a later step throws.
                         pi.hProcess = IntPtr.Zero;
                         _jobHandle = jobHandle;
+                        _pidCached = p.Id;
+                        _runningCached = true;
                         _status = $"Running (PID {p.Id})";
                         _lastError = null;
                         MozaLog.Info($"[AZOM] CoAP stub started (PID {p.Id}, exe '{exePath}').");
@@ -583,6 +565,7 @@ namespace MozaPlugin.Sdk
             lock (_gate)
             {
                 if (_process == null) return;
+                _runningCached = false;
                 int code;
                 try { code = _process.ExitCode; } catch { code = -1; }
 
@@ -690,6 +673,7 @@ namespace MozaPlugin.Sdk
 
                 try { _process.Dispose(); } catch { }
                 _process = null;
+                _runningCached = false;
             }
 
             // Close the raw kernel handle CreateProcess returned. Separate

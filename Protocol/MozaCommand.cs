@@ -79,28 +79,34 @@ namespace MozaPlugin.Protocol
         }
 
         public static int ParseIntValue(byte[] data, int byteCount)
+            => data == null ? 0 : ParseIntValue(data, 0, byteCount);
+
+        /// <summary>Big-endian integer of <paramref name="byteCount"/> bytes at
+        /// <paramref name="offset"/> — lets the response parser read straight from
+        /// the wire frame without slicing a value array per message.</summary>
+        public static int ParseIntValue(byte[] data, int offset, int byteCount)
         {
-            if (data == null || data.Length < byteCount)
+            if (data == null || byteCount <= 0 || offset < 0 || data.Length - offset < byteCount)
                 return 0;
 
             int value = 0;
             for (int i = 0; i < byteCount; i++)
-                value = (value << 8) | data[i];
+                value = (value << 8) | data[offset + i];
             return value;
         }
 
         public static float ParseFloatValue(byte[] data)
+            => data == null ? 0f : ParseFloatValue(data, 0);
+
+        /// <summary>Big-endian IEEE 754 single at <paramref name="offset"/>.</summary>
+        public static float ParseFloatValue(byte[] data, int offset)
         {
-            if (data == null || data.Length < 4)
+            if (data == null || offset < 0 || data.Length - offset < 4)
                 return 0f;
 
-            // Big-endian to little-endian conversion
-            var bytes = new byte[4];
-            bytes[0] = data[3];
-            bytes[1] = data[2];
-            bytes[2] = data[1];
-            bytes[3] = data[0];
-            return BitConverter.ToSingle(bytes, 0);
+            // Big-endian on the wire; assemble the bits directly (no scratch array).
+            int bits = (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
+            return BitConverter.ToSingle(BitConverter.GetBytes(bits), 0);
         }
 
         /// <summary>

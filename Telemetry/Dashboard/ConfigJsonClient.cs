@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Sessions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -35,7 +36,22 @@ namespace MozaPlugin.Telemetry.Dashboard
         // resolve a wheel:<id> key to a slot without it.
         //
         // Reset by HardReset() — wheel hot-swap, schema upgrade, dispose.
-        private static WheelDashboardState? _cachedLastState;
+        //
+        // One slot per target device: the wheel sender and the CM2 sender each
+        // own a ConfigJsonClient, and a single shared slot let one device's
+        // TitleId=4 delta merge onto the other's library (and HardReset wipe the
+        // other lane). Array element refs are atomic, so readers need no lock.
+        private static readonly WheelDashboardState?[] s_cachedByDevice = new WheelDashboardState?[256];
+
+        /// <summary>Target device id (0x17 wheel, 0x14/0x12 CM2) that selects this
+        /// client's cross-instance cache slot. Set by the owning sender.</summary>
+        public byte CacheKey { get; set; } = MozaProtocol.DeviceWheel;
+
+        private WheelDashboardState? CachedLastState
+        {
+            get => System.Threading.Volatile.Read(ref s_cachedByDevice[CacheKey]);
+            set => System.Threading.Volatile.Write(ref s_cachedByDevice[CacheKey], value);
+        }
 
         /// <summary>Most recent dashboard state parsed from the device.
         /// Falls back to the cross-instance cache when this instance hasn't
@@ -44,7 +60,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// only library data (ConfigJsonList, EnabledDashboards id→name)
         /// get usable answers; callers that need fresh slot state should
         /// observe TelemetrySender.WheelReportedSlot instead.</summary>
-        public WheelDashboardState? LastState => _lastState ?? _cachedLastState;
+        public WheelDashboardState? LastState => _lastState ?? CachedLastState;
 
         /// <summary>State decoded from THIS session's wheel push, with NO
         /// cross-session cache fallback (unlike <see cref="LastState"/>). Null until
@@ -91,9 +107,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             {
                 // TitleId=4 pushes are deltas — merge into the prior state so
                 // the cached inventory doesn't collapse to the last delta.
-                state = WheelDashboardState.Merge(_lastState ?? _cachedLastState, state);
+                state = WheelDashboardState.Merge(_lastState ?? CachedLastState, state);
                 _lastState = state;
-                _cachedLastState = state;
+                CachedLastState = state;
                 // Consume the decoded blob so successive updates (e.g. after
                 // a dashboard change) can reassemble a fresh one.
                 _deviceInbox.Clear();
@@ -145,7 +161,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public void CompactConfirmedDeletes()
         {
-            var basis = _lastState ?? _cachedLastState;
+            var basis = _lastState ?? CachedLastState;
             if (basis == null || basis.ConfirmedRemovedNames.Count == 0) return;
             var doomed = new HashSet<string>(basis.ConfirmedRemovedNames, StringComparer.Ordinal);
             var table = new List<string>(basis.ConfigJsonList);
@@ -154,7 +170,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             var s = CloneWithList(basis, table);
             s.ConfirmedRemovedNames = Array.Empty<string>();
             _lastState = s;
-            _cachedLastState = s;
+            CachedLastState = s;
             try
             {
                 MozaLog.Info(
@@ -179,7 +195,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public void ApplyLibraryDelta(string? addName, string? removeName)
         {
-            var basis = _lastState ?? _cachedLastState;
+            var basis = _lastState ?? CachedLastState;
             if (basis == null) return;
             var list = new List<string>(basis.ConfigJsonList);
             bool changed = false;
@@ -217,7 +233,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         public void AdoptDeclaredLibraryList(IReadOnlyList<string> names)
         {
             if (names == null || names.Count == 0) return;
-            var basis = _lastState ?? _cachedLastState;
+            var basis = _lastState ?? CachedLastState;
             if (basis == null) return;
             AdoptList(basis, new List<string>(names));
         }
@@ -229,7 +245,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             var s = CloneWithList(basis, names);
             _lastState = s;
-            _cachedLastState = s;
+            CachedLastState = s;
         }
 
         private static WheelDashboardState CloneWithList(WheelDashboardState basis, List<string> names)
@@ -276,9 +292,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (state == null) return ChunkResult.Buffered;
             // TitleId=4 pushes are deltas — merge into the prior state so the
             // cached inventory doesn't collapse to the last delta.
-            state = WheelDashboardState.Merge(_lastState ?? _cachedLastState, state);
+            state = WheelDashboardState.Merge(_lastState ?? CachedLastState, state);
             _lastState = state;
-            _cachedLastState = state;
+            CachedLastState = state;
             _deviceInbox.Clear();
             try
             {
@@ -341,7 +357,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             _deviceInbox.Clear();
             _lastState = null;
-            _cachedLastState = null;
+            CachedLastState = null;
             _lastMissingShape = "";
         }
 

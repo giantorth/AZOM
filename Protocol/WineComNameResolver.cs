@@ -100,22 +100,38 @@ namespace MozaPlugin.Protocol
             lock (s_gate) s_timestamp = 0;
         }
 
+        // Serialises Build(): SimHub's COM scanner calls in from parallel workers,
+        // and each Build() walks sysfs and forks a shell per MOZA tty. Taken only
+        // around the build; s_gate stays the short leaf lock for the map itself.
+        private static readonly object s_buildGate = new object();
+
         private static Dictionary<string, string> GetMap()
+        {
+            if (TryGetFresh(out var fresh)) return fresh;
+
+            lock (s_buildGate)
+            {
+                // Another caller may have rebuilt while we waited.
+                if (TryGetFresh(out fresh)) return fresh;
+
+                var built = Build();
+
+                lock (s_gate)
+                {
+                    s_ttyToCom = built;
+                    s_timestamp = Stopwatch.GetTimestamp();
+                    return s_ttyToCom;
+                }
+            }
+        }
+
+        private static bool TryGetFresh(out Dictionary<string, string> map)
         {
             lock (s_gate)
             {
                 long now = Stopwatch.GetTimestamp();
-                if (s_timestamp != 0 && (now - s_timestamp) < CacheTtlTicks)
-                    return s_ttyToCom;
-            }
-
-            var built = Build();
-
-            lock (s_gate)
-            {
-                s_ttyToCom = built;
-                s_timestamp = Stopwatch.GetTimestamp();
-                return s_ttyToCom;
+                map = s_ttyToCom;
+                return s_timestamp != 0 && (now - s_timestamp) < CacheTtlTicks;
             }
         }
 

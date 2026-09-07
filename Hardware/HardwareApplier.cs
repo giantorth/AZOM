@@ -283,10 +283,15 @@ namespace MozaPlugin.Hardware
         /// Park a flash-backed wheel write until the user stops changing it.
         /// Latest value per command wins; the quiet window restarts on every call.
         /// </summary>
+        // Latched by Shutdown(): a late queue (UI slider, read-thread re-assert hop)
+        // must not recreate the flush timer and fire into a disposed manager.
+        private bool _wheelCfgShutdown;
+
         private void QueueWheelCfgWrite(string command, long cacheValue, System.Action write)
         {
             lock (_pendingWheelCfgLock)
             {
+                if (_wheelCfgShutdown) return;
                 _pendingWheelCfg[command] = (cacheValue, write);
                 if (_wheelCfgFlushTimer == null)
                 {
@@ -334,6 +339,7 @@ namespace MozaPlugin.Hardware
             System.Timers.Timer? t;
             lock (_pendingWheelCfgLock)
             {
+                _wheelCfgShutdown = true;
                 _pendingWheelCfg.Clear();
                 t = _wheelCfgFlushTimer;
                 _wheelCfgFlushTimer = null;
@@ -442,26 +448,32 @@ namespace MozaPlugin.Hardware
         private static readonly System.Collections.Generic.Dictionary<string, long> s_baseCfgCache
             = new System.Collections.Generic.Dictionary<string, long>();
         private static byte[] s_baseCfgCacheUid = System.Array.Empty<byte>();
+        // Leaf lock: ApplyBaseToHardware runs on the serial dispatch thread (base
+        // detection) and the UI/profile thread (ApplyProfileHardware) concurrently.
+        private static readonly object s_baseCfgLock = new object();
 
         private void SyncBaseCfgCache()
         {
             var uid = _data.BaseMcuUid ?? System.Array.Empty<byte>();
             if (uid.Length == 0) return;   // unknown/blanked identity — keep cache
-            // First non-empty identity on a fresh cache: adopt it without clearing
-            // so config written while the UID was still being read (cold start)
-            // isn't needlessly re-sent. Only a genuinely DIFFERENT base clears.
-            if (s_baseCfgCacheUid.Length == 0)
+            lock (s_baseCfgLock)
             {
-                s_baseCfgCacheUid = (byte[])uid.Clone();
-                return;
-            }
-            bool same = uid.Length == s_baseCfgCacheUid.Length;
-            for (int i = 0; same && i < uid.Length; i++)
-                if (uid[i] != s_baseCfgCacheUid[i]) same = false;
-            if (!same)
-            {
-                s_baseCfgCache.Clear();
-                s_baseCfgCacheUid = (byte[])uid.Clone();
+                // First non-empty identity on a fresh cache: adopt it without clearing
+                // so config written while the UID was still being read (cold start)
+                // isn't needlessly re-sent. Only a genuinely DIFFERENT base clears.
+                if (s_baseCfgCacheUid.Length == 0)
+                {
+                    s_baseCfgCacheUid = (byte[])uid.Clone();
+                    return;
+                }
+                bool same = uid.Length == s_baseCfgCacheUid.Length;
+                for (int i = 0; same && i < uid.Length; i++)
+                    if (uid[i] != s_baseCfgCacheUid[i]) same = false;
+                if (!same)
+                {
+                    s_baseCfgCache.Clear();
+                    s_baseCfgCacheUid = (byte[])uid.Clone();
+                }
             }
         }
 
@@ -471,9 +483,12 @@ namespace MozaPlugin.Hardware
         /// some bases bounces the motor mode and resets the base.</summary>
         private bool BaseCfgChanged(string key, long value)
         {
-            if (s_baseCfgCache.TryGetValue(key, out var prev) && prev == value) return false;
-            s_baseCfgCache[key] = value;
-            return true;
+            lock (s_baseCfgLock)
+            {
+                if (s_baseCfgCache.TryGetValue(key, out var prev) && prev == value) return false;
+                s_baseCfgCache[key] = value;
+                return true;
+            }
         }
 
         /// <summary>Prime the write cache with the base's READ-BACK value (add-only, never
@@ -483,7 +498,10 @@ namespace MozaPlugin.Hardware
         /// wear (observed as the full Table-5 "Written" burst on every connect).</summary>
         private void BaseCfgPrime(string key, long deviceValue)
         {
-            if (!s_baseCfgCache.ContainsKey(key)) s_baseCfgCache[key] = deviceValue;
+            lock (s_baseCfgLock)
+            {
+                if (!s_baseCfgCache.ContainsKey(key)) s_baseCfgCache[key] = deviceValue;
+            }
         }
 
         // Resolve the pipe that owns pedals / handbrake. Pedals or a handbrake

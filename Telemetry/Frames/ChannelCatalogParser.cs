@@ -1007,16 +1007,22 @@ namespace MozaPlugin.Telemetry.Frames
                 // Diagnostic: hex-dump first 128 bytes of this session's buffer.
                 // Tagged with session id so diag readers can see whether catalog
                 // bytes came from mgmt (0x01) or telemetry (FlagByte) and spot
-                // cross-session straddles if they ever happen.
-                int dumpLen = Math.Min(buffer.Length, 128);
-                var hex = new StringBuilder(dumpLen * 3);
-                for (int d = 0; d < dumpLen; d++)
+                // cross-session straddles if they ever happen. Behind the wire
+                // gate: TryParse runs every 30 ms tick while a catalog burst grows
+                // the buffer, and an unconditional 384-char line per pass evicted
+                // the diagnostic ring.
+                if (MozaLog.WireDebugEnabled)
                 {
-                    if (d > 0) hex.Append('-');
-                    hex.Append(buffer[d].ToString("X2"));
+                    int dumpLen = Math.Min(buffer.Length, 128);
+                    var hex = new StringBuilder(dumpLen * 3);
+                    for (int d = 0; d < dumpLen; d++)
+                    {
+                        if (d > 0) hex.Append('-');
+                        hex.Append(buffer[d].ToString("X2"));
+                    }
+                    MozaLog.Debug(
+                        $"[AZOM] Catalog buffer dump sess=0x{session:X2} ({buffer.Length} bytes): {hex}");
                 }
-                MozaLog.Debug(
-                    $"[AZOM] Catalog buffer dump sess=0x{session:X2} ({buffer.Length} bytes): {hex}");
 
                 // Scan-forward for `04`-tag URL records. Each record encodes its
                 // canonical wheel-firmware idx in the byte at offset i+5 (1-based).
@@ -1491,10 +1497,12 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 // Per-session breakdown — one line per session that contributed URL
                 // records. Lets diag readers spot which session lost which records.
+                // Repeat-suppressed: TryParse re-runs every tick during a burst and
+                // the counters only move when a record lands.
                 foreach (var s in perSessionStats)
                 {
                     int newOnSess = s.distinctIdxAfter - s.distinctIdxBefore;
-                    MozaLog.Debug(
+                    MozaLog.DebugIfChanged("catalog-parse-" + s.session,
                         $"[AZOM] Catalog parse sess=0x{s.session:X2}: " +
                         $"full={s.full} prefix={s.prefix} abbr={s.abbr} " +
                         $"backref={s.backref} backrefFail={s.backrefFail} " +
@@ -1503,7 +1511,7 @@ namespace MozaPlugin.Telemetry.Frames
                 }
                 // Aggregate summary line, preserves the pre-split format for
                 // anyone grepping for "Catalog parse stats: full=...".
-                MozaLog.Debug(
+                MozaLog.DebugIfChanged("catalog-parse-stats",
                     $"[AZOM] Catalog parse stats: full={totalFull} prefix={totalPrefix} " +
                     $"abbr={totalAbbr} backref={totalBackref} backrefFail={totalBackrefFail} " +
                     $"sizeReject={totalSizeReject} plausReject={totalPlausReject} " +

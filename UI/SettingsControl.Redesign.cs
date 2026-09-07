@@ -204,9 +204,11 @@ namespace MozaPlugin.UI
                     _pedalClutchTraceSamples.Add(0);
                 }
 
+                // Started by OnLoadedStartTimers, not here: SimHub constructs this
+                // control on every game switch and only loads it if the user opens
+                // the page, and a running DispatcherTimer roots the control.
                 _bandwidthTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
                 _bandwidthTimer.Tick += OnBandwidthTick;
-                _bandwidthTimer.Start();
 
                 // InitRedesignControls is NOT inside a suppressor scope, so
                 // seeding SelectedIndex would fire the handler and write the

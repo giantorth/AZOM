@@ -135,7 +135,11 @@ namespace MozaPlugin.UI
             RequestAllSettings();
         }
 
-        private void OnSteeringAngleTick(object? sender, EventArgs e) => UpdateHidInputDisplays();
+        private void OnSteeringAngleTick(object? sender, EventArgs e)
+        {
+            try { UpdateHidInputDisplays(); }
+            catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-hid", $"[AZOM] HID display tick failed: {ex}"); }
+        }
 
         private void OnLoadedStartTimers(object sender, RoutedEventArgs e)
         {
@@ -179,6 +183,8 @@ namespace MozaPlugin.UI
             _steeringAngleTimer.Stop();
             _rotationReadbackTimer.Stop();
             _bandwidthTimer?.Stop();
+            _calCountdownTimer?.Stop();
+            _baseCalStatusTimer?.Stop();
 
             UnsubscribeStalks();
             // Closing the settings panel takes the sustained Engine/ABS/

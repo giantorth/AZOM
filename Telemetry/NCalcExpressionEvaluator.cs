@@ -28,6 +28,11 @@ namespace MozaPlugin.Telemetry
         // and churn allocations). Keyed by the raw stored string.
         private readonly ConcurrentDictionary<string, ExpressionValue> _compiled
             = new ConcurrentDictionary<string, ExpressionValue>(StringComparer.Ordinal);
+        // The plugin's real formula set is a few dozen strings. A source that
+        // synthesises expressions per call (the LFE test sweep bakes the sweeping
+        // RPM into the string) would otherwise grow this forever; past the cap
+        // the cache is simply dropped and the live formulas recompile once.
+        private const int MaxCompiled = 256;
 
         private NCalcEngineBase? _engine;
         private bool _engineInitFailed;
@@ -143,6 +148,7 @@ namespace MozaPlugin.Telemetry
                 ev = (ExpressionValue)expression;
             }
             catch (Exception ex) { WarnEvalOnce(expression, ex); return null; }
+            if (_compiled.Count >= MaxCompiled) _compiled.Clear();
             _compiled[expression] = ev;
             return ev;
         }

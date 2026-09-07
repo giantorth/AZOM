@@ -172,12 +172,17 @@ namespace MozaPlugin.Devices.Extensions
             if (profile != null && !string.IsNullOrEmpty(pageModelPrefix)
                 && TryGetPageGuid(pageModelPrefix!, out var pageGuid))
             {
-                if (profile.WheelOverridesByPageGuid == null)
-                    profile.WheelOverridesByPageGuid = new Dictionary<Guid, WheelOverride>();
-                if (!profile.WheelOverridesByPageGuid.TryGetValue(pageGuid, out var ov) || ov == null)
+                var overrides = profile.WheelOverridesByPageGuid;
+                if (overrides == null || !overrides.TryGetValue(pageGuid, out var ov) || ov == null)
                 {
+                    // COW swap — the profile store serializes this dict concurrently;
+                    // never Add in place (same rule as the sleep bundle below).
                     ov = new WheelOverride();
-                    profile.WheelOverridesByPageGuid[pageGuid] = ov;
+                    var next = overrides == null
+                        ? new Dictionary<Guid, WheelOverride>()
+                        : new Dictionary<Guid, WheelOverride>(overrides);
+                    next[pageGuid] = ov;
+                    profile.WheelOverridesByPageGuid = next;
                 }
                 MergeIntoOverlay(ov);
 

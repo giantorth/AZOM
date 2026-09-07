@@ -28,6 +28,11 @@ namespace MozaPlugin.Devices.MBooster
         // can deterministically resolve collisions (first-wins).
         private readonly List<MBoosterDeviceController> _order =
             new List<MBoosterDeviceController>();
+        // Copy-on-write mirror of _order for the 60 Hz DataUpdate fan-out and the
+        // per-HID-report merge: iterating it needs no lock, so those paths no
+        // longer hold _lock across the settings lookup and the workers' locks.
+        // Rebuilt wherever _order changes (under _lock).
+        private volatile MBoosterDeviceController[] _orderSnapshot = System.Array.Empty<MBoosterDeviceController>();
         private readonly object _lock = new object();
 
         // Lock-free fast-path counter for the DataUpdate hot path. Updated
@@ -211,6 +216,7 @@ namespace MozaPlugin.Devices.MBooster
                 }
 
                 // Publish the new count for the lock-free hot-path gate.
+                _orderSnapshot = _order.ToArray();
                 Volatile.Write(ref _controllerCount, _order.Count);
             }
 
@@ -313,6 +319,7 @@ namespace MozaPlugin.Devices.MBooster
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
                 _byIdentity[c.Identity] = c;
                 _order.Add(c);
+                _orderSnapshot = _order.ToArray();
                 Volatile.Write(ref _controllerCount, _order.Count);
             }
             MozaLog.Info($"[AZOM/mBooster] Routed lane registered: {MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName}, dev 0x{c.HostDeviceId:x2})");
@@ -357,11 +364,13 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         public void OnDataUpdate(in MBoosterTelemetrySnapshot snap)
         {
-            lock (_lock)
+            // Snapshot iteration — no registry lock across the settings lookup
+            // (its own lock) and PostTelemetry (each worker's lock).
+            var order = _orderSnapshot;
             {
-                for (int i = 0; i < _order.Count; i++)
+                for (int i = 0; i < order.Length; i++)
                 {
-                    var c = _order[i];
+                    var c = order[i];
                     if (c.IsRouted)
                     {
                         // A routed lane has no mBooster HID of its own — its
@@ -826,14 +835,14 @@ namespace MozaPlugin.Devices.MBooster
         private void MergePositions()
         {
             bool throttleSet = false, brakeSet = false, clutchSet = false;
-            // First-wins iteration over _order while holding the lock so the
-            // controller list can't mutate underneath us. Each lane hosts up to
-            // 3 pedal axes; every axis routes independently by its own role.
-            lock (_lock)
+            // First-wins iteration over the copy-on-write snapshot (runs per HID
+            // report; the list itself only changes on the 5 s reconnect tick). Each
+            // lane hosts up to 3 pedal axes; every axis routes independently by role.
+            var order = _orderSnapshot;
             {
-                for (int i = 0; i < _order.Count; i++)
+                for (int i = 0; i < order.Length; i++)
                 {
-                    var c = _order[i];
+                    var c = order[i];
                     // Routed lanes never merge: their positions already ARRIVE
                     // as MozaData.{Throttle,Brake,Clutch}Position via the base
                     // HID path — merging the mirrored copies back would just
@@ -1001,6 +1010,7 @@ namespace MozaPlugin.Devices.MBooster
             {
                 all = _order.ToList();
                 _order.Clear();
+                _orderSnapshot = System.Array.Empty<MBoosterDeviceController>();
                 _byIdentity.Clear();
             }
             foreach (var c in all)

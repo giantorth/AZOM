@@ -473,6 +473,12 @@ namespace MozaPlugin.Telemetry
 
         private void SendDisplayConfig()
         {
+            // The 7C:27/7C:23 cycle is documented for the wheel only (protocol/
+            // channel-config/group-0x43-active-display-cycle.md) and the cached
+            // frames address DeviceWheel — a CM2 sender on the shared bus must not
+            // emit them, or its 7C:23 46 FT-activate lands on the wheel.
+            if (_targetDeviceId != MozaProtocol.DeviceWheel) return;
+
             int pageCount = _profile?.PageCount ?? 1;
             if (pageCount < 1) pageCount = 1;
             var frames = _frames.GetDisplayConfigFrames(pageCount);

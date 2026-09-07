@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MozaControls
 {
@@ -173,12 +174,29 @@ namespace MozaControls
             self.Recompute();
         }
 
-        private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => Recompute();
+        private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => ScheduleRecompute();
 
         protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
         {
             base.OnRenderSizeChanged(sizeInfo);
-            Recompute();
+            ScheduleRecompute();
+        }
+
+        // Coalesce: the hosts push samples as Add + RemoveAt(0) on up to three
+        // bound collections per frame (six change events at 30 Hz on the pedal
+        // trace), and each one used to rebuild every series' geometry. One
+        // render-priority pass per dispatcher frame rebuilds them once.
+        private bool _recomputePending;
+
+        private void ScheduleRecompute()
+        {
+            if (_recomputePending) return;
+            _recomputePending = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
+            {
+                _recomputePending = false;
+                Recompute();
+            }));
         }
 
         private static List<double> Collect(System.Collections.IEnumerable? src)

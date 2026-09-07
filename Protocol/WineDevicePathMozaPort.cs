@@ -176,37 +176,50 @@ namespace MozaPlugin.Protocol
         // block". So ReadFile here is safe to call unconditionally.
         public bool ReadReturnsImmediately => true;
 
+        // Every syscall below runs under _gate together with its _closed check:
+        // Close() (from Disconnect / ClosePortAndNotify on another thread) frees the
+        // handle, and the OS may hand that value to an unrelated object — a read of
+        // _handle followed by ReadFile/WriteFile outside the gate could land on it.
+        // ReadFile returns immediately here (COMMTIMEOUTS) and WriteFile is capped
+        // at 500 ms, so Close() never waits long for an in-flight call.
         public int BytesToRead
         {
             get
             {
-                if (_closed) return 0;
-                if (!ClearCommError(_handle, out _, out COMSTAT st)) return 0;
-                return (int)st.cbInQue;
+                lock (_gate)
+                {
+                    if (_closed) return 0;
+                    if (!ClearCommError(_handle, out _, out COMSTAT st)) return 0;
+                    return (int)st.cbInQue;
+                }
             }
         }
 
         public int Read(byte[] buffer, int offset, int count)
         {
-            if (_closed || count <= 0) return 0;
-            // ReadFile fills from the buffer start; honor offset via a temp on the
-            // (unused-in-practice) offset!=0 path so the hot path stays copy-free.
-            if (offset == 0)
+            if (count <= 0) return 0;
+            lock (_gate)
             {
-                if (!ReadFile(_handle, buffer, (uint)count, out uint read, IntPtr.Zero))
+                if (_closed) return 0;
+                // ReadFile fills from the buffer start; honor offset via a temp on the
+                // (unused-in-practice) offset!=0 path so the hot path stays copy-free.
+                if (offset == 0)
+                {
+                    if (!ReadFile(_handle, buffer, (uint)count, out uint read, IntPtr.Zero))
+                        throw new IOException($"ReadFile failed: Win32 {Marshal.GetLastWin32Error()}");
+                    return (int)read;
+                }
+                byte[] tmp = new byte[count];
+                if (!ReadFile(_handle, tmp, (uint)count, out uint rd, IntPtr.Zero))
                     throw new IOException($"ReadFile failed: Win32 {Marshal.GetLastWin32Error()}");
-                return (int)read;
+                Array.Copy(tmp, 0, buffer, offset, (int)rd);
+                return (int)rd;
             }
-            byte[] tmp = new byte[count];
-            if (!ReadFile(_handle, tmp, (uint)count, out uint rd, IntPtr.Zero))
-                throw new IOException($"ReadFile failed: Win32 {Marshal.GetLastWin32Error()}");
-            Array.Copy(tmp, 0, buffer, offset, (int)rd);
-            return (int)rd;
         }
 
         public void Write(byte[] buffer, int offset, int count)
         {
-            if (_closed || count <= 0) return;
+            if (count <= 0) return;
             byte[] src;
             if (offset == 0)
             {
@@ -217,23 +230,27 @@ namespace MozaPlugin.Protocol
                 src = new byte[count];
                 Array.Copy(buffer, offset, src, 0, count);
             }
-            int written = 0;
-            while (written < count)
+            lock (_gate)
             {
-                // WriteFile starts at the buffer head; slice the remainder when a
-                // partial write occurs (rare for a tty, but correct).
-                byte[] chunk;
-                if (written == 0) chunk = src;
-                else { chunk = new byte[count - written]; Array.Copy(src, written, chunk, 0, count - written); }
-                if (!WriteFile(_handle, chunk, (uint)(count - written), out uint n, IntPtr.Zero))
-                    throw new IOException($"WriteFile failed: Win32 {Marshal.GetLastWin32Error()}");
-                if (n == 0) throw new IOException("WriteFile wrote 0 bytes");
-                written += (int)n;
+                if (_closed) return;
+                int written = 0;
+                while (written < count)
+                {
+                    // WriteFile starts at the buffer head; slice the remainder when a
+                    // partial write occurs (rare for a tty, but correct).
+                    byte[] chunk;
+                    if (written == 0) chunk = src;
+                    else { chunk = new byte[count - written]; Array.Copy(src, written, chunk, 0, count - written); }
+                    if (!WriteFile(_handle, chunk, (uint)(count - written), out uint n, IntPtr.Zero))
+                        throw new IOException($"WriteFile failed: Win32 {Marshal.GetLastWin32Error()}");
+                    if (n == 0) throw new IOException("WriteFile wrote 0 bytes");
+                    written += (int)n;
+                }
             }
         }
 
-        public void DiscardInBuffer() { if (!_closed) PurgeComm(_handle, PURGE_RXCLEAR); }
-        public void DiscardOutBuffer() { if (!_closed) PurgeComm(_handle, PURGE_TXCLEAR); }
+        public void DiscardInBuffer() { lock (_gate) { if (!_closed) PurgeComm(_handle, PURGE_RXCLEAR); } }
+        public void DiscardOutBuffer() { lock (_gate) { if (!_closed) PurgeComm(_handle, PURGE_TXCLEAR); } }
 
         public void Close()
         {

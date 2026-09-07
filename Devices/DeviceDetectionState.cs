@@ -95,7 +95,12 @@ namespace MozaPlugin.Devices
         // to ride with them, or the reload's fresh manager silently addresses every
         // "wheel" command at 0x17 (dead LEDs on ES, which locks 0x13).
         public volatile byte LastKnownWheelDeviceId;
-        public int WheelPollMisses;
+        // Interlocked: PollStatus increments it, the UI thread (connection toggle)
+        // and Init reset it.
+        private int _wheelPollMisses;
+        public int WheelPollMisses => Volatile.Read(ref _wheelPollMisses);
+        public int IncrementWheelPollMisses() => Interlocked.Increment(ref _wheelPollMisses);
+        public void ResetWheelPollMisses() => Interlocked.Exchange(ref _wheelPollMisses, 0);
 
         // Flips true when a wheel on a new-protocol-only id (0x17/0x15) ends up
         // classified old-protocol — a current-generation wheel answering like a
@@ -156,6 +161,17 @@ namespace MozaPlugin.Devices
             SgpDetected = false;
             NewWheelActingOldProtocol = false;
             NewWheelActingOldModel = "";
+            ClearOwners();
+        }
+
+        /// <summary>
+        /// Drop the per-pipe owner refs but keep the *Detected flags. The owners
+        /// are per-plugin-instance managers that End() disposes, so a bag carried
+        /// across a persistent-wire reload must not hand them to the next
+        /// instance; the next Mark*Detected re-points a null owner.
+        /// </summary>
+        public void ClearOwners()
+        {
             PedalsOwner = null;
             HandbrakeOwner = null;
             HgpOwner = null;
@@ -174,7 +190,7 @@ namespace MozaPlugin.Devices
             DashDetected = false;
             ResetWheelLedGroupMask();
             Group3ColorsRead = false;
-            WheelPollMisses = 0;
+            ResetWheelPollMisses();
             LastKnownWheelModel = "";
             LastKnownWheelDeviceId = 0;
             NewWheelActingOldProtocol = false;

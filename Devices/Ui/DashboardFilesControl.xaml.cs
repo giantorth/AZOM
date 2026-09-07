@@ -44,7 +44,11 @@ namespace MozaPlugin.Devices.Ui
             }
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            _refreshTimer.Tick += (_, _) => RefreshFilesTab();
+            _refreshTimer.Tick += (_, _) =>
+            {
+                try { RefreshFilesTab(); }
+                catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-files", $"[AZOM] Files tab tick failed: {ex}"); }
+            };
 
             // Settings restore and the Studio probe run here, not in the ctor:
             // MozaPlugin.Instance can still be null at construction (see
@@ -720,7 +724,14 @@ namespace MozaPlugin.Devices.Ui
                 && !string.IsNullOrEmpty(_plugin.ActiveTelemetryMzdashFolder))
             {
                 _libraryColdLoadTried = true;
-                _plugin.ReloadDashboardLibrary();
+                // ReadAllBytes + ParseMzdash per file, recursive — off the dispatcher
+                // (DeviceProber runs the same load on the serial read thread).
+                var plugin = _plugin;
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try { plugin.ReloadDashboardLibrary(); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] Dashboard library cold load failed: {ex.Message}"); }
+                });
             }
 
             int count = _plugin.DashCache.CachedNameCount;

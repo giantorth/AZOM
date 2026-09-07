@@ -258,8 +258,22 @@ namespace MozaControls
         public static readonly DependencyProperty LiveXProperty =
             DependencyProperty.Register(nameof(LiveX), typeof(double), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
-                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+                    (d, e) => ((MozaCurveEditor)d).OnLiveXChanged()));
         public double LiveX { get => (double)GetValue(LiveXProperty); set => SetValue(LiveXProperty, value); }
+
+        // The spline/grid/labels only depend on the nodes and the size; the live
+        // marker (pushed at 30 Hz while a pedal moves) reuses what the last
+        // Recompute() built instead of rebuilding the whole editor per sample.
+        private (Point p1, Point c1, Point c2, Point p2)[]? _liveSegments;
+        private Point[]? _liveNodePts;
+        private double _livePlotW;
+        private double _liveAxisBottomY;
+
+        private void OnLiveXChanged()
+        {
+            if (_liveSegments == null || _liveNodePts == null) { Recompute(); return; }
+            UpdateLiveMarker(_liveSegments, _liveNodePts, _livePlotW, _liveAxisBottomY);
+        }
 
         // -------- Read-only geometry / node positions surfaced to template --------
 
@@ -879,6 +893,10 @@ namespace MozaControls
             geom.Freeze();
             SetValue(CurveGeometryKey, geom);
 
+            _liveSegments = segments;
+            _liveNodePts = pts;
+            _livePlotW = plotW;
+            _liveAxisBottomY = PadTop + plotH;
             UpdateLiveMarker(segments, pts, plotW, PadTop + plotH);
 
             // ---- Background grid (4 interior horizontal + 4 vertical lines) ----

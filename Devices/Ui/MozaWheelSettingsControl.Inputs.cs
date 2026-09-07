@@ -52,7 +52,17 @@ namespace MozaPlugin.Devices.Ui
 
         // ── Live paddle bars + active buttons ──────────────────────────
 
-        internal void PushInputsLiveData(MozaData data) => RefreshInputsLive();
+        // Fed by the plugin pane's own 30 Hz HID timer; while this page's live
+        // timer is running that would be a second 30 Hz driver of the same text.
+        internal void PushInputsLiveData(MozaData data)
+        {
+            if (_inputsLiveTimer != null) return;
+            RefreshInputsLive();
+        }
+
+        // Signature of the last rendered button list ("3,7*," — star = pressed) so
+        // the Inlines are only rebuilt when the visible content changes.
+        private string _wiActiveButtonsSig = "";
 
         private void RefreshInputsLive()
         {
@@ -63,9 +73,9 @@ namespace MozaPlugin.Devices.Ui
                 WiLeftPaddleBar.Value = 0;
                 WiRightPaddleBar.Value = 0;
                 WiCombinedPaddleBar.Value = 0;
-                if (WiActiveButtonsText.Inlines.Count != 1 ||
-                    !(WiActiveButtonsText.Inlines.FirstInline is Run r0 && r0.Text == "None"))
+                if (_wiActiveButtonsSig != "none")
                 {
+                    _wiActiveButtonsSig = "none";
                     WiActiveButtonsText.Inlines.Clear();
                     WiActiveButtonsText.Inlines.Add(new Run("None"));
                 }
@@ -81,32 +91,52 @@ namespace MozaPlugin.Devices.Ui
         {
             if (_data == null || _data.ButtonCount == 0)
             {
-                WiActiveButtonsText.Inlines.Clear();
-                WiActiveButtonsText.Inlines.Add(new Run("None"));
+                if (_wiActiveButtonsSig != "none")
+                {
+                    _wiActiveButtonsSig = "none";
+                    WiActiveButtonsText.Inlines.Clear();
+                    WiActiveButtonsText.Inlines.Add(new Run("None"));
+                }
                 return;
             }
             var now = DateTime.UtcNow;
-            var inlines = new List<Inline>();
             int count = _data.ButtonCount;
+            var sig = new System.Text.StringBuilder(count * 3);
             for (int i = 0; i < count; i++)
             {
                 bool pressed = _data.ButtonStates[i];
                 if (pressed) _wiButtonLastPressed[i] = now;
                 if ((now - _wiButtonLastPressed[i]).TotalSeconds < 1.0)
                 {
-                    if (inlines.Count > 0) inlines.Add(new Run(", "));
-                    var run = new Run((i + 1).ToString());
-                    if (pressed)
-                    {
-                        run.FontWeight = FontWeights.Bold;
-                        run.Foreground = Brushes.White;
-                    }
-                    inlines.Add(run);
+                    sig.Append(i + 1);
+                    if (pressed) sig.Append('*');
+                    sig.Append(',');
                 }
             }
+            string signature = sig.Length == 0 ? "none" : sig.ToString();
+            if (signature == _wiActiveButtonsSig) return;   // 30 Hz caller; only rebuild on change
+            _wiActiveButtonsSig = signature;
+
             WiActiveButtonsText.Inlines.Clear();
-            if (inlines.Count > 0) foreach (var inline in inlines) WiActiveButtonsText.Inlines.Add(inline);
-            else WiActiveButtonsText.Inlines.Add(new Run("None"));
+            if (signature == "none")
+            {
+                WiActiveButtonsText.Inlines.Add(new Run("None"));
+                return;
+            }
+            bool first = true;
+            for (int i = 0; i < count; i++)
+            {
+                if ((now - _wiButtonLastPressed[i]).TotalSeconds >= 1.0) continue;
+                if (!first) WiActiveButtonsText.Inlines.Add(new Run(", "));
+                first = false;
+                var run = new Run((i + 1).ToString());
+                if (_data.ButtonStates[i])
+                {
+                    run.FontWeight = FontWeights.Bold;
+                    run.Foreground = Brushes.White;
+                }
+                WiActiveButtonsText.Inlines.Add(run);
+            }
         }
 
         // 0=Buttons → no live bars visible

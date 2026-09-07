@@ -725,7 +725,7 @@ namespace MozaPlugin
                 }
                 _deviceManager.ResetWheelDetection();
                 Interlocked.Exchange(ref _telemetryStartRequested, 0);
-                DetectionState.WheelPollMisses = 0;
+                DetectionState.ResetWheelPollMisses();
                 DetectionState.LastKnownWheelModel = "";
                 DetectionState.LastKnownWheelDeviceId = 0;
                 MozaLog.Info("[AZOM] Connection disabled");

@@ -44,6 +44,9 @@ namespace MozaPlugin.Telemetry.Display
         private System.Timers.Timer? _timer;
         private int _tickInProgress;
         private volatile bool _running;
+        // Start/Stop race from PollStatus and the serial read thread; see
+        // Fsr1DisplayDriver._lifecycleLock.
+        private readonly object _lifecycleLock = new object();
         private bool _lastConnected;
         private int _tickCounter;
         private readonly List<Cm1DisplayEmitter.Record> _chunkScratch
@@ -64,27 +67,33 @@ namespace MozaPlugin.Telemetry.Display
 
         public void Start()
         {
-            if (_running) return;
-            _running = true;
-            _tickCounter = 0;
-            _lastConnected = _connection.IsConnected;
-            SendHandshake();
-            _timer = new System.Timers.Timer(TickIntervalMs) { AutoReset = true };
-            _timer.Elapsed += OnTick;
-            _timer.Start();
+            lock (_lifecycleLock)
+            {
+                if (_running) return;
+                _running = true;
+                _tickCounter = 0;
+                _lastConnected = _connection.IsConnected;
+                SendHandshake();
+                _timer = new System.Timers.Timer(TickIntervalMs) { AutoReset = true };
+                _timer.Elapsed += OnTick;
+                _timer.Start();
+            }
             MozaLog.Info("[AZOM] CM1 display driver started (group-0x35 → 0x14)");
         }
 
         public void Stop()
         {
-            if (!_running && _timer == null) return;
-            _running = false;
-            if (_timer != null)
+            lock (_lifecycleLock)
             {
-                _timer.Stop();
-                _timer.Elapsed -= OnTick;
-                _timer.Dispose();
-                _timer = null;
+                if (!_running && _timer == null) return;
+                _running = false;
+                if (_timer != null)
+                {
+                    _timer.Stop();
+                    _timer.Elapsed -= OnTick;
+                    _timer.Dispose();
+                    _timer = null;
+                }
             }
             // Clear only the dash-lane slots — leave any co-resident wheel lane (0..8).
             try { _connection.ClearStreamSlots(ChunkSlotBase, LaneSlotCount); } catch { }

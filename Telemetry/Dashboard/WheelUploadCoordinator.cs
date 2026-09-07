@@ -1090,7 +1090,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                     if (_ackProgress.IsSet)
                     {
                         _ackProgress.Reset();
-                        liveDeadline = DateTime.UtcNow.AddMilliseconds(CompleteAckTimeoutMs);
+                        // Each progress ack buys the next round its own budget.
+                        liveDeadline = DateTime.UtcNow.AddMilliseconds(ProgressAckTimeoutMs);
                         MozaLog.Debug(
                             $"[AZOM] Session 0x{uploadSess:X2} progress: bytes_written={LastBytesWritten}/{LastTotalSize}");
                     }
