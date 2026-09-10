@@ -81,8 +81,14 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
         /// <summary>Feature flag. When false, dashboard switches cycle the
         /// full Stop+Start pipeline; when true, switches stay in this hot
-        /// path. Set from <c>MozaPluginSettings.EnableHotRenegotiation</c>.</summary>
-        public bool Enabled { get; set; }
+        /// path. Defaults ON, matching
+        /// <c>MozaPluginSettings.EnableHotRenegotiation</c> — that setting is the
+        /// override, not the only switch. The default must stay true: every
+        /// TelemetrySender owns one of these, and a secondary sender whose owner
+        /// forgets to propagate the setting would otherwise be silently stuck on
+        /// the legacy path (the CM2 lane was, so its switches got one unpaced
+        /// tier-def with no convergence check and rendered without data).</summary>
+        public bool Enabled { get; set; } = true;
 
         public bool IsBurstPending => Volatile.Read(ref _pendingReemit) != 0;
         public int RemainingEmissions => Math.Max(0, Volatile.Read(ref _pendingReemit));

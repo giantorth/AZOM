@@ -71,8 +71,9 @@ namespace MozaPlugin
         }
 
         /// <summary>Switch the CM2 dash to a dashboard slot (FF kind=4 on the CM2
-        /// sender), independent of the wheel.</summary>
-        internal void OnCm2DashboardSwitched(uint slot) =>
+        /// sender), independent of the wheel. Returns false when the switch never
+        /// reached the wire.</summary>
+        internal bool OnCm2DashboardSwitched(uint slot) =>
             _dashboardBindingCoordinator.OnDashboardSwitched(slot, ActiveCm2Sender);
 
         // Surface configJson wheel state for the Diagnostics tab.

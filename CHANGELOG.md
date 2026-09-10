@@ -16,6 +16,12 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **A CM2 dash shows data on every dashboard, not just the one it started on.** Switching
+  it to another dashboard left the display rendering with no telemetry behind it.
+
+- **A dashboard switched with the CM2's own buttons is followed** — the plugin no longer
+  pulls the dash back to its previously saved dashboard on the next restart.
+
 - **Other serial devices keep working.** The plugin was opening every COM port it couldn't
   identify while hunting for a wheelbase, holding a DIY pedal set or Arduino dash away from
   SimHub's own scanner; it now leaves ports the registry attributes to another vendor alone.

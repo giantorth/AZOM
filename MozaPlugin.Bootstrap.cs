@@ -953,6 +953,12 @@ namespace MozaPlugin
             // persistent wire left these ticking next to the next Init's pair.
             try { _fsr1Driver?.Dispose(); } catch { }
             _fsr1Driver = null;
+            try
+            {
+                if (_cm2Sender != null && _dashboardBindingCoordinator != null)
+                    _cm2Sender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
+            catch { }
             try { _cm2Sender?.Dispose(); } catch { }
             _cm2Sender = null;
             try { _cm1Driver?.Dispose(); } catch { }

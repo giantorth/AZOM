@@ -734,6 +734,31 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 dash lane:     {cm2.TargetDescription} on {cm2.ConnectionRef?.CaptureLabel} pipe " +
                     $"(frames={cm2.FramesSent}, {cm2.Phase})");
+
+                // The CM2's OWN switch/binding state. Every other section of this
+                // report (Session state, Dashboard state, the channel catalog, the
+                // last subscription) reads the MAIN sender, so on a wheel+CM2 rig a
+                // CM2-side fault was invisible here and only the raw log showed it.
+                sb.AppendLine();
+                sb.Append(
+                    $"CM2 switch state:  slot={cm2.WheelReportedSlot} lastKind4={cm2.LastEmittedKind4Slot} " +
+                    $"catalog={cm2.CatalogCount} hotReneg={YesNo(cm2.EnableHotRenegotiation)} " +
+                    $"cooldown={YesNo(cm2.IsInSilenceCooldown)}");
+                sb.AppendLine();
+                sb.Append($"CM2 engaged:       {cm2.Watchdog?.DisplayEngagementText() ?? "(n/a)"}");
+
+                // The CM2's dashboard list — the slot above indexes THIS list, not the
+                // wheel's, so both are needed to tell a wrong-slot from a wrong-list.
+                var cm2List = cm2.WheelState?.ConfigJsonList;
+                sb.AppendLine();
+                if (cm2List == null || cm2List.Count == 0)
+                    sb.Append("CM2 dashboards:    (none advertised yet)");
+                else
+                    sb.Append($"CM2 dashboards ({cm2List.Count}): {string.Join(", ", cm2List)}");
+                // The saved name the re-assert resolves to a slot; a value absent from
+                // the list above is why a re-assert silently does nothing.
+                sb.AppendLine();
+                sb.Append($"CM2 saved dash:    {Blank(plugin!.ActiveCm2DashboardName)}");
             }
             else if (cm2Present)
             {

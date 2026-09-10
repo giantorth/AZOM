@@ -146,7 +146,14 @@ namespace MozaPlugin.Telemetry
             bool shareBus = busCm2;
 
             if (_plugin._cm2Sender == null)
+            {
                 _plugin._cm2Sender = new TelemetrySender(conn);
+                // Follow switches made with the dash's OWN buttons. Subscribed here
+                // because this is the only construction site; -= sits next to the
+                // Dispose in End()/CleanupPartialInit.
+                _plugin._cm2Sender.WheelInitiatedSwitch +=
+                    _plugin.DashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
             else if (_plugin._cm2Sender.StateIsIdle)
                 _plugin._cm2Sender.Rebind(conn); // no-op when already on this connection
 
@@ -171,6 +178,11 @@ namespace MozaPlugin.Telemetry
             cm2.SharesConnection = shareBus;
             cm2.StrictInboundFilter = shareBus;
             cm2.ProfileTelemetryEnabled = true;
+            // Mirror the setting onto this lane too — the main sender gets it in
+            // Init, and without this a settings-driven false would only reach the
+            // wheel. The coordinator's own default is true, so this is the override
+            // path, not the enable.
+            cm2.EnableHotRenegotiation = _plugin.Settings?.EnableHotRenegotiation ?? true;
             // CM2 channel mappings live under the dash device GUID + a fixed key,
             // independent of the wheel, so the CM2's catalog-synth applies its own.
             cm2.MappingPageGuid = MozaPlugin.Cm2PageGuid;
@@ -225,6 +237,7 @@ namespace MozaPlugin.Telemetry
                 // Fresh start: allow the saved-dashboard re-assert to fire once the
                 // CM2 advertises its dashboard list (PollStatus → TickCm2DashboardReassert).
                 _cm2ReassertAttempted = false;
+                _cm2ReassertAttempts = 0;
                 // Re-anchored once this sender reaches Active (the discriminator times
                 // its CM1 decision from there, not from start — cold-start is long).
                 _discriminateSinceUtc = DateTime.MinValue;
@@ -243,6 +256,12 @@ namespace MozaPlugin.Telemetry
 
         // One-shot guard: re-assert the saved CM2 dashboard once per pipeline start.
         private bool _cm2ReassertAttempted;
+        // Attempts made in the current pipeline lifetime. The one-shot is only claimed
+        // once the kind=4 actually reaches the wire, so a sender that keeps refusing
+        // would otherwise be retried on every PollStatus tick forever; cap it so a
+        // pathological lane gives up instead of logging once per tick.
+        private int _cm2ReassertAttempts;
+        private const int Cm2ReassertMaxAttempts = 5;
 
         /// <summary>
         /// PollStatus hook: once the CM2 sender advertises its dashboard list, switch
@@ -254,7 +273,11 @@ namespace MozaPlugin.Telemetry
         {
             if (_cm2ReassertAttempted) return;
             var cm2 = _plugin._cm2Sender;
-            if (cm2 == null || !cm2.Enabled || cm2.FramesSent == 0) return;
+            if (cm2 == null || cm2.FramesSent == 0) return;
+            // Match what SendDashboardSwitch itself requires (Active, out of the
+            // post-emit cooldown) rather than the broader Enabled, so a sender still
+            // cold-starting is waited out silently instead of burning an attempt.
+            if (!cm2.IsActive || cm2.IsInSilenceCooldown) return;
 
             var list = cm2.WheelState?.ConfigJsonList;
             if (list == null || list.Count == 0) return; // not advertised yet — keep waiting
@@ -269,11 +292,25 @@ namespace MozaPlugin.Telemetry
             }
             if (slot < 0) { _cm2ReassertAttempted = true; return; } // saved dash not on this CM2
 
-            _cm2ReassertAttempted = true; // claim before issuing — switch restarts the pipeline
-            if (cm2.WheelReportedSlot == slot) return; // already there
+            if (cm2.WheelReportedSlot == slot) { _cm2ReassertAttempted = true; return; } // already there
 
             MozaLog.Info($"[AZOM] Re-asserting saved CM2 dashboard '{saved}' (slot {slot}) after pipeline start");
-            _plugin.OnCm2DashboardSwitched((uint)slot);
+            // Claim the one-shot ONLY once the kind=4 is on the wire. SendDashboardSwitch
+            // suppresses when the sender isn't Active or is inside the post-emit cooldown;
+            // claiming up front burned the re-assert for the pipeline's whole lifetime and
+            // left the CM2 on whatever dashboard it booted on. On failure we fall through
+            // unclaimed and the next PollStatus tick retries.
+            if (_plugin.OnCm2DashboardSwitched((uint)slot))
+            {
+                _cm2ReassertAttempted = true;
+            }
+            else if (++_cm2ReassertAttempts >= Cm2ReassertMaxAttempts)
+            {
+                _cm2ReassertAttempted = true;
+                MozaLog.Warn(
+                    $"[AZOM] CM2 dashboard re-assert to '{saved}' (slot {slot}) gave up after " +
+                    $"{_cm2ReassertAttempts} attempts — the switch never reached the wire");
+            }
         }
 
         // CM1 discriminator anchor: when the dash became decidable — the _cm2Sender
