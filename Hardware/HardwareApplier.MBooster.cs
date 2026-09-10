@@ -111,7 +111,12 @@ namespace MozaPlugin.Hardware
                 // Params 48/49). The UI hides these controls for a passive pedal;
                 // this stops values saved before that gate existed from still
                 // being replayed on every connect.
-                bool ownsPedalFeelHardware = controller.IsAxisMotorized(axis);
+                // Motorized AND the single owner of the brake-named singleton
+                // registers on its device id — two motorized axes sharing one
+                // id would otherwise overwrite each other's Travel/End Stop/
+                // Friction/Damping on every apply (bug 34JAASN5). See
+                // MBoosterDeviceController.OwnsSingletonRegisters.
+                bool ownsPedalFeelHardware = controller.OwnsSingletonRegisters(axis);
                 if (ownsPedalFeelHardware && cfg.TravelStartMm >= 0)
                 {
                     controller.SendIntWrite("mbooster-brake-travel-start",

@@ -78,6 +78,56 @@ House sent them to the unit that owns the brake's own registers, which is what
 `MotorDeviceForRole` already resolves. **Not** to a role-derived id: the brake
 here sits on the host while an active throttle sits at `0x1d`.
 
+### A routed lane can carry a real chain too (bug reports GVT5H8B8 / 34JAASN5)
+
+"An mBooster on a wheelbase's RJ45 pedal port is a single unit at `0x19`" was
+half wrong. That W17 carries an mBooster at `0x19` hosting one active pedal
+**and a second active unit chained behind it at `0x1d`**, which streams its own
+group-`0x0E` diagnostics on the shared pipe (65 frames in one capture) with its
+own MCU/MOS/MOT temps, `PD Linked: 1`, its own `Theta` and its own load cell —
+the scalar dialect below. The device's own aggregate view at `0x19` agrees:
+`PD Linked:[T 1 B 1 C 1]` with **both** throttle and brake
+`connected, type: active pedal`.
+
+With everything forced onto `0x19`, the two pedals shared one set of the
+brake-named singleton registers. The read-backs show them overwriting each
+other on every apply, 74 ms apart:
+
+```text
+19:12:29.054  travel-start = 4655   end = 43976   (3.8 / 35.9 mm — throttle's)
+19:12:29.128  travel-start = 21560  end = 60881   (17.6 / 49.7 mm — brake's)
+```
+
+and the motor routine (group `0x2A`, which has **no** pedal selector) always
+drove whichever motor `0x19` fronts, whatever pedal the user picked.
+
+**Discovery is passive and evidence-gated.** On a shared base/hub pipe
+`0x1d`/`0x1e` genuinely can belong to other peripherals (`0x1c` is the E-stop),
+so a routed lane emits nothing to a chained id until that id has, unprompted,
+logged the active-pedal wording itself
+(`MBoosterDeviceController.DiscoverRoutedChainDevice`). Only then is it probed
+— reads only — and only if it *answers* can the role map place a pedal on it.
+A discovered-but-silent id is never written to, which is the
+KY3HK4QP/A6N521CS failure mode. The diagnostics dump reports both halves as
+`routedChain=[0x1d(answers), …] addressable=[0x19, 0x1d]`.
+
+Two fallout fixes from the same reports:
+
+- **`ConfigDeviceForRole` had no routed guard.** Its fallbacks are
+  `MotorDeviceForAxis(axis)` and `0x12`, on the reasoning that "`0x12` is the
+  one id always present on the pipe" — true of a dedicated USB pipe, but on a
+  shared pipe `0x12` is the **wheelbase main**, so an unresolved routed chain
+  would have flash-committed pedal registers into the base. It now returns
+  `HostDeviceId`, matching `MotorDeviceForCurrentAxis`.
+- **Register `0xB4` is not a calibration-mode gate.** It read 2 → 0 → 2 across
+  a travel calibration on the USB unit, but reads a constant **15** on this
+  routed lane through an entire run — including while the firmware has acked
+  the start frame. Gating on it failed every travel calibration there. Nothing
+  branches on it now; the firmware's own `Pedal Calib …` lines are the real
+  progress signal, and their **absence** across the whole 20 s window is how
+  "the device acked the start frame and did nothing" is detected (which is what
+  `0x19` does for the throttle pair).
+
 ### A third diagnostic dialect — the chained unit's own scalar form
 
 The chained unit at `0x1d` reports only its own single pedal, in a form that

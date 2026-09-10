@@ -291,6 +291,25 @@ namespace MozaPlugin.UI
                 }
                 AppendMBoosterPedalConfig(sb, d, s);
                 AppendMBoosterStatusRegisters(sb, d);
+                // Routed chain: which chained ids announced themselves, and
+                // whether they went on to ANSWER — the pair that decides
+                // whether each pedal gets its own singleton registers or both
+                // fall back to the host and share one set (bug 34JAASN5).
+                if (d.IsRouted)
+                {
+                    var chain = d.RoutedChainIds;
+                    if (chain.Length > 0)
+                    {
+                        var parts = new System.Collections.Generic.List<string>();
+                        foreach (var dev in chain)
+                            parts.Add($"0x{dev:x2}{(d.DeviceHasAnswered(dev) ? "(answers)" : "(silent)")}");
+                        sb.AppendLine($"        routedChain=[{string.Join(", ", parts)}]  addressable=[{string.Join(", ", System.Array.ConvertAll(d.MotorIds, x => $"0x{x:x2}"))}]");
+                    }
+                    else
+                    {
+                        sb.AppendLine("        routedChain=[none announced]");
+                    }
+                }
             }
             return sb.ToString().TrimEnd();
         }

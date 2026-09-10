@@ -131,6 +131,66 @@ namespace MozaPlugin.UI
             }
         }
 
+        // ===== Per-pedal calibration routines =====
+        // The two hardware routines are addressed per PEDAL, so their buttons
+        // live on the pedal's own row rather than once per card: travel
+        // calibration carries the role in its cmd id (group 0x26 cmd 12/13/14),
+        // and a unit hosting two active pedals answers both on one device id,
+        // so a single shared pair of buttons could not say which pedal it
+        // meant. Bug GVT5H8B8 is exactly that confusion.
+        //
+        // All four of these are pushed by SettingsControl.RefreshMBoosterCalUi
+        // on every tab tick and on every runner progress event; nothing here
+        // decides them.
+
+        private bool _travelCalEnabled;
+        public bool TravelCalEnabled
+        {
+            get => _travelCalEnabled;
+            set { if (_travelCalEnabled == value) return; _travelCalEnabled = value; Raise(nameof(TravelCalEnabled)); }
+        }
+
+        private bool _motorCalEnabled;
+        public bool MotorCalEnabled
+        {
+            get => _motorCalEnabled;
+            set { if (_motorCalEnabled == value) return; _motorCalEnabled = value; Raise(nameof(MotorCalEnabled)); }
+        }
+
+        private string _travelCalLabel = "";
+        /// <summary>Button caption — the routine's name, or Stop while it runs.</summary>
+        public string TravelCalLabel
+        {
+            get => _travelCalLabel;
+            set { value ??= ""; if (_travelCalLabel == value) return; _travelCalLabel = value; Raise(nameof(TravelCalLabel)); }
+        }
+
+        private string _motorCalLabel = "";
+        public string MotorCalLabel
+        {
+            get => _motorCalLabel;
+            set { value ??= ""; if (_motorCalLabel == value) return; _motorCalLabel = value; Raise(nameof(MotorCalLabel)); }
+        }
+
+        private string _calStatus = "";
+        /// <summary>Progress/result line for a run on THIS pedal. Empty hides
+        /// the row's status line (see the EmptyStringToVisibility converter on
+        /// it in the DataTemplate), so an idle list costs no extra height.</summary>
+        public string CalStatus
+        {
+            get => _calStatus;
+            set { value ??= ""; if (_calStatus == value) return; _calStatus = value; Raise(nameof(CalStatus)); }
+        }
+
+        /// <summary>True when the calibration buttons should exist at all for
+        /// this pedal — a passive pedal has no motor to sweep or locate.</summary>
+        private bool _calVisible;
+        public bool CalVisible
+        {
+            get => _calVisible;
+            set { if (_calVisible == value) return; _calVisible = value; Raise(nameof(CalVisible)); }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }

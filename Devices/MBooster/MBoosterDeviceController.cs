@@ -62,12 +62,18 @@ namespace MozaPlugin.Devices.MBooster
         private readonly bool _ownsConnection = true;
         public bool IsRouted => !_ownsConnection;
 
-        // Motor/config device ids this lane may address: the chain id set on
-        // a dedicated USB pipe, ONLY the host sub-device id when routed —
-        // 0x1d/0x1e are other peripherals' bus ids on a base/hub pipe (0x1c
-        // is the E-stop), so a routed lane must never spray keepalives or
-        // disables at them.
-        public byte[] MotorIds { get; } = MozaMBoosterProtocol.MotorDeviceIds;
+        // Motor/config device ids this lane may address: the whole chain id set
+        // on a dedicated USB pipe; on a ROUTED lane it starts as the host
+        // sub-device id alone and grows only as chained units PROVE themselves
+        // (see DiscoverRoutedChainDevice). 0x1d/0x1e are other peripherals' bus
+        // ids on a base/hub pipe (0x1c is the E-stop), so a routed lane must
+        // never spray keepalives, disables or writes at an id that hasn't
+        // identified itself as an mBooster.
+        //
+        // Volatile whole-array swap rather than in-place mutation: the 50 Hz
+        // effect workers and SendAllDisableFrames iterate this without a lock.
+        private volatile byte[] _motorIds = MozaMBoosterProtocol.MotorDeviceIds;
+        public byte[] MotorIds => _motorIds;
 
         // Port name at construction time. May change on reconnect — read live
         // via Connection.LastPortName if needed.
@@ -435,7 +441,7 @@ namespace MozaPlugin.Devices.MBooster
             _ownsConnection = false;
             HostDeviceId = hostDeviceId;
             _swappedHostId = (byte)(((hostDeviceId & 0x0f) << 4) | (hostDeviceId >> 4));
-            MotorIds = new[] { hostDeviceId };
+            _motorIds = new[] { hostDeviceId };
             // The base HID reports the full 3-axis pedal surface regardless of
             // hookup; connectivity (ConnectedAxes) narrows it as usual.
             AxisCount = 3;
@@ -504,15 +510,21 @@ namespace MozaPlugin.Devices.MBooster
         /// 0x12 for that window — brake effects would fire from the throttle
         /// motor. Once types are known they win outright.
         ///
-        /// For a genuine multi-active chain the ids are role-based
-        /// (0x12/0x1d/0x1e per axis), left exactly as it was — no capture of
-        /// such a chain exists to widen it against.
+        /// For a genuine multi-active chain on a USB pipe the ids are
+        /// role-based (0x12/0x1d/0x1e per axis).
+        ///
+        /// A ROUTED lane always falls back to the host sub-device here, even
+        /// when it turns out to carry a real chain (bug reports GVT5H8B8 /
+        /// 34JAASN5): the only thing that can move one of its pedals onto a
+        /// chained id is the calibration-derived role map, which by
+        /// construction only ever contains ids that ANSWERED all six min/max
+        /// reads. So a chained id that was discovered but stays silent is
+        /// never written to — see DiscoverRoutedChainDevice.
         /// </summary>
         public byte MotorDeviceForCurrentAxis(int axisIndex)
         {
-            // Routed lane: everything addresses the tunneled pedal sub-device —
-            // 0x1d/0x1e are OTHER peripherals' ids on a shared base/hub bus.
-            // (Chained ids behind a base, if they exist, are unmapped so far.)
+            // Routed lane: the safe fallback is the tunneled pedal sub-device.
+            // Chained ids are reached only via the role map (see the remarks).
             if (!_ownsConnection) return HostDeviceId;
             int activeCount = ActiveAxisCount;
             if (activeCount >= 0)
@@ -592,6 +604,15 @@ namespace MozaPlugin.Devices.MBooster
             if (map != null && roleIndex >= 0 && !RoleIsAmbiguous(roleIndex)
                 && map.TryGetValue(roleIndex, out var dev))
                 return dev;
+            // ROUTED lane: neither fallback below applies. The reasoning above
+            // ("0x12 is the one id always present on the pipe") holds for a
+            // dedicated USB pipe only — on a shared base/hub pipe 0x12 is the
+            // WHEELBASE MAIN and the mBooster is the tunneled pedal sub-device,
+            // so both fallbacks would flash pedal registers into the wrong
+            // device entirely. Same guard MotorDeviceForCurrentAxis carries.
+            // A routed chain's second unit is reached only through the map
+            // above, once it has answered — see DiscoverRoutedChainDevice.
+            if (!_ownsConnection) return HostDeviceId;
             // Types known and a genuine multi-motor chain — the axis mapping is
             // real, not a guess.
             if (ActiveAxisCount > 1) return MotorDeviceForAxis(axisFallback);
@@ -651,6 +672,61 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         public byte CalibDeviceForAxis(int axisIndex)
             => ConfigDeviceForRole(RoleIndexForAxis(axisIndex), axisIndex);
+
+        /// <summary>
+        /// Whether this axis may push the brake-named SINGLETON registers —
+        /// Travel (0x84/0x85), End Stop (0xB2), Natural Friction (0xAE),
+        /// Virtual Damping (0xAD), Segmented Damping (0xB7), Deadzone/Max
+        /// Force/feel curve (0xAB), Max Threshold (0xB3), Sensor Ratio (0x1A).
+        /// None of them carries a per-pedal selector, so they configure
+        /// whichever pedal owns that hardware on the device id they are sent
+        /// to.
+        ///
+        /// Normally every motorized axis resolves to its own device id and the
+        /// answer is yes for all of them. But when two motorized axes land on
+        /// the SAME id — a routed chain whose role map hasn't resolved, so both
+        /// fall back to the host — they would take turns overwriting one
+        /// register set. Bug 34JAASN5 is exactly that: throttle 3.8/35.9mm and
+        /// brake 17.6/49.7mm hitting 0x19's travel registers 74ms apart on
+        /// every apply, last writer winning.
+        ///
+        /// In that case exactly one axis owns them: the pedal whose role the
+        /// registers are named for (Brake), else the lowest axis index, so the
+        /// choice is stable across applies rather than order-dependent.
+        /// </summary>
+        public bool OwnsSingletonRegisters(int axisIndex)
+        {
+            if (!IsAxisMotorized(axisIndex)) return false;
+            byte mine = CalibDeviceForAxis(axisIndex);
+
+            int bestAxis = axisIndex;
+            int bestRank = SingletonOwnerRank(axisIndex);
+            for (int a = 0; a < MaxAxes; a++)
+            {
+                if (a == axisIndex || !IsAxisMotorized(a)) continue;
+                if (CalibDeviceForAxis(a) != mine) continue;
+                int rank = SingletonOwnerRank(a);
+                if (rank < bestRank || (rank == bestRank && a < bestAxis))
+                {
+                    bestRank = rank;
+                    bestAxis = a;
+                }
+            }
+            return bestAxis == axisIndex;
+        }
+
+        // Brake wins (the registers are its own hardware), then throttle, then
+        // clutch, then an unresolved role.
+        private int SingletonOwnerRank(int axisIndex)
+        {
+            switch (RoleIndexForAxis(axisIndex))
+            {
+                case 1: return 0;   // Brake
+                case 0: return 1;   // Throttle
+                case 2: return 2;   // Clutch
+                default: return 3;
+            }
+        }
 
         /// <summary>Command-name prefix ("throttle"/"brake"/"clutch") for an
         /// axis's role, or null when unresolved.</summary>
@@ -960,6 +1036,11 @@ namespace MozaPlugin.Devices.MBooster
             // carries it (same rationale as HardwareApplier's own flush teardown).
             try { StopCalibFlushTimer(flush: false); } catch { }
             lock (_calibLock) _deviceCalib.Clear();
+            // Re-probe proven chained ids on the next connect — their answers
+            // are what the role map needs, and _deviceCalib was just cleared.
+            // The discovered set itself is kept: it identifies this rig's
+            // topology, which a port bounce doesn't change.
+            lock (_routedChainProbed) _routedChainProbed.Clear();
             // Status read-backs describe a live device; a stale 0xB4 or motor
             // status surviving a reconnect would let a calibration runner
             // conclude "already normal" / "already complete" before the
@@ -975,7 +1056,9 @@ namespace MozaPlugin.Devices.MBooster
             // sub-device id (nibble-swapped in the source byte) belong to
             // this lane. Applies to the 0x0E diagnostics too, which carry
             // the same swapped source byte (0x91 for dev 0x19).
-            if (!_ownsConnection && data[1] != _swappedHostId) return;
+            if (!_ownsConnection && data[1] != _swappedHostId
+                && !IsDiscoveredRoutedChainSource(data))
+                return;
             // Firmware debug/diagnostic group (0x0E) is normally silenced as noise,
             // but the mBooster streams useful chain-layout lines here ("PD Linked:
             // [T x B y C z]", "<pedal> is connected, type: active/passive pedal").
@@ -1148,6 +1231,10 @@ namespace MozaPlugin.Devices.MBooster
             // would swallow.
             try { FirmwareLogLine?.Invoke(ascii); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] FirmwareLogLine handler: {ex.Message}"); }
+            // A chained unit on a ROUTED lane announces itself here and nowhere
+            // else — this is the only way to learn it exists without writing
+            // blind to an id that may belong to another peripheral.
+            DiscoverRoutedChainDevice(data, ascii);
             if (ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("pedal is connected", StringComparison.OrdinalIgnoreCase) < 0 &&
@@ -1627,21 +1714,140 @@ namespace MozaPlugin.Devices.MBooster
         public void ProbeChainDevices()
         {
             // Routed lane: 0x1d/0x1e are OTHER peripherals' bus ids on a shared
-            // base/hub pipe — never probe them from here.
-            if (!_ownsConnection) return;
+            // base/hub pipe, so they are only probed once one has identified
+            // itself as an mBooster on its own (DiscoverRoutedChainDevice).
+            if (!_ownsConnection)
+            {
+                ProbeDiscoveredRoutedChain();
+                return;
+            }
             if (!_connection.IsConnected || _chainProbed) return;
             _chainProbed = true;
             foreach (var dev in new byte[] { 0x1d, 0x1e })
-                foreach (var name in new[]
-                {
-                    "mbooster-model-name", "mbooster-serial-a", "mbooster-serial-b",
-                    "mbooster-presence", "mbooster-device-type",
-                    "mbooster-throttle-min", "mbooster-throttle-max",
-                    "mbooster-brake-min", "mbooster-brake-max",
-                    "mbooster-clutch-min", "mbooster-clutch-max",
-                    "mbooster-brake-threshold", "mbooster-brake-angle-ratio",
-                })
-                    SendRead(name, dev);
+                ProbeChainDevice(dev);
+        }
+
+        private void ProbeChainDevice(byte dev)
+        {
+            foreach (var name in new[]
+            {
+                "mbooster-model-name", "mbooster-serial-a", "mbooster-serial-b",
+                "mbooster-presence", "mbooster-device-type",
+                "mbooster-throttle-min", "mbooster-throttle-max",
+                "mbooster-brake-min", "mbooster-brake-max",
+                "mbooster-clutch-min", "mbooster-clutch-max",
+                "mbooster-brake-threshold", "mbooster-brake-angle-ratio",
+            })
+                SendRead(name, dev);
+        }
+
+        // ===== Routed multi-unit chains =====
+        //
+        // A routed lane was assumed to be a single unit at the tunneled pedal
+        // sub-device id (0x19), because on a shared base/hub pipe 0x1d/0x1e
+        // belong to other peripherals. Bug reports GVT5H8B8 / 34JAASN5 disprove
+        // the single-unit half: that W17 carries an mBooster at 0x19 hosting one
+        // active pedal AND a second active unit chained behind it at 0x1d, which
+        // streams its own group-0x0E diagnostics (own MCU/MOS/MOT temps,
+        // "PD Linked: 1", own Theta and load cell) in the scalar chained-unit
+        // dialect. With everything forced onto 0x19, both pedals shared one set
+        // of the brake-named SINGLETON registers, so their Travel values
+        // overwrote each other ~74 ms apart on every apply (34JAASN5) and the
+        // motor routine always drove whichever motor 0x19 fronts (GVT5H8B8).
+        //
+        // Discovery is passive and evidence-gated: nothing is ever emitted to a
+        // chained id until that id has, unprompted, logged the active-pedal
+        // diagnostic wording. A non-mBooster peripheral sitting at 0x1d never
+        // does, so it is never written to.
+        private readonly HashSet<byte> _routedChainIds = new HashSet<byte>();
+        private readonly HashSet<byte> _routedChainProbed = new HashSet<byte>();
+
+        /// <summary>
+        /// Whether a device id has ever answered a parsed <c>mbooster-*</c>
+        /// read on this lane. A discovered-but-silent chained id must never be
+        /// routed to — writing into the void is the KY3HK4QP/A6N521CS failure
+        /// mode, where the real pedal keeps its old values while every write
+        /// disappears. The role map enforces this implicitly (it only contains
+        /// devices that answered all six min/max reads); this exposes it for
+        /// the diagnostics dump.
+        /// </summary>
+        public bool DeviceHasAnswered(byte device)
+        {
+            lock (_calibLock) return _deviceCalib.ContainsKey(device);
+        }
+
+        /// <summary>Chained mBooster ids this ROUTED lane has proven and may
+        /// address. Empty on a USB lane (which uses the full id set).</summary>
+        public byte[] RoutedChainIds
+        {
+            get { lock (_routedChainIds) return new List<byte>(_routedChainIds).ToArray(); }
+        }
+
+        /// <summary>
+        /// Should an inbound frame from a non-host source be handled by this
+        /// ROUTED lane? True for a chained id already proven to be an mBooster,
+        /// and for the group-0x0E diagnostic frames that do the proving — those
+        /// are read-only observations, so letting them through emits nothing.
+        /// </summary>
+        private bool IsDiscoveredRoutedChainSource(byte[] data)
+        {
+            byte src = data[1];
+            if (src != 0xd1 && src != 0xe1) return false;
+            byte dev = (byte)(((src & 0x0f) << 4) | (src >> 4));
+            lock (_routedChainIds)
+                if (_routedChainIds.Contains(dev)) return true;
+            return data[0] == MozaProtocol.FirmwareDebugGroup;
+        }
+
+        /// <summary>
+        /// Latch a chained id as a real mBooster once its own diagnostics say
+        /// so. Called from the 0x0E handler with the decoded ASCII.
+        /// </summary>
+        private void DiscoverRoutedChainDevice(byte[] data, string ascii)
+        {
+            if (_ownsConnection) return;
+            byte src = data[1];
+            if (src != 0xd1 && src != 0xe1) return;
+            // The scalar chained-unit dialect. "Active pedal heartbeat log" is
+            // the unambiguous one; the others corroborate it on a unit whose
+            // heartbeat header was dropped mid-stream.
+            if (ascii.IndexOf("Active pedal heartbeat", StringComparison.OrdinalIgnoreCase) < 0
+                && ascii.IndexOf("P-Sens raw", StringComparison.OrdinalIgnoreCase) < 0
+                && ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) < 0)
+                return;
+
+            byte dev = (byte)(((src & 0x0f) << 4) | (src >> 4));
+            lock (_routedChainIds)
+                if (!_routedChainIds.Add(dev)) return;
+
+            _motorIds = BuildRoutedMotorIds();
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} routed chain: dev 0x{dev:x2} identified itself as an active mBooster pedal — addressing it directly ({ascii})");
+            ProbeDiscoveredRoutedChain();
+        }
+
+        private byte[] BuildRoutedMotorIds()
+        {
+            var ids = new List<byte> { HostDeviceId };
+            lock (_routedChainIds)
+                foreach (var d in _routedChainIds)
+                    if (d != HostDeviceId) ids.Add(d);
+            ids.Sort();
+            return ids.ToArray();
+        }
+
+        /// <summary>Identity + calibration reads at each proven chained id, once
+        /// each. Reads only — the role map needs their answers to tell the two
+        /// pedals apart, and a chained id that answers nothing is never routed
+        /// to (see <see cref="DeviceHasAnswered"/>).</summary>
+        private void ProbeDiscoveredRoutedChain()
+        {
+            if (!_connection.IsConnected) return;
+            foreach (var dev in RoutedChainIds)
+            {
+                lock (_routedChainProbed)
+                    if (!_routedChainProbed.Add(dev)) continue;
+                ProbeChainDevice(dev);
+            }
         }
 
         /// <summary>

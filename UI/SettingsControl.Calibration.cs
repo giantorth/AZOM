@@ -351,7 +351,7 @@ namespace MozaPlugin.UI
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            if (!controller.IsAxisMotorized(_mboosterEffectPedalIndex)) return;
+            if (!controller.OwnsSingletonRegisters(_mboosterEffectPedalIndex)) return;
             byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
             controller.QueueCalibWrite($"{dev:x2}:{key}", () => push(controller, dev));
         }

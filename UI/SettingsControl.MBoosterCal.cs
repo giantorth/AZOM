@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Resources;
 
@@ -12,11 +11,18 @@ namespace MozaPlugin.UI
     /// motor rotor-locate) plus the plain Virtual Damping pair (cmdId 0xAD)
     /// that Pit House pushes alongside Segmented Damping.
     ///
+    /// The buttons live on each PEDAL's own row in the device list, not once
+    /// per card: travel calibration carries the pedal's role in its cmd id
+    /// (group 0x26 cmd 12/13/14), and a unit hosting two ACTIVE pedals answers
+    /// both on a single device id — so one shared pair of buttons genuinely
+    /// could not express which pedal was meant. Bug GVT5H8B8 was that
+    /// confusion in the field.
+    ///
     /// The routines themselves live in
     /// <see cref="MBoosterCalibrationRunner"/> on the registry, not here: both
     /// soft-reboot the pedal, so a run has to survive both the CDC outage and
     /// this settings panel being closed. This file is only the buttons, the
-    /// status line and the gating.
+    /// per-row status text and the gating.
     /// </summary>
     public partial class SettingsControl
     {
@@ -43,94 +49,104 @@ namespace MozaPlugin.UI
             catch { }
         }
 
-        private void MBoosterTravelCalButton_Click(object sender, RoutedEventArgs e)
-            => StartMBoosterCalibration(MBoosterCalKind.Travel);
+        private static MBoosterDeviceRow? RowOf(object sender)
+            => (sender as FrameworkElement)?.DataContext as MBoosterDeviceRow;
 
-        private void MBoosterMotorCalButton_Click(object sender, RoutedEventArgs e)
-            => StartMBoosterCalibration(MBoosterCalKind.Motor);
+        private void MBoosterRowTravelCal_Click(object sender, RoutedEventArgs e)
+            => StartMBoosterCalibration(MBoosterCalKind.Travel, RowOf(sender));
 
-        private void StartMBoosterCalibration(MBoosterCalKind kind)
+        private void MBoosterRowMotorCal_Click(object sender, RoutedEventArgs e)
+            => StartMBoosterCalibration(MBoosterCalKind.Motor, RowOf(sender));
+
+        private void StartMBoosterCalibration(MBoosterCalKind kind, MBoosterDeviceRow? row)
         {
-            var controller = CurrentMBoosterController();
+            if (row == null) return;
+            var controller = _plugin?.MBoosterRegistry?.FindByIdentity(row.Identity);
             if (controller == null) return;
             var runner = EnsureMBoosterCalRunner(create: true);
             if (runner == null) return;
 
             // The running routine's own button doubles as Cancel — no third
-            // control, and cancelling still sends the stop frame and the
-            // reboot, so the pedal can never be left in calibration mode.
+            // control, and cancelling still reboots the pedal so it can never
+            // be left mid-sweep or in the motor routine's debug mode.
             var running = runner.Snapshot();
             if (running.IsRunning)
             {
-                if (running.Kind == kind) runner.Cancel();
+                if (running.Kind == kind
+                    && string.Equals(running.Identity, row.Identity, StringComparison.OrdinalIgnoreCase)
+                    && running.AxisIndex == row.AxisIndex)
+                    runner.Cancel();
                 return;
             }
 
-            string error;
-            bool ok = kind == MBoosterCalKind.Travel
-                ? runner.StartTravelCalibration(controller, _mboosterEffectPedalIndex, out error)
-                : runner.StartMotorCalibration(controller, _mboosterEffectPedalIndex, out error);
-            if (!ok)
+            if (!runner.StartCalibration(kind, controller, row.AxisIndex, out string error))
             {
-                SetMBoosterCalStatus(string.Format(Strings.Status_CalibrationFailed, error));
+                row.CalStatus = string.Format(Strings.Status_CalibrationFailed, error);
                 return;
             }
             RefreshMBoosterCalUi();
         }
 
         /// <summary>
-        /// Button enable/visibility and the status line. Called from
-        /// RefreshMBoosterTab, from the passive-pedal gate, and on every
-        /// runner progress event.
+        /// Push button enable/caption/status onto every pedal row. Called from
+        /// RefreshMBoosterTab (via the passive-pedal gate) and on every runner
+        /// progress event.
         /// </summary>
         private void RefreshMBoosterCalUi()
         {
-            if (MBoosterCalButtonsPanel == null) return;
+            var rows = _mboosterDeviceRows;
+            if (rows == null || rows.Count == 0) return;
+
             var runner = EnsureMBoosterCalRunner(create: false);
             var status = runner?.Snapshot() ?? default;
-            var controller = CurrentMBoosterController();
+            bool anyRunning = status.IsRunning;
+            string? note = runner?.FirmwareNote;
 
-            // A routine reboots the whole unit, so while one runs the OTHER
-            // button is dead on every pedal — not just the one being
-            // calibrated. The running routine's own button becomes Cancel.
-            bool running = status.IsRunning;
-            bool usable = controller != null && controller.IsConnected
-                          && controller.IsAxisMotorized(_mboosterEffectPedalIndex);
-            bool travelRunning = running && status.Kind == MBoosterCalKind.Travel;
-            bool motorRunning = running && status.Kind == MBoosterCalKind.Motor;
-            MBoosterTravelCalButton.IsEnabled = travelRunning || (usable && !running);
-            MBoosterMotorCalButton.IsEnabled = motorRunning || (usable && !running);
-            MBoosterTravelCalButton.Content = travelRunning
-                ? Strings.Button_Stop : Strings.Button_TravelCalibration;
-            MBoosterMotorCalButton.Content = motorRunning
-                ? Strings.Button_Stop : Strings.Button_MotorCalibration;
-
-            if (!running && status.Step == MBoosterCalStep.Idle)
+            foreach (var row in rows)
             {
-                MBoosterCalStatus.Visibility = Visibility.Collapsed;
-                return;
-            }
+                var controller = _plugin?.MBoosterRegistry?.FindByIdentity(row.Identity);
+                // Both routines are motor-driven — the travel sweep IS the
+                // motor moving the pedal, and a rotor locate needs a rotor.
+                // A passive pedal has neither, and these are brake-named
+                // singleton commands, so running one from a passive pedal
+                // would act on the active pedal instead.
+                bool motorized = controller?.IsAxisMotorized(row.AxisIndex) ?? false;
+                row.CalVisible = controller == null || motorized;
 
-            // Only narrate the run that belongs to the pedal on screen.
-            bool mine = controller != null && status.Identity != null
-                        && string.Equals(controller.Identity, status.Identity, StringComparison.OrdinalIgnoreCase)
-                        && status.AxisIndex == _mboosterEffectPedalIndex;
-            if (!mine && running)
-            {
-                SetMBoosterCalStatus(Strings.Hint_MBoosterCalBusyElsewhere);
-                return;
-            }
-            if (!mine)
-            {
-                MBoosterCalStatus.Visibility = Visibility.Collapsed;
-                return;
-            }
+                bool mine = anyRunning
+                    && string.Equals(status.Identity, row.Identity, StringComparison.OrdinalIgnoreCase)
+                    && status.AxisIndex == row.AxisIndex;
+                bool usable = controller != null && controller.IsConnected && motorized;
 
-            SetMBoosterCalStatus(DescribeMBoosterCal(status, runner));
+                // A routine reboots the whole unit, so while one runs every
+                // other button on every row is dead; the running one becomes
+                // Cancel.
+                bool travelRunning = mine && status.Kind == MBoosterCalKind.Travel;
+                bool motorRunning = mine && status.Kind == MBoosterCalKind.Motor;
+                row.TravelCalEnabled = travelRunning || (usable && !anyRunning);
+                row.MotorCalEnabled = motorRunning || (usable && !anyRunning);
+                row.TravelCalLabel = travelRunning ? Strings.Button_Stop : Strings.Button_TravelCalibration;
+                row.MotorCalLabel = motorRunning ? Strings.Button_Stop : Strings.Button_MotorCalibration;
+
+                if (mine)
+                    row.CalStatus = DescribeMBoosterCal(status, note);
+                else if (!anyRunning && IsCalOutcome(status) && OwnsStatus(status, row))
+                    row.CalStatus = DescribeMBoosterCal(status, note);
+                else
+                    row.CalStatus = "";
+            }
         }
 
-        private string DescribeMBoosterCal(MBoosterCalibrationRunner.Status status,
-                                           MBoosterCalibrationRunner? runner)
+        /// <summary>A finished run's Done/Failed line stays on the row it ran
+        /// on, so the outcome doesn't vanish the instant the run ends.</summary>
+        private static bool IsCalOutcome(MBoosterCalibrationRunner.Status s)
+            => s.Step == MBoosterCalStep.Done || s.Step == MBoosterCalStep.Failed;
+
+        private static bool OwnsStatus(MBoosterCalibrationRunner.Status s, MBoosterDeviceRow row)
+            => string.Equals(s.Identity, row.Identity, StringComparison.OrdinalIgnoreCase)
+               && s.AxisIndex == row.AxisIndex;
+
+        private string DescribeMBoosterCal(MBoosterCalibrationRunner.Status status, string? note)
         {
             switch (status.Step)
             {
@@ -148,18 +164,11 @@ namespace MozaPlugin.UI
 
             // The firmware narrates both routines on its own debug channel, so
             // show what it actually said rather than only a countdown.
-            string note = runner?.FirmwareNote ?? string.Empty;
             string format = status.Kind == MBoosterCalKind.Motor
                 ? Strings.Hint_MBoosterMotorCal
                 : Strings.Hint_MBoosterTravelCal;
             string text = string.Format(format, status.SecondsRemaining);
-            return note.Length > 0 ? text + "  " + note : text;
-        }
-
-        private void SetMBoosterCalStatus(string text)
-        {
-            MBoosterCalStatus.Text = text;
-            MBoosterCalStatus.Visibility = Visibility.Visible;
+            return string.IsNullOrEmpty(note) ? text : text + "  " + note;
         }
 
         // ===== Plain Virtual Damping (cmdId 0xAD, press/release selectors) ===
