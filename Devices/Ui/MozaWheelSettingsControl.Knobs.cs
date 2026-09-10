@@ -99,6 +99,20 @@ namespace MozaPlugin.Devices.Ui
                     }
                     WriteWiKnobSignalMode(knobIdx, v);
                 };
+                // A ListBox raises SelectionChanged only when the selection MOVES, so
+                // clicking the segment that is already lit is silent — no event, no
+                // frame, nothing. That is precisely the click a user makes when the
+                // wheel disagrees with what the tab shows, and it is the one that has
+                // to reach the wheel. Tunnelled Down (not Up) so SelectedIndex is still
+                // the pre-click value: equal means the selection is about to not move,
+                // which is the case SelectionChanged will not cover.
+                chip.PreviewMouseLeftButtonDown += (s, e) =>
+                {
+                    if (_suppressEvents) return;
+                    int clicked = SegmentIndexFromSource(chip, e.OriginalSource);
+                    if (clicked < 0 || clicked != chip.SelectedIndex) return;
+                    WriteWiKnobSignalMode(knobIdx, clicked, force: true);
+                };
                 _wiKnobSignalChips[k] = chip;
 
                 var signalCard = new Border
@@ -199,6 +213,14 @@ namespace MozaPlugin.Devices.Ui
         // catalogued with 0 encoders never reads either, so both stay false.
         private bool HasKnobEncoders()
             => ResolveKnobEncoderCount() > 0 || (_data?.WheelKnobModeSupported ?? false);
+
+        // Which segment a mouse event landed on, or -1 if it missed the items.
+        private static int SegmentIndexFromSource(SegmentedControl chip, object source)
+        {
+            var container = ItemsControl.ContainerFromElement(chip, source as DependencyObject)
+                            as ListBoxItem;
+            return container == null ? -1 : chip.ItemContainerGenerator.IndexFromContainer(container);
+        }
 
         // Per-knob signal mode as the UI must render it: the per-(profile × wheel-page)
         // overlay wins, _data (the wheel's own readback) only fills an unset slot —

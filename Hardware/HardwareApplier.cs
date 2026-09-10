@@ -272,8 +272,8 @@ namespace MozaPlugin.Hardware
         // The change-cache check happens at FLUSH time, not queue time, so a drag that
         // ends back where it started writes nothing at all.
         private const double WheelCfgFlushDelayMs = 400.0;
-        private readonly System.Collections.Generic.Dictionary<string, (long CacheValue, System.Action Write)> _pendingWheelCfg
-            = new System.Collections.Generic.Dictionary<string, (long, System.Action)>(System.StringComparer.Ordinal);
+        private readonly System.Collections.Generic.Dictionary<string, (long CacheValue, System.Action Write, bool Force)> _pendingWheelCfg
+            = new System.Collections.Generic.Dictionary<string, (long, System.Action, bool)>(System.StringComparer.Ordinal);
         // Leaf lock: guards only the dictionary above. Never held across a device
         // write — the flush copies out, releases, then writes.
         private readonly object _pendingWheelCfgLock = new object();
@@ -287,12 +287,13 @@ namespace MozaPlugin.Hardware
         // must not recreate the flush timer and fire into a disposed manager.
         private bool _wheelCfgShutdown;
 
-        private void QueueWheelCfgWrite(string command, long cacheValue, System.Action write)
+        private void QueueWheelCfgWrite(string command, long cacheValue, System.Action write,
+                                        bool force = false)
         {
             lock (_pendingWheelCfgLock)
             {
                 if (_wheelCfgShutdown) return;
-                _pendingWheelCfg[command] = (cacheValue, write);
+                _pendingWheelCfg[command] = (cacheValue, write, force);
                 if (_wheelCfgFlushTimer == null)
                 {
                     _wheelCfgFlushTimer = new System.Timers.Timer(WheelCfgFlushDelayMs) { AutoReset = false };
@@ -306,7 +307,7 @@ namespace MozaPlugin.Hardware
 
         private void FlushPendingWheelCfgWrites()
         {
-            System.Collections.Generic.KeyValuePair<string, (long CacheValue, System.Action Write)>[] due;
+            System.Collections.Generic.KeyValuePair<string, (long CacheValue, System.Action Write, bool Force)>[] due;
             lock (_pendingWheelCfgLock)
             {
                 if (_pendingWheelCfg.Count == 0) return;
@@ -320,8 +321,11 @@ namespace MozaPlugin.Hardware
                 try
                 {
                     // Re-check against the cache now: the value may have travelled and
-                    // come back, or an apply may have written it in the meantime.
-                    if (!WheelCfgChanged(kv.Key, kv.Value.CacheValue)) continue;
+                    // come back, or an apply may have written it in the meantime. A forced
+                    // write still records its value here, but goes out either way — it
+                    // exists precisely because the cache is not to be trusted.
+                    bool changed = WheelCfgChanged(kv.Key, kv.Value.CacheValue);
+                    if (!changed && !kv.Value.Force) continue;
                     kv.Value.Write();
                 }
                 catch (System.Exception ex)
@@ -1676,13 +1680,19 @@ namespace MozaPlugin.Hardware
         // Skip the wire when the matching device isn't detected. Sentinel-guard
         // numeric values to drop "no opinion" writes.
 
-        public void WriteIfWheelDetected(string command, int value)
+        /// <summary><paramref name="force"/> = the user deliberately re-asserted a value the
+        /// change gate already believes is in the register, so send it anyway. Without it a
+        /// wheel whose real state has drifted from the cache can never be corrected from the
+        /// UI: the gate reads "already written" and drops every attempt. Only ever set from an
+        /// explicit user action — an apply must stay gated or it re-flashes on every
+        /// re-detect.</summary>
+        public void WriteIfWheelDetected(string command, int value, bool force = false)
         {
             if (value < 0) return;
             if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
             if (IsFlashBackedWheelCfg(command))
             {
-                QueueWheelCfgWrite(command, value, () => _deviceManager.WriteSetting(command, value));
+                QueueWheelCfgWrite(command, value, () => _deviceManager.WriteSetting(command, value), force);
                 return;
             }
             _deviceManager.WriteSetting(command, value);
