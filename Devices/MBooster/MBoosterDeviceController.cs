@@ -553,6 +553,52 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
+        /// Device id for a pedal CONFIG write (calibration, Pedal Feel, Sim
+        /// Input) — the resolved role map when it exists, else the host
+        /// <see cref="MozaProtocol.DeviceMain"/>. Never the count-based chain
+        /// guess that <see cref="MotorDeviceForCurrentAxis"/> falls back to.
+        ///
+        /// <para>Config writes are flash-committed on the unit that receives
+        /// them, so a guessed id does durable damage: on a single unit hosting a
+        /// passive pedal the whole write batch lands on <c>0x1d</c>, which does
+        /// not exist and never answers, and the pedal keeps whatever it had
+        /// (bug report A6N521CS — 28 group-0x24 writes to 0x1d, nothing to the
+        /// real device until the type verdict 6.2 s later); on a genuine chain
+        /// the wrong unit commits another pedal's curve and
+        /// <c>RoutingResolved</c>'s re-apply only writes the corrected id, so
+        /// the foreign values stay (docs/protocol/devices/mbooster.md, bundle
+        /// KY3HK4QP). <c>0x12</c> is the one id always present on the pipe, so
+        /// it is the only safe guess.</para>
+        ///
+        /// <para>The count-based guess is wrong on its own terms anyway: pedal
+        /// COUNT is explicitly not the chain discriminator — one mBooster
+        /// commonly hosts passive pedals that the connectivity diagnostic
+        /// reports exactly like chained units, and only the per-pedal active/
+        /// passive TYPE separates them (see mbooster.md "Active vs passive is
+        /// the chain discriminator"). Until <see cref="ActiveAxisCount"/> is
+        /// known there is nothing to route with.</para>
+        ///
+        /// <para>Effects deliberately keep using
+        /// <see cref="MotorDeviceForRole"/>: a motor frame is transient, and
+        /// collapsing every axis onto <c>0x12</c> during the unresolved window
+        /// would make several axes' workers race for the host's motor (the
+        /// hazard <c>MBoosterEffectWorker.IsPedalAxisConnected</c> guards, whose
+        /// own <see cref="IsAxisMotorized"/> gate is fail-open in that same
+        /// window).</para>
+        /// </summary>
+        public byte ConfigDeviceForRole(int roleIndex, int axisFallback)
+        {
+            var map = _roleToDevice;
+            if (map != null && roleIndex >= 0 && !RoleIsAmbiguous(roleIndex)
+                && map.TryGetValue(roleIndex, out var dev))
+                return dev;
+            // Types known and a genuine multi-motor chain — the axis mapping is
+            // real, not a guess.
+            if (ActiveAxisCount > 1) return MotorDeviceForAxis(axisFallback);
+            return MozaProtocol.DeviceMain;
+        }
+
+        /// <summary>
         /// The motor device id for a pedal ROLE (0=Throttle,1=Brake,2=Clutch),
         /// using the calibration-derived chain map (see
         /// <see cref="RecomputeChainRoleMap"/>) so effects reach the physical
@@ -592,13 +638,19 @@ namespace MozaPlugin.Devices.MBooster
         /// Device id an axis's own PHYSICAL (per-unit) calibration writes go to
         /// — travel, endstop, damping, threshold, sensor ratio, and the two
         /// calibration ROUTINES. Routed by role through the chain map, not by
-        /// raw HID axis; see <see cref="MotorDeviceForRole"/>. Single shared
+        /// raw HID axis; see <see cref="ConfigDeviceForRole"/>. Single shared
         /// implementation so the UI sliders, the connect-time apply and
         /// <see cref="MBoosterCalibrationRunner"/> can never disagree about
         /// which physical pedal they are addressing.
+        ///
+        /// <para>Resolves through <see cref="ConfigDeviceForRole"/>, so an
+        /// unresolved chain falls back to the host rather than to a guessed
+        /// 0x1d/0x1e — these writes are flash-committed by whichever unit
+        /// receives them. The matching calibration READS already had this
+        /// behaviour via <see cref="MotorDeviceForRole(int)"/>.</para>
         /// </summary>
         public byte CalibDeviceForAxis(int axisIndex)
-            => MotorDeviceForRole(RoleIndexForAxis(axisIndex), axisIndex);
+            => ConfigDeviceForRole(RoleIndexForAxis(axisIndex), axisIndex);
 
         /// <summary>Command-name prefix ("throttle"/"brake"/"clutch") for an
         /// axis's role, or null when unresolved.</summary>

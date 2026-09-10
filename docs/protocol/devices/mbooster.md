@@ -151,6 +151,34 @@ otherwise, once every axis resolves to the one real device id, the passive
 axes' workers all stream at the active pedal's motor and race the genuine
 worker for it (`MBoosterEffectWorker.IsPedalAxisConnected`).
 
+### Config writes and effect frames route differently on purpose
+
+Until `ActiveAxisCount` is known there is no sound chain signal, so
+`MBoosterDeviceController.ConfigDeviceForRole` — used by the connect-time
+apply (`HardwareApplier.MBooster`), `CalibDeviceForAxis`, the UI sliders and
+`MBoosterCalibrationRunner` — resolves the role map when it exists and
+otherwise falls back to the **host** `0x12`, never to `MotorDeviceForAxis`.
+Effects keep using `MotorDeviceForRole`/`MotorDeviceForCurrentAxis` with its
+count-based guess.
+
+The asymmetry is about durability. A motor frame is transient; a config write
+is flash-committed by whichever unit receives it, and `RoutingResolved`'s
+re-apply only writes the *corrected* id, so a wrong one is never undone.
+Bundle A6N521CS is the failure: the connectivity cache seed
+(`MBoosterKnownPedals`, `T=False B=True C=True`) made `connectedCount > 1`
+read as a chain 9 s before the type lines landed, so all 28 group-`0x24`
+feel-curve writes of the connect-time apply went to `0x1d` — which does not
+exist on that unit and answered nothing — and the real device got its first
+write 6.2 s later, from the post-verdict re-apply. Note the count-based guess
+is wrong on its own terms here: this is one unit hosting a passive clutch,
+exactly the topology the section above says pedal count cannot distinguish
+from a chain.
+
+Collapsing effects onto `0x12` in that same window is *not* the fix — it would
+put several axes' workers on the host's motor at once, the race
+`IsPedalAxisConnected` guards, whose own `IsAxisMotorized` gate is fail-open
+while the types are unknown.
+
 **The verdict arrives long after the detection edge.** The type lines ride
 the once-a-minute heartbeat block, so the connect-time apply
 (`MozaPlugin.ApplyMBoosterToHardware`, fired from the detection rising
@@ -304,11 +332,21 @@ Engine off:                7e 09 24 12 b1 04 00 00 00 00 00 00 00 7f
 
 ### Keepalive
 
-Degenerate 0-payload frame targeting device 0x12 — `7e 00 00 12 9d`.
+Degenerate 0-payload frame — `7e 00 00 12 9d` for the host.
 Built by [`MozaMBoosterProtocol.BuildKeepalive`](../../../Protocol/MozaMBoosterProtocol.cs).
 Emitted every ~500 ms from `MBoosterEffectWorker` regardless of
 effect state. Stops being sent → motor eventually drops connection
 state and may stop responding to writes.
+
+Sent to **every** id in `MotorIds`, not just `0x12`: on a USB lane that is
+`0x12` + `0x1d` + `0x1e` every 500 ms for the life of the connection
+(matching Pit House — a chained active mBooster's motor drops its connection
+state if its own id isn't kept alive, and the writes are harmless on an
+empty or passive port). A routed lane keeps only the tunneled sub-device,
+since `0x1d`/`0x1e` belong to other peripherals on a shared base/hub pipe.
+So a capture showing a steady 2 Hz triplet to all three ids on a
+single-pedal unit is correct and expected — do not read it as the phantom
+routing described above, which is group-`0x24` **config** traffic.
 
 **Detection note:** the keepalive and motor frames are write-only —
 the device never replies to either. With all effects disabled (the

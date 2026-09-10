@@ -16,6 +16,18 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **Other serial devices keep working.** The plugin was opening every COM port it couldn't
+  identify while hunting for a wheelbase, holding a DIY pedal set or Arduino dash away from
+  SimHub's own scanner; it now leaves ports the registry attributes to another vendor alone.
+
+- **mBooster settings survive a reconnect.** When the pedal's serial arrived mid-session its
+  two settings entries were reconciled by letting one replace the other outright, so a single
+  stored value on one side could discard everything on the other; they are now merged field by
+  field.
+
+- **mBooster calibration reaches the pedal.** On a unit hosting a passive pedal the whole
+  connect-time config batch was addressed to a chained device that wasn't there.
+
 - **Dashboard uploads no longer stall part-way.** An upload could stop advancing at any
   percentage and sit there indefinitely, never finishing and never failing. The plugin was
   overrunning the cable, losing its place in the wheel's replies, and giving up on the one

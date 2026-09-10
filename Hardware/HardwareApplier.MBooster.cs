@@ -78,16 +78,20 @@ namespace MozaPlugin.Hardware
                 // on that pedal's own mBooster unit (confirmed on hardware: each
                 // unit reports only its own pedal's calibration, under its own
                 // role register). Address it by the pedal's ROLE through the
-                // calibration-derived chain map (same as the effects — see
-                // MBoosterEffectWorker.TargetDevice), NOT the raw HID axis: the
+                // calibration-derived chain map, NOT the raw HID axis: the
                 // motor/config device id follows the chain plug position, which
                 // doesn't match the HID axis order, so an axis-index device
-                // sends these writes to the wrong physical pedal. Falls back to
-                // the axis mapping (0x12 for a standalone) until the map resolves.
+                // sends these writes to the wrong physical pedal.
+                //
+                // ConfigDeviceForRole, not MotorDeviceForRole (which the effect
+                // workers use): until the active/passive verdict lands there is
+                // no sound way to guess a chain id, and these writes are
+                // flash-committed on whichever unit receives them. See that
+                // method for the evidence.
                 int roleIdx = role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? 0
                             : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? 1
                             : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? 2 : -1;
-                byte dev = controller.MotorDeviceForRole(roleIdx, axis);
+                byte dev = controller.ConfigDeviceForRole(roleIdx, axis);
 
                 if (cfg.Direction >= 0) controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev);
                 if (cfg.Min >= 0) controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev);
