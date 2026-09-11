@@ -227,7 +227,7 @@
   <data name="Button_JoinDiscord" xml:space="preserve"><value>Εγγραφή στο Discord</value></data>
   <data name="Button_SponsorDevelopment" xml:space="preserve"><value>Χορηγία Ανάπτυξης</value></data>
   <data name="Button_Kofi" xml:space="preserve"><value>Στηρίξτε με στο Ko-fi</value></data>
-  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
+  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/AZOM</value></data>
   <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Εγγραφή στο Discord του προσθέτου</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
   <data name="Tooltip_Kofi" xml:space="preserve"><value>ko-fi.com/giantorth</value></data>
@@ -725,7 +725,6 @@ Id: {2}</value></data>
   <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Απελευθέρωση κρατημένων πλήκτρων</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Στάδιο υαλοκαθαριστήρων {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Στάδιο φώτων {0}</value></data>
-  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Το PR έκλεισε — μετάβαση σε Σταθερό</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// κέρδος ανά band · 100% = ουδέτερο · 500% = μέγιστη ενίσχυση</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ΕΥΑΙΣΘΗΣΙΑ</value></data>
@@ -775,4 +774,21 @@ Id: {2}</value></data>
   <data name="Upload_StatusStopped" xml:space="preserve"><value>Σταμάτησε - {0}%</value></data>
   <data name="Section_UploadSource" xml:space="preserve"><value>ΠΗΓΗ ΑΠΟΣΤΟΛΗΣ</value></data>
   <data name="Banner_LegacyLfeMigrated_Body" xml:space="preserve"><value>Τα απτικά εφέ LFE της βάσης μεταφέρθηκαν στη συσκευή βάσης MOZA — προσθέστε αυτήν τη συσκευή για να μεταφερθούν τα εφέ σας.</value></data>
+  <data name="Button_TravelCalibration" xml:space="preserve"><value>ΒΑΘΜ. ΔΙΑΔΡΟΜΗΣ</value></data>
+  <data name="Button_MotorCalibration" xml:space="preserve"><value>ΒΑΘΜ. ΜΟΤΕΡ</value></data>
+  <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>Βαθμονόμηση διαδρομής πεντάλ — το μοτέρ κινεί μόνο του το πεντάλ, μη το πατάτε. Απομένουν {0}s…</value></data>
+  <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>Βαθμονόμηση μοτέρ — μη πατάτε το πεντάλ. Διαρκεί περίπου ένα λεπτό. Απομένουν {0}s…</value></data>
+  <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>Επανεκκίνηση του πεντάλ για ολοκλήρωση — θα επανασυνδεθεί σε λίγα δευτερόλεπτα.</value></data>
+  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>Εκτελείται βαθμονόμηση σε άλλο πεντάλ.</value></data>
+  <data name="Status_CalibrationFailed" xml:space="preserve"><value>Η βαθμονόμηση απέτυχε: {0}</value></data>
+  <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Απόσβεση (πάτημα)</value></data>
+  <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Απόσβεση (απελευθέρωση)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Εισαγωγή ταμπλό SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>ΕΙΣΑΓΩΓΗ SIMHUB DASH…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Μετατροπή ταμπλό SimHub .djson σε MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>ΕΠΙΛΟΓΗ .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>ΜΕΤΑΤΡΟΠΗ</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Ταμπλό SimHub (*.djson)|*.djson|Όλα τα αρχεία (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Η μετατροπή απέτυχε: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Απορρίφθηκε το {0}% των widget</value></data>
 </root>

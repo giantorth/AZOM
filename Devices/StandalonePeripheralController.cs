@@ -29,7 +29,7 @@ namespace MozaPlugin.Devices
         /// <see cref="SettingsReadCommands"/> itself, because the shared
         /// <c>Mark*Detected</c> helpers early-return once the flag is latched.</summary>
         public Action<DeviceProber, bool> MarkDetected { get; }
-        /// <summary>Reads this peripheral's shared detection flag (gates presence-probe polling).</summary>
+        /// <summary>Reads this peripheral's shared detection flag (drives the UI tab).</summary>
         public Func<DeviceDetectionState, bool> IsDetected { get; }
         /// <summary>Settings this lane reads once the binary channel is confirmed.
         /// Every descriptor carries one: the shared <c>Mark*Detected</c> helpers latch
@@ -183,8 +183,7 @@ namespace MozaPlugin.Devices
         private volatile bool _disposed;
         // True once the device has answered our binary protocol on THIS dedicated
         // pipe (a {0x80,*} presence ACK). Distinct from the shared tab flag: the
-        // tab shows on connect, but the self/root (0x00) presence probe keeps
-        // firing until this latches — only then are settings reads safe to issue.
+        // tab shows on connect; the settings reads wait for this.
         private volatile bool _binaryConfirmed;
 
         public string Identity { get; }
@@ -265,26 +264,28 @@ namespace MozaPlugin.Devices
                 // gate it on a binary ACK this device may never send. issueReads:
                 // false until the self-probe confirms the device speaks binary.
                 _desc.MarkDetected(_prober, false);
-                // Still probe (self/root 0x00) so a device that DOES answer can
-                // upgrade us to settings reads; Poll gates on _binaryConfirmed.
+                // Probe now (self/root 0x00): the ACK confirms binary and
+                // unlocks the settings reads.
                 Poll();
             }
             return ok;
         }
 
         /// <summary>
-        /// While the binary channel is unconfirmed, (re)send the presence probe
-        /// to the root device. On a dedicated pipe the peripheral IS the root
-        /// ("main", 0x12) device — NOT the 0x19/0x1B sub-device address used when
-        /// a base/hub relays the probe (docs/protocol/devices/usb-ids.md). Its
-        /// own debug frames confirm this (src=main → swap(0x21)=0x12).
-        /// The registry calls this each Refresh so a device that wasn't ready at
-        /// connect still latches later. Gated on _binaryConfirmed (not the shared
-        /// tab flag) so probing continues after the tab is shown on connect.
+        /// Send the presence probe to the root device. On a dedicated pipe the
+        /// peripheral IS the root ("main", 0x12) device — NOT the 0x19/0x1B
+        /// sub-device address used when a base/hub relays the probe
+        /// (docs/protocol/devices/usb-ids.md). Its own debug frames confirm this
+        /// (src=main → swap(0x21)=0x12).
+        /// The registry calls this every Refresh (5 s) for the life of the
+        /// connection. Until the first ACK it is the binary-channel probe that
+        /// unlocks the settings reads; after that it is the lane's keepalive —
+        /// the device sends nothing unasked, and the connection's 30 s read-idle
+        /// detector closes a port that stays silent, which would drop the tab.
         /// </summary>
         public void Poll()
         {
-            if (_disposed || !_connection.IsConnected || _binaryConfirmed) return;
+            if (_disposed || !_connection.IsConnected) return;
             _deviceManager.SendPresenceProbe(MozaProtocol.DeviceMain);
         }
 

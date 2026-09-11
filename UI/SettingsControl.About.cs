@@ -30,7 +30,7 @@ namespace MozaPlugin.UI
         // ── Diagnostics tab ─────────────────────────────────────────────
         // ===== About-tab link handlers =====
 
-        private const string AboutGitHubUrl  = "https://github.com/giantorth/moza-simhub-plugin";
+        private const string AboutGitHubUrl  = "https://github.com/giantorth/AZOM";
         private const string AboutDiscordUrl = "https://discord.gg/J4enw43e62";
         private const string AboutSponsorUrl = "https://github.com/sponsors/giantorth";
         private const string AboutKofiUrl    = "https://ko-fi.com/giantorth";

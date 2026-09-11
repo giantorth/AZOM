@@ -58,7 +58,10 @@ namespace MozaPlugin.Settings
         public int[]? WheelFlagColors { get; set; }
         public int[]? WheelIdleColor { get; set; }
         public int[]? WheelESRpmColors { get; set; }
-        public int[]? WheelKnobBackgroundColors { get; set; }
+        // Knob palettes (W17/W18): per-knob Active [5] and per-LED ring [56]. Sparse:
+        // a slot is -1 until the user sets it, and every consumer skips negatives
+        // (UnpackColorsInto / MergeOverlayIntoData / the knob writers), so only what
+        // the user chose is ever re-asserted on the wheel.
         public int[]? WheelKnobPrimaryColors { get; set; }
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
@@ -100,8 +103,6 @@ namespace MozaPlugin.Settings
                 WheelFlagColors = WheelFlagColors != null ? (int[])WheelFlagColors.Clone() : null,
                 WheelIdleColor = WheelIdleColor != null ? (int[])WheelIdleColor.Clone() : null,
                 WheelESRpmColors = WheelESRpmColors != null ? (int[])WheelESRpmColors.Clone() : null,
-                WheelKnobBackgroundColors = WheelKnobBackgroundColors != null
-                    ? (int[])WheelKnobBackgroundColors.Clone() : null,
                 WheelKnobPrimaryColors = WheelKnobPrimaryColors != null
                     ? (int[])WheelKnobPrimaryColors.Clone() : null,
                 WheelKnobRingColors = WheelKnobRingColors != null
@@ -598,9 +599,8 @@ namespace MozaPlugin.Settings
         public int[]? WheelFlagColors { get; set; }       // [6]
         public int[]? WheelIdleColor { get; set; }        // [1]
         public int[]? WheelESRpmColors { get; set; }     // [10]
-        public int[]? WheelKnobBackgroundColors { get; set; } // [5] — W17/W18
-        public int[]? WheelKnobPrimaryColors { get; set; }    // [5] — W17/W18
-        public int[]? WheelKnobRingColors { get; set; }       // [56] — Group 3 per-LED ring
+        public int[]? WheelKnobPrimaryColors { get; set; }    // [5] — W17/W18; -1 = unset slot
+        public int[]? WheelKnobRingColors { get; set; }       // [56] — Group 3 per-LED ring; -1 = unset slot
         public int WheelKnobRingBrightness { get; set; } = -1;
         // Single wheel-wide "restore stored knob colors when telemetry sends off" toggle.
         public bool WheelKnobDefaultDuringTelemetry { get; set; }
@@ -807,7 +807,6 @@ namespace MozaPlugin.Settings
             WheelFlagColors = CloneArray(p.WheelFlagColors);
             WheelIdleColor = CloneArray(p.WheelIdleColor);
             WheelESRpmColors = CloneArray(p.WheelESRpmColors);
-            WheelKnobBackgroundColors = CloneArray(p.WheelKnobBackgroundColors);
             WheelKnobPrimaryColors = CloneArray(p.WheelKnobPrimaryColors);
             WheelKnobRingColors = CloneArray(p.WheelKnobRingColors);
             WheelKnobRingBrightness = p.WheelKnobRingBrightness;
@@ -1075,12 +1074,30 @@ namespace MozaPlugin.Settings
             return packed;
         }
 
+        /// <summary>A packed colour array with every slot unset (-1).</summary>
+        public static int[] NewUnsetColorArray(int length)
+        {
+            var arr = new int[length];
+            for (int i = 0; i < length; i++) arr[i] = -1;
+            return arr;
+        }
+
+        /// <summary>True when the array is non-empty and every slot is packed black.</summary>
+        public static bool IsAllBlack(int[]? packed)
+        {
+            if (packed == null || packed.Length == 0) return false;
+            foreach (var v in packed) if (v != 0) return false;
+            return true;
+        }
+
+        // Negative slots are "no opinion" (sparse knob palettes) and leave the target untouched.
         public static void UnpackColorsInto(int[]? packed, byte[][] target)
         {
             if (packed == null) return;
             int count = Math.Min(packed.Length, target.Length);
             for (int i = 0; i < count; i++)
             {
+                if (packed[i] < 0) continue;
                 var rgb = UnpackColor(packed[i]);
                 target[i][0] = rgb[0];
                 target[i][1] = rgb[1];

@@ -227,7 +227,7 @@
   <data name="Button_JoinDiscord" xml:space="preserve"><value>加入 Discord</value></data>
   <data name="Button_SponsorDevelopment" xml:space="preserve"><value>赞助开发</value></data>
   <data name="Button_Kofi" xml:space="preserve"><value>在 Ko-fi 上支持我</value></data>
-  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
+  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/AZOM</value></data>
   <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>加入项目 Discord</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
   <data name="Tooltip_Kofi" xml:space="preserve"><value>ko-fi.com/giantorth</value></data>
@@ -726,7 +726,6 @@ Id: {2}</value></data>
   <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>释放按住的按键</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>雨刮挡位 {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>灯光挡位 {0}</value></data>
-  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
@@ -776,4 +775,21 @@ Id: {2}</value></data>
   <data name="Upload_StatusStopped" xml:space="preserve"><value>已停止 - {0}%</value></data>
   <data name="Section_UploadSource" xml:space="preserve"><value>上传来源</value></data>
   <data name="Banner_LegacyLfeMigrated_Body" xml:space="preserve"><value>底座 LFE 触感已并入 MOZA 底座设备 — 添加该设备即可迁移你的效果。</value></data>
+  <data name="Button_TravelCalibration" xml:space="preserve"><value>行程校准</value></data>
+  <data name="Button_MotorCalibration" xml:space="preserve"><value>电机校准</value></data>
+  <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>正在校准踏板行程 — 电机会自行推动踏板，请勿踩踏。剩余 {0} 秒…</value></data>
+  <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>正在校准电机 — 请勿踩踏板。大约需要一分钟。剩余 {0} 秒…</value></data>
+  <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>正在重启踏板以完成校准 — 几秒后会重新连接。</value></data>
+  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>另一个踏板正在进行校准。</value></data>
+  <data name="Status_CalibrationFailed" xml:space="preserve"><value>校准失败：{0}</value></data>
+  <data name="SliderLabel_DampingPress" xml:space="preserve"><value>阻尼（踩下）</value></data>
+  <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>阻尼（松开）</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>导入 SimHub 仪表板</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>导入 SIMHUB 仪表板…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>将 SimHub .djson 仪表板转换为 MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>选择 .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>转换</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub 仪表板 (*.djson)|*.djson|所有文件 (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>转换失败：{0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>已丢弃 {0}% 的组件</value></data>
 </root>

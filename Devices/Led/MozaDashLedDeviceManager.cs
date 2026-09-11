@@ -52,6 +52,10 @@ namespace MozaPlugin.Devices.Led
         private bool _hostDriveEngaged;
         private bool _prevGameActive;
 
+        // Latched while this pipeline is standing down for a dashboard upload,
+        // so the resume edge can drop the change-detection caches.
+        private bool _uploadPaused;
+
         // LED-bitmask keepalive: the dash firmware blanks its LEDs if it doesn't
         // get a fresh dash-send-telemetry frame within a few seconds, even when the
         // value is unchanged. PitHouse re-sends the bitmask every telemetry frame
@@ -154,6 +158,7 @@ namespace MozaPlugin.Devices.Led
                 _newColorsPrimed = false;
                 _hostDriveEngaged = false;
                 _prevGameActive = false;
+                _uploadPaused = false;
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -260,6 +265,27 @@ namespace MozaPlugin.Devices.Led
                 var plugin = MozaPlugin.Instance;
                 if (plugin == null || !plugin.Data.IsConnected || !plugin.IsDashDetected)
                     return;
+
+                // Dashboard upload standing the pipeline down (see the same
+                // guard, and why it is not the raw in-flight flag, in
+                // MozaLedDeviceManager). On resume, drop the change-detection
+                // caches: the dash firmware blanked its strip once the keepalive
+                // stopped, so an unchanged frame must still be re-sent.
+                if (UploadProgressLedBar.IsStandDownActive)
+                {
+                    _uploadPaused = true;
+                    return;
+                }
+                if (_uploadPaused)
+                {
+                    _uploadPaused = false;
+                    _lastBitmask = -1;
+                    _lastFlagPrimed = false;
+                    _rpmColorsPrimed = false;
+                    _newColorsPrimed = false;
+                    _lastSendTime = DateTime.MinValue;
+                    _lastFlagSendTime = DateTime.MinValue;
+                }
 
                 if (rawColors.Length > 0)
                     ledColors = MozaLedDeviceManager.ApplyOverrides(ledColors, rawColors, 0, TotalLedCount);

@@ -226,6 +226,11 @@ namespace MozaPlugin.Devices.Led
         // ES wheel wake-up
         private bool _ledsAwake;
 
+        // Latched while the live pipeline is standing down for a dashboard
+        // upload, so the resume edge can re-arm the caches. See the upload
+        // guard in Display().
+        private bool _uploadPaused;
+
         /// <summary>
         /// Expected wheel model prefix for this device instance.
         /// Null = unknown (don't connect). Empty string = generic fallback (any wheel).
@@ -359,6 +364,7 @@ namespace MozaPlugin.Devices.Led
             _btnChangedUtc = _btnFedUtc = DateTime.MinValue;
             _knobDrivenUtc = _knobFedUtc = DateTime.MinValue;
             _ledsAwake = false;
+            _uploadPaused = false;
         }
 
         public bool IsConnected() => IsModelConnected(MozaPlugin.Instance, ExpectedModelPrefix);
@@ -566,6 +572,39 @@ namespace MozaPlugin.Devices.Led
                 // computed for it; only the hardware write is suppressed.
                 if (!IsConnected())
                     return;
+
+                // Dashboard upload standing the pipeline down: the RPM bar
+                // becomes the transfer's progress meter (UploadProgressLedBar,
+                // fed from the telemetry tick). Two reasons to pause rather
+                // than interleave — the upload and a 60 Hz LED stream contend
+                // for the same half-duplex link (the contention the negotiation
+                // throttle below exists for, only worse: the wheel processes
+                // upload rounds at a few hundred B/s), and both writers would
+                // otherwise fight over the group-0 frame buffer. _lastState is
+                // already captured above, so SimHub's own LED preview keeps
+                // updating; only the hardware writes stop.
+                //
+                // The gate is IsStandDownActive, NOT the raw in-flight flag: a
+                // wedged upload holds that flag for minutes before its attempt
+                // terminates (bundle C4KX4GKK: 6 min 17 s with no byte
+                // progress), and the LEDs must not be hostage to it. See
+                // UploadProgressLedBar.StallReleaseSeconds.
+                //
+                // On the trailing edge every cached frame describes state the
+                // wheel no longer holds — the progress bar overwrote the RPM
+                // buffer and the button / knob / flag groups reverted to their
+                // stored palettes once their keepalives stopped — so re-arm the
+                // whole cache.
+                if (UploadProgressLedBar.IsStandDownActive)
+                {
+                    _uploadPaused = true;
+                    return;
+                }
+                if (_uploadPaused)
+                {
+                    _uploadPaused = false;
+                    InvalidateLiveCache(LedKind.All);
+                }
 
                 // Catalog-negotiation LED throttle: while the wheel is (re)advertising
                 // its catalog (cold-start or a post-switch hot-reneg burst) the link is

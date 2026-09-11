@@ -185,6 +185,17 @@ namespace MozaPlugin.UI
             _bandwidthTimer?.Stop();
             _calCountdownTimer?.Stop();
             _baseCalStatusTimer?.Stop();
+            // Detach from the mBooster calibration runner (which lives on the
+            // registry and outlives this panel): its ProgressChanged handler
+            // captures `this`, so staying subscribed would root the whole
+            // SettingsControl graph past panel-close. A run in flight keeps
+            // running — that's the point of it not living here — and
+            // re-subscribes on the next Loaded via EnsureMBoosterCalRunner.
+            if (_mboosterCalRunner != null)
+            {
+                _mboosterCalRunner.ProgressChanged -= OnMBoosterCalProgress;
+                _mboosterCalRunner = null;
+            }
 
             UnsubscribeStalks();
             // Closing the settings panel takes the sustained Engine/ABS/

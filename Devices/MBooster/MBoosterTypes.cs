@@ -18,28 +18,46 @@ namespace MozaPlugin.Devices.MBooster
         public const float TravelMinGapMm = 3.8f;
         public const float TravelMaxGapMm = 32.1f;
 
-        // Pedal Feel Max Force/Deadzone slider bounds, role-scoped — a
-        // Throttle or Clutch pedal is a much lighter spring than a brake's
-        // load cell, so both get their own narrower Max Force range instead
-        // of the Brake-shaped 24-200kg (same 4-20kg for both — shared
-        // constant, not duplicated per role). Deadzone differs per role
-        // (Clutch's spring has more built-in play than Throttle's), so it
-        // stays a separate constant each. Selected in
-        // UpdateMBoosterConfigVisibilityForRole.
-        public const float ThrottleMaxForceMinKg = 4f;
-        public const float ThrottleMaxForceMaxKg = 20f;
-        public const float ThrottleDeadzoneMinKg = 0f;
-        public const float ThrottleDeadzoneMaxKg = 5f;
-        public const float ClutchDeadzoneMinKg = 0f;
-        public const float ClutchDeadzoneMaxKg = 8f;
-        // Brake bounds are Pit House's own (user-reported from its UI): Max
+        // Pedal Feel Max Force/Deadzone bounds follow the pedal's HARDWARE,
+        // not the role assigned to it. Any mBooster pedal can be set to
+        // throttle / brake / clutch, and an ACTIVE (motorized, load-cell)
+        // pedal is the same hardware whichever role it holds — so scoping
+        // these by role capped a real load cell at a light spring's ceiling
+        // the moment it was assigned throttle or clutch. A passive pedal is
+        // lighter hardware, so it keeps its own narrower pair — but one pair,
+        // not one per role (Deadzone used to be 5kg throttle / 8kg clutch /
+        // 37kg brake; the passive ceiling is now the wider 8kg for any role).
+        // Resolve through <see cref="ForceRanges"/> so the slider bounds and
+        // the stored-value clamp can never disagree.
+        //
+        // Active values are Pit House's own (user-reported from its UI): Max
         // Force starts at 24kg, not 0 — matching the low end of the original
         // max-force-24-75-128-166-200.pcapng sweep — and Deadzone tops out at
-        // 37kg. Both were previously guessed from the XAML's old 0-40/0-200.
-        public const float BrakeMaxForceMinKg = 24f;
-        public const float BrakeMaxForceMaxKg = 200f;
-        public const float BrakeDeadzoneMinKg = 0f;
-        public const float BrakeDeadzoneMaxKg = 37f;
+        // 37kg.
+        public const float ActiveMaxForceMinKg = 24f;
+        public const float ActiveMaxForceMaxKg = 200f;
+        public const float ActiveDeadzoneMinKg = 0f;
+        public const float ActiveDeadzoneMaxKg = 37f;
+        public const float PassiveMaxForceMinKg = 4f;
+        public const float PassiveMaxForceMaxKg = 20f;
+        public const float PassiveDeadzoneMinKg = 0f;
+        public const float PassiveDeadzoneMaxKg = 8f;
+
+        /// <summary>
+        /// Max Force / Deadzone bounds for one pedal. Active/passive is the
+        /// ONLY input: the role a pedal is assigned has no bearing on what its
+        /// hardware can do. Callers that don't yet know the verdict pass true —
+        /// the wider range never clamps a real value away.
+        /// </summary>
+        public static void ForceRanges(bool motorized,
+            out float maxForceMin, out float maxForceMax,
+            out float deadzoneMin, out float deadzoneMax)
+        {
+            maxForceMin = motorized ? ActiveMaxForceMinKg : PassiveMaxForceMinKg;
+            maxForceMax = motorized ? ActiveMaxForceMaxKg : PassiveMaxForceMaxKg;
+            deadzoneMin = motorized ? ActiveDeadzoneMinKg : PassiveDeadzoneMinKg;
+            deadzoneMax = motorized ? ActiveDeadzoneMaxKg : PassiveDeadzoneMaxKg;
+        }
 
         // Engine Vibration's hardware-safe frequency range. No longer a
         // user-facing slider bound — Engine's frequency is telemetry-derived
@@ -523,6 +541,11 @@ namespace MozaPlugin.Devices.MBooster
         float EndstopEndStiffness { get; set; }
         float NaturalFrictionPct { get; set; }
         bool NaturalFrictionEnabled { get; set; }
+        // Plain (non-segmented) virtual damping, cmdId 0xAD selectors 0/1 —
+        // a register set separate from SegmentedDamping's own per-segment
+        // fields, which Pit House writes in the same burst. -1 = not set.
+        float DampingPressPct { get; set; }
+        float DampingReleasePct { get; set; }
         MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
     }
 
@@ -565,6 +588,9 @@ namespace MozaPlugin.Devices.MBooster
         public float NaturalFrictionPct { get; set; } = -1;
         // Master on/off — see MBoosterDeviceSettings.NaturalFrictionEnabled.
         public bool NaturalFrictionEnabled { get; set; } = true;
+        // See MBoosterDeviceSettings.DampingPressPct.
+        public float DampingPressPct { get; set; } = -1;
+        public float DampingReleasePct { get; set; } = -1;
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
@@ -602,6 +628,8 @@ namespace MozaPlugin.Devices.MBooster
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
                 NaturalFrictionEnabled = NaturalFrictionEnabled,
+                DampingPressPct = DampingPressPct,
+                DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
@@ -900,6 +928,25 @@ namespace MozaPlugin.Devices.MBooster
         // existed.
         public bool NaturalFrictionEnabled { get; set; } = true;
 
+        // Plain (non-segmented) Virtual Damping, 0-100% each for press and
+        // release. Real hardware write on cmdId 0xAD with the same
+        // "fixed 0x00 + selector" shape as Natural Friction above (selector
+        // 0x00 = press, 0x01 = release), 2-byte int, raw = round(pct * 65535 /
+        // 100) — MozaMBoosterProtocol.EncodeFrictionPct's encoding.
+        //
+        // This is a GENUINELY SEPARATE register set from Segmented Damping
+        // (0xB7): the firmware's own log prints `virtual_damping_press` /
+        // `virtual_damping_release` for these and
+        // `virtual_damping_press1..3` / `_release1..3` for 0xB7's, out of the
+        // same Pit House write burst. Its physical full scales are 12.0 press
+        // and 10.0 release, so the captured 40%/25% decoded to 4.80000 and
+        // 2.50003. Pit House pushes both selectors on every config apply, so
+        // the plugin does too. -1 = "not yet set / no override", same sentinel
+        // as every other Pedal Feel field. See
+        // docs/protocol/devices/mbooster.md "Pedal Feel".
+        public float DampingPressPct { get; set; } = -1;
+        public float DampingReleasePct { get; set; } = -1;
+
         // Segmented Damping (Pit House-style) — see
         // MBoosterSegmentedDampingSettings and
         // docs/protocol/devices/mbooster.md "Segmented Damping".
@@ -947,6 +994,8 @@ namespace MozaPlugin.Devices.MBooster
                 EndstopEndStiffness = EndstopEndStiffness,
                 NaturalFrictionPct = NaturalFrictionPct,
                 NaturalFrictionEnabled = NaturalFrictionEnabled,
+                DampingPressPct = DampingPressPct,
+                DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
                 DisplayName = DisplayName,
             };

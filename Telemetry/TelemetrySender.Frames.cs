@@ -322,21 +322,34 @@ namespace MozaPlugin.Telemetry
         {
             int idx = _widgetPollIndex++;
             // Cycle layout (slot ranges):
-            //   0..14   = 15 grp 0x40 dev 0x17 static polls
-            //   15..29  = 15 grp 0x40 dev 0x17 1e0x scan (5×3)
-            //   30..43  = 14 grp 0x40 dev 0x17 1f00 scan
-            //   44..57  = 14 grp 0x40 dev 0x17 1f01 scan
-            //   58..69  = 12 grp 0x0E dev 0x12/13/17/19 discovery probes
-            //   70..73  = 4 grp 0x1F dev 0x12 4f08-4f0b LED state reads
-            //   74..79  = 2 grp 0x3F dev 0x17 1a01/1a03 display variants (slots
-            //             76/77; 74/75/78/79 deleted — see block below for why).
-            //             The 80-slot total is kept so other slots keep their
-            //             modulo offsets stable.
-            const int totalCycle = 80;
+            //   0..13   = 14 grp 0x40 dev 0x17 static polls
+            //   14..28  = 15 grp 0x40 dev 0x17 1e0x scan (5×3)
+            //   29..42  = 14 grp 0x40 dev 0x17 1f00 scan
+            //   43..56  = 14 grp 0x40 dev 0x17 1f01 scan
+            //   57..60  = 4 grp 0x1F dev 0x12 4f08-4f0b LED state reads
+            //   61..62  = 2 grp 0x3F dev 0x17 1a01/1a03 display variants
+            //
+            // Slots are COMPACT — no null placeholders. An audit of 35 diagnostic
+            // bundles across 7 wheel models (tools/poll-audit) put the surviving
+            // slots at 84-90 % answered, so the cycle is a live conversation, not
+            // filler, and a run of silent slots is a real gap in it. The dead
+            // entries were dropped rather than nulled for that reason:
+            //   · grp 0x0E dev 0x12/13/17/19 discovery probes (12 slots) — never
+            //     emitted what the source said. `s / 3 switch { … }` parses as
+            //     `s / (3 switch { … })` == s / 25 == 0, so every one addressed
+            //     device 0x00 and the cmd ternary fell through to its 0x13 default:
+            //     three malformed frames, 242/241/240 of them across the audit, and
+            //     zero of the intended twelve. Not repaired — group 0x0E is the
+            //     param-manager channel, poking it on the wheel provokes the Table-8
+            //     read-fail storm, and PitHouse never sends 0e→0x17 (see the block
+            //     comment in MozaPlugin.PollStatusCore). Repairing would START
+            //     emitting traffic this plugin has never actually sent.
+            //   · 0x40 dev 0x17 `29 00 00` — 82 sent, 0 answered, on every model.
+            const int totalCycle = 63;
             int slot = idx % totalCycle;
 
             byte[]? frame = null;
-            if (slot < 15)
+            if (slot < 14)
             {
                 frame = slot switch
                 {
@@ -353,59 +366,49 @@ namespace MozaPlugin.Telemetry
                     10 => BuildGroup40Bytes(new byte[] { 0x21, 0x00, 0x00 }),
                     11 => BuildGroup40Bytes(new byte[] { 0x27, 0x00, 0x00, 0x00, 0x00, 0x00 }),
                     12 => BuildGroup40Bytes(new byte[] { 0x28, 0x00, 0x00 }),
-                    13 => BuildGroup40Bytes(new byte[] { 0x29, 0x00, 0x00 }),
-                    14 => BuildGroup40Bytes(new byte[] { 0x2A, 0x00, 0x00 }),
+                    // Byte-identical to the wheel-knob-signal-mode0 READ frame
+                    // (MozaCommandDatabase sub-id { 42, 0 } + 1 payload byte), so the
+                    // reply resolves to that command name — see the seed-once note in
+                    // MozaData.StoreKnobSignalMode. Kept: the wheel answers it 86 % of
+                    // the time and it is part of the engagement conversation.
+                    13 => BuildGroup40Bytes(new byte[] { 0x2A, 0x00, 0x00 }),
                     _ => null,
                 };
             }
-            else if (slot < 30)
+            else if (slot < 29)
             {
-                int s = slot - 15;
+                int s = slot - 14;
                 byte sub = (byte)((s / 5) == 0 ? 0x00 : (s / 5) == 1 ? 0x01 : 0x03);
                 byte b4 = (byte)(0x02 + (s % 5));
                 frame = BuildGroup40Bytes(new byte[] { 0x1E, sub, b4, 0x00, 0x00 });
             }
-            else if (slot < 44)
+            else if (slot < 43)
             {
                 // 1F 00 FF XX — RPM-bar color reads (indices 2-15). Part of
                 // the parity-poll keepalive set; on the GS V2 Pro the wheel
                 // needs to see these requests landing periodically or the
                 // RPM-LED group stops responding to telemetry-mode writes
                 // (see field-block comment near _ledStatePollGroup1).
-                byte b5 = (byte)(0x02 + (slot - 30));
+                byte b5 = (byte)(0x02 + (slot - 29));
                 frame = BuildGroup40Bytes(new byte[] { 0x1F, 0x00, 0xFF, b5, 0x00, 0x00, 0x00 });
             }
-            else if (slot < 58)
+            else if (slot < 57)
             {
                 // 1F 01 FF XX — Button color reads (indices 2-15). Same
                 // keepalive role as the RPM-bar reads above.
-                byte b5 = (byte)(0x02 + (slot - 44));
+                byte b5 = (byte)(0x02 + (slot - 43));
                 frame = BuildGroup40Bytes(new byte[] { 0x1F, 0x01, 0xFF, b5, 0x00, 0x00, 0x00 });
             }
-            else if (slot < 70)
-            {
-                // grp 0x0E discovery probes — wheel/base device discovery
-                int s = slot - 58;
-                byte dev = (byte)(s / 3 switch
-                {
-                    0 => 0x12, 1 => 0x13, 2 => 0x17, _ => 0x19,
-                });
-                int sub = s % 3;
-                byte cmd = (byte)(sub == 0 ? 0x00 : sub == 1 ? 0x01 :
-                    (dev == 0x12 ? 0x03 : dev == 0x13 ? 0x07 :
-                     dev == 0x17 ? 0x0F : 0x13));
-                frame = BuildGenericFrame(0x0E, dev, new byte[] { 0x00, cmd });
-            }
-            else if (slot < 74)
+            else if (slot < 61)
             {
                 // grp 0x1F dev 0x12 cmd 4f08-4f0b — LED state reads
-                byte cmd2 = (byte)(0x08 + (slot - 70));
+                byte cmd2 = (byte)(0x08 + (slot - 57));
                 frame = BuildGenericFrame(0x1F, 0x12, new byte[] { 0x4F, cmd2, 0x00 });
             }
             else
             {
-                // grp 0x3F dev 0x17 display variants. Only slots 2 (buttons-
-                // bitmask) and 3 (knob-bitmask) survive, both gated on
+                // grp 0x3F dev 0x17 display variants. Only the buttons-bitmask
+                // and knob-bitmask writes survive, both gated on
                 // IsLiveAnywhere() — PitHouse-derived bridge captures only
                 // emit these with active=0/window=0 (286/286 in
                 // bridge-20260517-081336.jsonl) because PitHouse drives no
@@ -415,28 +418,28 @@ namespace MozaPlugin.Telemetry
                 // until the next non-zero frame, which the user sees as a
                 // ~87 s default-colour flash.
                 //
-                // Slots 0/1/4/5 were here too at one point but a sweep across
+                // Four more variants were here at one point but a sweep across
                 // 55 bridge captures showed PitHouse never emits the exact
-                // bytes the plugin was sending: slot 0 (19 01 00) / slot 1
+                // bytes the plugin was sending: (19 01 00) and
                 // (19 03 00) are mis-sized button/knob colour-chunk writes
                 // that the firmware would interpret as "set LED 0 to black"
-                // per the colour-commands padding rule. Slot 4
-                // (1F 00 FF 00 00 00 00) writes to an idx=0xFF padding slot
-                // and PitHouse never sends it. Slot 5 (21 00 00,
+                // per the colour-commands padding rule. (1F 00 FF 00 00 00 00)
+                // writes to an idx=0xFF padding slot
+                // and PitHouse never sends it. (21 00 00,
                 // wheel-idle-timeout=0) IS something PitHouse sends, but
                 // sporadically on user setting change, not periodically —
-                // emitting it every ~87 s silently overrides whatever
+                // emitting it every cycle silently overrides whatever
                 // idle-timeout the user set in the plugin UI. The legitimate
                 // path (UI / saved-settings apply) writes wheel-idle-timeout
                 // with the user's chosen value via
                 // MozaWheelSettingsControl.cs:1180 and HardwareApplier.cs:181;
                 // the widget-poll slot has no business reasserting 0 on top.
-                int s = slot - 74;
+                int s = slot - 61;
                 bool liveActive = Devices.Led.MozaLedDeviceManager.IsLiveAnywhere();
                 frame = s switch
                 {
-                    2 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
-                    3 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
+                    0 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
+                    1 => liveActive ? null : BuildGenericFrame(0x3F, 0x17, new byte[] { 0x1A, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }),
                     _ => null,
                 };
             }

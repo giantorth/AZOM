@@ -137,6 +137,8 @@ namespace MozaPlugin.Devices.MBooster
         private float _brakeFadeAppliedThresholdKg = -1;
         private long _brakeFadeThresholdLastWriteTicks;
         private volatile bool _brakeFadeTestActive;
+        // Set while a calibration routine owns the pedal — see SetSuspended.
+        private volatile bool _suspended;
 
         // Engine's, ABS's, Road Texture's, Lockup's, and Threshold's Test
         // toggles all run indefinitely while on, live-tracking Frequency/
@@ -434,6 +436,38 @@ namespace MozaPlugin.Devices.MBooster
         public void SetBrakeFadeTestSustained(bool on) => _brakeFadeTestActive = on;
 
         /// <summary>
+        /// Park this worker's effect + Brake Fade output while a hardware
+        /// calibration routine owns the pedal, WITHOUT stopping the thread —
+        /// the ~500ms keepalive keeps flowing, exactly as real Pit House keeps
+        /// sending it right through both calibrations.
+        ///
+        /// Load-bearing for the travel calibration: the firmware drives the
+        /// pedal through its own motor sweep, and Brake Fade rewrites
+        /// mbooster-brake-travel-end at up to 2Hz
+        /// (<see cref="UpdateBrakeFadeTravelEnd"/>), so an unsuspended worker
+        /// would rewrite a travel register mid-sweep. Suspending also silences
+        /// any latched waveform, since the motor is about to be commanded by
+        /// the firmware itself.
+        ///
+        /// Brake Fade's overrides are restored to their base values on the way
+        /// in (same path <see cref="Stop"/> uses) so the calibration doesn't
+        /// measure against a fade-extended Travel End.
+        /// </summary>
+        public void SetSuspended(bool on)
+        {
+            if (on == _suspended) return;
+            _suspended = on;
+            if (!on) return;
+            try { TryRestoreBrakeFadeOnStop(); } catch { }
+            if (!_device.IsConnected) return;
+            foreach (MBoosterEffectId id in Enum.GetValues(typeof(MBoosterEffectId)))
+            {
+                try { _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice)); }
+                catch { }
+            }
+        }
+
+        /// <summary>
         /// Turn one custom effect's sustained test toggle on/off. See
         /// <see cref="_customEffectTestSustained"/>. Effects with no id are
         /// never testable (nothing to key the toggle on).
@@ -489,8 +523,10 @@ namespace MozaPlugin.Devices.MBooster
             // real device and fight the genuine pedal's worker over it. Brake
             // Fade below has its own, similar gate
             // (IsPedalAxisConnected + PedalRole == Brake, not primary-only);
-            // the 500ms keepalive stays primary-only/lane-wide unconditionally.
-            if (IsPedalAxisConnected())
+            // the 500ms keepalive stays primary-only/lane-wide unconditionally
+            // — including while _suspended, matching Pit House, which keeps
+            // sending it right through a calibration routine (see SetSuspended).
+            if (IsPedalAxisConnected() && !_suspended)
             {
                 var effects = PedalEffects(lane);
 
@@ -595,7 +631,7 @@ namespace MozaPlugin.Devices.MBooster
             // base values it ramps, and the device id its calibration writes
             // are addressed to (TargetDevice), are THIS axis's own. See
             // UpdateBrakeFade.
-            if (IsPedalAxisConnected() && PedalRole(lane) == MBoosterRole.Brake)
+            if (IsPedalAxisConnected() && !_suspended && PedalRole(lane) == MBoosterRole.Brake)
                 UpdateBrakeFade(lane, PedalEffects(lane), snap);
 
             // --- 500 ms keepalive (separate from motor frames) -------------

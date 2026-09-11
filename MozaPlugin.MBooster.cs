@@ -81,14 +81,26 @@ namespace MozaPlugin
                 //
                 // Fix: an untouched placeholder (see IsUntouchedMBoosterPlaceholder)
                 // still loses to whatever's already at the serial key, same as
-                // before. But once the transport-keyed entry holds real,
-                // user-visible data, it wins — it can only have gotten that data
-                // via a live edit moments ago (it started as an empty placeholder
-                // THIS session), so it's the freshest thing we know about. Only
-                // log (not silently overwrite) when the serial-keyed side ALSO
-                // already holds real data — a genuine two-real-datasets conflict
-                // this heuristic can't perfectly resolve, but at least it's now
-                // visible instead of an invisible, permanent data loss.
+                // before. Otherwise the two entries are MERGED FIELD BY FIELD,
+                // keeping a real value over an untouched sentinel on either side,
+                // so nothing is lost in either direction. The transport-keyed
+                // entry only wins fields it actually holds a value for.
+                //
+                // It used to win WHOLESALE (dict[key] = stale), on the reasoning
+                // that it "can only have gotten that data via a live edit moments
+                // ago (it started as an empty placeholder THIS session)". That
+                // premise is false: transport-keyed entries persist to disk like
+                // any other key, so one comes BACK next session already
+                // non-placeholder and then overwrote the serial-keyed entry with
+                // its own defaults. Bug reports QR3760VJ / A6N521CS bracket
+                // exactly that: the transport-keyed entry held ONE real value
+                // (pedal 1's MaxForceKg), and on the strength of it took the
+                // whole record — wiping the serial-keyed entry's Direction, its
+                // output curve and its entire second-pedal row, 27 s before the
+                // settings tab had even seeded, so no live edit existed. One
+                // field should never carry fourteen others with it. There is no
+                // timestamp behind "more recently touched" and there never was;
+                // per-field merging removes the need for one.
                 if (!string.Equals(original, key, StringComparison.OrdinalIgnoreCase)
                     && dict.TryGetValue(original, out var stale))
                 {
@@ -100,8 +112,14 @@ namespace MozaPlugin
                     }
                     else if (!staleUntouched)
                     {
-                        if (!IsUntouchedMBoosterPlaceholder(existing))
-                            MozaLog.Warn($"[AZOM/mBooster] GetOrCreateMBoosterSettings: BOTH the transport-keyed entry ('{original}') and the serial-keyed entry ('{key}') hold real data in profile '{profile.Name}' — keeping the transport-keyed (more recently touched) one; the serial-keyed one's prior values are discarded.");
+                        // `stale` survives as the object (unchanged from before, so
+                        // a UI control or worker already holding it keeps editing
+                        // the live entry), backfilled with everything the
+                        // serial-keyed entry had and it doesn't.
+                        var conflicts = new List<string>();
+                        MergeMBoosterSettings(from: existing, into: stale, conflicts: conflicts);
+                        if (conflicts.Count > 0)
+                            MozaLog.Warn($"[AZOM/mBooster] GetOrCreateMBoosterSettings: the transport-keyed entry ('{original}') and the serial-keyed entry ('{key}') both hold a value for {string.Join(", ", conflicts)} in profile '{profile.Name}' — merged, keeping the transport-keyed value for those field(s); every other value from both sides was preserved.");
                         dict[key] = stale;
                     }
                     dict.Remove(original);
@@ -141,20 +159,174 @@ namespace MozaPlugin
         {
             return s.Role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled
                 && s.AxisRoles == null
-                && s.Direction < 0 && s.Min < 0 && s.Max < 0
-                && s.CurveY == null && s.CurveX == null
-                && s.SensorOutputRatioPct < 0 && s.MaxThresholdKg < 0
-                && s.InputCurveY == null && s.InputCurveX == null
-                && s.DeadzoneKg < 0 && s.MaxForceKg < 0
-                && s.TravelStartMm < 0 && s.TravelEndMm < 0
-                && s.EndstopFrontStiffness < 0 && s.EndstopEndStiffness < 0
-                && s.NaturalFrictionPct < 0
                 && string.IsNullOrEmpty(s.DisplayName)
-                && (s.Pedals == null || s.Pedals.Count == 0)
-                && s.SegmentedDamping.Divider1Pressed < 0 && s.SegmentedDamping.Divider2Pressed < 0
-                && s.SegmentedDamping.Seg1Pressed < 0 && s.SegmentedDamping.Seg2Pressed < 0 && s.SegmentedDamping.Seg3Pressed < 0
-                && s.SegmentedDamping.Divider1Released < 0 && s.SegmentedDamping.Divider2Released < 0
-                && s.SegmentedDamping.Seg1Released < 0 && s.SegmentedDamping.Seg2Released < 0 && s.SegmentedDamping.Seg3Released < 0;
+                && IsUntouchedPedalConfig(s)
+                && PedalRowsAllUntouched(s);
+        }
+
+        /// <summary>
+        /// True if every per-pedal row is itself untouched (or there are none).
+        ///
+        /// <para>This used to be a bare <c>Pedals.Count == 0</c> test, which made
+        /// the mere EXISTENCE of a row count as real data — and rows get created
+        /// without any user edit (MozaMBoosterRegistry.GetOrCreatePedalConfig
+        /// creates on demand, and any SaveSettings then persists it), so an entry
+        /// holding nothing but one all-default row counted as "touched" and beat
+        /// a serial-keyed entry full of real values. Independent of the
+        /// wholesale-overwrite problem the caller describes, and no longer
+        /// load-bearing now the merge is per-field — but the test was simply
+        /// wrong, and it is the difference between merging and not merging at
+        /// all.</para>
+        /// </summary>
+        private static bool PedalRowsAllUntouched(MBoosterDeviceSettings s)
+        {
+            if (s.Pedals == null || s.Pedals.Count == 0) return true;
+            foreach (var kv in s.Pedals)
+                if (kv.Value != null && !IsUntouchedPedalConfig(kv.Value)) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// True if every calibration / Sim Input / Pedal Feel field on one pedal's
+        /// config is still at its untouched sentinel. Shared by
+        /// <see cref="IsUntouchedMBoosterPlaceholder"/> and the per-row check, so
+        /// a device's flat fields and a chained pedal's row are judged by the same
+        /// rule — both implement <see cref="IMBoosterPedalConfig"/>.
+        ///
+        /// <para><c>NaturalFrictionEnabled</c> is deliberately excluded: it
+        /// defaults to <c>true</c>, so "off" and "never set" are not
+        /// distinguishable and it cannot participate in a sentinel test.</para>
+        /// </summary>
+        private static bool IsUntouchedPedalConfig(global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig c)
+        {
+            return c.Direction < 0 && c.Min < 0 && c.Max < 0
+                && c.CurveY == null && c.CurveX == null
+                && c.SensorOutputRatioPct < 0 && c.MaxThresholdKg < 0
+                && c.InputCurveY == null && c.InputCurveX == null
+                && c.DeadzoneKg < 0 && c.MaxForceKg < 0
+                && c.TravelStartMm < 0 && c.TravelEndMm < 0
+                && c.EndstopFrontStiffness < 0 && c.EndstopEndStiffness < 0
+                && c.NaturalFrictionPct < 0
+                && c.DampingPressPct < 0 && c.DampingReleasePct < 0
+                && c.SegmentedDamping.Divider1Pressed < 0 && c.SegmentedDamping.Divider2Pressed < 0
+                && c.SegmentedDamping.Seg1Pressed < 0 && c.SegmentedDamping.Seg2Pressed < 0 && c.SegmentedDamping.Seg3Pressed < 0
+                && c.SegmentedDamping.Divider1Released < 0 && c.SegmentedDamping.Divider2Released < 0
+                && c.SegmentedDamping.Seg1Released < 0 && c.SegmentedDamping.Seg2Released < 0 && c.SegmentedDamping.Seg3Released < 0;
+        }
+
+        /// <summary>
+        /// Backfill <paramref name="into"/> with every value <paramref name="from"/>
+        /// holds and it does not, for the re-key migration. Device-level fields,
+        /// the flat pedal config, and each per-pedal row. Field names where BOTH
+        /// sides hold a real (differing) value are appended to
+        /// <paramref name="conflicts"/> — <paramref name="into"/> keeps its own
+        /// value for those.
+        ///
+        /// <para>Effect settings and CustomEffects are not merged, matching
+        /// <see cref="IsUntouchedPedalConfig"/>'s deliberate omission of them: their
+        /// field-level defaults are per-effect and not sentinel-shaped, so
+        /// "unset" isn't detectable. An entry whose ONLY content is effects is
+        /// therefore still treated as untouched and loses the migration, exactly
+        /// as it did before this change.</para>
+        /// </summary>
+        private static void MergeMBoosterSettings(
+            MBoosterDeviceSettings from, MBoosterDeviceSettings into, List<string> conflicts)
+        {
+            if (from == null || into == null) return;
+
+            if (into.Role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled)
+                into.Role = from.Role;
+            else if (from.Role != global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled
+                     && from.Role != into.Role)
+                conflicts.Add("Role");
+
+            if (into.AxisRoles == null) into.AxisRoles = from.AxisRoles;
+            else if (from.AxisRoles != null) conflicts.Add("AxisRoles");
+
+            if (string.IsNullOrEmpty(into.DisplayName)) into.DisplayName = from.DisplayName;
+            else if (!string.IsNullOrEmpty(from.DisplayName)
+                     && !string.Equals(from.DisplayName, into.DisplayName, StringComparison.Ordinal))
+                conflicts.Add("DisplayName");
+
+            MergeMBoosterPedalConfig(from, into, conflicts, "");
+
+            if (from.Pedals != null && from.Pedals.Count > 0)
+            {
+                // Copy-on-write, same as GetOrCreatePedalConfig: the 50 Hz effect
+                // workers read Pedals without a lock, so publish a new dictionary
+                // by atomic reference swap rather than mutating in place.
+                var merged = into.Pedals != null
+                    ? new Dictionary<int, global::MozaPlugin.Devices.MBooster.MBoosterPedalSettings>(into.Pedals)
+                    : new Dictionary<int, global::MozaPlugin.Devices.MBooster.MBoosterPedalSettings>();
+                foreach (var kv in from.Pedals)
+                {
+                    if (kv.Value == null) continue;
+                    if (!merged.TryGetValue(kv.Key, out var mine) || mine == null)
+                        merged[kv.Key] = kv.Value;
+                    else
+                        MergeMBoosterPedalConfig(kv.Value, mine, conflicts, $"pedal {kv.Key} ");
+                }
+                into.Pedals = merged;
+            }
+        }
+
+        /// <summary>Field-level half of <see cref="MergeMBoosterSettings"/> for one
+        /// pedal's worth of config. <paramref name="label"/> prefixes any conflict
+        /// names so a per-pedal clash is distinguishable from a device-level one.</summary>
+        private static void MergeMBoosterPedalConfig(
+            global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig from,
+            global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig into,
+            List<string> conflicts, string label)
+        {
+            void Int(string name, Func<int> get, Action<int> set, int other)
+            {
+                if (get() < 0) { if (other >= 0) set(other); }
+                else if (other >= 0 && other != get()) conflicts.Add(label + name);
+            }
+            void Flt(string name, Func<float> get, Action<float> set, float other)
+            {
+                if (get() < 0) { if (other >= 0) set(other); }
+                else if (other >= 0 && Math.Abs(other - get()) > 0.0001f) conflicts.Add(label + name);
+            }
+            void Arr(string name, Func<float[]?> get, Action<float[]?> set, float[]? other)
+            {
+                if (get() == null) { if (other != null) set(other); }
+                else if (other != null) conflicts.Add(label + name);
+            }
+
+            Int("Direction", () => into.Direction, v => into.Direction = v, from.Direction);
+            Int("Min", () => into.Min, v => into.Min = v, from.Min);
+            Int("Max", () => into.Max, v => into.Max = v, from.Max);
+            Arr("CurveY", () => into.CurveY, v => into.CurveY = v, from.CurveY);
+            Arr("CurveX", () => into.CurveX, v => into.CurveX = v, from.CurveX);
+            Flt("SensorOutputRatioPct", () => into.SensorOutputRatioPct, v => into.SensorOutputRatioPct = v, from.SensorOutputRatioPct);
+            Flt("MaxThresholdKg", () => into.MaxThresholdKg, v => into.MaxThresholdKg = v, from.MaxThresholdKg);
+            Arr("InputCurveY", () => into.InputCurveY, v => into.InputCurveY = v, from.InputCurveY);
+            Arr("InputCurveX", () => into.InputCurveX, v => into.InputCurveX = v, from.InputCurveX);
+            Flt("DeadzoneKg", () => into.DeadzoneKg, v => into.DeadzoneKg = v, from.DeadzoneKg);
+            Flt("MaxForceKg", () => into.MaxForceKg, v => into.MaxForceKg = v, from.MaxForceKg);
+            Flt("TravelStartMm", () => into.TravelStartMm, v => into.TravelStartMm = v, from.TravelStartMm);
+            Flt("TravelEndMm", () => into.TravelEndMm, v => into.TravelEndMm = v, from.TravelEndMm);
+            Flt("EndstopFrontStiffness", () => into.EndstopFrontStiffness, v => into.EndstopFrontStiffness = v, from.EndstopFrontStiffness);
+            Flt("EndstopEndStiffness", () => into.EndstopEndStiffness, v => into.EndstopEndStiffness = v, from.EndstopEndStiffness);
+            Flt("NaturalFrictionPct", () => into.NaturalFrictionPct, v => into.NaturalFrictionPct = v, from.NaturalFrictionPct);
+            Flt("DampingPressPct", () => into.DampingPressPct, v => into.DampingPressPct = v, from.DampingPressPct);
+            Flt("DampingReleasePct", () => into.DampingReleasePct, v => into.DampingReleasePct = v, from.DampingReleasePct);
+
+            // MBoosterSegmentedDampingSettings is a sealed class, so these are
+            // references — mutating sd edits into.SegmentedDamping in place.
+            var sd = into.SegmentedDamping;
+            var fd = from.SegmentedDamping;
+            Flt("SegmentedDamping.Divider1Pressed", () => sd.Divider1Pressed, v => sd.Divider1Pressed = v, fd.Divider1Pressed);
+            Flt("SegmentedDamping.Divider2Pressed", () => sd.Divider2Pressed, v => sd.Divider2Pressed = v, fd.Divider2Pressed);
+            Flt("SegmentedDamping.Seg1Pressed", () => sd.Seg1Pressed, v => sd.Seg1Pressed = v, fd.Seg1Pressed);
+            Flt("SegmentedDamping.Seg2Pressed", () => sd.Seg2Pressed, v => sd.Seg2Pressed = v, fd.Seg2Pressed);
+            Flt("SegmentedDamping.Seg3Pressed", () => sd.Seg3Pressed, v => sd.Seg3Pressed = v, fd.Seg3Pressed);
+            Flt("SegmentedDamping.Divider1Released", () => sd.Divider1Released, v => sd.Divider1Released = v, fd.Divider1Released);
+            Flt("SegmentedDamping.Divider2Released", () => sd.Divider2Released, v => sd.Divider2Released = v, fd.Divider2Released);
+            Flt("SegmentedDamping.Seg1Released", () => sd.Seg1Released, v => sd.Seg1Released = v, fd.Seg1Released);
+            Flt("SegmentedDamping.Seg2Released", () => sd.Seg2Released, v => sd.Seg2Released = v, fd.Seg2Released);
+            Flt("SegmentedDamping.Seg3Released", () => sd.Seg3Released, v => sd.Seg3Released = v, fd.Seg3Released);
         }
 
         /// <summary>

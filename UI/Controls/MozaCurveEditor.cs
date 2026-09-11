@@ -1269,14 +1269,28 @@ namespace MozaControls
                     // or not it's been dragged from its default.
                     double[] dataXs = { X1, X2, X3, X4, X5, X6 };
                     int n = Math.Min(nodePts.Length, dataXs.Length);
-                    double clampedX = Math.Max(0, Math.Min(dataXs[n - 1], liveX));
-                    double x0 = 0, px0 = PadLeft, x1 = dataXs[0], px1 = nodePts[0].X;
-                    for (int i = 0; i < n - 1; i++)
+                    // A curve with a top-right end point (AnchorAtTopRight —
+                    // Pedal Feel) runs PAST its last draggable node to a fixed
+                    // point at data X=100, so that point is one more (dataX,
+                    // pixelX) pair here. Without it the marker clamps to the
+                    // last node's X — on the default breakpoints ~86% — and
+                    // sticks one point short of full travel however hard the
+                    // pedal is pressed. Curves without it still stop at their
+                    // last node, which IS their end (Sim Input Mapping
+                    // plateaus beyond it — see EvaluateCurveArbitraryX).
+                    bool endAnchor = AnchorAtTopRight;
+                    int pairs = endAnchor ? n + 1 : n;
+                    double DataXAt(int i) => i < n ? dataXs[i] : 100.0;
+                    double PixelXAt(int i) => i < n ? nodePts[i].X : PadLeft + 0.98 * plotW;
+
+                    double clampedX = Math.Max(0, Math.Min(DataXAt(pairs - 1), liveX));
+                    double x0 = 0, px0 = PadLeft, x1 = DataXAt(0), px1 = PixelXAt(0);
+                    for (int i = 0; i < pairs - 1; i++)
                     {
-                        if (clampedX >= dataXs[i] && clampedX <= dataXs[i + 1])
+                        if (clampedX >= DataXAt(i) && clampedX <= DataXAt(i + 1))
                         {
-                            x0 = dataXs[i]; px0 = nodePts[i].X;
-                            x1 = dataXs[i + 1]; px1 = nodePts[i + 1].X;
+                            x0 = DataXAt(i); px0 = PixelXAt(i);
+                            x1 = DataXAt(i + 1); px1 = PixelXAt(i + 1);
                             break;
                         }
                     }

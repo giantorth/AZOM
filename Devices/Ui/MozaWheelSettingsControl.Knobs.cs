@@ -16,10 +16,11 @@ namespace MozaPlugin.Devices.Ui
     // knob — plus a centre swatch), a single shared PaletteStrip editor below,
     // and bulk actions ("Fill ring with selected", "Copy this knob to all").
     //
-    // Reads/writes the same _data fields as the legacy Border-based UI:
-    //   • Centre swatch  ↔ _data.WheelKnobPrimaryColors[knob]
-    //   • Ring slot N    ↔ _data.KnobRingColors[WheelModelInfo.KnobRingStartIndex(knob) + N]
-    // Wire commands match the existing handlers:
+    // Renders overlay-first (saved sparse arrays win; _data fills unset slots with
+    // the wheel's own values — see RefreshWheel) and persists slot-by-slot:
+    //   • Centre swatch  ↔ overlay.WheelKnobPrimaryColors[knob]
+    //   • Ring slot N    ↔ overlay.WheelKnobRingColors[WheelModelInfo.KnobRingStartIndex(knob) + N]
+    // Wire commands:
     //   • "wheel-knob{N}-active-color" for the centre swatch
     //   • "wheel-knob-bg-color{ledIndex+1}" for each ring LED
     public partial class MozaWheelSettingsControl
@@ -79,6 +80,10 @@ namespace MozaPlugin.Devices.Ui
                     if (_suppressEvents) return;
                     int v = chip.SelectedIndex;
                     if (v < 0) return;
+                    // The chip owns the write. Driving the hidden stub's
+                    // SelectedIndex instead drops the edit whenever the two already
+                    // agree; the stub is only kept in sync for the XAML handler
+                    // contract, silently so it can't double-write.
                     var hidden = knobIdx switch
                     {
                         0 => WiKnobSignalMode0Combo,
@@ -88,7 +93,25 @@ namespace MozaPlugin.Devices.Ui
                         4 => WiKnobSignalMode4Combo,
                         _ => null
                     };
-                    if (hidden != null && hidden.SelectedIndex != v) hidden.SelectedIndex = v;
+                    if (hidden != null && hidden.SelectedIndex != v)
+                    {
+                        using (_suppressor.Begin()) hidden.SelectedIndex = v;
+                    }
+                    WriteWiKnobSignalMode(knobIdx, v);
+                };
+                // A ListBox raises SelectionChanged only when the selection MOVES, so
+                // clicking the segment that is already lit is silent — no event, no
+                // frame, nothing. That is precisely the click a user makes when the
+                // wheel disagrees with what the tab shows, and it is the one that has
+                // to reach the wheel. Tunnelled Down (not Up) so SelectedIndex is still
+                // the pre-click value: equal means the selection is about to not move,
+                // which is the case SelectionChanged will not cover.
+                chip.PreviewMouseLeftButtonDown += (s, e) =>
+                {
+                    if (_suppressEvents) return;
+                    int clicked = SegmentIndexFromSource(chip, e.OriginalSource);
+                    if (clicked < 0 || clicked != chip.SelectedIndex) return;
+                    WriteWiKnobSignalMode(knobIdx, clicked, force: true);
                 };
                 _wiKnobSignalChips[k] = chip;
 
@@ -191,8 +214,29 @@ namespace MozaPlugin.Devices.Ui
         private bool HasKnobEncoders()
             => ResolveKnobEncoderCount() > 0 || (_data?.WheelKnobModeSupported ?? false);
 
+        // Which segment a mouse event landed on, or -1 if it missed the items.
+        private static int SegmentIndexFromSource(SegmentedControl chip, object source)
+        {
+            var container = ItemsControl.ContainerFromElement(chip, source as DependencyObject)
+                            as ListBoxItem;
+            return container == null ? -1 : chip.ItemContainerGenerator.IndexFromContainer(container);
+        }
+
+        // Per-knob signal mode as the UI must render it: the per-(profile × wheel-page)
+        // overlay wins, _data (the wheel's own readback) only fills an unset slot —
+        // the same overlay-first rule the other input modes follow. Both the chips and
+        // the hidden stubs resolve through here so the two surfaces cannot disagree.
+        private int ResolveKnobSignalMode(WheelOverride? ov, int logicalKnob)
+        {
+            if (_data == null || logicalKnob < 0 || logicalKnob >= MozaData.WheelKnobMax) return -1;
+            var sig = ov?.WheelKnobSignalModes;
+            if (sig != null && logicalKnob < sig.Length && sig[logicalKnob] >= 0)
+                return sig[logicalKnob];
+            return _data.WheelKnobSignalModes[logicalKnob];
+        }
+
         // Called from RefreshInputsAndKnobsSignalMode — sync per-knob chip
-        // visibility + selected index from _data, toggle the per-knob signal grid
+        // visibility + selected index, toggle the per-knob signal grid
         // vs the legacy "All Rotaries" panel based on firmware support, and hide
         // signal-mode cards for knobs that don't exist on this wheel.
         internal void SyncKnobSignalChips()
@@ -212,13 +256,14 @@ namespace MozaPlugin.Devices.Ui
                 WiSignalModeGrid.Visibility = (perKnob && encoderCount > 0)
                     ? Visibility.Visible : Visibility.Collapsed;
             }
+            var ov = _plugin?.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
             using (_suppressor.Begin())
             {
                 for (int k = 0; k < _wiKnobSignalChips.Length; k++)
                 {
                     var chip = _wiKnobSignalChips[k];
                     var card = _wiKnobSignalCardWrappers[k];
-                    int v = _data.WheelKnobSignalModes[k];
+                    int v = ResolveKnobSignalMode(ov, k);
                     bool present = k < encoderCount;
                     // Show every present knob's selector once firmware reports
                     // per-knob support. A not-yet-read value (-1) leaves the chip
@@ -233,11 +278,11 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
-        // Reflect _data → KnobRingViz on every refresh tick. Also toggles
-        // per-knob visibility (Collapsed when knobCount < this knob index)
-        // and resizes each viz's ring to match the per-knob LED count
+        // Reflect the merged (overlay-first) palettes → KnobRingViz on every refresh
+        // tick. Also toggles per-knob visibility (Collapsed when knobCount < this
+        // knob index) and resizes each viz's ring to match the per-knob LED count
         // (e.g. KS Pro middle knob = 8 dots evenly spaced, not 12 with 4 dimmed).
-        private void RefreshKnobRingViz(int knobCount, int[]? ledsPerKnob)
+        private void RefreshKnobRingViz(byte[][] active, byte[][] ring, int knobCount, int[]? ledsPerKnob)
         {
             if (!_wiKnobsBuilt || _wiKnobViz == null || _wiKnobViewWrappers == null || _data == null) return;
             // Match the visible-knob count so 4-knob wheels fill the full row
@@ -255,7 +300,7 @@ namespace MozaPlugin.Devices.Ui
                 if (!present) continue;
                 var viz = _wiKnobViz[k];
                 // Centre = active color
-                var ac = _data.WheelKnobPrimaryColors[k];
+                var ac = active[k];
                 viz.ActiveColor = Color.FromRgb(ac[0], ac[1], ac[2]);
                 // Ring = one dot per physical LED on this knob. Resize the
                 // collection if the per-knob count changed (assigning a new
@@ -282,7 +327,7 @@ namespace MozaPlugin.Devices.Ui
                     int absIdx = startIdx + i;
                     if (absIdx < MozaData.KnobRingLedMax)
                     {
-                        var rc = _data.KnobRingColors[absIdx];
+                        var rc = ring[absIdx];
                         var c = Color.FromRgb(rc[0], rc[1], rc[2]);
                         // The ObservableCollection indexer raises Replace even for an
                         // identical value; skip unchanged slots on this 500 ms tick.
@@ -361,11 +406,8 @@ namespace MozaPlugin.Devices.Ui
                 // dedup'ing against the stale frame.
                 _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob{knob + 1}-active-color", r, g, b, LedKind.Knob);
                 // Wheel-LED fields aren't captured by MozaProfile.CaptureFromCurrent —
-                // UI handlers must push into the wheel overlay directly, otherwise
-                // ApplyWheelToHardware on the next tick writes the stale overlay
-                // value back over the user's pick.
-                var packed = MozaProfile.PackColors(_data.WheelKnobPrimaryColors);
-                _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobPrimaryColors = packed);
+                // UI handlers push into the wheel overlay directly (this slot only).
+                PersistKnobActiveSlot(knob, MozaProfile.PackColor(new[] { r, g, b }));
                 _plugin.SaveSettings();
             }
             else if (slot >= 0)
@@ -381,7 +423,7 @@ namespace MozaPlugin.Devices.Ui
                 _data.WriteLedColor(_data.KnobRingColors[absIdx], r, g, b);
                 // A4: gated wheel-LED write — see OnPaletteColorPicked active branch above.
                 _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{absIdx + 1}", r, g, b, LedKind.Knob);
-                PersistKnobRingColors();
+                PersistKnobRingSlots(new[] { (absIdx, MozaProfile.PackColor(new[] { r, g, b })) });
                 _plugin.SaveSettings();
             }
 
@@ -395,19 +437,14 @@ namespace MozaPlugin.Devices.Ui
         }
 
         // "Fill ring with selected" — write the current palette colour to every
-        // present ring LED on the currently selected knob. Uses the existing
-        // BulkSetKnobRingColor helper for the wire fan-out by temporarily routing
-        // WheelKnobBackgroundColors through it.
+        // present ring LED on the currently selected knob and persist those slots.
         private void WiKnobFillRing_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
             if (_data == null || _plugin == null || WiKnobPalette == null || _wiSelectedKnob < 0) return;
             var c = WiKnobPalette.SelectedColor;
             int knob = _wiSelectedKnob;
-            // B4: atomic 3-byte write.
-            _data.WriteLedColor(_data.WheelKnobBackgroundColors[knob], c.R, c.G, c.B);
-            BulkSetKnobRingColor(knob);
-            PersistKnobRingColors();
+            PersistKnobRingSlots(BulkSetKnobRingColor(knob, c.R, c.G, c.B));
             _plugin.SaveSettings();
             // Mirror in-memory so the next refresh tick paints the new ring
             if (_wiKnobViz != null && knob < _wiKnobViz.Length)
@@ -418,25 +455,34 @@ namespace MozaPlugin.Devices.Ui
         }
 
         // "Copy this knob to all" — apply the selected knob's ACTIVE + ring colours
-        // to every other present knob.
+        // (as rendered: saved slots, else the wheel's values) to every other
+        // present knob, and persist every slot written.
         private void WiKnobCopyToAll_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            if (_data == null || _plugin == null || _wiSelectedKnob < 0) return;
+            if (_data == null || _plugin == null || _wiKnobViz == null || _wiSelectedKnob < 0) return;
             int src = _wiSelectedKnob;
-            var srcActive = _data.WheelKnobPrimaryColors[src];
-            int srcStart = _plugin.WheelModelInfo?.KnobRingStartIndex(src) ?? (src * 12);
-            int srcLedCount = _plugin.WheelModelInfo?.KnobRingLeds != null && src < _plugin.WheelModelInfo.KnobRingLeds.Length
-                ? _plugin.WheelModelInfo.KnobRingLeds[src] : 0;
-            int knobCount = _plugin.WheelModelInfo?.KnobCount ?? 0;
+            if (src >= _wiKnobViz.Length) return;
+            var srcViz = _wiKnobViz[src];
+            var a = srcViz.ActiveColor;
+            int srcPacked = MozaProfile.PackColor(new[] { a.R, a.G, a.B });
+            int srcLedCount = Math.Min(
+                srcViz.RingColors?.Count ?? 0,
+                _plugin.WheelModelInfo?.KnobRingLeds != null && src < _plugin.WheelModelInfo.KnobRingLeds.Length
+                    ? _plugin.WheelModelInfo.KnobRingLeds[src] : 0);
+            int knobCount = Math.Min(_plugin.WheelModelInfo?.KnobCount ?? 0, _wiKnobViz.Length);
+            var ringSlots = new System.Collections.Generic.List<(int absIdx, int packed)>();
             for (int k = 0; k < knobCount; k++)
             {
                 if (k == src) continue;
+                var dstViz = _wiKnobViz[k];
                 // Copy active
                 // B4: atomic 3-byte write.
-                _data.WriteLedColor(_data.WheelKnobPrimaryColors[k], srcActive[0], srcActive[1], srcActive[2]);
+                _data.WriteLedColor(_data.WheelKnobPrimaryColors[k], a.R, a.G, a.B);
                 // Wheel-LED write + live-cache invalidation (see WriteLedColorIfWheelDetected).
-                _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob{k + 1}-active-color", srcActive[0], srcActive[1], srcActive[2], LedKind.Knob);
+                _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob{k + 1}-active-color", a.R, a.G, a.B, LedKind.Knob);
+                PersistKnobActiveSlot(k, srcPacked);
+                dstViz.ActiveColor = a;
                 // Copy ring (slot by slot — destination may have a different LED count)
                 int dstStart = _plugin.WheelModelInfo?.KnobRingStartIndex(k) ?? (k * 12);
                 int dstLedCount = _plugin.WheelModelInfo?.KnobRingLeds != null && k < _plugin.WheelModelInfo.KnobRingLeds.Length
@@ -444,22 +490,18 @@ namespace MozaPlugin.Devices.Ui
                 int common = Math.Min(srcLedCount, dstLedCount);
                 for (int i = 0; i < common; i++)
                 {
-                    int srcAbs = srcStart + i;
                     int dstAbs = dstStart + i;
-                    if (srcAbs >= MozaData.KnobRingLedMax || dstAbs >= MozaData.KnobRingLedMax) break;
-                    var c = _data.KnobRingColors[srcAbs];
+                    if (dstAbs >= MozaData.KnobRingLedMax) break;
+                    var c = srcViz.RingColors![i];
                     // B4: atomic 3-byte write.
-                    _data.WriteLedColor(_data.KnobRingColors[dstAbs], c[0], c[1], c[2]);
+                    _data.WriteLedColor(_data.KnobRingColors[dstAbs], c.R, c.G, c.B);
                     // Wheel-LED write + live-cache invalidation (see WriteLedColorIfWheelDetected).
-                    _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{dstAbs + 1}", c[0], c[1], c[2], LedKind.Knob);
+                    _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{dstAbs + 1}", c.R, c.G, c.B, LedKind.Knob);
+                    ringSlots.Add((dstAbs, MozaProfile.PackColor(new[] { c.R, c.G, c.B })));
+                    if (dstViz.RingColors != null && i < dstViz.RingColors.Count) dstViz.RingColors[i] = c;
                 }
             }
-            // Pack the full per-knob active colour array into the overlay once
-            // after all knobs have been copied — same persistence pattern as
-            // the per-swatch path; ring colours go through PersistKnobRingColors.
-            var packedActive = MozaProfile.PackColors(_data.WheelKnobPrimaryColors);
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobPrimaryColors = packedActive);
-            PersistKnobRingColors();
+            PersistKnobRingSlots(ringSlots);
             _plugin.SaveSettings();
         }
     }

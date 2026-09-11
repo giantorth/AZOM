@@ -205,9 +205,25 @@ namespace MozaPlugin.Devices
             // we stay quiet rather than risk wedging it. wheel-knob-brightness is
             // still read on known knob wheels (lights the Rotary-group presence
             // flag used by knob-ring writes).
+            //
+            // Knob palettes are seeded here like the RPM/button colours above (once,
+            // at detect) so _data holds the wheel's stored Active + ring colours before
+            // the Knobs tab is opened. PitHouse sweeps cmd 0x27 ROLE0 per knob within
+            // ~3 s of connect (docs/protocol/findings/2026-05-10-knob-led-cmd27.md).
+            // Single paced sweep, not a poll: a ~1 Hz ring poll (cmd 0x1F) produced
+            // "Unexpected cmd: 31" firmware warnings on the Universal Hub path.
             if (info.KnobCount > 0)
             {
                 cmds.Add("wheel-knob-brightness");
+                int knobs = System.Math.Min(info.KnobCount, MozaData.WheelKnobMax);
+                for (int k = 1; k <= knobs; k++)
+                    cmds.Add($"wheel-knob{k}-active-color");
+                if (info.KnobRingLeds != null)
+                {
+                    int ring = System.Math.Min(info.KnobRingLedTotal, MozaData.KnobRingLedMax);
+                    for (int i = 1; i <= ring; i++)
+                        cmds.Add($"wheel-knob-bg-color{i}");
+                }
             }
 
             return cmds.ToArray();

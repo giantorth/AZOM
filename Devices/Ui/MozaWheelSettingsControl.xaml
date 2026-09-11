@@ -585,11 +585,8 @@
                         </StackPanel>
                     </ctrl:SectionCard>
 
-                    <!-- Legacy panels kept as collapsed stubs so code-behind that
-                         populates WheelKnobPanel + WheelKnobRingPanel still resolves. -->
+                    <!-- Hidden stubs: keep the x:Names + handler contract for code-behind. -->
                     <StackPanel x:Name="WheelKnobRingSection" Visibility="Collapsed">
-                        <StackPanel x:Name="WheelKnobPanel"/>
-                        <StackPanel x:Name="WheelKnobRingPanel"/>
                         <!-- Per-knob signal mode stubs (now driven by inline chips above each
                              KnobRingViz). Plain ComboBox + StackPanel keeps the x:Names + handler
                              contract intact for the existing code-behind without dragging extra

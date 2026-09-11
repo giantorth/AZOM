@@ -50,13 +50,6 @@ namespace MozaPlugin.Devices.Ui
         private const int WheelRpmSwatchMax = 25;
         private readonly Border[] _wheelRpmColorSwatches = new Border[WheelRpmSwatchMax];
         private readonly TextBlock[] _wheelRpmIndexLabels = new TextBlock[WheelRpmSwatchMax];
-        private readonly Border[] _wheelKnobBgSwatches = new Border[MozaData.WheelKnobMax];
-        private readonly Border[] _wheelKnobPrimarySwatches = new Border[MozaData.WheelKnobMax];
-        private readonly FrameworkElement[] _wheelKnobRowContainers = new FrameworkElement[MozaData.WheelKnobMax];
-
-        // Group 3 per-LED ring swatches
-        private readonly Border[] _knobRingColorSwatches = new Border[MozaData.KnobRingLedMax];
-        private readonly FrameworkElement[] _knobRingKnobContainers = new FrameworkElement[MozaData.WheelKnobMax];
 
         public MozaWheelSettingsControl()
         {
@@ -220,11 +213,8 @@ skipReadByMode:
             BuildButtonSwatchRow();
             BuildRpmSwatches();
             InitInlineColorEditors();
-            BuildKnobSwatchRows();        // legacy hidden swatches — kept for refresh-path compat
-            BuildKnobRingSwatchRows();    // legacy hidden swatches — kept for refresh-path compat
-            // KnobRingViz panels for the redesigned Knobs tab. Wrapped: any
-            // failure here must not take the whole device control down (the
-            // legacy hidden swatch path above still updates _data).
+            // KnobRingViz panels for the Knobs tab. Wrapped: a failure here must
+            // not take the whole device control down.
             try { BuildKnobRingVizPanels(); }
             catch (Exception ex) { MozaLog.Warn($"[AZOM] BuildKnobRingVizPanels failed: {ex.Message}"); }
             _swatchesBuilt = true;
@@ -246,16 +236,17 @@ skipReadByMode:
 
         // Overlay-wins helper: unpack the persisted overlay's packed int[] array
         // into a fresh byte[][] when present; fall back to _data's wheel-mirrored
-        // bytes otherwise. Slots past the overlay's length read from _data so a
-        // short overlay (e.g. legacy 10-entry array) doesn't blank out the
-        // higher slots. Used to render LED swatches without letting the wheel's
-        // transient response state mask the user's saved choice.
+        // bytes otherwise. Slots past the overlay's length, and unset (-1) slots
+        // of a sparse knob palette, read from _data so a short overlay (e.g.
+        // legacy 10-entry array) doesn't blank out the higher slots. Used to
+        // render LED swatches without letting the wheel's transient response
+        // state mask the user's saved choice.
         private static byte[][] MergeOverlayIntoData(int[]? packedOverlay, byte[][] data)
         {
             var result = new byte[data.Length][];
             for (int i = 0; i < data.Length; i++)
             {
-                if (packedOverlay != null && i < packedOverlay.Length)
+                if (packedOverlay != null && i < packedOverlay.Length && packedOverlay[i] >= 0)
                 {
                     var rgb = MozaProfile.UnpackColor(packedOverlay[i]);
                     result[i] = new[] { rgb[0], rgb[1], rgb[2] };
@@ -371,15 +362,6 @@ skipReadByMode:
             public string CommandPrefix = "";
             public int Index;
             public byte[][] ColorSource = Array.Empty<byte[]>();
-            // When non-empty, used verbatim as the wheel command name instead of
-            // "{CommandPrefix}{Index+1}". Used for knob colors whose commands follow
-            // the pattern "wheel-knob{N}-active-color" (per-knob Active LED).
-            public string CommandNameOverride = "";
-            // Optional callback fired after a successful picker commit — lets the
-            // caller repack the colour into a packed int[] on MozaPluginSettings
-            // (knob colours are write-only on the wire, so settings is the only
-            // persisted copy).
-            public Action? OnChanged;
             // Identifies which inline editor panel owns this swatch.
             public SwatchSection Section = SwatchSection.None;
         }
@@ -498,13 +480,9 @@ skipReadByMode:
         private void CommitColorToSwatch(Border swatch, ColorSwatchInfo info, byte r, byte g, byte b)
         {
             if (_plugin == null || _data == null) return;
-            string cmdName;
-            if (!string.IsNullOrEmpty(info.CommandNameOverride))
-                cmdName = info.CommandNameOverride;
-            else if (!string.IsNullOrEmpty(info.CommandPrefix))
-                cmdName = $"{info.CommandPrefix}{info.Index + 1}";
-            else
-                cmdName = "";
+            string cmdName = !string.IsNullOrEmpty(info.CommandPrefix)
+                ? $"{info.CommandPrefix}{info.Index + 1}"
+                : "";
             if (!string.IsNullOrEmpty(cmdName))
             {
                 // Route LED-colour writes through the LED helper so the live cache
@@ -517,9 +495,7 @@ skipReadByMode:
                     SwatchSection.Rpm    => LedKind.Rpm,
                     SwatchSection.Flag   => LedKind.Flag,
                     SwatchSection.Button => LedKind.Button,
-                    _ => cmdName.StartsWith("wheel-knob", StringComparison.Ordinal)
-                            ? LedKind.Knob
-                            : LedKind.None,
+                    _ => LedKind.None,
                 };
                 if (kind != LedKind.None)
                     _plugin.HardwareApplier.WriteLedColorIfWheelDetected(cmdName, r, g, b, kind);
@@ -554,194 +530,69 @@ skipReadByMode:
                     break;
             }
 
-            info.OnChanged?.Invoke();
             _plugin.SaveSettings();
         }
 
-        private void BuildKnobSwatchRows()
+        // ===== Knob palette persistence =====
+        // The saved knob arrays are sparse: a slot is -1 until the user sets it.
+        // Edits start from the SAVED array and set only the touched slots — never
+        // a repack of _data, whose not-yet-read slots hold the black default.
+
+        private void PersistKnobRingSlots(System.Collections.Generic.IEnumerable<(int absIdx, int packed)> slots)
         {
-            if (_data == null) return;
-            int count = MozaData.WheelKnobMax;
-            for (int i = 0; i < count; i++)
+            if (_plugin == null) return;
+            _plugin.UpdateActiveWheelOverlay(o =>
             {
-                int idx = i;
-                var row = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(0, 0, 0, 4),
-                };
-                row.Children.Add(new TextBlock
-                {
-                    Text = $"Knob {idx + 1}",
-                    Width = 70,
-                    VerticalAlignment = VerticalAlignment.Center,
-                });
-                // "Active" swatch — single per-knob LED color (cmd 0x27 ROLE=0).
-                // The picked color is shown at whichever ring LED is the knob's
-                // current rotation position.
-                var active = CreateKnobSwatch($"wheel-knob{idx + 1}-active-color", idx, _data.WheelKnobPrimaryColors, isBackground: false);
-                // "Inactive" swatch — per-knob bulk default. The picked color is
-                // fanned out to all 12 ring LEDs (cmd 0x1F per-LED) via
-                // BulkSetKnobRingColor. The empty CommandNameOverride suppresses
-                // the per-click cmd 0x27 write — bulk handling is the only wire
-                // activity for this swatch.
-                var bg = CreateKnobSwatch("", idx, _data.WheelKnobBackgroundColors, isBackground: true);
-                row.Children.Add(WrapInCell(active));
-                row.Children.Add(WrapInCell(bg));
-                WheelKnobPanel.Children.Add(row);
-                _wheelKnobBgSwatches[idx] = bg;
-                _wheelKnobPrimarySwatches[idx] = active;
-                _wheelKnobRowContainers[idx] = row;
-            }
+                var arr = GrowUnset(o.WheelKnobRingColors, MozaData.KnobRingLedMax);
+                foreach (var (absIdx, packed) in slots)
+                    if (absIdx >= 0 && absIdx < arr.Length) arr[absIdx] = packed;
+                o.WheelKnobRingColors = arr;
+            });
         }
 
-        private Border CreateKnobSwatch(string commandName, int idx, byte[][] colorSource, bool isBackground)
+        private void PersistKnobActiveSlot(int knob, int packed)
         {
-            var border = new Border
+            if (_plugin == null || knob < 0 || knob >= MozaData.WheelKnobMax) return;
+            _plugin.UpdateActiveWheelOverlay(o =>
             {
-                Width = 28, Height = 28,
-                BorderBrush = GetCachedBrush(85, 85, 85),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(3),
-                Cursor = Cursors.Hand,
-                Background = Brushes.Black,
-                Tag = new ColorSwatchInfo
-                {
-                    CommandNameOverride = commandName,
-                    Index = idx,
-                    ColorSource = colorSource,
-                    OnChanged = () => PersistKnobColor(idx, isBackground),
-                },
-            };
-            border.MouseLeftButtonUp += ColorSwatch_Click;
-            return border;
+                var arr = GrowUnset(o.WheelKnobPrimaryColors, MozaData.WheelKnobMax);
+                arr[knob] = packed;
+                o.WheelKnobPrimaryColors = arr;
+            });
         }
 
-        private void PersistKnobColor(int idx, bool isBackground)
+        // Fresh copy of `src` padded to at least `length` slots with -1 (unset).
+        private static int[] GrowUnset(int[]? src, int length)
         {
-            if (_data == null || _plugin == null) return;
-            // Write-only on the wire — the wheel overlay is the canonical store.
-            // Repack the full array so null -> default black is preserved.
-            if (isBackground)
-            {
-                var packed = MozaProfile.PackColors(_data.WheelKnobBackgroundColors);
-                _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobBackgroundColors = packed);
-                // "Inactive" swatch bulk-sets all ring LEDs for this knob to the same color.
-                // Writes to hardware + updates MozaData but does NOT persist ring colors —
-                // individual ring swatch edits take priority on next save.
-                BulkSetKnobRingColor(idx);
-            }
-            else
-            {
-                var packed = MozaProfile.PackColors(_data.WheelKnobPrimaryColors);
-                _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobPrimaryColors = packed);
-            }
+            var arr = MozaProfile.NewUnsetColorArray(Math.Max(length, src?.Length ?? 0));
+            if (src != null) Array.Copy(src, arr, src.Length);
+            return arr;
         }
 
-        private void BulkSetKnobRingColor(int knobIdx)
+        // Write one colour to every ring LED of a knob (wire + _data mirror) and
+        // return the (ringIndex, packed) slots written so the caller can persist them.
+        private System.Collections.Generic.List<(int absIdx, int packed)> BulkSetKnobRingColor(int knobIdx, byte r, byte g, byte b)
         {
-            if (_data == null || _device == null || _plugin == null) return;
+            var slots = new System.Collections.Generic.List<(int absIdx, int packed)>();
+            if (_data == null || _plugin == null) return slots;
             var model = _plugin.WheelModelInfo;
-            if (model?.KnobRingLeds == null || knobIdx >= model.KnobRingLeds.Length) return;
-            if (!_plugin.IsWheelLedGroupPresent(3)) return;
+            if (model?.KnobRingLeds == null || knobIdx < 0 || knobIdx >= model.KnobRingLeds.Length) return slots;
+            if (!_plugin.IsWheelLedGroupPresent(3)) return slots;
 
-            var color = _data.WheelKnobBackgroundColors[knobIdx];
-            byte r = color[0], g = color[1], b = color[2];
             int startIdx = model.KnobRingStartIndex(knobIdx);
             int count = model.KnobRingLeds[knobIdx];
-
+            int packed = MozaProfile.PackColor(new[] { r, g, b });
             for (int i = 0; i < count; i++)
             {
                 int ledIdx = startIdx + i;
+                if (ledIdx >= MozaData.KnobRingLedMax) break;
                 // Wheel-LED write + live-cache invalidation.
                 _plugin.HardwareApplier.WriteLedColorIfWheelDetected($"wheel-knob-bg-color{ledIdx + 1}", r, g, b, LedKind.Knob);
                 // B4: atomic 3-byte write.
                 _data.WriteLedColor(_data.KnobRingColors[ledIdx], r, g, b);
+                slots.Add((ledIdx, packed));
             }
-            // Read each ring LED back so swatches reflect wheel ground-truth.
-            var readCmds = new string[count];
-            for (int i = 0; i < count; i++)
-                readCmds[i] = $"wheel-knob-bg-color{startIdx + i + 1}";
-            _device.ReadSettingsPaced(readCmds);
-            // Intentionally NOT calling PersistKnobRingColors() — bulk-set is a
-            // convenience shortcut, individual ring edits take persistence priority.
-        }
-
-        private void BuildKnobRingSwatchRows()
-        {
-            if (_data == null) return;
-            int knobMax = MozaData.WheelKnobMax;
-            // Build with maximum possible LED count per knob (12); visibility is
-            // controlled per-knob in RefreshWheel based on actual WheelModelInfo.
-            for (int k = 0; k < knobMax; k++)
-            {
-                int knobIdx = k;
-                var knobPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
-                knobPanel.Children.Add(new TextBlock
-                {
-                    Text = $"Knob {knobIdx + 1} Ring",
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = 12,
-                    Margin = new Thickness(0, 0, 0, 4),
-                });
-
-                // Index labels row
-                var indexRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
-                for (int i = 0; i < 12; i++)
-                {
-                    indexRow.Children.Add(new TextBlock
-                    {
-                        Text = (i + 1).ToString(),
-                        Width = 28,
-                        TextAlignment = TextAlignment.Center,
-                        Foreground = Brushes.Gray,
-                        FontSize = 10,
-                        Margin = new Thickness(2, 0, 2, 0),
-                    });
-                }
-                knobPanel.Children.Add(indexRow);
-
-                // Swatch row — always build 12, hide extras in RefreshWheel
-                var swatchRow = new StackPanel { Orientation = Orientation.Horizontal };
-                for (int i = 0; i < 12; i++)
-                {
-                    // Placeholder LED index — corrected per-model in RefreshWheel
-                    int ledIndex = knobIdx * 12 + i;
-                    if (ledIndex >= MozaData.KnobRingLedMax) break;
-                    var border = new Border
-                    {
-                        Width = 28, Height = 28,
-                        BorderBrush = GetCachedBrush(85, 85, 85),
-                        BorderThickness = new Thickness(1),
-                        CornerRadius = new CornerRadius(3),
-                        Margin = new Thickness(2, 0, 2, 0),
-                        Cursor = Cursors.Hand,
-                        Background = Brushes.Black,
-                        Tag = new ColorSwatchInfo
-                        {
-                            CommandPrefix = "wheel-knob-bg-color",
-                            Index = ledIndex,
-                            ColorSource = _data.KnobRingColors,
-                            OnChanged = () => PersistKnobRingColors(),
-                        },
-                    };
-                    border.MouseLeftButtonUp += ColorSwatch_Click;
-                    swatchRow.Children.Add(border);
-                    if (ledIndex < MozaData.KnobRingLedMax)
-                        _knobRingColorSwatches[ledIndex] = border;
-                }
-                knobPanel.Children.Add(swatchRow);
-
-                WheelKnobRingPanel.Children.Add(knobPanel);
-                _knobRingKnobContainers[knobIdx] = knobPanel;
-            }
-        }
-
-        private void PersistKnobRingColors()
-        {
-            if (_data == null || _plugin == null) return;
-            var packed = MozaProfile.PackColors(_data.KnobRingColors);
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobRingColors = packed);
+            return slots;
         }
 
         private void ColorSwatch_Click(object sender, MouseButtonEventArgs e)
@@ -749,26 +600,10 @@ skipReadByMode:
             if (_suppressEvents || _plugin == null) return;
             var border = (Border)sender;
             var info = (ColorSwatchInfo)border.Tag;
-
-            // RPM / Flag / Button swatches: route to the inline editor (cyan
-            // selection ring + PaletteStrip below). Other swatches with no
-            // section (legacy knob-row containers in WheelKnobRingSection, the
-            // sleep colour swatch which has its own click handler) fall through
-            // to the legacy modal dialog.
+            // RPM / Flag / Button swatches route to the inline editor (cyan
+            // selection ring + PaletteStrip below).
             if (info.Section != SwatchSection.None)
-            {
                 SelectSwatchForEditor(border, info);
-                return;
-            }
-
-            var current = info.ColorSource[info.Index];
-            var dialog = new ColorPickerDialog(current[0], current[1], current[2]);
-            dialog.Owner = Window.GetWindow(this);
-            if (dialog.ShowDialog() == true)
-            {
-                CommitColorToSwatch(border, info,
-                    dialog.SelectedR, dialog.SelectedG, dialog.SelectedB);
-            }
         }
 
         // ===== Refresh =====
@@ -983,73 +818,19 @@ skipReadByMode:
                         ? Visibility.Visible : Visibility.Collapsed;
                     WiKnobSignalModeSection.Visibility = hasEncoders ? Visibility.Visible : Visibility.Collapsed;
                     WiKnobColoursSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-                    for (int i = 0; i < MozaData.WheelKnobMax; i++)
-                    {
-                        var vis = i < knobCount ? Visibility.Visible : Visibility.Collapsed;
-                        if (_wheelKnobRowContainers[i] != null)
-                            _wheelKnobRowContainers[i].Visibility = vis;
-                    }
-                    UpdateSwatches(_wheelKnobBgSwatches, _data.WheelKnobBackgroundColors, knobCount);
-                    UpdateSwatches(_wheelKnobPrimarySwatches, _data.WheelKnobPrimaryColors, knobCount);
 
-                    // Push the same data into the visible KnobRingViz UI on the Knobs sub-tab.
-                    RefreshKnobRingViz(knobCount, modelInfo?.KnobRingLeds);
-
-                    // Legacy knob-ring section is collapsed unconditionally — the
-                    // KnobRingViz path above replaces it. Kept in the visual tree
-                    // so the existing swatch-build code-behind keeps resolving.
-                    var ringLeds = modelInfo?.KnobRingLeds;
-                    bool showRings = knobCount > 0 && ringLeds != null && _plugin!.IsWheelLedGroupPresent(3);
-                    WheelKnobRingSection.Visibility = Visibility.Collapsed;
-                    if (showRings)
-                    {
-                        for (int k = 0; k < MozaData.WheelKnobMax; k++)
-                        {
-                            bool knobVisible = k < knobCount;
-                            if (_knobRingKnobContainers[k] != null)
-                                _knobRingKnobContainers[k].Visibility = knobVisible ? Visibility.Visible : Visibility.Collapsed;
-
-                            if (knobVisible)
-                            {
-                                // Update swatch indices + visibility based on actual per-knob LED count
-                                int startIdx = modelInfo!.KnobRingStartIndex(k);
-                                int ledsThisKnob = ringLeds![k];
-                                for (int i = 0; i < 12; i++)
-                                {
-                                    int swatchSlot = k * 12 + i;
-                                    if (swatchSlot >= MozaData.KnobRingLedMax) break;
-                                    var swatch = _knobRingColorSwatches[swatchSlot];
-                                    if (swatch == null) continue;
-                                    if (i < ledsThisKnob)
-                                    {
-                                        swatch.Visibility = Visibility.Visible;
-                                        var info = (ColorSwatchInfo)swatch.Tag;
-                                        info.Index = startIdx + i;
-                                    }
-                                    else
-                                    {
-                                        swatch.Visibility = Visibility.Collapsed;
-                                    }
-                                }
-                            }
-                        }
-                        // Update swatch colors from data
-                        for (int k = 0; k < knobCount; k++)
-                        {
-                            int startIdx = modelInfo!.KnobRingStartIndex(k);
-                            int ledsThisKnob = ringLeds![k];
-                            for (int i = 0; i < ledsThisKnob; i++)
-                            {
-                                int swatchSlot = k * 12 + i;
-                                if (swatchSlot >= MozaData.KnobRingLedMax) break;
-                                var swatch = _knobRingColorSwatches[swatchSlot];
-                                if (swatch == null) continue;
-                                var c = _data.KnobRingColors[startIdx + i];
-                                swatch.Background = GetCachedBrush(c[0], c[1], c[2]);
-                            }
-                        }
-
-                    }
+                    // Knob palettes render overlay-first like the RPM/button swatches
+                    // above: the saved (sparse) arrays win and _data fills the unset
+                    // slots with the wheel's own values. Profile baseline is the
+                    // fallback tier, as in ApplyWheelToHardware.
+                    var curProfile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+                    var knobActive = MergeOverlayIntoData(
+                        wheelOv?.WheelKnobPrimaryColors ?? curProfile?.WheelKnobPrimaryColors,
+                        _data.WheelKnobPrimaryColors);
+                    var knobRing = MergeOverlayIntoData(
+                        wheelOv?.WheelKnobRingColors ?? curProfile?.WheelKnobRingColors,
+                        _data.KnobRingColors);
+                    RefreshKnobRingViz(knobActive, knobRing, knobCount, modelInfo?.KnobRingLeds);
                 }
 
                 if (oldWheel)

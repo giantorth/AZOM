@@ -329,14 +329,25 @@ namespace MozaPlugin
         // Store a wheel-knob-signal-mode{firmwareIndex} response into the slot for
         // the LOGICAL knob it controls. Most wheels are identity; the KS Pro
         // firmware addresses signal modes in a different order than its LED groups
-        // (firmware 0..4 → physical knobs 1,4,5,3,2), so map through the model's
+        // (firmware 0..4 → physical knobs 1,5,4,2,3), so map through the model's
         // KnobSignalModeOrder. WheelModelName is always resolved before signal-mode
         // reads are issued (DeviceProber gates them on the known model).
+        //
+        // SEED-ONCE: the value slot is filled only while still -1. The telemetry
+        // widget poll emits `40 17 2A 00 00` (TelemetrySender.Frames.cs), which is
+        // byte-identical to the wheel-knob-signal-mode0 read, so its reply lands
+        // here every cycle and would otherwise rewrite logical knob 0 behind the
+        // user's back. The readback is untrustworthy anyway: bundle WDCZXZ83 has the
+        // wheel reporting fw0=1 nine seconds before a write proved that bit clear
+        // in its own Table 2 Param 19 mask (docs/protocol/devices/wheel-0x17.md).
+        // The capability latches below stay unconditional — they only record that
+        // the encoder answered at all.
         private void StoreKnobSignalMode(int firmwareIndex, int value)
         {
             int logical = Devices.WheelModelInfo.FromModelName(WheelModelName)
                 .SignalModeLogicalKnob(firmwareIndex);
-            if (logical >= 0 && logical < WheelKnobSignalModes.Length)
+            if (logical >= 0 && logical < WheelKnobSignalModes.Length
+                && WheelKnobSignalModes[logical] < 0)
                 WheelKnobSignalModes[logical] = value;
             SetKnobSignalModePresent(logical);
             WheelKnobSignalModeSupported = true;
@@ -384,6 +395,17 @@ namespace MozaPlugin
             }
         }
 
+        /// <summary>
+        /// Mirror a packed profile/overlay colour array into <paramref name="target"/>
+        /// under <see cref="LedColorLock"/>. Negative (unset) slots are skipped. Does
+        /// not arm the A5 read-suppression gate — this is saved host state, not a pick.
+        /// </summary>
+        public void MirrorPackedColors(int[]? packed, byte[][] target)
+        {
+            if (packed == null) return;
+            lock (LedColorLock) Settings.MozaProfile.UnpackColorsInto(packed, target);
+        }
+
         // Wheel RPM colors (10 LEDs, [R, G, B] each)
         public readonly byte[][] WheelRpmColors = InitWheelRpmColorArray();
         public readonly byte[][] WheelRpmBlinkColors = InitRpmColorArray();
@@ -408,12 +430,12 @@ namespace MozaPlugin
         public readonly byte[][] WheelFlagColors = InitFlagColorArray();
         public readonly byte[] WheelIdleColor = new byte[] { 255, 255, 255 };
 
-        // Per-knob LED ring colors — W17 CS Pro (4 knobs) / W18 KS Pro (5 knobs).
-        // Background = idle colour shown when the knob is not being turned;
-        // primary = colour flashed on rotation. Wire: [0x27, group, role] + RGB,
-        // group 0..KnobCount-1, role 0=background, 1=primary.
+        // Per-knob Active LED colour — W17 CS Pro (4 knobs) / W18 KS Pro (5 knobs):
+        // the ring LED at the knob's current rotation position. Wire: [0x27, knob,
+        // role] + RGB, knob 0..KnobCount-1, role 0 = stored Active (read/write),
+        // role 1 = live position colour (read-only). See
+        // docs/protocol/findings/2026-05-10-knob-led-cmd27.md.
         public const int WheelKnobMax = 5;
-        public readonly byte[][] WheelKnobBackgroundColors = InitColorArray(WheelKnobMax);
         public readonly byte[][] WheelKnobPrimaryColors = InitColorArray(WheelKnobMax);
 
         // Per-LED knob ring (Inactive / background) colors. Up to 56 LEDs
@@ -1398,9 +1420,13 @@ namespace MozaPlugin
             WheelDevicePresence = 0;
             // Knob-encoder capability is per-rim and must not survive a swap: a CS Pro's
             // four answers would otherwise draw four selectors on a 2-encoder rim. The
-            // mode VALUES (WheelKnobSignalModes / WheelKnobMode) are deliberately left
-            // alone — the per-wheel overlay is their truth, not this mirror.
+            // per-knob signal-mode VALUES clear with it, because StoreKnobSignalMode is
+            // seed-once — left set, the previous rim's modes would pin this mirror for
+            // the rest of the session and the new rim's own sweep could never fill it.
+            // The overlay stays the truth for any knob the user has actually set.
             System.Threading.Interlocked.Exchange(ref _wheelKnobSignalModeMask, 0);
+            for (int i = 0; i < WheelKnobSignalModes.Length; i++)
+                WheelKnobSignalModes[i] = -1;
             WheelKnobSignalModeSupported = false;
             WheelKnobModeSupported = false;
             WheelMcuUid = System.Array.Empty<byte>();

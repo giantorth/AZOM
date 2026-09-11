@@ -58,10 +58,9 @@ namespace MozaPlugin.Devices.Extensions
         public int[]? WheelFlagColors { get; set; }
         public int[]? WheelIdleColor { get; set; }
         public int[]? WheelESRpmColors { get; set; }
-        public int[]? WheelKnobBackgroundColors { get; set; }
+        // Knob palettes: per-knob Active [5] + Group 3 per-LED ring [56], packed
+        // R<<16|G<<8|B, -1 = slot never set (see WheelOverride).
         public int[]? WheelKnobPrimaryColors { get; set; }
-
-        // Group 3 per-LED ring colors (packed R<<16|G<<8|B per LED, up to 56)
         public int[]? WheelKnobRingColors { get; set; }
         public int WheelKnobRingBrightness { get; set; } = -1;
         public bool? WheelKnobDefaultDuringTelemetry { get; set; }
@@ -131,9 +130,12 @@ namespace MozaPlugin.Devices.Extensions
             WheelFlagColors = MozaProfile.PackColors(data.WheelFlagColors);
             WheelIdleColor = new[] { MozaProfile.PackColor(data.WheelIdleColor) };
             WheelESRpmColors = MozaProfile.PackColors(data.WheelESRpmColors);
-            WheelKnobBackgroundColors = MozaProfile.PackColors(data.WheelKnobBackgroundColors);
-            WheelKnobPrimaryColors = MozaProfile.PackColors(data.WheelKnobPrimaryColors);
-            WheelKnobRingColors = MozaProfile.PackColors(data.KnobRingColors);
+            // No overlay entry for this page = the user never chose a knob colour here.
+            // _data only mirrors the wheel (black until seeded), so packing it would
+            // turn "never read" into a saved all-black palette that the next drain
+            // adopts and ApplyWheelToHardware writes to the wheel.
+            WheelKnobPrimaryColors = null;
+            WheelKnobRingColors = null;
             WheelKnobRingBrightness = data.KnobRingBrightness;
             WheelKnobDefaultDuringTelemetry = data.WheelKnobDefaultDuringTelemetry;
             WheelKnobStaticTimeoutMs = data.WheelKnobStaticTimeoutMs;
@@ -245,26 +247,26 @@ namespace MozaPlugin.Devices.Extensions
 
             // Mirror colors into _data so the UI's swatches reflect the loaded
             // values immediately. Hardware writes flow through ApplyWheelToHardware
-            // which sources from the overlay we just populated.
-            MozaProfile.UnpackColorsInto(WheelRpmColors, data.WheelRpmColors);
-            MozaProfile.UnpackColorsInto(WheelRpmBlinkColors, data.WheelRpmBlinkColors);
-            MozaProfile.UnpackColorsInto(WheelButtonColors, data.WheelButtonColors);
+            // which sources from the overlay we just populated. Under LedColorLock
+            // via MirrorPackedColors — the serial thread writes the same slots.
+            data.MirrorPackedColors(WheelRpmColors, data.WheelRpmColors);
+            data.MirrorPackedColors(WheelRpmBlinkColors, data.WheelRpmBlinkColors);
+            data.MirrorPackedColors(WheelButtonColors, data.WheelButtonColors);
             if (WheelButtonDefaultDuringTelemetry != null)
             {
                 int n = Math.Min(WheelButtonDefaultDuringTelemetry.Length, data.WheelButtonDefaultDuringTelemetry.Length);
                 for (int i = 0; i < n; i++)
                     data.WheelButtonDefaultDuringTelemetry[i] = WheelButtonDefaultDuringTelemetry[i];
             }
-            MozaProfile.UnpackColorsInto(WheelFlagColors, data.WheelFlagColors);
+            data.MirrorPackedColors(WheelFlagColors, data.WheelFlagColors);
             if (WheelIdleColor != null && WheelIdleColor.Length > 0)
             {
                 var rgb = MozaProfile.UnpackColor(WheelIdleColor[0]);
                 Array.Copy(rgb, data.WheelIdleColor, 3);
             }
-            MozaProfile.UnpackColorsInto(WheelESRpmColors, data.WheelESRpmColors);
-            MozaProfile.UnpackColorsInto(WheelKnobBackgroundColors, data.WheelKnobBackgroundColors);
-            MozaProfile.UnpackColorsInto(WheelKnobPrimaryColors, data.WheelKnobPrimaryColors);
-            MozaProfile.UnpackColorsInto(WheelKnobRingColors, data.KnobRingColors);
+            data.MirrorPackedColors(WheelESRpmColors, data.WheelESRpmColors);
+            data.MirrorPackedColors(WheelKnobPrimaryColors, data.WheelKnobPrimaryColors);
+            data.MirrorPackedColors(WheelKnobRingColors, data.KnobRingColors);
             if (WheelKnobRingBrightness >= 0) data.KnobRingBrightness = WheelKnobRingBrightness;
             if (WheelKnobDefaultDuringTelemetry.HasValue)
                 data.WheelKnobDefaultDuringTelemetry = WheelKnobDefaultDuringTelemetry.Value;
@@ -330,8 +332,6 @@ namespace MozaPlugin.Devices.Extensions
             if (ov.WheelFlagColors      == null && WheelFlagColors         != null) ov.WheelFlagColors      = (int[])WheelFlagColors.Clone();
             if (ov.WheelIdleColor       == null && WheelIdleColor          != null) ov.WheelIdleColor       = (int[])WheelIdleColor.Clone();
             if (ov.WheelESRpmColors     == null && WheelESRpmColors        != null) ov.WheelESRpmColors     = (int[])WheelESRpmColors.Clone();
-            if (ov.WheelKnobBackgroundColors == null && WheelKnobBackgroundColors != null)
-                ov.WheelKnobBackgroundColors = (int[])WheelKnobBackgroundColors.Clone();
             if (ov.WheelKnobPrimaryColors    == null && WheelKnobPrimaryColors    != null)
                 ov.WheelKnobPrimaryColors    = (int[])WheelKnobPrimaryColors.Clone();
             if (ov.WheelKnobRingColors       == null && WheelKnobRingColors       != null)
@@ -391,7 +391,6 @@ namespace MozaPlugin.Devices.Extensions
             WheelFlagColors         = ov.WheelFlagColors;
             WheelIdleColor          = ov.WheelIdleColor;
             WheelESRpmColors        = ov.WheelESRpmColors;
-            WheelKnobBackgroundColors = ov.WheelKnobBackgroundColors;
             WheelKnobPrimaryColors    = ov.WheelKnobPrimaryColors;
             WheelKnobRingColors       = ov.WheelKnobRingColors;
             WheelKnobRingBrightness = ov.WheelKnobRingBrightness;

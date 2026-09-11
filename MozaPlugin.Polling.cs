@@ -561,11 +561,11 @@ namespace MozaPlugin
 
             // Group 3 (knob ring) brightness read once after group detected +
             // model resolved. The per-LED ring COLORS (wheel-knob-bg-color{N})
-            // are no longer read on the PollStatus path — they're driven by
-            // tab activation in MozaWheelSettingsControl.WheelTabs_SelectionChanged
-            // (gated on WheelKnobLedMode == 2 / Static), same policy as the
-            // RPM and Button color reads. Brightness is a single non-color
-            // status read, kept here as part of capability discovery.
+            // are not polled here — they're seeded once at detect in
+            // DeviceProber.BuildNewWheelLedReadCommands and re-read on Knobs-tab
+            // activation, same policy as the RPM and Button colors. Brightness is
+            // a single non-color status read, kept here as part of capability
+            // discovery.
             if (!DetectionState.Group3ColorsRead && DetectionState.NewWheelDetected && IsWheelLedGroupPresent(3))
             {
                 var model = WheelModelInfo;
@@ -573,7 +573,7 @@ namespace MozaPlugin
                 {
                     DetectionState.Group3ColorsRead = true;
                     _deviceManager.ReadSetting("wheel-knob-brightness");
-                    MozaLog.Debug($"[AZOM] Read knob ring brightness (color reads deferred to Knobs-tab activation)");
+                    MozaLog.Debug("[AZOM] Read knob ring brightness");
                 }
             }
 

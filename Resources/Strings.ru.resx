@@ -226,7 +226,7 @@
   <data name="Button_JoinDiscord" xml:space="preserve"><value>Присоединиться к Discord</value></data>
   <data name="Button_SponsorDevelopment" xml:space="preserve"><value>Поддержать разработку</value></data>
   <data name="Button_Kofi" xml:space="preserve"><value>Поддержите меня на Ko-fi</value></data>
-  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/moza-simhub-plugin</value></data>
+  <data name="Tooltip_Github" xml:space="preserve"><value>github.com/giantorth/AZOM</value></data>
   <data name="Tooltip_JoinDiscord" xml:space="preserve"><value>Присоединиться к Discord проекта</value></data>
   <data name="Tooltip_Sponsor" xml:space="preserve"><value>github.com/sponsors/giantorth</value></data>
   <data name="Tooltip_Kofi" xml:space="preserve"><value>ko-fi.com/giantorth</value></data>
@@ -726,7 +726,6 @@ Id: {2}</value></data>
   <data name="StalkKind_ReleaseHeld" xml:space="preserve"><value>Отпустить удерживаемые клавиши</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Ступень стеклоочистителей {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Ступень света {0}</value></data>
-  <data name="Option_ReleaseChannelPr" xml:space="preserve"><value>PR #{0}: {1}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR закрыт — переключено на Стабильный</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// усиление по полосам · 100% = нейтраль · 500% = максимум</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ЧУВСТВИТЕЛЬНОСТЬ</value></data>
@@ -776,4 +775,21 @@ Id: {2}</value></data>
   <data name="Upload_StatusStopped" xml:space="preserve"><value>Остановлено - {0}%</value></data>
   <data name="Section_UploadSource" xml:space="preserve"><value>ИСТОЧНИК ЗАГРУЗКИ</value></data>
   <data name="Banner_LegacyLfeMigrated_Body" xml:space="preserve"><value>Тактильная отдача LFE базы теперь часть устройства базы MOZA — добавьте это устройство, чтобы перенести ваши эффекты.</value></data>
+  <data name="Button_TravelCalibration" xml:space="preserve"><value>КАЛИБР. ХОДА</value></data>
+  <data name="Button_MotorCalibration" xml:space="preserve"><value>КАЛИБР. МОТОРА</value></data>
+  <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>Калибровка хода педали — мотор двигает педаль сам, не нажимайте её. Осталось {0}с…</value></data>
+  <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>Калибровка мотора — не нажимайте педаль. Занимает около минуты. Осталось {0}с…</value></data>
+  <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>Педаль перезапускается для завершения — подключится снова через несколько секунд.</value></data>
+  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>Калибровка выполняется на другой педали.</value></data>
+  <data name="Status_CalibrationFailed" xml:space="preserve"><value>Калибровка не удалась: {0}</value></data>
+  <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Демпфирование (нажатие)</value></data>
+  <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Демпфирование (отпускание)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Импорт панели SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>ИМПОРТ ПАНЕЛИ SIMHUB…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Преобразовать панель SimHub .djson в MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>ВЫБРАТЬ .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>ПРЕОБРАЗОВАТЬ</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Панели SimHub (*.djson)|*.djson|Все файлы (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Не удалось преобразовать: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Отброшено {0}% виджетов</value></data>
 </root>

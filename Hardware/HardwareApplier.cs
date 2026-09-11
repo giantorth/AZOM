@@ -272,8 +272,8 @@ namespace MozaPlugin.Hardware
         // The change-cache check happens at FLUSH time, not queue time, so a drag that
         // ends back where it started writes nothing at all.
         private const double WheelCfgFlushDelayMs = 400.0;
-        private readonly System.Collections.Generic.Dictionary<string, (long CacheValue, System.Action Write)> _pendingWheelCfg
-            = new System.Collections.Generic.Dictionary<string, (long, System.Action)>(System.StringComparer.Ordinal);
+        private readonly System.Collections.Generic.Dictionary<string, (long CacheValue, System.Action Write, bool Force)> _pendingWheelCfg
+            = new System.Collections.Generic.Dictionary<string, (long, System.Action, bool)>(System.StringComparer.Ordinal);
         // Leaf lock: guards only the dictionary above. Never held across a device
         // write — the flush copies out, releases, then writes.
         private readonly object _pendingWheelCfgLock = new object();
@@ -287,12 +287,13 @@ namespace MozaPlugin.Hardware
         // must not recreate the flush timer and fire into a disposed manager.
         private bool _wheelCfgShutdown;
 
-        private void QueueWheelCfgWrite(string command, long cacheValue, System.Action write)
+        private void QueueWheelCfgWrite(string command, long cacheValue, System.Action write,
+                                        bool force = false)
         {
             lock (_pendingWheelCfgLock)
             {
                 if (_wheelCfgShutdown) return;
-                _pendingWheelCfg[command] = (cacheValue, write);
+                _pendingWheelCfg[command] = (cacheValue, write, force);
                 if (_wheelCfgFlushTimer == null)
                 {
                     _wheelCfgFlushTimer = new System.Timers.Timer(WheelCfgFlushDelayMs) { AutoReset = false };
@@ -306,7 +307,7 @@ namespace MozaPlugin.Hardware
 
         private void FlushPendingWheelCfgWrites()
         {
-            System.Collections.Generic.KeyValuePair<string, (long CacheValue, System.Action Write)>[] due;
+            System.Collections.Generic.KeyValuePair<string, (long CacheValue, System.Action Write, bool Force)>[] due;
             lock (_pendingWheelCfgLock)
             {
                 if (_pendingWheelCfg.Count == 0) return;
@@ -320,8 +321,11 @@ namespace MozaPlugin.Hardware
                 try
                 {
                     // Re-check against the cache now: the value may have travelled and
-                    // come back, or an apply may have written it in the meantime.
-                    if (!WheelCfgChanged(kv.Key, kv.Value.CacheValue)) continue;
+                    // come back, or an apply may have written it in the meantime. A forced
+                    // write still records its value here, but goes out either way — it
+                    // exists precisely because the cache is not to be trusted.
+                    bool changed = WheelCfgChanged(kv.Key, kv.Value.CacheValue);
+                    if (!changed && !kv.Value.Force) continue;
                     kv.Value.Write();
                 }
                 catch (System.Exception ex)
@@ -642,7 +646,6 @@ namespace MozaPlugin.Hardware
             int[]? flagColors         = EffArr(ov?.WheelFlagColors, profile.WheelFlagColors);
             int[]? idleColor          = EffArr(ov?.WheelIdleColor, profile.WheelIdleColor);
             int[]? esRpmColors        = EffArr(ov?.WheelESRpmColors, profile.WheelESRpmColors);
-            int[]? knobBgColors       = EffArr(ov?.WheelKnobBackgroundColors, profile.WheelKnobBackgroundColors);
             int[]? knobPrimaryColors  = EffArr(ov?.WheelKnobPrimaryColors, profile.WheelKnobPrimaryColors);
             int[]? knobRingColors     = EffArr(ov?.WheelKnobRingColors, profile.WheelKnobRingColors);
             bool knobDefaultTelemetry = ov?.WheelKnobDefaultDuringTelemetry
@@ -651,17 +654,19 @@ namespace MozaPlugin.Hardware
                                         ? ov.WheelKnobStaticTimeoutMs
                                         : profile.WheelKnobStaticTimeoutMs;
 
-            // Mirror colors into _data (UI uses _data.* for swatches).
-            MozaProfile.UnpackColorsInto(rpmColors, _data.WheelRpmColors);
-            MozaProfile.UnpackColorsInto(rpmBlinkColors, _data.WheelRpmBlinkColors);
-            MozaProfile.UnpackColorsInto(buttonColors, _data.WheelButtonColors);
+            // Mirror colors into _data (UI falls back to _data.* where nothing is
+            // saved). Under LedColorLock: the serial thread's SetColor and the UI's
+            // WriteLedColor hold it, so a bare unpack could tear an RGB triplet.
+            _data.MirrorPackedColors(rpmColors, _data.WheelRpmColors);
+            _data.MirrorPackedColors(rpmBlinkColors, _data.WheelRpmBlinkColors);
+            _data.MirrorPackedColors(buttonColors, _data.WheelButtonColors);
             if (buttonDefaults != null)
             {
                 int n = Math.Min(buttonDefaults.Length, _data.WheelButtonDefaultDuringTelemetry.Length);
                 for (int i = 0; i < n; i++)
                     _data.WheelButtonDefaultDuringTelemetry[i] = buttonDefaults[i];
             }
-            MozaProfile.UnpackColorsInto(flagColors, _data.WheelFlagColors);
+            _data.MirrorPackedColors(flagColors, _data.WheelFlagColors);
             if (idleColor != null && idleColor.Length > 0)
             {
                 var rgb = MozaProfile.UnpackColor(idleColor[0]);
@@ -669,10 +674,9 @@ namespace MozaPlugin.Hardware
                 _data.WheelIdleColor[1] = rgb[1];
                 _data.WheelIdleColor[2] = rgb[2];
             }
-            MozaProfile.UnpackColorsInto(esRpmColors, _data.WheelESRpmColors);
-            MozaProfile.UnpackColorsInto(knobBgColors, _data.WheelKnobBackgroundColors);
-            MozaProfile.UnpackColorsInto(knobPrimaryColors, _data.WheelKnobPrimaryColors);
-            MozaProfile.UnpackColorsInto(knobRingColors, _data.KnobRingColors);
+            _data.MirrorPackedColors(esRpmColors, _data.WheelESRpmColors);
+            _data.MirrorPackedColors(knobPrimaryColors, _data.WheelKnobPrimaryColors);
+            _data.MirrorPackedColors(knobRingColors, _data.KnobRingColors);
             if (knobRingBri >= 0) _data.KnobRingBrightness = knobRingBri;
             _data.WheelKnobDefaultDuringTelemetry = knobDefaultTelemetry;
             _data.WheelKnobStaticTimeoutMs = knobStaticTimeoutMs;
@@ -862,7 +866,6 @@ namespace MozaPlugin.Hardware
                     if (WheelCfgChangedForApply("wheel-idle-color", ((long)rgb[0] << 16) | ((long)rgb[1] << 8) | rgb[2]))
                         _deviceManager.WriteColor("wheel-idle-color", rgb[0], rgb[1], rgb[2]);
                 }
-                bool knobBgChg  = WheelCfgChangedArr("wheel-knob-bg-color", knobBgColors);
                 bool knobPriChg = WheelCfgChangedArr("wheel-knob-primary-color", knobPrimaryColors);
                 // Brightness keys on the REAL command name ("wheel-knob-brightness"), the
                 // one the readback and the zone/master paths use — a separate
@@ -878,19 +881,18 @@ namespace MozaPlugin.Hardware
                 // cost), so keep this unconditional as before.
                 MozaLedDeviceManager.InvalidateLiveCacheAny(
                     LedKind.Rpm | LedKind.Button | LedKind.Flag);
-                if (knobBgChg || knobPriChg) WriteKnobColors(knobBgColors, knobPrimaryColors);
+                if (knobPriChg) WriteKnobColors(knobPrimaryColors);
                 if (knobRingChg) WriteKnobRingColors(knobRingColors, knobRingBri);
 
-                // If we have no saved active-colour overlay (fresh install, or
-                // user never touched the centre swatch), read the wheel's own
-                // stored values back — they'll land in MozaData via
-                // UpdateFromArray for wheel-knob{N}-active-color and surface
-                // as the visible defaults instead of black-on-load.
-                if (knobPrimaryColors == null && hasKnob)
+                // Knobs whose Active colour the user hasn't saved (array null or slot
+                // unset) render from _data, so read the wheel's stored value back for
+                // them — it lands via UpdateFromArray for wheel-knob{N}-active-color.
+                if (hasKnob)
                 {
-                    int knobs = model.KnobCount;
-                    for (int i = 0; i < knobs && i < 5; i++)
-                        _deviceManager.ReadSetting($"wheel-knob{i + 1}-active-color");
+                    int knobs = Math.Min(model.KnobCount, MozaData.WheelKnobMax);
+                    for (int i = 0; i < knobs; i++)
+                        if (knobPrimaryColors == null || i >= knobPrimaryColors.Length || knobPrimaryColors[i] < 0)
+                            _deviceManager.ReadSetting($"wheel-knob{i + 1}-active-color");
                 }
             }
 
@@ -1678,13 +1680,19 @@ namespace MozaPlugin.Hardware
         // Skip the wire when the matching device isn't detected. Sentinel-guard
         // numeric values to drop "no opinion" writes.
 
-        public void WriteIfWheelDetected(string command, int value)
+        /// <summary><paramref name="force"/> = the user deliberately re-asserted a value the
+        /// change gate already believes is in the register, so send it anyway. Without it a
+        /// wheel whose real state has drifted from the cache can never be corrected from the
+        /// UI: the gate reads "already written" and drops every attempt. Only ever set from an
+        /// explicit user action — an apply must stay gated or it re-flashes on every
+        /// re-detect.</summary>
+        public void WriteIfWheelDetected(string command, int value, bool force = false)
         {
             if (value < 0) return;
             if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected) return;
             if (IsFlashBackedWheelCfg(command))
             {
-                QueueWheelCfgWrite(command, value, () => _deviceManager.WriteSetting(command, value));
+                QueueWheelCfgWrite(command, value, () => _deviceManager.WriteSetting(command, value), force);
                 return;
             }
             _deviceManager.WriteSetting(command, value);
@@ -1914,67 +1922,49 @@ namespace MozaPlugin.Hardware
                 }
                 case LedKind.Knob:
                 {
-                    int knobs = model.KnobCount;
+                    int knobs = Math.Min(model.KnobCount, MozaData.WheelKnobMax);
                     if (knobs <= 0) return;
 
-                    // Unlike the RPM/button palettes — which DeviceProber reads back at
-                    // every detection, so _data always holds the wheel's own values —
-                    // the knob palettes are only read on Knobs-tab activation, and that
-                    // read is skipped while the group is in SimHub mode. So on the
-                    // transition INTO Static, _data can still be the all-black
-                    // InitColorArray default, and pushing it would erase the wheel's
-                    // stored palette instead of restoring the user's (bundle 0TWEX2AK:
+                    // Push only the slots the user saved — the same sparse overlay/profile
+                    // arrays ApplyWheelToHardware writes from — and read the rest back so
+                    // the UI seeds from the wheel. Never source from _data here: a slot no
+                    // read has landed on yet still holds the InitColorArray default, and
+                    // pushing that erased the wheel's stored palette (bundle 0TWEX2AK:
                     // "Static mode does not seem to work, all knobs go black").
-                    // Push only what the user actually has saved — the same overlay/
-                    // profile arrays ApplyWheelToHardware writes from — and when there
-                    // is nothing saved, read the wheel's values back to seed the UI and
-                    // write nothing.
                     var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
                     var ov = _plugin.GetCurrentWheelOverlay(profile);
                     int[]? savedPrimary = EffArr(ov?.WheelKnobPrimaryColors, profile?.WheelKnobPrimaryColors);
                     int[]? savedRing    = EffArr(ov?.WheelKnobRingColors,    profile?.WheelKnobRingColors);
 
                     // Per-knob "Active" LED color (cmd 0x27 ROLE=0).
-                    if (savedPrimary != null)
+                    for (int i = 0; i < knobs; i++)
                     {
-                        int primLen = Math.Min(savedPrimary.Length, knobs);
-                        for (int i = 0; i < primLen; i++)
+                        if (savedPrimary != null && i < savedPrimary.Length && savedPrimary[i] >= 0)
                         {
                             var rgb = MozaProfile.UnpackColor(savedPrimary[i]);
                             _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
                         }
-                    }
-                    else
-                    {
-                        for (int i = 0; i < knobs && i < 5; i++)
+                        else
                             _deviceManager.ReadSetting($"wheel-knob{i + 1}-active-color");
                     }
 
                     // Per-ring-LED "background" color (cmd 0x1F 0x03 0x01), indexed by
-                    // RING LED 0..KnobRingLedTotal-1 — NOT by knob. The old source,
-                    // _data.WheelKnobBackgroundColors, is a 5-entry per-KNOB scratch for
-                    // "fill ring with selected", so it wrote knob-indexed colours into
-                    // ring-LED slots and Min(5, KnobRingLedTotal) capped the sweep at the
-                    // first 5 LEDs — on a KS Pro (rings 12/12/8/12/12) that repainted
-                    // part of knob 1 and left the other 51 untouched.
+                    // RING LED 0..KnobRingLedTotal-1 — NOT by knob.
                     if (model.KnobRingLeds != null && _detectionState.IsWheelLedGroupPresent(3))
                     {
-                        if (savedRing != null)
+                        var reads = new System.Collections.Generic.List<string>();
+                        int ringTotal = Math.Min(model.KnobRingLedTotal, MozaData.KnobRingLedMax);
+                        for (int i = 0; i < ringTotal; i++)
                         {
-                            int ringLen = Math.Min(savedRing.Length, model.KnobRingLedTotal);
-                            for (int i = 0; i < ringLen; i++)
+                            if (savedRing != null && i < savedRing.Length && savedRing[i] >= 0)
                             {
                                 var rgb = MozaProfile.UnpackColor(savedRing[i]);
                                 _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
                             }
+                            else
+                                reads.Add($"wheel-knob-bg-color{i + 1}");
                         }
-                        else
-                        {
-                            var reads = new string[model.KnobRingLedTotal];
-                            for (int i = 0; i < reads.Length; i++)
-                                reads[i] = $"wheel-knob-bg-color{i + 1}";
-                            _deviceManager.ReadSettingsPaced(reads);
-                        }
+                        if (reads.Count > 0) _deviceManager.ReadSettingsPaced(reads.ToArray());
                     }
                     MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);
                     break;
@@ -2091,10 +2081,9 @@ namespace MozaPlugin.Hardware
         }
 
         /// <summary>
-        /// Push per-knob "bulk Inactive default" + per-knob "Active" colors. No-op
-        /// unless the active wheel exposes knob LED rings (W17 CS Pro / W18 KS Pro).
-        /// Bulk Inactive fans out to all ring LEDs via per-LED writes (cmd 0x1F 0x03 0x01);
-        /// Active drives cmd 0x27 ROLE=0.
+        /// Push per-knob "Active" colors (cmd 0x27 ROLE=0). No-op unless the active
+        /// wheel exposes knob LEDs (W17 CS Pro / W18 KS Pro). Unset (negative) slots
+        /// are skipped — only what the user saved is asserted.
         ///
         /// Writes are unconditional with respect to live telemetry — per user
         /// confirmation, cmd 0x27 / cmd 0x1F 0x03 0x01 during live frames does not
@@ -2103,48 +2092,26 @@ namespace MozaPlugin.Hardware
         /// tick re-sends instead of dedup'ing against a frame whose underlying wheel
         /// state we just rewrote.
         /// </summary>
-        public void WriteKnobColors(int[]? packedBulkInactive, int[]? packedActive)
+        public void WriteKnobColors(int[]? packedActive)
         {
             var model = _plugin.WheelModelInfo;
-            int knobs = model?.KnobCount ?? 0;
-            if (knobs <= 0) return;
+            int knobs = Math.Min(model?.KnobCount ?? 0, MozaData.WheelKnobMax);
+            if (knobs <= 0 || packedActive == null) return;
 
-            // Per-knob Active LED color (cmd 0x27 ROLE=0).
-            if (packedActive != null)
+            int len = Math.Min(packedActive.Length, knobs);
+            for (int i = 0; i < len; i++)
             {
-                int len = Math.Min(packedActive.Length, knobs);
-                for (int i = 0; i < len; i++)
-                {
-                    var rgb = MozaProfile.UnpackColor(packedActive[i]);
-                    _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
-                }
-            }
-
-            // Per-knob "bulk Inactive default" fanned over ring LEDs.
-            if (packedBulkInactive != null
-                && model?.KnobRingLeds != null
-                && _detectionState.IsWheelLedGroupPresent(3))
-            {
-                int kLen = Math.Min(packedBulkInactive.Length, knobs);
-                for (int k = 0; k < kLen; k++)
-                {
-                    var rgb = MozaProfile.UnpackColor(packedBulkInactive[k]);
-                    int startIdx = model.KnobRingStartIndex(k);
-                    int count = model.KnobRingLeds[k];
-                    for (int i = 0; i < count; i++)
-                    {
-                        int ledIdx = startIdx + i;
-                        _deviceManager.WriteColor($"wheel-knob-bg-color{ledIdx + 1}", rgb[0], rgb[1], rgb[2]);
-                    }
-                }
+                if (packedActive[i] < 0) continue;
+                var rgb = MozaProfile.UnpackColor(packedActive[i]);
+                _deviceManager.WriteColor($"wheel-knob{i + 1}-active-color", rgb[0], rgb[1], rgb[2]);
             }
             MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Knob);
         }
 
         /// <summary>
         /// Push per-LED ring colors (cmd 0x1F 0x03 0x01). No-op unless the active
-        /// wheel has KnobRingLeds and Group 3 is present. Brightness &lt; 0 skips
-        /// the brightness write.
+        /// wheel has KnobRingLeds and Group 3 is present. Unset (negative) slots are
+        /// skipped. Brightness &lt; 0 skips the brightness write.
         /// </summary>
         public void WriteKnobRingColors(int[]? packedColors, int brightness)
         {
@@ -2155,9 +2122,10 @@ namespace MozaPlugin.Hardware
             if (brightness >= 0 && WheelCfgChangedForApply("wheel-knob-brightness", brightness))
                 _deviceManager.WriteSetting("wheel-knob-brightness", brightness);
             if (packedColors == null) return;
-            int total = Math.Min(packedColors.Length, model.KnobRingLedTotal);
+            int total = Math.Min(packedColors.Length, Math.Min(model.KnobRingLedTotal, MozaData.KnobRingLedMax));
             for (int i = 0; i < total; i++)
             {
+                if (packedColors[i] < 0) continue;
                 var rgb = MozaProfile.UnpackColor(packedColors[i]);
                 _deviceManager.WriteColor($"wheel-knob-bg-color{i + 1}", rgb[0], rgb[1], rgb[2]);
             }

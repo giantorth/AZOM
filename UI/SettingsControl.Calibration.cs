@@ -311,19 +311,15 @@ namespace MozaPlugin.UI
         private static byte MBoosterCalibDevice(global::MozaPlugin.Devices.MBooster.MBoosterDeviceController? controller, int axisIndex)
         {
             if (controller == null) return global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
-            // Resolve against the CONNECTED axis count, not the raw HID axis
+            // Resolves against the CONNECTED axis count, not the raw HID axis
             // count — same fix as MBoosterSelectedPedalRolePrefix. Otherwise
             // a chain-capable hub with fewer pedals wired than raw axis slots
             // falls into ResolveAxisRole's axis-order fallback here too,
             // routing calibration writes (Travel/Endstop/Max Threshold/
-            // Sensor Ratio) to the wrong physical MotorDeviceForRole.
-            int axisCount = controller.ConnectedAxisIndices().Count;
-            if (axisCount <= 0) axisCount = 1;
-            var role = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(controller.CurrentSettings, axisIndex, axisCount);
-            int roleIdx = role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? 0
-                        : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? 1
-                        : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? 2 : -1;
-            return controller.MotorDeviceForRole(roleIdx, axisIndex);
+            // Sensor Ratio) to the wrong physical MotorDeviceForRole. The
+            // resolution now lives on the controller so the connect-time apply
+            // and MBoosterCalibrationRunner share this exact path.
+            return controller.CalibDeviceForAxis(axisIndex);
         }
 
         /// <summary>
@@ -355,7 +351,7 @@ namespace MozaPlugin.UI
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            if (!controller.IsAxisMotorized(_mboosterEffectPedalIndex)) return;
+            if (!controller.OwnsSingletonRegisters(_mboosterEffectPedalIndex)) return;
             byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
             controller.QueueCalibWrite($"{dev:x2}:{key}", () => push(controller, dev));
         }

@@ -63,8 +63,10 @@ namespace MozaPlugin.Devices.Extensions
         };
 
         // Wheelbase model token → thumbnail resource key. Renders are named by the
-        // product they depict, which is not always the bare firmware token. Models
-        // absent here simply get no picture (same as most wheels).
+        // product they depict, which is not always the bare firmware token. Checked
+        // BEFORE the hardware-code map, so a token that names exactly one product
+        // wins over a revision code shared by several (D11 is R21/R25/R27 alike).
+        // Models absent from both maps simply get no picture (same as most wheels).
         private static readonly (string Prefix, string ThumbnailKey)[] BaseThumbnails =
         {
             ("R21", "R21U"),
@@ -584,27 +586,43 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         /// <summary>
-        /// Art key for a wheelbase: its hardware revision code where we have art for
-        /// it, then the token map, then the bare token.
+        /// Art key for a wheelbase: the token map where it has an entry, then the
+        /// attached unit's hardware revision code, then the bare token.
         ///
-        /// The hardware code comes first because a model token is coarser than the
-        /// product — "R16" covers V1, V2 and the Ultra, which look nothing alike —
-        /// and the code is what actually identifies the unit. Everything unrecognised
-        /// degrades to the token, i.e. to the previous behaviour.
+        /// The token map goes first because a hardware code can be COARSER than the
+        /// token, not just finer: D11 is the R21, R25 and R27 alike, so keying off it
+        /// stamped the R21 render onto an R25 that has its own art. The code still
+        /// resolves everything the token cannot — "R16" covers V1, V2 and the Ultra,
+        /// which look nothing alike, and only the code says which is plugged in.
+        ///
+        /// That is also why the code is consulted only for <paramref name="prefix"/>
+        /// equal to the ATTACHED base's model: it identifies the unit on the wire, so
+        /// applying it to another model's definition would paint that folder with the
+        /// connected base's picture.
         /// </summary>
         private static string BaseThumbnailKey(string prefix)
         {
-            var data = MozaPlugin.Instance?.Data;
-            var byHardware = BaseModelInfo.ThumbnailKeyForHardware(
-                BaseModelInfo.ExtractHardwareCode(data?.BaseSwVersion, data?.BaseHwVersion));
-            if (byHardware.Length != 0)
-                return byHardware;
-
             foreach (var (p, key) in BaseThumbnails)
             {
                 if (string.Equals(p, prefix, StringComparison.OrdinalIgnoreCase))
                     return key;
             }
+
+            // Either spelling of the attached base counts: callers name a definition
+            // by the catalog prefix (DeployAllKnown) or by the raw firmware token
+            // (DeployForBaseModel), and both address the same unit.
+            var data = MozaPlugin.Instance?.Data;
+            bool isAttached =
+                string.Equals(BaseModelInfo.ExtractPrefix(data?.BaseModelName), prefix, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(BaseModelInfo.ExtractToken(data?.BaseModelName), prefix, StringComparison.OrdinalIgnoreCase);
+            if (isAttached && prefix.Length != 0)
+            {
+                var byHardware = BaseModelInfo.ThumbnailKeyForHardware(
+                    BaseModelInfo.ExtractHardwareCode(data?.BaseSwVersion, data?.BaseHwVersion));
+                if (byHardware.Length != 0)
+                    return byHardware;
+            }
+
             return prefix;
         }
 
@@ -636,33 +654,65 @@ namespace MozaPlugin.Devices.Extensions
         /// model-named one exists, so SimHub doesn't offer two devices for the same
         /// wheelbase. A device instance the user added under the old identity is
         /// orphaned by this — they re-add the model-named device once.
+        ///
+        /// Callable at any time and safe to repeat: it re-checks the folder every
+        /// call and returns false when there is nothing to do. That matters because
+        /// the retry is the whole point — the delete can fail while SimHub holds
+        /// <c>thumbnail.png</c> open for the device picture, and until v1.6 this ran
+        /// only on the one boot that wrote the model-named definition, so a single
+        /// failure left both devices in the Devices page permanently.
+        ///
+        /// Returns true when the definition is gone, so the caller can raise the
+        /// restart hint.
         /// </summary>
-        private static void RemoveLegacyBaseDefinition()
+        public static bool RemoveLegacyBaseDefinition()
         {
+            var deviceDir = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User", LegacyBaseDeviceName);
+            var deviceJsonPath = Path.Combine(deviceDir, "device.json");
+
             try
             {
-                var deviceDir = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User", LegacyBaseDeviceName);
-                var deviceJsonPath = Path.Combine(deviceDir, "device.json");
                 if (!File.Exists(deviceJsonPath))
-                    return;
+                    return false;
 
                 // Only the legacy shared identity. Anything else living under that
                 // folder name is not ours to delete.
                 string? existingGuid = JObject.Parse(File.ReadAllText(deviceJsonPath))
                     .SelectToken("DescriptorUniqueId")?.Value<string>();
                 if (!string.Equals(existingGuid, MozaDeviceConstants.BaseAmbientGuid, StringComparison.OrdinalIgnoreCase))
-                    return;
+                    return false;
 
-                Directory.Delete(deviceDir, recursive: true);
-                MozaLog.Info(
-                    "[AZOM] Removed the legacy shared 'MOZA Wheel Base' definition — this wheelbase now has a " +
-                    "model-named device; re-add it in SimHub's Devices page after restarting");
+                // device.json first, on its own. It is the file SimHub resolves the
+                // descriptor from, so once it is gone the duplicate entry is too —
+                // and it is the one file SimHub never holds open, unlike the
+                // thumbnail. A recursive delete that trips over a locked picture
+                // used to abort before removing anything.
+                File.Delete(deviceJsonPath);
             }
             catch (Exception ex)
             {
                 MozaLog.Warn($"[AZOM] Could not remove legacy base device definition: {ex.Message}");
+                return false;
             }
+
+            // Leftovers only. A failure here leaves an empty-ish folder SimHub
+            // ignores, so it must not turn a successful removal into a failed one.
+            try
+            {
+                Directory.Delete(deviceDir, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] Legacy 'MOZA Wheel Base' folder kept a file back ({ex.Message}) — "
+                    + "the definition is gone, which is what drops the entry");
+            }
+
+            MozaLog.Info(
+                "[AZOM] Removed the legacy shared 'MOZA Wheel Base' definition — this wheelbase now has a " +
+                "model-named device; restart SimHub to drop the duplicate entry");
+            return true;
         }
 
         private static bool DeployGeneratedWheelDefinition(string deviceName, string guid, string productName,

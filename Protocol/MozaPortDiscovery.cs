@@ -97,6 +97,16 @@ namespace MozaPlugin.Protocol
         // concurrent cache refresh doesn't double-log the same PID.
         private readonly HashSet<ushort> _loggedUnknownPids = new HashSet<ushort>();
 
+        // ForeignPortVids cache — separate lock and timestamp from the MOZA port
+        // cache so neither invalidates the other (the probe sweep and the
+        // detection lanes run on different cadences).
+        private readonly object _foreignLock = new object();
+        private long _foreignTimestamp;                                // 0 = uninitialised
+        private IReadOnlyDictionary<string, ushort> _cachedForeign =
+            new Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _loggedForeignPorts =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         private MozaPortDiscovery() { }
 
         /// <summary>Enumerate MOZA CDC ACM ports (cached for <see cref="CacheTtlTicks"/>).</summary>
@@ -166,6 +176,66 @@ namespace MozaPlugin.Protocol
                 MozaLog.DebugIfChanged("port-discovery", $"[AZOM] MOZA detection: source={sourceLabel}, {summary}");
 
             return ports;
+        }
+
+        /// <summary>
+        /// COM ports the registry attributes to a NON-MOZA USB device, mapped to
+        /// that device's VID. Cached on the same TTL as <see cref="Enumerate"/>.
+        ///
+        /// <para>The blind serial probe in <see cref="MozaSerialConnection"/> opens
+        /// every port <see cref="Enumerate"/> did not classify. On a normal Windows
+        /// box that is every other USB-serial device the user owns — a DIY pedal
+        /// set, an Arduino dash, a button box — and opening one both holds it away
+        /// from SimHub's own scanner and writes MOZA probe frames into its stream
+        /// (bug reports A6N521CS / QR3760VJ: four of the reporter's ports seized in
+        /// one sweep, their DIY pedal among them). The registry already knows who
+        /// each port belongs to; this surfaces it so the probe can skip them.</para>
+        ///
+        /// <para><b>Registry source only, deliberately.</b> The sysfs enumerator
+        /// filters to <see cref="MozaVid"/> at the source (LinuxUsbEnumerator), so
+        /// under Wine this is empty and the probe keeps its full reach — which is
+        /// exactly where the blind probe is load-bearing, since there is no
+        /// <c>Enum\USB</c> tree to classify anything with.</para>
+        /// </summary>
+        public IReadOnlyDictionary<string, ushort> ForeignPortVids()
+        {
+            lock (_foreignLock)
+            {
+                long now = Stopwatch.GetTimestamp();
+                if (_foreignTimestamp != 0 && (now - _foreignTimestamp) < CacheTtlTicks)
+                    return _cachedForeign;
+            }
+
+            // No registry tree to read under Wine — see the remarks above.
+            var map = new Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase);
+            if (!LinuxUsbEnumerator.Available)
+            {
+                var all = WalkUsbSerialPortsCached();
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var pi = all[i];
+                    if (pi.Vid == MozaVid) continue;
+                    map[pi.PortName] = pi.Vid;
+                }
+            }
+
+            List<string>? newlySeen = null;
+            lock (_foreignLock)
+            {
+                _cachedForeign = map;
+                _foreignTimestamp = Stopwatch.GetTimestamp();
+                foreach (var kv in map)
+                    if (_loggedForeignPorts.Add(kv.Key))
+                        (newlySeen ??= new List<string>()).Add(
+                            $"{kv.Key}:VID_{kv.Value.ToString("X4", CultureInfo.InvariantCulture)}");
+            }
+
+            // One line the first time each foreign port is seen, so a support
+            // bundle shows which ports the probe is deliberately not touching.
+            if (newlySeen != null)
+                MozaLog.Info($"[AZOM] Non-MOZA USB-serial port(s), excluded from probing: {string.Join(", ", newlySeen)}");
+
+            return map;
         }
 
         /// <summary>
@@ -326,6 +396,47 @@ namespace MozaPlugin.Protocol
 
         private static IReadOnlyList<PortInfo> EnumerateFromRegistry()
         {
+            var all = WalkUsbSerialPortsCached();
+            var results = new List<PortInfo>(all.Count);
+            for (int i = 0; i < all.Count; i++)
+                if (all[i].Vid == MozaVid) results.Add(all[i]);
+            return results;
+        }
+
+        // Shared raw-walk cache. The walk now visits every Enum\USB device key
+        // rather than only the MOZA ones (that is what makes foreign ports
+        // identifiable), so the MOZA list and the foreign map must not each pay
+        // for their own pass. Same TTL as the port cache.
+        private static readonly object s_walkLock = new object();
+        private static long s_walkTimestamp;                       // 0 = uninitialised
+        private static List<PortInfo> s_walkCache = new List<PortInfo>();
+
+        private static List<PortInfo> WalkUsbSerialPortsCached()
+        {
+            lock (s_walkLock)
+            {
+                long now = Stopwatch.GetTimestamp();
+                if (s_walkTimestamp != 0 && (now - s_walkTimestamp) < CacheTtlTicks)
+                    return s_walkCache;
+            }
+            var fresh = WalkUsbSerialPorts();
+            lock (s_walkLock)
+            {
+                s_walkCache = fresh;
+                s_walkTimestamp = Stopwatch.GetTimestamp();
+            }
+            return fresh;
+        }
+
+        /// <summary>
+        /// Every currently-mounted USB-serial (usbser) COM port in the registry,
+        /// whatever its vendor, with the real VID on each <see cref="PortInfo"/>.
+        /// <see cref="EnumerateFromRegistry"/> filters this to <see cref="MozaVid"/>;
+        /// <see cref="ForeignPortVids"/> takes everything else. Go through
+        /// <see cref="WalkUsbSerialPortsCached"/> rather than calling this directly.
+        /// </summary>
+        private static List<PortInfo> WalkUsbSerialPorts()
+        {
             // Live COM port set — drops ghost registry entries left by previous
             // USB-port attachments. SerialPort.GetPortNames reads the same
             // SERIALCOMM table the kernel populates with currently-mounted ports.
@@ -352,7 +463,7 @@ namespace MozaPlugin.Protocol
 
                 foreach (var deviceKeyName in enumKey.GetSubKeyNames())
                 {
-                    if (!TryParseMozaCdcKey(deviceKeyName, out var pid))
+                    if (!TryParseUsbCdcKey(deviceKeyName, out var vid, out var pid))
                         continue;
 
                     using var deviceKey = enumKey.OpenSubKey(deviceKeyName, writable: false);
@@ -386,7 +497,7 @@ namespace MozaPlugin.Protocol
                         // read from the instance key (REG_SZ). Absent on some driver
                         // stacks / under Wine — empty string is the graceful default.
                         var containerId = (instanceKey.GetValue("ContainerID") as string) ?? string.Empty;
-                        results.Add(new PortInfo(portName!, MozaVid, pid, friendly, instanceName, containerId));
+                        results.Add(new PortInfo(portName!, vid, pid, friendly, instanceName, containerId));
                     }
                 }
             }
@@ -406,33 +517,45 @@ namespace MozaPlugin.Protocol
             return results;
         }
 
-        // Match any MOZA USB device-ID key "VID_346E&PID_xxxx" optionally
-        // followed by an '&'-delimited suffix — the bare single-interface form
-        // (e.g. mBooster Pedals PID 0x0008), the composite child "…&MI_00", and
-        // the revision-bearing forms Windows emits on some USB topologies
-        // (deep hub chains, etc.): "…&REV_0100", "…&REV_0100&MI_00". We do not
-        // enumerate exact suffix shapes — the authoritative CDC gate is
-        // downstream in EnumerateFromRegistry (Service=="usbser" + Device
-        // Parameters\PortName presence + live-COM check), which rejects the
-        // composite parent (binds usbccgp, no PortName) and any non-serial
-        // interface regardless of how the key is spelled.
-        private static bool TryParseMozaCdcKey(string keyName, out ushort pid)
+        // Match any USB device-ID key "VID_xxxx&PID_xxxx" optionally followed
+        // by an '&'-delimited suffix — the bare single-interface form (e.g.
+        // mBooster Pedals PID 0x0008), the composite child "…&MI_00", and the
+        // revision-bearing forms Windows emits on some USB topologies (deep hub
+        // chains, etc.): "…&REV_0100", "…&REV_0100&MI_00". We do not enumerate
+        // exact suffix shapes — the authoritative CDC gate is downstream in
+        // WalkUsbSerialPorts (Service=="usbser" + Device Parameters\PortName
+        // presence + live-COM check), which rejects the composite parent (binds
+        // usbccgp, no PortName) and any non-serial interface regardless of how
+        // the key is spelled.
+        //
+        // Deliberately NOT limited to VID_346E. The MOZA-only filter now sits in
+        // the callers, because knowing which COM ports belong to OTHER vendors is
+        // exactly what keeps the blind serial probe off them — see
+        // ForeignPortVids.
+        private static bool TryParseUsbCdcKey(string keyName, out ushort vid, out ushort pid)
         {
+            vid = 0;
             pid = 0;
             if (string.IsNullOrEmpty(keyName)) return false;
 
-            const string vidPrefix = "VID_346E&PID_";
-            int afterPid = vidPrefix.Length + 4;
+            const string vidPrefix = "VID_";
+            const string pidInfix = "&PID_";
+            // "VID_" + 4 hex + "&PID_" + 4 hex
+            int pidStart = vidPrefix.Length + 4 + pidInfix.Length;
+            int afterPid = pidStart + 4;
             if (keyName.Length < afterPid) return false;
             if (string.Compare(keyName, 0, vidPrefix, 0, vidPrefix.Length,
+                               StringComparison.OrdinalIgnoreCase) != 0) return false;
+            if (string.Compare(keyName, vidPrefix.Length + 4, pidInfix, 0, pidInfix.Length,
                                StringComparison.OrdinalIgnoreCase) != 0) return false;
 
             // Anything after the 4-hex PID must start with '&' so we don't
             // accept a longer (malformed) PID field as a match.
             if (keyName.Length > afterPid && keyName[afterPid] != '&') return false;
 
-            var pidHex = keyName.Substring(vidPrefix.Length, 4);
-            return ushort.TryParse(pidHex, NumberStyles.HexNumber,
+            if (!ushort.TryParse(keyName.Substring(vidPrefix.Length, 4), NumberStyles.HexNumber,
+                                 CultureInfo.InvariantCulture, out vid)) return false;
+            return ushort.TryParse(keyName.Substring(pidStart, 4), NumberStyles.HexNumber,
                                    CultureInfo.InvariantCulture, out pid);
         }
 

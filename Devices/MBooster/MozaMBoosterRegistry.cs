@@ -101,6 +101,33 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
+        // Owns the two hardware calibration routines. Deliberately NOT on the
+        // controller: both routines soft-reboot the pedal, and Refresh() above
+        // disposes and removes a controller whose port disappears, so
+        // controller-scoped run state would die mid-flow. Identity survives the
+        // re-enumeration; the runner keys on it. See MBoosterCalibrationRunner.
+        private MBoosterCalibrationRunner? _calibrationRunner;
+        private readonly object _calibrationRunnerLock = new object();
+
+        /// <summary>The calibration routine runner for this session, created on
+        /// first use. One per registry: the routines reboot the unit, so two
+        /// cannot be allowed to interleave even across different lanes.</summary>
+        internal MBoosterCalibrationRunner CalibrationRunner
+        {
+            get
+            {
+                lock (_calibrationRunnerLock)
+                    return _calibrationRunner ??= new MBoosterCalibrationRunner(this);
+            }
+        }
+
+        /// <summary>Runner state without forcing it into existence — the UI asks
+        /// this on every tab refresh.</summary>
+        internal MBoosterCalibrationRunner? CalibrationRunnerOrNull
+        {
+            get { lock (_calibrationRunnerLock) return _calibrationRunner; }
+        }
+
         /// <summary>Fired (foreground thread NOT guaranteed) on detection rising edge.</summary>
         public event Action<MBoosterDeviceController>? DeviceDetected;
         /// <summary>Fired when a new device is added to the registry.</summary>
@@ -173,6 +200,7 @@ namespace MozaPlugin.Devices.MBooster
                     // Wire rising-edge detection to the plugin-level handler
                     // (applies profile, reads calibration, etc.).
                     c.DetectedRisingEdge += () => OnControllerDetected(c);
+                    c.FirmwareLogLine += line => OnFirmwareLogLine(c, line);
                     // Forward the serial-interrogation result so the plugin can
                     // re-key per-device settings from the transport identity to
                     // the stable serial (settings follow the physical unit).
@@ -241,6 +269,10 @@ namespace MozaPlugin.Devices.MBooster
                 {
                     MozaLog.Info($"[AZOM/mBooster] Removed {MBoosterDeviceController.ShortIdentity(c.Identity)} (port gone from registry)");
                     try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Dispose: {ex.Message}"); }
+                    // A running calibration expects exactly this: its own soft
+                    // reboot takes the port away. Tell the runner before the
+                    // public event so it can't miss the drop.
+                    try { CalibrationRunnerOrNull?.OnDeviceRemoved(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnDeviceRemoved: {ex.Message}"); }
                     try { DeviceRemoved?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceRemoved handler: {ex.Message}"); }
                 }
             }
@@ -304,6 +336,7 @@ namespace MozaPlugin.Devices.MBooster
             {
                 if (_byIdentity.ContainsKey(c.Identity)) return;
                 c.DetectedRisingEdge += () => OnControllerDetected(c);
+                c.FirmwareLogLine += line => OnFirmwareLogLine(c, line);
                 c.SerialResolved += (id, ser) =>
                 {
                     try { _onSerialResolved?.Invoke(id, ser); }
@@ -338,7 +371,20 @@ namespace MozaPlugin.Devices.MBooster
         private void OnControllerDetected(MBoosterDeviceController c)
         {
             try { _onDeviceDetectedEdge?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnDetectedEdge: {ex.Message}"); }
+            // A calibration run crossing its own soft reboot resumes from here.
+            // After _onDeviceDetectedEdge, so the reconnect's config re-push is
+            // already queued when the runner re-arms the effect suspension.
+            try { CalibrationRunnerOrNull?.OnDeviceDetected(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnDeviceDetected: {ex.Message}"); }
             try { DeviceDetected?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceDetected handler: {ex.Message}"); }
+        }
+
+        /// <summary>Route a controller's group-0x0E firmware-log line to a
+        /// running calibration, which reports the firmware's own progress
+        /// wording instead of just a countdown.</summary>
+        internal void OnFirmwareLogLine(MBoosterDeviceController c, string line)
+        {
+            try { CalibrationRunnerOrNull?.OnFirmwareLogLine(c, line); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnFirmwareLogLine: {ex.Message}"); }
         }
 
         /// <summary>
@@ -1046,6 +1092,10 @@ namespace MozaPlugin.Devices.MBooster
 
         public void Dispose()
         {
+            MBoosterCalibrationRunner? runner;
+            lock (_calibrationRunnerLock) { runner = _calibrationRunner; _calibrationRunner = null; }
+            try { runner?.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner Dispose: {ex.Message}"); }
+
             List<MBoosterDeviceController> all;
             lock (_lock)
             {

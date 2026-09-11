@@ -171,6 +171,15 @@ namespace MozaPlugin
                     FixMBoosterCurveArraysSeventhsBug();
                 }
 
+                // Saved knob palettes that are entirely black were laundered from an
+                // unseeded _data mirror, not chosen — null them once so the wheel's
+                // own stored colours show and nothing re-writes black on apply.
+                if (!_settings.KnobColorAllBlackRepaired)
+                {
+                    _settings.KnobColorAllBlackRepaired = true;
+                    _profileCoordinator.RepairAllBlackKnobColorArrays();
+                }
+
                 // Initialise the GUID↔model registry up front — page-GUID
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
@@ -944,6 +953,12 @@ namespace MozaPlugin
             // persistent wire left these ticking next to the next Init's pair.
             try { _fsr1Driver?.Dispose(); } catch { }
             _fsr1Driver = null;
+            try
+            {
+                if (_cm2Sender != null && _dashboardBindingCoordinator != null)
+                    _cm2Sender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
+            catch { }
             try { _cm2Sender?.Dispose(); } catch { }
             _cm2Sender = null;
             try { _cm1Driver?.Dispose(); } catch { }

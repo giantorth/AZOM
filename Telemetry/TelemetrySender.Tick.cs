@@ -59,6 +59,15 @@ namespace MozaPlugin.Telemetry
                 // on a wheel that has no bound dashboard (no tiers) at all.
                 TickEmitDeviceLogPoll();
 
+                // Dashboard-upload progress on the wheel's RPM bar. Sits with
+                // the device-log pull ABOVE the Preamble branch and the
+                // no-tiers early return below: the connect-time upload is
+                // dispatched before this timer even starts and can run through
+                // the whole preamble, and a wheel with no bound dashboard
+                // uploads too. Internally paced and idempotent, so both
+                // senders ticking it is harmless.
+                Devices.Led.UploadProgressLedBar.Tick(MozaPlugin.Instance);
+
                 // Preamble: ~1 second of heartbeats while the wheel acks our
                 // session opens and pushes its initial catalog + state. No
                 // telemetry, no value frames; once the tick countdown elapses
@@ -839,12 +848,10 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>Widget-state poll cycle. Cycle of 80 slots at one frame per
-        /// 10 ticks gives ~0.4/s per slot; PitHouse capture cadence is ~0.2/s
-        /// per slot, within tolerable range.</summary>
-        /// <summary>Widget-state poll cycle at ~1 Hz. The cycle rotates
-        /// through 80 probes, so each individual probe gets covered every
-        /// ~80 seconds.</summary>
+        /// <summary>Widget-state poll cycle: one frame per ~1 Hz slow tick,
+        /// rotating through the 63 live probes in SendOneWidgetPoll, so each
+        /// individual probe recurs every ~63 s. PitHouse's own capture cadence
+        /// is ~0.2/s per probe — we stay well under it.</summary>
         private void TickEmitWidgetPoll()
         {
             int slow = Math.Max(8, 1000 / _baseTickMs);

@@ -229,7 +229,11 @@ namespace MozaPlugin.Devices.Ui
         private void WiKnobSignalMode3Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(3, WiKnobSignalMode3Combo.SelectedIndex);
         private void WiKnobSignalMode4Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(4, WiKnobSignalMode4Combo.SelectedIndex);
 
-        private void WriteWiKnobSignalMode(int index, int value)
+        // force = the user clicked the segment that was already selected. That is a
+        // deliberate "put this back on the wheel", so it must bypass the write-on-change
+        // gate — the whole point is that the wheel's real state disagrees with what the
+        // plugin cached.
+        private void WriteWiKnobSignalMode(int index, int value, bool force = false)
         {
             if (_suppressEvents || _plugin == null || _data == null) return;
             if (value < 0) return; // ComboBox SelectionChanged can fire during refresh
@@ -239,7 +243,7 @@ namespace MozaPlugin.Devices.Ui
             // index is the logical knob (LED/UI order); the wire command addresses
             // the firmware signal-mode index, which differs on the KS Pro.
             int fwIndex = _plugin.WheelModelInfo?.SignalModeFirmwareIndex(index) ?? index;
-            _plugin.HardwareApplier.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value);
+            _plugin.HardwareApplier.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value, force);
             _plugin.SaveSettings();
         }
 
@@ -320,14 +324,13 @@ namespace MozaPlugin.Devices.Ui
                         ? Visibility.Visible : Visibility.Collapsed;
                     if (perKnob)
                     {
-                        // Per-knob mode: keep the hidden source-of-truth combos in sync;
-                        // the visible chips above each KnobRingViz forward to them.
+                        // Per-knob mode: the visible chips own the write; these hidden
+                        // stubs exist for the XAML handler contract and just mirror the
+                        // same resolved value.
                         var combos = new[] { WiKnobSignalMode0Combo, WiKnobSignalMode1Combo, WiKnobSignalMode2Combo, WiKnobSignalMode3Combo, WiKnobSignalMode4Combo };
-                        var ovSig = ov?.WheelKnobSignalModes;
                         for (int i = 0; i < 5; i++)
                         {
-                            int v = ovSig != null && i < ovSig.Length && ovSig[i] >= 0
-                                ? ovSig[i] : _data.WheelKnobSignalModes[i];
+                            int v = ResolveKnobSignalMode(ov, i);
                             if (v >= 0) SetComboSafe(combos[i], v);
                         }
                     }

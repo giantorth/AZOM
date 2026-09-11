@@ -763,6 +763,51 @@ namespace MozaPlugin
         /// or USB, independent of the wheel), or null when no CM2 is present.</summary>
         internal TelemetrySender? Cm2Sender => _cm2Sender;
 
+        /// <summary>
+        /// True while a dashboard upload is in flight on either display
+        /// pipeline. The live LED pipeline stands down for the duration and the
+        /// wheel's RPM bar becomes the transfer's progress meter — see
+        /// <see cref="Devices.Led.UploadProgressLedBar"/>.
+        /// </summary>
+        internal bool IsDashboardUploadInFlight =>
+            (_telemetrySender?.IsUploadInFlight ?? false)
+            || (_cm2Sender?.IsUploadInFlight ?? false);
+
+        /// <summary>
+        /// 0..1 progress of the in-flight dashboard upload (whichever pipeline
+        /// is transferring), 0 when none is. Only one upload runs at a time —
+        /// both senders share the wheel's file-transfer sessions — so the max
+        /// is just "the one that is live".
+        /// </summary>
+        /// <summary>
+        /// Monotonic ack count for the pipeline currently uploading, 0 when none
+        /// is. Liveness only — the absolute value is meaningless across
+        /// pipelines, callers just watch it move.
+        /// </summary>
+        internal long DashboardUploadAckedChunks
+        {
+            get
+            {
+                if (_telemetrySender?.IsUploadInFlight ?? false)
+                    return _telemetrySender!.UploadAckedChunkCount;
+                if (_cm2Sender?.IsUploadInFlight ?? false)
+                    return _cm2Sender!.UploadAckedChunkCount;
+                return 0L;
+            }
+        }
+
+        internal double DashboardUploadProgress
+        {
+            get
+            {
+                double wheel = (_telemetrySender?.IsUploadInFlight ?? false)
+                    ? _telemetrySender!.UploadProgress : 0.0;
+                double dash = (_cm2Sender?.IsUploadInFlight ?? false)
+                    ? _cm2Sender!.UploadProgress : 0.0;
+                return wheel > dash ? wheel : dash;
+            }
+        }
+
         // "Send Test Pattern" toggle, shared across every display pipeline. The
         // tier-def senders consume it via their own TestMode; the standalone FSR1
         // (0x42) / CM1 (0x35) drivers read this flag in their tick and synthesise a

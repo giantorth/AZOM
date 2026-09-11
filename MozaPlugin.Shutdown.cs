@@ -113,6 +113,12 @@ namespace MozaPlugin
             // doesn't leave two ticking the same connection after re-Init.
             try { _fsr1Driver?.Dispose(); } catch { }
             _fsr1Driver = null;
+            try
+            {
+                if (_cm2Sender != null)
+                    _cm2Sender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
+            catch { }
             try { _cm2Sender?.Dispose(); } catch { }
             _cm2Sender = null;
             try { _cm1Driver?.Dispose(); } catch { }

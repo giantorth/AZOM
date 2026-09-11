@@ -794,7 +794,6 @@ namespace MozaPlugin.Resources
         public static string StalkKind_ReleaseHeld => Get("StalkKind_ReleaseHeld");
         public static string StalkKind_WiperStage => Get("StalkKind_WiperStage");
         public static string StalkKind_LightStage => Get("StalkKind_LightStage");
-        public static string Option_ReleaseChannelPr => Get("Option_ReleaseChannelPr");
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
         public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
         public static string Label_EqSensitivity => Get("Label_EqSensitivity");
@@ -834,5 +833,22 @@ namespace MozaPlugin.Resources
         public static string Upload_StatusStopped => Get("Upload_StatusStopped");
         public static string Section_UploadSource => Get("Section_UploadSource");
         public static string Banner_LegacyLfeMigrated_Body => Get("Banner_LegacyLfeMigrated_Body");
+        public static string Button_TravelCalibration => Get("Button_TravelCalibration");
+        public static string Button_MotorCalibration => Get("Button_MotorCalibration");
+        public static string Hint_MBoosterTravelCal => Get("Hint_MBoosterTravelCal");
+        public static string Hint_MBoosterMotorCal => Get("Hint_MBoosterMotorCal");
+        public static string Hint_MBoosterCalRebooting => Get("Hint_MBoosterCalRebooting");
+        public static string Hint_MBoosterCalBusyElsewhere => Get("Hint_MBoosterCalBusyElsewhere");
+        public static string Status_CalibrationFailed => Get("Status_CalibrationFailed");
+        public static string SliderLabel_DampingPress => Get("SliderLabel_DampingPress");
+        public static string SliderLabel_DampingRelease => Get("SliderLabel_DampingRelease");
+        public static string Title_DjsonImport => Get("Title_DjsonImport");
+        public static string Button_ImportSimHubDash => Get("Button_ImportSimHubDash");
+        public static string Tooltip_ImportSimHubDash => Get("Tooltip_ImportSimHubDash");
+        public static string Button_PickDjson => Get("Button_PickDjson");
+        public static string Button_Convert => Get("Button_Convert");
+        public static string FileFilter_Djson => Get("FileFilter_Djson");
+        public static string Status_DjsonConvertFailed => Get("Status_DjsonConvertFailed");
+        public static string Status_DjsonHeavyLoss => Get("Status_DjsonHeavyLoss");
     }
 }

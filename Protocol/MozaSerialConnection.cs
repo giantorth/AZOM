@@ -250,6 +250,15 @@ namespace MozaPlugin.Protocol
         private static readonly ConcurrentDictionary<string, byte> _probeInFlight =
             new ConcurrentDictionary<string, byte>();
 
+        // Ports whose probe thread we have abandoned and want to stop polling.
+        // The thread itself does the Close (cross-thread Close mid-Open is the
+        // Wine segfault — see _probeInFlight above), so this is the only way to
+        // shorten the hold: it cuts the remaining SerialProbeCore.TotalBudgetMs
+        // to at most one poll slice. Set on the join timeout, cleared by the
+        // probe thread's finally and at the start of every new probe.
+        private static readonly ConcurrentDictionary<string, byte> _probeAbort =
+            new ConcurrentDictionary<string, byte>();
+
         // Per-port blocked-probe backoff. A port whose Open() keeps hanging (a
         // non-MOZA CDC device, or one another process holds open) used to be
         // re-probed on every sweep forever.
@@ -285,6 +294,27 @@ namespace MozaPlugin.Protocol
 
         private const int ProbeBackoffBaseMs = 10_000;
         private const int ProbeBackoffMaxMs = 300_000;
+
+        /// <summary>
+        /// How long <see cref="ProbeWithTimeout"/> waits for the probe thread
+        /// before abandoning it.
+        ///
+        /// <para><b>Must stay clear of the probe's own budget.</b> A port that
+        /// opens but doesn't answer burns the full
+        /// <see cref="SerialProbeCore.TotalBudgetMs"/> polling before its
+        /// <c>finally</c> closes the handle, so a deadline anywhere near that
+        /// value makes the abandon path — written for the Wine
+        /// freshly-powered-base wedge — the NORMAL outcome for any healthy
+        /// foreign device, leaving its port held. This was literally the bug: a
+        /// hardcoded 600 ms against a 500 ms budget left 100 ms for
+        /// <c>Open()</c> + <c>DiscardInBuffer()</c> + three writes +
+        /// <c>Close()</c>, and native-Windows bundles A6N521CS / QR3760VJ show
+        /// four ports abandoned in a single sweep. Defined in terms of the
+        /// budget so the two can never drift apart again.</para>
+        /// </summary>
+        internal const int ProbeOpenAllowanceMs = 1_500;
+        internal const int ProbeJoinTimeoutMs =
+            SerialProbeCore.TotalBudgetMs + ProbeOpenAllowanceMs;
 
         /// <summary>Retry interval after <paramref name="consecutive"/> blocked
         /// probe cycles: ProbeBackoffBaseMs doubled per cycle, capped at
@@ -400,10 +430,12 @@ namespace MozaPlugin.Protocol
         // fires for a "half-open" port that delivers BytesToRead==0 forever
         // WITHOUT throwing (a real failure mode: sleep/resume, USB stall) — the
         // ReadLoop just spins at Thread.Sleep(2) and nothing triggers reconnect.
-        // We stamp the last successful read and, once the wheel HAS talked,
-        // force a reconnect if inbound goes silent past ReadIdleDeadMs. The
-        // plugin's ~1 Hz parity polls keep a healthy wheel answering well inside
-        // this window, so a breach means the port is dead, not merely idle.
+        // We stamp the last successful read and, once the device HAS talked,
+        // force a reconnect if inbound goes silent past ReadIdleDeadMs. Every
+        // lane owner must keep something answering well inside this window (the
+        // wheel's ~1 Hz parity polls, the hub / base-aux 5 s reads, the standalone
+        // lanes' 5 s presence probe), so a breach means the port is dead, not
+        // merely idle.
         private long _lastRxUtcTicks;
         private const int ReadIdleDeadMs = 30_000;
 
@@ -562,6 +594,18 @@ namespace MozaPlugin.Protocol
         public DateTime LastSuccessfulOpenUtc
         {
             get { lock (_failureLock) return _lastSuccessfulOpenUtc; }
+        }
+
+        /// <summary>Time since the last inbound byte on this connection; null
+        /// before the first one (or after the read-idle detector has fired).
+        /// Diagnostics only.</summary>
+        public TimeSpan? InboundAge
+        {
+            get
+            {
+                long lastRx = Interlocked.Read(ref _lastRxUtcTicks);
+                return lastRx == 0 ? (TimeSpan?)null : TimeSpan.FromTicks(DateTime.UtcNow.Ticks - lastRx);
+            }
         }
 
         /// <summary>
@@ -1854,6 +1898,29 @@ namespace MozaPlugin.Protocol
                 return nb.CompareTo(na); // Descending - check high ports first
             });
 
+            // Drop ports the registry attributes to ANOTHER vendor. The probe
+            // opens a port and writes MOZA frames into it, so a port we can prove
+            // isn't ours must never be touched: doing so holds the device away
+            // from SimHub's own scanner and injects foreign bytes into its stream
+            // (bug reports A6N521CS / QR3760VJ — a DIY pedal set among four ports
+            // seized in one sweep). Ports the registry cannot identify are still
+            // probed, which is what keeps the Wine/by-id path working: sysfs
+            // filters to the MOZA VID at the source, so ForeignPortVids is empty
+            // there and this is a no-op.
+            var foreignVids = MozaPortDiscovery.Instance.ForeignPortVids();
+            if (foreignVids.Count > 0)
+            {
+                var mine = new List<string>(ports.Length);
+                for (int i = 0; i < ports.Length; i++)
+                    if (!foreignVids.ContainsKey(ports[i])) mine.Add(ports[i]);
+                if (mine.Count != ports.Length)
+                {
+                    MozaLog.DebugIfChanged($"probe-skip-foreign:{laneLabel}",
+                        $"[AZOM] [{laneLabel}] Skipping {ports.Length - mine.Count} non-MOZA COM port(s); probing {mine.Count}");
+                    ports = mine.ToArray();
+                }
+            }
+
             // Reset blocked-probe backoff for ports that have left the
             // enumeration since the last sweep: an unplug/replug may be
             // different hardware, so it starts over at the full probe cadence
@@ -1905,9 +1972,9 @@ namespace MozaPlugin.Protocol
                 MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
                     $"[AZOM] [{laneLabel}] Registry classifies {registryByPort.Count} of {ports.Length} COM port(s); probing the remainder");
 
-            // 600ms budget per port — SerialPort.Open can hang indefinitely under Wine
-            // if another process holds the tty. Background-thread the probe so one bad
-            // port can't block all detection.
+            // Per-port budget is ProbeJoinTimeoutMs — SerialPort.Open can hang
+            // indefinitely under Wine if another process holds the tty. Background-
+            // thread the probe so one bad port can't block all detection.
             var unreachable = new HashSet<string>();
 
             // Skip ports held by a sibling connection (Wine pty has no O_EXCL).
@@ -1962,7 +2029,7 @@ namespace MozaPlugin.Protocol
                         continue;
                     }
 
-                    var (baseResp, baseReach) = ProbeWithTimeout(port, 600, ProbeKind.Base);
+                    var (baseResp, baseReach) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Base);
                     if (!baseReach) { unreachable.Add(port); continue; }
                     if (baseResp)
                     {
@@ -1970,7 +2037,7 @@ namespace MozaPlugin.Protocol
                         continue;
                     }
 
-                    var (ab9Resp, _) = ProbeWithTimeout(port, 600, ProbeKind.Ab9);
+                    var (ab9Resp, _) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Ab9);
                     if (ab9Resp)
                     {
                         MozaLog.Info($"[AZOM] Found Moza AB9 shifter on {port} (probe)");
@@ -1998,7 +2065,7 @@ namespace MozaPlugin.Protocol
                         continue;
                     }
 
-                    var (responded, _) = ProbeWithTimeout(port, 600, ProbeKind.Hub);
+                    var (responded, _) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Hub);
                     if (responded)
                     {
                         MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe, dedicated hub connection)");
@@ -2024,7 +2091,7 @@ namespace MozaPlugin.Protocol
                     continue;
                 }
 
-                var (responded, reachable) = ProbeWithTimeout(port, 600, ProbeKind.Base);
+                var (responded, reachable) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Base);
                 if (responded)
                 {
                     MozaLog.Info($"[AZOM] Found Moza base on {port} (probe)");
@@ -2043,7 +2110,7 @@ namespace MozaPlugin.Protocol
                 // here is guaranteed mismatching — skip without re-logging.
                 if (registryByPort.ContainsKey(port)) continue;
 
-                var (responded, _) = ProbeWithTimeout(port, 600, ProbeKind.Hub);
+                var (responded, _) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Hub);
                 if (responded)
                 {
                     MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe)");
@@ -2094,6 +2161,7 @@ namespace MozaPlugin.Protocol
 
             bool responded = false;
             bool reachable = false;
+            _probeAbort.TryRemove(portName, out _);
             _probeInFlight[portName] = 1;
 
             var t = new Thread(() =>
@@ -2106,11 +2174,13 @@ namespace MozaPlugin.Protocol
                     // simply left running; it self-cleans here when Open finally
                     // returns.
                     (responded, reachable) = SerialProbeCore.ProbeOnePort(
-                        portName, kind, m => MozaLog.Debug($"[AZOM] {m}"));
+                        portName, kind, m => MozaLog.Debug($"[AZOM] {m}"),
+                        shouldAbort: () => _probeAbort.ContainsKey(portName));
                 }
                 catch { responded = false; reachable = false; }
                 finally
                 {
+                    _probeAbort.TryRemove(portName, out _);
                     _probeInFlight.TryRemove(portName, out _);
                 }
             })
@@ -2125,6 +2195,7 @@ namespace MozaPlugin.Protocol
                 // thread's finally — which removes the in-flight marker — will
                 // never run, so clear it here; otherwise this port is skipped
                 // forever (the marker would be a permanent in-flight tombstone).
+                _probeAbort.TryRemove(portName, out _);
                 _probeInFlight.TryRemove(portName, out _);
                 return (false, false);
             }
@@ -2139,6 +2210,13 @@ namespace MozaPlugin.Protocol
                 // thread, removes the in-flight marker) when the syscall finally
                 // returns; until then this port is skipped above. The thread is
                 // IsBackground, so it never blocks process exit.
+                //
+                // Raise the abort flag so a thread that is merely POLLING (open
+                // succeeded, device just isn't answering) stops at its next slice
+                // instead of holding the port for the rest of its budget. A
+                // thread genuinely wedged inside Open() never reaches the check —
+                // nothing changes for it, which is the case this path exists for.
+                _probeAbort[portName] = 1;
                 NoteProbeBlocked(portName, backoff,
                     $"timed out after {timeoutMs}ms — abandoning blocked probe thread " +
                     "(not force-closing cross-thread; port marked in-flight)");

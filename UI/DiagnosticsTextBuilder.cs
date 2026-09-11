@@ -167,7 +167,9 @@ namespace MozaPlugin.UI
         /// <para><c>binary=</c> is the presence-probe latch that gates the settings
         /// reads, and <c>read=</c> whether those reads actually came back: a lane that
         /// is connected with <c>read=no</c> means the tab is showing MozaData defaults,
-        /// not the device's stored calibration.</para>
+        /// not the device's stored calibration. <c>rx=</c> is the age of the lane's
+        /// last inbound byte; the lane is polled every 5 s and the connection closes
+        /// a port silent for 30 s, so a healthy lane never shows more than ~5 s.</para>
         /// </summary>
         public static string BuildStandalonePeripherals(MozaPlugin plugin, MozaData data)
         {
@@ -201,10 +203,12 @@ namespace MozaPlugin.UI
                         : "n/a";
                 // capture= is this lane's CaptureLabel, i.e. the exact "source" column
                 // its frames carry in serial-capture-*.txt — ties a row to its traffic.
+                var rxAge = c.Connection.InboundAge;
+                string rx = rxAge.HasValue ? $"{(long)rxAge.Value.TotalMilliseconds} ms ago" : "—";
                 sb.AppendLine(
                     $"        tabFlag={(c.SharedFlagSet ? "set" : "clear")}  " +
                     $"ownsWrites={(c.OwnsPeripheral ? "yes" : "no")}  settingsRead={read}  " +
-                    $"pendingReads={c.PendingResponses.PendingCount}  capture={c.Connection.CaptureLabel}");
+                    $"pendingReads={c.PendingResponses.PendingCount}  rx={rx}  capture={c.Connection.CaptureLabel}");
                 var f = c.Connection.LastFailure;
                 if (f.Kind != ConnectionFailureKind.None)
                     sb.AppendLine($"        lastFailure={f.Kind} port={Blank(f.PortName ?? "")} '{f.Message}'");
@@ -286,8 +290,56 @@ namespace MozaPlugin.UI
                     sb.AppendLine($"        axes={d.AxisCount}  connected={d.ConnectedAxisCount}  roles=[{string.Join(", ", roleParts)}]");
                 }
                 AppendMBoosterPedalConfig(sb, d, s);
+                AppendMBoosterStatusRegisters(sb, d);
+                // Routed chain: which chained ids announced themselves, and
+                // whether they went on to ANSWER — the pair that decides
+                // whether each pedal gets its own singleton registers or both
+                // fall back to the host and share one set (bug 34JAASN5).
+                if (d.IsRouted)
+                {
+                    var chain = d.RoutedChainIds;
+                    if (chain.Length > 0)
+                    {
+                        var parts = new System.Collections.Generic.List<string>();
+                        foreach (var dev in chain)
+                            parts.Add($"0x{dev:x2}{(d.DeviceHasAnswered(dev) ? "(answers)" : "(silent)")}");
+                        sb.AppendLine($"        routedChain=[{string.Join(", ", parts)}]  addressable=[{string.Join(", ", System.Array.ConvertAll(d.MotorIds, x => $"0x{x:x2}"))}]");
+                    }
+                    else
+                    {
+                        sb.AppendLine("        routedChain=[none announced]");
+                    }
+                }
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// The group-35 status registers real Pit House polls that AZOM had no
+        /// names for. Only 0xB4 has a decoded meaning — the pedal's
+        /// calibration-mode state (2 = normal, 0 = mid travel calibration),
+        /// which is why a travel calibration MUST be followed by a soft reboot.
+        /// The rest (0x0D, 0x21-0x24) read as per-unit constants in every
+        /// capture so far and are printed raw so the next bundle from a
+        /// different topology can settle what they mean, instead of the values
+        /// being guessed at. See docs/protocol/devices/mbooster.md.
+        /// </summary>
+        private static void AppendMBoosterStatusRegisters(StringBuilder sb, MBoosterDeviceController d)
+        {
+            var regs = d.StatusRegisters();
+            if (regs.Count == 0) return;
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var kv in regs)
+            {
+                // Key is "<dev hex>:mbooster-<name>" — drop the shared prefix.
+                int cut = kv.Key.IndexOf(":mbooster-", StringComparison.Ordinal);
+                string label = cut >= 0
+                    ? kv.Key.Substring(0, cut + 1) + kv.Key.Substring(cut + ":mbooster-".Length)
+                    : kv.Key;
+                parts.Add($"{label}={kv.Value}");
+            }
+            parts.Sort(StringComparer.Ordinal);
+            sb.AppendLine($"        status=[{string.Join(", ", parts)}]");
         }
 
         /// <summary>
@@ -338,6 +390,7 @@ namespace MozaPlugin.UI
                     $"travel={FmtMm(cfg.TravelStartMm)}..{FmtMm(cfg.TravelEndMm)} " +
                     $"endstop={FmtRaw(cfg.EndstopFrontStiffness)}/{FmtRaw(cfg.EndstopEndStiffness)} " +
                     $"friction={FmtPct(cfg.NaturalFrictionPct)} " +
+                    $"damping={FmtPct(cfg.DampingPressPct)}/{FmtPct(cfg.DampingReleasePct)} " +
                     $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
                     $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")}");
             }
@@ -500,6 +553,28 @@ namespace MozaPlugin.UI
                                + $"  want bri rpm={Bri(overlay.WheelRpmBrightness)} "
                                + $"btn={Bri(overlay.WheelButtonsBrightness)} knob={Bri(overlay.WheelKnobRingBrightness)}"
                              : ""));
+            // Per-encoder BUTTON/KNOB signal mode (0=Buttons, 1=Knob). Four views, because
+            // they are known to disagree: the profile's wish (overlay), the wheel's own
+            // 2A [fw] readback (data), and what the write cache thinks is in the register.
+            // `fw` is the firmware index the write addresses — it is NOT the logical knob
+            // on CS Pro / KS Pro (WheelModelInfo.KnobSignalModeOrder). The wheel stores all
+            // of them in one bitmask it also logs as "Table 2, Param 19 Written: N" in the
+            // Firmware debug section below, so the two can be compared directly.
+            int encCount = model.KnobEncoderCount >= 0
+                ? Math.Min(model.KnobEncoderCount, MozaData.WheelKnobMax) : swept;
+            if (encCount > 0)
+            {
+                var sigOv = overlay?.WheelKnobSignalModes;
+                sb.AppendLine("Knob signal:    knob   fw  overlay  data  mode c/w");
+                for (int k = 0; k < encCount; k++)
+                {
+                    int fw = model.SignalModeFirmwareIndex(k);
+                    string o = sigOv != null && k < sigOv.Length && sigOv[k] >= 0
+                        ? sigOv[k].ToString(CultureInfo.InvariantCulture) : "—";
+                    sb.AppendLine($"                {k + 1,4}  {fw,3}  {o,7}  {Bri(d.WheelKnobSignalModes[k]),4}"
+                                  + $"  {Cfg($"wheel-knob-signal-mode{fw}")}");
+                }
+            }
             // Header and rows share one width table so the columns line up. mode next to
             // mode-cache/want is the load-bearing pair: a wheel reporting Static while the
             // plugin wants SimHub means the mode write never landed, and the firmware is
@@ -659,6 +734,31 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 dash lane:     {cm2.TargetDescription} on {cm2.ConnectionRef?.CaptureLabel} pipe " +
                     $"(frames={cm2.FramesSent}, {cm2.Phase})");
+
+                // The CM2's OWN switch/binding state. Every other section of this
+                // report (Session state, Dashboard state, the channel catalog, the
+                // last subscription) reads the MAIN sender, so on a wheel+CM2 rig a
+                // CM2-side fault was invisible here and only the raw log showed it.
+                sb.AppendLine();
+                sb.Append(
+                    $"CM2 switch state:  slot={cm2.WheelReportedSlot} lastKind4={cm2.LastEmittedKind4Slot} " +
+                    $"catalog={cm2.CatalogCount} hotReneg={YesNo(cm2.EnableHotRenegotiation)} " +
+                    $"cooldown={YesNo(cm2.IsInSilenceCooldown)}");
+                sb.AppendLine();
+                sb.Append($"CM2 engaged:       {cm2.Watchdog?.DisplayEngagementText() ?? "(n/a)"}");
+
+                // The CM2's dashboard list — the slot above indexes THIS list, not the
+                // wheel's, so both are needed to tell a wrong-slot from a wrong-list.
+                var cm2List = cm2.WheelState?.ConfigJsonList;
+                sb.AppendLine();
+                if (cm2List == null || cm2List.Count == 0)
+                    sb.Append("CM2 dashboards:    (none advertised yet)");
+                else
+                    sb.Append($"CM2 dashboards ({cm2List.Count}): {string.Join(", ", cm2List)}");
+                // The saved name the re-assert resolves to a slot; a value absent from
+                // the list above is why a re-assert silently does nothing.
+                sb.AppendLine();
+                sb.Append($"CM2 saved dash:    {Blank(plugin!.ActiveCm2DashboardName)}");
             }
             else if (cm2Present)
             {

@@ -51,6 +51,102 @@ always lives at `0x12`** regardless of which HID axis it reports on
 (confirmed on three units, support bundles 2026-07-30 and KY3HK4QP: every
 response frame came from `0x12`; `0x1d`/`0x1e` never acked anything).
 
+### A real two-unit chain — `0x1d` DOES answer (Pit House captures, 2026-09-08)
+
+The 2026-09-08 calibration captures are the first observed **genuine chain**,
+and the counter-example to the KY3HK4QP conclusion above that "`0x1d`/`0x1e`
+never acked anything" — which was true of that unit, not of the id.
+
+One CDC pipe (USBPcap device address 4, then 3 after the calibration's own
+re-enumeration — the same physical device) carries traffic to **both `0x12`
+and `0x1d`**, and both answer everything: identity
+(`0x84`/`0x85`/`0x86`/`0x87`/`0x88`/`0x8F`/`0x90`/`0x91`), config
+reads/write-echoes (`0xA3`/`0xA4`), position (`0xA5`), and the firmware log
+(`0x0E`, `src=0x21` and `src=0xD1`). The two report **distinct serials** —
+`Q419960` at `0x12`, `Q315674` at `0x1d` — so they are genuinely two units,
+not one answering twice. `0x1e` was written 38–56 times across the captures
+and **never** answered.
+
+So a write-with-no-response tally still proves an id is absent (that logic is
+sound), but the absence must be measured per unit — never generalised into
+"`0x1d` is always phantom".
+
+The host `0x12` aggregates: `PD Linked:[T 1 B 1 C 1]`, Throttle **active**,
+Brake **active**, Clutch **passive**. Both calibration routines were addressed
+to `0x12`, and `0x12`'s log is where every `B-PD…` line appears — i.e. Pit
+House sent them to the unit that owns the brake's own registers, which is what
+`MotorDeviceForRole` already resolves. **Not** to a role-derived id: the brake
+here sits on the host while an active throttle sits at `0x1d`.
+
+### A routed lane can carry a real chain too (bug reports GVT5H8B8 / 34JAASN5)
+
+"An mBooster on a wheelbase's RJ45 pedal port is a single unit at `0x19`" was
+half wrong. That W17 carries an mBooster at `0x19` hosting one active pedal
+**and a second active unit chained behind it at `0x1d`**, which streams its own
+group-`0x0E` diagnostics on the shared pipe (65 frames in one capture) with its
+own MCU/MOS/MOT temps, `PD Linked: 1`, its own `Theta` and its own load cell —
+the scalar dialect below. The device's own aggregate view at `0x19` agrees:
+`PD Linked:[T 1 B 1 C 1]` with **both** throttle and brake
+`connected, type: active pedal`.
+
+With everything forced onto `0x19`, the two pedals shared one set of the
+brake-named singleton registers. The read-backs show them overwriting each
+other on every apply, 74 ms apart:
+
+```text
+19:12:29.054  travel-start = 4655   end = 43976   (3.8 / 35.9 mm — throttle's)
+19:12:29.128  travel-start = 21560  end = 60881   (17.6 / 49.7 mm — brake's)
+```
+
+and the motor routine (group `0x2A`, which has **no** pedal selector) always
+drove whichever motor `0x19` fronts, whatever pedal the user picked.
+
+**Discovery is passive and evidence-gated.** On a shared base/hub pipe
+`0x1d`/`0x1e` genuinely can belong to other peripherals (`0x1c` is the E-stop),
+so a routed lane emits nothing to a chained id until that id has, unprompted,
+logged the active-pedal wording itself
+(`MBoosterDeviceController.DiscoverRoutedChainDevice`). Only then is it probed
+— reads only — and only if it *answers* can the role map place a pedal on it.
+A discovered-but-silent id is never written to, which is the
+KY3HK4QP/A6N521CS failure mode. The diagnostics dump reports both halves as
+`routedChain=[0x1d(answers), …] addressable=[0x19, 0x1d]`.
+
+Two fallout fixes from the same reports:
+
+- **`ConfigDeviceForRole` had no routed guard.** Its fallbacks are
+  `MotorDeviceForAxis(axis)` and `0x12`, on the reasoning that "`0x12` is the
+  one id always present on the pipe" — true of a dedicated USB pipe, but on a
+  shared pipe `0x12` is the **wheelbase main**, so an unresolved routed chain
+  would have flash-committed pedal registers into the base. It now returns
+  `HostDeviceId`, matching `MotorDeviceForCurrentAxis`.
+- **Register `0xB4` is not a calibration-mode gate.** It read 2 → 0 → 2 across
+  a travel calibration on the USB unit, but reads a constant **15** on this
+  routed lane through an entire run — including while the firmware has acked
+  the start frame. Gating on it failed every travel calibration there. Nothing
+  branches on it now; the firmware's own `Pedal Calib …` lines are the real
+  progress signal, and their **absence** across the whole 20 s window is how
+  "the device acked the start frame and did nothing" is detected (which is what
+  `0x19` does for the throttle pair).
+
+### A third diagnostic dialect — the chained unit's own scalar form
+
+The chained unit at `0x1d` reports only its own single pedal, in a form that
+is neither of the two dialects tabulated below — scalar, not per-pedal:
+
+```text
+PD Linked: 1
+Theta:[min 0.00000.. max 24.11499 angle 16.28173..]
+Sensor Dir: -1
+OP Dir: 0
+```
+
+`LogPedalDiagnosticIfRelevant`'s `PD Linked` matcher fires on this, but
+`FlagAfter(ascii, 'T')` finds no `T`/`B`/`C` markers, so the parse fails its
+`t >= 0 && b >= 0 && c >= 0` guard and `ConnectedAxes` is left alone. That is
+the correct outcome — a chained unit's own view is not the lane's
+connectivity — but it is accidental rather than intended, so don't "fix" the
+parser to accept it.
+
 ### Active vs passive is the chain discriminator — not the pedal count
 
 One mBooster commonly hosts **passive** pedals (a CRP2 throttle/clutch) on
@@ -104,6 +200,34 @@ A passive pedal also has no motor, so its effect worker must not tick —
 otherwise, once every axis resolves to the one real device id, the passive
 axes' workers all stream at the active pedal's motor and race the genuine
 worker for it (`MBoosterEffectWorker.IsPedalAxisConnected`).
+
+### Config writes and effect frames route differently on purpose
+
+Until `ActiveAxisCount` is known there is no sound chain signal, so
+`MBoosterDeviceController.ConfigDeviceForRole` — used by the connect-time
+apply (`HardwareApplier.MBooster`), `CalibDeviceForAxis`, the UI sliders and
+`MBoosterCalibrationRunner` — resolves the role map when it exists and
+otherwise falls back to the **host** `0x12`, never to `MotorDeviceForAxis`.
+Effects keep using `MotorDeviceForRole`/`MotorDeviceForCurrentAxis` with its
+count-based guess.
+
+The asymmetry is about durability. A motor frame is transient; a config write
+is flash-committed by whichever unit receives it, and `RoutingResolved`'s
+re-apply only writes the *corrected* id, so a wrong one is never undone.
+Bundle A6N521CS is the failure: the connectivity cache seed
+(`MBoosterKnownPedals`, `T=False B=True C=True`) made `connectedCount > 1`
+read as a chain 9 s before the type lines landed, so all 28 group-`0x24`
+feel-curve writes of the connect-time apply went to `0x1d` — which does not
+exist on that unit and answered nothing — and the real device got its first
+write 6.2 s later, from the post-verdict re-apply. Note the count-based guess
+is wrong on its own terms here: this is one unit hosting a passive clutch,
+exactly the topology the section above says pedal count cannot distinguish
+from a chain.
+
+Collapsing effects onto `0x12` in that same window is *not* the fix — it would
+put several axes' workers on the host's motor at once, the race
+`IsPedalAxisConnected` guards, whose own `IsAxisMotorized` gate is fail-open
+while the types are unknown.
 
 **The verdict arrives long after the detection edge.** The type lines ride
 the once-a-minute heartbeat block, so the connect-time apply
@@ -258,11 +382,21 @@ Engine off:                7e 09 24 12 b1 04 00 00 00 00 00 00 00 7f
 
 ### Keepalive
 
-Degenerate 0-payload frame targeting device 0x12 — `7e 00 00 12 9d`.
+Degenerate 0-payload frame — `7e 00 00 12 9d` for the host.
 Built by [`MozaMBoosterProtocol.BuildKeepalive`](../../../Protocol/MozaMBoosterProtocol.cs).
 Emitted every ~500 ms from `MBoosterEffectWorker` regardless of
 effect state. Stops being sent → motor eventually drops connection
 state and may stop responding to writes.
+
+Sent to **every** id in `MotorIds`, not just `0x12`: on a USB lane that is
+`0x12` + `0x1d` + `0x1e` every 500 ms for the life of the connection
+(matching Pit House — a chained active mBooster's motor drops its connection
+state if its own id isn't kept alive, and the writes are harmless on an
+empty or passive port). A routed lane keeps only the tunneled sub-device,
+since `0x1d`/`0x1e` belong to other peripherals on a shared base/hub pipe.
+So a capture showing a steady 2 Hz triplet to all three ids on a
+single-pedal unit is correct and expected — do not read it as the phantom
+routing described above, which is group-`0x24` **config** traffic.
 
 **Detection note:** the keepalive and motor frames are write-only —
 the device never replies to either. With all effects disabled (the
@@ -281,6 +415,134 @@ Same opcode with `enable = 0` and all params zeroed.
 Sent at every effect deactivation edge AND for all four effect IDs on
 controller dispose, otherwise the last-active waveform can latch on
 the motor after the port closes.
+
+### Soft reboot — group `0x01` cmd `0x02`
+
+`7e 01 01 12 02` — byte-identical to the wheelbase's own
+[`main-soft-reboot`](main-hub-0x12.md), on the mBooster's own pipe.
+Registered as `mbooster-soft-reboot`. The firmware answers with
+`serial_cmd_com.c:262 Software reset.` and the CDC pipe drops for **~4.6 s**,
+after which the host re-runs the whole identity handshake and re-pushes the
+entire config block.
+
+Not optional decoration: **both** calibration routines below need it, and
+[`MozaMBoosterRegistry.Refresh`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
+disposes and removes a controller whose port disappears during the outage.
+That is why
+[`MBoosterCalibrationRunner`](../../../Devices/MBooster/MBoosterCalibrationRunner.cs)
+lives on the registry, keyed by USB device-instance identity (which survives
+the re-enumeration), rather than on the controller.
+
+### Travel calibration — group `0x26` (38) cmd `0x0D` / `0x11`
+
+The same cmd ids the wheelbase pedals bus uses
+(`pedals-brake-cal-start`/`-stop`) — but **Pit House sends param `0x0000`** on
+this bus where the plugin's pedals-bus call sites pass `1`.
+
+```text
+h2b  7e 03 26 12 0d 00 00 d3      start          (cmd 13, param 0x0000)
+b2h  7e 03 a6 21 0d 00 00 62      echo
+        … firmware self-drives, ~10-13 s, zero host frames …
+h2b  7e 03 26 12 11 00 00 d7      stop / commit  (cmd 17, param 0x0000)
+b2h  7e 03 a6 21 11 00 00 66      echo
+```
+
+Firmware log on start:
+
+```text
+pedal_cmd.c:781     B-PD-C-S
+model_app.c:65      pedal_active_mode changed: 4
+motor_mode.c:28     Set MotorMode to:12
+pedal_active.c:387  Foot on, motor enabled
+common_wrapper.c:57 Pedal Calib Start
+```
+
+then, with no further host frames: `Pedal Calib Backward` (+2.5 s),
+`Pedal Calib Forward` (+6.1 s), `Pedal Calib pressure Calculating....`
+(+9.7 s / +13.4 s across the two runs).
+
+**The motor sweeps the pedal itself — the user must keep their foot off it.**
+The two captured runs agree to 0.01° and to five decimals on sweep speed
+(`Min -0.02197, Max 22.93945, Speed 32.95898, B-L 50394` vs
+`Min 0.00000, Max 22.95043, Speed 32.95898, B-L 50385`), which a human press
+cannot reproduce. Confirmed independently from the `0xA5` position stream:
+brake output went 0 → 19660 → 0 between t=16.7 and t=18.6, exactly across
+`Pedal Calib Forward`, and sat flat at 0 either side.
+
+On stop: `Pedal Calib End`, then commits of Table 6 params 29 (max angle
+22.96), 31, 42, 48, 54 (load-cell raw max 50394) and Table 2 param 23. Both
+runs also logged `B-PD Angle Excess`. Note it does **not** touch the
+`0x84`/`0x85` travel registers, so the post-reboot config re-push doesn't
+fight it.
+
+Pit House waits **exactly 20.0 s** between start and stop (11.557→31.556 and
+101.835→121.831) and sends no status read of any kind in between — its routine
+read loop just continues.
+
+**The soft reboot ~2 s after the stop frame is mandatory**, and register
+`0xB4` is the proof: it holds `2` in normal operation, drops to `0` within
+~0.3 s of the start frame, and returns to `2` only after the reboot — in both
+captures. It tracks the `Table 6 Param 50` / `pedal_active_mode changed: 4`
+the start frame writes, i.e. the routine leaves the pedal in calibration mode
+and only the reboot takes it out.
+
+Only the BRAKE pair is capture-confirmed, and the firmware's `B-PD-C-S`
+("brake pedal, calibration, start") is brake-specific wording. Throttle
+(`12`/`16`) and clutch (`14`/`18`) are registered by symmetry with the
+pedals bus and selected by the axis's resolved role.
+
+### Motor rotor-locate calibration — group `0x2A` (42) cmd `0x14` / `0x15`
+
+The firmware's `serial_reply_motor.c` calls this group **MotorCtrl** and echoes
+every frame as `MotorCtrl Cmd: <decimal cmd>, param_high: <b0>,
+param_low: <b1>`, which pins the 2-byte param layout exactly.
+
+```text
+h2b  7e 01 01 12 02 a1        soft reboot    → "Software reset."      t=16.83
+                              … ~4.6 s outage; host re-probes identity
+                                and re-pushes the whole config block …
+h2b  7e 03 2a 12 14 00 01 df  enter debug    → debug_mode enable,
+                                                MotorMode 0→9          t=36.83
+h2b  7e 03 2a 12 15 01 03 e3  start locate   → MotorMode 9→8,
+                                                "Motor Locate Start",
+                                                "Phase Sequence Ok"    t=41.83
+h2b  7e 03 2a 12 15 00 00 df  poll           → 7e 03 aa 21 15 00 01 (running)
+                                      …      → 7e 03 aa 21 15 00 03 (complete)
+```
+
+Completion at t=101.32, **59.5 s** after the locate frame:
+
+```text
+motor_wrapper.c:58   max_err: 0.00464 compen_theta_e:4.01480
+motor_wrapper.c:58   MotorMode From 8 to 0
+diag_svr_event.c:108 error_code 159 clear          ← "Rotor Not Located" cleared
+param_manage.c:340   Table 3, Param 5, 7…17 Written  ← compensation coefficients
+```
+
+and only on the `03` poll: `debug_mode disable`, `Set MotorMode to:12`. No
+reboot follows a successful locate — Pit House sends none.
+
+Cadence: first poll **+45.0 s** after the locate frame, then every 5 s.
+
+**cmd `0x15` carries three meanings in one cmd id**, distinguished by its
+param, and so does its echo — `param_high = 1` is the start command echoed
+back verbatim, and only a `param_high = 0` reply reports a state in its low
+byte. Reading the low byte unconditionally makes the start echo (`01 03`) look
+like "complete".
+
+**The pre-reboot is part of the routine.** It lands exactly **20.0 s** before
+the enter-debug frame — the same 20.0 s Pit House uses for the travel
+routine, i.e. a scripted sequence rather than a leftover from whatever
+preceded the recording. It also matters mechanically: enter-debug is logged as
+`MotorMode 0→9`, and MotorMode is 0 only because the post-reboot startup check
+ended in `error_code 159 / Rotor Not Located`. In normal operation the motor
+sits at MotorMode **12** (`Foot on, motor enabled`), and entering debug from
+12 is not observed.
+
+**No failure state was ever captured** — only `01` (running) and `03`
+(complete) — so wall clock is the only failure signal. The runner allows 180 s
+from the locate frame, then reports failure and soft-reboots, since the
+completing poll is the firmware's only exit from debug mode / MotorMode 8.
 
 ## Stream lane
 
@@ -949,6 +1211,70 @@ device or closing the settings panel
 (`SettingsControl.StopAllCustomEffectTests`), same safety net the other
 five effects' tests have.
 
+## What Pit House reads (2026-09-08 captures)
+
+### Connect handshake — twelve frames, in this order
+
+Every one of these groups was already decoded on the `wheel`/`base` buses, so
+the `mbooster-*` entries are plain twins. Re-runs verbatim on every reconnect,
+which is what a calibration's soft reboot produces.
+
+```text
+7e 00 09 12            presence         → 89 21 00 02
+7e 04 04 12 00000000   device-type      → 84 21 01 02 00 08
+7e 00 06 12            mcu uid          → 86 21 2b 00 29 00 0f "Q419960"
+7e 01 02 12 00         device-presence  → 82 21 02
+7e 04 05 12 00000000   capabilities     → 85 21 01 02 53 00
+7e 01 07 12 01         model name       → 87 21 01 "mBooster"
+7e 01 0f 12 01         sw version       → 8f 21 01 "RS21-P01-MC PB"
+7e 01 11 12 04         identity-11      → 91 21 04 01
+7e 01 08 12 01         hw version      → 88 21 01 "RS21-P01-HW PM-C"
+7e 01 10 12 00         serial a         → 90 21 00 "6d6Eai+WZC4CKKPy"
+7e 01 08 12 02         hw sub           → 88 21 02 "U-V12"
+7e 01 10 12 01         serial b         → 90 21 01 "EeW7Mh/ODpCPuVL1H"
+```
+
+`mbooster-device-type` needs `payloadBytes = 4`, not 0: `BuildReadMessage`
+appends `PayloadBytes` zeros, and 0 emitted a shorter `7e 00 04 12` that the
+capture never shows. Same as `base-fw-version`.
+
+### Per-cycle config read set (~2 s, group 35 to `0x12`)
+
+`0x01`–`0x09`, `0x0D`–`0x1D`, `0x21`–`0x24`, `0x84`, `0x85`, `0xAB`+sel `07`,
+`0xAD`+sel `00`/`01`, `0xAE`+sel `00`/`01`, `0xB2`+sel `00`/`01`, `0xB3`,
+`0xB4`. Plus `0x24` alone at ~15 Hz. Pit House reads neither `0xB7` nor
+anything the plugin reads that it doesn't.
+
+Two things this exposed in `RequestCalibrationReads`:
+
+- Travel, End Stop, Friction, Damping and Deadzone were **never read back**,
+  only written — they were registered with read group 35 but absent from the
+  burst, so the UI could not seed from the device.
+- The fifteen `mbooster-{throttle,brake,clutch}-y1..y5` reads it *did* ask for
+  were **silently dropped**: those commands lost their entries when the output
+  curve moved host-side, and `SendRead` returns false for an unknown name. Pit
+  House still reads all fifteen, so they are back as **read-only** entries
+  (write group `0xFF`) — the disproven write path stays gone.
+
+### Registers with no decoded meaning
+
+| cmd | width | `0x12` | `0x1d` | reading |
+|---|---|---|---|---|
+| `0x0D` | 2 | `0000` | `0000` | constant |
+| `0x21` | 2 | `0001` | `0002` | constant per unit |
+| `0x22` | 2 | `0002` | `0001` | constant per unit, inverse of `0x21` |
+| `0x23` | 2 | `0003` | `0003` | constant |
+| `0x24` | 4 | `0` | `0` | polled ~15 Hz, never moved |
+| `0xB4` | 4 | `2`→`0`→`2` | `2` | **calibration-mode state** |
+
+`0xB4` is named (`mbooster-calibration-state`) and load-bearing — see
+[Travel calibration](#travel-calibration--group-0x26-38-cmd-0x0d--0x11).
+`0x21`/`0x22`/`0x23` look like a pedal↔slot map (identity on the host,
+throttle/brake swapped on the chained unit) but one capture cannot prove that,
+so nothing is built on them. All six are read, stored per device and printed
+in the diagnostics dump (`status=[…]`) so the next bundle from a different
+topology settles them.
+
 ## Calibration surface (experimental)
 
 The protocol note marks the pedal-config command surface (group 35
@@ -1057,6 +1383,66 @@ device. `CurveY`/`CurveX` are `null` by default (identity / no remapping)
 — existing profiles are unaffected until a user opens this section.
 
 ## Pedal Feel
+
+### Virtual Damping — cmdId `0xAD`, press/release selectors
+
+A **separate register set** from Segmented Damping's per-segment fields
+(`0xB7`), not a duplicate of them: the firmware log prints
+`pedal_active_cmd.c:427 virtual_damping_press` / `:442
+virtual_damping_release` for these and
+`:770 virtual_damping_press1` … `:791 virtual_damping_release3` for `0xB7`'s,
+out of the *same* Pit House write burst.
+
+Same "fixed `0x00` + selector" shape as End Stop (`0xB2`) and Natural
+Friction (`0xAE`) — selector `0x00` = press, `0x01` = release, arriving as the
+firmware's `param_uint_high` — with a 2-byte value on the usual
+`raw = round(pct × 65535 / 100)` scale:
+
+```text
+7e 05 24 12 ad 00 00 66 66 3f    press   0x6666 → virtual_damping_press 4.80000
+7e 05 24 12 ad 00 01 40 00 b4    release 0x4000 → virtual_damping_release 2.50003
+```
+
+Those two decodes give the **physical full scales: 12.0 press, 10.0
+release** (40 % of 12 = 4.8; 25 % of 10 = 2.5). Units unstated by the
+firmware.
+
+Pit House pushes both selectors on **every** config apply, and reads both
+back every cycle, so `ApplyMBoosterToHardware` does too
+(`MBoosterDeviceSettings.DampingPressPct`/`DampingReleasePct`, `-1` = no
+override as everywhere else). The two selectors are independent values here,
+unlike Natural Friction's pair which always carries the same number.
+
+In the 2026-09-08 captures `0xAD` and all three `0xB7` segments held the same
+40 %/25 %, so **which of the two wins when they disagree is not determined** —
+but replicating what Pit House writes needs no answer to that.
+
+### `0xB2` is `softlimit_hardness`, and the value is a 0–1 fraction
+
+The firmware names End Stop's two selectors
+`pedal_active_cmd.c:476 softlimit_hardness_release` (selector `0x00`) and
+`:482 softlimit_hardness_press` (selector `0x01`), and decodes `0x4CCD` as
+`0.30000` — i.e. `raw / 65535` is a plain 0–1 fraction, so the plugin's
+percentage reading is right. (`tools/mbooster-config-writes` used to print
+this `× 10` as "3.00/10"; fixed.)
+
+### `0xB7` field order and scales, independently confirmed
+
+The firmware echoes the whole `0xB7` write field by field, and the order
+matches what the 11-capture cross-check already established. Wire
+`3333 b333 3333 b333 | 6666 4000 6666 4000 6666 4000` logged as:
+
+```text
+damping_press_point1 0.20000    damping_press_point2 0.70000
+damping_release_point1 0.20000  damping_release_point2 0.70000
+virtual_damping_press1 4.80000  virtual_damping_release1 2.50003
+virtual_damping_press2 4.80000  virtual_damping_release2 2.50003
+virtual_damping_press3 4.80000  virtual_damping_release3 2.50003
+```
+
+So: the four dividers are 0–1 fractions of pedal travel, and the six segment
+values share `0xAD`'s per-direction full scales (12.0 press / 10.0 release).
+The plugin's `pct × 65535 / 100` encoding is correct as-is.
 
 A card to the left of Sim Input Mapping holds `InputCurveY` on
 `MBoosterDeviceSettings` — 6 nodes.
@@ -2067,6 +2453,8 @@ equivalent of `ImportPlan.TouchedMBoosters`.
 - Per-device controller — [`Devices/MBooster/MBoosterDeviceController.cs`](../../../Devices/MBooster/MBoosterDeviceController.cs)
 - 50 Hz effect worker — [`Devices/MBooster/MBoosterEffectWorker.cs`](../../../Devices/MBooster/MBoosterEffectWorker.cs)
 - Multi-device registry — [`Devices/MBooster/MozaMBoosterRegistry.cs`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
+- Calibration routines — [`Devices/MBooster/MBoosterCalibrationRunner.cs`](../../../Devices/MBooster/MBoosterCalibrationRunner.cs), UI in [`UI/SettingsControl.MBoosterCal.cs`](../../../UI/SettingsControl.MBoosterCal.cs)
+- Byte-exact frame expectations — [`tools/cmd-frame-mbooster-cal.txt`](../../../tools/cmd-frame-mbooster-cal.txt), checked with [`tools/cmd-frame`](../../../tools/cmd-frame) (`tools/cmd-frame --check tools/cmd-frame-mbooster-cal.txt`)
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
 - Profile storage — [`Settings/MozaProfile.cs`](../../../Settings/MozaProfile.cs) (`MBoosterSettings` dict)
 - UI tab — [`UI/SettingsControl.xaml`](../../../UI/SettingsControl.xaml) (`MBoosterTab`) + handlers in `SettingsControl.xaml.cs` under "mBooster tab — multi-device"

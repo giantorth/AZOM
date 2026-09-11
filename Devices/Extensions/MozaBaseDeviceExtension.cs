@@ -277,9 +277,13 @@ namespace MozaPlugin.Devices.Extensions
                 if (plugin == null || settings == null) return;
 
                 // Already handled for this device instance, or Init found nothing to do.
+                // Still worth a retire pass: an upgrade that imported on an earlier
+                // build, or one that never had anything to import, can be sitting on
+                // a legacy definition whose one-shot delete failed.
                 if (_settings.LegacyLfeImported || string.IsNullOrEmpty(settings.LegacyLfeMigrationInstanceId))
                 {
                     _legacyImportSettled = true;
+                    TryRetireLegacyDefinition(plugin);
                     return;
                 }
 
@@ -358,6 +362,37 @@ namespace MozaPlugin.Devices.Extensions
                 s.LegacyLfeMigrationPending = false;
                 try { plugin.PersistSettings(); } catch { /* best-effort */ }
             }
+
+            TryRetireLegacyDefinition(plugin);
+        }
+
+        /// <summary>
+        /// Delete the pre-1.6 shared "MOZA Wheel Base" definition now that this
+        /// device has taken over, so the user stops seeing two wheelbases.
+        ///
+        /// The migration banner asks the user to ADD the model-named device while
+        /// leaving the old one live, so following it is what produces the pair —
+        /// which makes retiring the old definition part of the migration, not a
+        /// side effect of whichever boot happened to write the new one. Both remain
+        /// bound to this extension in the meantime (MozaDeviceConstants.IsBaseDevice
+        /// still matches BaseAmbientGuid), so both drive the ambient strip until the
+        /// duplicate is gone.
+        ///
+        /// Two guards. It runs only from a PER-MODEL device — the legacy device's own
+        /// extension must never delete the definition it is running from. And it
+        /// waits for the import to settle: the legacy instance's saved settings are
+        /// what the migration reads, and orphaning the instance before they are
+        /// carried across risks SimHub reaping them first.
+        /// </summary>
+        private void TryRetireLegacyDefinition(MozaPlugin plugin)
+        {
+            if (_modelPrefix.Length == 0) return;
+
+            var settings = plugin.Settings;
+            if (settings == null || settings.LegacyLfeMigrationPending) return;
+
+            if (DeviceDefinitionDeployer.RemoveLegacyBaseDefinition())
+                plugin.DeviceDefinitionDeployed = true;   // raises the restart hint
         }
 
         private void ImportOnUiThread(DeviceInstance? motors, LedModuleDevice? leds, LegacyBaseScanResult legacy)

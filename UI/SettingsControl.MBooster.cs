@@ -482,13 +482,13 @@ namespace MozaPlugin.UI
                 var cfg = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.GetOrCreatePedalConfig(s, axisIndex, controller.SoleConnectedAxis());
                 if (cfg != null)
                 {
-                    bool isBrake = role == MBoosterRole.Brake;
-                    float dzMin = isBrake ? MBoosterUiConstants.BrakeDeadzoneMinKg
-                        : role == MBoosterRole.Clutch ? MBoosterUiConstants.ClutchDeadzoneMinKg : MBoosterUiConstants.ThrottleDeadzoneMinKg;
-                    float dzMax = isBrake ? MBoosterUiConstants.BrakeDeadzoneMaxKg
-                        : role == MBoosterRole.Clutch ? MBoosterUiConstants.ClutchDeadzoneMaxKg : MBoosterUiConstants.ThrottleDeadzoneMaxKg;
-                    float mfMin = isBrake ? MBoosterUiConstants.BrakeMaxForceMinKg : MBoosterUiConstants.ThrottleMaxForceMinKg;
-                    float mfMax = isBrake ? MBoosterUiConstants.BrakeMaxForceMaxKg : MBoosterUiConstants.ThrottleMaxForceMaxKg;
+                    // Hardware, not role — reassigning an ACTIVE pedal from
+                    // brake to throttle must not clamp its load-cell value
+                    // down to a spring pedal's ceiling (that clamp, plus the
+                    // slider's own coercion, is what walked Max Force to 24kg
+                    // in bug reports ARE6993X / QQS3MVDS).
+                    MBoosterUiConstants.ForceRanges(controller.IsAxisMotorized(axisIndex),
+                        out float mfMin, out float mfMax, out float dzMin, out float dzMax);
                     bool clamped = false;
                     if (cfg.MaxForceKg >= 0)
                     {
@@ -769,6 +769,15 @@ namespace MozaPlugin.UI
             bool frictionEnabled = fx?.NaturalFrictionEnabled ?? true;
             MBoosterNaturalFrictionEnable.IsChecked = frictionEnabled;
             MBoosterNaturalFrictionSlider.IsEnabled = frictionEnabled;
+
+            // Plain Virtual Damping (0xAD) — separate registers from the 0xB7
+            // segments below; see MBoosterDeviceSettings.DampingPressPct.
+            float dp = fx?.DampingPressPct ?? -1;
+            MBoosterDampingPressSlider.Value = dp >= 0 ? dp : 0;
+            SetValueText(MBoosterDampingPressValue, MBoosterDampingPressSlider.Value.ToString("F0"));
+            float dr = fx?.DampingReleasePct ?? -1;
+            MBoosterDampingReleaseSlider.Value = dr >= 0 ? dr : 0;
+            SetValueText(MBoosterDampingReleaseValue, MBoosterDampingReleaseSlider.Value.ToString("F0"));
 
             var sd = fx?.SegmentedDamping;
             bool dampingEnabled = sd?.DampingEnabled ?? true;

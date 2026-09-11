@@ -56,6 +56,7 @@ namespace MozaPlugin.Settings
         {
             TelemetryEnabledDefaultForNewWheels = true,
             WheelbaseLfeSource = WheelbaseLfeSource.ShakeIt,
+            KnobColorAllBlackRepaired = true,
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -151,17 +152,6 @@ namespace MozaPlugin.Settings
         // Packed as R<<16 | G<<8 | B, null = defaults not yet customized
         public int[]? WheelRpmBlinkColors { get; set; }
         public int[]? DashRpmBlinkColors { get; set; }
-
-        // Per-knob LED ring colours (W17/W18 only). Write-only on the wire —
-        // persisted here so they survive restarts. Packed as R<<16 | G<<8 | B.
-        public int[]? WheelKnobBackgroundColors { get; set; }
-        public int[]? WheelKnobPrimaryColors { get; set; }
-
-        // Group 3 per-LED ring colors (up to 56 LEDs). Readable from wheel but persisted
-        // for profile switching. Packed as R<<16 | G<<8 | B.
-        public int[]? WheelKnobRingColors { get; set; }
-        private volatile int _wheelKnobRingBrightness = -1;
-        public int WheelKnobRingBrightness { get => _wheelKnobRingBrightness; set => _wheelKnobRingBrightness = value; }
 
         // Connection enabled (persisted toggle)
         public bool ConnectionEnabled { get; set; } = true;
@@ -341,6 +331,12 @@ namespace MozaPlugin.Settings
         // MozaPlugin.Init. Latched whether or not an orphan was found, so a user
         // who later picks the plugin LFE tab is never flipped back.
         public bool LegacyLfeDeviceMigrated { get; set; }
+
+        // One-shot marker for the repair that nulls saved knob palettes that are
+        // entirely black — laundered from an unseeded MozaData mirror by the old
+        // device-JSON capture / whole-array persist paths, not chosen by anyone.
+        // See ProfileCoordinator.RepairAllBlackKnobColorArrays.
+        public bool KnobColorAllBlackRepaired { get; set; }
 
         // An orphaned pre-1.6 haptics device was found and its settings have not
         // been carried into a per-model wheelbase device yet. Drives the one-time

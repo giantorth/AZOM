@@ -6,9 +6,12 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MozaPlugin.Diagnostics;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
+using MozaPlugin.UI.DjsonImport;
 using MozaPlugin.Resources;
+using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Devices.Ui
 {
@@ -255,6 +258,46 @@ namespace MozaPlugin.Devices.Ui
                 return null;
             var p = _plugin.DashCache.TryGetFolderFilePath(name);
             return !string.IsNullOrEmpty(p) && System.IO.File.Exists(p) ? p : null;
+        }
+
+        /// <summary>
+        /// Convert a SimHub <c>.djson</c> dashboard to <c>.mzdash</c>.
+        ///
+        /// <para>The converter writes into Dashboard Studio's project root, which the
+        /// library scan already covers, so a successful conversion only needs the same
+        /// rescan the folder picker does for the new dashboard to appear in the upload
+        /// list.</para>
+        /// </summary>
+        private void ImportDjson_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+
+            // Seed the target display from the connected wheel's own configJson, never
+            // from Studio's built-in literal (it describes one specific wheel).
+            JArray? ideal = null;
+            var infos = ResolveIdealDeviceInfos();
+            if (infos.Count > 0)
+            {
+                try
+                {
+                    ideal = JArray.Parse(DashboardStudioLauncher.BuildIdealDeviceInfosJson(infos));
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM] DashboardFiles: idealDeviceInfos not usable: {ex.Message}");
+                }
+            }
+
+            var dialog = new DjsonImportDialog(_plugin.DashProfileStore, ideal)
+            {
+                Owner = Window.GetWindow(this),
+            };
+            dialog.ShowDialog();
+
+            if (!dialog.Converted) return;
+            _plugin.ReloadDashboardLibrary();
+            SeedUploadLibrary(force: true);
+            RefreshDashboardUploadStatus();
         }
 
         private void StudioCreate_Click(object sender, RoutedEventArgs e)
@@ -827,7 +870,13 @@ namespace MozaPlugin.Devices.Ui
             uint bw = ts?.UploadLastBytesWritten ?? 0;
             uint total = ts?.UploadLastTotalSize ?? 0;
             byte status = ts?.UploadLastStatusByte ?? 0;
-            int pct = total == 0 ? 0 : (int)(bw * 100L / total);
+            // Percentage comes from UploadProgress (content sub-msgs emitted),
+            // NOT bw/total: the wheel's ready-ack sometimes echoes total_size
+            // into bytes_written, which read 100 % before a single content chunk
+            // had gone out (bundle NS9G817J). bw/total still decides
+            // complete-vs-stopped below — "does the wheel have all the bytes"
+            // is exactly what it answers.
+            int pct = (int)Math.Round((ts?.UploadProgress ?? 0.0) * 100.0);
 
             UploadInfoProgressText.Text =
                   inFlight    ? string.Format(Strings.Upload_StatusUploading, pct)

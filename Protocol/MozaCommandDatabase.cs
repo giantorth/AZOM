@@ -711,11 +711,101 @@ namespace MozaPlugin.Protocol
             // docs/protocol/devices/mbooster.md "Pedal Feel".
             AddCommand("mbooster-brake-friction-0", "mbooster", 35, 36, new byte[] { 0xAE, 0x00, 0x00 }, 2, "int");
             AddCommand("mbooster-brake-friction-1", "mbooster", 35, 36, new byte[] { 0xAE, 0x00, 0x01 }, 2, "int");
-            // (The per-role 5-point output curve commands (cmdIds 14-29,
-            // mbooster-{throttle,brake,clutch}-y1..y5) were removed — the Sim
-            // Input Mapping output curve is now purely host-side, with no
+            // Virtual Damping (0-100%) — the PLAIN, non-segmented damping pair,
+            // a genuinely separate register set from Segmented Damping's own
+            // per-segment fields (cmdId 0xB7): the firmware log prints
+            // `virtual_damping_press` / `virtual_damping_release`
+            // (pedal_active_cmd.c:427/:442) for these and
+            // `virtual_damping_press1..3` / `_release1..3` for 0xB7's, from the
+            // same write burst. Same "prefix + selector" shape as End Stop and
+            // Natural Friction: cmdId 0xAD, fixed 0x00, selector (0x00 = press,
+            // 0x01 = release) before the 2-byte value. Encoded as pct like
+            // 0xB7 (raw = round(pct * 65535 / 100)); the firmware's own
+            // physical full scales are 12.0 press / 10.0 release, so the
+            // captured 0x6666/0x4000 decoded to 4.80000 / 2.50003. Pit House
+            // pushes both selectors in the same burst as 0xB7. See
+            // docs/protocol/devices/mbooster.md "Pedal Feel".
+            AddCommand("mbooster-brake-damping-press",   "mbooster", 35, 36, new byte[] { 0xAD, 0x00, 0x00 }, 2, "int");
+            AddCommand("mbooster-brake-damping-release", "mbooster", 35, 36, new byte[] { 0xAD, 0x00, 0x01 }, 2, "int");
+            // Registers Pit House reads that had no names here. 0xB4 is the
+            // pedal's calibration-mode state — 2 = normal, 0 = in travel
+            // calibration; it drops to 0 within ~0.3s of a cal-start and
+            // returns to 2 only after the soft reboot, tracking the
+            // `Table 6 Param 50` / `pedal_active_mode changed: 4` the start
+            // frame writes. That is what makes the post-calibration reboot
+            // mandatory (see mbooster-soft-reboot below). The 0x0D/0x21-0x24
+            // set read as constants in both captures (0x12: 0/1/2/3/0;
+            // 0x1d: 0/2/1/3/0) — read and surfaced in diagnostics so the next
+            // capture resolves them rather than being guessed at.
+            AddCommand("mbooster-calibration-state", "mbooster", 35, 0xFF, new byte[] { 0xB4 }, 4, "int");
+            AddCommand("mbooster-status-0d",         "mbooster", 35, 0xFF, new byte[] { 0x0D }, 2, "int");
+            AddCommand("mbooster-status-21",         "mbooster", 35, 0xFF, new byte[] { 0x21 }, 2, "int");
+            AddCommand("mbooster-status-22",         "mbooster", 35, 0xFF, new byte[] { 0x22 }, 2, "int");
+            AddCommand("mbooster-status-23",         "mbooster", 35, 0xFF, new byte[] { 0x23 }, 2, "int");
+            AddCommand("mbooster-status-24",         "mbooster", 35, 0xFF, new byte[] { 0x24 }, 4, "int");
+            // ===== mBooster CALIBRATION ROUTINES =====
+            // Pedal travel calibration — group 38, the SAME cmd ids the
+            // wheelbase pedals bus uses (pedals-*-cal-start/-stop above), but
+            // Pit House sends param 0x0000 on this bus where the pedals-bus
+            // call sites pass 1. Capture-confirmed for the BRAKE pair
+            // (7e 03 26 12 0d 00 00 / 7e 03 26 12 11 00 00): start puts the
+            // firmware in `Pedal Calib Start`, which then self-drives its own
+            // motor sweep (Backward -> Forward -> pressure Calculating, ~10-13s,
+            // zero host frames), and stop commits the measured angle/load-cell
+            // range. Pit House waits exactly 20.0s between the two and polls
+            // nothing. Throttle/clutch mirror the pedals-bus symmetry.
+            AddCommand("mbooster-throttle-cal-start", "mbooster", 0xFF, 38, new byte[] { 12 }, 2, "int");
+            AddCommand("mbooster-throttle-cal-stop",  "mbooster", 0xFF, 38, new byte[] { 16 }, 2, "int");
+            AddCommand("mbooster-brake-cal-start",    "mbooster", 0xFF, 38, new byte[] { 13 }, 2, "int");
+            AddCommand("mbooster-brake-cal-stop",     "mbooster", 0xFF, 38, new byte[] { 17 }, 2, "int");
+            AddCommand("mbooster-clutch-cal-start",   "mbooster", 0xFF, 38, new byte[] { 14 }, 2, "int");
+            AddCommand("mbooster-clutch-cal-stop",    "mbooster", 0xFF, 38, new byte[] { 18 }, 2, "int");
+            // Motor (rotor-locate) calibration — group 0x2A, which the
+            // firmware's own log calls "MotorCtrl" and echoes as
+            // `MotorCtrl Cmd: <decimal cmd>, param_high: <b0>, param_low: <b1>`
+            // (serial_reply_motor.c:44), pinning the 2-byte param layout.
+            //   cmd 0x14 param 0x0001 -> debug_mode enable, MotorMode 0->9
+            //   cmd 0x15 param 0x0103 -> MotorMode 9->8, "Motor Locate Start"
+            //   cmd 0x15 param 0x0000 -> status query; the 0xAA echo's low byte
+            //                            is 1 while running, 3 once complete
+            // cmd 0x15 therefore keeps a READ group so its echo parses back
+            // under the same name. Completion clears error_code 159 ("Rotor Not
+            // Located") and commits the Table 3 compensation coefficients;
+            // it took 59.5s in the capture.
+            AddCommand("mbooster-motor-cal-enter",  "mbooster", 0xFF, 0x2A, new byte[] { 0x14 }, 2, "int");
+            AddCommand("mbooster-motor-cal-locate", "mbooster", 0x2A, 0x2A, new byte[] { 0x15 }, 2, "int");
+            // Soft reboot — byte-identical to main-soft-reboot, on the
+            // mBooster's own pipe (7e 01 01 12 02). Pit House sends it ~2s
+            // after a travel-calibration stop, and again ~20s BEFORE a motor
+            // calibration; each costs a ~4.6s CDC outage followed by a full
+            // identity re-probe and config re-push.
+            AddCommand("mbooster-soft-reboot", "mbooster", 0xFF, 1, new byte[] { 2 }, 0, "int");
+            // The per-role 5-point output curve commands (cmdIds 14-29,
+            // mbooster-{throttle,brake,clutch}-y1..y5) lost their WRITE side —
+            // the Sim Input Mapping output curve is purely host-side, with no
             // wire encoding at all; see docs/protocol/devices/mbooster.md
-            // "Sim Input Mapping" for the historical writeup.)
+            // "Sim Input Mapping" for the historical writeup. They are still
+            // registered READ-ONLY (write group 0xFF) because real Pit House
+            // reads all fifteen every cycle (`7e 05 23 12 0e 00 00 00 00` …),
+            // and RequestCalibrationReads has been asking for them by name
+            // since before the removal — with no entry those fifteen reads
+            // were silently dropped by SendRead. Note the non-contiguous y5
+            // ids (0x1B/0x1C/0x1D), which straddle angle-ratio at 0x1A.
+            AddCommand("mbooster-throttle-y1", "mbooster", 35, 0xFF, new byte[] { 0x0E }, 4, "float");
+            AddCommand("mbooster-throttle-y2", "mbooster", 35, 0xFF, new byte[] { 0x0F }, 4, "float");
+            AddCommand("mbooster-throttle-y3", "mbooster", 35, 0xFF, new byte[] { 0x10 }, 4, "float");
+            AddCommand("mbooster-throttle-y4", "mbooster", 35, 0xFF, new byte[] { 0x11 }, 4, "float");
+            AddCommand("mbooster-throttle-y5", "mbooster", 35, 0xFF, new byte[] { 0x1B }, 4, "float");
+            AddCommand("mbooster-brake-y1",    "mbooster", 35, 0xFF, new byte[] { 0x12 }, 4, "float");
+            AddCommand("mbooster-brake-y2",    "mbooster", 35, 0xFF, new byte[] { 0x13 }, 4, "float");
+            AddCommand("mbooster-brake-y3",    "mbooster", 35, 0xFF, new byte[] { 0x14 }, 4, "float");
+            AddCommand("mbooster-brake-y4",    "mbooster", 35, 0xFF, new byte[] { 0x15 }, 4, "float");
+            AddCommand("mbooster-brake-y5",    "mbooster", 35, 0xFF, new byte[] { 0x1C }, 4, "float");
+            AddCommand("mbooster-clutch-y1",   "mbooster", 35, 0xFF, new byte[] { 0x16 }, 4, "float");
+            AddCommand("mbooster-clutch-y2",   "mbooster", 35, 0xFF, new byte[] { 0x17 }, 4, "float");
+            AddCommand("mbooster-clutch-y3",   "mbooster", 35, 0xFF, new byte[] { 0x18 }, 4, "float");
+            AddCommand("mbooster-clutch-y4",   "mbooster", 35, 0xFF, new byte[] { 0x19 }, 4, "float");
+            AddCommand("mbooster-clutch-y5",   "mbooster", 35, 0xFF, new byte[] { 0x1D }, 4, "float");
             // Live outputs (read-only group 37) — fallback live-position source
             // if HID identity pairing fails on a particular unit.
             AddCommand("mbooster-throttle-output", "mbooster", 37, 0xFF, new byte[] { 1 }, 2, "int");
@@ -739,7 +829,31 @@ namespace MozaPlugin.Protocol
             AddCommand("mbooster-serial-a",   "mbooster", 16, 0xFF, new byte[] { 0 }, 0, "array");
             AddCommand("mbooster-serial-b",   "mbooster", 16, 0xFF, new byte[] { 1 }, 0, "array");
             AddCommand("mbooster-presence",   "mbooster",  9, 0xFF, new byte[] { },  0, "array");
-            AddCommand("mbooster-device-type","mbooster",  4, 0xFF, new byte[] { },  0, "array");
+            // 4 payload bytes, not 0: Pit House probes device-type as
+            // `7e 04 04 12 00 00 00 00`, same as base-fw-version above.
+            // BuildReadMessage appends PayloadBytes zeros, so 0 here emitted a
+            // shorter `7e 00 04 12` that the capture never shows.
+            AddCommand("mbooster-device-type","mbooster",  4, 0xFF, new byte[] { },  4, "array");
+            // The rest of Pit House's connect handshake. Every group here is
+            // already decoded on the wheel/base buses (wheel-device-presence,
+            // wheel-capabilities, wheel-mcu-uid, *-hw-version, *-hw-sub,
+            // *-sw-version, *-identity-11) — these are plain mbooster-bus
+            // twins, re-tagged so the replies don't cross-match. Capture
+            // replies from a real unit:
+            //   7e 01 02 12 00 -> 82 21 02
+            //   7e 04 05 12 00000000 -> 85 21 01 02 53 00
+            //   7e 00 06 12    -> 86 21 2b 00 29 00 0f "Q419960"
+            //   7e 01 08 12 01 -> 88 21 01 "RS21-P01-HW PM-C"
+            //   7e 01 08 12 02 -> 88 21 02 "U-V12"
+            //   7e 01 0f 12 01 -> 8f 21 01 "RS21-P01-MC PB"
+            //   7e 01 11 12 04 -> 91 21 04 01
+            AddCommand("mbooster-device-presence","mbooster",  2, 0xFF, new byte[] { 0 }, 0, "array");
+            AddCommand("mbooster-capabilities",   "mbooster",  5, 0xFF, new byte[] { },  4, "array");
+            AddCommand("mbooster-mcu-uid",        "mbooster",  6, 0xFF, new byte[] { },  0, "array");
+            AddCommand("mbooster-hw-version",     "mbooster",  8, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("mbooster-hw-sub",         "mbooster",  8, 0xFF, new byte[] { 2 }, 0, "array");
+            AddCommand("mbooster-sw-version",     "mbooster", 15, 0xFF, new byte[] { 1 }, 0, "array");
+            AddCommand("mbooster-identity-11",    "mbooster", 17, 0xFF, new byte[] { 4 }, 0, "array");
 
             // ===== BASE AMBIENT LEDS (dev 0x12, write grp 0x20, read grp 0x22) =====
             // Two 9-LED strips on R21/R25/R27 bodies; R9/R12 silently drop the read.

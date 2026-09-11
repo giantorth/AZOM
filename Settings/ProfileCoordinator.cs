@@ -326,6 +326,39 @@ namespace MozaPlugin.Settings
         }
 
         /// <summary>
+        /// One-shot repair: null every saved knob palette (per-knob Active / per-LED
+        /// ring, overlay and baseline) whose slots are all black. Those arrays were
+        /// laundered from an unseeded <see cref="MozaData"/> mirror by the old
+        /// whole-array persist / device-JSON capture paths, and every apply re-wrote
+        /// them to the wheel. Runs from Init before the profile system starts.
+        /// </summary>
+        internal void RepairAllBlackKnobColorArrays()
+        {
+            var store = _plugin.Settings?.ProfileStore;
+            if (store == null) return;
+            int cleared = 0;
+            foreach (var profile in store.Profiles)
+            {
+                if (profile == null) continue;
+                if (MozaProfile.IsAllBlack(profile.WheelKnobPrimaryColors)) { profile.WheelKnobPrimaryColors = null; cleared++; }
+                if (MozaProfile.IsAllBlack(profile.WheelKnobRingColors))    { profile.WheelKnobRingColors    = null; cleared++; }
+                var overrides = profile.WheelOverridesByPageGuid;
+                if (overrides == null) continue;
+                foreach (var ov in overrides.Values)
+                {
+                    if (ov == null) continue;
+                    if (MozaProfile.IsAllBlack(ov.WheelKnobPrimaryColors)) { ov.WheelKnobPrimaryColors = null; cleared++; }
+                    if (MozaProfile.IsAllBlack(ov.WheelKnobRingColors))    { ov.WheelKnobRingColors    = null; cleared++; }
+                }
+            }
+            if (cleared > 0)
+            {
+                MozaLog.Info($"[AZOM] Cleared {cleared} all-black saved knob palette array(s)");
+                PersistSettings();
+            }
+        }
+
+        /// <summary>
         /// Apply a profile by routing through the consolidated Apply*ToHardware
         /// methods. Each method mirrors profile/overlay values into _data (always)
         /// and writes to hardware when the matching device is detected.

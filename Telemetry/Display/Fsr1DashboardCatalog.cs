@@ -403,7 +403,12 @@ namespace MozaPlugin.Telemetry.Display
             new()
             {
                 RecordType = 0x06, Key = "type-06", Label = "Dashboard 06 — timing / gap", IsLive = true,
-                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x08,
+                // b2 = 0x00, not 0x08. The "Daashboard 4 and 8" capture is the only one with a
+                // LIVE gap on this record: PitHouse holds 00/00 across all 12 297 frames on
+                // index 7 while the gap climbs +0.045→+2.910 s. 0x08 came from sessions where
+                // PitHouse never had a delta at all, and pages 2/3/7 were the only ones still
+                // sending it — the same pages reported as gap-dead on-wheel.
+                PayloadLen = 25, LiveB1 = 0x00, LiveB2 = 0x00,
                 Fields = new Fields()
                     .U24("clt", "Current lap time", G + "CurrentLapTime", MsScale)
                     .U24("llt", "Last lap time", G + "LastLapTime", MsScale)
