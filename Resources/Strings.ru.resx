@@ -784,4 +784,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Калибровка не удалась: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Демпфирование (нажатие)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Демпфирование (отпускание)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Импорт панели SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>ИМПОРТ ПАНЕЛИ SIMHUB…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Преобразовать панель SimHub .djson в MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>ВЫБРАТЬ .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>ПРЕОБРАЗОВАТЬ</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Панели SimHub (*.djson)|*.djson|Все файлы (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Не удалось преобразовать: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Отброшено {0}% виджетов</value></data>
 </root>

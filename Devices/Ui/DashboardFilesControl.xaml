@@ -124,6 +124,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0" x:Name="StudioEditButton" Content="{x:Static res:Strings.Button_EditInStudio}"
@@ -132,7 +133,12 @@
                     <Button Grid.Column="1" x:Name="StudioCreateButton" Content="{x:Static res:Strings.Button_NewDashboard}"
                             ToolTip="{x:Static res:Strings.Tooltip_NewDashboard}"
                             Margin="0,0,8,0" Click="StudioCreate_Click"/>
-                    <TextBlock Grid.Column="2" x:Name="StudioStatusText" VerticalAlignment="Center"
+                    <!-- SimHub .djson import. Needs no Studio install (it only writes a
+                         file), so unlike the two Studio buttons it is never disabled. -->
+                    <Button Grid.Column="2" x:Name="ImportDjsonButton" Content="{x:Static res:Strings.Button_ImportSimHubDash}"
+                            ToolTip="{x:Static res:Strings.Tooltip_ImportSimHubDash}"
+                            Margin="0,0,8,0" Click="ImportDjson_Click"/>
+                    <TextBlock Grid.Column="3" x:Name="StudioStatusText" VerticalAlignment="Center"
                                Style="{StaticResource MutedHintText}"
                                TextTrimming="CharacterEllipsis"/>
                 </Grid>

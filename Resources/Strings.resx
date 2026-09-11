@@ -791,4 +791,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Calibration failed: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Damping (press)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Damping (release)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Import SimHub Dashboard</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>IMPORT SIMHUB DASH…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Convert a SimHub .djson dashboard to a MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>CHOOSE .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>CONVERT</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub dashboards (*.djson)|*.djson|All files (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Conversion failed: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% of widgets dropped</value></data>
 </root>

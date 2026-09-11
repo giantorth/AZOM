@@ -784,4 +784,12 @@ Id : {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Échec du calibrage : {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Amortissement (appui)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Amortissement (relâchement)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Importer un tableau de bord SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>IMPORTER UN DASH SIMHUB…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Convertir un tableau de bord SimHub .djson en .mzdash MOZA</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>CHOISIR .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>CONVERTIR</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Tableaux de bord SimHub (*.djson)|*.djson|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Échec de la conversion : {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % des widgets abandonnés</value></data>
 </root>

@@ -787,4 +787,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Calibrazione non riuscita: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Smorzamento (pressione)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Smorzamento (rilascio)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Importa cruscotto SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>IMPORTA DASH SIMHUB…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Converti un cruscotto SimHub .djson in .mzdash MOZA</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>SCEGLI .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>CONVERTI</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Cruscotti SimHub (*.djson)|*.djson|Tutti i file (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Conversione non riuscita: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% dei widget scartati</value></data>
 </root>

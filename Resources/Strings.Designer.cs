@@ -842,5 +842,13 @@ namespace MozaPlugin.Resources
         public static string Status_CalibrationFailed => Get("Status_CalibrationFailed");
         public static string SliderLabel_DampingPress => Get("SliderLabel_DampingPress");
         public static string SliderLabel_DampingRelease => Get("SliderLabel_DampingRelease");
+        public static string Title_DjsonImport => Get("Title_DjsonImport");
+        public static string Button_ImportSimHubDash => Get("Button_ImportSimHubDash");
+        public static string Tooltip_ImportSimHubDash => Get("Tooltip_ImportSimHubDash");
+        public static string Button_PickDjson => Get("Button_PickDjson");
+        public static string Button_Convert => Get("Button_Convert");
+        public static string FileFilter_Djson => Get("FileFilter_Djson");
+        public static string Status_DjsonConvertFailed => Get("Status_DjsonConvertFailed");
+        public static string Status_DjsonHeavyLoss => Get("Status_DjsonHeavyLoss");
     }
 }

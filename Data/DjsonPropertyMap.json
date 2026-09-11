@@ -1,0 +1,88 @@
+{
+  "_comment": [
+    "SimHub property -> MOZA channel, for the .djson import path (UI/DjsonImport).",
+    "Telemetry.json's simhub_property gives a direct reverse index for 41 of the 137",
+    "distinct [Property] references in SimHub's stock DashTemplates. This file recovers",
+    "the ones that name the same quantity under a different property path, plus a few",
+    "that are derivable in wheel JS from channels that do exist.",
+    "",
+    "Lookup is case-insensitive and 'DataCorePlugin.GameData.NewData.' is normalised to",
+    "'DataCorePlugin.GameData.' before matching, so either spelling works as a key.",
+    "",
+    "Extending coverage is a data edit — add a row here, no code change."
+  ],
+
+  "aliases": {
+    "_comment": "SimHub property path -> canonical v1/gameData channel URL. Every target verified present in Data/Telemetry.json.",
+
+    "DataCorePlugin.GameData.WaterTemperature": "v1/gameData/WaterTemp",
+    "DataCorePlugin.GameData.AirTemperature": "v1/gameData/AirTemp",
+    "DataCorePlugin.GameData.RoadTemperature": "v1/gameData/TrackTemp",
+
+    "DataCorePlugin.GameData.Gas": "v1/gameData/Throttle",
+    "DataCorePlugin.GameData.FilteredRpms": "v1/gameData/Rpm",
+
+    "DataCorePlugin.GameData.SpeedLocal": "v1/gameData/SpeedKmh",
+    "DataCorePlugin.GameData.FilteredSpeedLocal": "v1/gameData/SpeedKmh",
+    "DataCorePlugin.GameData.MaxSpeedLocal": "v1/gameData/MaxSpeedKmh",
+
+    "DataCorePlugin.GameData.TyreCoreTemperature1": "v1/gameData/TyreTempFrontLeft",
+    "DataCorePlugin.GameData.TyreCoreTemperature2": "v1/gameData/TyreTempFrontRight",
+    "DataCorePlugin.GameData.TyreCoreTemperature3": "v1/gameData/TyreTempRearLeft",
+    "DataCorePlugin.GameData.TyreCoreTemperature4": "v1/gameData/TyreTempRearRight",
+
+    "DataCorePlugin.GameData.Sector1BestLapTime": "v1/gameData/Sector1BestTime",
+    "DataCorePlugin.GameData.Sector2BestLapTime": "v1/gameData/Sector2BestTime",
+    "DataCorePlugin.GameData.Sector3BestLapTime": "v1/gameData/Sector3BestTime",
+
+    "SerialDashPlugin.ComputedRPMPercent": "v1/gameData/CarSettings_CurrentDisplayedRPMPercent",
+
+    "DataCorePlugin.Computed.Fuel_Percent": "v1/gameData/FuelRemainder",
+    "DataCorePlugin.Computed.Fuel_RemainingLaps": "v1/gameData/FuelLaps",
+    "DataCorePlugin.Computed.Fuel_LitersPerLap": "v1/gameData/FuelConsumeLap",
+
+    "PersistantTrackerPlugin.EstimatedLapTime": "v1/gameData/EstimatedLapTime"
+  },
+
+  "synthetic": {
+    "_comment": [
+      "SimHub property path -> a JavaScript expression evaluated ON THE WHEEL.",
+      "Use only where no single channel carries the quantity but it is derivable from",
+      "channels that do. Reference channels as CH(<url>); the resolver rewrites that to",
+      "Telemetry.get(\"<url>\").value and records each url as a dependency.",
+      "Guard division — an absent channel reads back NaN."
+    ],
+
+    "DataCorePlugin.Computed.Fuel_RemainingTime":
+      "(function(){var l=CH(v1/gameData/FuelLaps),t=CH(v1/gameData/EstimatedLapTime);return (isNaN(l)||isNaN(t))?NaN:l*t;})()",
+
+    "DataCorePlugin.GameData.RpmPercent":
+      "(function(){var r=CH(v1/gameData/Rpm),m=CH(v1/gameData/MaxRpm);return (isNaN(r)||isNaN(m)||m<=0)?NaN:r/m*100;})()"
+  },
+
+  "unmappable": {
+    "_comment": [
+      "Documented dead ends — no channel exists and none is derivable. Listed so the",
+      "conversion report can say WHY a binding was dropped instead of just 'unknown'.",
+      "These need the plugin-side NCalc fallback (claim a spare catalog channel and put",
+      "the expression in MozaProfile.TelemetryChannelMappings), which is out of scope."
+    ],
+
+    "DataCorePlugin.GameData.OilTemperature": "no oil-temperature channel in Telemetry.json",
+    "DataCorePlugin.GameData.SpeedLocalUnit": "unit label, not a telemetry value",
+    "DataCorePlugin.GameData.TyrePressureUnit": "unit label, not a telemetry value",
+    "DataCorePlugin.GameData.CarSettings_RPMRedLineReached": "no redline-threshold channel",
+    "DataCorePlugin.GameData.CarSettings_RedLineReached": "no redline-threshold channel",
+    "DataCorePlugin.GameData.CarSettings_RedLineDisplayedPercent": "no redline-threshold channel",
+    "DataCorePlugin.GameData.CarSettings_RPMShiftLight1": "no shift-light-threshold channel",
+    "DataCorePlugin.GameData.CarSettings_RPMShiftLight2": "no shift-light-threshold channel",
+    "DataCorePlugin.GameData.BestsplitDelta": "no live-delta channel",
+    "DataCorePlugin.GameData.SelfsplitDelta": "no live-delta channel",
+    "PersistantTrackerPlugin.AllTimeBestLiveDeltaSeconds": "no live-delta channel",
+    "PersistantTrackerPlugin.AllTimeBestLiveDeltaProgressSeconds": "no live-delta channel",
+    "SystemInfosProvider.CurrentFrameRate": "PC statistic, not vehicle telemetry",
+    "SystemInfosProvider.MainCPUTemp": "PC statistic, not vehicle telemetry",
+    "SystemInfoPlugin.SimHubProcessor": "PC statistic, not vehicle telemetry",
+    "DataCorePlugin.CustomExpression.CurrentDateTime": "user-defined expression, resolvable only in SimHub"
+  }
+}

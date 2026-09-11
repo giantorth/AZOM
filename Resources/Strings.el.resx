@@ -783,4 +783,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Η βαθμονόμηση απέτυχε: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Απόσβεση (πάτημα)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Απόσβεση (απελευθέρωση)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Εισαγωγή ταμπλό SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>ΕΙΣΑΓΩΓΗ SIMHUB DASH…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Μετατροπή ταμπλό SimHub .djson σε MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>ΕΠΙΛΟΓΗ .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>ΜΕΤΑΤΡΟΠΗ</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Ταμπλό SimHub (*.djson)|*.djson|Όλα τα αρχεία (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Η μετατροπή απέτυχε: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Απορρίφθηκε το {0}% των widget</value></data>
 </root>

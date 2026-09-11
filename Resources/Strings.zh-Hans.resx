@@ -784,4 +784,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>校准失败：{0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>阻尼（踩下）</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>阻尼（松开）</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>导入 SimHub 仪表板</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>导入 SIMHUB 仪表板…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>将 SimHub .djson 仪表板转换为 MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>选择 .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>转换</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub 仪表板 (*.djson)|*.djson|所有文件 (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>转换失败：{0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>已丢弃 {0}% 的组件</value></data>
 </root>

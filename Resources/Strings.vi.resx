@@ -784,4 +784,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Hiệu chuẩn thất bại: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Giảm chấn (khi đạp)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Giảm chấn (khi nhả)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>Nhập bảng điều khiển SimHub</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>NHẬP BẢNG SIMHUB…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Chuyển đổi bảng điều khiển SimHub .djson sang MOZA .mzdash</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>CHỌN .DJSON…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>CHUYỂN ĐỔI</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>Bảng điều khiển SimHub (*.djson)|*.djson|Tất cả tệp (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Chuyển đổi thất bại: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Đã bỏ {0}% tiện ích</value></data>
 </root>

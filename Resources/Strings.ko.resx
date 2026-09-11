@@ -783,4 +783,12 @@ Id: {2}</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>캘리브레이션 실패: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>감쇠 (밟을 때)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>감쇠 (놓을 때)</value></data>
+  <data name="Title_DjsonImport" xml:space="preserve"><value>SimHub 대시보드 가져오기</value></data>
+  <data name="Button_ImportSimHubDash" xml:space="preserve"><value>SIMHUB 대시 가져오기…</value></data>
+  <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>SimHub .djson 대시보드를 MOZA .mzdash로 변환합니다</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>.DJSON 선택…</value></data>
+  <data name="Button_Convert" xml:space="preserve"><value>변환</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub 대시보드 (*.djson)|*.djson|모든 파일 (*.*)|*.*</value></data>
+  <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>변환 실패: {0}</value></data>
+  <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>위젯 {0}% 삭제됨</value></data>
 </root>
