@@ -16,6 +16,8 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **AB9 engine vibration now has a 20hz floor** 
+
 - **A CM2 dash shows data on every dashboard, not just the one it started on.** Switching
   it to another dashboard left the display rendering with no telemetry behind it.
 
