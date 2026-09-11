@@ -18,28 +18,46 @@ namespace MozaPlugin.Devices.MBooster
         public const float TravelMinGapMm = 3.8f;
         public const float TravelMaxGapMm = 32.1f;
 
-        // Pedal Feel Max Force/Deadzone slider bounds, role-scoped — a
-        // Throttle or Clutch pedal is a much lighter spring than a brake's
-        // load cell, so both get their own narrower Max Force range instead
-        // of the Brake-shaped 24-200kg (same 4-20kg for both — shared
-        // constant, not duplicated per role). Deadzone differs per role
-        // (Clutch's spring has more built-in play than Throttle's), so it
-        // stays a separate constant each. Selected in
-        // UpdateMBoosterConfigVisibilityForRole.
-        public const float ThrottleMaxForceMinKg = 4f;
-        public const float ThrottleMaxForceMaxKg = 20f;
-        public const float ThrottleDeadzoneMinKg = 0f;
-        public const float ThrottleDeadzoneMaxKg = 5f;
-        public const float ClutchDeadzoneMinKg = 0f;
-        public const float ClutchDeadzoneMaxKg = 8f;
-        // Brake bounds are Pit House's own (user-reported from its UI): Max
+        // Pedal Feel Max Force/Deadzone bounds follow the pedal's HARDWARE,
+        // not the role assigned to it. Any mBooster pedal can be set to
+        // throttle / brake / clutch, and an ACTIVE (motorized, load-cell)
+        // pedal is the same hardware whichever role it holds — so scoping
+        // these by role capped a real load cell at a light spring's ceiling
+        // the moment it was assigned throttle or clutch. A passive pedal is
+        // lighter hardware, so it keeps its own narrower pair — but one pair,
+        // not one per role (Deadzone used to be 5kg throttle / 8kg clutch /
+        // 37kg brake; the passive ceiling is now the wider 8kg for any role).
+        // Resolve through <see cref="ForceRanges"/> so the slider bounds and
+        // the stored-value clamp can never disagree.
+        //
+        // Active values are Pit House's own (user-reported from its UI): Max
         // Force starts at 24kg, not 0 — matching the low end of the original
         // max-force-24-75-128-166-200.pcapng sweep — and Deadzone tops out at
-        // 37kg. Both were previously guessed from the XAML's old 0-40/0-200.
-        public const float BrakeMaxForceMinKg = 24f;
-        public const float BrakeMaxForceMaxKg = 200f;
-        public const float BrakeDeadzoneMinKg = 0f;
-        public const float BrakeDeadzoneMaxKg = 37f;
+        // 37kg.
+        public const float ActiveMaxForceMinKg = 24f;
+        public const float ActiveMaxForceMaxKg = 200f;
+        public const float ActiveDeadzoneMinKg = 0f;
+        public const float ActiveDeadzoneMaxKg = 37f;
+        public const float PassiveMaxForceMinKg = 4f;
+        public const float PassiveMaxForceMaxKg = 20f;
+        public const float PassiveDeadzoneMinKg = 0f;
+        public const float PassiveDeadzoneMaxKg = 8f;
+
+        /// <summary>
+        /// Max Force / Deadzone bounds for one pedal. Active/passive is the
+        /// ONLY input: the role a pedal is assigned has no bearing on what its
+        /// hardware can do. Callers that don't yet know the verdict pass true —
+        /// the wider range never clamps a real value away.
+        /// </summary>
+        public static void ForceRanges(bool motorized,
+            out float maxForceMin, out float maxForceMax,
+            out float deadzoneMin, out float deadzoneMax)
+        {
+            maxForceMin = motorized ? ActiveMaxForceMinKg : PassiveMaxForceMinKg;
+            maxForceMax = motorized ? ActiveMaxForceMaxKg : PassiveMaxForceMaxKg;
+            deadzoneMin = motorized ? ActiveDeadzoneMinKg : PassiveDeadzoneMinKg;
+            deadzoneMax = motorized ? ActiveDeadzoneMaxKg : PassiveDeadzoneMaxKg;
+        }
 
         // Engine Vibration's hardware-safe frequency range. No longer a
         // user-facing slider bound — Engine's frequency is telemetry-derived

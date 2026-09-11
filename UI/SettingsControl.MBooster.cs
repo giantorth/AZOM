@@ -482,13 +482,13 @@ namespace MozaPlugin.UI
                 var cfg = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.GetOrCreatePedalConfig(s, axisIndex, controller.SoleConnectedAxis());
                 if (cfg != null)
                 {
-                    bool isBrake = role == MBoosterRole.Brake;
-                    float dzMin = isBrake ? MBoosterUiConstants.BrakeDeadzoneMinKg
-                        : role == MBoosterRole.Clutch ? MBoosterUiConstants.ClutchDeadzoneMinKg : MBoosterUiConstants.ThrottleDeadzoneMinKg;
-                    float dzMax = isBrake ? MBoosterUiConstants.BrakeDeadzoneMaxKg
-                        : role == MBoosterRole.Clutch ? MBoosterUiConstants.ClutchDeadzoneMaxKg : MBoosterUiConstants.ThrottleDeadzoneMaxKg;
-                    float mfMin = isBrake ? MBoosterUiConstants.BrakeMaxForceMinKg : MBoosterUiConstants.ThrottleMaxForceMinKg;
-                    float mfMax = isBrake ? MBoosterUiConstants.BrakeMaxForceMaxKg : MBoosterUiConstants.ThrottleMaxForceMaxKg;
+                    // Hardware, not role — reassigning an ACTIVE pedal from
+                    // brake to throttle must not clamp its load-cell value
+                    // down to a spring pedal's ceiling (that clamp, plus the
+                    // slider's own coercion, is what walked Max Force to 24kg
+                    // in bug reports ARE6993X / QQS3MVDS).
+                    MBoosterUiConstants.ForceRanges(controller.IsAxisMotorized(axisIndex),
+                        out float mfMin, out float mfMax, out float dzMin, out float dzMax);
                     bool clamped = false;
                     if (cfg.MaxForceKg >= 0)
                     {

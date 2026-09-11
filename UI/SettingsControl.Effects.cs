@@ -254,17 +254,39 @@ namespace MozaPlugin.UI
             // SeedMBoosterConfigControls seeds the actual value (this method
             // runs earlier in RefreshMBoosterTab — see call site) so the
             // seeded value never gets silently clamped by stale bounds.
-            MBoosterMaxForceSlider.Minimum = (isThrottle || isClutch) ? MBoosterUiConstants.ThrottleMaxForceMinKg : MBoosterUiConstants.BrakeMaxForceMinKg;
-            MBoosterMaxForceSlider.Maximum = (isThrottle || isClutch) ? MBoosterUiConstants.ThrottleMaxForceMaxKg : MBoosterUiConstants.BrakeMaxForceMaxKg;
-            MBoosterDeadzoneSlider.Minimum = isThrottle ? MBoosterUiConstants.ThrottleDeadzoneMinKg
-                : isClutch ? MBoosterUiConstants.ClutchDeadzoneMinKg : MBoosterUiConstants.BrakeDeadzoneMinKg;
-            MBoosterDeadzoneSlider.Maximum = isThrottle ? MBoosterUiConstants.ThrottleDeadzoneMaxKg
-                : isClutch ? MBoosterUiConstants.ClutchDeadzoneMaxKg : MBoosterUiConstants.BrakeDeadzoneMaxKg;
-            // Pedal Feel's curve plots absolute force, so its Y ceiling is
-            // this role's own Max Force ceiling (200kg Brake / 20kg
-            // Throttle-Clutch) — otherwise a light pedal's whole curve would
-            // sit squashed against the bottom of a 200kg axis.
-            MBoosterInputCurveEditor.YMax = MBoosterMaxForceSlider.Maximum;
+            //
+            // SUPPRESSED (bug reports ARE6993X / QQS3MVDS, "Max Force keeps
+            // reverting to 24"): guarding the seed wasn't enough, because
+            // moving the bounds makes WPF coerce Slider.Value into the new
+            // range RIGHT HERE, which raises ValueChanged — and that handler
+            // wrote the coerced number into whichever pedal is now selected.
+            // Selecting a throttle after a brake pushed the brake's 80kg down
+            // to the throttle's 20kg ceiling and saved it; selecting the brake
+            // again pulled 20 up to its own 24kg FLOOR and saved that. Both
+            // reporters' settings show exactly that: brake pinned at 24,
+            // throttle and clutch at 20. The seed a moment later restores the
+            // correct value on screen, so nothing is lost by ignoring these.
+            using (_suppressor.Begin())
+            {
+                // Fail-open to the active range while the active/passive
+                // verdict is still outstanding — the wider range can't clamp a
+                // real value away, and the panel is hidden for a passive pedal
+                // anyway (UpdateMBoosterEffectPassiveState).
+                bool motorized = CurrentMBoosterController()?.IsAxisMotorized(_mboosterEffectPedalIndex) ?? true;
+                MBoosterUiConstants.ForceRanges(motorized,
+                    out float mfMin, out float mfMax, out float dzMin, out float dzMax);
+                MBoosterMaxForceSlider.Minimum = mfMin;
+                MBoosterMaxForceSlider.Maximum = mfMax;
+                MBoosterDeadzoneSlider.Minimum = dzMin;
+                MBoosterDeadzoneSlider.Maximum = dzMax;
+                // Pedal Feel's curve plots absolute force, so its Y ceiling is
+                // this role's own Max Force ceiling (200kg Brake / 20kg
+                // Throttle-Clutch) — otherwise a light pedal's whole curve would
+                // sit squashed against the bottom of a 200kg axis. Inside the
+                // suppressor too: SpanHigh is bound TwoWay to the Max Force
+                // slider, so the editor can push a value back the same way.
+                MBoosterInputCurveEditor.YMax = MBoosterMaxForceSlider.Maximum;
+            }
 
             // Effects list is role-scoped too: ABS, Lockup, Threshold, and
             // Brake Fade are all brake-specific (ABS/Lockup/Threshold trigger
@@ -312,11 +334,18 @@ namespace MozaPlugin.UI
             // No real role to resolve without hardware — Brake-shaped bounds
             // are as good a demo default as any (matches this panel's other
             // "show everything" choices above).
-            MBoosterMaxForceSlider.Minimum = MBoosterUiConstants.BrakeMaxForceMinKg;
-            MBoosterMaxForceSlider.Maximum = MBoosterUiConstants.BrakeMaxForceMaxKg;
-            MBoosterDeadzoneSlider.Minimum = MBoosterUiConstants.BrakeDeadzoneMinKg;
-            MBoosterDeadzoneSlider.Maximum = MBoosterUiConstants.BrakeDeadzoneMaxKg;
-            MBoosterInputCurveEditor.YMax = MBoosterMaxForceSlider.Maximum;
+            // Suppressed for the same reason as the role-scoped bounds above:
+            // moving them coerces Slider.Value, which raises ValueChanged.
+            // Harmless here today (the demo target is null), but this path also
+            // runs with show-all-tabs while real hardware is attached.
+            using (_suppressor.Begin())
+            {
+                MBoosterMaxForceSlider.Minimum = MBoosterUiConstants.ActiveMaxForceMinKg;
+                MBoosterMaxForceSlider.Maximum = MBoosterUiConstants.ActiveMaxForceMaxKg;
+                MBoosterDeadzoneSlider.Minimum = MBoosterUiConstants.ActiveDeadzoneMinKg;
+                MBoosterDeadzoneSlider.Maximum = MBoosterUiConstants.ActiveDeadzoneMaxKg;
+                MBoosterInputCurveEditor.YMax = MBoosterMaxForceSlider.Maximum;
+            }
 
             // Seed every control to its default once. The curve editors take no
             // node data of their own — they two-way bind to the hidden data-store
