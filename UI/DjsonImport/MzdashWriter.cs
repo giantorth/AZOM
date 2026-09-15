@@ -79,7 +79,7 @@ namespace MozaPlugin.UI.DjsonImport
                 ["window"] = new JObject
                 {
                     ["GUID"] = "{" + Guid.NewGuid().ToString("D") + "}",
-                    ["defaultScreenId"] = 0,
+                    ["defaultScreenId"] = ClampScreen(dashboard),
                     ["idealDeviceInfos"] = idealDeviceInfos ?? new JArray(),
                 },
             };
@@ -154,6 +154,13 @@ namespace MozaPlugin.UI.DjsonImport
 
             o["type"] = TypeName(node.Kind);
             return SortKeys(o);
+        }
+
+        /// <summary>The page the wheel opens on, kept inside the emitted range.</summary>
+        private static int ClampScreen(IrDashboard dashboard)
+        {
+            if (dashboard.Screens.Count == 0) return 0;
+            return Math.Max(0, Math.Min(dashboard.DefaultScreen, dashboard.Screens.Count - 1));
         }
 
         private static string TypeName(IrKind kind) => kind switch

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace MozaPlugin.UI.DjsonImport
@@ -13,8 +14,10 @@ namespace MozaPlugin.UI.DjsonImport
         public string Js { get; set; } = "";
         /// <summary>Channel URLs the expression reads.</summary>
         public List<string> Urls { get; } = new List<string>();
-        /// <summary>Why it failed, or non-fatal notes. One line each.</summary>
+        /// <summary>Why it failed. One line each.</summary>
         public List<string> Problems { get; } = new List<string>();
+        /// <summary>Non-fatal remarks about how it was converted.</summary>
+        public List<string> Notes { get; } = new List<string>();
 
         public static TranspileResult Fail(string problem)
         {
@@ -44,22 +47,32 @@ namespace MozaPlugin.UI.DjsonImport
 
         public NCalcToJs(ChannelResolver channels) => _channels = channels;
 
-        public TranspileResult Translate(string? expression)
+        /// <param name="allowOffload">Whether an expression the wheel cannot evaluate may
+        /// be handed to SimHub on a borrowed channel. False for targets that need text —
+        /// a borrowed channel is numeric, so a colour would arrive as a number and render
+        /// black, which is worse than leaving the design-time value in place.</param>
+        public TranspileResult Translate(string? expression, bool allowOffload = true)
         {
             string src = (expression ?? "").Trim();
             if (src.Length == 0) return TranspileResult.Fail("empty expression");
 
-            // SimHub supports a `js:` escape whose body is already JavaScript — but it
-            // is SimHub-flavoured ($prop(...) etc.), not wheel-flavoured, so passing it
-            // through would emit something that silently reads undefined on the wheel.
-            // SimHub also auto-detects JavaScript without the prefix, so catch that shape
-            // too: without this it fails deep in the lexer as "unexpected character '$'",
-            // which tells the user nothing about what to do.
-            if (src.StartsWith("js:", StringComparison.OrdinalIgnoreCase) || LooksLikeJavaScript(src))
+            // SimHub-flavoured JavaScript ($prop(...), custom plugin functions, multi-
+            // statement bodies) cannot run on the wheel — but SimHub itself can evaluate
+            // it, so hand the whole expression to a borrowed channel rather than dropping
+            // the widget. SimHub auto-detects JS without the `js:` prefix, so both shapes
+            // route the same way.
+            bool isJavaScript = src.StartsWith("js:", StringComparison.OrdinalIgnoreCase)
+                             || LooksLikeJavaScript(src);
+            if (isJavaScript)
             {
-                return TranspileResult.Fail(
-                    "SimHub-side JavaScript ($prop/var/return) cannot run on the wheel — "
-                    + "rewrite it as an NCalc expression to convert it");
+                if (!allowOffload)
+                {
+                    return TranspileResult.Fail(
+                        "SimHub-side JavaScript, and this target needs text — "
+                        + "a borrowed channel is numeric and cannot carry it");
+                }
+                return Offload(src, isJavaScript: true,
+                    "SimHub-side JavaScript, evaluated by SimHub on a borrowed channel");
             }
 
             var result = new TranspileResult();
@@ -70,12 +83,52 @@ namespace MozaPlugin.UI.DjsonImport
                 parser.ExpectEnd();
                 result.Js = js;
                 result.Ok = result.Problems.Count == 0;
+                if (result.Ok) return result;
             }
             catch (TranspileException ex)
             {
                 result.Ok = false;
                 result.Problems.Add(ex.Message);
             }
+
+            // The expression is valid SimHub but uses something the wheel has no
+            // equivalent for — a stateful function, a SimHub-only helper. SimHub can
+            // still evaluate it, so offload rather than lose the widget.
+            if (!allowOffload) return result;
+
+            var offloaded = Offload(src, isJavaScript: false,
+                $"evaluated by SimHub on a borrowed channel ({result.Problems.FirstOrDefault()})");
+            return offloaded.Ok ? offloaded : result;
+        }
+
+        /// <summary>
+        /// Send an entire expression to SimHub: borrow a spare channel, have the plugin
+        /// evaluate the expression and publish the result there, and read that channel
+        /// from the wheel.
+        ///
+        /// <para>Only numeric results survive the trip — the borrowable channels are all
+        /// numeric — so a formula producing text or a colour string still cannot be
+        /// carried, and is reported instead.</para>
+        /// </summary>
+        private TranspileResult Offload(string expression, bool isJavaScript, string note)
+        {
+            // NCalcExpressionEvaluator selects the JavaScript interpreter on this prefix,
+            // matching how SimHub's own dashboard bindings mark a JS formula.
+            string source = isJavaScript && !expression.StartsWith("js:", StringComparison.OrdinalIgnoreCase)
+                ? "js:" + expression
+                : expression;
+
+            var borrowed = _channels.Allocate(source);
+            if (borrowed == null || !borrowed.Value.IsUsable)
+            {
+                return TranspileResult.Fail(isJavaScript
+                    ? "SimHub-side JavaScript and no spare channel is free to carry its result"
+                    : note);
+            }
+
+            var result = new TranspileResult { Ok = true, Js = borrowed.Value.Js };
+            result.Urls.AddRange(borrowed.Value.Urls);
+            result.Notes.Add(note);
             return result;
         }
 

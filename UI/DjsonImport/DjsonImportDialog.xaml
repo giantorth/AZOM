@@ -16,8 +16,23 @@
                 <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <Style TargetType="Button" BasedOn="{StaticResource MozaButton}"/>
+            <!-- Without this the report pane's scrollbars render as stock light-grey
+                 Windows chrome against the dark theme. Same registration
+                 PitHouseImportControl uses. -->
+            <Style TargetType="ScrollBar" BasedOn="{StaticResource MozaScrollBar}"/>
             <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            </Style>
+            <!-- An unstyled TextBox comes up white-on-black from the default WPF template,
+                 which is what made this dialog look nothing like the rest of the app. -->
+            <Style TargetType="TextBox">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="Background" Value="{StaticResource BgDeepBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="CaretBrush" Value="{StaticResource CyanBrush}"/>
+                <Setter Property="SelectionBrush" Value="{StaticResource CyanBrush}"/>
+                <Setter Property="SelectionOpacity" Value="0.35"/>
             </Style>
         </ResourceDictionary>
     </Window.Resources>
@@ -56,9 +71,8 @@
                      IsReadOnly="True" AcceptsReturn="True"
                      VerticalScrollBarVisibility="Auto"
                      HorizontalScrollBarVisibility="Auto"
-                     FontFamily="Consolas, Courier New, monospace" FontSize="12"
-                     Background="Transparent" BorderThickness="0"
-                     Foreground="{DynamicResource TextBrush}"
+                     FontFamily="{StaticResource FontMono}" FontSize="12"
+                     Background="Transparent"
                      Padding="8"/>
         </Border>
 

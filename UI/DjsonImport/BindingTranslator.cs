@@ -186,13 +186,18 @@ namespace MozaPlugin.UI.DjsonImport
                 string expression = DjsonReader.Str(DjsonReader.Obj(spec, "Formula"), "Expression");
                 if (expression.Length == 0) continue;
 
-                var t = _js.Translate(expression);
+                // A colour target needs a "#RRGGBB" string. Borrowed channels are numeric,
+                // so an expression that can only be evaluated by SimHub has nowhere to put
+                // a colour — offloading it would land a number in a colour slot and render
+                // black. Leave the design-time colour instead and report it.
+                var t = _js.Translate(expression, allowOffload: !IsColorTarget(target));
                 if (!t.Ok)
                 {
                     NoteFailure(expression, t);
                     continue;
                 }
                 foreach (var u in t.Urls) _report.Channels.Add(u);
+                foreach (var note in t.Notes) _report.Notes.Add(note);
 
                 int mode = DjsonReader.Int(spec, "Mode", 2);
                 if (mode == 4)
@@ -232,6 +237,10 @@ namespace MozaPlugin.UI.DjsonImport
             }
             return JsFormatters.ChainIdentity;
         }
+
+        /// <summary>True for mzdash targets whose value is a colour string.</summary>
+        private static bool IsColorTarget(string target)
+            => target.EndsWith("Color", StringComparison.OrdinalIgnoreCase);
 
         private static int DecimalsInSpec(string spec)
         {

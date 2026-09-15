@@ -82,8 +82,16 @@ namespace MozaPlugin.UI.DjsonImport
             return set;
         }
 
-        /// <summary>Images from the sibling archive first, then any loose files beside the
-        /// dashboard (a handful of stock templates ship one that way).</summary>
+        /// <summary>
+        /// Images from every <c>.ressources</c> archive beside the dashboard, then any
+        /// loose files (a handful of stock templates ship one that way).
+        ///
+        /// <para>The dashboard's own archive is read first so its names win, but the
+        /// sibling archives matter just as much: SimHub keeps one per <c>.djson</c>, and a
+        /// dashboard built from <c>WidgetItem</c> includes — as the community ones are —
+        /// holds most of its artwork in the widgets' archives, not its own. Reading only
+        /// the main file's leaves every inlined widget's images blank.</para>
+        /// </summary>
         private static IEnumerable<(string name, string ext, byte[] bytes)> EnumerateSources(
             string djsonPath, ConversionReport report)
         {
@@ -95,6 +103,12 @@ namespace MozaPlugin.UI.DjsonImport
 
             string? dir = Path.GetDirectoryName(djsonPath);
             if (string.IsNullOrEmpty(dir)) yield break;
+
+            foreach (var sibling in SafeListFiles(dir!, report, "*.djson.ressources"))
+            {
+                if (string.Equals(sibling, archive, StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (var entry in ReadArchive(sibling, report)) yield return entry;
+            }
 
             foreach (var file in SafeListFiles(dir!, report))
             {
@@ -150,9 +164,10 @@ namespace MozaPlugin.UI.DjsonImport
             return results;
         }
 
-        private static IEnumerable<string> SafeListFiles(string dir, ConversionReport report)
+        private static IEnumerable<string> SafeListFiles(string dir, ConversionReport report,
+                                                         string pattern = "*")
         {
-            try { return Directory.GetFiles(dir); }
+            try { return Directory.GetFiles(dir, pattern); }
             catch (Exception ex)
             {
                 report.Notes.Add($"could not list '{dir}': {ex.Message}");

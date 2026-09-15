@@ -792,9 +792,9 @@ Id: {2}</value></data>
   <data name="Title_DjsonImport" xml:space="preserve"><value>Importer SimHub-dashbord</value></data>
   <data name="Button_ImportSimHubDash" xml:space="preserve"><value>IMPORTER SIMHUB-DASH…</value></data>
   <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Konverter et SimHub-.djson-dashbord til MOZA-.mzdash</value></data>
-  <data name="Button_PickDjson" xml:space="preserve"><value>VELG .DJSON…</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>VELG FIL…</value></data>
   <data name="Button_Convert" xml:space="preserve"><value>KONVERTER</value></data>
-  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub-dashbord (*.djson)|*.djson|Alle filer (*.*)|*.*</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub-dashbord (*.djson;*.simhubdash)|*.djson;*.simhubdash|Alle filer (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Konverteringen mislyktes: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % av modulene forkastet</value></data>
 </root>

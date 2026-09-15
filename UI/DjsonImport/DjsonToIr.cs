@@ -67,6 +67,7 @@ namespace MozaPlugin.UI.DjsonImport
         {
             var dash = new IrDashboard { Name = dashboardName };
 
+            int inGame = -1;
             foreach (var screen in DjsonReader.Items(root["Screens"]))
             {
                 var node = new IrNode
@@ -75,9 +76,22 @@ namespace MozaPlugin.UI.DjsonImport
                     Name = DjsonReader.Str(screen, "Name", "Screen"),
                     Background = ColorOf(screen, "BackgroundColor", "#FF000000"),
                 };
+                // The page a driver expects on track. SimHub dashboards commonly put an
+                // idle/splash screen first, so opening on page 0 shows the wrong thing.
+                if (inGame < 0 && DjsonReader.Bool(screen, "InGameScreen"))
+                    inGame = dash.Screens.Count;
+
                 foreach (var item in DjsonReader.Items(screen["Items"]))
                     AddConverted(node.Children, item);
                 dash.Screens.Add(node);
+            }
+
+            if (inGame > 0)
+            {
+                dash.DefaultScreen = inGame;
+                _report.Notes.Add(
+                    $"opens on page {inGame + 1} ('{dash.Screens[inGame].Name}') — "
+                    + "the source's in-game screen");
             }
 
             if (dash.Screens.Count == 0)
@@ -282,12 +296,35 @@ namespace MozaPlugin.UI.DjsonImport
                     break;
                 }
 
-                // Widget contents are authored against the widget's own canvas origin, so
-                // shift them to where the host item sits.
+                // A WidgetItem draws the referenced dashboard INTO its own rectangle, so
+                // the widget's coordinates are in the widget's own canvas and have to be
+                // scaled to the host rect — not merely shifted. Every WidgetItem in the
+                // wild sets AutoSize, and the host rect always matches the widget canvas's
+                // aspect, so one uniform factor is right; getting this wrong pushes content
+                // far outside the frame (a 814-wide widget drawn into a 733-wide slot
+                // overhangs by 81px, and the errors compound through nested widgets).
                 double left = DjsonReader.Num(item, "Left");
                 double top = DjsonReader.Num(item, "Top");
-                if (left != 0 || top != 0)
-                    foreach (var c in host.Children) Translate(c, left, top);
+                double hostW = DjsonReader.Num(item, "Width");
+                double hostH = DjsonReader.Num(item, "Height");
+                double baseW = DjsonReader.Num(root, "BaseWidth");
+                double baseH = DjsonReader.Num(root, "BaseHeight");
+
+                double scale = 1.0;
+                if (baseW > 0 && baseH > 0 && hostW > 0 && hostH > 0)
+                {
+                    double sx = hostW / baseW, sy = hostH / baseH;
+                    scale = Math.Min(sx, sy);
+                    if (Math.Abs(sx - sy) > 0.01 * Math.Max(sx, sy))
+                    {
+                        _report.Notes.Add(
+                            $"widget '{fileName}' is drawn into a rectangle of a different "
+                            + $"shape than its {baseW:0}x{baseH:0} canvas — fitted uniformly");
+                    }
+                }
+
+                foreach (var c in host.Children)
+                    CanvasFitter.ScaleAndOffset(c, scale, left, top);
 
                 _report.Record("WidgetItem", name, ItemOutcome.Converted,
                     $"inlined '{fileName}'");

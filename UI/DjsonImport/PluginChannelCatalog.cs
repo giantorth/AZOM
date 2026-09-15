@@ -18,7 +18,8 @@ namespace MozaPlugin.UI.DjsonImport
         public static IEnumerable<ChannelRow> Rows(DashboardProfileStore store)
         {
             foreach (var entry in store.EnumerateTelemetryChannels())
-                yield return new ChannelRow(entry.Url, entry.DefaultProperty);
+                yield return new ChannelRow(entry.Url, entry.DefaultProperty,
+                                            entry.Compression, entry.PackageLevel);
         }
 
         /// <summary>A converter wired to the plugin's catalog.</summary>

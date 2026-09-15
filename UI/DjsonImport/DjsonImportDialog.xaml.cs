@@ -31,6 +31,7 @@ namespace MozaPlugin.UI.DjsonImport
 
         private readonly DashboardProfileStore _store;
         private readonly JArray? _idealDeviceInfos;
+        private readonly string? _libraryFolder;
 
         private string? _sourcePath;
         private string? _convertedPath;
@@ -39,13 +40,25 @@ namespace MozaPlugin.UI.DjsonImport
         /// rescan the library.</summary>
         public bool Converted { get; private set; }
 
+        /// <summary>The written dashboard, once <see cref="Converted"/>.</summary>
+        public string? ConvertedPath => _convertedPath;
+
+        /// <summary>The last successful conversion, so the caller can publish its
+        /// <see cref="ConversionReport.ChannelOverrides"/>.</summary>
+        public ConversionResult? Result { get; private set; }
+
+        /// <param name="libraryFolder">The configured dashboard library, or null. When set
+        /// the converted dashboard lands there, so it appears in the upload list and gets
+        /// picked up by the folder scan on the next connect.</param>
         /// <param name="idealDeviceInfos">The connected display's descriptor from the
         /// wheel's own configJson, or null when no wheel is connected. Never substitute
         /// Studio's built-in literal — it describes one specific wheel.</param>
-        public DjsonImportDialog(DashboardProfileStore store, JArray? idealDeviceInfos)
+        public DjsonImportDialog(DashboardProfileStore store, JArray? idealDeviceInfos,
+                                 string? libraryFolder)
         {
             _store = store;
             _idealDeviceInfos = idealDeviceInfos;
+            _libraryFolder = libraryFolder;
             InitializeComponent();
         }
 
@@ -76,13 +89,7 @@ namespace MozaPlugin.UI.DjsonImport
         {
             if (string.IsNullOrEmpty(_sourcePath)) return;
 
-            string? outputRoot = DashboardStudioLauncher.ResolveProjectRoot();
-            if (string.IsNullOrEmpty(outputRoot))
-            {
-                // No PitHouse install: still convert, next to the source, so the file can
-                // be picked up by the Files tab's local-file upload mode.
-                outputRoot = Path.GetDirectoryName(_sourcePath);
-            }
+            string? outputRoot = ResolveOutputRoot();
             if (string.IsNullOrEmpty(outputRoot))
             {
                 ShowSummary(string.Format(Strings.Status_DjsonConvertFailed,
@@ -124,10 +131,14 @@ namespace MozaPlugin.UI.DjsonImport
             }
 
             Converted = true;
+            Result = result;
             _convertedPath = result.MzdashPath;
             StudioButton.IsEnabled = true;
 
             string summary = result.Report.Summary();
+            summary += $"  |  {result.Report.Channels.Count} channels";
+            if (result.Report.ChannelOverrides.Count > 0)
+                summary += $" ({result.Report.ChannelOverrides.Count} via SimHub)";
             bool heavy = result.Report.DropRatio > HeavyLossRatio;
             if (heavy)
             {
@@ -153,6 +164,26 @@ namespace MozaPlugin.UI.DjsonImport
             SummaryText.Text = text;
             SummaryText.Foreground = (Brush)FindResource(error ? "AmberBrush" : "TextBrush");
             SummaryText.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Where the converted dashboard goes.
+        ///
+        /// <para>The configured dashboard library wins: that folder is what the plugin
+        /// scans into <c>DashboardCache</c>, so a dashboard written there shows up in the
+        /// upload list and survives a restart. Studio's project root is the fallback so
+        /// the result is still somewhere the editor lists, and only failing both does it
+        /// land beside the source file.</para>
+        /// </summary>
+        private string? ResolveOutputRoot()
+        {
+            if (!string.IsNullOrWhiteSpace(_libraryFolder) && Directory.Exists(_libraryFolder))
+                return _libraryFolder;
+
+            string? studio = DashboardStudioLauncher.ResolveProjectRoot();
+            if (!string.IsNullOrEmpty(studio)) return studio;
+
+            return Path.GetDirectoryName(_sourcePath);
         }
 
         /// <summary>The connected display's <c>productType</c> from its own descriptor,

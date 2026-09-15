@@ -288,16 +288,69 @@ namespace MozaPlugin.Devices.Ui
                 }
             }
 
-            var dialog = new DjsonImportDialog(_plugin.DashProfileStore, ideal)
+            var dialog = new DjsonImportDialog(
+                _plugin.DashProfileStore, ideal, _plugin.ActiveTelemetryMzdashFolder)
             {
                 Owner = Window.GetWindow(this),
             };
             dialog.ShowDialog();
 
             if (!dialog.Converted) return;
+
+            PublishChannelOverrides(dialog.Result, dialog.ConvertedPath);
             _plugin.ReloadDashboardLibrary();
             SeedUploadLibrary(force: true);
             RefreshDashboardUploadStatus();
+        }
+
+        /// <summary>
+        /// Persist the channel borrowings a conversion made.
+        ///
+        /// <para>Properties with no MOZA channel of their own are carried on a spare
+        /// catalog channel, with the plugin publishing SimHub's value there. That only
+        /// happens if the mapping is stored — the mzdash alone just reads whatever the
+        /// channel normally carries — so this runs before the library rescan.</para>
+        ///
+        /// <para>Keyed to the converted file rather than the active dashboard: the user
+        /// has not selected it yet, and the mapping must be waiting when they do.</para>
+        /// </summary>
+        private void PublishChannelOverrides(ConversionResult? result, string? mzdashPath)
+        {
+            var overrides = result?.Report.ChannelOverrides;
+            if (_plugin == null || overrides == null || overrides.Count == 0) return;
+            if (string.IsNullOrEmpty(mzdashPath)) return;
+
+            try
+            {
+                var profile = _plugin.DashProfileStore.ParseMzdash(mzdashPath!);
+                if (profile == null)
+                {
+                    MozaLog.Warn("[AZOM] DjsonImport: converted dashboard did not re-parse; "
+                               + "channel overrides not stored");
+                    return;
+                }
+
+                string dashKey = DashboardProfileStore.GetDashboardKey(mzdashPath, profile);
+                foreach (var o in overrides)
+                {
+                    if (IsCm2Target)
+                    {
+                        _plugin.ChannelMapping.Set(o.Url, o.Source,
+                            MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
+                    }
+                    else
+                    {
+                        _plugin.ChannelMapping.Set(o.Url, o.Source, pageGuid: null, fixedDashKey: dashKey);
+                    }
+                }
+
+                MozaLog.Info($"[AZOM] DjsonImport: stored {overrides.Count} channel override(s) "
+                           + $"for '{dashKey}'");
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] DjsonImport: could not store channel overrides: {ex}");
+            }
         }
 
         private void StudioCreate_Click(object sender, RoutedEventArgs e)

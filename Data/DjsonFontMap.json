@@ -61,6 +61,31 @@
     "Consolas": "0Arame",
     "LCDMono": "0Arame",
     "Courier New": "0Arame",
-    "Lucida Console": "0Arame"
+    "Lucida Console": "0Arame",
+    "CPMono_v07 Plain": "0Arame",
+    "CPMono_v07 Bold": "0Arame",
+    "CPMono_v07 Light": "0Arame",
+    "CPMono": "0Arame",
+
+    "Bahnschrift": "League Gothic",
+    "Bahnschrift Condensed": "League Gothic",
+    "Bahnschrift SemiCondensed": "League Gothic",
+    "Roboto Condensed": "League Gothic",
+
+    "Microsoft JhengHei": "Source Han Sans CN",
+    "Microsoft JhengHei UI": "Source Han Sans CN",
+    "Microsoft YaHei": "Source Han Sans CN",
+    "SimSun": "Source Han Sans CN",
+    "PingFang SC": "Source Han Sans CN",
+    "Noto Sans CJK SC": "Source Han Sans CN",
+
+    "Monkirta Pursuit NC": "Furore",
+    "911 Porscha": "Big John",
+    "Arial Edit": "Roboto",
+    "Arial Narrow": "League Gothic",
+    "Impact": "Big John",
+    "Bebas Neue": "League Gothic",
+    "Orbitron": "Furore",
+    "Rajdhani": "Aileron"
   }
 }

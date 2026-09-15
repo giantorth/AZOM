@@ -18,10 +18,10 @@ using Newtonsoft.Json.Linq;
 // ("W17 Display", "S09 Display", ...). Worth using: a CM2 is 1280x720, the same 16:9 most
 // SimHub dashboards are authored at, where the 780x248 wheel screens can only fill ~57%.
 //
-// <input> is a .djson file or a directory searched recursively. Converting a whole
-// directory is the corpus smoke test: it is what catches the Newtonsoft "$values" wrapper,
-// the WhereEnumerableIterator $type leak, and missing .ressources archives, none of which
-// show up on a single hand-picked dashboard.
+// <input> is a .djson file, a .simhubdash bundle, or a directory searched recursively for
+// both. Converting a whole directory is the corpus smoke test: it catches the Newtonsoft
+// "$values" wrapper, the WhereEnumerableIterator $type leak, and missing .ressources
+// archives, none of which show up on a single hand-picked dashboard.
 //
 // Exit code 0 when every file converted, 1 when any failed — so it works as a CI gate.
 
@@ -32,7 +32,7 @@ internal static class Program
         if (args.Length < 2)
         {
             Console.Error.WriteLine(
-                "usage: djson-convert <input.djson|dir> <output-dir> "
+                "usage: djson-convert <input.djson|.simhubdash|dir> <output-dir> "
                 + "[--telemetry <Telemetry.json>] [--display <productType>] [--quiet]");
             return 2;
         }
@@ -77,13 +77,19 @@ internal static class Program
 
         var inputs = new List<string>();
         if (Directory.Exists(input))
-            inputs.AddRange(Directory.GetFiles(input, "*.djson", SearchOption.AllDirectories).OrderBy(p => p));
+        {
+            inputs.AddRange(Directory.GetFiles(input, "*.djson", SearchOption.AllDirectories));
+            inputs.AddRange(Directory.GetFiles(input, "*.simhubdash", SearchOption.AllDirectories));
+            inputs.Sort(StringComparer.OrdinalIgnoreCase);
+        }
         else
+        {
             inputs.Add(input);
+        }
 
         if (inputs.Count == 0)
         {
-            Console.Error.WriteLine($"no .djson files under '{input}'");
+            Console.Error.WriteLine($"no .djson or .simhubdash files under '{input}'");
             return 2;
         }
 
@@ -174,7 +180,10 @@ internal static class Program
             if (s is not JObject o) continue;
             string url = (string?)o["url"] ?? "";
             if (url.Length == 0) continue;
-            rows.Add(new ChannelRow(url, (string?)o["simhub_property"] ?? ""));
+            rows.Add(new ChannelRow(url,
+                                    (string?)o["simhub_property"] ?? "",
+                                    (string?)o["compression"] ?? "",
+                                    (int?)o["package_level"] ?? 0));
         }
         return rows;
     }

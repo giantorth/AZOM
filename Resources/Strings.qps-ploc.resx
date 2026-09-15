@@ -777,9 +777,9 @@
   <data name="Title_DjsonImport" xml:space="preserve"><value>Fetch SimHub Woof-board</value></data>
   <data name="Button_ImportSimHubDash" xml:space="preserve"><value>FETCH SIMHUB DASH…</value></data>
   <data name="Tooltip_ImportSimHubDash" xml:space="preserve"><value>Turn a SimHub .djson woof-board into a MOZA .mzdash</value></data>
-  <data name="Button_PickDjson" xml:space="preserve"><value>SNIFF OUT .DJSON…</value></data>
+  <data name="Button_PickDjson" xml:space="preserve"><value>SNIFF OUT A FILE…</value></data>
   <data name="Button_Convert" xml:space="preserve"><value>FETCH IT</value></data>
-  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub woof-boards (*.djson)|*.djson|Every last file (*.*)|*.*</value></data>
+  <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub woof-boards (*.djson;*.simhubdash)|*.djson;*.simhubdash|Every last file (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Conversion flopped: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% of widgets buried in the yard</value></data>
 </root>

@@ -169,6 +169,11 @@ namespace MozaPlugin.UI.DjsonImport
     {
         public string Name { get; set; } = "";
         public List<IrNode> Screens { get; } = new List<IrNode>();
+
+        /// <summary>Index of the page the wheel should open on. SimHub marks its screens
+        /// as in-game / idle / pit; the in-game one is what a driver expects to see, and
+        /// it is often not the first in the file.</summary>
+        public int DefaultScreen { get; set; }
         /// <summary>mzdash <c>imageResources</c> — <c>MD5/&lt;md5&gt;.&lt;ext&gt;</c> paths.</summary>
         public List<string> ImageResources { get; } = new List<string>();
     }

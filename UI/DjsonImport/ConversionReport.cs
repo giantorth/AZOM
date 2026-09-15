@@ -57,6 +57,11 @@ namespace MozaPlugin.UI.DjsonImport
         public SortedSet<string> Channels { get; } =
             new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>Channels borrowed to carry a SimHub value that has none of its own.
+        /// The host must publish these as per-dashboard channel mappings, or the widgets
+        /// bound to them read nothing.</summary>
+        public List<ChannelAllocation> ChannelOverrides { get; } = new List<ChannelAllocation>();
+
         public int ConvertedCount => Items.Count(i => i.Outcome == ItemOutcome.Converted);
         public int SubstitutedCount => Items.Count(i => i.Outcome == ItemOutcome.Substituted);
         public int DroppedCount => Items.Count(i => i.Outcome == ItemOutcome.Dropped);
@@ -114,14 +119,44 @@ namespace MozaPlugin.UI.DjsonImport
                             + ")");
             }
             sb.AppendLine($"items      : {Summary()}");
-            sb.AppendLine($"channels   : {Channels.Count}");
+            sb.AppendLine($"channels   : {Channels.Count}"
+                        + (ChannelOverrides.Count > 0
+                            ? $" ({ChannelOverrides.Count} fed from SimHub)" : ""));
             sb.AppendLine();
+
+            if (Channels.Count == 0 && TotalCount > 0)
+            {
+                sb.AppendLine("This dashboard reads NO telemetry — every widget renders its");
+                sb.AppendLine("design-time value. See the dropped formulas below.");
+                sb.AppendLine();
+            }
+
+            if (ChannelOverrides.Count > 0)
+            {
+                sb.AppendLine("Channels fed from SimHub");
+                sb.AppendLine(new string('-', 60));
+                sb.AppendLine("  These properties have no MOZA channel, so a spare channel is");
+                sb.AppendLine("  borrowed and the plugin publishes SimHub's value on it.");
+                foreach (var o in ChannelOverrides)
+                    sb.AppendLine($"  {o.Url}  @{o.PackageLevel}ms  <-  {Truncate(o.Source)}");
+                sb.AppendLine();
+            }
 
             if (Notes.Count > 0)
             {
+                // Collapse repeats: a dashboard built on a SimHub plugin can emit the same
+                // note hundreds of times, burying the one-off notes that actually matter.
                 sb.AppendLine("Notes");
                 sb.AppendLine(new string('-', 60));
-                foreach (var n in Notes) sb.AppendLine($"  {n}");
+                var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                var order = new List<string>();
+                foreach (var n in Notes)
+                {
+                    if (!seen.ContainsKey(n)) { seen[n] = 0; order.Add(n); }
+                    seen[n]++;
+                }
+                foreach (var n in order)
+                    sb.AppendLine(seen[n] > 1 ? $"  {seen[n]}x  {n}" : $"  {n}");
                 sb.AppendLine();
             }
 
@@ -159,6 +194,9 @@ namespace MozaPlugin.UI.DjsonImport
 
             return sb.ToString();
         }
+
+        private static string Truncate(string s)
+            => s.Length <= 90 ? s.Replace("\n", " ") : s.Substring(0, 87).Replace("\n", " ") + "...";
 
         private static void AppendCounts(StringBuilder sb, string title, Dictionary<string, int> map)
         {

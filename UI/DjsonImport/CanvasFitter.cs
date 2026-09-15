@@ -4,73 +4,135 @@ using System.Collections.Generic;
 namespace MozaPlugin.UI.DjsonImport
 {
     /// <summary>
-    /// Rescales each screen onto the wheel's canvas.
+    /// Rescales a dashboard onto the wheel's canvas.
     ///
-    /// <para>SimHub dashboards are mostly 1280x720 (16:9); the wheel is 780x248 (3.15:1).
-    /// Nothing makes those aspect ratios agree, so the fit is <b>uniform</b> — scale by
-    /// <c>min(sx, sy)</c> and centre — which keeps circles round and text proportioned at
-    /// the cost of leaving side gutters. A 16:9 source ends up using about 57% of the
-    /// canvas; the user finishes the layout in Dashboard Studio.</para>
+    /// <para>The transform is derived from the source's <b>declared</b> canvas
+    /// (<c>BaseWidth</c>/<c>BaseHeight</c>) and applied <b>identically to every screen</b>.
+    /// Both of those matter:</para>
     ///
-    /// <para>The fit is computed from each screen's actual content bounding box rather than
-    /// the declared <c>BaseWidth</c>/<c>BaseHeight</c>. It is never worse — an empty margin
-    /// costs nothing to discard — and on dashboards whose content occupies a band it is
-    /// much better (one stock screen goes from 56% to 94% canvas use).</para>
+    /// <list type="bullet">
+    /// <item>The declared canvas is the frame the author composed against. Fitting each
+    /// screen to its own content instead looks appealing — it fills more of the wheel —
+    /// but it silently rescales and re-centres every page differently, so nothing lines
+    /// up between pages, and it is wrecked by the off-canvas elements SimHub dashboards
+    /// routinely park outside the frame (one stock dashboard reaches y=-91 and x=808 on
+    /// an 800x268 canvas, dragging a faithful 0.93 fit down to 0.55).</item>
+    /// <item>One shared transform keeps a multi-page dashboard coherent: a header drawn at
+    /// the same coordinates on every page still lands in the same place.</item>
+    /// </list>
+    ///
+    /// <para>Aspect ratio is preserved, so a source that does not match the wheel's ratio
+    /// leaves gutters rather than distorting. Content outside the declared canvas stays
+    /// outside it — that is where the author put it.</para>
     /// </summary>
     public static class CanvasFitter
     {
-        /// <summary>The W17/W18 dashboard canvas, and the value in all 24 factory
+        /// <summary>The W17/W18/W20 dashboard canvas, and the value in all 24 factory
         /// dashboards examined. Passed through rather than hard-coded at the call sites so
         /// a different display family is a parameter change, not a code change.</summary>
         public const int WheelWidth = 780;
         public const int WheelHeight = 248;
 
-        /// <summary>Fit every screen and record the scale used for each.</summary>
+        /// <summary>
+        /// Fit the dashboard onto <paramref name="canvasWidth"/> x
+        /// <paramref name="canvasHeight"/>.
+        /// </summary>
+        /// <param name="sourceWidth">The source's declared canvas width. Zero or negative
+        /// falls back to the union of every screen's content.</param>
         public static void Fit(IrDashboard dashboard, int canvasWidth, int canvasHeight,
+                               double sourceWidth, double sourceHeight,
                                ConversionReport report)
         {
-            foreach (var screen in dashboard.Screens)
+            double frameX = 0, frameY = 0;
+            double frameW = sourceWidth, frameH = sourceHeight;
+
+            if (frameW <= 0 || frameH <= 0)
             {
-                double scale = FitScreen(screen, canvasWidth, canvasHeight);
-                report.ScreenFitScales.Add(scale);
+                var bounds = UnionContentBounds(dashboard);
+                if (bounds == null)
+                {
+                    report.Notes.Add("nothing to lay out — no positioned elements");
+                    return;
+                }
+                (frameX, frameY, double maxX, double maxY) = bounds.Value;
+                frameW = maxX - frameX;
+                frameH = maxY - frameY;
+                report.Notes.Add(
+                    "source declares no canvas size — fitted to the content bounds instead");
             }
 
-            // The screen itself always fills the canvas exactly.
+            if (frameW <= 0 || frameH <= 0) return;
+
+            double scale = Math.Min(canvasWidth / frameW, canvasHeight / frameH);
+            double offsetX = (canvasWidth - frameW * scale) / 2.0;
+            double offsetY = (canvasHeight - frameH * scale) / 2.0;
+
             foreach (var screen in dashboard.Screens)
             {
+                foreach (var child in screen.Children)
+                    Transform(child, scale, frameX, frameY, offsetX, offsetY);
+
                 screen.X = 0;
                 screen.Y = 0;
                 screen.Width = canvasWidth;
                 screen.Height = canvasHeight;
+
+                report.ScreenFitScales.Add(scale);
             }
+
+            ReportOffCanvas(dashboard, canvasWidth, canvasHeight, report);
         }
 
-        private static double FitScreen(IrNode screen, int canvasWidth, int canvasHeight)
+        /// <summary>
+        /// Scale and translate a subtree: <c>out = (in - origin) * scale + offset</c>.
+        ///
+        /// <para>Also used for widget inlining, where a referenced dashboard is drawn into
+        /// a host rectangle and so needs the same treatment one level down.</para>
+        /// </summary>
+        public static void Transform(IrNode node, double scale,
+                                     double originX, double originY,
+                                     double offsetX, double offsetY)
         {
-            var bounds = ContentBounds(screen);
-            if (bounds == null) return 1.0;
+            // A layer has no geometry of its own on the wheel, but its children do — and
+            // Repetitions has already been expanded into their absolute coordinates.
+            if (node.Kind != IrKind.Layer)
+            {
+                node.X = (node.X - originX) * scale + offsetX;
+                node.Y = (node.Y - originY) * scale + offsetY;
+                node.Width *= scale;
+                node.Height *= scale;
 
-            var (minX, minY, maxX, maxY) = bounds.Value;
-            double w = maxX - minX;
-            double h = maxY - minY;
-            if (w <= 0 || h <= 0) return 1.0;
+                node.BorderWidth *= scale;
+                node.BorderRadius *= scale;
+                ScaleBorder(node.Border, scale);
+                ScaleEffect(node.Effect, scale);
 
-            double scale = Math.Min(canvasWidth / w, canvasHeight / h);
+                if (node.Text != null)
+                {
+                    node.Text.FontSize *= scale;
+                    node.Text.PaddingTop *= scale;
+                    node.Text.PaddingBottom *= scale;
+                    node.Text.PaddingLeft *= scale;
+                    node.Text.PaddingRight *= scale;
+                }
 
-            // Centre what is left over, so the gutters are even rather than all on one side.
-            double offsetX = (canvasWidth - w * scale) / 2.0;
-            double offsetY = (canvasHeight - h * scale) / 2.0;
+                // Gauge min/max/value are data, not geometry — only the stroke scales.
+                if (node.Gauge != null)
+                    node.Gauge.StrokeThickness *= scale;
+            }
 
-            foreach (var child in screen.Children)
-                Apply(child, scale, minX, minY, offsetX, offsetY);
-
-            return scale;
+            foreach (var c in node.Children)
+                Transform(c, scale, originX, originY, offsetX, offsetY);
         }
 
-        /// <summary>The bounding box of everything that will actually render.
-        /// Layers are skipped: they carry no geometry in mzdash and their <c>.djson</c>
-        /// Left/Top is only a bounding box of the children already counted here.</summary>
-        private static (double minX, double minY, double maxX, double maxY)? ContentBounds(IrNode root)
+        /// <summary>Scale a subtree in place about its own origin, for widget inlining.</summary>
+        public static void ScaleAndOffset(IrNode node, double scale, double offsetX, double offsetY)
+            => Transform(node, scale, 0, 0, offsetX, offsetY);
+
+        /// <summary>The bounding box of everything that will actually render, across every
+        /// screen. Layers are skipped: they carry no geometry in mzdash.</summary>
+        private static (double minX, double minY, double maxX, double maxY)? UnionContentBounds(
+            IrDashboard dashboard)
         {
             double minX = double.MaxValue, minY = double.MaxValue;
             double maxX = double.MinValue, maxY = double.MinValue;
@@ -91,42 +153,39 @@ namespace MozaPlugin.UI.DjsonImport
                 foreach (var c in node.Children) Walk(c, v);
             }
 
-            Walk(root, true);
+            foreach (var screen in dashboard.Screens) Walk(screen, true);
             return any ? (minX, minY, maxX, maxY) : ((double, double, double, double)?)null;
         }
 
-        private static void Apply(IrNode node, double s, double minX, double minY,
-                                  double offsetX, double offsetY)
+        /// <summary>Count what ends up outside the visible canvas. Some of it is deliberate
+        /// — SimHub dashboards park alternates off-frame — but a large number usually means
+        /// the source was authored for a taller screen.</summary>
+        private static void ReportOffCanvas(IrDashboard dashboard, int width, int height,
+                                            ConversionReport report)
         {
-            // A layer has no geometry of its own on the wheel, but its children do — and
-            // Repetitions has already been expanded into their absolute coordinates.
-            if (node.Kind != IrKind.Layer)
+            int outside = 0, total = 0;
+
+            void Walk(IrNode node, bool visible)
             {
-                node.X = (node.X - minX) * s + offsetX;
-                node.Y = (node.Y - minY) * s + offsetY;
-                node.Width *= s;
-                node.Height *= s;
-
-                node.BorderWidth *= s;
-                node.BorderRadius *= s;
-                ScaleBorder(node.Border, s);
-                ScaleEffect(node.Effect, s);
-
-                if (node.Text != null)
+                bool v = visible && node.Visible;
+                if (v && node.Kind != IrKind.Layer && node.Kind != IrKind.Screen
+                    && node.Width > 0 && node.Height > 0)
                 {
-                    node.Text.FontSize *= s;
-                    node.Text.PaddingTop *= s;
-                    node.Text.PaddingBottom *= s;
-                    node.Text.PaddingLeft *= s;
-                    node.Text.PaddingRight *= s;
+                    total++;
+                    if (node.X + node.Width <= 0 || node.Y + node.Height <= 0
+                        || node.X >= width || node.Y >= height)
+                        outside++;
                 }
-
-                // Gauge min/max/value are data, not geometry — only the stroke scales.
-                if (node.Gauge != null)
-                    node.Gauge.StrokeThickness *= s;
+                foreach (var c in node.Children) Walk(c, v);
             }
 
-            foreach (var c in node.Children) Apply(c, s, minX, minY, offsetX, offsetY);
+            foreach (var screen in dashboard.Screens) Walk(screen, true);
+
+            if (outside > 0)
+            {
+                report.Notes.Add($"{outside} of {total} visible elements sit outside the "
+                               + "canvas — they were off-frame in the source too");
+            }
         }
 
         private static void ScaleBorder(IrBorder b, double s)

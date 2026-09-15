@@ -60,17 +60,33 @@
       "(function(){var r=CH(v1/gameData/Rpm),m=CH(v1/gameData/MaxRpm);return (isNaN(r)||isNaN(m)||m<=0)?NaN:r/m*100;})()"
   },
 
+  "string_valued": {
+    "_comment": [
+      "Properties whose value is TEXT. The channels the converter can borrow for an",
+      "unmapped property are all numeric, so these must never be allocated one — the",
+      "value would coerce to 0 and render as a garbage number. They are dropped and",
+      "reported instead. All 23 string channels in Telemetry.json already carry a",
+      "simhub_property, so there is nothing to lend."
+    ],
+
+    "DataCorePlugin.GameData.SpeedLocalUnit": "unit label",
+    "DataCorePlugin.GameData.TyrePressureUnit": "unit label",
+    "DataCorePlugin.GameData.CarClass": "text",
+    "DataCorePlugin.GameData.CarModel": "text",
+    "DataCorePlugin.GameData.PlayerName": "text",
+    "DataCorePlugin.GameData.SessionTypeName": "text",
+    "DataCorePlugin.GameData.Flag_Name": "text",
+    "DataCorePlugin.CustomExpression.CurrentDateTime": "formatted clock text"
+  },
+
   "unmappable": {
     "_comment": [
-      "Documented dead ends — no channel exists and none is derivable. Listed so the",
-      "conversion report can say WHY a binding was dropped instead of just 'unknown'.",
-      "These need the plugin-side NCalc fallback (claim a spare catalog channel and put",
-      "the expression in MozaProfile.TelemetryChannelMappings), which is out of scope."
+      "Documented dead ends — no channel of their own. Listed so the conversion report",
+      "can say WHY rather than just 'unknown'. With channel allocation enabled these are",
+      "still carried over SimHub on a borrowed channel; the note explains the cost."
     ],
 
     "DataCorePlugin.GameData.OilTemperature": "no oil-temperature channel in Telemetry.json",
-    "DataCorePlugin.GameData.SpeedLocalUnit": "unit label, not a telemetry value",
-    "DataCorePlugin.GameData.TyrePressureUnit": "unit label, not a telemetry value",
     "DataCorePlugin.GameData.CarSettings_RPMRedLineReached": "no redline-threshold channel",
     "DataCorePlugin.GameData.CarSettings_RedLineReached": "no redline-threshold channel",
     "DataCorePlugin.GameData.CarSettings_RedLineDisplayedPercent": "no redline-threshold channel",

@@ -74,10 +74,54 @@ namespace MozaPlugin.UI.DjsonImport
         public bool WriteReportFile { get; set; } = true;
 
         /// <summary>
+        /// Let properties with no MOZA channel borrow a spare one, with SimHub publishing
+        /// the value. On by default: SimHub has the data for almost every property a
+        /// dashboard reads, so dropping those widgets loses content for no reason.
+        ///
+        /// <para>The caller must apply <see cref="ConversionReport.ChannelOverrides"/> as
+        /// per-dashboard channel mappings — without that the borrowed channels carry their
+        /// factory meaning and the widgets read the wrong thing.</para>
+        /// </summary>
+        public bool AllowChannelAllocation { get; set; } = true;
+
+        /// <summary>
         /// Convert one dashboard into <c>&lt;outputRoot&gt;/&lt;name&gt;/&lt;name&gt;.mzdash</c>,
         /// with its images under that folder's <c>Resource/MD5/</c>.
+        ///
+        /// <para>Accepts either a bare <c>.djson</c> or a <c>.simhubdash</c> bundle; the
+        /// bundle is expanded to a temporary folder and converted from there, so widget
+        /// includes and <c>.ressources</c> archives resolve as siblings exactly as they
+        /// would in a SimHub install.</para>
         /// </summary>
-        public ConversionResult Convert(string djsonPath, string outputRoot)
+        public ConversionResult Convert(string sourcePath, string outputRoot)
+        {
+            if (!SimhubDashBundle.IsBundle(sourcePath)) return ConvertDjson(sourcePath, outputRoot);
+
+            var bundleResult = new ConversionResult();
+            SimhubDashBundle? bundle = null;
+            try
+            {
+                bundle = SimhubDashBundle.Open(sourcePath, bundleResult.Report);
+            }
+            catch (Exception ex)
+            {
+                bundleResult.Error = $"could not open bundle: {ex.Message}";
+                MozaLog.Warn($"[AZOM] DjsonImport: bundle '{Path.GetFileName(sourcePath)}' failed: {ex}");
+                return bundleResult;
+            }
+
+            using (bundle)
+            {
+                var result = ConvertDjson(bundle.MainDjsonPath, outputRoot);
+                // Carry the bundle's own notes across and report the real source, not the
+                // temporary folder the conversion actually read.
+                result.Report.Notes.InsertRange(0, bundleResult.Report.Notes);
+                result.Report.SourcePath = sourcePath;
+                return result;
+            }
+        }
+
+        private ConversionResult ConvertDjson(string djsonPath, string outputRoot)
         {
             var result = new ConversionResult();
             var report = result.Report;
@@ -114,7 +158,30 @@ namespace MozaPlugin.UI.DjsonImport
 
             try
             {
+                // Each conversion gets a clean allocation pool — borrowings are recorded
+                // per dashboard, so one dashboard's must not leak into the next.
+                _channels.ResetAllocations();
+
                 var images = ResourceExtractor.Extract(djsonPath, outputDir, StudioImageRoot, report);
+
+                // Pass 1, allocation off: learn which channels the dashboard reads for
+                // their own meaning. Those are reserved so pass 2 can lend out any other
+                // float channel without ever handing back one that is already in use.
+                // Mapping is pure apart from the images already extracted, so running it
+                // twice costs only parse time and removes the ceiling a
+                // borrow-only-unmapped-channels pool would impose.
+                if (AllowChannelAllocation)
+                {
+                    _channels.AllocationEnabled = false;
+                    var probeReport = new ConversionReport();
+                    var probe = new DjsonToIr(
+                        new BindingTranslator(_channels, new NCalcToJs(_channels), probeReport),
+                        _fonts, probeReport, images.ByName, sourceDir);
+                    probe.Convert(root, name);
+                    _channels.ReserveDirect(probeReport.Channels);
+                }
+
+                _channels.AllocationEnabled = AllowChannelAllocation;
 
                 var translator = new BindingTranslator(_channels, new NCalcToJs(_channels), report);
                 var mapper = new DjsonToIr(translator, _fonts, report, images.ByName, sourceDir);
@@ -129,7 +196,16 @@ namespace MozaPlugin.UI.DjsonImport
                     return result;
                 }
 
-                CanvasFitter.Fit(dashboard, CanvasWidth, CanvasHeight, report);
+                report.ChannelOverrides.AddRange(_channels.Allocations);
+                if (_channels.AllocationEnabled && _channels.AvailableChannels == 0
+                    && report.UnresolvedProperties.Count > 0)
+                {
+                    report.Notes.Add("every spare channel is in use — the remaining "
+                                   + "unresolved properties were dropped");
+                }
+
+                CanvasFitter.Fit(dashboard, CanvasWidth, CanvasHeight,
+                                 report.SourceWidth, report.SourceHeight, report);
 
                 var writer = new MzdashWriter();
                 var document = writer.Build(
