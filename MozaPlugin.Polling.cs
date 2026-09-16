@@ -173,6 +173,14 @@ namespace MozaPlugin
             try { NudgeRoutedMBoosterProbes(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe nudge: {ex.Message}"); }
 
+            // Pedal-haptics: a lane per connected pipe, then resolve outstanding
+            // probes, retire dead lanes and probe one new candidate port. Both
+            // calls are idempotent, so this simply re-runs every tick.
+            try { EnsureRoutedPedalHapticsLane(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Routed lane: {ex.Message}"); }
+            try { _pedalHapticsRegistry?.Refresh(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Refresh: {ex.Message}"); }
+
             // Standalone pedals/handbrake on their own ports (enumeration-
             // only, same device-source gate as the other dedicated lanes).
             if (deviceSourceLive)

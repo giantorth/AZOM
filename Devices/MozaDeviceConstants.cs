@@ -28,6 +28,10 @@ namespace MozaPlugin.Devices
         // user added under the old definition keeps routing to the base extension
         // until they re-add the model-named device.
         public const string BaseAmbientGuid   = "b8361c60-1bbd-4497-8cb4-af5df7db7251";
+        // Three-channel pedal vibration unit (bus device 0x1F). One fixed identity:
+        // the unit has no model variants to key on, and no identity traffic in any
+        // capture to learn one from.
+        public const string PedalHapticsGuid  = "f0d7c700-21e5-413d-9e43-e04239c8224c";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -283,6 +287,10 @@ namespace MozaPlugin.Devices
         /// <summary>Returns true if the DeviceTypeID is a wheelbase device — either a
         /// per-model definition or the legacy shared "MOZA Wheel Base" identity.</summary>
         public static bool IsBaseDevice(string deviceTypeId) => GetBaseModelPrefix(deviceTypeId) != null;
+
+        /// <summary>Returns true if the DeviceTypeID is the pedal-haptics unit.</summary>
+        public static bool IsPedalHapticsDevice(string deviceTypeId) =>
+            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, PedalHapticsGuid);
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>

@@ -31,6 +31,7 @@ expected to stay in sync.
 | `0x0023` | Shifter     | SGP                           | confirmed   |
 | `0x0024` | Stalks      | MOZA Stalks                   | confirmed   |
 | `0x0025` | Dashboard   | CM2 Racing Dash               | confirmed   |
+| `0x002F` | PedalHaptics| S12 pedal vibration           | confirmed   |
 | `0x1000` | Ab9         | AB9 active shifter            | confirmed   |
 | `0x1002` | Ab9         | AB6 active shifter            | confirmed   |
 
@@ -73,6 +74,7 @@ CDC device.
 | `Stalks`    | *(none — recognised so neither wheelbase nor AB9 probes it; the plugin reads it over **HID only**, see [`../../../Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs))* | *(none — but the device **does** have a CDC surface: identity groups, heartbeat, `0x0E`, and a ~1 Hz group `0x4C` read. See [`../open-questions.md`](../open-questions.md) § Group `0x4C`)* |
 | `Hub`       | **Hub-only (no base):** the primary `Wheelbase` `MozaSerialConnection` claims the hub port (its filter admits hub PIDs) and runs the full wheel/session/telemetry pipeline there. **Base + hub both present:** the base stays the primary (the registry walk prefers a `Wheelbase`-category port) and a dedicated [`MozaHubDeviceManager`](../../../Devices/MozaHubDeviceManager.cs) claims the hub port to enumerate its peripherals (pedals/handbrake/port-power) in parallel. The `_activePorts` guard stops the dedicated connection from re-opening a hub the primary already holds. | Primary: `MozaProbeTarget.BaseAndHub`. Dedicated: `MozaProbeTarget.HubOnly` (single `0x64` hub probe), registry-only (probe fallback force-disabled). The post-session `0xE4` reply from `hub-port1-power` calls `MarkHubDetected()` to set `HubProbeSucceeded` for [`TelemetrySender`](../../../Telemetry/TelemetrySender.cs)'s 5-slot enumeration burst (primary pipe only). |
 | `Dashboard` | Dedicated `MozaSerialConnection` filtered to dashboard PIDs only (`0x0025`), separate from the wheelbase connection so a standalone CM2 works alongside a base | Registry direct-claims the dashboard port by PID (no probe scan); screen telemetry / config writes address `dev_id=0x12` (CM2 bridge/main). A CM2 *behind* a wheelbase has no own port and is the dash sub-device at `dev_id=0x14` on the wheelbase connection. |
+| `PedalHaptics` | [`PedalHapticsDeviceController`](../../../Devices/PedalHaptics/PedalHapticsDeviceController.cs) (multi-device under [`MozaPedalHapticsRegistry`](../../../Devices/PedalHaptics/MozaPedalHapticsRegistry.cs)), one dedicated connection per S12 plugged straight into the PC, addressed `0x12`. A unit behind a base/hub has no port of its own and is reached on that pipe through the extended envelope (`0x1F` + extended id `0x1E`) instead. See [`pedal-haptics.md`](pedal-haptics.md). | `MozaProbeTarget.PedalHaptics` — registry-only, claimed by PID; probe fallback force-disabled, so this never writes scan bytes to a port it was not handed. |
 | `Unknown`   | Both `Wheelbase` and `Ab9` connections accept unknown PIDs as fallback    | Each runs its own probe; the first matching response wins             |
 
 ## Discovery path

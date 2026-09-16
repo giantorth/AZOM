@@ -20,7 +20,7 @@ namespace MozaPlugin.Devices.Extensions
     /// (fresh deploy or stale-rewrite); the caller is expected to flip its
     /// "restart SimHub" flag on a true result.
     /// </summary>
-    internal static class DeviceDefinitionDeployer
+    internal static partial class DeviceDefinitionDeployer
     {
         private const string DashCm2Resource = "MozaPlugin.Devices.DashCm2.device.json";
         private const string DashCm1Resource = "MozaPlugin.Devices.DashCm1.device.json";

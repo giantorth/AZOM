@@ -151,6 +151,9 @@ local REQ_GROUPS = {
 
     [0x46] = "E-Stop: Status Poll",
 
+    -- Pedal haptics (dev 0x1F). Effect write, echoed verbatim on 0xCD.
+    [0x4D] = "S12: Vibration Command",
+
     -- Shifter (dev 0x1A)
     [0x51] = "Shifter: Settings Read",
     [0x52] = "Shifter: Settings Write",
@@ -192,6 +195,9 @@ local REQ_DEVICES = {
     [0x1C] = "E-Stop",
     [0x1D] = "Reserved/mBooster2",
     [0x1E] = "Reserved/mBooster3",
+    -- 0x1F is not a bus device id but the extended-addressing form: the real
+    -- destination follows as a one-byte extended id. Named for readability.
+    [0x1F] = "Extended(S12)",
 }
 
 local DEVICE_NAMES = {}
@@ -579,6 +585,21 @@ local MB_EFFECTS = {
     [9] = "Road Texture",
 }
 
+-- S12 pedal ids. Note the physical ports are silkscreened CLUTCH / BRAKE /
+-- THROTTLE left to right, which is the REVERSE of the id order; brake is the
+-- middle either way.
+local PH_PEDALS = { [1] = "throttle", [2] = "brake", [3] = "clutch" }
+
+-- Effect slots. Nine per pedal, all concurrent. The names are the game events
+-- each slot represents; the firmware plays whatever parameters it is handed.
+local PH_SLOTS = {
+    [0] = "TC", [1] = "ABS", [2] = "Lockup", [3] = "BrakeThreshold",
+    [4] = "EngineVibration", [5] = "ClutchBitePoint", [6] = "GearShift",
+    [7] = "WheelSlip", [8] = "RoadTexture",
+}
+
+local PH_SUBCMDS = { [1] = "set", [2] = "query" }
+
 -- LFE effect ids (Protocol/MozaBaseLfeProtocol.cs, group 0x2D cmd 0x77)
 local LFE_EFFECTS = { [0] = "gearshift", [1] = "engine", [2] = "abs" }
 
@@ -588,8 +609,12 @@ local LFE_EFFECTS = { [0] = "gearshift", [1] = "engine", [2] = "abs" }
 --   0x35/0x36 CM1 keyed value stream (payload = [key u16 BE][f32 BE] * N)
 --   0x42 FSR1 display push (payload = [type][b1][b2][00][00][data])
 --   0x43 handled entirely by decode_43 (opcode, keepalive, or wrapped identity)
+--   0x4D S12 vibration; decode_pedal_haptics names every field, and on the
+--        extended envelope the first payload byte is the extended id, so a
+--        generic prefix read would label "1e01" as a command it is not
 local NO_CMD_ID = {
     [0x00] = true, [0x35] = true, [0x36] = true, [0x42] = true, [0x43] = true,
+    [0x4D] = true,
 }
 
 -- ─── Proto fields ───────────────────────────────────────────────────────────
@@ -675,6 +700,15 @@ local pf = {
     mb_param1   = ProtoField.uint8 ("moza.mb.param1",    "Param1",          base.DEC),
     mb_freq     = ProtoField.uint16("moza.mb.freq",      "Frequency (BE raw)", base.DEC),
     mb_amp      = ProtoField.uint16("moza.mb.amp",       "Amplitude (BE raw)", base.DEC),
+
+    -- Pedal haptics (0x4D, cmd 1E 01)
+    ph_sub      = ProtoField.uint8 ("moza.ph.sub",       "Sub-command",     base.HEX, PH_SUBCMDS),
+    ph_pedal    = ProtoField.uint8 ("moza.ph.pedal",     "Pedal",           base.DEC, PH_PEDALS),
+    ph_slot     = ProtoField.uint8 ("moza.ph.slot",      "Effect Slot",     base.DEC, PH_SLOTS),
+    ph_enable   = ProtoField.uint8 ("moza.ph.enable",    "Enable",          base.DEC),
+    ph_duration = ProtoField.uint16("moza.ph.duration",  "Duration (BE, ms)", base.DEC),
+    ph_freq     = ProtoField.uint16("moza.ph.freq",      "Frequency (BE, Hz)", base.DEC),
+    ph_strength = ProtoField.uint16("moza.ph.strength",  "Strength (BE)",   base.DEC),
 
     -- FSR1 group 0x42
     fsr_type    = ProtoField.uint8 ("moza.fsr1.type",    "Record Type",     base.HEX, FSR1_TYPES),
@@ -1156,6 +1190,48 @@ local function decode_mbooster(tvb, t, off, n)
         :append_text(string.format("  (%.1f%%)", am / 65535.0 * 100.0))
 end
 
+-- Group 0x4D — S12 vibration command, echoed on 0xCD.
+-- Protocol/MozaPedalHapticsProtocol.cs, docs/protocol/devices/pedal-haptics.md
+--
+-- Two envelopes carry the same 11-byte payload. A unit on its own USB port is
+-- addressed 0x12 with length 0x0B; one reached through another device's pipe is
+-- addressed 0x1F followed by extended id 0x1E, which counts toward the length
+-- (0x0C) and shifts every payload byte one place right.
+--
+-- `off` points at the first payload byte the caller found, i.e. past the
+-- extended id when there is one, so this decoder is envelope-agnostic.
+local function decode_pedal_haptics(tvb, t, off, n, extended)
+    local avail = n - (extended and 1 or 0)
+    if avail < 11 then
+        if n > 0 then t:add(pf.data, tvb(off, n)) end
+        return
+    end
+
+    local sub  = tvb(off + 1, 1):uint()
+    local slot = tvb(off + 3, 1):uint()
+
+    t:add(pf.ph_sub,      tvb(off + 1, 1))
+    t:add(pf.ph_pedal,    tvb(off + 2, 1))
+    t:add(pf.ph_slot,     tvb(off + 3, 1))
+    t:add(pf.ph_enable,   tvb(off + 4, 1))
+    t:add(pf.ph_duration, tvb(off + 5, 2))
+
+    -- Slot 8 reuses the frequency field for an integer suspension position.
+    local freq = tvb(off + 7, 2):uint()
+    local fi = t:add(pf.ph_freq, tvb(off + 7, 2))
+    if slot == 8 then
+        fi:append_text(string.format("  (suspension position %d, not Hz)", freq))
+    end
+
+    local strength = tvb(off + 9, 2):uint()
+    t:add(pf.ph_strength, tvb(off + 9, 2))
+        :append_text(string.format("  (%.1f%% of full scale)", strength / 65535.0 * 100.0))
+
+    if sub == 2 then
+        t:append_text("  [query: enable/duration/frequency/strength are the reply's state]")
+    end
+end
+
 -- Groups 0x3F / 0x40 — wheel config, LED live path
 local function decode_wheel_cfg(tvb, t, off, n)
     if n < 1 then return false end
@@ -1517,6 +1593,14 @@ local function parse_frames(tvb, pinfo, tree)
                             decode_cm1(ftvb, ftree, payload_off, n)
                         elseif bg == 0x24 and ftvb(payload_off, 1):uint() == 0xB1 then
                             decode_mbooster(ftvb, ftree, payload_off, n)
+                        elseif bg == 0x4D and n >= 11 then
+                            -- Extended envelope: address 0x1F/0xF1 puts a one-byte
+                            -- extended id before the payload. Detect it on the
+                            -- address, not on the payload, so an id that happens to
+                            -- equal a payload byte cannot confuse the split.
+                            local ph_ext = (device == 0x1F or device == 0xF1)
+                            decode_pedal_haptics(ftvb, ftree,
+                                payload_off + (ph_ext and 1 or 0), n, ph_ext)
                         elseif bg == 0x3F or bg == 0x40 or bg == 0x3E then
                             handled = decode_wheel_cfg(ftvb, ftree, payload_off, n)
                         elseif bg == 0x41 then

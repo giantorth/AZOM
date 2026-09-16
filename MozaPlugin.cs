@@ -102,6 +102,8 @@ namespace MozaPlugin
         // while the base IS the primary — gated on PrimaryBoundToHub.
         private MozaBaseDeviceManager _baseManager = null!;
         private MozaMBoosterRegistry? _mboosterRegistry;
+        // Pedal-haptics units (bus device 0x1F). See MozaPlugin.PedalHaptics.cs.
+        private Devices.PedalHaptics.MozaPedalHapticsRegistry? _pedalHapticsRegistry;
         // Dedicated lane for peripherals plugged STRAIGHT into the PC (their own
         // USB port + PID) rather than through a base/hub — one connection per
         // attached pedal set / handbrake. Config/calibration only; axes stay HID.

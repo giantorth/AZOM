@@ -139,9 +139,10 @@ touch session lifecycle, test a game switch explicitly.
 | `Protocol/` | Serial transport only: `MozaSerialConnection` (threads, framing, 0x7E stuffing, write lanes), `MozaPortDiscovery` (device enumeration, registry + sysfs sources), `WineHost`/`LinuxUsbEnumerator`/`WineComNameResolver`/`WineDevicePathMozaPort`/`WineNativeExec` (Wine/Proton discovery + transport + native-exec), `MozaUsbIds` (PID inventory), `MozaCommandDatabase` (200+ commands), `MozaResponseParser`, `MozaProtocol` (constants/checksums), `MozaHidReader`, `PendingResponseTracker`, `WriteBudget`, `ConnectionFailure` |
 | `Devices/` | Connection + detection: `DeviceProber`, `DeviceDetectionState`, `ConnectionCoordinator`, `MozaDeviceManager` (per-connection read/write API), the per-lane `Moza{Base,Hub,Dashboard,Ab9}DeviceManager`, standalone-peripheral registry/controller, `WheelModelInfo`, `MozaDeviceConstants`, `GearshiftDetector`, `StandbyCoordinator` |
 | `Devices/MBooster/` | mBooster subsystem: `MBoosterDeviceController`, `MBoosterEffectWorker`, `MBoosterEffectSynthesizer`, `MBoosterTypes`, `MozaMBoosterRegistry`, `MBoosterCalibrationRunner` (the travel + motor calibration routines; owned by the registry because both soft-reboot the pedal and outlive its controller) |
+| `Devices/PedalHaptics/` | S12 pedal-vibration subsystem (group `0x4D`): `PedalHapticsDeviceController`, `PedalHapticsEffectWorker` (one 50 Hz thread covering all 27 channels — 3 pedals x 9 effect slots — round-robin under a per-tick frame budget — ShakeIt does the synthesis, so unlike the mBooster there is nothing per-pedal to parallelize), `MozaPedalHapticsRegistry` (USB lanes by PID `0x002F`, plus speculative routed lanes for a unit behind a base/hub) |
 | `Devices/Led/` | SimHub LED integration: `Moza{,Dash,Base}LedDeviceManager`, `LedDriverInjection`, `SimHubLedCompat`, `UploadProgressLedBar` |
-| `Devices/Haptics/` | Host-rendered haptics loops: `Ab9EngineVibrationWorker`, `BaseLfeEffectWorker`, `EngineVibrationMath`; plus `MozaBaseHapticsBridge` (the wheelbase device's ShakeIt Haptics section) |
-| `Devices/Extensions/` | SimHub device-extension plumbing: `Moza{Wheel,Dash,Base}DeviceExtension` + their `*ExtensionSettings`, `DeviceDefinitionDeployer`, `MozaDeviceExtensionFilter` |
+| `Devices/Haptics/` | Host-rendered haptics loops: `Ab9EngineVibrationWorker`, `BaseLfeEffectWorker`, `EngineVibrationMath`; plus the two ShakeIt Haptics-section bridges, `MozaBaseHapticsBridge` (wheelbase LFE) and `MozaPedalHapticsBridge` (pedal haptics) |
+| `Devices/Extensions/` | SimHub device-extension plumbing: `Moza{Wheel,Dash,Base,PedalHaptics}DeviceExtension` + their `*ExtensionSettings`, `DeviceDefinitionDeployer` (+ `.PedalHaptics` partial), `MozaDeviceExtensionFilter` |
 | `Devices/Ui/` | Per-device WPF pages: `Moza{Wheel,Dash,Base}SettingsControl`, the shared `DashboardManagementControl` / `DashboardFilesControl`, channel-mapping rows, `WheelUiHelpers` |
 | `Devices/StalksTruckSim/` | Truck-sim stalk controller + action mapping |
 | `Telemetry/` | Dashboard telemetry pipeline: `TelemetrySender` (orchestrator, split into partials) + `DashboardBindingCoordinator`, `DualDisplayCoordinator`, `Fsr1Cm1MappingCoordinator`, `ChannelMappingCoordinator`, `SimHubPropertyResolver`, `RetryBackoff` |
@@ -162,7 +163,7 @@ touch session lifecycle, test a game switch explicitly.
 | `Data/` | `Telemetry.json` — 400+ channel definitions (URL, compression, package_level, default `simhub_property`/`simhub_scale`) |
 | `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`). **Frozen path** — see [Paths that can't move](#paths-that-cant-move) |
 | `docs/` | This guide, protocol reference (`docs/protocol/`), SimHub internals notes (`simhub.md`), capture workflow (`usb-capture.md`), MOZA Dashboard Studio CLI integration (`dashboard-studio.md`) |
-| `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …). Capture dir comes from `MOZA_TRACE_DIR` |
+| `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …) plus the no-capture emitter checks (`cmd-frame`, `pedal-haptics-frame-check`) and `dissector-selftest.lua`. Capture dir comes from `MOZA_TRACE_DIR` |
 | _(moved out)_ | The Python wheel/device emulator + USB-gadget bridge rig now lives in its own project: [giantorth/moza-simulator](https://github.com/giantorth/moza-simulator) |
 | `libs/SimHub/` | Reference-only SimHub DLLs, auto-updated by CI |
 
@@ -189,6 +190,7 @@ extracting a collaborator.
   | `.ChannelMapping.cs` | property-resolver forwarders and the NCalc formula plumbing |
   | `.Diagnostics.cs` | display-running predicates + the read-only diagnostics surface |
   | `.Haptics.cs` | LFE test triggers + the ShakeIt channel bridge |
+  | `.PedalHaptics.cs` | Pedal-haptics registry surface: routed-lane registration, definition deploy on detect, the ShakeIt per-channel post path |
   | `.Shims.cs` | the remaining forwarder facade to extracted collaborators |
 
 - **`Telemetry/TelemetrySender`** (telemetry orchestrator): `.cs` (fields, ctor, `Rebind`, `Dispose`, nested `TierState`), `.Lifecycle.cs` (`Start`/`StartInner`/`Stop`), `.Tick.cs` (the timer loop and per-tick emitters), `.CatalogSync.cs` (resync probe, subscription growth, post-switch convergence), `.Subscription.cs`, `.Profile.cs`, `.Sessions.cs`, `.DashCommands.cs`, `.Library.cs` (configJson + library sync), `.Session09.cs`, `.DeviceLog.cs`, `.Frames.cs`.

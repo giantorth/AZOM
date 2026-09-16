@@ -555,6 +555,15 @@ namespace MozaPlugin
                 try { _mboosterRegistry.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Initial refresh: {ex.Message}"); }
 
+                // Pedal-haptics registry — owns routed lanes handed over by the
+                // device prober plus any USB unit it discovers by probe. Same
+                // initial-walk reasoning as the mBooster above.
+                _pedalHapticsRegistry = new Devices.PedalHaptics.MozaPedalHapticsRegistry(
+                    isShuttingDown: () => IsShuttingDown);
+                _pedalHapticsRegistry.DeviceDetected += OnPedalHapticsDeviceDetected;
+                try { _pedalHapticsRegistry.Refresh(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Initial refresh: {ex.Message}"); }
+
                 // Standalone-peripheral registry — one dedicated connection per
                 // pedal set / handbrake plugged directly into the PC. Refresh()
                 // runs on the reconnect timer; the initial walk is deferred to

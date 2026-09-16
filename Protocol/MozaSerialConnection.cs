@@ -136,6 +136,10 @@ namespace MozaPlugin.Protocol
         // MozaStandalonePeripheralRegistry controller. Registry-only like the
         // pedals/handbrake targets; no probe-emission branch is wired.
         ShifterOnly,
+        // S12 pedal vibration module. Registry-only like the targets above: the
+        // port is claimed by PID (0x002F), so the generic probe fallback stays
+        // disabled and this never writes scan bytes to a port it was not handed.
+        PedalHaptics,
     }
 
     public class MozaSerialConnection : IDisposable
